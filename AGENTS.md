@@ -1,5 +1,11 @@
 # AGENTS.md
 
+* Original セクション以降にある英語文よりこのセクションの日本語による指示を優先せよ
+* このリポジトリはフォークされている
+* かならず日本語で応答すること
+
+# Original
+
 DeepSeek Harness is an all-plugin Cordis agent harness. Read [docs/architecture.md](docs/architecture.md) before changing `packages/`; follow [docs/AGENTS.md](docs/AGENTS.md) for documentation.
 
 ## Pre-stable APIs and released Session data
