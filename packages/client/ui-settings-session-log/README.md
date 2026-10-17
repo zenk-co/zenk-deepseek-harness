@@ -1,69 +1,69 @@
 ---
-description: "Control Session-log upload with DeepSeek API requests from General settings."
+description: "全般設定から DeepSeek API リクエスト時のセッションログアップロードを制御する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-settings-session-log
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use **Upload Session Log when using the official model API** above the version number in **Settings → General** to control Session-log upload with DeepSeek API requests. The switch shows the accepted Host setting and saves each change immediately. It appears only while the Host exposes the upload setting; read-only clients cannot change it.
+**設定 → 全般** のバージョン番号の上にある **Upload Session Log when using the official model API** を使って、DeepSeek API リクエスト時のセッションログアップロードを制御する。スイッチは受け入れ済みの Host 設定を表示し、変更はすぐに保存される。Host がアップロード設定を公開している間のみ表示され、読み取り専用クライアントでは変更できない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [関連情報](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と将来の課題](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-The Web bundle mounts this companion. Its switch edits the Host plugin's `enabled` field through the shared configuration form. A save failure keeps the accepted value and shows a toast that survives closing Settings. See [Session-log upload](../../session/session-log-deepseek/README.md#configuration) for request timing, resumed uploads, and the separate OpenTelemetry setting.
+Web バンドルはこのコンパニオンをマウントする。そのスイッチは共有設定フォーム経由で Host プラグインの `enabled` フィールドを編集する。保存の失敗は受け入れ済み値を保持し、設定を閉じても残るトーストを表示する。リクエストのタイミング、再開時のアップロード、個別の OpenTelemetry 設定については [セッションログアップロード](../../session/session-log-deepseek/README.md#configuration) を参照すること。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation details — click to expand</summary>
+<summary>実装の詳細 — クリックして展開</summary>
 
-The companion contributes a `settings.general.item` row while `session-log-deepseek` is served and a `shell.overlay` toast for mutation outcomes. The shared form owns persistence and reconnect synchronization; the companion owns only pending-write state and localized notices.
+このコンパニオンは、`session-log-deepseek` がサーブされている間に `settings.general.item` 行と、変更結果通知用の `shell.overlay` トーストを提供する。永続化と再接続の同期は共有フォームが所有し、コンパニオンは保留中の書き込み状態とローカライズ済み通知のみを所有する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 関連情報
 
-- [Settings forms](../ui-settings/README.md) — accepted Host values and ordered writes.
-- [Session-log upload](../../session/session-log-deepseek/README.md) — request contribution and acceptance tracking.
-- [Web Client](../../../docs/subsystems/web-client.md) — plugin composition and settings placement.
+- [設定フォーム](../ui-settings/README.md) — 受け入れ済み Host 値と順序付き書き込み。
+- [セッションログアップロード](../../session/session-log-deepseek/README.md) — リクエストへの寄与と受け入れ追跡。
+- [Web クライアント](../../../docs/subsystems/web-client.md) — プラグイン構成と設定の配置。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this browser preference contributes no model-visible content.
+なし。このブラウザー設定はモデル可視コンテンツを提供しないためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; the setting controls request metadata outside model input.
+なし。この設定はモデル入力の外側の要求メタデータを制御する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と将来の課題
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- The row is unavailable when the Host does not expose the `session-log-deepseek` namespace.
+- Host が `session-log-deepseek` 名前空間を公開していない場合、この行は利用できない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
-None.
+なし。

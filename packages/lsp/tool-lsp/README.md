@@ -1,179 +1,179 @@
 ---
-description: "The model-facing lsp tool: four read-only code-navigation operations with one-based UTF-16 cursor coordinates, bounded results, and hover text, for users and maintainers composing model code navigation."
+description: "モデルに面する lsp ツール: 1 始まりの UTF-16 カーソル座標、境界付きの結果、ホバーテキストを備えた 4 つの読み取り専用コードナビゲーション操作。モデルのコードナビゲーションを構成するユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-lsp
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-tool-lsp` lets a model navigate code through one read-only `lsp` tool: open a symbol's definition, find references and implementations, or read hover documentation. Requests use one-based UTF-16 line and character positions. Navigation results are bounded, grouped by file, and labeled when locations are omitted or text is truncated; hover results are normalized and distinguish missing information from errors. The package requires a configured LSP provider and a session workspace root. Choose it when textual search is ambiguous or a change needs precise symbol relationships; ordinary navigation should continue to use `search` and `read`.
+`dsh-tool-lsp` は、1 つの読み取り専用 `lsp` ツールを通じてモデルがコードをナビゲートできるようにする: シンボルの定義を開き、参照と実装を見つけ、ホバードキュメントを読む。リクエストは 1 始まりの UTF-16 の行と文字の位置を使用する。ナビゲーション結果は境界付きでファイルごとにグループ化され、位置が省略されたりテキストが切り詰められたりした場合はラベル付けされる。ホバー結果は正規化され、情報の欠落とエラーを区別する。このパッケージには設定済みの LSP プロバイダーとセッションのワークスペースルートが必要である。テキスト検索が曖昧な場合や、変更に正確なシンボル関係が必要な場合に選択する。通常のナビゲーションは引き続き `search` と `read` を使うべきである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Queries use the Session's current working directory as their workspace root. Changing directory affects subsequent queries without changing an already running server's root.
+クエリは Session の現在の作業ディレクトリをワークスペースルートとして使用する。ディレクトリを変更すると、すでに実行中のサーバーのルートを変更せずに、後続のクエリに影響する。
 
-An agent uses `lsp` when textual matches are ambiguous or before a change that needs precise definitions, implementations, or references; the tool's prompt guidance tells it to prefer `search`/`read` for ordinary navigation.
+エージェントは、テキストの一致が曖昧な場合、または正確な定義、実装、参照が必要な変更の前に `lsp` を使用する。ツールのプロンプトガイダンスは、通常のナビゲーションには `search`/`read` を優先するよう指示する。
 
-### The tool
+### ツール
 
-`lsp` takes `operation` (`goToDefinition`, `findReferences`, `goToImplementation`, or `hover`), `file_path`, `line`, and `character`. `line` and `character` are positive one-based UTF-16 cursor coordinates; an off-symbol position may return no results. `findReferences` always includes the declaration, so impact analysis never misses the defining site. Provider choice, language id, workspace root, limits, timeout, and executable stay outside model input.
+`lsp` は `operation`(`goToDefinition`、`findReferences`、`goToImplementation`、または `hover`)、`file_path`、`line`、`character` を取る。`line` と `character` は正の 1 始まりの UTF-16 カーソル座標であり、シンボルから外れた位置は結果を返さないことがある。`findReferences` は常に宣言を含むため、影響分析が定義箇所を見逃すことはない。プロバイダーの選択、言語 id、ワークスペースルート、制限、タイムアウト、実行可能ファイルはモデル入力の外にとどまる。
 
-### What the model gets back
+### モデルが受け取るもの
 
-Navigation returns `path:line:character` locations grouped by file (one-based); hover returns normalized text or a no-hover notice. Empty locations and no hover are successful no-result responses. Results are capped first by `maxLocations` and then by `maxResultChars`, with omission and truncation markers inside the complete cap; the caps affect only presentation, not the canonical result value.
+ナビゲーションはファイルごとにグループ化された `path:line:character` の位置(1 始まり)を返し、ホバーは正規化されたテキストまたはホバーなしの通知を返す。空の位置とホバーなしは成功した結果なし応答である。結果はまず `maxLocations` で、次に `maxResultChars` で上限が課され、省略と切り詰めのマーカーは完全な上限の内側に含まれる。上限は表示にのみ影響し、正規の結果値には影響しない。
 
-### Configuration
+### 設定
 
-| Key | Default | Meaning |
+| キー | デフォルト | 意味 |
 |---|---|---|
-| `maxLocations` | `100` | Largest number of rendered locations before an omission marker |
-| `maxResultChars` | `16000` | Largest complete rendered result, including truncation metadata |
-| `timeoutMs` | `60000` | Tool-call timeout budget enforced by `dsh-tool-call-timeout-policy`; covers the complete queued open/query/close lifecycle and is not model-configurable |
+| `maxLocations` | `100` | 省略マーカーの前に描画される位置の最大数 |
+| `maxResultChars` | `16000` | 切り詰めメタデータを含む、完全に描画された結果の最大サイズ |
+| `timeoutMs` | `60000` | `dsh-tool-call-timeout-policy` が強制するツール呼び出しのタイムアウト予算。キューに入れられた open/query/close ライフサイクル全体をカバーし、モデルからは設定できない |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-lsp) is the exhaustive source for every accepted field.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-lsp)が、受け付けられるすべてのフィールドの網羅的なソースである。
 
-### Failures and recovery
+### 失敗と回復
 
-The tool requires an Agent Session; a non-agent call fails with `LSP_WORKSPACE_REQUIRED` before any query. The working-directory service supplies and validates its current root. When no provider handles the file's extension, the query fails with `LSP_UNAVAILABLE`; malformed provider payloads remain structured `LSP_MALFORMED_RESPONSE` errors. These surface to the model as error tool results it can read and route on.
+このツールは Agent Session を必要とし、エージェント以外の呼び出しはクエリの前に `LSP_WORKSPACE_REQUIRED` で失敗する。作業ディレクトリサービスが現在のルートを提供して検証する。ファイルの拡張子を処理するプロバイダーがない場合、クエリは `LSP_UNAVAILABLE` で失敗する。不正な形式のプロバイダーペイロードは構造化された `LSP_MALFORMED_RESPONSE` エラーのままである。これらはモデルが読んでルーティングできるエラーツール結果として表面化する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the tool and where the code realizes them; observable behavior is covered in [Use this package](#use-this-package).
+このセクションでは、ツールの背後にある設計判断と、コードがそれらをどこで実現するかを説明する。観察可能な動作は[このパッケージの使い方](#use-this-package)で扱う。
 
-### Design notes
+### 設計ノート
 
-- **Consumer-only.** The tool runtime-injects only `tools`, `lsp`, and `systemPrompt`, imports no provider, and passes only `exec.signal` to the seam.
-- **Coordinate conversion.** `parseLspArgs` validates that `line` and `character` are positive integers and converts them to the seam's zero-based positions; rendered locations convert back to one-based form.
-- **Canonical result passthrough.** The tool returns the seam's closed union (`{ kind: 'locations', locations, resolvedWorkspaceUri }` or `{ kind: 'hover', hover }`) so native renderers can inspect every acquired location and zero-based range directly.
-- **Execution-world URI rendering.** `renderUri` resolves a `file:` URI against the provider's canonical workspace URI — workspace-relative inside it, URI-derived absolute outside it, verbatim when malformed or not `file:` — never applying host-platform path rules to the session cwd.
-- **Caps after rendering.** `maxLocations` bounds the item count first, then `maxResultChars` bounds the complete rendered text including its omission or truncation marker.
-- **Generic search-card presentation.** `presentLspCall` renders a `{ card: 'generic', kind: 'search', title, locations: [{ path, line }] }` view; the args-derived title carries the operation and one-based cursor, and follow-along focuses the queried line while the title preserves the column.
+- **コンシューマーのみ。** ツールは実行時に `tools`、`lsp`、`systemPrompt` のみを注入し、プロバイダーをインポートせず、シームには `exec.signal` のみを渡す。
+- **座標変換。** `parseLspArgs` は `line` と `character` が正の整数であることを検証し、シームの 0 始まりの位置に変換する。描画される位置は 1 始まりの形式に変換し戻される。
+- **正規結果のパススルー。** ツールはシームの閉じたユニオン(`{ kind: 'locations', locations, resolvedWorkspaceUri }` または `{ kind: 'hover', hover }`)を返すため、ネイティブレンダラーが取得されたすべての位置と 0 始まりの範囲を直接検査できる。
+- **実行ワールドの URI 描画。** `renderUri` は `file:` URI をプロバイダーの正規ワークスペース URI に対して解決する(その内側ではワークスペース相対、外側では URI 由来の絶対、不正な形式または `file:` でない場合はそのまま)。セッションの cwd にホストプラットフォームのパス規則を適用することは決してない。
+- **描画後の上限。** `maxLocations` がまず項目数を制限し、次に `maxResultChars` が省略または切り詰めのマーカーを含む完全な描画テキストを制限する。
+- **汎用検索カードの表示。** `presentLspCall` は `{ card: 'generic', kind: 'search', title, locations: [{ path, line }] }` ビューを描画する。引数由来のタイトルは操作と 1 始まりのカーソルを運び、フォローアロングはクエリされた行にフォーカスし、タイトルは列を保持する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config schema, tool registration, system-prompt section, execution |
-| [`src/render.ts`](src/render.ts) | Pure formatting, coordinate conversion, URI resolution, result caps, UI presentation |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: 設定スキーマ、ツール登録、システムプロンプトセクション、実行 |
+| [`src/render.ts`](src/render.ts) | 純粋なフォーマット、座標変換、URI 解決、結果の上限、UI 表示 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the model-facing surface to the seam and the provider.
+パッケージレベルのコントラクトでは足りない場合にこれらのページを読む。モデルに面するサーフェスからシームとプロバイダーへと進む。
 
-- [LSP navigation subsystem](../../../docs/subsystems/lsp.md) — operations, coordinates, requests and results, and `LspError` codes.
-- [dsh-lsp](../lsp/README.md) — the seam this tool queries.
-- [dsh-lsp-stdio](../lsp-stdio/README.md) — the stdio provider that answers these queries.
-- [lsp group map](../README.md) — the three-package family and its related documentation.
+- [LSP ナビゲーションサブシステム](../../../docs/subsystems/lsp.md) — 操作、座標、リクエストと結果、`LspError` コード。
+- [dsh-lsp](../lsp/README.md) — このツールがクエリするシーム。
+- [dsh-lsp-stdio](../lsp-stdio/README.md) — これらのクエリに応答する stdio プロバイダー。
+- [lsp グループマップ](../README.md) — 3 パッケージのファミリーとその関連ドキュメント。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-One system-prompt section (first-party order 2200) positions LSP as a precision aid with the following text:
+1 つのシステムプロンプトセクション(ファーストパーティ順序 2200)が、次のテキストで LSP を精度の補助として位置付ける:
 
-##### Verbatim guidance
+##### 逐語ガイダンス
 
 ```markdown
 Use search/read for ordinary navigation. Use lsp when textual matches are ambiguous or before a change requires precise definitions, implementations, or references. Positions are one-based line and character (UTF-16) at the cursor; an off-symbol position may return no results. findReferences always includes the declaration.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Fixed guidance cost on every request while the plugin is active.
+プラグインがアクティブな間、すべてのリクエストで固定のガイダンスコスト。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the plugin scope and guidance text are unchanged; activation or disposal may invalidate reuse from this section.
+プラグインスコープとガイダンステキストが変わらない間はプレフィックス安定。アクティベーションまたは破棄により、このセクションからの再利用が無効になる可能性がある。
 
-### Tool schema
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The model sees the generated [`lsp` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-lsp).
+モデルは生成された [`lsp` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-lsp)を見る。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost on every request while enabled; the `timeoutMs` budget is never sent to the model.
+有効な間、すべてのリクエストで固定のスキーマコスト。`timeoutMs` 予算がモデルに送られることはない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the visible tool definition and order are unchanged; registration lifecycle or scoped restrictions may invalidate reuse from the first changed schema token.
+可視のツール定義と順序が変わらない間はプレフィックス安定。登録ライフサイクルまたはスコープ制限により、最初に変わったスキーマトークンからの再利用が無効になる可能性がある。
 
-### Results
+### 結果
 
-#### What the model sees
+#### モデルが見るもの
 
-File-grouped `path:line:character` location lines or normalized hover text, capped first by `maxLocations` and then by `maxResultChars`; omission and truncation markers are included inside the complete character cap. These caps affect only Native/model presentation, not the canonical value. Empty results use distinct `No results.` / `No hover information.` lines.
+ファイルごとにグループ化された `path:line:character` の位置行、または正規化されたホバーテキスト。まず `maxLocations`、次に `maxResultChars` で上限が課される。省略と切り詰めのマーカーは完全な文字数上限の内側に含まれる。これらの上限は Native/モデル表示にのみ影響し、正規の値には影響しない。空の結果は別個の `No results.` / `No hover information.` 行を使用する。
 
-#### Token effect
+#### トークンへの影響
 
-Capped per tool result by `maxResultChars`, with `maxLocations` additionally bounding navigation item count.
+ツール結果ごとに `maxResultChars` で上限が課され、`maxLocations` がさらにナビゲーションの項目数を制限する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Tool results append after the cached request prefix and do not directly invalidate it.
+ツール結果はキャッシュされたリクエストプレフィックスの後に追加され、それを直接無効化しない。
 
-### UI presentation
+### UI 表示
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing. The client renders a generic search card — `{ card: 'generic', kind: 'search', title, locations: [{ path, line }] }` — whose args-derived title carries the operation and one-based cursor; follow-along focuses the queried line while the title preserves the column.
+なし。クライアントは汎用検索カード — `{ card: 'generic', kind: 'search', title, locations: [{ path, line }] }` — を描画し、その引数由来のタイトルは操作と 1 始まりのカーソルを運ぶ。フォローアロングはクエリされた行にフォーカスし、タイトルは列を保持する。
 
-#### Token effect
+#### トークンへの影響
 
-Zero direct token effect because rendering is client-side only.
+描画はクライアント側のみであるため、直接のトークンへの影響はゼロ。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; UI presentation is outside the model request.
+なし。UI 表示はモデルリクエストの外側である。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the tool is a poor fit. They are current package constraints, not a task backlog.
+これらの制限は、このツールが適さない状況を定義する。現在のパッケージの制約であり、タスクのバックログではない。
 
-- **UTF-16 cursor coordinates** — columns are exact for the protocol but hard for a model to count around non-BMP characters; an off-symbol position may return empty results, so the prompt explains the convention without encouraging broad LSP use.
-- **No cross-server completeness promise** — supported servers may return empty or partial results depending on indexing readiness; the tool promises no completeness across languages or servers.
+- **UTF-16 カーソル座標** — 列はプロトコルにとって正確だが、モデルが非 BMP 文字の周囲で数えるのは難しい。シンボルから外れた位置は空の結果を返すことがあるため、プロンプトは広範な LSP 利用を促すことなく慣習を説明する。
+- **サーバー間の完全性の約束はなし** — サポートされるサーバーはインデックスの準備状況に応じて空または部分的な結果を返すことがある。ツールは言語やサーバーをまたぐ完全性を約束しない。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

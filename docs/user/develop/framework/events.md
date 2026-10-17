@@ -1,12 +1,12 @@
-# Event system
+# イベント機構
 
-English | [中文](events.zh.md)
+日本語 | [English](events.en.md) | [中文](events.zh.md)
 
-Events are the core communication mechanism between Cordis plugins. Harness uses them extensively for loosely coupled extension points.
+イベントは Cordis プラグイン間の中心的な通信機構である。Harness は疎結合な拡張点としてそれらを広く使う。
 
-## Basic use
+## 基本的な使い方
 
-### Listen for an event
+### イベントを待ち受ける
 
 ```ts ignore-check
 ctx.on('event-name', (payload) => {
@@ -14,19 +14,19 @@ ctx.on('event-name', (payload) => {
 })
 ```
 
-### Emit an event
+### イベントを発する
 
 ```ts ignore-check
 ctx.emit('event-name', payload)
 ```
 
-## Event modes
+## イベント様式
 
-Cordis provides several event modes for different interaction contracts.
+Cordis は異なる相互作用契約向けに複数のイベント様式を提供する。
 
-### emit — broadcast
+### emit — 放送
 
-Every listener runs synchronously and return values are ignored:
+全リスナーが同期に走り、戻り値は無視される。
 
 ```ts ignore-check
 // Emit
@@ -38,9 +38,9 @@ ctx.on('my-plugin/ready', ({ id }) => {
 })
 ```
 
-### bail — short circuit
+### bail — 短絡
 
-Listeners run in order; the first result other than `null`, `false`, or `undefined` becomes the final result:
+リスナーは順に走り、`null`、`false`、`undefined` 以外の最初の結果が最終結果になる。
 
 ```ts ignore-check
 // Dispatch
@@ -53,17 +53,17 @@ ctx.on('some-check', (input) => {
 })
 ```
 
-### serial — ordered execution
+### serial — 順序実行
 
-Listeners run in registration order and asynchronous results are awaited. The first result other than `null`, `false`, or `undefined` stops further execution:
+リスナーは登録順に走り、非同期結果は待機される。`null`、`false`、`undefined` 以外の最初の結果が後続の実行を止める。
 
 ```ts ignore-check
 await ctx.serial('setup-phase', context)
 ```
 
-### waterfall — pipeline
+### waterfall — 管路
 
-Each listener may wrap the downstream result to form a processing chain. A listener **must call `next()` to delegate downstream**; omitting the call short-circuits the pipeline:
+各リスナーは下流結果を包んで処理連鎖を形作れる。リスナーは下流へ委ねるために **`next()` を呼ばなければならない**。呼び出しの省略は管路を短絡する。
 
 ```ts ignore-check
 // Dispatch
@@ -77,12 +77,12 @@ ctx.on('my-plugin/transform', async (_input, next) => {
 ```
 
 ::: warning
-A waterfall listener **must call `next()`**. Omitting it short-circuits the pipeline by design, enabling interception and gateway behavior.
+waterfall リスナーは **`next()` を呼ばなければならない**。省略は設計どおり管路を短絡し、横取りと門番動作を可能にする。
 :::
 
-## Typed events
+## 型付きイベント
 
-Harness uses TypeScript declaration merging for type-safe events:
+Harness は型安全なイベントのために TypeScript 宣言マージを使う。
 
 ```ts
 import '@deepseek-ai/cordis'
@@ -99,15 +99,15 @@ declare module '@deepseek-ai/cordis' {
 // are now inferred correctly.
 ```
 
-## Cordis events and session records
+## Cordis イベントとセッション記録
 
-Harness Cordis events use `namespace/action` names, including `agent/pre-step`, `agent/request`, `agent/request-error`, `tools/result`, and `session/event`. The generated `cordis-surface` regions on the [subsystem pages](../../../subsystems/core.md) record complete signatures and modes.
+Harness Cordis イベントは `agent/pre-step`、`agent/request`、`agent/request-error`、`tools/result`、`session/event` を含む `namespace/action` 名を使う。生成済み `cordis-surface` 領域が[サブシステムページ](../../../subsystems/core.md)に完全な署名と様式を記録する。
 
-`turn/*`, `step/*`, `tool/call`, `tool/result`, and `compaction/*` are durable session-event types, not same-named Cordis events. To observe them, listen to `session/event` and inspect `event.type`.
+`turn/*`、`step/*`、`tool/call`、`tool/result`、`compaction/*` は同名 Cordis イベントではなく durable なセッションイベント型である。それらを観測するには `session/event` を待ち受けて `event.type` を調べる。
 
-## Event listeners are effects
+## イベントリスナーはエフェクトである
 
-A listener registered with `ctx.on()` is removed automatically when its plugin unloads:
+`ctx.on()` で登録したリスナーは所有プラグインのアンロード時に自動的に外される。
 
 ```ts ignore-check
 export function apply(ctx: Context) {
@@ -116,9 +116,9 @@ export function apply(ctx: Context) {
 }
 ```
 
-## Example: logging plugin
+## 例: 記録プラグイン
 
-This plugin logs tool calls and results:
+このプラグインはツール呼び出しと結果を記録する。
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -137,7 +137,7 @@ export function apply(ctx: Context) {
 }
 ```
 
-## Next steps
+## 次の手順
 
-- [Capability layering](../practice/index.md) — understand events within capability interfaces
-- [LLM adapters](../practice/llm-adapter.md) — implement a complete LLM backend
+- [ケイパビリティ層化](../practice/index.md) — ケイパビリティ界面の中でイベントを理解する
+- [LLM アダプター](../practice/llm-adapter.md) — 完全な LLM バックエンドを実装する

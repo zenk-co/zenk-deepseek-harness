@@ -5,31 +5,31 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-session-format-v0-to-v1
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package restores released v0 Session JSONL by decoding each physical row and producing the shared-layout v1 format. It preserves validated headers and events apart from changing version 0 to version 1, while applying only the finite legacy normalizations accepted by v0 persistence. Malformed or unsupported historical records fail migration before the current restorer runs, with the source retained for recovery. The migration accepts only the frozen first-party event inventory and does not publish or select later format migrations.
+このパッケージは各物理行を復号し、共有レイアウト v1 形式を生成して、リリース済み v0 セッション JSONL を復元します。バージョン 0 をバージョン 1 に変えるほかは検証済みヘッダーとイベントを保持し、v0 永続化が受け付けた有限の legacy 正規化のみ適用します。不正または未対応の履歴記録は現行 restorer 実行前に移行失敗となり、回復用にソースを保持します。移行は凍結ファーストパーティーイベント目録のみ受け付け、以後の形式移行の公開や選択はしません。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-### When to use it
+### 利用すべき場面
 
-Persistence obtains this edge through `dsh-session-format-catalog`; feature compositions do not mount it. Import it directly only when assembling or testing the static released-format catalog.
+永続化は `dsh-session-format-catalog` 経由でこのエッジを取得します。機能構成はマウントしません。静的リリース形式カタログの組立てや試験時のみ直接インポートします。
 
-### Entry point
+### エントリーポイント
 
 ```text
 const decoder = releasedV0SessionFormatCodec.createDecoder(physicalHeader, 'recoverable')
@@ -40,21 +40,21 @@ stage.transformEvent(event, migrationContext)
 const targetInheritedEventCount = stage.finish(migrationContext)
 ```
 
-`releasedV0SessionFormatCodec` reads the exact v0 header and physical rows, including packed Assistant deltas and range-encoded source-event references. Its decoder emits either a scalar event or a codec-owned compact run through `emitEvent()` and `emitRun()`. `sessionFormatV0ToV1` creates one stateful stage per restore; the static catalog connects that decoder and stage so migration does not retain a physical-row array. `releasedV1SessionFormatCodec` exposes the same row-at-a-time decoder for the v1 physical layout without freezing the ordinary event vocabulary.
+`releasedV0SessionFormatCodec` はパック済みアシスタントデルタと範囲符号化ソースイベント参照を含め、正確な v0 ヘッダーと物理行を読みます。そのデコーダーは `emitEvent()` と `emitRun()` 経由でスカラーイベントまたはコーデック所有のコンパクト実行のいずれかを送出します。`sessionFormatV0ToV1` は restore ごとに 1 つの状態付きステージを作成します。静的カタログはそのデコーダーとステージを接続するため、移行は物理行配列を保持しません。`releasedV1SessionFormatCodec` は通常イベント語彙を凍結せず、v1 物理レイアウト向けに同じ行単位デコーダーを公開します。
 
-The alpha edge refuses every event type outside its frozen inventory, including an unknown event marked `ignorable: true`. It also refuses unexpected payload members. `tool/result.meta` and nested PTC `arguments` remain explicit opaque JSON fields and are preserved without Session-sequence interpretation. Unknown content-block `type`, message-source `kind`, assistant finish-reason `kind`, and `turn/end` reason `kind` arms remain owner-opaque JSON while their known arms receive structural validation.
+alpha エッジは凍結目録外のすべてのイベント型を拒否し、`ignorable: true` 印の不明イベントも含みます。予期しないペイロードメンバーも拒否します。`tool/result.meta` と入れ子 PTC `arguments` は明示の不透明 JSON フィールドのまま残り、セッション列解釈なしに保持されます。不明のコンテンツブロック `type`、メッセージソース `kind`、アシスタント終了理由 `kind`、`turn/end` 理由 `kind` アームは所有者不透明 JSON のまま残り、既知アームは構造検証を受けます。
 
-The bounded historical normalizers convert `steering/message` to `user/message`, rename `compact/*` events to `compaction/*`, remove `turn/start.trigger`, convert retired `turn/end` reasons, add current message wrappers and deterministic ids for legacy messages, retry chains, and compaction groups, and remove the obsolete `request/header.header.messagePrefix` duplicate. Retired `request/header-delta`, `mode/set`, and the `request/header` fallback reason refuse migration. No other event, reference, source, or payload fact may change.
+有界の履歴正規化器は `steering/message` を `user/message` に変換し、`compact/*` イベントを `compaction/*` に改名し、`turn/start.trigger` を除去し、引退 `turn/end` 理由を変換し、legacy メッセージ、再試行チェーン、コンパクション群に現行メッセージラッパーと決定論的 ID を付加し、廃止 `request/header.header.messagePrefix` 重複を除去します。引退した `request/header-delta`、`mode/set`、および `request/header` フォールバック理由は移行を拒否します。他のイベント、参照、ソース、ペイロード事実は変更できません。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The physical codec validates each packed row atomically, emits it as a compact run, and never mutates parsed input. Recoverable decoding drops a complete faulty row and keeps the preceding prefix unless a later decoded `turn/end` proves that the faulty region was committed. The incremental normalizer retains only message, retry, and open-compaction identities; the catalog performs complete relationship validation on the final current artifact.
+物理コーデックは各パック行を不可分に検証し、コンパクト実行として送出し、解析済み入力を変異させません。回復可能復号は完全な不良行を落とし、以降に復号された `turn/end` が不良領域のコミットを証明しない限り prior 接頭辞を保持します。増分正規化器はメッセージ、再試行、開コンパクション同一性のみ保持します。カタログは最終現行成果物に完全関係検証を行います。
 
 | File | Role |
 |---|---|
@@ -79,31 +79,31 @@ The physical codec validates each packed row atomically, emits it as a compact r
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Historical restoration
+### 履歴復元
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing directly. After restoration, `deriveMessages()` sees canonical released-v0 events unchanged under v1; bounded historical forms produce the same model-visible content through their defined current wrappers.
+直接なし。復元後、`deriveMessages()` は v1 配下で不変の正規 release-v0 イベントを見ます。有界の履歴形式は定められた現行ラッパー経由で同じモデル可視内容を生成します。
 
-#### Token effect
+#### トークン効果
 
-Zero direct tokens.
+直接トークンゼロ。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-No direct effect for canonical v0 history. Bounded normalizers preserve model-visible content while producing current wrappers and deterministic identities.
+正規 v0 履歴に直接効果なし。有界正規化器は現行ラッパーと決定論的同一性を生成しつつモデル可視内容を保持します。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Closed first-party inventory** — unknown external-plugin events refuse migration in this alpha policy.
-- **One adjacent edge** — this package does not perform publication or select later migrations.
+- **Closed first-party inventory** — 不明の外部プラグインイベントはこの alpha ポリシーで移行拒否となります。
+- **One adjacent edge** — このパッケージは公開も以降移行の選択もしません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

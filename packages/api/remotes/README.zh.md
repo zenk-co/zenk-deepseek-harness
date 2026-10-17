@@ -5,7 +5,7 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-api-remotes
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 桌面埋点遵循[产品采集策略](../../client/product-analytics/README.zh.md)及其动态应用配置，不包含 Web 使用情况。
 

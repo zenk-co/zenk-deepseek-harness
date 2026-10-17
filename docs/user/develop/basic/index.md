@@ -1,20 +1,20 @@
-# Your first plugin
+# 初めてのプラグイン
 
-English | [中文](index.zh.md)
+日本語 | [English](index.en.md) | [中文](index.zh.md)
 
-This tutorial creates a minimal Harness plugin and loads it into the Web UI. Start from a repository checkout that has completed the [run-from-source path](../../../../README.md#run-from-source).
+この手引きは最小の Harness プラグインを作り Web UI に読み込む。[ソースから走らせる経路](../../../../README.md#run-from-source)を完了したリポジトリ複製から始めること。
 
-## Create a local project
+## ローカル計画を作る
 
-From the repository root, create a scratch project for the tutorial:
+リポジトリ根から手引き用の作業計画を作る。
 
 ```sh
 mkdir -p scratch-plugin/src
 ```
 
-## What is a plugin?
+## プラグインとは何か
 
-In Harness, a plugin is a TypeScript module that exports an `apply` function. The framework calls `apply` when loading the plugin and passes a `ctx` context object through which the plugin registers capabilities:
+Harness ではプラグインは `apply` 関数を表出する TypeScript 単位である。枠組みはプラグイン読み込み時に `apply` を呼び、プラグインがケイパビリティを登録する `ctx` 文脈対象を渡す。
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -26,11 +26,11 @@ export function apply(ctx: Context) {
 }
 ```
 
-That is the complete configuration.
+これが完全な構成である。
 
-## Create the plugin file
+## プラグインファイルを作る
 
-Create `scratch-plugin/src/my-plugin.ts`:
+`scratch-plugin/src/my-plugin.ts` を作成する。
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -43,9 +43,9 @@ export function apply(ctx: Context) {
 }
 ```
 
-## Register it in cordis.yml
+## cordis.yml に登録する
 
-Run `pwd` from the repository root, then create `scratch-plugin/cordis.yml` as a Web overlay that inserts the local plugin. Replace `/absolute/path/to/deepseek-harness` below with the printed path:
+リポジトリ根から `pwd` を走らせ、ローカルプラグインを挿入する Web オーバーレイとして `scratch-plugin/cordis.yml` を作る。下の `/absolute/path/to/deepseek-harness` を表示された経路に置き換えること。
 
 ```yaml
 - insert:
@@ -53,21 +53,21 @@ Run `pwd` from the repository root, then create `scratch-plugin/cordis.yml` as a
       name: '/absolute/path/to/deepseek-harness/scratch-plugin/src/my-plugin.ts'
 ```
 
-The plugin path must be absolute. A patch file contributes configuration but does not change the profile directory from which the loader resolves module paths.
+プラグイン経路は絶対でなければならない。パッチファイルは構成を提供するが、ローダーが単位経路を解決するプロファイル directory を変えない。
 
-Start the Web UI with that overlay:
+そのオーバーレイで Web UI を起動する。
 
 ```sh
 pnpm dsh web --patch ./scratch-plugin/cordis.yml
 ```
 
-Open `http://127.0.0.1:3080`. The terminal prints `[hello-plugin] plugin loaded!` during startup.
+`http://127.0.0.1:3080` を開く。起動中に端末へ `[hello-plugin] plugin loaded!` と表示される。
 
-## Automatic cleanup
+## 自動片付け
 
-Anything registered through `ctx`—event listeners, tools, or timers—is cleaned up when the plugin unloads. You do not need to call removeListener or clearInterval manually.
+`ctx` 経由で登録したもの — イベント待ち受け、ツール、タイマー — はプラグインのアンロード時に片付けられる。removeListener や clearInterval を手で呼ぶ必要はない。
 
-For a resource that needs explicit cleanup, such as a network connection, use `ctx.effect()` to provide its disposer:
+接続のような明示的片付けの要る資源には、破棄子を与えるために `ctx.effect()` を使う。
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -84,9 +84,9 @@ export function apply(ctx: Context) {
 }
 ```
 
-## Declare dependencies
+## 依存を宣言する
 
-If the plugin consumes another service such as `tools` or `llm`, declare it in `inject`:
+プラグインが `tools` や `llm` のような他サービスを消費する場合は `inject` で宣言する。
 
 ```ts ignore-check
 import type { Context } from '@deepseek-ai/cordis'
@@ -100,13 +100,13 @@ export function apply(ctx: Context) {
 }
 ```
 
-The framework waits for every required service before loading the plugin.
+枠組みはプラグイン読み込み前に必須サービスすべてを待つ。
 
-## Three plugin forms
+## 3 つのプラグイン形式
 
-In addition to a function module, a plugin can use object or class form.
+関数単位に加え、プラグインはオブジェクト形式やクラス形式を使える。
 
-### Object form
+### オブジェクト形式
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -120,7 +120,7 @@ export default {
 }
 ```
 
-### Class form
+### クラス形式
 
 ```ts
 import { Service, type Context } from '@deepseek-ai/cordis'
@@ -135,10 +135,10 @@ export default class MyService extends Service {
 }
 ```
 
-Function form is sufficient in most cases. Use class form when the plugin provides a service to other plugins; see [services and dependencies](../framework/service.md).
+関数形式は大半の場合に十分である。プラグインが他プラグインへのサービスを提供する場合にクラス形式を使う。[サービスと依存](..//framework/service.md) を見ること。
 
-## Next steps
+## 次の手順
 
-- [Build a tool](./tool.md) — learn the tool definition DSL
-- [Plugin configuration](./config.md) — accept user configuration
-- [Cordis tutorial](../../../cordis-tutorial/index.md) — the plugin framework underneath, built from a scratch directory with no API key
+- [ツールを作る](./tool.md) — ツール定義 DSL を学ぶ
+- [プラグイン設定](./config.md) — 利用者設定を受け付ける
+- [Cordis 手引き](../../../cordis-tutorial/index.md) — 土台のプラグインフレームワーク。API 鍵なしの作業 directory から組み立てる

@@ -1,39 +1,39 @@
-# Web UI style reference
+# Web UI スタイルリファレンス
 
-English | [中文](web-styling.zh.md)
+日本語 | [English](web-styling.en.md) | [中文](web-styling.zh.md)
 
-This reference defines styling ownership and component rules for browser client packages. The current token values live in [`packages/client/ui-theme/src/styles/`](../packages/client/ui-theme/src/styles/); this document does not duplicate that generated-by-source inventory.
+このリファレンスはブラウザークライアントパッケージのスタイル所有権とコンポーネント規則を定義する。現行トークン値は [`packages/client/ui-theme/src/styles/`](../packages/client/ui-theme/src/styles/) にあり、この文書はそのソース生成目録を重複しない。
 
-## Ownership
+## 所有権
 
-[`ui-theme`](../packages/client/ui-theme/README.md) owns the `--dsw-*` static scale, semantic aliases, typography, motion, gradients, shadows, scrollbar styles, and light/dark preference. [`ui-layout`](../packages/client/ui-layout/README.md) applies the resolved theme snapshot to the document. Feature packages consume semantic aliases and do not define another global theme.
+[`ui-theme`](../packages/client/ui-theme/README.md) は `--dsw-*` 静的 scale・意味別名・書体・ motion・グラデーション・影・スクロールバー様式・明暗設定を所有する。[`ui-layout`](../packages/client/ui-layout/README.md) は解決済みテーマ snapshot を文書に適用する。機能パッケージは意味別名を消費し、別の全体テーマを定義しない。
 
-Global style sheets belong in `ui-theme/src/styles/`. Component styles live beside their component as CSS Modules. A component may define a local custom property when its value is part of that component's layout or presentation contract; shared colors, typography, elevation, and motion belong to the theme package.
+全体様式表は `ui-theme/src/styles/` に属する。コンポーネント様式はコンポーネントのそばに CSS Modules として置く。コンポーネントはその値がそのコンポーネントの配置や表示契約の一部である場合にローカルカスタム特性を定義できる。共有色・書体・ elevation・motion はテーマパッケージに属する。
 
 <a id="component-rules"></a>
-## Component rules
+## コンポーネント規則
 
-- Reuse the control before restyling one: the [ui-primitives component catalog](../packages/client/ui-primitives/README.md#component-catalog) is the only channel that crosses feature packages, and a deliberate visual difference belongs in a prop there rather than in a second copy ([reference](../packages/client/ui-primitives/README.md)).
-- Use CSS Modules and `clsx`; do not add a component library or Tailwind.
-- Use `--dsw-alias-*` semantic tokens in feature components. Do not copy static palette values or write literal colors there.
-- Keep theme selectors out of feature component CSS. Light/dark overrides belong to the theme owner.
-- Pair font sizes with line heights and use the theme typography variables when an existing role matches.
-- Keep source text, terminal output, and diff lines unwrapped when their component contract requires column preservation; use the shared scrollbar styles rather than component-specific scrollbar selectors.
-- Put presentation in CSS. Inline React styles may pass component-local custom-property values but must not encode theme branches.
-- Preserve keyboard focus visibility and reduced-motion behavior when adding transitions or hover-only controls.
-- Rounded corners inherit the global superellipse smoothing from ui-theme's `corner-shape.css` on supporting engines. Pair `corner-shape: round` with every full-round `border-radius` (`50%`, `100%`, or a pill radius) so circles and capsules keep circular arcs; the ui-theme corner-shape spec enforces the pairing.
-- Elevated surfaces (menus, popovers, modals, panels, floating buttons, the composer) set `border: 0` and take `box-shadow: var(--dsw-elevation-panel)`, `var(--dsw-elevation-prominent)`, or the composer's `var(--dsw-elevation-soft)` (larger blur at lower alpha): the 0.5px hairline stroke is the first shadow layer, and `--dsw-elevation-stroke-color` rebinds or suppresses it per surface or state. Never pair a `--dsw-alias-border-*` border with an lv/elevation shadow — the ui-theme elevation spec rejects the pairing; state-colored borders (warn panels) stay real borders.
-- Existing and new dropdown, context, submenu, and selection menus use `Menu` or wrap custom content in `MenuSurface`. The material is the theme-owned `--dsw-menu-surface-fill` plus `--dsw-menu-backdrop-filter`; feature and platform CSS must not override either. The ui-theme menu spec rejects unwrapped menu/listbox renderers, material overrides, and token redefinitions. The schedule-owned `TaskMenu` and `ClockPicker` retain their existing containers and material as explicit exceptions ([owner](../packages/client/ui-schedule/README.md)).
-- Modal backdrops, including settings and confirmation dialogs, retain their translucent dark mask without blur. The theme sets `--dsw-mask-blur` to `none`; Desktop-owned modal overlays also leave the parent page unfiltered.
-- Menu background filtering stays on an isolated layer so nested menus and fixed overlays retain their positioning and backdrop. On macOS, `MenuSurface` adds an opaque backing behind page content only within each menu’s bounds, allowing Chromium to blur content over native vibrancy; CSS anchors follow placement and size, and unmounting removes the backing. Overlays without this backing use `--dsw-specific-menu`, whose theme-owned macOS fill is 94% opaque to keep underlying text from bleeding through. Other elevated surfaces using that fill pair it with the same filter on their own isolated background when they contain fixed overlays.
-- Flat borders and separators that use a neutral `--dsw-alias-border-*` token draw at `0.5px` — buttons, inputs, cards, row dividers, and separators drawn as filled boxes (menu separators, the conversation header seam, markdown `hr`, vertical rails) share the hairline weight, which Chromium paints as one device pixel. Dashed affordances and state-colored borders keep 1px; spinner ring tracks keep their width through the spec's explicit allowlist. The ui-theme elevation spec rejects wider neutral solid borders.
-- Clickable artifact links (markdown anchors, prose file mentions, web source and fetch links, produced-file chips, workflow member links) color through `--dsw-alias-link` at `font-weight: 500`, with no underline at rest and a dotted 3px-offset underline on hover/focus. Compact Thinking Markdown keeps tertiary text color and a resting dotted underline ([compact presentation](../packages/client/ui-primitives/README.md#rendering-agent-output)). Text-leading anchors also lead with the ui-primitives `LinkIconMedium` category glyph riding `currentColor`, which for a well-known external host is that site's own mark instead of the globe; workflow member links and image-only anchors carry no glyph, and tool-row file links keep their grey dotted affordance.
+- 制御を再装飾する前に再利用する。[ui-primitives コンポーネントカタログ](../packages/client/ui-primitives/README.md#component-catalog)は機能パッケージを横断する唯一の経路であり、意図的な外観差は第 2 複製ではなくそこの prop に属する（[リファレンス](../packages/client/ui-primitives/README.md)）。
+- CSS Modules と `clsx` を使う。コンポーネントライブラリや Tailwind を追加しない。
+- 機能コンポーネントでは `--dsw-alias-*` 意味トークンを使う。静的 palette 値を複写したりリテラル色を書いたりしない。
+- 機能コンポーネント CSS にテーマ選択子を置かない。明暗上書きはテーマ所有者に属する。
+- フォントサイズと行高を対にし、既存役割が一致する場合はテーマ書体変数を使う。
+- そのコンポーネント契約が列保持を要求する場合、ソース文・端末出力・差分行を折り返さない。部品固有スクロールバー選択子ではなく共有スクロールバー様式を使う。
+- 表示は CSS に置く。インライン React 様式はコンポーネントローカルのカスタム特性値を渡せるが、テーマ分岐を符号化してはならない。
+- 遷移やホバー専用制御を追加する場合、キーボードフォーカス可視性と reduced-motion 動作を保持する。
+- 角丸は対応エンジン上で ui-theme の `corner-shape.css` から全体 superellipse 平滑化を継承する。完全な丸 `border-radius`（`50%`、`100%`、pill 半径）ごとに `corner-shape: round` を対にし、円とカプセルが円弧を保つようにする。ui-theme 角形状仕様がその対付けを強制する。
+- 隆起面（メニュー、popover、モーダル、パネル、浮動ボタン、コンポーザー）は `border: 0` を設定し、`box-shadow: var(--dsw-elevation-panel)`、`var(--dsw-elevation-prominent)`、またはコンポーザーの `var(--dsw-elevation-soft)`（低い alpha で大きな blur）を取る。0.5px hairline 罫は最初の影層であり、`--dsw-elevation-stroke-color` は面や状態ごとに再束縛または抑制する。`--dsw-alias-border-*` 境界と lv/elevation 影を対にしない。ui-theme elevation 仕様がその対付けを拒否する。状態色境界（warn パネル）は実境界のままである。
+- 既存と新規の dropdown・context・submenu・選択メニューは `Menu` を使うか独自内容を `MenuSurface` で包む。素材はテーマ所有の `--dsw-menu-surface-fill` と `--dsw-menu-backdrop-filter` であり、機能と平台 CSS はどちらも上書きしてはならない。ui-theme メニュー仕様は包まないメニュー/listbox 描画器、素材上書き、トークン再定義を拒否する。schedule 所有の `TaskMenu` と `ClockPicker` は明示例外として既存容器と素材を保持する（[所有者](../packages/client/ui-schedule/README.md)）。
+- 設定や確認ダイアログを含むモーダル backdrop は blur なしの半透明暗 mask を保持する。テーマは `--dsw-mask-blur` を `none` に設定する。Desktop 所有モーダルオーバーレイも親ページを filter しないままにする。
+- メニュー背景 filtering は分離層に置き、入れ子メニューと固定オーバーレイが配置と backdrop を保持できるようにする。macOS では `MenuSurface` が各メニュー範囲内でのみページ内容背後に不透明 backing を加え、Chromium がネイティブ vibrancy 上の内容を blur できるようにする。CSS アンカーは配置と寸法に従い、unmount は backing を除去する。この backing のないオーバーレイは `--dsw-specific-menu` を使い、そのテーマ所有 macOS fill は 94% 不透明であり、下の文の透けを防ぐ。その fill を使う他の隆起面は固定オーバーレイを含む場合に自らの分離背景上で同一 filter と対にする。
+- 中立 `--dsw-alias-border-*` トークンを使う平坦境界と区切りは `0.5px` で描く。ボタン、入力、カード、行区切り、充填箱として描かれる区切り（メニュー区切り、会話ヘッダー seam、markdown `hr`、垂直 rail）は hairline 太さを共有し、Chromium は 1 機器 pixel として描く。破線 affordance と状態色境界は 1px を保ち、spinner 環 track は仕様の明示 allowlist を通じて幅を保つ。ui-theme elevation 仕様は幅広の中立実線境界を拒否する。
+- クリック可能成果物リンク（markdown アンカー、散文ファイル言及、Web ソースと fetch リンク、生成ファイル chip、ワークフローメンバー link）は `--dsw-alias-link` で `font-weight: 500` の色付けとし、静止時は下線なし、ホバー/フォーカス時は 3px offset の点線下線とする。Compact Thinking Markdown は tertiary 文色と静止時点線下線を保つ（[compact 表示](../packages/client/ui-primitives/README.md#rendering-agent-output)）。文先頭アンカーは ui-primitives `LinkIconMedium` 分類グリフを `currentColor` 乗りで先導し、著名外部ホストでは globe の代わりにその site 独自印とする。ワークフローメンバー link と画像専用アンカーはグリフを持たず、ツール行ファイル link は灰色点線 affordance を保つ。
 
 <a id="corner-radii-and-settings-cards"></a>
-## Corner radii and settings cards
+## 角半径と設定カード
 
-The [DSH unified corner-radius standard](ui-radius.md) defines the radius scale, component size mapping, circle and capsule exceptions, nested hover geometry, and settings-card fills and strokes.
+[DSH 統一角半径標準](ui-radius.md)は半径 scale、コンポーネント寸法対応、円とカプセル例外、入れ子ホバー形状、設定カード fill と罫を定義する。
 
-## Changing the system
+## 系の変更
 
-Add or change a shared token in the owning `ui-theme` sheet, then consume its semantic alias from feature packages. Update the owning package reference when a public styling contract changes. Visual behavior follows the [testing policy](testing.md); the [archived styling-system Agent Note](../.agents/notes/archived/process/2026-07-19-web-styling-system.md) records framework rationale.
+共有トークンの追加や変更は所有 `ui-theme` 表で行い、機能パッケージからその意味別名を消費する。公開スタイル契約が変わる場合は所有パッケージリファレンスを更新する。視覚動作は[検査ポリシー](testing.md)に従い、[アーカイブ済みスタイル系エージェントノート](../.agents/notes/archived/process/2026-07-19-web-styling-system.md)は枠組み根拠を記録する。

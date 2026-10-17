@@ -5,7 +5,7 @@ kind: "package-group"
 
 # guard/：循环卫生 guard 家族
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

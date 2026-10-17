@@ -1,35 +1,35 @@
 ---
-description: "The build-time Typert generator: source type analysis, compiler-independent models, and artifact emission for maintainers wiring Typert publication or consuming generated artifacts."
+description: "ビルド時の Typert ジェネレーター: Typert 公開を配線する、または生成アーティファクトを消費するメンテナーのための、ソース型解析、コンパイラー非依存モデル、アーティファクト出力。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-typert-generator
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-typert-generator` lets maintainers turn public TypeScript types into build artifacts and compiler-independent models. Packages opt in through the `./typert` and optional `./client/typert` exports, and generation rejects declarations, publish lists, Remote exports, or Zod projections that it cannot represent correctly. Repository builds emit executable schema factories and matching declarations, while tools can call `WorkspaceAnalyzer` for inspection or catalog generation without publishing artifacts. Generation runs only at build time and never in a live agent session.
+`dsh-typert-generator` は、メンテナーが公開 TypeScript 型をビルドアーティファクトとコンパイラー非依存モデルに変換できるようにする。パッケージは `./typert` と任意の `./client/typert` エクスポートを通じてオプトインし、生成は正しく表現できない宣言、公開リスト、Remote エクスポート、または Zod プロジェクションを拒否する。リポジトリのビルドは実行可能なスキーマファクトリーと対応する宣言を出力し、ツールはアーティファクトを公開せずに検査やカタログ生成のために `WorkspaceAnalyzer` を呼べる。生成はビルド時にのみ実行され、ライブのエージェントセッションでは決して実行されない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-This package is for package and repository maintainers who wire Typert generation into a build or consume generated artifacts. Publication is opt-in: declare the export entries, run the build, and the artifacts appear in `lib/`; static analysis needs no artifact.
+このパッケージは、Typert 生成をビルドに配線する、または生成アーティファクトを消費するパッケージとリポジトリのメンテナー向けである。公開はオプトインである: エクスポートエントリを宣言してビルドを実行すると、アーティファクトが `lib/` に現れる。静的解析はアーティファクトを必要としない。
 
-### Publishing Typert artifacts from a package
+### パッケージから Typert アーティファクトを公開する
 
-A contributing package declares the host-face artifact export in `package.json`; packages that contribute both faces also declare `./client/typert`, and packages with Remote methods declare `./remote`:
+コントリビュートするパッケージは `package.json` で host フェイスのアーティファクトエクスポートを宣言する。両方のフェイスをコントリビュートするパッケージは `./client/typert` も宣言し、Remote メソッドを持つパッケージは `./remote` を宣言する:
 
 ```yaml
 exports:
@@ -41,132 +41,132 @@ files:
   - "lib/typert.host.d.ts"
 ```
 
-After the build, `lib/typert.host.js` and `lib/typert.host.d.ts` exist and the [loader](../loader/README.md) registers the contribution in Loader compositions. The generated declaration file exposes `TYPERT` as `unknown`, so contributing packages never depend on the runtime registry. The generator fails the build when a declaration is missing, points at the wrong file, or publishes Remote artifacts without Remote methods; unsupported Zod projections fail with a `TypertEmitError` naming the construct instead of flattening or weakening the source type.
+ビルド後、`lib/typert.host.js` と `lib/typert.host.d.ts` が存在し、[loader](../loader/README.md) が Loader 構成でそのコントリビューションを登録する。生成された宣言ファイルは `TYPERT` を `unknown` として公開するため、コントリビュートするパッケージがランタイムレジストリに依存することは決してない。ジェネレーターは、宣言が欠けている、誤ったファイルを指している、または Remote メソッドなしで Remote アーティファクトを公開している場合にビルドを失敗させる。サポートされない Zod プロジェクションは、ソース型を平坦化したり弱めたりする代わりに、その構文を名指しする `TypertEmitError` で失敗する。
 
 <a id="ordinary-remote-metadata"></a>
-### Ordinary Remote metadata
+### 通常の Remote メタデータ
 
-The emitter writes one static `TypertRemoteMethodSpec` per endpoint and calls the pure `createTypertRemoteInfo` factory with the spec and the artifact's own imported Zod runtime. Ordinary consumer `./remote` artifacts retain their default export and `TYPERT_REMOTE`, typed as `TypertRemoteInfo` with precise `TypertRemoteMethod<Input, Output, Mode, Uplink, DecodedOutput>` entries in `TYPERT_REMOTE.methods`. Each entry is the same object as its direct descriptor in `TYPERT_REMOTE.descriptors`; Context-only receivers remain in descriptors and scoped declarations. There is no separate `REMOTE_METHODS` export, nested `metadata`, or second `output` codec. The [protocol](<../protocol/README.md>) owns the factory and method API.
+エミッターはエンドポイントごとに 1 つの静的 `TypertRemoteMethodSpec` を書き込み、そのスペックとアーティファクト自身がインポートした Zod ランタイムで純粋な `createTypertRemoteInfo` ファクトリーを呼ぶ。通常のコンシューマー `./remote` アーティファクトは、デフォルトエクスポートと `TYPERT_REMOTE` を保持し、`TYPERT_REMOTE.methods` に正確な `TypertRemoteMethod<Input, Output, Mode, Uplink, DecodedOutput>` エントリを持つ `TypertRemoteInfo` として型付けられる。各エントリは `TYPERT_REMOTE.descriptors` 内の直接の記述子と同じオブジェクトである。Context のみのレシーバーは記述子とスコープ付き宣言に残る。別個の `REMOTE_METHODS` エクスポート、ネストされた `metadata`、または 2 つ目の `output` コーデックは存在しない。[プロトコル](<../protocol/README.md>)がファクトリーとメソッド API を所有する。
 
-The factory returns a class instance that retains the spec until its `descriptors` or `methods` getter builds their shared index. Each consumer-selected input-policy view, parser, and projection is independently lazy and cached, and generated individual Zod factories also materialize and cache on first use. Ordinary Host `./typert` builds a private info instance whose descriptors are exposed by the `TYPERT.invocations` getter. Host and consumer artifacts share definitions, not object identity across Programs or processes.
+ファクトリーは、`descriptors` または `methods` ゲッターが共有インデックスを構築するまでスペックを保持するクラスインスタンスを返す。コンシューマーが選択した入力ポリシービュー、パーサー、プロジェクションはそれぞれ独立に遅延されキャッシュされ、生成された個々の Zod ファクトリーも初回使用時に実体化してキャッシュする。通常の Host `./typert` はプライベートな info インスタンスを構築し、その記述子は `TYPERT.invocations` ゲッターによって公開される。Host とコンシューマーのアーティファクトは定義を共有し、Program またはプロセスをまたぐオブジェクト同一性は共有しない。
 
-Generated declarations use type-only imports for owner and schema types. Importing metadata neither activates the Host Service nor opens a network connection. Framework consumers query the existing [registry](<../registry/README.md>); standalone consumers can import `./remote` directly. Source compositions requiring strict validation prebuild ordinary artifacts and register `./typert` through the [loader](<../loader/README.md>); descriptor-free source discovery cannot recover erased type constraints, documentation, or schemas.
+生成された宣言は、オーナーとスキーマの型に型のみのインポートを使用する。メタデータのインポートは Host サービスをアクティブ化せず、ネットワーク接続も開かない。フレームワークのコンシューマーは既存の[レジストリ](<../registry/README.md>)に問い合わせる。スタンドアロンのコンシューマーは `./remote` を直接インポートできる。厳密な検証を必要とするソース構成は、通常のアーティファクトを事前ビルドし、[loader](<../loader/README.md>) を通じて `./typert` を登録する。記述子のないソース発見は、消去された型制約、ドキュメント、スキーマを復元できない。
 
-Missing JSDoc and unsupported tool JSON Schema do not block otherwise valid ordinary generation or its strict codecs. Metadata retains parsers and available documentation independently of projection: each unsupported input variant or output projection omits `jsonSchema` and records its own `jsonSchemaError`. A tool consumer explicitly selects methods and requires its documentation and supported input schema; an output parser is required, but output JSON Schema is optional unless that consumer requires it. Metadata alone does not make every Remote method a tool.
+JSDoc の欠落とサポートされないツール JSON Schema は、それ以外は有効な通常の生成やその厳密コーデックをブロックしない。メタデータはプロジェクションとは独立にパーサーと利用可能なドキュメントを保持する: サポートされない各入力バリアントまたは出力プロジェクションは `jsonSchema` を省略し、自身の `jsonSchemaError` を記録する。ツールコンシューマーはメソッドを明示的に選択し、そのドキュメントとサポートされる入力スキーマを要求する。出力パーサーは必須だが、出力 JSON Schema はそのコンシューマーが要求しない限り任意である。メタデータだけでは、すべての Remote メソッドがツールになるわけではない。
 
-Every generated parameter spec contains both `codec` and `strictCodec`, derived from the same checker-resolved type model; the analyzer and model carry no per-method input policy. `method.input()` and `{ strict: false }` select the normal codec used by Host dispatch, whose declared objects accept and strip unknown fields. `method.input({ strict: true })` selects recursively closed declared objects for both parsing and supported JSON Schema. Both named-argument envelopes reject extra arguments; explicit JSON and dictionary keys remain open, while constrained dictionary values also validate named fields against their index value type. Strict parsing distributes named-field and index-value unions before merging and closing each supported object combination, including optional fields and nullable index values. `result` keeps its single normal codec. Tool projection targets the tool-schema subset that [`@deepseek-ai/dsh-tools`](../../core/tools/src/json-schema.ts) enforces on tool parameters, tool output, and the generated PTC SDK; it supports scalars, objects, arrays, and disjoint unions, while canonical `JsonValue` and string-keyed JSON dictionaries need no recursive references. A type outside that subset is reported instead of projected more weakly. Numeric bounds and other semantic rules absent from TypeScript remain with the owning operation.
+生成されるすべてのパラメータースペックは、同じチェッカー解決済み型モデルから導出された `codec` と `strictCodec` の両方を含む。アナライザーとモデルはメソッドごとの入力ポリシーを持ち運ばない。`method.input()` と `{ strict: false }` は Host ディスパッチが使用する通常のコーデックを選択し、その宣言オブジェクトは未知のフィールドを受け入れて除去する。`method.input({ strict: true })` は、パースとサポートされる JSON Schema の両方に対して再帰的に閉じた宣言オブジェクトを選択する。両方の名前付き引数エンベロープは余分な引数を拒否する。明示的な JSON と辞書キーは開いたままである一方、制約された辞書値は名前付きフィールドをそのインデックス値型に対して検証もする。厳密パースは、各サポート対象オブジェクトの組み合わせ — オプションのフィールドと nullable なインデックス値を含む — をマージして閉じる前に、名前付きフィールドとインデックス値のユニオンを分配する。`result` は単一の通常コーデックを保つ。ツールプロジェクションは、[`@deepseek-ai/dsh-tools`](../../core/tools/src/json-schema.ts) がツールパラメーター、ツール出力、生成 PTC SDK に強制するツールスキーマサブセットを対象とする。スカラー、オブジェクト、配列、非交和ユニオンをサポートし、正規の `JsonValue` と文字列キーの JSON 辞書は再帰参照を必要としない。そのサブセット外の型は、より弱くプロジェクションされるのではなく報告される。TypeScript に存在しない数値境界やその他のセマンティックルールは、所有する操作に残る。
 
-`WorkspaceTypertGenerator` analyzes all contributors of each selected face before filtering emitted packages, so a package subset retains the same declaration merges and output bytes as a complete build.
+`WorkspaceTypertGenerator` は、出力パッケージをフィルタリングする前に、選択された各フェイスのすべてのコントリビューターを解析するため、パッケージサブセットは完全なビルドと同じ宣言マージと出力バイトを保つ。
 
-### Analyzing a workspace statically
+### ワークスペースを静的に解析する
 
-Static consumers call `WorkspaceAnalyzer` directly against the workspace's `tsconfig.host.json` and `tsconfig.client.json` aggregates, select a face and package subset, and read the resulting `FaceModel` and type graph without emitting or loading runtime artifacts. `analyzeInBatches()` processes a large package selection through bounded compiler programs with the same model shape, and `discoverPackages()` finds contributing packages without building a type-checker program; its optional `package.json` predicate skips a package before its sources or project config are read. Typert parses only the tsconfigs of packages it analyzes; validating every referenced tsconfig belongs to the preceding `tsc -b`.
+静的コンシューマーは、ワークスペースの `tsconfig.host.json` と `tsconfig.client.json` 集約に対して `WorkspaceAnalyzer` を直接呼び出し、フェイスとパッケージサブセットを選択し、ランタイムアーティファクトを出力またはロードせずに結果の `FaceModel` と型グラフを読む。`analyzeInBatches()` は大きなパッケージ選択を、同じモデルの形を持つ境界付きコンパイラープログラムを通じて処理し、`discoverPackages()` は型チェッカープログラムを構築せずにコントリビュートするパッケージを見つける。そのオプションの `package.json` 述語は、ソースまたはプロジェクト設定が読まれる前にパッケージをスキップする。Typert は解析するパッケージの tsconfig のみをパースする。参照されるすべての tsconfig の検証は直前の `tsc -b` に属する。
 
-JSON, YAML, SVG, PNG, JPEG, and WebP resource exports contribute no TypeScript declarations and are excluded from the API model. Missing JavaScript or TypeScript export sources remain errors.
+JSON、YAML、SVG、PNG、JPEG、WebP のリソースエクスポートは TypeScript 宣言を提供せず、API モデルから除外される。JavaScript または TypeScript のエクスポートソースの欠落はエラーのままである。
 
-### Running generation inside a tsdown build
+### tsdown ビルド内で生成を実行する
 
-The package's `./tsdown` subpath provides `typertPlugin()` for the root tsdown config: it lowers standard decorators in TypeScript dependencies before bundling and emits the model-driven face artifacts at the package output root. A module-id filter on its `transform` hook keeps non-TypeScript modules out of JavaScript. The workspace root is the nearest ancestor of the bundle that contains both `tsconfig.host.json` and `packages/`, so a package's own face leaf config never qualifies. In `package` mode it generates synchronously in the bundled package's `writeBundle` and emits only that package.
+このパッケージの `./tsdown` サブパスは、ルート tsdown 設定用の `typertPlugin()` を提供する: バンドル前に TypeScript 依存関係の標準デコレーターをローワリングし、モデル駆動のフェイスアーティファクトをパッケージ出力ルートに出力する。その `transform` フックのモジュール id フィルターは、非 TypeScript モジュールを JavaScript から締め出す。ワークスペースルートは、`tsconfig.host.json` と `packages/` の両方を含むバンドルの最も近い祖先であるため、パッケージ自身のフェイスリーフ設定が該当することは決してない。`package` モードでは、バンドルされたパッケージの `writeBundle` で同期的に生成し、そのパッケージのみを出力する。
 
-In `workspace` mode it emits every explicit contributor once without blocking bundling: the first package build's `buildStart` starts generation in a Worker Thread, and the first `writeBundle` awaits the result and writes every artifact while later bundles return immediately. An analysis error, a worker crash or early exit, or a malformed worker response fails that bundle, and therefore the tsdown pass, with a `TypertWorkerError` naming the workspace and cause; the worker is terminated before the failure is reported.
+`workspace` モードでは、バンドルをブロックせずにすべての明示的コントリビューターを 1 回ずつ出力する: 最初のパッケージビルドの `buildStart` が Worker Thread で生成を開始し、最初の `writeBundle` が結果を待ってすべてのアーティファクトを書き込み、以降のバンドルは即座に戻る。解析エラー、ワーカーのクラッシュまたは早期終了、または不正なワーカー応答は、ワークスペースと原因を名指しする `TypertWorkerError` でそのバンドル、ひいては tsdown パスを失敗させる。ワーカーは失敗が報告される前に終了させられる。
 
-### Generating without a bundler
+### バンドラーなしで生成する
 
-`writeWorkspaceArtifacts()` and `writePackageArtifacts()` are the plugin's file writers: each artifact becomes `lib/typert.<face>.{js,d.ts}`, plus `lib/typert.remote-client.{js,d.ts,d.ts.map}` when it carries Remote methods, and a Host artifact without Remote methods removes stale Remote client files. Writing the result of `WorkspaceTypertGenerator.generateContributors()` through them leaves the same bytes as the `workspace`-mode plugin, and `findWorkspaceRoot()` applies the plugin's workspace-root rule. The repository's bundle-free pass, [`scripts/generate-typert.ts`](../../../scripts/generate-typert.ts), generates the Host face this way for type checks that need no bundle.
+`writeWorkspaceArtifacts()` と `writePackageArtifacts()` はプラグインのファイルライターである: 各アーティファクトは `lib/typert.<face>.{js,d.ts}` になり、Remote メソッドを持ち運ぶ場合は加えて `lib/typert.remote-client.{js,d.ts,d.ts.map}` になり、Remote メソッドのない Host アーティファクトは古い Remote クライアントファイルを削除する。`WorkspaceTypertGenerator.generateContributors()` の結果をこれらを通じて書き込むと、`workspace` モードのプラグインと同じバイトが残り、`findWorkspaceRoot()` はプラグインのワークスペースルートルールを適用する。リポジトリのバンドル不要パスである [`scripts/generate-typert.ts`](../../../scripts/generate-typert.ts) は、バンドルを必要としない型チェックのために、この方法で Host フェイスを生成する。
 
-With `rejectBuildOutputs: true`, analysis fails with a `TypertAnalysisError` when a face program loads a file from a workspace package's `lib/` directory, or cannot resolve an import of a workspace package, as on a tree whose packages are not yet compiled. The error names each such import specifier and the source file a `paths` alias should map it to, so a passing generation depends only on workspace source and can run before or beside package compilation. Leave it off for a face whose sources import generated outputs, such as a Client face importing `/remote`.
+`rejectBuildOutputs: true` の場合、フェイスプログラムがワークスペースパッケージの `lib/` ディレクトリからファイルをロードするとき、またはワークスペースパッケージのインポートを解決できないとき — パッケージがまだコンパイルされていないツリーのように — 、解析は `TypertAnalysisError` で失敗する。このエラーは、そのような各インポート指定子と、`paths` エイリアスがそれをマップすべきソースファイルを名指しするため、合格する生成はワークスペースソースのみに依存し、パッケージのコンパイルの前または横で実行できる。ソースが生成出力をインポートするフェイス — 例えば `/remote` をインポートする Client フェイス — ではこれをオフのままにする。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-This section explains how the generator reaches a compiler-independent model and what it emits; the observable build behavior is covered in [Use this package](#use-this-package).
+このセクションでは、ジェネレーターがどのようにコンパイラー非依存モデルに到達し、何を出力するかを説明する。観察可能なビルド動作は[このパッケージを使う](#use-this-package)で説明されている。
 
-### Design concept
+### 設計概念
 
-The generator is built on one separation: extraction and emission are decoupled through the compiler-independent model. `WorkspaceAnalyzer` reads TypeScript programs seeded from the face aggregate tsconfigs and produces `FaceModel` and `TypeGraph` data; `FaceModelEmitter` consumes only that model and never receives compiler nodes. The model retains declaration identity, generic parameters and applications, explicit inheritance, conditional and mapped types, import attributes, abstract modifiers, and source JSDoc, and excludes constructors, static members, and non-public members.
+ジェネレーターは 1 つの分離の上に構築されている: 抽出と出力はコンパイラー非依存モデルを通じて分離される。`WorkspaceAnalyzer` はフェイス集約 tsconfig からシードされた TypeScript プログラムを読み、`FaceModel` と `TypeGraph` データを生成する。`FaceModelEmitter` はそのモデルのみを消費し、コンパイラーノードを決して受け取らない。モデルは宣言の同一性、ジェネリックパラメーターと適用、明示的な継承、条件型とマップ型、インポート属性、abstract 修飾子、ソース JSDoc を保持し、コンストラクター、静的メンバー、非公開メンバーを除外する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Public API: analyzer, emitter, workspace generator, renderer, catalog projection |
-| [`src/analyzer.ts`](src/analyzer.ts) | `WorkspaceAnalyzer`: face programs, check/write modes, batching, discovery, source index |
-| [`src/model.ts`](src/model.ts) | Compiler-independent model types |
-| [`src/emitter.ts`](src/emitter.ts) | `FaceModelEmitter`: Zod schema and declaration emission, Remote declarations |
-| [`src/workspace.ts`](src/workspace.ts) | `WorkspaceTypertGenerator`: discovery, generation, export and files validation; workspace-root lookup |
-| [`src/tsdown-plugin.ts`](src/tsdown-plugin.ts) | tsdown plugin face: decorator lowering and artifact emission |
-| [`src/artifact-files.ts`](src/artifact-files.ts) | Package-local artifact writers shared by the plugin and bundle-free generation |
-| [`src/build-output-guard.ts`](src/build-output-guard.ts) | Detection of workspace `lib/` files and unresolved workspace imports in a face program for `rejectBuildOutputs` |
-| [`src/worker.ts`](src/worker.ts) | Worker Thread entry for workspace-mode generation |
-| [`src/cordis-catalog.ts`](src/cordis-catalog.ts) | Catalog projection used by the generated Cordis catalogs |
+| [`src/index.ts`](src/index.ts) | 公開 API: アナライザー、エミッター、ワークスペースジェネレーター、レンダラー、カタログプロジェクション |
+| [`src/analyzer.ts`](src/analyzer.ts) | `WorkspaceAnalyzer`: フェイスプログラム、check/write モード、バッチ処理、発見、ソースインデックス |
+| [`src/model.ts`](src/model.ts) | コンパイラー非依存モデル型 |
+| [`src/emitter.ts`](src/emitter.ts) | `FaceModelEmitter`: Zod スキーマと宣言の出力、Remote 宣言 |
+| [`src/workspace.ts`](src/workspace.ts) | `WorkspaceTypertGenerator`: 発見、生成、エクスポートと files の検証、ワークスペースルートの検索 |
+| [`src/tsdown-plugin.ts`](src/tsdown-plugin.ts) | tsdown プラグインフェイス: デコレーターのローワリングとアーティファクト出力 |
+| [`src/artifact-files.ts`](src/artifact-files.ts) | プラグインとバンドル不要生成が共有するパッケージローカルアーティファクトライター |
+| [`src/build-output-guard.ts`](src/build-output-guard.ts) | `rejectBuildOutputs` のための、フェイスプログラム内のワークスペース `lib/` ファイルと未解決のワークスペースインポートの検出 |
+| [`src/worker.ts`](src/worker.ts) | ワークスペースモード生成のための Worker Thread エントリ |
+| [`src/cordis-catalog.ts`](src/cordis-catalog.ts) | 生成された Cordis カタログが使用するカタログプロジェクション |
 
-### Analysis and faces
+### 解析とフェイス
 
-Host and Client are independent TypeScript programs. Direct project references establish compiler-face membership, while `dsh.client` package subpaths establish runtime-face contribution; `package.json#exports` marks every cross-package public boundary, and imports or re-exports are the only cross-face edges. A relative import that resolves inside the referencing package is followed through that module's re-exports until a package specifier appears, so package-local forwarding modules keep their original declaration references; a relative import that resolves into another package fails. `check` mode fails on syntax or semantic diagnostics, missing public annotations, private cross-package references, and reachable declaration merges the model cannot retain losslessly; `write` mode inserts checker-derived annotations and returns a clean check-mode model. Types owned by NPM dependencies remain `external` references instead of being expanded. A stream method's return type may be `Iterable<Out>`, `AsyncIterable<Out>`, or the protocol's `RemoteStream<Out, In>`, recognized by symbol and declaring package like the standard-library wrappers; a second type argument other than `never` yields the descriptor's uplink codec, and the generated Client signature returns `RemoteStreamHandle<Out, In>`.
+Host と Client は独立した TypeScript プログラムである。直接のプロジェクト参照がコンパイラーフェイスのメンバーシップを確立し、`dsh.client` パッケージサブパスがランタイムフェイスのコントリビューションを確立する。`package.json#exports` がすべてのパッケージ間公開境界を示し、インポートまたは再エクスポートが唯一のクロスフェイスエッジである。参照元パッケージ内で解決される相対インポートは、パッケージ指定子が現れるまでそのモジュールの再エクスポートを通じて追跡されるため、パッケージローカルの転送モジュールは元の宣言参照を保つ。別のパッケージに解決される相対インポートは失敗する。`check` モードは、構文またはセマンティクスの診断、公開アノテーションの欠落、プライベートなパッケージ間参照、およびモデルがロスレスに保持できない到達可能な宣言マージで失敗する。`write` モードはチェッカー由来のアノテーションを挿入し、クリーンな check モードモデルを返す。NPM 依存関係が所有する型は、展開される代わりに `external` 参照のままである。ストリームメソッドの戻り値型は `Iterable<Out>`、`AsyncIterable<Out>`、またはプロトコルの `RemoteStream<Out, In>` であり、標準ライブラリのラッパーと同様にシンボルと宣言パッケージによって認識される。`never` 以外の 2 番目の型引数は記述子のアップリンクコーデックを生み、生成された Client シグネチャーは `RemoteStreamHandle<Out, In>` を返す。
 
-### Emission and publication contract
+### 出力と公開契約
 
-`FaceModelEmitter` emits executable JavaScript containing success-cached Zod schema factories and the `TYPERT` contribution, plus a declaration file whose factories return `z.ZodType<SourceType>` through the package's public export; unsupported Zod projections fail. The Host face with Remote methods additionally emits `typert.remote-client.*` projections of Host Remote contracts for the Client. `WorkspaceTypertGenerator` validates each contributor's `package.json`: `./typert` and `./client/typert` (and `./remote` when Remote methods exist) must point at the exact generated files, and the `files` list must include them.
+`FaceModelEmitter` は、成功がキャッシュされた Zod スキーマファクトリーと `TYPERT` コントリビューションを含む実行可能な JavaScript、およびそのファクトリーがパッケージの公開エクスポートを通じて `z.ZodType<SourceType>` を返す宣言ファイルを出力する。サポートされない Zod プロジェクションは失敗する。Remote メソッドを持つ Host フェイスは、Client のために Host Remote 契約の `typert.remote-client.*` プロジェクションを追加で出力する。`WorkspaceTypertGenerator` は各コントリビューターの `package.json` を検証する: `./typert` と `./client/typert`(Remote メソッドが存在する場合は `./remote` も)は正確に生成されたファイルを指さなければならず、`files` リストにそれらが含まれなければならない。
 
-[Unary binary results](../protocol/README.md) are recognized after generic type resolution. Their codecs validate the byte-array type and JSON metadata without iterating, copying, or freezing the byte payload; generated Client declarations retain the authored metadata and narrow the byte backing to `ArrayBuffer`.
+[単項バイナリ結果](../protocol/README.md)は、ジェネリック型解決の後に認識される。そのコーデックは、バイトペイロードを反復、コピー、フリーズせずに、バイト配列の型と JSON メタデータを検証する。生成された Client 宣言は書かれたメタデータを保持し、バイトのバッキングを `ArrayBuffer` に絞り込む。
 
-### Catalog projection
+### カタログプロジェクション
 
-The runtime type closure indexes exported workspace declarations and referenced framework enums. Vendored declarations stay outside business API discovery; their enums remain available when a public result refers to them.
+ランタイム型クロージャーは、エクスポートされたワークスペース宣言と参照されたフレームワーク enum をインデックスする。ベンダーされた宣言はビジネス API 発見の外に留まる。その enum は、公開結果がそれらを参照するときに利用可能なままである。
 
-The root export includes the model-driven extraction, completeness checks, and deterministic text renderers used by this repository's Cordis catalogs. They accept a `CordisCatalogPolicy`; repository-owned type links, foundation and exemption classifications, and inherited Cordis entries stay in `scripts/gen-cordis-catalog.ts` and are passed in explicitly, so this package contains projection mechanics, not a hidden copy of the repository's documentation taxonomy.
+ルートエクスポートには、このリポジトリの Cordis カタログが使用するモデル駆動の抽出、完全性チェック、決定論的テキストレンダラーが含まれる。これらは `CordisCatalogPolicy` を受け入れる。リポジトリ所有の型リンク、基盤と免除の分類、継承された Cordis エントリは `scripts/gen-cordis-catalog.ts` に留まり明示的に渡されるため、このパッケージにはプロジェクションの仕組みが含まれ、リポジトリのドキュメント分類の隠しコピーは含まれない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough; they move from the generated model to the runtime and the Remote-call path.
+パッケージレベルの契約では不十分な場合は、これらのページを読む。生成されたモデルからランタイムと Remote 呼び出しパスへと進む。
 
-- [Typert subsystem reference](../../../docs/subsystems/typert.md) — the Remote contracts and registry interfaces the generator models.
-- [Typert protocol](../protocol/README.md) — the declarations generated artifacts extend and consume.
-- [Typert registry](../registry/README.md) — the runtime store the emitted artifacts feed.
-- [API Gateway reference](../../../docs/api-gateway.md) — how generated Remote descriptors are invoked end to end.
-- [Compiler-independent model Agent Note](../../../.agents/notes/implemented/architecture/2026-07-27-compiler-independent-typert-model.md) — the model design, alternatives, and consequences.
+- [Typert サブシステムリファレンス](../../../docs/subsystems/typert.md) — ジェネレーターがモデル化する Remote 契約とレジストリインターフェース。
+- [Typert プロトコル](../protocol/README.md) — 生成アーティファクトが拡張し消費する宣言。
+- [Typert レジストリ](../registry/README.md) — 出力されたアーティファクトが供給するランタイムストア。
+- [API Gateway リファレンス](../../../docs/api-gateway.md) — 生成された Remote 記述子がエンドツーエンドでどのように呼び出されるか。
+- [コンパイラー非依存モデルの Agent Note](../../../.agents/notes/implemented/architecture/2026-07-27-compiler-independent-typert-model.md) — モデル設計、代替案、帰結。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the build-time generator runs outside any agent runtime and touches no model request.
+なし。ビルド時のジェネレーターはエージェントランタイムの外で実行され、モデル要求に触れない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct effect; generated artifacts reach a request only when a consumer places them in one.
+直接の影響はない。生成アーティファクトは、コンシューマーがそれを要求に入れたときにのみ要求に到達する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the generator cannot model or emit; they are current package constraints, not a task backlog.
+これらの制限は、ジェネレーターがモデル化または出力できないものを定義する。これらは現在のパッケージの制約であり、タスクバックログではない。
 
-- **Package export patterns are skipped** — contributing packages need concrete export targets; wildcard export patterns are not analyzed.
-- **Namespace re-exports across faces fail** — named and star re-exports produce links, but a namespace re-export cannot be represented until `TypeTargetModel` can model a module namespace without flattening it.
-- **The Zod emitter supports a deliberate subset** — generic schema declarations and computed constructs such as conditional or mapped schema roots fail until a concrete schema-factory policy exists.
-- **Strict indexed object merging has limits** — named-field and index-value unions are combined branch by branch when their object members are concrete properties. Recursive references, nested index signatures, and computed members retain separate schema intersections; strict parsing can reject otherwise valid values whose fields come from different operands.
-- **No generated schema imports across faces** — cross-face links are represented for analysis, but no generated schema requires a runtime cross-face Zod import.
-- **Discovery covers concrete public exports only** — declarations neither exported nor imported by the reachable graph are intentionally outside the package model.
+- **パッケージエクスポートパターンはスキップされる** — コントリビュートするパッケージは具体的なエクスポートターゲットを必要とする。ワイルドカードのエクスポートパターンは解析されない。
+- **フェイス間の名前空間再エクスポートは失敗する** — 名前付きおよびスター再エクスポートはリンクを生成するが、名前空間再エクスポートは、`TypeTargetModel` がモジュール名前空間を平坦化せずにモデル化できるようになるまで表現できない。
+- **Zod エミッターは意図的なサブセットをサポートする** — ジェネリックスキーマ宣言や、条件型・マップ型のスキーマルートなどの計算構文は、具体的なスキーマファクトリーポリシーが存在するまで失敗する。
+- **厳密なインデックス付きオブジェクトマージには限界がある** — 名前付きフィールドとインデックス値のユニオンは、そのオブジェクトメンバーが具体的なプロパティである場合、分岐ごとに結合される。再帰参照、ネストされたインデックスシグネチャー、計算メンバーは別々のスキーマ交差を保持し、厳密パースは、フィールドが異なるオペランドから来るそれ以外は有効な値を拒否することがある。
+- **フェイス間で生成スキーマのインポートはない** — クロスフェイスリンクは解析のために表現されるが、生成スキーマがランタイムのクロスフェイス Zod インポートを必要とすることはない。
+- **発見が対象とするのは具体的な公開エクスポートのみ** — エクスポートもされておらず、到達可能なグラフにインポートもされていない宣言は、意図的にパッケージモデルの外にある。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

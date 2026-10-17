@@ -1,31 +1,31 @@
 ---
-description: "Shared TypeScript declarations for package identity, runtime requirements, and DSH plugin metadata."
+description: "パッケージ識別子・実行時要件・DSH プラグインメタデータ向けの共有 TypeScript 宣言。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-package-manifest
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `DshPackageManifest` for package metadata, `DshManifest` for the public fields under `dsh`, and member types such as `DshClientManifest` for one domain. Each reader owns JSON parsing, validation, and default resolution.
+パッケージメタデータには `DshPackageManifest` を、`dsh` 配下の公開欄には `DshManifest` を、1 領域向けには `DshClientManifest` などの構成員型を使う。各読み手が JSON 構文解析・検証・既定解決を所有する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Import from the package root. Use a development dependency when only checking your own source; use a production dependency if your published declarations reference these types.
+パッケージルートからインポートする。自身のソース検査だけなら開発依存で、公開宣言がこれらの型を参照するなら製品依存で使う。
 
 ```ts
 import type { DshClientManifest, DshPackageManifest } from '@deepseek-ai/dsh-package-manifest'
@@ -43,61 +43,61 @@ const manifest: DshPackageManifest = {
 }
 ```
 
-`DshPackageManifest` describes the package.json fields used by DSH, with required `name` and `version`; it is not an exhaustive npm schema. Local profile readers use `Partial<DshPackageManifest>` because profiles need no published version. `DshManifest` describes only public author fields under `dsh`. `DshBundleManifest.patch` is one patch file path or an ordered list of them, each relative to the package root; the launcher applies a list in order as one bundle layer. TypeScript checks the example and erases `import type`; these interfaces do not parse JSON or write a file.
+`DshPackageManifest` は DSH が使う package.json 欄を記述し、`name` と `version` が必須である。網羅的な npm スキーマではない。ローカルプロファイル読み手は `Partial<DshPackageManifest>` を使う。プロファイルに公開バージョンは不要なためである。`DshManifest` は `dsh` 配下の公開作成者欄のみを記述する。`DshBundleManifest.patch` は 1 つのパッチファイルパスまたはその順序付き一覧であり、各々パッケージルート相対である。ランチャーは一覧を 1 バンドル層として順に適用する。TypeScript はサンプルを検査して `import type` を消去する。これらのインターフェースは JSON を構文解析もファイル書き込みもしない。
 
-The following metadata fields are optional. Omitting them leaves the format version or compatible host versions undeclared; readers do not infer defaults.
+次のメタデータ欄は任意である。省くと形式バージョンまたは適合ホストバージョンが未宣言のままとなり、読み手は既定値を推測しない。
 
-| Field | Meaning |
+| フィールド | 意味 |
 |---|---|
-| `dsh.manifestVersion` | Manifest format identifier; the declared format is `1`, independent of the npm package version and Session format version. |
-| `engines.dsh` | Author-declared compatible DSH versions as a SemVer range, including exact prerelease versions. This field sits beside `engines.node` and `engines.npm`; an engines object may omit `dsh`. |
+| `dsh.manifestVersion` | マニフェスト形式識別子。宣言形式は `1` であり、npm パッケージバージョンやセッション形式バージョンとは独立である。 |
+| `engines.dsh` | 作成者が宣言する適合 DSH バージョンの SemVer 範囲（正確なプレリリースバージョンを含む）。この欄は `engines.node`・`engines.npm` の横にあり、engines オブジェクトは `dsh` を省ける。 |
 
-`LocalizedText` carries literal text or a language map with a required English fallback. `PluginLocalizedMeta` carries optional display title, description, an image data URL resolved from a package root's `package.json.icon` or an exported `<specifier>/icon`, and metadata diagnostics for installed plugins. [App boot](../../boot/app-boot/README.md) reads these values; this package only supplies their types.
+`LocalizedText` は原文または必須英語フォールバック付きの言語対応表を運ぶ。`PluginLocalizedMeta` は任意の表示題名・説明、パッケージルートの `package.json.icon` または出力 `<specifier>/icon` から解決される画像データ URL、インストール済みプラグイン向けのメタデータ診断を運ぶ。[アプリ起動](../../boot/app-boot/README.md)がこれらの値を読む。このパッケージはその型のみを供給する。
 
-Public composition declarations are defined in [`src/types.ts`](src/types.ts). Internal `configTrees`, `sessionFormatMigration`, and generated `moduleFallback` metadata remain owned by their image-packer, catalog, and launcher readers; the public types do not expose them.
+公開コンポジション宣言は [`src/types.ts`](src/types.ts) で定義される。内部 `configTrees`・`sessionFormatMigration`・生成 `moduleFallback` メタデータはそのイメージパッカー・カタログ・ランチャー読み手の所有のままにあり、公開型はそれらを公開しない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-The package root only re-exports declarations from [`src/types.ts`](src/types.ts).
+パッケージルートは [`src/types.ts`](src/types.ts) からの宣言を再出力するだけである。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Profile launcher](../../boot/app-boot/README.md#profiles) — manifest loading and composition.
-- [Public package metadata](../../../.agents/notes/implemented/architecture/2026-09-10-public-package-manifest.md) — field placement and reader ownership.
+- [プロファイルランチャー](../../boot/app-boot/README.md#profiles) — マニフェスト読み込みとコンポジション。
+- [公開パッケージメタデータ](../../../.agents/notes/implemented/architecture/2026-09-10-public-package-manifest.md) — 欄配置と読み手所有。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package only exports types.
+なし。このパッケージは型のみを出力するため。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Type declarations add no model input, so provider cache reuse is unaffected.
+型宣言はモデル入力を増やさないため、プロバイダーキャッシュ再利用に影響しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Static typing only.** Consumers read and validate the JSON fields they use, then adapt the shared declarations to their runtime data. The package supplies no parser, getter helpers, file checks, or defaults.
-- **Compatibility is declarative.** Current installers and loaders do not enforce `dsh.manifestVersion` or `engines.dsh`; declaring a range does not reject incompatible hosts or validate SemVer syntax.
+- **静的型付けのみ。**利用者は使う JSON 欄を読み取って検証し、共有宣言を実行時データに適合させる。パッケージは構文解析器・取得ヘルパー・ファイル検査・既定値を供給しない。
+- **適合性は宣言的。**現在のインストーラーとローダーは `dsh.manifestVersion` も `engines.dsh` も強制しない。範囲の宣言は非適合ホストを拒否も SemVer 構文を検証もしない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

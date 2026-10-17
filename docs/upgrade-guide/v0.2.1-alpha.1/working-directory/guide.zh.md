@@ -5,7 +5,7 @@ description: "Session 工作目录替代内置 cwd 配置，工具展示元数�
 
 # 迁移工作目录配置与工具展示
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

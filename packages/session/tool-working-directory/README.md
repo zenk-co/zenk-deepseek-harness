@@ -5,27 +5,27 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-working-directory
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Read the Session’s current directory or enter an existing directory with the same tool. Relative changes use the current directory. The returned absolute path can be passed to other tools.
+セッションのカレントディレクトリの読み取りも、既存ディレクトリへの移動も同じツールで行う。相対変更はカレントディレクトリを基準とする。返される絶対パスは他のツールに渡せる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount alongside `tools` and `workingDirectory`. Call `working_directory({})` to read or `working_directory({ cd: "src" })` to change directory. The tool has no configuration fields.
+`tools` と `workingDirectory` と並べてマウントする。読み取りには `working_directory({})`、ディレクトリ変更には `working_directory({ cd: "src" })` を呼び出す。このツールに設定フィールドはない。
 
 ```yaml
 - name: '@deepseek-ai/dsh-tool-working-directory'
@@ -34,57 +34,57 @@ Mount alongside `tools` and `workingDirectory`. Call `working_directory({})` to 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The tool delegates validation, recovery, persistence, and context notices to the directory owner. Its canonical result contains `cwd`; native rendering returns that path. The generic tool card displays the arguments and result without a separate GUI renderer.
+このツールは検証、回復、永続化、コンテキスト通知をディレクトリ所有者に委譲する。正規結果は `cwd` を含み、ネイティブ描画はそのパスを返す。汎用ツールカードは引数と結果を、個別 GUI レンダラーなしに表示する。
 
-No runtime invariant companion is published because the tool delegates all directory state and mutations to `workingDirectory`.
+ディレクトリ状態と変更をすべて `workingDirectory` に委譲するため、公開される実行時不変条件コンパニオンはない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Working directories](../../../docs/subsystems/working-directory.md) — shared runtime behavior.
-- [Session group](../README.md) — durable Session services.
-- [Testing](../../../docs/testing.md) — composition and replay verification.
+- [作業ディレクトリ](../../../docs/subsystems/working-directory.md) — 共有実行時動作。
+- [セッショングループ](../README.md) — durable セッションサービス。
+- [テスト](../../../docs/testing.md) — 構成とリプレイ検証。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Tool schema and result
+### ツールスキーマと結果
 
-#### What the model sees
+#### モデルが見るもの
 
-The [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-working-directory) defines the optional `cd` argument and canonical `cwd` result. Directory notices are owned by `dsh-working-directory`.
+[ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-working-directory)は任意の `cd` 引数と正規の `cwd` 結果を定義する。ディレクトリ通知は `dsh-working-directory` が所有する。
 
-#### Token effect
+#### トークンへの影響
 
-The registered schema and returned path contribute tokens when the tool is available and invoked.
+登録済みスキーマと返されるパスは、ツールが利用可能で呼び出された際にトークンを消費する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Changing tool availability changes its schema context. A tool call appends ordinary call and result history without replacing prior messages.
+ツール可用性の変更によりスキーマコンテキストが変わる。ツール呼び出しは、以前のメッセージを置換せずに通常の呼び出し・結果履歴を追加する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Calling Session required** — the tool requires an Agent and changes neither existing processes nor write permissions.
+- **呼び出しセッションが必須** — このツールはエージェントを必要とし、既存プロセスも書き込み権限も変更しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

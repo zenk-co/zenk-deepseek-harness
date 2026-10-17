@@ -3,16 +3,16 @@ kind: upgrade-guide
 description: "JSONL persistence uses a namespace plugin import; direct service-class construction and class type annotations must use the persistence service instead."
 ---
 
-# Mount JSONL persistence through its plugin
+# JSONL 永続化をプラグイン経由でマウントする
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更内容
 
-`@deepseek-ai/dsh-session-persistence-jsonl` exports a function plugin through named `name`, `Config`, and `apply` exports, with no default export. Default imports, direct construction, subclassing, `instanceof`, and class type annotations are affected. The plugin retains listeners and handles through the consumer unloads triggered by removing this provider; concurrent root disposal remains unordered. The `sessionPersistence` service API, YAML configuration, and stored files remain unchanged.
+`@deepseek-ai/dsh-session-persistence-jsonl` は名前付き `name`、`Config`、`apply` エクスポートによる関数プラグインをエクスポートし、デフォルトエクスポートは無い。デフォルトインポート、直接構築、サブクラス化、`instanceof`、クラス型注釈が影響を受ける。プラグインはこのプロバイダーの削除によるコンシューマーアンロードで発動するリスナーとハンドルを保持し、並行ルート破棄は順序不定のままである。`sessionPersistence` サービス API、YAML 設定、保存ファイルは不変である。
 
-## Migration
+## 移行手順
 
-1. Replace the default import with `import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'`. Existing `ctx.plugin(JsonlSessionPersistence, config)` calls remain valid; replace direct construction with this mounting call. For dynamic imports, use the module namespace returned by `await import(...)` instead of its `.default`. Consumers declare `inject: ['sessionPersistence']` and access `ctx.sessionPersistence`.
-2. Use the `SessionPersistence` type from `@deepseek-ai/dsh-session-persistence` for service annotations. Replace concrete-class `instanceof` checks and subclasses with consumers of that service; the concrete JSONL class is private.
-3. Await plugin startup and confirm a session can be created, flushed, and reopened. Register asynchronous consumer cleanup in the scope that injects `sessionPersistence` so backend unloading waits for it.
+1. デフォルトインポートを `import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'` に置き換える。既存の `ctx.plugin(JsonlSessionPersistence, config)` 呼び出しは引き続き有効であり、直接構築をこのマウント呼び出しに置き換える。動的インポートでは `await import(...)` が返すモジュール名前空間をその `.default` の代わりに使う。コンシューマーは `inject: ['sessionPersistence']` を宣言し `ctx.sessionPersistence` にアクセスする。
+2. サービス注釈には `@deepseek-ai/dsh-session-persistence` の `SessionPersistence` 型を使う。具体クラスの `instanceof` 検査とサブクラスをそのサービスのコンシューマーに置き換える。具体的な JSONL クラスはプライベートである。
+3. プラグイン起動を待機し、セッションを作成・フラッシュ・再開できることを確認する。バックエンドのアンロードが待機するよう、非同期コンシューマークリーンアップを `sessionPersistence` を注入するスコープに登録する。

@@ -1,47 +1,47 @@
-# Post-mortem 0002: Filesystem snapshot tools were permanently disabled
+# ポストモーテム 0002: ファイルシステムスナップショットツールが恒久的に無効化された
 
-English | [中文](0002-js-expression-disabled-filesystem-tools.zh.md)
+日本語 | [English](0002-js-expression-disabled-filesystem-tools.en.md) | [中文](0002-js-expression-disabled-filesystem-tools.zh.md)
 
-Status: resolved
+ステータス: 解決済み
 
-## Executive summary
+## エグゼクティブサマリー
 
-The ACP example attempted to enable filesystem plugins conditionally with `disabled: !!js ...`, but Cordis evaluates JavaScript expressions only inside plugin `config`. The raw expression object was truthy, so the filesystem stack was always disabled. Snapshot refresh then accepted `UNKNOWN_TOOL` results as new expected outputs. The fix uses an explicit filesystem overlay and adds static-config and snapshot-result guards.
+ACP の例は `disabled: !!js ...` でファイルシステムプラグインを条件付きで有効化しようとしたが、Cordis は JavaScript 式をプラグイン `config` 内でのみ評価する。生の式オブジェクトは truthy だったので、ファイルシステムスタックは常に無効化されていた。スナップショットのリフレッシュはその後 `UNKNOWN_TOOL` 結果を新しい期待出力として受け入れた。修正は明示的なファイルシステム overlay を使用し、静的設定ガードとスナップショット結果ガードを追加する。
 
-## Summary
+## 概要
 
-The default ACP composition is intentionally bash-only because its sandbox cannot confine in-process filesystem providers. Filesystem snapshot scenarios still need `read`, `write`, and `edit`, so their plugins were placed in the default `cordis.yml` with a `disabled` expression intended to enable them only for full-access launches and snapshots.
+デフォルトの ACP コンポジションは意図的に bash のみである。そのサンドボックスはインプロセスのファイルシステムプロバイダーを閉じ込められないためである。ファイルシステムスナップショットシナリオは依然として `read`、`write`、`edit` を必要とするので、それらのプラグインはデフォルトの `cordis.yml` に、フルアクセス起動とスナップショットのためだけにそれらを有効化する意図の `disabled` 式とともに置かれた。
 
-Cordis Include parsed each `!!js` scalar into an expression object. The Loader recursively interpolated the plugin's `config`, but consumed entry metadata such as `disabled` directly. Every filesystem entry therefore saw a truthy object and remained disabled in every mode.
+Cordis Include は各 `!!js` スカラーを式オブジェクトにパースした。Loader はプラグインの `config` を再帰的に補間したが、`disabled` などのエントリーメタデータは直接消費した。したがってすべてのファイルシステムエントリーが truthy なオブジェクトを見て、すべてのモードで無効のままだった。
 
-## Impact
+## 影響
 
-Seven filesystem scenarios and the mixed workspace-edit scenario called tools that were absent from the registry. Their structured session logs carried `ToolNotFoundError` with code `UNKNOWN_TOOL`, while stdout rendered generic failed tool cards. The snapshot suite passed because both outputs matched the refreshed fixtures; it proved deterministic replay of the regression rather than successful filesystem behavior.
+7 つのファイルシステムシナリオと混合ワークスペース編集シナリオが、レジストリに存在しないツールを呼び出した。それらの構造化セッションログはコード `UNKNOWN_TOOL` を持つ `ToolNotFoundError` を運び、stdout は汎用の失敗ツールカードをレンダリングした。スナップショットスイートは両方の出力がリフレッシュされたフィクスチャと一致したため通過した。それは成功したファイルシステム動作ではなく、リグレッションの決定論的リプレイを証明していた。
 
-The live confined default did not gain unintended filesystem access. A naive interpolation fix would have created that risk: permission presets update bash sandbox and approval state at runtime, but cannot mount, unmount, or confine the filesystem stack.
+ライブの閉じ込められたデフォルトが意図しないファイルシステムアクセスを得ることはなかった。素朴な補間修正はそのリスクを生んでいただろう: パーミッションプリセットは実行時に bash サンドボックスと承認状態を更新するが、ファイルシステムスタックをマウント、アンマウント、閉じ込めすることはできない。
 
-## Timeline
+## タイムライン
 
-- PR #261 consolidated ACP compositions and refreshed the filesystem snapshots while introducing conditional filesystem entries.
-- All unit, coverage, snapshot, documentation, build, and hygiene checks passed.
-- Review of the refreshed filesystem expected outputs found generic failed cards and structured `UNKNOWN_TOOL` results.
-- A real Loader boot confirmed that every `disabled` value remained an expression object and every filesystem fiber was absent.
+- PR #261 が ACP コンポジションを統合し、条件付きファイルシステムエントリーを導入しつつファイルシステムスナップショットをリフレッシュした。
+- すべてのユニット、カバレッジ、スナップショット、ドキュメント、ビルド、ハイジーンチェックが通過した。
+- リフレッシュされたファイルシステム期待出力のレビューが、汎用の失敗カードと構造化された `UNKNOWN_TOOL` 結果を発見した。
+- 実際の Loader 起動が、すべての `disabled` 値が式オブジェクトのままであり、すべてのファイルシステムファイバーが不在であることを確認した。
 
-## Root cause
+## 根本原因
 
-The implementation assumed `!!js` applied to an entire Loader entry. It applies only to `entry.options.config`: `Entry._resolveConfig()` interpolates that field, while `Entry.disabled` tests `entry.options.disabled` without interpolation. The YAML tag was syntactically valid, so loading produced no diagnostic.
+実装は `!!js` が Loader エントリー全体に適用されると仮定していた。それは `entry.options.config` にのみ適用される: `Entry._resolveConfig()` がそのフィールドを補間し、`Entry.disabled` は補間なしで `entry.options.disabled` をテストする。YAML タグは構文的に有効だったので、ロードは診断を生成しなかった。
 
-The snapshot framework treated any deterministic transcript as valid behavior. Header pins verified the composed tool schemas, but the filesystem scenarios shared a pin from the default composition and therefore did not independently prove that their required tools were registered. Refresh rewrote the expected stdout and session logs before any semantic assertion rejected missing tools.
+スナップショットフレームワークは任意の決定論的トランスクリプトを有効な動作として扱った。ヘッダーピンは構成されたツールスキーマを検証したが、ファイルシステムシナリオはデフォルトコンポジションからのピンを共有していたので、必要なツールが登録されていることを独立に証明しなかった。リフレッシュは、意味論的アサーションが欠落ツールを拒否する前に、期待 stdout とセッションログを書き換えた。
 
-## Guardrails added
+## 追加されたガードレール
 
-- Filesystem scenarios boot `fs.cordis.yml`, an explicit fixed full-access overlay with a paired replay config and its own request-header class.
-- [`AGENTS.md`](../../AGENTS.md) and the [Cordis primer](../cordis-primer.md#loader-configuration) state that `!!js` is valid under plugin `config` and entry `disabled`; other entry metadata stays literal, so conditional composition uses overlays.
-- `verify-cordis-config` parses repository Cordis YAML and rejects expression nodes in Loader entry metadata, including include patches and inserted entries.
-- `dsh-session-snapshot` rejects structured `UNKNOWN_TOOL` results in fresh runs and committed session fixtures before they can be committed as expected outputs.
+- ファイルシステムシナリオは `fs.cordis.yml` を起動する。ペアのリプレイ設定と独自のリクエストヘッダークラスを持つ、明示的な固定フルアクセス overlay である。
+- [`AGENTS.md`](../../AGENTS.md) と [Cordis プライマー](../cordis-primer.md#loader-configuration) は、`!!js` がプラグイン `config` とエントリー `disabled` の下で有効であり、他のエントリーメタデータはリテラルのままで、条件付きコンポジションは overlay を使うと述べている。
+- `verify-cordis-config` はリポジトリの Cordis YAML をパースし、include パッチと挿入エントリーを含む Loader エントリーメタデータ内の式ノードを拒否する。
+- `dsh-session-snapshot` は新規実行とコミット済みセッションフィクスチャ内の構造化 `UNKNOWN_TOOL` 結果を、期待出力としてコミットされ得る前に拒否する。
 
-## Lessons
+## 教訓
 
-- A syntactically accepted configuration value is not necessarily evaluated at that location; document and verify exactly which fields are interpolated.
-- A snapshot refresh is fixture production, not correctness review. Semantic impossibilities such as a missing registered tool need assertions independent of the expected output.
-- Permission controls must describe only the capabilities they actually govern. Composition-time filesystem access cannot follow a runtime bash-only preset safely.
+- 構文的に受け入れられた設定値がその場所で評価されるとは限らない。どのフィールドが補間されるかを正確に文書化して検証する。
+- スナップショットのリフレッシュはフィクスチャ生成であり、正しさのレビューではない。登録済みツールの欠落のような意味論的不可能性には、期待出力から独立したアサーションが必要である。
+- パーミッション制御は、それが実際に統治するケイパビリティのみを記述しなければならない。コンポジション時のファイルシステムアクセスは、実行時の bash のみのプリセットに安全に従うことはできない。

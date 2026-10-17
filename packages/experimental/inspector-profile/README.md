@@ -5,67 +5,67 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-inspector-profile
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Enable this optional bundle to inspect Session data in the Sidebar and open NodeJS Inspector in the bottom panel. It enables both inspectors and Host fetch capture; the bundle itself is off by default in Plugin Manager.
+この任意バンドルを有効にすると、Sidebar でセッションデータを検査し、下部パネルで NodeJS Inspector を開ける。両方のインスペクターと Host fetch 取り込みを有効にする。バンドル自体は Plugin Manager でデフォルトオフである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Enable **Developer Tools** in Plugin Manager's official group. This selects `@deepseek-ai/dsh-experimental-inspector-profile` for the current Web profile.
+Plugin Manager の official グループで **Developer Tools** を有効にする。これにより現在の Web プロファイル用に `@deepseek-ai/dsh-experimental-inspector-profile` が選択される。
 
-Open **Session Log** from the Sidebar's new-tab menu or guide. [Session Inspector](../session-inspector/README.md) provides one view with selectable Raw Log and Chat Group presentations; Raw Log is selected initially.
+Sidebar の新規タブメニューまたはガイドから **Session Log** を開く。[Session Inspector](../session-inspector/README.md)は選択可能な Raw Log と Chat Group 表示を持つ 1 つのビューを提供する。Raw Log が初期選択である。
 
-Press **Ctrl/Cmd+Shift+.** to open or collapse **NodeJS Inspector** in the bottom panel with the packaged DevTools frontend. Enabling this bundle starts the local debugging backend and unredacted Host fetch capture; no user override or debugging argument is required.
+**Ctrl/Cmd+Shift+.** を押すと、パッケージ済み DevTools フロントエンドで下部パネルに **NodeJS Inspector** を開閉する。このバンドルの有効化によりローカルデバッグバックエンドと非編集 Host fetch 取り込みが開始される。ユーザーオーバーライドやデバッグ引数は不要である。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) enables Session Inspector and the NodeJS Inspector backend with `captureFetch: true`, independently of debugging flags. See the Inspector [README](../inspector/README.md) for debugging and capture behavior. Each plugin owns its behavior and lifetime.
+[`cordis.patch.yml`](cordis.patch.yml)はデバッグフラグとは独立に、Session Inspector と NodeJS Inspector バックエンドを `captureFetch: true` で有効にする。デバッグと取り込み動作は Inspector [README](../inspector/README.md) を参照。各プラグインが自身の動作と存続期間を所有する。
 
 </details>
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this bundle mounts developer inspection plugins without contributing model context.
+なし。このバンドルはモデルコンテキストを提供せずに開発者検査プラグインをマウントするためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; the bundle adds no request content.
+なし。このバンドルはリクエスト内容を追加しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Web only** — the inspection views require the Web application's Session services.
-- **Internal diagnostics** — the component switch remains available, but there is no dedicated Web debugging button. Explicit activation enables unredacted capture and local code execution; see the [security restrictions](../inspector/README.md#security).
+- **Web のみ** — 検査ビューは Web アプリケーションのセッションサービスを必要とする。
+- **内部診断** — コンポーネント切り替えは利用可能なままであるが、専用の Web デバッグボタンはない。明示的有効化により非編集取り込みとローカルコード実行が有効になる。[セキュリティ制限](../inspector/README.md#security)を参照。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

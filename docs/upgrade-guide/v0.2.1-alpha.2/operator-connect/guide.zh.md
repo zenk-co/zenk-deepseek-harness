@@ -5,7 +5,7 @@ description: "非页面 Client 默认不参与转发交互，并使用不带浏�
 
 # 为非页面客户端选择交互参与模式
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

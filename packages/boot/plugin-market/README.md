@@ -1,117 +1,117 @@
 ---
-description: "Host reader of the plugin market indexes a user configures, with installation status, compatibility, and the read-only plugin_market tool."
+description: "ユーザーが構成したプラグインマーケットインデックスの Host リーダー。インストール状態、互換性、読み取り専用の plugin_market ツール付き。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-plugin-market
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`pluginMarket` reads the plugin market indexes the user configures, validates them with [`dsh-plugin-market-index`](../../util/plugin-market-index/README.md), and annotates every entry with the profile's installation status, DSH compatibility, and the exact arguments that install it. The Web [Discover tab](../../client/ui-plugin-market/README.md) and the `plugin_market` agent tool read through it; installation itself goes through [`pluginManager.installBundle`](../plugin-manager/README.md). The format and its rationale live in the [index format Agent Note](../../../.agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md); the Host and Web design lives in the [Discover Agent Note](../../../.agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md).
+`pluginMarket` は、ユーザーが構成したプラグインマーケットインデックスを読み、[`dsh-plugin-market-index`](../../util/plugin-market-index/README.md) で検証し、すべてのエントリにプロファイルのインストール状態、DSH 互換性、およびそれをインストールする正確な引数を注記する。Web の [Discover タブ](../../client/ui-plugin-market/README.md) と `plugin_market` エージェントツールはこれを通じて読む。インストール自体は [`pluginManager.installBundle`](../plugin-manager/README.md) を通る。フォーマットとその根拠は [index format Agent Note](../../../.agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md) にあり、Host と Web の設計は [Discover Agent Note](../../../.agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md) にある。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The optional [custom plugin markets bundle](../../experimental/plugin-market-bundle/README.md) mounts the service as the `plugin-market` row; shipped profiles leave the bundle off. Like `plugin-manager`, the row is disabled without a profile, and it waits for `pluginManager`. No index source is configured by default, so the Host sends no market request until a user adds one.
+省略可能な [custom plugin markets バンドル](../../experimental/plugin-market-bundle/README.md) がこのサービスを `plugin-market` 行としてマウントする。出荷済みプロファイルはこのバンドルを外している。`plugin-manager` と同様、この行はプロファイルなしでは無効で、`pluginManager` を待つ。既定ではインデックスソースが構成されないので、ユーザーが追加するまで Host はマーケットリクエストを送信しない。
 
-| Config | Default | Meaning |
+| 設定 | 既定値 | 意味 |
 |---|---|---|
-| `indexes` | `[]` | Index URLs in display order. A usable URL is in canonical form and uses `http:` or `https:`, without credentials or fragment. The field is volatile: Discover, Settings, and `setIndexes` change it without remounting this service or `plugin-manager`. |
-| `fetchTimeoutMs` | `15000` | Deadline for one index fetch, including its body. |
-| `maxBytes` | `134217728` | Largest accepted index body. |
-| `cacheTtlMs` | `600000` | Lifetime of a successfully read document. |
+| `indexes` | `[]` | 表示順のインデックス URL。使用可能な URL は正規形で `http:` または `https:` を使い、認証情報もフラグメントもない。このフィールドは揮発性である。Discover、Settings、`setIndexes` がこのサービスや `plugin-manager` を再マウントせずに変更する。 |
+| `fetchTimeoutMs` | `15000` | ボディを含む 1 回のインデックスフェッチの期限。 |
+| `maxBytes` | `134217728` | 受け入れられるインデックスボディの最大サイズ。 |
+| `cacheTtlMs` | `600000` | 正常に読み取られたドキュメントの寿命。 |
 
-Settings and profile files can store any http(s) string, so the service validates each URL when it lists or reads it. `listIndexes` reports an unusable URL with its refusal, `search` and `entry` refuse it, and no request is sent to it; a repeated URL is listed once.
+Settings とプロファイルファイルは任意の http(s) 文字列を保存できるので、サービスは一覧または読み取りのたびに各 URL を検証する。`listIndexes` は使用不能な URL をその拒否とともに報告し、`search` と `entry` はそれを拒否し、それに対してリクエストは送信されない。繰り返された URL は 1 回だけ一覧される。
 
-The Remote methods are:
+Remote メソッドは次のとおり:
 
-- `listIndexes()` returns each configured URL with the title and description of its last successful read and, when the last read failed, its error. It never fetches.
-- `setIndexes(urls)` normalizes and validates each URL not already configured, keeps configured ones as written, refuses a repeated URL, and writes it through `settings.update` to this service's profile entry. It fails with `plugin-market/settings-unavailable` without Settings or a profile entry. The committed list is announced by `plugin-market/changed`.
-- `search(url, query)` accepts only a configured URL, so the service never fetches an arbitrary address. It returns one page of the plugins that match `query`, with the index title, description, and declarations, the document's `fetchedAt`, the `total` number of matches, and the `nextOffset`; each plugin carries its `defaultVersion` and `installation`, and each version its `install` and `compatibility`.
+- `listIndexes()` は、構成された各 URL を、最後に成功した読み取りのタイトルと説明、および最後の読み取りが失敗した場合はそのエラーとともに返す。これは決してフェッチしない。
+- `setIndexes(urls)` は、まだ構成されていない各 URL を正規化して検証し、構成済みのものは書かれたまま保持し、繰り返された URL を拒否し、`settings.update` を通じてこのサービスのプロファイルエントリに書き込む。Settings またはプロファイルエントリがない場合は `plugin-market/settings-unavailable` で失敗する。コミットされたリストは `plugin-market/changed` で告知される。
+- `search(url, query)` は構成済み URL のみを受け入れるので、サービスは任意のアドレスをフェッチしない。これは `query` に一致するプラグインの 1 ページを、インデックスのタイトル、説明、宣言、ドキュメントの `fetchedAt`、一致の `total` 数、`nextOffset` とともに返す。各プラグインはその `defaultVersion` と `installation` を、各バージョンはその `install` と `compatibility` を運ぶ。
 
-The service method `entry(url, name)`, which is not a Remote method, returns one plugin of a configured index in the same form, or `undefined` when the index does not list it.
+Remote メソッドではないサービメソッド `entry(url, name)` は、構成済みインデックスの 1 つのプラグインを同じ形式で返すか、インデックスがそれを掲載していない場合は `undefined` を返す。
 
-A query selects plugins with every one of its conditions:
+クエリはそのすべての条件でプラグインを選択する:
 
-| Field | Meaning |
+| フィールド | 意味 |
 |---|---|
-| `text` | Fuzzy words; see below. Text without letters or digits selects every plugin. |
-| `category` | The plugin's category id. |
-| `labels` | Label ids the plugin must all have. An undeclared category or label id matches no plugin. |
-| `sort` | `index` order; `relevance`, best text match first and index order without text; latest `published` time; or a declared sort `key`, with plugins lacking the value last. Each takes `asc` or `desc` where it has a direction, and ties keep index order. An undeclared sort key leaves index order. |
-| `offset`, `limit` | The page: `offset` is a non-negative integer and `limit` an integer from 1 to 100; other values fail with `plugin-market/invalid-query`. |
-| `refresh` | Fetch again instead of using the cached document. |
-| `fetchedAt` | `fetchedAt` of an earlier page: answer from that document while it is cached, even after `cacheTtlMs`, so later pages continue the same results. |
+| `text` | ファジーな単語。以下を参照。文字も数字も含まないテキストはすべてのプラグインを選択する。 |
+| `category` | プラグインのカテゴリ id。 |
+| `labels` | プラグインがすべて持たなければならないラベル id。宣言されていないカテゴリまたはラベル id はどのプラグインにも一致しない。 |
+| `sort` | `index` 順、`relevance`（テキストがある場合はベストマッチ順、ない場合はインデックス順）、最新の `published` 時刻、または宣言されたソート `key`（値を持たないプラグインは最後）。それぞれ方向がある場合は `asc` または `desc` を取り、同順位はインデックス順を保つ。宣言されていないソートキーはインデックス順のままにする。 |
+| `offset`, `limit` | ページ: `offset` は非負整数、`limit` は 1 から 100 の整数である。その他の値は `plugin-market/invalid-query` で失敗する。 |
+| `refresh` | キャッシュされたドキュメントを使う代わりに再フェッチする。 |
+| `fetchedAt` | 以前のページの `fetchedAt`: そのドキュメントがキャッシュされている間、`cacheTtlMs` の後でもそのドキュメントから回答するので、後のページは同じ結果を継続する。 |
 
-Text matches the package name, author, keywords, and every language of the title, description, and category and label titles. It is split into runs of letters, marks, and digits; a run of Chinese, Japanese, or Korean characters becomes its overlapping character pairs and its last character, so text written without spaces matches without a dictionary. Words are compared after NFKC normalization and without case. Every query word must match an indexed word as a prefix or, from four characters, within an edit distance of one fifth of its length rounded to the nearest integer, at most 2. Name and title matches weigh three times, and keyword matches twice, a match elsewhere.
+テキストはパッケージ名、作者、キーワード、およびタイトル、説明、カテゴリとラベルのタイトルのすべての言語に一致する。テキストは文字、マーク、数字の連なりに分割される。中国語、日本語、韓国語の文字の連なりは、重複する文字ペアと最後の文字になるので、スペースなしで書かれたテキストも辞書なしで一致する。単語は NFKC 正規化後、大文字小文字を区別せずに比較される。すべてのクエリ単語は、インデックスされた単語にプレフィックスとして一致するか、4 文字以上ではその長さの 5 分の 1（最も近い整数に丸め、最大 2）の編集距離以内で一致しなければならない。名前とタイトルの一致は他の場所での一致の 3 倍、キーワードの一致は 2 倍の重みを持つ。
 
-Failures use `plugin-market/invalid-query`, `plugin-market/invalid-index-url`, `plugin-market/unknown-index`, `plugin-market/fetch-failed`, and `plugin-market/invalid-index`; the last carries the JSON path of the offending value.
+失敗は `plugin-market/invalid-query`、`plugin-market/invalid-index-url`、`plugin-market/unknown-index`、`plugin-market/fetch-failed`、`plugin-market/invalid-index` を使う。最後のものは問題の値の JSON パスを運ぶ。
 
-The `plugin_market` tool lists the configured indexes, pages the plugins of one index in index order or, with a `query`, by best match, or pages one plugin's versions. It requires no approval because it reads only the sources the user configured and changes nothing; each version it returns carries the `target` and `registry` to pass to `plugin_manager`'s `install_bundle`, which keeps its own approval. The tool cannot change index sources. Creator mode keeps its row beside `plugin_manager`, and the row registers the tool only while `pluginMarket` is mounted; other presets keep it disabled.
+`plugin_market` ツールは構成されたインデックスを一覧し、1 つのインデックスのプラグインをインデックス順に、または `query` があればベストマッチ順にページングし、あるいは 1 つのプラグインのバージョンをページングする。ユーザーが構成したソースだけを読み、何も変更しないので承認は不要である。返される各バージョンは、`plugin_manager` の `install_bundle` に渡す `target` と `registry` を運び、これは独自の承認を保つ。このツールはインデックスソースを変更できない。Creator モードは `plugin_manager` の隣にその行を保ち、その行は `pluginMarket` がマウントされている間だけツールを登録する。他のプリセットは無効のままにする。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-The Host fetches with the process `fetch`, so the configured outbound proxy applies, and refuses redirects. The body is read up to `maxBytes`, then a fresh Worker Thread decodes it as strict UTF-8, parses it as JSON, and validates it; relative icon references resolve against the configured URL. The body's buffer moves to the Worker, and the validated index returns to the Host by structured clone. The Worker is the self-contained `lib/worker.cjs` bundle; disposal terminates it, and a Worker failure is reported as `plugin-market/fetch-failed`.
+Host はプロセスの `fetch` でフェッチするので、設定されたアウトバウンドプロキシが適用され、リダイレクトは拒否される。ボディは `maxBytes` まで読み取られ、次に新しい Worker Thread がそれを厳密な UTF-8 としてデコードし、JSON として解析し、検証する。相対アイコン参照は構成された URL に対して解決される。ボディのバッファーは Worker に移動し、検証済みインデックスは構造化クローンで Host に戻る。Worker は自己完結の `lib/worker.cjs` バンドルである。破棄はそれを終了させ、Worker の失敗は `plugin-market/fetch-failed` として報告される。
 
-Concurrent reads of one URL share one fetch. A successful document is cached for `cacheTtlMs`; `refresh` bypasses the cache. Each fetched document gets a new `fetchedAt`, and the cached document stays answerable by its `fetchedAt` until a later fetch replaces it. A failed read records its message for `listIndexes` and keeps no document. A read that finishes after its URL left the configuration updates neither cache nor error. On `loader/volatile-update` the service drops state of removed URLs and emits `plugin-market/changed`. Disposal aborts in-flight fetches.
+1 つの URL の並行読み取りは 1 つのフェッチを共有する。成功したドキュメントは `cacheTtlMs` の間キャッシュされる。`refresh` はキャッシュを迂回する。フェッチされた各ドキュメントは新しい `fetchedAt` を得て、キャッシュされたドキュメントは後のフェッチが置き換えるまでその `fetchedAt` で回答可能なままである。失敗した読み取りはそのメッセージを `listIndexes` のために記録し、ドキュメントを保持しない。URL が構成から外れた後に完了した読み取りは、キャッシュもエラーも更新しない。`loader/volatile-update` で、サービスは削除された URL の状態を落とし、`plugin-market/changed` を発行する。破棄は進行中のフェッチを abort する。
 
-Filtering and ordering read only the document; installation status and compatibility are computed for the returned page on every call. The first query with text in a document builds its text index with [MiniSearch](https://github.com/lucaong/minisearch), 500 plugins per event-loop turn, and later queries reuse it until the document is replaced.
+フィルタリングと順序付けはドキュメントだけを読む。インストール状態と互換性は、呼び出しごとに返されるページについて計算される。ドキュメント内でテキストを持つ最初のクエリは、[MiniSearch](https://github.com/lucaong/minisearch) でそのテキストインデックスを構築し（イベントループのターンごとに 500 プラグイン）、後のクエリはドキュメントが置き換えられるまでそれを再利用する。
 
-Compatibility is computed per version with `evaluatePluginCompatibility`, the version's `engines.dsh`, and the profile's version exemptions, the same check installation applies. A plugin's default version is its highest compatible version without a prerelease tag, or its highest compatible prerelease when it lists no version without one; a plugin with no compatible version has none. Installation status comes from `pluginManager.listBundles()` by package name, measured against the default version, or the highest version without one: `not-installed`, also for an on-demand catalog entry the profile has not installed; `installed` at that version; `update-available` when that version is greater; `different-version` when the installed version is unknown, not valid SemVer, or greater; and `provided` for a bundle the DSH installation ships.
+互換性はバージョンごとに `evaluatePluginCompatibility`、そのバージョンの `engines.dsh`、プロファイルのバージョン免除を使って計算され、インストールが適用するのと同じチェックである。プラグインの既定バージョンは、プレリリースタグのない最も高い互換バージョン、またはプレリリースなしのバージョンを一切掲載していない場合は最も高い互換プレリリースである。互換バージョンのないプラグインには既定バージョンがない。インストール状態はパッケージ名で `pluginManager.listBundles()` から得られ、既定バージョン、またはそれがなければ最も高いバージョンに対して測定される: `not-installed`（プロファイルがまだインストールしていないオンデマンドカタログエントリも同様）、そのバージョンでの `installed`、そのバージョンの方が大きい場合の `update-available`、インストール済みバージョンが不明、有効な SemVer でない、または大きい場合の `different-version`、そして DSH インストールが出荷するバンドルの `provided`。
 
-`marketInstallTarget` builds install arguments: `name@version` with the version's registry for npm, and `git+<url>.git#<commit>` with `&path:/<path>` for a package directory in Git.
+`marketInstallTarget` はインストール引数を構築する。npm にはバージョンのレジストリ付きの `name@version`、Git 内のパッケージディレクトリには `&path:/<path>` 付きの `git+<url>.git#<commit>`。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Market listing tool
+### マーケット一覧ツール
 
-#### What the model sees
+#### モデルが見るもの
 
-The [`plugin_market` tool](../../../docs/tool-catalog.md#deepseek-aidsh-plugin-market) returns JSON: configured index URLs with English titles and last errors, one page of plugins, in index order or by best match for a `query`, with name, English title, description, and author each truncated to 300 characters, homepage, repository, category, label ids, sort-key values, installation status, the default version, and the number of versions, or one page of a plugin's versions. Each returned version carries its ISO publish time, compatibility, and install arguments. Its description states that market text is third-party content, not instructions.
+[`plugin_market` ツール](../../../docs/tool-catalog.md#deepseek-aidsh-plugin-market) は JSON を返す。構成されたインデックス URL と英語タイトルおよび最後のエラー、プラグインの 1 ページ（インデックス順、または `query` に対してベストマッチ順）で、名前、英語タイトル、説明、作者はそれぞれ 300 文字に切り捨てられ、ホームページ、リポジトリ、カテゴリ、ラベル id、ソートキー値、インストール状態、既定バージョン、バージョン数を含む。あるいは 1 つのプラグインのバージョンの 1 ページ。返される各バージョンは ISO 公開時刻、互換性、インストール引数を運ぶ。その説明は、マーケットのテキストがサードパーティのコンテンツであり、指示ではないことを述べる。
 
-#### Token effect
+#### トークンへの影響
 
-The tool declaration is present when a preset mounts it; each call adds its JSON result, bounded by `limit` (at most 100 plugins or versions).
+ツール宣言はプリセットがそれをマウントするときに存在する。各呼び出しはその JSON 結果を追加し、`limit`（最大 100 プラグインまたはバージョン）で制限される。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only: results enter the conversation as ordinary tool results and do not change earlier request tokens.
+追記専用: 結果は通常のツール結果として会話に入り、以前のリクエストトークンを変えない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **No upgrade** — an installed bundle with a newer index version is reported as `update-available`; upgrading remains uninstall followed by install.
-- **Unsigned indexes** — index content, including a Git entry's name and version, is the market's claim; the installed manifest decides what is installed.
-- **Last write wins** — `setIndexes` replaces the whole list, so two windows editing sources at the same time can overwrite each other's change.
-- **Redirects refused** — an index served only behind a redirect must be configured at its final URL.
-- **Whole-document reads** — the Host downloads and keeps each index up to `maxBytes` and builds its text index in memory; a synthetic index of 20,000 plugins took about 0.8 s of build time and 130 MiB of heap. Parsing runs in a Worker, but receiving the validated index still blocks the Host event loop while the clone is deserialized: about 35 ms for a synthetic 7.6 MiB index of 20,000 plugins and about 190 ms for 38 MiB and 100,000 plugins. Larger markets need a server-side query protocol.
-- **Pages can change** — `fetchedAt` pins pages only while the document is cached; after another read replaces it, a reader must start again from the first page.
+- **アップグレードなし** — より新しいインデックスバージョンを持つインストール済みバンドルは `update-available` として報告される。アップグレードはアンインストール後にインストールするままである。
+- **署名なしインデックス** — Git エントリの名前とバージョンを含むインデックス内容はマーケットの主張である。何がインストールされるかはインストール済みマニフェストが決める。
+- **後書き優先** — `setIndexes` はリスト全体を置き換えるので、同時にソースを編集する 2 つのウィンドウが互いの変更を上書きしうる。
+- **リダイレクトは拒否** — リダイレクトの背後でのみ提供されるインデックスは、最終 URL で構成しなければならない。
+- **ドキュメント全体の読み取り** — Host は各インデックスを `maxBytes` までダウンロードして保持し、そのテキストインデックスをメモリ内に構築する。20,000 プラグインの合成インデックスは約 0.8 秒のビルド時間と 130 MiB のヒープを要した。解析は Worker で実行されるが、検証済みインデックスの受信はクローンのデシリアライズ中に Host のイベントループをブロックする。20,000 プラグインの合成 7.6 MiB インデックスで約 35 ms、38 MiB・100,000 プラグインで約 190 ms である。より大きなマーケットにはサーバー側のクエリプロトコルが必要である。
+- **ページは変わりうる** — `fetchedAt` がページを固定するのはドキュメントがキャッシュされている間だけである。別の読み取りが置き換えた後は、読者は最初のページからやり直さなければならない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

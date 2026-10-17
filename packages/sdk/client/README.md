@@ -1,37 +1,37 @@
 ---
-description: "The TypeScript SDK client for callers that spawn a DeepSeek Harness runtime subprocess and drive agent turns over stdio JSON-RPC: the DeepSeekHarness run API and the lower-level HarnessClient."
+description: "DeepSeek Harness ランタイムの subprocess を起動し、stdio JSON-RPC でエージェントのターンを駆動する呼び出し元向けの TypeScript SDK クライアント: DeepSeekHarness の run API と低レベルの HarnessClient。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-sdk-client
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-sdk-client` lets TypeScript programs start and drive a complete DeepSeek Harness runtime over stdio JSON-RPC. Use `DeepSeekHarness` to open sessions, send text or image prompts, collect event and notification streams, and obtain the last committed assistant response when the runtime becomes idle; use `HarnessClient` for direct protocol requests and subscriptions. Callers may provide `dshBin`; otherwise the client resolves the same-version `@deepseek-ai/dsh` executable. The client owns the subprocess across runs, exposes typed transport and protocol failures, and reaps it on `close()` or `await using`. It is suitable when the caller can choose the runtime profile and launch settings.
+`dsh-sdk-client` を使うと、TypeScript プログラムが stdio JSON-RPC 経由で完全な DeepSeek Harness ランタイムを起動して駆動できる。`DeepSeekHarness` でセッションを開き、テキストまたは画像のプロンプトを送り、イベントと通知のストリームを収集し、ランタイムがアイドルになったときに最後にコミットされたアシスタント応答を取得する。直接のプロトコルリクエストと購読には `HarnessClient` を使う。呼び出し元は `dshBin` を指定できる。指定しない場合、クライアントは同一バージョンの `@deepseek-ai/dsh` 実行ファイルを解決する。クライアントは実行をまたいで subprocess を所有し、型付きのトランスポートとプロトコルの失敗を公開し、`close()` または `await using` でそれを回収する。呼び出し元がランタイムプロファイルと起動設定を選べる場合に適している。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-`await harness.resumeSession(savedId)` restores a persisted session from the configured `dshHome` and returns a `HarnessSession` ready for `run()`. Save the original session id and reuse its home and workspace. Restoration preserves conversation history and its directory, repairs an interrupted final turn, and sends no new input. Missing, unreadable, incompatible, or occupied sessions reject without creating a replacement. `session(id)` remains a lazy handle for an in-process session; it does not request persisted restoration. Shell, browser, and other external processes are not restored by this API.
+`await harness.resumeSession(savedId)` は、構成された `dshHome` から永続化セッションを復元し、`run()` の準備ができた `HarnessSession` を返す。元の session id を保存し、そのホームとワークスペースを再利用する。復元は会話履歴とそのディレクトリを保ち、中断された最終ターンを修復し、新しい入力を送らない。欠落、読み取り不能、非互換、または使用中のセッションは、置き換えを作成せずに拒否する。`session(id)` はプロセス内セッションの遅延ハンドルのままであり、永続化された復元を要求しない。シェル、ブラウザー、その他の外部プロセスはこの API では復元されない。
 
-`HarnessSession.getWorkingDirectory()` reads the effective directory; `setWorkingDirectory(path)` changes it and returns the validated absolute path. Either method creates an unknown Session without starting a model turn. Relative paths use the Session's current directory. Origin metadata, permissions, and existing processes remain unchanged. `HarnessClient` exposes the same methods with a leading `sessionId` argument.
+`HarnessSession.getWorkingDirectory()` は有効なディレクトリを読み取り、`setWorkingDirectory(path)` はそれを変更して検証済みの絶対パスを返す。どちらのメソッドも、モデルのターンを開始せずに未知の Session を作成する。相対パスは Session の現在のディレクトリを使う。オリジンのメタデータ、権限、既存のプロセスは変更されない。`HarnessClient` は先頭に `sessionId` 引数を付けた同じメソッドを公開する。
 
-Use this client when TypeScript code must drive a complete Harness runtime from another process and you can name the runtime executable explicitly. The common path is minimal: construct a `DeepSeekHarness` with a launch spec, run prompts, and close it so the child process is always reaped.
+TypeScript のコードが別のプロセスから完全な Harness ランタイムを駆動する必要があり、ランタイム実行ファイルを明示的に名指せる場合はこのクライアントを使う。一般的な手順は最小限である。起動仕様で `DeepSeekHarness` を構築し、プロンプトを実行し、子プロセスが常に回収されるようクローズする。
 
-### Running agent turns with DeepSeekHarness
+### DeepSeekHarness でエージェントのターンを実行する
 
 ```ts
 import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client'
@@ -49,92 +49,91 @@ const result = await harness.run('say hi')
 console.log(result.finalResponse)
 ```
 
-The subprocess starts lazily on first use and stays owned by the instance across `run()` calls; call `close()` (or use `await using`) so the child is always reaped. `start()` memoizes the bounded `initialize` handshake, which carries the workspace cwd, provider/model route, optional adapter-owned `reasoningEffort`, and optional positive `maxTokens` output cap. The server validates that exact route before it accepts prompts; an omitted effort preserves the model's default. `initializeTimeoutMs` defaults to 10 seconds, and its diagnostic names the selected profile with the retained stderr tail. `run(input, { sessionId?, onNotification? })` accepts text or `SdkPromptContentBlock[]`; an inline raster block carries canonical base64 plus `mimeType` and becomes a durable attachment inside the runtime. The call owns one activity interval: it queues the prompt, waits until its message id appears in a durable inbox receipt, then collects through the next whole-agent `idle`. It returns `RunResult { sessionId, finalResponse, events, notifications }`, where `finalResponse` is the last committed root-session assistant text in that interval — not a response causally assigned to the prompt, because steering, injected context, and other queued work may contribute before idle. `session(id?)` opens a named or fresh session handle. When a failed handshake is cleaned up successfully, the instance installs a fresh client so a later call retries with a new process until terminal `close()`; if initialization and cleanup both fail, `start()` returns an ordered `AggregateError` and retains the failed client instead of spawning beside a process whose exit is unproved. `maxTokens` caps each root-agent request output and is inherited by in-process descendants; compaction plugins own their separate summary limits.
+subprocess は最初の使用時に遅延して起動し、`run()` 呼び出しをまたいでインスタンスが所有し続ける。`close()` を呼ぶ（または `await using` を使う）ことで子が常に回収される。`start()` は有界の `initialize` ハンドシェイクをメモ化し、それはワークスペースの cwd、プロバイダー/モデルのルート、任意のアダプター所有の `reasoningEffort`、および任意の正の `maxTokens` 出力上限を運ぶ。サーバーはプロンプトを受け入れる前にその正確なルートを検証する。省略されたエフォートはモデルの既定値を保つ。`initializeTimeoutMs` の既定値は 10 秒で、その診断は選択されたプロファイルを保持された stderr の末尾とともに名指す。`run(input, { sessionId?, onNotification? })` はテキストまたは `SdkPromptContentBlock[]` を受け取る。インラインのラスターブロックは正規の base64 と `mimeType` を運び、ランタイム内で耐久性のある添付になる。この呼び出しは 1 つのアクティビティ区間を所有する。プロンプトをキューし、そのメッセージ id が耐久性のある受信箱レシートに現れるまで待ち、次にエージェント全体が `idle` を報告するまで収集する。`RunResult { sessionId, finalResponse, events, notifications }` を返す。ここで `finalResponse` はその区間で最後にコミットされたルートセッションのアシスタントテキストであり、プロンプトに因果的に割り当てられた応答ではない。ステアリング、注入されたコンテキスト、その他のキュー済み作業がアイドル前に寄与することがあるためである。`session(id?)` は名前付きまたは新しいセッションハンドルを開く。失敗したハンドシェイクのクリーンアップが成功した場合、インスタンスは新しいクライアントを設置し、終端の `close()` まで後の呼び出しが新しいプロセスで再試行する。初期化とクリーンアップの両方が失敗した場合、`start()` は順序付きの `AggregateError` を返し、終了が証明されていないプロセスの隣で spawn する代わりに失敗したクライアントを保持する。`maxTokens` は各ルートエージェントリクエストの出力を上限し、プロセス内の子孫に継承される。コンパクションプラグインは独自の要約上限を所有する。
 
-### Lower-level control with HarnessClient
+### HarnessClient による低レベル制御
 
-`HarnessClient` is the protocol client under the run API: explicit `start()`, `initialize()`, `prompt()`, `request()`, and `close()`, plus notification subscriptions. `prompt()` returns the queued message id as soon as the runtime accepts it and never waits for agent activity. `subscribe(filter?)` returns a `NotificationSubscription` (awaitable `next()`, non-blocking `tryNext()`, async iteration); `subscribeSessionTree(id)` scopes to one session and the descendants discovered from `subagent.started` lineage edges — the runtime notifies for every session in its context, and scoping is client-side, exactly like the Python SDK.
+`HarnessClient` は run API の下にあるプロトコルクライアントである。明示的な `start()`、`initialize()`、`prompt()`、`request()`、`close()`、および通知の購読を備える。`prompt()` はランタイムが受け入れた時点でキュー済みのメッセージ id を返し、エージェントのアクティビティを決して待たない。`subscribe(filter?)` は `NotificationSubscription`（await 可能な `next()`、ノンブロッキングの `tryNext()`、非同期イテレーション）を返す。`subscribeSessionTree(id)` は 1 つのセッションと、`subagent.started` の系統エッジから発見された子孫にスコープする。ランタイムはそのコンテキスト内のすべてのセッションについて通知し、スコープは Python SDK とまったく同じくクライアント側である。
 
-Task-owning consumers can subscribe before `prompt()`, then call `request('session/wait', { sessionId })` and drain queued notifications with `tryNext()`. This waits for managed descendants and their root summary turns; `HarnessSession.run()` retains its next-idle interval. `validatedSessionEvent()` validates the event envelope and the assistant/turn fields consumed by SDK readers before they enter an output fold.
+タスクを所有するコンシューマーは `prompt()` の前に購読し、次に `request('session/wait', { sessionId })` を呼び、キュー済みの通知を `tryNext()` で排出できる。これは管理対象の子孫とそのルート要約ターンを待つ。`HarnessSession.run()` は自身の next-idle 区間を保つ。`validatedSessionEvent()` はイベントエンベロープと、SDK のリーダーが消費するアシスタント/ターンのフィールドを、出力フォールドに入る前に検証する。
 
-The client exports typed errors for every failure mode: `JsonRpcResponseError` (a wire error response, code and data preserved), `RequestTimeoutError` (a configured bound elapsed), `SdkProtocolError` (a response outside the documented protocol), and `TransportClosedError` (the runtime is gone — the message carries the exit code and a bounded stderr tail). `close()` requests protocol `shutdown` (bounded by `shutdownTimeoutMs`, default 1000 ms), then walks a stdin-EOF → SIGTERM → SIGKILL ladder until the process has exited; it is idempotent, and a closed client refuses reuse. `HarnessClientOptions.env` replaces the child environment entirely when given (`undefined` inherits the parent's); callers own credential policy — `scrubbedParentEnv` from `dsh-subprocess` is the shared scrub base for isolation-minded launches.
+クライアントはすべての失敗モードに型付きエラーをエクスポートする。`JsonRpcResponseError`（ワイヤのエラー応答。コードとデータを保持）、`RequestTimeoutError`（構成された上限を経過）、`SdkProtocolError`（文書化されたプロトコルの外の応答）、`TransportClosedError`（ランタイムが消滅。メッセージは終了コードと有界の stderr 末尾を運ぶ）である。`close()` はプロトコルの `shutdown` を要求し（`shutdownTimeoutMs` で制限、既定 1000 ms）、次にプロセスが終了するまで stdin-EOF → SIGTERM → SIGKILL のラダーを進む。冪等であり、クローズ済みクライアントは再利用を拒否する。`HarnessClientOptions.env` は指定された場合に子環境を完全に置き換える（`undefined` は親のものを継承する）。資格情報ポリシーは呼び出し元が所有する。`dsh-subprocess` の `scrubbedParentEnv` は、分離を重視する起動のための共有スクラブベースである。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design behind the client; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションはクライアントの背後の設計を説明する。観測可能な挙動は[このパッケージを使う](#use-this-package)で完全にカバーされている。
 
-### Design concept
+### 設計概念
 
-The client is two layers over one wire: `DeepSeekHarness` (owned runs) over `HarnessClient` (the protocol client), mirroring the Python SDK's layering. It runs outside any harness context, so it spawns the runtime directly rather than through the `dsh-subprocess` service — the seam's documented exception for SDK-managed transports — and its teardown ladder lives in this package. The runtime notifies for every session in its context; session-tree scoping is a client-side filter over `subagent.started` lineage edges.
+クライアントは 1 つのワイヤの上の 2 つの層である。`HarnessClient`（プロトコルクライアント）の上の `DeepSeekHarness`（所有された実行）であり、Python SDK の層構成を反映する。harness コンテキストの外側で動作するため、`dsh-subprocess` サービスを通さずにランタイムを直接 spawn する——SDK 管理のトランスポートに対する seam の文書化された例外——そしてそのテアダウンラダーは本パッケージにある。ランタイムはそのコンテキスト内のすべてのセッションについて通知し、セッションツリーのスコープは `subagent.started` の系統エッジに対するクライアント側のフィルターである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/api.ts`](src/api.ts) | `DeepSeekHarness` + `HarnessSession`: owned runs, receipt-to-idle collection, `finalResponse` |
-| [`src/client.ts`](src/client.ts) | `HarnessClient`: spawn, handshake, requests, subscription fan-out, typed errors |
-| [`src/dispose.ts`](src/dispose.ts) | Private teardown ladder: stdin EOF → SIGTERM → SIGKILL to actual exit |
-| [`src/types.ts`](src/types.ts) | Launch and timeout options, notification shapes, `RunResult` |
-| [`src/index.ts`](src/index.ts) | Consumer interface: the two client layers and caller-facing types |
+| [`src/api.ts`](src/api.ts) | `DeepSeekHarness` + `HarnessSession`: 所有された実行、レシートからアイドルまでの収集、`finalResponse` |
+| [`src/client.ts`](src/client.ts) | `HarnessClient`: spawn、ハンドシェイク、リクエスト、購読のファンアウト、型付きエラー |
+| [`src/dispose.ts`](src/dispose.ts) | 私有のテアダウンラダー: stdin EOF → SIGTERM → SIGKILL から実際の終了まで |
+| [`src/types.ts`](src/types.ts) | 起動とタイムアウトのオプション、通知の形、`RunResult` |
+| [`src/index.ts`](src/index.ts) | コンシューマーインターフェース: 2 つのクライアント層と呼び出し元向けの型 |
 
-### Owned activity flow
+### 所有されたアクティビティの流れ
 
-A run subscribes to the session tree, queues the prompt, waits until the prompt's message id appears in a durable `agent/inbox/spliced` receipt, then collects notifications until the whole agent reports `idle`. `finalResponse` is derived from the last `assistant/message` in the collected events. Transport loss, timeout, and protocol violations reject the run; model outcomes remain observable in the event stream without being attributed to one input.
+実行はセッションツリーを購読し、プロンプトをキューし、プロンプトのメッセージ id が耐久性のある `agent/inbox/spliced` レシートに現れるまで待ち、次にエージェント全体が `idle` を報告するまで通知を収集する。`finalResponse` は収集されたイベントの最後の `assistant/message` から導出される。トランスポートの喪失、タイムアウト、プロトコル違反は実行を拒否する。モデルの結果は、1 つの入力に帰属されないままイベントストリームで観測可能であり続ける。
 
-### Errors and teardown
+### エラーとテアダウン
 
-Every failure mode maps to one exported error class — a wire error response, an elapsed request bound, a response outside the documented protocol, or a dead runtime — so callers branch on failure type; the four classes are exported from [src/index.ts](src/index.ts). Teardown is a private, idempotent escalation (stdin EOF → SIGTERM → SIGKILL) in [src/dispose.ts](src/dispose.ts) that ends only at actual process exit.
+すべての失敗モードは 1 つのエクスポートされたエラークラスに対応する——ワイヤのエラー応答、経過したリクエスト上限、文書化されたプロトコルの外の応答、または死んだランタイム——ため、呼び出し元は失敗の型で分岐する。4 つのクラスは [src/index.ts](src/index.ts) からエクスポートされる。テアダウンは [src/dispose.ts](src/dispose.ts) の私有で冪等なエスカレーション（stdin EOF → SIGTERM → SIGKILL）であり、実際のプロセス終了でのみ終わる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the client contract is not enough. They move from the wire protocol to the serving plugin and the applications that use this client.
+クライアント契約で足りない場合はこれらのページを読む。ワイヤプロトコルから、サービスを提供するプラグインとこのクライアントを使うアプリケーションへと進む。
 
-- [SDK wire protocol](../protocol/README.md) — the JSON-RPC methods and payload shapes this client speaks.
-- [JSON-RPC serving plugin](../server/README.md) — the runtime plugin that serves this client.
-- [Python SDK](../../../python/README.md) — the design twin that shares the same runtime peer and protocol.
-- [SDK subagent backend](../../subagent/subagent-dsh-sdk/README.md) — a harness-internal consumer of this client.
-- [SDK application bundle](../../bundle/sdk-app/README.md) — the `dsh --profile sdk` runtime application this client launches.
+- [SDK ワイヤプロトコル](../protocol/README.md) — このクライアントが話す JSON-RPC メソッドとペイロードの形。
+- [JSON-RPC サービス提供プラグイン](../server/README.md) — このクライアントにサービスするランタイムプラグイン。
+- [Python SDK](../../../python/README.md) — 同じランタイムピアとプロトコルを共有する設計上の双子。
+- [SDK サブエージェントバックエンド](../../subagent/subagent-dsh-sdk/README.md) — このクライアントの harness 内部のコンシューマー。
+- [SDK アプリケーションバンドル](../../bundle/sdk-app/README.md) — このクライアントが起動する `dsh --profile sdk` ランタイムアプリケーション。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this is a client-process library; model-facing behavior lives in the spawned runtime's composed plugins.
+なし。これはクライアントプロセスのライブラリであり、モデル向けの挙動は spawn されたランタイムのコンポーズされたプラグインにある。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None in the client process. Profile, patch, provider, model, and history choices determine cache reuse in the child.
+クライアントプロセスにはない。プロファイル、パッチ、プロバイダー、モデル、履歴の選択が子でのキャッシュ再利用を決める。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
+これらの制限は、このクライアントが不向きになる、または特別な注意を要する状況を定義する。他の SDK クライアントとの比較やタスクバックログではなく、現在のパッケージの制約である。
 
-These limits define when the client is a poor fit or needs special care. They are current package constraints, not a comparison with other SDK clients or a task backlog.
-
-- **No bundled-runtime resolution** — the client resolves the same-version `@deepseek-ai/dsh` package (or a caller-provided `dshBin`); packaged-executable discovery stays Python-side until a TypeScript distribution consumer exists.
-- **No mid-turn cancel** — the wire has no prompt-cancel method; abandoning a turn means closing the runtime (see the [protocol limitations](../protocol/README.md#known-limitations-and-deferred-work)).
-- **No per-prompt result** — low-level `prompt()` returns only an enqueue receipt; high-level `run()` owns receipt-to-idle collection, and abandoning it means closing the runtime.
-- **Client→server notifications and server→client requests are unimplemented** on both wire ends; the transport carries them for future approval flows.
+- **バンドル済みランタイムの解決はない** — クライアントは同一バージョンの `@deepseek-ai/dsh` パッケージ（または呼び出し元が指定した `dshBin`）を解決する。パッケージ化された実行ファイルの発見は、TypeScript のディストリビューションのコンシューマーが現れるまで Python 側に留まる。
+- **ターン途中のキャンセルはない** — ワイヤにプロンプトキャンセルメソッドはない。ターンを放棄するにはランタイムをクローズする（[プロトコルの制限](../protocol/README.md#known-limitations-and-deferred-work)を参照）。
+- **プロンプトごとの結果はない** — 低レベルの `prompt()` はエンキューされたレシートのみを返す。高レベルの `run()` がレシートからアイドルまでの収集を所有し、それを放棄するにはランタイムをクローズする。
+- **Client→server の通知と server→client のリクエストは未実装** — どちらのワイヤ端でも。トランスポートは将来の承認フローのためにそれらを運ぶ。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers and is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the code. The launch spec is intentionally fully explicit: no bundled-runtime resolution is planned for TypeScript until a distribution consumer exists. Keep the dispose ladder and the error vocabulary in sync with the Python client, which drives the same runtime. No other unresolved design questions are recorded.
+この開発者ノートはメンテナー向けの作業コンテキストであり、明示的に非権威である。出荷済みの挙動と制限は、上記のセクションとコードにある。起動仕様は意図的に完全に明示的である。TypeScript 向けのバンドル済みランタイムの解決は、ディストリビューションのコンシューマーが現れるまで計画されていない。dispose ラダーとエラー語彙は、同じランタイムを駆動する Python クライアントと同期させておくこと。その他の未解決の設計上の問いは記録されていない。
 
 </details>

@@ -5,83 +5,83 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-computer-use
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-A deployment can enable one computer-use provider at a time. Loading another provider fails with the registered provider name. Each provider supplies its own tools and desktop operations. This package adds no model-visible tools and does not coordinate concurrent Sessions.
+デプロイでは一度に 1 つの computer-use プロバイダーを有効にできる。別のプロバイダーを読み込むと、登録済みプロバイダー名で失敗する。各プロバイダーは独自のツールとデスクトップ操作を提供する。このパッケージはモデル可視のツールを追加せず、並行セッション間の調整も行わない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the service once beside the chosen provider in a Cordis composition:
+選択したプロバイダーと並べて、サービスを 1 回マウントする（Cordis 構成内）:
 
 ```yaml
 - name: '@deepseek-ai/dsh-computer-use'
 ```
 
-The service has no configuration. Provider plugins inject `computerUse` and call `ctx.computerUse.register(ComputerUseProviderName(name))`; the brand is exported from `@deepseek-ai/dsh-computer-use/brand`. The returned effect disposer releases that registration.
+このサービスに設定はない。プロバイダープラグインは `computerUse` をインジェクトし、`ctx.computerUse.register(ComputerUseProviderName(name))` を呼び出す。このブランドは `@deepseek-ai/dsh-computer-use/brand` からエクスポートされる。返されるエフェクト破棄子がその登録を解放する。
 
-Providers stop admitting tool calls, close their resources, and await owned work before releasing the registration. `ctx.computerUse.providerName` reports the registered name until release.
+プロバイダーはツール呼び出しの受け付けを停止し、リソースを閉じ、登録を解放する前に所有する作業を待機する。`ctx.computerUse.providerName` は解放まで登録名を報告する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-One private name owns the slot. Cordis effects remove contributions when their plugin unloads; a repeated disposer cannot remove a later registration. The [source](src/index.ts) contains no driver object, operation interface, or provider selector.
+1 つのプライベート名がスロットを所有する。プラグインのアンロード時に Cordis エフェクトが提供物を除去し、繰り返された破棄子が後の登録を除去することはない。[ソース](src/index.ts)にはドライバーオブジェクト、操作インターフェース、プロバイダーセレクターは含まれない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Computer use](../../../docs/subsystems/computer-use.md) — provider selection and shared-desktop limits.
-- [Cua Driver MCP provider](../../experimental/computer-use-cua-driver-mcp/README.md) — use an installed driver.
-- [Cua Driver native provider](../../experimental/computer-use-cua-driver-native/README.md) — use the npm runtime.
+- [Computer use](../../../docs/subsystems/computer-use.md) — プロバイダー選択と共有デスクトップの制限。
+- [Cua Driver MCP プロバイダー](../../experimental/computer-use-cua-driver-mcp/README.md) — インストール済みドライバーを使用する。
+- [Cua Driver ネイティブプロバイダー](../../experimental/computer-use-cua-driver-native/README.md) — npm ランタイムを使用する。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this registry only records provider names.
+なし。このレジストリーはプロバイダー名を記録するだけである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Registration does not alter model requests. Provider-owned tools and guidance determine their own request-prefix effects.
+登録によってモデルリクエストは変わらない。プロバイダー所有のツールとガイダンスが、それぞれのリクエストプレフィックスへの影響を決定する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-The service limits registrations within its Cordis service instance.
+このサービスは Cordis サービスインスタンス内での登録を制限する。
 
-- **Shared desktop** — concurrent Sessions and separate DSH processes can operate the same desktop; callers coordinate whole computer-use workflows.
-- **Provider selection** — configuration selects the provider; the model cannot switch registered drivers at runtime.
+- **共有デスクトップ** — 並行セッションや別の DSH プロセスが同じデスクトップを操作できる。呼び出し元は computer-use ワークフロー全体を調整する。
+- **プロバイダー選択** — プロバイダーは設定で選択する。モデルは実行時に登録済みドライバーを切り替えられない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

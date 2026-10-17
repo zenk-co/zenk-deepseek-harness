@@ -1,12 +1,12 @@
-# 6. Composition and HMR
+# 6. コンポジションと HMR
 
-English | [中文](06-composition-and-hmr.zh.md)
+日本語 | [English](06-composition-and-hmr.en.md) | [中文](06-composition-and-hmr.zh.md)
 
-Every capability built so far is a plugin, and `cordis.yml` selects the application's plugin tree. This chapter changes that composition, hot-reloads a plugin, and diagnoses a plugin that never loads.
+これまでに作ったすべてのケイパビリティはプラグインであり、`cordis.yml` がアプリケーションのプラグインツリーを選ぶ。この章ではそのコンポジションを変更し、プラグインをホットリロードし、読み込まれないプラグインを診断する。
 
-## Entries are more than a name
+## エントリーは名前以上のもの
 
-A config entry accepts metadata beyond `name` and `config`:
+設定エントリーは `name` と `config` を超えるメタデータを受け付ける:
 
 ```yaml
 - id: greeter          # stable identity for this entry
@@ -16,15 +16,15 @@ A config entry accepts metadata beyond `name` and `config`:
   disabled: true       # keep the entry, skip mounting it
 ```
 
-`id` gives the entry a stable identity so the loader can tell an edit to an existing entry apart from a removal plus an addition. `disabled: true` unmounts a plugin without deleting its entry — flip it back and the plugin (and everything PENDING on its services) loads again.
+`id` はエントリーに安定した識別子を与え、ローダーが既存エントリーへの編集と削除＋追加を区別できるようにする。`disabled: true` はエントリーを削除せずにプラグインのマウントを外す。戻せばプラグイン（とそのサービスを PENDING しているすべて）が再び読み込まれる。
 
-Groups nest a sub-list of entries that load and unload as one unit, and `isolate` gives a group its own instance of a service name — two groups can each see a differently configured `shell` provider without affecting each other. The [Cordis primer](../cordis-primer.md) and the [service isolation example](../user/develop/framework/service.md#service-isolation) cover the details.
+グループはエントリーのサブリストを入れ子にし、1 単位で読み込み・破棄する。`isolate` はグループにサービス名の独自インスタンスを与え、2 つのグループが互いに影響せず異なる設定の `shell` プロバイダーを参照できる。[Cordis 入門](../cordis-primer.md)と[サービス分離の例](../user/develop/framework/service.md#service-isolation)が詳細を扱う。
 
-## Hot module replacement
+## ホットモジュールリプレースメント
 
-Because unloading releases effects ([chapter 2](02-lifecycle-and-effects.md)) and loading follows dependencies ([chapter 3](03-services.md)), HMR can replace a running plugin by unloading and loading it. The `@deepseek-ai/dsh-hmr` plugin watches your files and does exactly that on save.
+アンロードでエフェクトが解放され（[第 2 章](02-lifecycle-and-effects.md)）、読み込みが依存関係に従うため（[第 3 章](03-services.md)）、HMR は実行中のプラグインをアンロード・再読み込みで置換できる。`@deepseek-ai/dsh-hmr` プラグインはファイルを監視し、保存時にまさにそれを行う。
 
-In `tmp/cordis-tutorial`, write `cordis.yml`:
+`tmp/cordis-tutorial` に `cordis.yml` を書く:
 
 ```yaml
 - id: logger
@@ -39,15 +39,15 @@ In `tmp/cordis-tutorial`, write `cordis.yml`:
   name: './hello.ts'
 ```
 
-Two support plugins joined the list: HMR logs through the Cordis logger service, so without a console exporter you would not see its messages, and it `inject`s the `timer` service for debouncing — without `@deepseek-ai/cordis-plugin-timer` it sits in PENDING forever, silently. That silence is the subject of the next section.
+2 つの支援プラグインが一覧に加わった。HMR は Cordis ロガーサービス経由で記録するため、コンソール出力先がなければそのメッセージは見えず、`timer` サービスを `inject` してデバウンスするため、`@deepseek-ai/cordis-plugin-timer` がなければ永久に PENDING のまま黙り続ける。その沈黙が次の節の主題である。
 
-HMR reads Node's loader internals through the Loader's native helper. Run Cordis under tsx:
+HMR はローダーのネイティブヘルパー経由で Node のローダー内部を読む。Cordis を tsx 配下で実行する:
 
 ```sh
 node --import tsx ../../vendor/cordis/bin.js
 ```
 
-Now edit `hello.ts` — change the log message — and save:
+`hello.ts` を編集してログメッセージを変え、保存する:
 
 ```
 hello from my first plugin
@@ -56,13 +56,13 @@ hello from my first plugin
 hello from my EDITED plugin
 ```
 
-The old instance unloaded (all its effects unwound), the new code loaded, `apply` ran again. Stop the process with Ctrl-C. Editing `cordis.yml` itself is also picked up: the loader diffs entries by `id` and mounts, unmounts, or reconfigures only what changed. This is why the entries above carry explicit `id`s — an entry without one gets a generated id on every read, so after any config-file edit it counts as removed-plus-added and remounts even if its own lines did not change.
+古いインスタンスはアンロードされ（すべてのエフェクトが巻き戻され）、新しいコードが読み込まれ、`apply` が再実行された。Ctrl-C でプロセスを止める。`cordis.yml` 自体の編集も検出される。ローダーは `id` でエントリーを差分し、変わったものだけマウント・破棄・再設定する。だから上記エントリーには明示的な `id` が付いている。`id` のないエントリーは読み込みのたびに生成 id を得るため、設定ファイルの編集後は自身の行が変わっていなくても削除＋追加と数えられ、再マウントされる。
 
-## Diagnosing a plugin that never loads
+## 読み込まれないプラグインの診断
 
-The flip side of dependency-driven loading: a plugin whose `inject` names a service nobody provides waits forever, printing nothing. No error — PENDING is a legitimate state, since the provider may be mounted later.
+依存関係駆動の読み込みの裏返しとして、`inject` に誰も提供しないサービス名を書いたプラグインは永久に待ち、何も出力しない。エラーにならない。プロバイダーが後からマウントされるかもしれないため、PENDING は正当な状態である。
 
-You can see the states directly. Every context can enumerate the plugin registry; create `diagnose.ts`:
+状態は直接見られる。すべてのコンテキストはプラグインレジストリを列挙できる。`diagnose.ts` を作る:
 
 ```ts
 import { FiberState, type Context } from '@deepseek-ai/cordis'
@@ -82,7 +82,7 @@ export function apply(ctx: Context) {
 }
 ```
 
-And a plugin with an unsatisfiable dependency, `needs-timer.ts`:
+そして満たせない依存を持つプラグイン `needs-timer.ts`:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -100,14 +100,14 @@ export function apply(ctx: Context) {
 - name: './diagnose.ts'
 ```
 
-Run it (plain `node --import tsx ../../vendor/cordis/bin.js`; stop with Ctrl-C):
+実行する（素の `node --import tsx ../../vendor/cordis/bin.js`。Ctrl-C で止める）:
 
 ```
 needs-timer is PENDING — a required service is missing
 ```
 
-`inject: ['timer']` has no provider. Add `- name: '@deepseek-ai/cordis-plugin-timer'` to the list and the plugin loads. When a plugin does nothing and reports nothing, inspect its fiber state. Iterating without the PENDING filter also shows the loader's own plugins (Loader, Include) as ACTIVE fibers because plugins mount the config file itself.
+`inject: ['timer']` にプロバイダーがいない。一覧に `- name: '@deepseek-ai/cordis-plugin-timer'` を加えるとプラグインは読み込まれる。プラグインが何もせず何も報告しないときはファイバー状態を調べること。PENDING 絞り込みなしの反復では、設定ファイル自体をマウントするプラグイン（Loader、Include）も ACTIVE ファイバーとして表示される。
 
-Next: [Into the harness](07-into-the-harness.md) — the same patterns against real harness services.
+次: [ハーネスの世界へ](07-into-the-harness.md) — 実際のハーネスサービスに対する同じパターンである。
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)

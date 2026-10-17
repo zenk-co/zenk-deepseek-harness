@@ -1,69 +1,69 @@
-# Translation rules
+# 翻訳ルール
 
-English | [中文](translation-rules.zh.md)
+日本語 | [English](translation-rules.en.md) | [中文](translation-rules.zh.md)
 
-How to translate between the two sides of a documentation pair in this repo. Both languages carry equal authority ([README.md](README.md)): a change is authored in either language, and that side is the source for that update — these rules govern producing or updating the counterpart. They bind humans and agents equally. Routine agent work translates the changed content directly in one terminology-guided pass; the extended [.agents/skills/dsh-translate-docs](../../.agents/skills/dsh-translate-docs/SKILL.md) workflow runs only when the user explicitly invokes it. Rule levels follow RFC 2119 usage: **MUST** / **MUST NOT** are gate- or review-blocking; **SHOULD** needs a stated reason to deviate; **MAY** is discretionary.
+このリポジトリでドキュメントペアの両側の間をどう翻訳するか。両言語は同等の権威を持つ（[README.md](README.md)）: 変更はどちらの言語で著されてもよく、その側がその更新のソースである — これらのルールは対になる側の作成または更新を統治する。これらは人間とエージェントを同等に拘束する。日常的なエージェント作業は変更されたコンテンツを 1 回の用語ガイド付きパスで直接翻訳し、拡張された [.agents/skills/dsh-translate-docs](../../.agents/skills/dsh-translate-docs/SKILL.md) ワークフローはユーザーが明示的に呼び出したときにのみ実行する。ルールレベルは RFC 2119 の用法に従う: **MUST** / **MUST NOT** はゲートまたはレビューをブロックし、**SHOULD** は逸脱に理由の明示を必要とし、**MAY** は任意である。
 
-## Faithfulness
+## 忠実性
 
-- The counterpart *MUST* say what the authored side says — no added behavior, prerequisites, warnings, version claims, or examples, and no dropped ones. If the pair disagrees on substance, neither language wins by default: fix the side that is wrong, then bring the other along in the same change.
-- The counterpart *SHOULD* read as natural technical writing in its own language, not word-by-word gloss. Translate meaning, restructure sentences where the target grammar wants it, and keep the author's register — terse stays terse.
-- Do not translate the untranslatable: if a sentence resists natural rendering because it leans on an idiom of the source language, translate the idea, not the idiom.
+- 対になる側は、著された側が述べていることを述べなければならない（MUST） — 振る舞い、前提条件、警告、バージョンの主張、例の追加はなく、削除もない。ペアが実質で食い違う場合、どちらの言語もデフォルトで勝つことはない: 間違っている側を直し、その同じ変更で他方も追随させる。
+- 対になる側は、逐語的な置き換えではなく、その言語の自然な技術文書として読めるべきである（SHOULD）。意味を訳し、ターゲット文法が求める場所で文を再構成し、著者のレジスターを保つ — 簡潔なものは簡潔なままにする。
+- 翻訳できないものは翻訳しない: ソース言語のイディオムに依存するために自然な表現が難しい文は、イディオムではなくアイデアを訳す。
 
-## Voice
+## 文体
 
-- The register is calibrated by [style-samples.md](style-samples.md) — human-approved gold pairs, one per document genre. The counterpart MUST match the target-language side of the nearest sample; where its voice and a prose voice rule disagree, the sample wins. Chinese targets use institutional technical Chinese; English targets use concise professional developer prose.
-- Write as a native technical author restating the content, not as a translator transposing sentences, while preserving every source clause: nothing added, nothing dropped — fluency never justifies losing a clause.
-- Give sentences an explicit actor when the target language would otherwise obscure it; for Chinese, replace vague passives or abstract subjects with the actual actor (系统、门禁、评审人).
-- Prefer established target-language engineering idiom over calques (误报／漏检 for false positive/negative, 执行红线 for enforcement frontier); localize metaphors instead of transplanting them, and unpack noun chains where the target language requires it.
-- Split long paragraphs by semantic unit — one idea per paragraph. Paragraph boundaries MAY differ from the source; the structural signature does not count paragraphs.
-- When translating into Chinese, category nouns use Chinese with a first-mention English annotation (实操手册（cookbook）); when translating into English, use the conventional English category name. Literal directory or file references stay code-formatted English.
+- レジスターは [style-samples.md](style-samples.md) によって較正される — ドキュメントジャンルごとに 1 つの、人間が承認したゴールドペアである。対になる側は最も近いサンプルのターゲット言語側に一致しなければならない（MUST）。その声と散文の声のルールが食い違う場合、サンプルが勝つ。中国語ターゲットは機関的な技術中国語を使い、英語ターゲットは簡潔でプロフェッショナルな開発者向け散文を使う。
+- 文を置き換える翻訳者としてではなく、コンテンツを再表現するネイティブの技術著者として書く。ただしソースのすべての節を保持すること: 何も追加せず、何も削除しない — 流暢さはどの節も失うことを正当化しない。
+- ターゲット言語がそうしなければ不明瞭になる場合は、文に明示的な行為者を与える。中国語では、曖昧な受動態や抽象的な主語を実際の行為者（系统、门禁、评审人）に置き換える。
+- 確立されたターゲット言語のエンジニアリングイディオムを借用訳より優先する（false positive/negative には误报／漏检、enforcement frontier には执行红线）。メタファーは移植するのではなくローカライズし、ターゲット言語が要求する場合は名詞の連鎖を展開する。
+- 長い段落は意味単位で分割する — 1 段落に 1 つのアイデア。段落の境界はソースと異なってよい（MAY）。構造シグネチャは段落を数えない。
+- 中国語へ翻訳する場合、カテゴリ名詞は中国語を使い、初出に英語注記を付ける（实操手册（cookbook））。英語へ翻訳する場合は慣例的な英語のカテゴリ名を使う。ディレクトリやファイルへの文字どおりの参照はコード形式の英語のままとする。
 
-## Structure preservation
+## 構造の保持
 
-The pairing gate checks heading depths, fenced code blocks, table row and column counts, list kinds, ordered-list starts, list item counts, link locale, and semantic targets. Preserve the rest of the frame manually; the paired files MUST match one to one in:
+ペアリングゲートは見出しの深さ、フェンス付きコードブロック、表の行数と列数、リストの種類、順序付きリストの開始番号、リスト項目数、リンクのロケール、セマンティックターゲットをチェックする。フレームの残りは手動で保持すること。ペアのファイルは以下で 1 対 1 に一致しなければならない（MUST）:
 
-- heading hierarchy (same levels, same order — heading TEXT is translated),
-- list shape and numbering,
-- tables (same columns, same row order; header cells translated per terminology),
-- fenced code blocks — **byte-identical, including comments**; the pairing signature compares their info strings and contents, and ` ```ts ` blocks compile under `doc-typecheck`,
-- inline code spans (commands, flags, config keys, file paths, event names, API names, version numbers) — verbatim, never translated or reformatted,
-- links and anchors: every relative document link MUST keep the same semantic target and exact query/fragment suffix. When the target belongs to the active bilingual corpus, the English side uses its `.md` path and the Chinese side uses its `.zh.md` path; a missing counterpart in that corpus is an error, while targets outside it keep the original path. External URLs, images, and pure in-page fragments stay unchanged. The language switcher remains the explicit cross-locale exception, and a README rendered outside GitHub MAY use the canonical public repository URL to its exact counterpart as documented in [README.md](README.md). Link TEXT is translated.
+- 見出し階層（同じレベル、同じ順序 — 見出しのテキストは翻訳する）、
+- リストの形と番号付け、
+- 表（同じ列、同じ行順。ヘッダーセルは用語に従って翻訳する）、
+- フェンス付きコードブロック — **コメントを含めてバイト単位で同一**。ペアリングシグネチャは情報文字列と内容を比較し、` ```ts ` ブロックは `doc-typecheck` の下でコンパイルされる、
+- インラインコードスパン（コマンド、フラグ、設定キー、ファイルパス、イベント名、API 名、バージョン番号） — 逐語のまま、翻訳も再フォーマットもしない、
+- リンクとアンカー: すべての相対ドキュメントリンクは同じセマンティックターゲットと正確なクエリ/フラグメントサフィックスを保たなければならない（MUST）。ターゲットがアクティブなバイリンガルコーパスに属する場合、英語側は `.md` パスを使い、中国語側は `.zh.md` パスを使う。そのコーパスに対になるものが欠けているのはエラーであり、それ以外のターゲットは元のパスを保つ。外部 URL、画像、純粋なページ内フラグメントは変わらない。言語スイッチャーは明示的なクロスロケール例外のままであり、GitHub の外でレンダリングされる README は [README.md](README.md) に文書化されているとおり、正確な対になる側への正規の公開リポジトリ URL を使ってよい（MAY）。リンクのテキストは翻訳する。
 
-The repo's Markdown conventions apply to `.zh.md` files unchanged: one physical line per paragraph (`verify-md-wrap`), resolving relative links (`verify-md-links`), exactly one trailing newline.
+このリポジトリの Markdown 規約は `.zh.md` ファイルにも変更なく適用される: 1 段落 1 物理行（`verify-md-wrap`）、相対リンクの解決（`verify-md-links`）、末尾改行はちょうど 1 つ。
 
-## Terminology
+## 用語
 
-- [terminology.md](terminology.md) is the source of truth in both directions. Before translating, load it; every listed term MUST follow its row and its "不要译作" prohibitions. A Chinese target uses the "中文" column and its "首次出现" annotation; an English target uses the "English" column without adding a Chinese gloss.
-- For a Chinese target, an unlisted technical term MAY use an established rendering from a major Chinese-language OSS or vendor source (K8s/Vue/MDN Chinese docs, 微软简中风格指南, big-tech project docs), cited in the PR. Without such precedent it MUST stay in English and be listed under 「待定术语」(pending terms) with a suggested rendering.
-- For an English target, use the established English technical term. If the source term has no unambiguous established equivalent, preserve it with a short explanatory gloss and list it under pending terms. Neither direction may invent a rendering inline; a decided term enters [terminology.md](terminology.md) in the same PR or a follow-up.
+- [terminology.md](terminology.md) は両方向の真実のソースである。翻訳の前に読み込むこと。列挙されたすべての用語はその行とその「不要译作」の禁止に従わなければならない（MUST）。中国語ターゲットは「中文」列とその「首次出现」注記を使い、英語ターゲットは「English」列を中国語の注記なしで使う。
+- 中国語ターゲットでは、未列挙の技術用語は主要な中国語圏の OSS またはベンダーソース（K8s/Vue/MDN 中国語ドキュメント、微软简中风格指南、大手テック企業のプロジェクトドキュメント）で確立された訳を使い、PR で引用してよい（MAY）。そのような前例がない場合は英語のままにし、推奨訳とともに「待定术语」（保留用語）に列挙しなければならない（MUST）。
+- 英語ターゲットでは、確立された英語の技術用語を使う。ソース用語に明確な確立された等価物がない場合は、短い説明の注記を付けて保持し、保留用語に列挙する。どちらの方向もその場で訳を発明してはならない（MUST NOT）。決定された用語は同じ PR またはフォローアップで [terminology.md](terminology.md) に入る。
 
-## Typography
+## タイポグラフィ
 
-These rules govern the Chinese side; the English side follows the repo's normal Markdown conventions (root `AGENTS.md`). The mixed-script rules below follow the cross-project consensus of the [MDN Simplified Chinese translation guide](https://github.com/mdn/translated-content/blob/main/docs/zh-cn/translation-guide.md), the [Kubernetes zh-cn localization guide](https://kubernetes.io/zh-cn/docs/contribute/localization_zh/), the [Vue.js Chinese translation conventions](https://github.com/vuejs-translations/docs-zh-cn/wiki/%E7%BF%BB%E8%AF%91%E9%A1%BB%E7%9F%A5), and [中文文案排版指北](https://github.com/sparanoid/chinese-copywriting-guidelines), which in turn ground in [W3C clreq](https://www.w3.org/TR/clreq/) and GB/T 15834—2011:
+これらのルールは中国語側を統治し、英語側はリポジトリの通常の Markdown 規約（ルート `AGENTS.md`）に従う。以下の混在スクリプトのルールは、[MDN 簡体字中国語翻訳ガイド](https://github.com/mdn/translated-content/blob/main/docs/zh-cn/translation-guide.md)、[Kubernetes zh-cn ローカライズガイド](https://kubernetes.io/zh-cn/docs/contribute/localization_zh/)、[Vue.js 中国語翻訳規約](https://github.com/vuejs-translations/docs-zh-cn/wiki/%E7%BF%BB%E8%AF%91%E9%A1%BB%E7%9F%A5)、[中文文案排版指北](https://github.com/sparanoid/chinese-copywriting-guidelines)のクロスプロジェクトの合意に従う。これらはさらに [W3C clreq](https://www.w3.org/TR/clreq/) と GB/T 15834—2011 に根拠を置く:
 
-- MUST put one half-width space between Chinese text and Latin words, and between Chinese text and numerals: `每个 plugin 注册 3 个 tool`。No space between a full-width punctuation mark and anything.
-- MUST use full-width (Chinese) punctuation in Chinese prose: `，。：；？！（）「」`. Half-width punctuation stays inside code spans, inside complete English sentences quoted as-is, and in numbers (`3.5`, `1,024`).
-- Chinese prose *SHOULD* prefer colons, periods, commas, or parentheses over em dashes. Keep an em dash only when no other punctuation preserves the sentence naturally.
-- Enumeration commas: a Chinese list of parallel items uses 顿号（、）, not commas.
-- MUST NOT use full-width digits or full-width Latin letters — `１２３` never, `123` always.
-- Proper nouns keep their canonical casing: GitHub, TypeScript, DeepSeek — never `github`/`Github` unless quoting code.
-- Second person is 你, not 您 (matches the Vue and Kubernetes Chinese conventions and this repo's direct voice).
-- Emphasis markers (`**bold**`, `*italic*`) stay on the same spans as the source; Chinese has no italics, so the rendered emphasis may look identical — do not substitute quotation marks or other decoration.
+- 中国語テキストとラテン語の間、および中国語テキストと数字の間には半角スペースを 1 つ入れる（MUST）: `每个 plugin 注册 3 个 tool`。全角句読点と何かの間にスペースは入れない。
+- 中国語の散文では全角（中国語）句読点を使う（MUST）: `，。：；？！（）「」`。半角句読点はコードスパン内、そのまま引用された完全な英文内、および数字（`3.5`、`1,024`）に留まる。
+- 中国語の散文はダッシュよりもコロン、ピリオド、コンマ、括弧を優先するべきである（SHOULD）。他の句読点が文を自然に保てない場合にのみダッシュを保つ。
+- 列挙の読点: 並列項目の中国語リストは、コンマではなく頓号（、）を使う。
+- 全角数字や全角ラテン文字を使ってはならない（MUST NOT） — `１２３` は決して使わず、常に `123` を使う。
+- 固有名詞はその正規の表記を保つ: GitHub、TypeScript、DeepSeek — コードを引用する場合を除き、`github`/`Github` とはしない。
+- 二人称は 您 ではなく 你 である（Vue と Kubernetes の中国語規約、およびこのリポジトリの直接的な声に一致する）。
+- 強調マーカー（`**bold**`、`*italic*`）はソースと同じスパンに留まる。中国語にイタリックはないので、レンダリングされた強調は同一に見えることがある — 引用符やその他の装飾で代用しないこと。
 
-## Quality bar
+## 品質基準
 
-- A pair is done when a bilingual engineer reading either file alone gets everything a reader of the other gets — same facts, same caveats, same tone — and nothing extra.
-- Run `pnpm run verify-translation-pairing` and the rest of `doc-sync` for records, switchers, heading depths, code blocks, table row and column counts, list kinds, ordered-list starts, list item counts, links, and repository Markdown rules. Human review owns list and table order, noncanonical list numbering, inline code, emphasis, meaning, terminology, and tone.
+- バイリンガルのエンジニアがどちらのファイルを単独で読んでも、他方の読者が得るものすべて — 同じ事実、同じ注意事項、同じトーン — を得て、余分なものが何もなければ、ペアは完成である。
+- レコード、スイッチャー、見出しの深さ、コードブロック、表の行数と列数、リストの種類、順序付きリストの開始番号、リスト項目数、リンク、リポジトリの Markdown ルールのために `pnpm run verify-translation-pairing` と `doc-sync` の残りを実行する。リストと表の順序、非標準のリスト番号付け、インラインコード、強調、意味、用語、トーンは人間のレビューが所有する。
 
-## References
+## 参考文献
 
-Authorities cited by these rules, for humans and agents who want the underlying reasoning:
+これらのルールが引用する権威。根底にある理由を知りたい人間とエージェント向け:
 
-- [中文文案排版指北](https://github.com/sparanoid/chinese-copywriting-guidelines) — the de-facto community standard for mixed CJK/Latin spacing and punctuation.
-- [MDN zh-CN translation guide](https://github.com/mdn/translated-content/blob/main/docs/zh-cn/translation-guide.md) — an in-repo translation-rules file of the same shape as this one; spacing, punctuation, and glossary practice.
-- [Kubernetes zh-cn localization guide](https://kubernetes.io/zh-cn/docs/contribute/localization_zh/) — terminology-first-occurrence and punctuation practice from the largest zh localization team.
-- [Vue.js docs-zh-cn 翻译须知](https://github.com/vuejs-translations/docs-zh-cn/wiki/%E7%BF%BB%E8%AF%91%E9%A1%BB%E7%9F%A5) — per-term translate/keep decisions and tone.
-- [zh-style-guide](https://zh-style-guide.readthedocs.io) — a community Chinese technical-writing style guide whose rule-level taxonomy (and RFC 2119 keyword levels) this file borrows; aggregates GB/T 15834/15835, clreq, and vendor guides.
-- [W3C clreq](https://www.w3.org/TR/clreq/) and the [Microsoft Simplified Chinese style guide](https://learn.microsoft.com/en-us/globalization/reference/microsoft-style-guides) — the formal typographic and vendor-localization baselines.
-- GB/T 19682-2005《翻译服务译文质量要求》 — the national standard whose three base requirements (忠实原文、术语统一、行文通顺) this file's Faithfulness and Terminology sections operationalize.
+- [中文文案排版指北](https://github.com/sparanoid/chinese-copywriting-guidelines) — 混在 CJK/ラテン語のスペースと句読点についての事実上のコミュニティ標準。
+- [MDN zh-CN 翻訳ガイド](https://github.com/mdn/translated-content/blob/main/docs/zh-cn/translation-guide.md) — これと同じ形のリポジトリ内翻訳ルールファイル。スペース、句読点、用語集の実践。
+- [Kubernetes zh-cn ローカライズガイド](https://kubernetes.io/zh-cn/docs/contribute/localization_zh/) — 最大の zh ローカライズチームによる用語初出と句読点の実践。
+- [Vue.js docs-zh-cn 翻訳须知](https://github.com/vuejs-translations/docs-zh-cn/wiki/%E7%BF%BB%E8%AF%91%E9%A1%BB%E7%9F%A5) — 用語ごとの翻訳/保持の決定とトーン。
+- [zh-style-guide](https://zh-style-guide.readthedocs.io) — コミュニティの中国語技術文書スタイルガイド。このファイルはそのルールレベルの分類（および RFC 2119 キーワードレベル）を借りている。GB/T 15834/15835、clreq、ベンダーガイドを集約する。
+- [W3C clreq](https://www.w3.org/TR/clreq/) と [Microsoft 簡体字中国語スタイルガイド](https://learn.microsoft.com/en-us/globalization/reference/microsoft-style-guides) — 正式なタイポグラフィとベンダーローカライズのベースライン。
+- GB/T 19682-2005『翻译服务译文质量要求』 — このファイルの忠実性と用語のセクションが運用化する 3 つの基本要件（忠实原文、术语统一、行文通顺）を持つ国家標準。

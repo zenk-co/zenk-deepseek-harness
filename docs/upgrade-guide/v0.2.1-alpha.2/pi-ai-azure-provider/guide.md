@@ -3,17 +3,17 @@ kind: upgrade-guide
 description: "The pi-ai Azure provider route is renamed from azure-openai-responses to azure."
 ---
 
-# Azure provider route rename
+# Azure プロバイダールートの改名
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更内容
 
-The installed pi-ai catalog identifies the Azure provider as `azure` instead of `azure-openai-responses`. The `azure` route includes both Responses and Chat Completions models. The Responses API identifier remains `azure-openai-responses`, and the `AZURE_OPENAI_*` environment variables keep their names. Configurations and model selections that use the old provider key no longer resolve the Azure catalog.
+インストール済み pi-ai カタログは Azure プロバイダーを `azure-openai-responses` ではなく `azure` として識別する。`azure` ルートは Responses と Chat Completions の両モデルを含む。Responses API 識別子は `azure-openai-responses` のままであり、`AZURE_OPENAI_*` 環境変数も名前を保つ。旧プロバイダーキーを用いる設定とモデル選択は Azure カタログを解決しなくなる。
 
-## Migration
+## 移行手順
 
-1. In the `llm-pi-ai` configuration in `$DSH_HOME/profiles/<profile>/cordis.patch.yml` or another supplying layer, rename `config.providers.azure-openai-responses` to `config.providers.azure`. Preserve its existing fields and any `apiKeyEnv` reference.
-2. Use catalog model IDs under `models`; map a custom Azure deployment name with `AZURE_OPENAI_DEPLOYMENT_NAME_MAP`. The mixed catalog cannot infer a protocol for a model ID absent from the catalog. An explicit route-level `api` overrides every model on that route; it does not select the Azure provider.
-3. Update explicit request/default provider selections to `azure`, and reselect an Azure model when continuing an existing Session. Configure the new Azure entry in Settings → Models if its key was stored for the old entry. Do not edit historical Session events.
-4. Confirm that Settings → Models offers `azure` and lists the expected models, then send a short request using the configured deployment.
+1. `$DSH_HOME/profiles/<profile>/cordis.patch.yml` または他の提供層内の `llm-pi-ai` 設定で、`config.providers.azure-openai-responses` を `config.providers.azure` に改名する。既存フィールドと `apiKeyEnv` 参照は保持する。
+2. `models` 下にカタログモデル ID を使う。カスタム Azure デプロイ名は `AZURE_OPENAI_DEPLOYMENT_NAME_MAP` で対応付ける。混成カタログはカタログに無いモデル ID のプロトコルを推論できない。ルートレベルの明示的 `api` はそのルート上の全モデルを上書きし、Azure プロバイダーを選択しない。
+3. 明示的なリクエスト/既定プロバイダー選択を `azure` に更新し、既存セッション継続時は Azure モデルを再選択する。旧エントリ用にキーが保存されていた場合は設定 → モデルで新しい Azure エントリを構成する。履歴セッションイベントは編集しない。
+4. 設定 → モデルが `azure` を提供し期待モデルを列挙すること、構成したデプロイで短いリクエストを送信できることを確認する。

@@ -1,34 +1,34 @@
-# Voice input
+# 音声入力
 
-English | [中文](voice-input.zh.md)
+日本語 | [English](voice-input.en.md) | [中文](voice-input.zh.md)
 
-Experimental speech recognition has three roles: the [Service Definition](../../packages/experimental/speech-to-text/README.md) routes named providers, the [SenseVoice provider](../../packages/experimental/speech-to-text-sensevoice/README.md) owns local inference, and the [Remote consumer](../../packages/experimental/api-speech-to-text/README.md) serves the browser. The [optional bundle](../../packages/experimental/voice-input-bundle/README.md) composes them with the microphone UI.
+実験的な音声認識には 3 つの役割がある。[Service Definition](../../packages/experimental/speech-to-text/README.md) は名前付きプロバイダーをルーティングし、[SenseVoice プロバイダー](../../packages/experimental/speech-to-text-sensevoice/README.md) はローカル推論を所有し、[Remote コンシューマー](../../packages/experimental/api-speech-to-text/README.md) はブラウザに提供する。[オプションのバンドル](../../packages/experimental/voice-input-bundle/README.md)がそれらをマイク UI とともに構成する。
 
-## Provider selection
+## プロバイダーの選択
 
-`SpeechProviderId` brands the registration identity. `SpeechProviderInfo` carries a display name, accepted `languages` hints and `host-local` or `cloud` processing location. `SpeechRequest` contains WAV bytes and optional provider/language selection; `resolve()` produces `SpeechSpec` with one captured provider instance. A missing provider or unsupported language fails; replacement or withdrawal invalidates resolved work. Audio never falls back to a different provider.
+`SpeechProviderId` は登録 ID をブランド化する。`SpeechProviderInfo` は表示名、受け付けられる `languages` ヒント、`host-local` または `cloud` の処理場所を運ぶ。`SpeechRequest` は WAV バイトとオプションのプロバイダー/言語選択を含み、`resolve()` は 1 つのキャプチャされたプロバイダーインスタンスを持つ `SpeechSpec` を生成する。プロバイダーがない場合や未サポートの言語は失敗する。置き換えや撤回は解決済みの作業を無効化する。音声が別のプロバイダーにフォールバックすることは決してない。
 
-`SpeechProvider.transcribe()` accepts one complete `SpeechInput` and an `AbortSignal`. `Transcript` returns plain `text`, `audioSeconds` and `inferenceSeconds`. Providers honor cancellation and settle their work before deregistration completes. The local provider serializes calls, bounds its queue and manages its worker lifetime independently of Sessions.
+`SpeechProvider.transcribe()` は 1 つの完全な `SpeechInput` と `AbortSignal` を受け付ける。`Transcript` はプレーンな `text`、`audioSeconds`、`inferenceSeconds` を返す。プロバイダーはキャンセルを尊重し、登録解除が完了する前に作業を確定する。ローカルプロバイダーは呼び出しを直列化し、キューを制限し、ワーカーのライフタイムをセッションから独立して管理する。
 
-## Browser and Host ownership
+## ブラウザと Host の所有権
 
-The browser owns microphone tracks and the unsent draft. `TranscriptionRequest` sends canonical base64 PCM16 WAV through the authenticated Remote. `SpeechCatalog` advertises available providers, the default selection and recording byte/duration limits. The API validates this process input before recognition.
+ブラウザはマイクトラックと未送信のドラフトを所有する。`TranscriptionRequest` は正規の base64 PCM16 WAV を認証済み Remote を通じて送信する。`SpeechCatalog` は利用可能なプロバイダー、デフォルトの選択、録音のバイト数/時間制限を通知する。API は認識前にこのプロセス入力を検証する。
 
-The input facade captures a revision-bearing selection before recording. `InputActions.insertText()` inserts one undoable plain-text edit only while the selection revision is current and submission permits editing. A rejected insertion leaves the transcript available for explicit insertion. Switching Sessions or disposing the plugin invalidates late results. Recognition itself writes no Session event; ordinary user submission owns the final model-visible text.
+入力ファサードは、録音前にリビジョンを持つ選択をキャプチャする。`InputActions.insertText()` は、選択リビジョンが最新であり、送信が編集を許可している場合にのみ、1 つの undo 可能なプレーンテキスト編集を挿入する。拒否された挿入は、明示的な挿入のためにトランスクリプトを利用可能なまま残す。セッションの切り替えやプラグインの破棄は、遅れて届いた結果を無効化する。認識自体はセッションイベントを書き込まない。最終的なモデル可視テキストは通常のユーザー送信が所有する。
 
-## Preparation and settings
+## 準備と設定
 
-`SpeechProviderInfo.downloadSources` advertises preparation origins. `SpeechPreparationOptions.downloadSource` selects one for a task; omission preserves provider policy. SenseVoice validates the advertised choice, pins a manual source without fallback, and rejects source changes during active preparation. The UI keeps a choice for retries in the current card; it is not a persisted recognition preference.
+`SpeechProviderInfo.downloadSources` は準備用のオリジンを通知する。`SpeechPreparationOptions.downloadSource` はタスク用に 1 つを選択する。省略時はプロバイダーポリシーが保持される。SenseVoice は通知された選択を検証し、手動ソースをフォールバックなしで固定し、準備中のソース変更を拒否する。UI は現在のカードでの再試行用に選択を保持するが、それは永続化された認識設定ではない。
 
-The Host provider owns one preparation task across page and Session changes. The Client shares one `follow()` subscription across the composer, setup prompt and bundle details. Optional `SpeechSetupEstimate` metadata supplies provider-specific planning hints, separate from measured progress. `SpeechPreparationStepKind` identifies ordered resource operations; `SpeechPreparationStep` records each status and start time. The complete `SpeechPreparationState` retains these steps after cancellation or failure. The collapsed UI shows the current operation; expanding lists all steps, with byte progress or elapsed time only for the running step. Closing an observer never cancels preparation. Verified files survive retries and idle worker reclamation.
+Host プロバイダーは、ページとセッションの変更をまたいで 1 つの準備タスクを所有する。Client はコンポーザー、セットアッププロンプト、バンドル詳細の間で 1 つの `follow()` サブスクリプションを共有する。オプションの `SpeechSetupEstimate` メタデータは、計測された進捗とは別に、プロバイダー固有の計画ヒントを提供する。`SpeechPreparationStepKind` は順序付きリソース操作を識別し、`SpeechPreparationStep` は各ステータスと開始時刻を記録する。完全な `SpeechPreparationState` は、キャンセルや失敗の後もこれらのステップを保持する。折りたたまれた UI は現在の操作を表示し、展開するとすべてのステップを一覧し、バイト進捗または経過時間は実行中のステップにのみ表示される。オブザーバーを閉じても準備がキャンセルされることは決してない。検証済みファイルは再試行とアイドルワーカーの回収を生き延びる。
 
-Failed preparation can include `SpeechDownloadFailure` with the asset, source origin, classified reason and optional diagnostic code or HTTP status. The Client localizes recovery advice; raw download causes remain on the Host.
+失敗した準備には、対象アセット、ソースオリジン、分類された理由、オプションの診断コードまたは HTTP ステータスを含む `SpeechDownloadFailure` が含まれることがある。Client は回復のアドバイスをローカライズする。ダウンロードの生の原因は Host に残る。
 
-The microphone occupies `conversation.input.activity`, between the model selector and Send. Clicking starts capture and expands the toolbar; Stop transcribes and inserts into the draft. The activity preserves the editor and submit action, owns local feedback, and releases expansion on unmount. Cancel, Escape or hiding the page discards capture. Waveform history displays measured microphone amplitude. Bundle details contain recognition preferences, preparation state and progress. Explicit enablement uses `plugins.bundle.activation` to guide users with missing models to setup; the list shows only the bundle description and switch.
+マイクはモデルセレクターと Send の間の `conversation.input.activity` を占有する。クリックするとキャプチャが開始され、ツールバーが展開される。Stop は文字起こししてドラフトに挿入する。このアクティビティはエディターと送信アクションを保持し、ローカルのフィードバックを所有し、アンマウント時に展開を解放する。Cancel、Escape、またはページの非表示はキャプチャを破棄する。波形履歴は計測されたマイク振幅を表示する。バンドル詳細には認識設定、準備状態、進捗が含まれる。明示的な有効化は `plugins.bundle.activation` を使用して、モデルが不足しているユーザーをセットアップへ導く。リストにはバンドルの説明とスイッチのみが表示される。
 
-## Design rationale
+## 設計の根拠
 
-The [voice input decision](../../.agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md) explains transient audio, explicit provider selection and lazy local preparation.
+[音声入力の決定](../../.agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md)が、一時的な音声、明示的なプロバイダー選択、遅延ローカル準備を説明する。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -36,13 +36,13 @@ The [voice input decision](../../.agents/notes/implemented/architecture/2026-09-
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される(doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。再生成は `pnpm run gen-cordis-catalog`)。言語版の違いは、ロケール固有のペアドキュメントパスのみである。シグネチャブロックは `ts cordis-catalog` フェンスを使用し、元のソース JSDoc を保持する。ディスパッチモードは [primer](../cordis-primer.md#dispatch-modes) で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxspeechcontroller--speechcontroller"></a>
 
 ### `ctx.speechController` — `SpeechController`
 
-Speech calls never activate or submit to an Agent.
+音声呼び出しが Agent をアクティブ化したり、Agent に送信したりすることは決してない。
 
 ```ts cordis-catalog
 /**
@@ -88,13 +88,13 @@ Speech calls never activate or submit to an Agent.
 @Remote async transcribe(request: TranscriptionRequest, signal: AbortSignal): Promise<Transcript>
 ```
 
-Source: [`packages/experimental/api-speech-to-text/src/index.ts`](../../packages/experimental/api-speech-to-text/src/index.ts)
+ソース: [`packages/experimental/api-speech-to-text/src/index.ts`](../../packages/experimental/api-speech-to-text/src/index.ts)
 
 <a id="ctxspeechtotext--speechtotext"></a>
 
 ### `ctx.speechToText` — `SpeechToText`
 
-Registry shared by all transcription consumers in one Host composition.
+1 つの Host 構成内のすべての文字起こしコンシューマーが共有するレジストリ。
 
 ```ts cordis-catalog
 /**
@@ -160,5 +160,5 @@ resolve(request: SpeechRequest): SpeechSpec
 async transcribe(spec: SpeechSpec, signal: AbortSignal): Promise<Transcript>
 ```
 
-Source: [`packages/experimental/speech-to-text/src/index.ts`](../../packages/experimental/speech-to-text/src/index.ts)
+ソース: [`packages/experimental/speech-to-text/src/index.ts`](../../packages/experimental/speech-to-text/src/index.ts)
 <!-- END GENERATED cordis-surface -->

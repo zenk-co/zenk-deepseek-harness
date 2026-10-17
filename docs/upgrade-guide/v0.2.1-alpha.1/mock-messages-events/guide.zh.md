@@ -5,7 +5,7 @@ description: "Messages 模拟流为原生 SDK 消费方发布具名 SSE 事件�
 
 # 读取 Messages 模拟服务器的具名事件
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

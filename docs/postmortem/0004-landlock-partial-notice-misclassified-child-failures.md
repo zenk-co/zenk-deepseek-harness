@@ -1,55 +1,55 @@
-# Post-mortem 0004: Landlock partial-enforcement notice misclassified child failures
+# 事後分析 0004: Landlock 部分適用通知による子失敗の誤分類
 
-English | [中文](0004-landlock-partial-notice-misclassified-child-failures.zh.md)
+日本語 | [English](0004-landlock-partial-notice-misclassified-child-failures.en.md) | [中文](0004-landlock-partial-notice-misclassified-child-failures.zh.md)
 
-Status: resolved
+状態: 解決済み
 
-## Executive summary
+## 要旨
 
-On kernels with an older Landlock ABI, the launcher prints a benign partial-enforcement notice before executing every child. The harness treated that shared `landlock-run:` prefix plus any nonzero child exit as launcher failure, so ordinary outcomes such as ripgrep's exit 1 for no matches surfaced as `SANDBOX_UNAVAILABLE`; the then-bash-backed filesystem search also hid that structured error behind `SEARCH_FAILED`. Broad signature rules and missing partial-ABI composition coverage let the defect through. Runner classification now requires status-gated fatal evidence after exact informational exclusions, and an assembled keyless scenario pins the surviving bash path. Filesystem search uses packaged ripgrep through the subprocess seam and does not cross sandboxed bash.
+古い Landlock ABI のカーネルでは、ランチャーがすべての子実行の前に無害な部分適用通知を表示する。ハーネスは共有 `landlock-run:` 接頭辞と非ゼロ子終了をランチャー失敗として扱ったため、一致なしの ripgrep 終了 1 のような通常結果が `SANDBOX_UNAVAILABLE` として表面化した。当時の bash 基盤ファイルシステム検索はその構造化エラーを `SEARCH_FAILED` 背後に隠してもいた。広い署名規則と部分 ABI 構成対象範囲の欠落が欠陥を通した。実行器分類は厳密な情報除外後の状態 gated 致命的証拠を要求するようになり、組み立て済みキーレス scenario が残る bash パスを固定する。ファイルシステム検索はサブプロセスシーム経由のパッケージ済み ripgrep を使い、サンドボックス化 bash を横断しない。
 
-## Summary
+## 概要
 
-The native launcher contract distinguishes two kinds of stderr lines. A partially enforcing kernel prints exactly `landlock-run: partial enforcement (older Landlock ABI)` and continues into the child. A launcher failure prints another `landlock-run:` line and exits 125 without executing the child.
+ネイティブランチャー契約は 2 種類の stderr 行を区別する。部分適用カーネルは厳密に `landlock-run: partial enforcement (older Landlock ABI)` を表示して子に続行する。ランチャー失敗は別の `landlock-run:` 行を表示し、子を実行せずに 125 で終了する。
 
-The harness represented both with one case-insensitive `landlock-run: ` substring. Its consumer classified any nonzero exit carrying that substring as runner failure. The child's status was therefore attached to the launcher's informational line: `false`, ripgrep's no-match exit 1, invalid-pattern exit 2, and even a child-selected exit 125 could be blamed on the sandbox despite successful confinement and execution.
+ハーネスは両方を 1 件の大文字小文字不区別 `landlock-run: ` 部分文字列で表した。そのコンシューマーはその部分文字列を持つ非ゼロ終了をすべて実行器失敗に分類した。そのため子の状態はランチャーの情報行に結び付けられた。`false`、一致なし ripgrep 終了 1、無効パターン終了 2、子選択の終了 125 さえ、閉じ込めと実行の成功にもかかわらずサンドボックスのせいにされ得た。
 
-At the time of the incident, filesystem search added a second attribution error. Its bash-backed `runRipgrep()` caught every rejected bash run that was not aborted and replaced it with a generic cwd/shell-start `SEARCH_FAILED`, including the structured `SandboxUnavailableError` produced by the sandbox executor.
+事案当時、ファイルシステム検索は第 2 の帰属誤りを加えた。その bash 基盤 `runRipgrep()` は中断以外の拒否された bash 実行をすべて捕捉し、サンドボックス実行器が生んだ構造化 `SandboxUnavailableError` を含めて汎用 cwd/シェル開始 `SEARCH_FAILED` に置換した。
 
-## Impact
+## 影響
 
-On partial-ABI Landlock hosts, legitimate nonzero child outcomes could appear as sandbox infrastructure failure. `glob` and `grep` were especially visible because ripgrep uses exit 1 as successful empty search. When a real sandbox failure did occur through filesystem search, callers lost its `SANDBOX_UNAVAILABLE` code and received an incorrect startup diagnosis.
+部分 ABI Landlock ホストでは、正当な非ゼロ子結果がサンドボックス基盤失敗として現れ得た。`glob` と `grep` は特に目立った。ripgrep が終了 1 を成功の空検索に使うためである。ファイルシステム検索経由で真のサンドボックス失敗が起きた場合、呼び出し側は `SANDBOX_UNAVAILABLE` コードを失い、誤った開始診断を受け取った。
 
-The defect did not weaken confinement or run a command unconfined. Its security effect was availability and diagnostic integrity: a valid confined result was rejected or mislabeled.
+この欠陥は閉じ込めを弱めず、無閉じ込めでコマンドを実行しなかった。その安全効果は可用性と診断完全性である。有効な閉じ込め結果が拒否または誤表示された。
 
-## Timeline
+## 経緯
 
-- The native launcher contract defined exit 125 for launcher failures, a fatal `landlock-run:` line for every such failure, and the exact partial-enforcement notice for successful child execution.
-- The sandbox provider reduced that contract to `runnerFailureSignatures: ['landlock-run: ']`; the bash consumer combined the prefix with any nonzero exit and reported stderr's first line.
-- Unit tests covered clean success, denial diagnostics, and fatal runner prefixes. Real-runner tests self-skipped without a usable kernel and did not force partial enforcement followed by a nonzero child.
-- A minimal POSIX wrapper that prints the notice and `exec`s its payload reproduced the failure with `false` and ripgrep no-match.
-- Structured rules plus shared foreground/background classification and assembled replay coverage closed the surviving sandbox attribution gap. Filesystem search uses packaged ripgrep through `ctx.subprocess`; the fix leaves that path outside sandboxed bash.
+- ネイティブランチャー契約はランチャー失敗の終了 125、すべてのその種失敗の致命的 `landlock-run:` 行、子実行成功の厳密な部分適用通知を定義した。
+- サンドボックスプロバイダーはその契約を `runnerFailureSignatures: ['landlock-run: ']` に縮小し、bash コンシューマーは接頭辞と非ゼロ終了を組み合わせて stderr 先頭行を報告した。
+- 単体検査は清浄成功・拒否診断・致命的実行器接頭辞を対象とした。実実行器検査は利用可能カーネルなしで自己 skip し、非ゼロ子に続く部分適用強制を行わなかった。
+- 通知を表示してペイロードを `exec` する最小 POSIX ラッパーが `false` と ripgrep 一致なしで失敗を再現した。
+- 構造化規則と共有前景/背景分類および組み立て再実行対象範囲が残るサンドボックス帰属隔たりを閉じた。ファイルシステム検索は `ctx.subprocess` 経由のパッケージ済み ripgrep を使い、修正はそのパスをサンドボックス化 bash の外に保つ。
 
-## Root cause
+## 根本原因
 
-The public sandbox result type could express only a bag of substrings. It could not state that Landlock failure requires exit 125, that evidence must occur within one fatal line, or that one exact line under the same prefix is informational. The boolean consumer consequently joined unrelated facts from different processes and selected the first stderr line for detail even when a later line was the fatal evidence.
+公開サンドボックス結果型は部分文字列の袋のみを表せた。Landlock 失敗が終了 125 を要求すること、証拠が 1 件の致命行内に現れなければならないこと、同一接頭辞下の厳密 1 行が情報であることを述べられなかった。そのため真偽値コンシューマーは別プロセスの無関係事実を結合し、致命証拠が後行にある場合でも詳細に stderr 先頭行を選んだ。
 
-The test matrix mirrored that representation. Fake providers emitted either no runner line or an unambiguously fatal prefix; they never emitted a benign runner line before a child-controlled nonzero exit. Real Landlock coverage depended on the host ABI, so full-ABI hosts could not exercise the notice. In the incident-era search implementation, filesystem-search tests modeled raw spawn errors but not a structured error thrown by the real sandboxed bash composition.
+検査行列はその表現を反映した。偽プロバイダーは実行器行なしまたは曖昧さのない致命接頭辞のいずれかを出し、子制御の非ゼロ終了の前に無害実行器行を出すことはなかった。実 Landlock 対象範囲はホスト ABI に依存したため、全 ABI ホストは通知を行使できなかった。事案時代の検索実装では、ファイルシステム検索検査は raw 生成誤りを模したが、実サンドボックス化 bash 構成が投げる構造化誤りを模さなかった。
 
-Stderr remains an in-band attribution channel. A confined child can deliberately reproduce a runner's gated fatal line and exit status, causing an availability/diagnostic false attribution. The tighter conjunction prevents the accidental collision in this incident but does not authenticate the writer; an out-of-band status protocol remains separate hardening, not a sandbox-bypass fix.
+Stderr は帯域内帰属チャネルのままである。閉じ込められた子は実行器の gated 致命行と終了状態を意図的に再現でき、可用性/診断の偽帰属を起こす。厳密な連言はこの事案の偶発衝突を防ぐが、書き手を認証しない。帯域外状態プロトコルは別の堅牢化であり、サンドボックス回避修正ではない。
 
-## Guardrails added
+## 追加した防護策
 
-- [`RunnerFailureRule`](../subsystems/sandbox.md#wrapped-argv-and-classification-dialects) carries optional allowed exit codes, case-insensitive per-line fatal signatures, and case-insensitive exact informational-line exclusions.
-- [`dsh-sandbox-local`](../../packages/sandbox/sandbox-local/) maps Landlock to exit 125 plus a non-notice `landlock-run:` line while bwrap, Seatbelt, and custom runners remain signature-only.
-- [`dsh-bash-sandbox`](../../packages/shell/bash-sandbox/) directly spawns the provider argv, so a pre-start rejection uses the spawn-error channel instead of localized shell diagnostics. Settled foreground and background execution share one evidence-returning classifier; fatal evidence outranks denial, and foreground errors report the matched fatal line without changing captured stderr.
-- [`dsh-tool-fs-search`](../../packages/fs/tool-fs-search/) uses packaged ripgrep through `ctx.subprocess` and remains outside the sandboxed bash seam.
-- The native-boundary regression cases live in [`partial-landlock.spec.ts`](../../packages/shell/bash-sandbox/tests/partial-landlock.spec.ts), including informational notices, fatal evidence, and foreground/background classification.
-- The assembled product path is pinned by the [`partial-landlock` snapshot composition](../../snapshots/session/partial-landlock-child-failure/cordis.snapshot.yml), independently of filesystem-search implementation choices.
+- [`RunnerFailureRule`](../subsystems/sandbox.md#wrapped-argv-and-classification-dialects) は任意の許容終了コード、行ごと大文字小文字不区別の致命署名、大文字小文字不区別の厳密な情報行除外を運ぶ。
+- [`dsh-sandbox-local`](../../packages/sandbox/sandbox-local/) は Landlock を終了 125＋通知でない `landlock-run:` 行に対応付け、bwrap・Seatbelt・カスタム実行器は署名のみのままである。
+- [`dsh-bash-sandbox`](../../packages/shell/bash-sandbox/) はプロバイダー argv を直接生成するため、開始前拒否はローカライズ済みシェル診断ではなく生成エラーチャネルを使う。確定済み前景・背景実行は 1 件の証拠返却分類器を共有する。致命証拠は拒否に優越し、前景誤差は捕捉 stderr を変えずに一致致命行を報告する。
+- [`dsh-tool-fs-search`](../../packages/fs/tool-fs-search/) は `ctx.subprocess` 経由のパッケージ済み ripgrep を使い、サンドボックス化 bash シームの外に残る。
+- ネイティブ境界の回帰 case は [`partial-landlock.spec.ts`](../../packages/shell/bash-sandbox/tests/partial-landlock.spec.ts) にあり、情報通知・致命証拠・前景/背景分類を含む。
+- 組み立て済み製品パスはファイルシステム検索実装選択と独立に [`partial-landlock` snapshot 構成](../../snapshots/session/partial-landlock-child-failure/cordis.snapshot.yml) が固定する。
 
-## Lessons
+## 教訓
 
-- Process attribution requires a conjunction of independent evidence; a shared prefix is not a protocol.
-- Informational and fatal diagnostics can share a namespace, so exclusions must be exact and narrow while unknown fatal lines stay fail-closed.
-- An adapter must preserve structured failures owned by the seam below it instead of replacing them with its own nearest generic category.
-- Platform-dependent behavior needs a deterministic fake at the native boundary plus one assembled product path; a self-skipping real-kernel test cannot carry that regression alone.
+- プロセス帰属は独立証拠の連言を要求する。共有接頭辞はプロトコルではない。
+- 情報と致命の診断は名前空間を共有し得るため、除外は厳密かつ狭く、未知の致命行はフェイルクローズドのままにする。
+- 適合器は下位シーム所有の構造化失敗を保持しなければならず、自らの最寄り汎用区分で置換してはならない。
+- 平台依存動作はネイティブ境界の決定論的偽物と組み立て済み製品パス 1 件を必要とし、自己 skip の実カーネル検査だけではその回帰を担えない。

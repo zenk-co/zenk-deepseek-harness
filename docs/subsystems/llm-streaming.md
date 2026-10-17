@@ -1,16 +1,16 @@
-# LLM Streaming
+# LLM ストリーミング
 
-English | [中文](llm-streaming.zh.md)
+日本語 | [English](llm-streaming.en.md) | [中文](llm-streaming.zh.md)
 
-The conversation and streaming types from [`packages/llm`](../../packages/llm/README.md): durable `Message` values, request-only user inputs, shared `ContentBlock` variants, the fully assembled model request, the raw `StreamChunk` protocol, the adapter contract every adapter must implement, and the shared assembler. The [core packages](core.md) hold and log these values on every turn; this page declares them.
+[`packages/llm`](../../packages/llm/README.md) 由来の会話・ストリーミング型: 永続化される `Message` 値、リクエスト専用のユーザー入力、共有の `ContentBlock` バリアント、完全に組み立てられたモデルリクエスト、生の `StreamChunk` プロトコル、すべてのアダプターが実装しなければならないアダプターコントラクト、そして共有のアセンブラー。[コアパッケージ](core.md)は毎ターンこれらの値を保持してログに記録する; このページではそれらを宣言する。
 
 Source: [`packages/llm/llm/src/types.ts`](../../packages/llm/llm/src/types.ts)
 
 <a id="content-blocks-and-messages"></a>
 
-## Content blocks and messages
+## コンテンツブロックとメッセージ
 
-A conversation is `Message`s; a message is an array of typed **content blocks**. The block union derives from `ContentBlockMap`.
+会話は `Message` の列であり、メッセージは型付き **コンテンツブロック** の配列である。ブロックの共用体は `ContentBlockMap` から導出される。
 
 Source: [`packages/llm/llm/src/types.ts`](../../packages/llm/llm/src/types.ts)
 
@@ -31,9 +31,9 @@ interface ContentBlockMap {
 }
 ```
 
-The block interfaces (full fields in source): `TextBlock` (`text`), `ReasoningBlock` (thinking, distinct from visible text), `ImageBlock` (a durable [image attachment](attachment.md)), `FileBlock` (a durable verbatim [file attachment](attachment.md) that request assembly projects to handle text for every route), and `ToolCallBlock` (`id: ToolCallId`, `name`, raw-JSON `arguments`). Tool results are first-class `ToolResultMessage` values with `toolCallId`, result `content`, and optional `isError`; they are not content blocks. `ContentBlock = ContentBlockMap[ContentBlockType]`. A new modality belongs in the merge-extensible map only when its adapter, UI, compaction, and durable replay paths honor it. Developer tool-change blocks are projected according to the resolved route capability.
+ブロックインターフェース (完全なフィールドはソース参照): `TextBlock` (`text`)、`ReasoningBlock` (可視テキストとは異なる思考内容)、`ImageBlock` (永続化される[画像添付](attachment.md))、`FileBlock` (永続化される逐語的[ファイル添付](attachment.md)であり、リクエスト組み立てがすべてのルート向けに扱うテキストへ投影する)、および `ToolCallBlock` (`id: ToolCallId`、`name`、生 JSON の `arguments`)。ツール結果は `toolCallId`、結果 `content`、任意の `isError` を持つ一級の `ToolResultMessage` 値であり、コンテンツブロックではない。`ContentBlock = ContentBlockMap[ContentBlockType]`。新しいモダリティは、そのアダプター、UI、コンパクション、永続化リプレイの各経路がそれを尊重する場合にのみ、マージ拡張可能なマップに属する。開発者向けツール変更ブロックは、解決済みルートケイパビリティに従って投影される。
 
-Image access belongs to request serialization rather than the durable attachment or deterministic request-image version. `resolveImageAttachmentAccess()` combines the attachment provider's optional host object path with a mapping supplied by the consumer for the current tool execution filesystem. The result is available only for that request and does not participate in `variantId`.
+画像アクセスは、永続化される添付や決定的なリクエスト画像バージョンではなく、リクエスト直列化に属する。`resolveImageAttachmentAccess()` は、添付プロバイダーの任意のホストオブジェクトパスと、現在のツール実行ファイルシステム向けにコンシューマーが提供したマッピングを組み合わせる。結果はそのリクエストでのみ利用可能であり、`variantId` には関与しない。
 
 Source: [`packages/llm/llm/src/content.ts`](../../packages/llm/llm/src/content.ts)
 
@@ -47,7 +47,7 @@ interface ImageAttachmentAccess {
 
 Source: [`packages/llm/llm/src/message.ts`](../../packages/llm/llm/src/message.ts)
 
-A `Message` is one identified, immutable role/source/content value. Model-produced assistant messages name the provider and model that produced them and carry optional adapter-private replay data in their source:
+`Message` は、識別子付きの不変な role/source/content 値である。モデルが生成したアシスタントメッセージは、それを生成したプロバイダーとモデルを名指しし、ソース内に任意のアダプタープライベートなリプレイデータを運ぶ:
 
 ```ts type-equiv
 /** Provider/model identity and adapter-private replay data for an assistant message. */
@@ -70,9 +70,9 @@ interface AssistantProviderMetadata {
 type Message = MessageRoleMap[keyof MessageRoleMap]
 ```
 
-`DeveloperMessage` records incremental agent session changes in conversation order with the `developer` role. `ToolAdditionBlock.toolName` activates the definition selected by the containing Session event's historical header reference; `ToolRemovalBlock.toolName` removes the active definition. Both blocks are rejected in other message roles. `deferLoading` independently requests deferred definition loading without requiring an addition record. See [Session](../../packages/core/session/README.md) for header binding and the [LLM package](../../packages/llm/llm/README.md#known-limitations-and-deferred-work) for provider support limits. `ToolUpdate` is `in-history` or `addition-only` on resolved and prepared model metadata. `GenerateOptions.toolHistory` carries `ToolHistory`: initial `tools` and ordered `updates`, each binding a developer `messageId` to its historically resolved `additions`. The runtime projects this state into provider declarations; it does not change the active tool list in logged headers.
+`DeveloperMessage` は、`developer` ロールで会話順に増分エージェントセッション変更を記録する。`ToolAdditionBlock.toolName` は、含む Session イベントの履歴ヘッダー参照が選択した定義を有効化し、`ToolRemovalBlock.toolName` は有効な定義を削除する。両ブロックは他のメッセージロールでは拒否される。`deferLoading` は追加レコードを必要とせずに定義の遅延読み込みを独立に要求する。ヘッダーバインディングは [Session](../../packages/core/session/README.md)、プロバイダーサポート制限は [LLM パッケージ](../../packages/llm/llm/README.md#known-limitations-and-deferred-work)を参照。`ToolUpdate` は、解決済み・準備済みモデルメタデータ上で `in-history` または `addition-only` である。`GenerateOptions.toolHistory` は `ToolHistory` を運ぶ: 初期 `tools` と順序付き `updates` であり、各々が開発者 `messageId` を履歴的に解決された `additions` に束縛する。ランタイムはこの状態をプロバイダー宣言へ投影する; ログ済みヘッダー内の有効ツール一覧は変更しない。
 
-Where a message came from is itself a merge-extensible sum type:
+メッセージの由来自体がマージ拡張可能な総和型である:
 
 ```ts type-equiv
 /**
@@ -90,7 +90,7 @@ interface MessageSourceMap {
 }
 ```
 
-Producer identity and presentation form are independent. `kind` answers *who produced this*; the optional `form` answers *what kind of information this is*, and consumers decide how to present it. Several producers may share one form, and one producer may emit more than one form over a session. The values are semantic and grow one at a time; an absent or unrecognized value uses the documented default and is presented as opaque content:
+プロデューサー同一性と表示形態は独立である。`kind` は*誰がこれを生成したか*に答え、任意の `form` は*どのような種類の情報か*に答え、コンシューマーが表示方法を決める。複数のプロデューサーが 1 つの形態を共有でき、1 つのプロデューサーがセッションを通じて複数の形態を送出できる。値は意味的であり一度に 1 つずつ増える; 欠落または未知の値は文書化された既定値を使い、不透明なコンテンツとして表示される:
 
 ```ts type-equiv
 /**
@@ -164,9 +164,9 @@ type ContextFormed =
 
 <a id="streamchunk--the-raw-protocol"></a>
 
-## `StreamChunk` — the raw protocol
+## `StreamChunk` — 生プロトコル
 
-A streaming response interleaves several typed blocks (text, reasoning, multiple tool calls). `index` ties each delta to its block; `block-end` carries the fully-assembled `ContentBlock` so consumers don't have to re-assemble deltas themselves. It is a **closed** discriminated union — a `switch` over `type` ends with `assertNever`, so adding a variant breaks compilation at every consumer that must handle it.
+ストリーミング応答は複数の型付きブロック (テキスト、推論、複数のツール呼び出し) を織り交ぜる。`index` が各差分をそのブロックに結び付け、`block-end` が完全に組み立てられた `ContentBlock` を運ぶため、コンシューマーが差分を自前で再組み立てする必要はない。これは**クローズド**な判別共用体であり — `type` 上の `switch` は `assertNever` で終わるため、バリアントの追加はそれを扱わなければならないすべてのコンシューマーでコンパイルを壊す。
 
 ```ts type-equiv
 /**
@@ -217,17 +217,17 @@ type StreamChunk =
 
 <a id="compact-assistant-streams"></a>
 
-## Compact Assistant streams
+## コンパクトなアシスタントストリーム
 
-`AssistantStreamAccumulator` pairs each `StreamChunk` with its original safe-integer timestamp and produces `AssistantStreamRecord[]`. Consecutive text, reasoning, or tool-argument deltas for the same block become one record with `time0`, exact timestamp gaps, and one array entry per original delta; every other chunk stays a timestamped raw record. This representation removes repeated event envelopes without joining token boundaries or dropping terminal, usage, block, failure, or replay facts.
+`AssistantStreamAccumulator` は各 `StreamChunk` を元の safe-integer タイムスタンプと対にし、`AssistantStreamRecord[]` を生成する。同一ブロック向けの連続するテキスト・推論・ツール引数差分は、`time0`、正確なタイムスタンプ間隔、元の差分ごとの配列 1 エントリーを持つ 1 レコードになる; その他のチャンクはタイムスタンプ付きの生レコードのまま残る。この表現は、トークン境界の結合や終端・使用量・ブロック・失敗・リプレイの事実の欠落なしに、繰り返されるイベントエンベロープを取り除く。
 
-`snapshot()` returns a detached immutable stream. `expandAssistantStream()` strictly checks record keys, member counts, indexes, timestamps, tool-call identity, and lossless JSON before recreating the exact timed chunk sequence. The Session log embeds this stream in `assistant/message` for a surface result or `assistant/attempt` for an attempt with no surface message.
+`snapshot()` は切り離された不変ストリームを返す。`expandAssistantStream()` は、正確な時刻付きチャンク列を再現する前に、レコードキー、メンバー数、インデックス、タイムスタンプ、ツール呼び出し同一性、ロスレス JSON を厳密に検査する。Session ログは、表面結果向けには `assistant/message` に、表面メッセージのない試行向けには `assistant/attempt` にこのストリームを埋め込む。
 
-Process-local `agent/assistant-stream` frames carry live presentation. Durable replay and restore validation still expand the embedded settlement; telemetry, token accounting, and Host folds read the compact records directly. Record-level readers (`assistantStreamFirstTokenTime`, `assistantStreamHasVisibleContent`, `assistantStreamHasVisibleText`, `lastAssistantStreamChunk`, `assistantStreamChunks`, `joinAssistantStreamText`, `assembleAssistantStream`, and the per-run `runFirstTokenTime` and `runFirstVisibleTime`) answer consumer questions in one pass over the records with early exit, so a large history costs O(records) per settlement instead of O(members) expansion ([fold reference](../../packages/llm/llm/README.md)). `expandAssistantStream()` remains the validating path for records read at a durable boundary and for consumers that need every member.
+プロセス局所の `agent/assistant-stream` フレームがライブ表示を運ぶ。永続化リプレイと復元検証は埋め込まれた確定物を依然として展開する; テレメトリー、トークン会計、Host フォールドはコンパクトなレコードを直接読む。レコード単位のリーダー (`assistantStreamFirstTokenTime`、`assistantStreamHasVisibleContent`、`assistantStreamHasVisibleText`、`lastAssistantStreamChunk`、`assistantStreamChunks`、`joinAssistantStreamText`、`assembleAssistantStream`、およびランごとの `runFirstTokenTime` と `runFirstVisibleTime`) は、早期終了付きでレコード上を一走査してコンシューマーの問いに答えるため、大きな履歴は確定物ごとに O(メンバー) 展開ではなく O(レコード) で済む ([フォールド参照](../../packages/llm/llm/README.md))。`expandAssistantStream()` は、永続化境界で読まれるレコードと全メンバーを必要とするコンシューマー向けの検証経路であり続ける。
 
 ## `LlmFailure`
 
-Every thrown or in-band final-adapter failure normalizes to one serializable provider-neutral payload. `providerRetryAfterMs` is a validated positive delay requested by the provider, not a retry decision; `ProviderRequestId` is an opaque branded string for diagnostics.
+throw された失敗もインバンドの最終アダプター失敗も、1 つの直列化可能なプロバイダー中立ペイロードに正規化される。`providerRetryAfterMs` はプロバイダーが要求した検証済みの正の遅延であり、再試行決定ではない; `ProviderRequestId` は診断用の不透明なブランド付き文字列である。
 
 ```ts type-equiv
 /** Serializable provider or transport failure facts; policy decides whether they are retryable. */
@@ -252,9 +252,9 @@ interface LlmFailure {
 }
 ```
 
-## Request-image pricing
+## リクエスト画像の価格付け
 
-An adapter whose provider charges visual tokens for request images declares per-route pricing by overriding `LlmAdapter.imageRequestPricing`, and `ctx.llm.imageRequestPricing(provider, model)` resolves it synchronously for consumers. The token meter resolves the routed model's pricing on every measurement so compaction pressure, retention, and range selection price image history as the routed request actually sends it; the DeepSeek adapter prices each retained occurrence at its per-model request target with the published vision accounting and each occurrence selected by a logged image-offload decision as its placeholder text, while provider usage remains the authoritative anchor for completed requests.
+リクエスト画像に視覚トークンを課金するプロバイダーのアダプターは、`LlmAdapter.imageRequestPricing` をオーバーライドしてルートごとの価格付けを宣言し、`ctx.llm.imageRequestPricing(provider, model)` がコンシューマー向けにそれを同期的に解決する。トークンメーターは測定ごとにルーティング済みモデルの価格付けを解決するため、コンパクション圧力、保持、範囲選択は、ルーティング済みリクエストが実際に送る通りに画像履歴へ価格を付ける; DeepSeek アダプターは、保持された各出現をモデルごとのリクエストターゲットで公開 vision 会計により価格付けし、ログ済み画像オフロード決定で選ばれた各出現をそのプレースホルダーテキストとして価格付けする一方、完了済みリクエストについてはプロバイダー使用量が権威ある基準であり続ける。
 
 ```ts type-equiv
 /**
@@ -291,27 +291,27 @@ interface LlmImageRequestPricing {
 }
 ```
 
-## The adapter contract
+## アダプターコントラクト
 
-Every adapter MUST obey these, and every consumer may rely on them:
+すべてのアダプターは以下に従わなければならず (MUST)、すべてのコンシューマーはそれらに依存できる:
 
-- **`usage` before `finish`, nothing after `finish`.** Defer both to the provider's end-of-stream marker so a trailing usage-only chunk can't violate the ordering.
-- **Tool-call `arguments` stay raw JSON strings end-to-end.** Partial fragments stream via `argumentsDelta`; a provider that hands back parsed objects re-stringifies at `block-end`.
-- **Two sanctioned error paths, one `LlmFailure` type.** A failure may either THROW from `stream()` (transport/protocol errors) **or** end the stream with `finish {kind:'error'|'aborted', failure}` (provider in-band errors, for adapters that can't throw mid-stream). `LlmError.failure` carries the same `LlmFailure`. After the call selects its adapter, the stream preserves the exact thrown `Error` object and associates immutable facts plus the serving registration's immutable retry policy with that call; the agent loop commits the attempt stream as `assistant/attempt`, closes the failed step, and offers the error, facts, immutable prior-retried facts, serving policy, and turn signal to `agent/request-error`. A handling listener returns `{ kind: 'retry' }` after its awaited repair; absent recovery the structured failure becomes the turn error, and no surface Assistant message or tool side effect is committed for that attempt.
-- **One adapter call is one provider attempt.** Adapters disable library retries. Agent-level recovery opens another durable numbered turn; direct `ctx.llm.stream()` callers remain single-attempt.
-- **Provider stalls are bounded at the transport.** Both shipping remote adapters expose positive finite `streamIdleTimeoutMs` with a five-minute default. The watchdog arms only while iterator `next()` is outstanding, uses one stable signal for the whole request, maps its own expiry to `TIMEOUT`, and keeps an earlier caller abort as `ABORTED`.
-- **Context overflow has one canonical code.** Both DeepSeek adapters classify explicit provider detail through `isContextWindowExceededError()` and surface `CONTEXT_WINDOW_EXCEEDED`, whether the failure arrives as a thrown HTTP `LlmError` or an in-band finish error. Consumers route on the code, never provider text.
-- **An empty completion is a retryable error, not a silent success.** Both adapters map a terminal `stop` finish that carried no content blocks to `finish {kind:'error'}` with the canonical `EMPTY_RESPONSE` code, and `dsh-llm-retry` retries it by default.
-- **Every provider HTTP request carries the app-attribution header.** Adapters send `attributionHeaders()` (below) - the `User-Agent` baseline - and prove it with a wire-level test.
-- **Replay state is adapter-owned; its split is shared.** A successful `finish` may carry a `ReplayEnvelope`: opaque response-level metadata plus optional per-block entries aligned with the emitted block sequence. The alignment is the harness's vocabulary — when assembly drops a block it drops the entry at the same position, so stored metadata always describes stored content. The loop stores the pruned envelope with the assembled assistant message. On a later request, `LlmRuntime` passes the state only when the historical provider and target provider are currently registered to the exact same adapter instance. That adapter validates the state and owns any cross-model or cross-provider conversion; other adapters receive the provider-neutral content plus provider/model fields without the private state. Durable content stays authoritative: a stored state the reading adapter cannot use degrades that one message to provider-neutral conversion with a diagnostic instead of failing the request.
+- **`usage` は `finish` の前に、`finish` の後には何もない。** 両方をプロバイダーのストリーム終端マーカーまで遅延させるため、末尾の使用量のみのチャンクが順序を壊すことはない。
+- **ツール呼び出しの `arguments` は端から端まで生 JSON 文字列のまま。** 部分断片は `argumentsDelta` でストリーミングする; 解析済みオブジェクトを返すプロバイダーは `block-end` で再文字列化する。
+- **公認のエラー経路は 2 つ、1 つの `LlmFailure` 型。** 失敗は `stream()` から THROW するか (輸送/プロトコルエラー)、`finish {kind:'error'|'aborted', failure}` でストリームを終えるか (ストリーム途中で throw できないアダプター向けのプロバイダーインバンドエラー) のいずれかである。`LlmError.failure` は同じ `LlmFailure` を運ぶ。呼び出しがアダプターを選択した後、ストリームは throw された正確な `Error` オブジェクトを保持し、不変の事実と提供側登録の不変な再試行ポリシーをその呼び出しに関連付ける; エージェントループは試行ストリームを `assistant/attempt` としてコミットし、失敗したステップを閉じ、エラー、事実、不変の過去再試行事実、提供ポリシー、ターン信号を `agent/request-error` に提供する。処理リスナーは待機した修復の後に `{ kind: 'retry' }` を返す; 回復がなければ構造化失敗がターンエラーとなり、その試行では表面アシスタントメッセージもツール副作用もコミットされない。
+- **1 アダプター呼び出しは 1 プロバイダー試行。** アダプターはライブラリー再試行を無効化する。エージェント単位の回復は別の永続化番号付きターンを開く; 直接の `ctx.llm.stream()` 呼び出し元は単一試行のままである。
+- **プロバイダーの停滞は輸送層で有界である。** 出荷される両リモートアダプターは正の有限な `streamIdleTimeoutMs` を 5 分既定で公開する。ウォッチドッグはイテレーター `next()` が未解決の間のみ作動し、リクエスト全体で 1 つの安定した信号を使い、自身の期限切れを `TIMEOUT` に写像し、より早い呼び出し元中止を `ABORTED` として保持する。
+- **コンテキスト溢れは 1 つの正準コードを持つ。** 両 DeepSeek アダプターは明示的なプロバイダー詳細を `isContextWindowExceededError()` で分類し、throw された HTTP `LlmError` としての到着かインバンド終了エラーかにかかわらず `CONTEXT_WINDOW_EXCEEDED` を表出する。コンシューマーはプロバイダーテキストではなくコードで振り分ける。
+- **空の補完は再試行可能なエラーであり、無言の成功ではない。** 両アダプターは、コンテンツブロックを運ばなかった終端 `stop` 終了を、正準 `EMPTY_RESPONSE` コード付きの `finish {kind:'error'}` へ写像し、`dsh-llm-retry` は既定でそれを再試行する。
+- **すべてのプロバイダー HTTP リクエストはアプリ帰属ヘッダーを運ぶ。** アダプターは `attributionHeaders()` (下記) — `User-Agent` 基準 — を送り、ワイヤーレベルのテストでそれを証明する。
+- **リプレイ状態はアダプター所有であり、その分割は共有である。** 成功した `finish` は `ReplayEnvelope` を運んでもよい: 不透明な応答単位メタデータと任意のブロック単位エントリーであり、送出ブロック列と整列する。整列はハーネスのボキャブラリーである — 組み立てがブロックを落とすとき同じ位置のエントリーも落とすため、格納メタデータは常に格納コンテンツを記述する。ループは枝刈り済みエンベロープを組み立て済みアシスタントメッセージとともに格納する。後のリクエストでは、`LlmRuntime` は履歴プロバイダーと対象プロバイダーが現在まったく同じアダプターインスタンスに登録されている場合にのみ状態を渡す。そのアダプターは状態を検証し、モデル間・プロバイダー間変換を所有する; 他のアダプターはプロバイダー/モデルフィールド付きのプロバイダー中立コンテンツを受け取り、プライベート状態は受け取らない。永続化コンテンツが権威であり続ける: 読み取り側アダプターが使えない格納状態は、その 1 メッセージを診断付きでプロバイダー中立変換へ降格させるのであり、リクエストを失敗させない。
 
 ## `ResolvedRetryPolicy`
 
-Retry configuration resolves before route registration into an immutable discriminated union. Normal mode carries `mode: 'normal'`, finite `maxRetries`, `retryableCodes`, and required `initialDelayMs`, `maxDelayMs`, and `jitterRatio`; always mode carries `mode: 'always'` and the same required backoff fields without a finite maximum. Omitting a provider policy uses the normal default of five retries. Layered settings may retain normal-only `maxRetries` or `retryableCodes` after switching to always mode; the resolver ignores those inactive fields and captures the pure always policy. `LlmRuntime.providerRetryPolicy(provider)` returns the registered value, and `llmRetryPolicyOf(stream)` returns the value captured from the serving registration after the call selects it, so later route disposal or replacement cannot change an in-flight failure's recovery policy. The [generated config catalog](../config-catalog.md) lists the optional input fields.
+再試行設定はルート登録の前に不変の判別共用体へ解決される。通常モードは `mode: 'normal'`、有限の `maxRetries`、`retryableCodes`、必須の `initialDelayMs`、`maxDelayMs`、`jitterRatio` を運び、常時モードは `mode: 'always'` と同じ必須バックオフフィールドを有限上限なしに運ぶ。プロバイダーポリシーの省略は 5 回再試行の通常既定を使う。層状設定は常時モード切替後に通常専用の `maxRetries` や `retryableCodes` を残すことがある; リゾルバーはそれら非活性フィールドを無視し、純粋な常時ポリシーを捕捉する。`LlmRuntime.providerRetryPolicy(provider)` は登録値を返し、`llmRetryPolicyOf(stream)` は呼び出しが提供登録を選択した後に捕捉された値を返すため、後のルート破棄や置換が進行中の失敗の回復ポリシーを変えることはない。任意入力フィールドの一覧は[生成設定カタログ](../config-catalog.md)にある。
 
-## `AppIdentity` — app attribution
+## `AppIdentity` — アプリ帰属
 
-The static public application identity every adapter sends to providers ([`packages/llm/llm/src/attribution.ts`](../../packages/llm/llm/src/attribution.ts)). `attributionHeaders(identity?)` maps it to the standard `User-Agent` header only; OpenRouter-specific app attribution headers are intentionally not supported by this contract. The default `APP_IDENTITY` sources its version from the package manifest; every field is a public product fact - no secrets, paths, session ids, or per-user identifiers, and nothing per-request may influence the values.
+すべてのアダプターがプロバイダーへ送る静的な公開アプリケーション同一性 ([`packages/llm/llm/src/attribution.ts`](../../packages/llm/llm/src/attribution.ts))。`attributionHeaders(identity?)` はそれを標準 `User-Agent` ヘッダーのみに写像する; OpenRouter 固有のアプリ帰属ヘッダーはこのコントラクトでは意図的にサポートされない。既定の `APP_IDENTITY` はパッケージマニフェストからバージョンを取得する; すべてのフィールドは公開プロダクト事実であり — シークレット、パス、セッション id、ユーザーごとの識別子はなく、リクエストごとの何ものも値を左右してはならない。
 
 ```ts type-equiv
 /**
@@ -333,7 +333,7 @@ interface AppIdentity {
 
 ## `TokenUsage`
 
-Per-call token accounting. Counts are **disjoint**: `inputTokens` is uncached input only; cached input is reported separately, and billed input is the sum of the three. Adapters whose providers fold cache hits into a single prompt total (DeepSeek's `prompt_tokens`) subtract them back out. Optional `totalTokens` is an exact aggregate prompt-plus-output count preserved from the provider or reconstructed from authoritative aggregate counters; adapters omit it when unavailable or inconsistent. `reasoningTokens`, when present, is informational detail already included in `outputTokens`; totals must not add it again.
+呼び出しごとのトークン会計。カウントは**互いに素**である: `inputTokens` は非キャッシュ入力のみであり、キャッシュ入力は別途報告され、課金入力は 3 者の合計である。キャッシュヒットを単一プロンプト合計に畳み込むプロバイダー (DeepSeek の `prompt_tokens`) のアダプターはそれらを差し戻して引く。任意の `totalTokens` は、プロバイダーから保持されたか権威ある集計カウンターから再構成された、プロンプト+出力の正確な集計カウントであり、利用不可または不整合の場合はアダプターが省略する。`reasoningTokens` は存在する場合、すでに出力トークンに含まれる参考詳細であり、合計に再加算してはならない。
 
 ```ts type-equiv
 /**
@@ -363,9 +363,9 @@ interface TokenUsage {
 
 ## `BlockAssembler`
 
-`BlockAssembler` ([`packages/llm/llm/src/assembler.ts`](../../packages/llm/llm/src/assembler.ts)) is the single shared implementation that folds a `StreamChunk` stream back into `ContentBlock`s, usage, finish reason, and replay state. The loop logs the raw chunks while feeding the same chunks through an assembler, then stores the assembled assistant content with the provider and model that produced it. A consumer that needs the assembled result without re-implementing the fold uses this.
+`BlockAssembler` ([`packages/llm/llm/src/assembler.ts`](../../packages/llm/llm/src/assembler.ts)) は、`StreamChunk` ストリームを `ContentBlock` 群、使用量、終了理由、リプレイ状態へ折り畳む単一の共有実装である。ループは生チャンクをログに記録しながら同じチャンクをアセンブラーに流し、組み立て済みアシスタントコンテンツをそれを生成したプロバイダーとモデルとともに格納する。折り畳みを再実装せずに組み立て結果を必要とするコンシューマーはこれを使う。
 
-One keep/drop decision covers content and metadata together: a `max-tokens` finish drops every tool call because a truncated call is unsafe to execute, and the same decision prunes the replay envelope's per-block entry at each dropped position. `blocks()` and `replayState` therefore cannot disagree, whatever assembly removes.
+1 つの保持/破棄決定がコンテンツとメタデータの両方を覆う: `max-tokens` 終了は切り詰められた呼び出しの実行が安全でないためすべてのツール呼び出しを落とし、同じ決定がリプレイエンベロープのブロック単位エントリーを落とした各位置で枝刈りする。したがって組み立てが何を除去しても `blocks()` と `replayState` は矛盾し得ない。
 
 ```ts public-api
 /**
@@ -422,15 +422,15 @@ declare class BlockAssembler {
 
 <a id="the-model-request-and-result"></a>
 
-## The model request
+## モデルリクエスト
 
-One model call is a fully-assembled `GenerateOptions`. The adapter answers with a raw [`StreamChunk`](#streamchunk--the-raw-protocol) stream; the consumer assembles it with [`BlockAssembler`](#blockassembler).
+1 モデル呼び出しは完全に組み立てられた `GenerateOptions` である。アダプターは生の [`StreamChunk`](#streamchunk--the-raw-protocol) ストリームで答え、コンシューマーは [`BlockAssembler`](#blockassembler) でそれを組み立てる。
 
 Source: [`packages/llm/llm/src/types.ts`](../../packages/llm/llm/src/types.ts)
 
-Provider and model discovery uses small provider-neutral descriptors. A model catalog is advisory: routing still keys on a registered provider.
+プロバイダーとモデルの発見は小さなプロバイダー中立記述子を使う。モデルカタログは助言的である: ルーティングは依然として登録済みプロバイダーをキーとする。
 
-Registering an adapter returns a handle: the disposer, plus the atomic route replacement a plugin whose route set is user-configurable needs.
+アダプターの登録はハンドルを返す: ディスポーザーと、ルート集合がユーザー設定可能なプラグインが必要とする不可分なルート置換である。
 
 ```ts type-equiv
 /**
@@ -468,7 +468,7 @@ interface LlmProviderInfo {
 }
 ```
 
-Adapter plugins additionally declare which routes *could* run through `registerConfigurableProviders()`, addressing each one's user-settings section, so configuration surfaces can offer dormant providers before any route registers.
+アダプタープラグインはさらに、`registerConfigurableProviders()` を通じて動作*し得る*ルートを宣言し、各々のユーザー設定セクションを指し示すため、設定サーフェスはルート登録前に休止プロバイダーを提供できる。
 
 ```ts type-equiv
 /**
@@ -513,7 +513,7 @@ interface LlmConfigurableProvider {
 }
 ```
 
-A settings editor shows `defaultBaseURL`, endpoint configuration variables from `baseURLEnv`, and `nativeAuth` for a profile that leaves the endpoint or the credential reference unset. Both variable lists contain names, never values.
+設定エディターは、エンドポイントや資格情報参照を未設定のままにするプロファイル向けに `defaultBaseURL`、`baseURLEnv` 由来のエンドポイント設定変数、`nativeAuth` を表示する。両変数一覧は名前のみを含み、値を決して含まない。
 
 ```ts type-equiv
 /** Authentication a provider route performs without a credential reference in its profile. */
@@ -541,7 +541,7 @@ interface LlmModelInfo {
 }
 ```
 
-Correctness-sensitive metadata is resolved separately from the advisory catalog and is owned by the adapter serving the exact route. Context capacity, adapter call defaults, reasoning choices, and the system prompt update mode share one exact-model result so consumers do not repeat authoritative model resolution. `SystemPromptUpdate` has the single value `'in-history'`: the model reads the latest `system` message at any position of `messages` as the complete effective system prompt, so the agent loop can append a changed prompt after the cached history instead of rewriting message 0 ([decision rule](../../packages/core/agent-loop/README.md#understand-the-implementation)); an absent mode means only a leading system message is read, and `normalizeModelInfo` rejects any other value with `INVALID_MODEL_INFO`.
+正確性に敏感なメタデータは助言的カタログとは別に解決され、正確なルートを提供するアダプターが所有する。コンテキスト容量、アダプター呼び出し既定、推論選択肢、システムプロンプト更新モードは 1 つの正確モデル結果を共有するため、コンシューマーは権威あるモデル解決を繰り返さない。`SystemPromptUpdate` は単一値 `'in-history'` を持つ: モデルは `messages` 内の任意位置の最新の `system` メッセージを完全な有効システムプロンプトとして読むため、エージェントループはメッセージ 0 を書き換える代わりにキャッシュ済み履歴の後に変更プロンプトを追記できる ([決定規則](../../packages/core/agent-loop/README.md#understand-the-implementation)); モード欠落は先頭システムメッセージのみが読まれることを意味し、`normalizeModelInfo` は他の値を `INVALID_MODEL_INFO` で拒否する。
 
 ```ts type-equiv
 /** Provider-owned context capacity for one exact provider/model route. */
@@ -551,7 +551,7 @@ interface LlmModelContext {
 }
 ```
 
-Reasoning effort is another exact-route capability. The core brands identifiers but does not enumerate their values; each adapter owns the choices in increasing effort order, display names, and optional deployment default. Ordering compares selectable controls, not predicted token use, cost, or latency.
+推論エフォートは別の正確ルートケイパビリティである。コアは識別子にブランドを付けるが値を列挙しない; 各アダプターがエフォート昇順の選択肢、表示名、任意のデプロイ既定を所有する。順序付けは、予測トークン使用量・コスト・遅延ではなく、選択可能なコントロールを比較する。
 
 ```ts type-equiv
 /** Adapter-owned identifier for one model's selectable reasoning effort. */
@@ -599,7 +599,7 @@ interface LlmResolvedModelInfo extends LlmModelInfo {
 }
 ```
 
-Auxiliary callers can provide user content without a durable identity or source. Existing `Message[]` histories remain valid request inputs. Session writes, Agent delivery, and recorded title requests continue to require durable messages.
+補助呼び出し元は、永続化同一性やソースなしにユーザーコンテンツを提供できる。既存の `Message[]` 履歴は依然として有効なリクエスト入力である。Session 書き込み、Agent 配送、記録済みタイトル要求は引き続き永続化メッセージを要求する。
 
 ```ts type-equiv
 /** User input for one LLM request; it has no durable Session identity or source. */
@@ -663,7 +663,7 @@ interface GenerateOptions {
 }
 ```
 
-Why a model response stopped is a merge-extensible reason. Terminal provider failures carry the streaming contract's [`LlmFailure`](#llmfailure):
+モデル応答が停止した理由はマージ拡張可能な理由である。終端プロバイダー失敗はストリーミングコントラクトの [`LlmFailure`](#llmfailure) を運ぶ:
 
 ```ts type-equiv
 /**
@@ -679,9 +679,9 @@ interface FinishReasonMap {
 }
 ```
 
-`FinishReason = FinishReasonMap[keyof FinishReasonMap]`. `TokenUsage` (per-call accounting with disjoint cache fields) is detailed [below](#tokenusage).
+`FinishReason = FinishReasonMap[keyof FinishReasonMap]`。`TokenUsage` (互いに素なキャッシュフィールドを持つ呼び出しごとの会計) の詳細は[下記](#tokenusage)。
 
-`GenerateOptions.tools` carries `ToolSchema` — the JSON-schema description of a tool, as sent to the model. It is declared in dsh-llm (not dsh-tools) precisely because it is part of the request the loop assembles every step:
+`GenerateOptions.tools` は `ToolSchema` を運ぶ — モデルへ送られる通りのツールの JSON スキーマ記述である。それがループが毎ステップ組み立てるリクエストの一部であるまさにその理由で、dsh-tools ではなく dsh-llm で宣言されている:
 
 ```ts type-equiv
 /**
@@ -705,9 +705,9 @@ interface ToolSchema {
 }
 ```
 
-The model-facing `ToolSchema` is the wire type; the registered `ToolDefinition` that produces it (schema + `execute`) is on [tools.md](tools.md).
+モデル向け `ToolSchema` はワイヤー型である; それを生成する登録済み `ToolDefinition` (スキーマ + `execute`) は [tools.md](tools.md) にある。
 
-A provider a surface is still drafting has no route and no catalog, so interrogation is described separately: the request carries the draft the user is editing, and the reply is candidates a surface may adopt rather than a catalog it must serve.
+サーフェスがまだ下書き中のプロバイダーにはルートもカタログもないため、問い合わせは別に記述される: リクエストはユーザーが編集中の下書きを運び、返答は提供しなければならないカタログではなくサーフェスが採用し得る候補である。
 
 ```ts type-equiv
 /**
@@ -756,13 +756,13 @@ interface LlmDiscoveredModel {
 }
 ```
 
-### The request envelope: `LlmCallConfig` and the logged header
+### リクエストエンベロープ: `LlmCallConfig` とログ済みヘッダー
 
-The loop builds each request from logged state. `EpochHeader` records call config, marks the fields supplied by adapter defaults, and records the authoritative returned tool order (configured by `toolOrder`, or lexicographic when unset) through full `request/header` snapshots. The rendered prompt is derived history — the `system/message` at surface node 0, plus any later system node an `in-history` route appended — so the header and the derived history together make the request reconstructable from the session log. See [session.md](session.md#the-request-header-event-requestheader) and the [reconstructability Agent Note](../../.agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.md).
+ループはログ済み状態から各リクエストを構築する。`EpochHeader` は呼び出し設定を記録し、アダプター既定が提供したフィールドを印付けし、完全な `request/header` スナップショットを通じて権威ある返却ツール順序 (`toolOrder` で設定され、未設定時は辞書式) を記録する。描画済みプロンプトは導出履歴である — 表面ノード 0 の `system/message` と、`in-history` ルートが追記した後のシステムノード — ので、ヘッダーと導出履歴の組み合わせがリクエストをセッションログから再構成可能にする。[session.md](session.md#the-request-header-event-requestheader) と[再構成可能性 Agent Note](../../.agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.md)を参照。
 
-`agent/request` receives a frozen call-config seed and may return a replacement to switch provider, model, reasoning effort, or sampling. Before the waterfall, the loop removes values marked as adapter defaults so exact-model preparation materializes the selected route's current values; unmarked explicit settings remain in the proposal. After the waterfall, preparation rejects unsupported explicit effort ids without clamping and logs the effective config plus the fields supplied by adapter defaults under the turn signal. On step admission, this waterfall and preparation run after assembly and `step/start` but before the system prompt and accepted user batch are committed; cancellation during either commits neither. The prepared capability governs prompt reconciliation, and the call keeps one adapter registration through dispatch. Requests reaching `llm/stream` are deep-frozen, so mutation throws, and carry a process-local loop identity so observers do not confuse separately logged frozen auxiliary calls with conversation requests.
+`agent/request` は凍結された呼び出し設定シードを受け取り、プロバイダー、モデル、推論エフォート、サンプリングを切り替える置換を返してもよい。ウォーターフォール前に、ループはアダプター既定として印付けされた値を取り除くため、正確モデル準備が選択ルートの現在値を実体化する; 印のない明示設定は提案に残る。ウォーターフォール後に、準備はサポートされない明示エフォート id をクランプなしに拒否し、ターン信号の下で有効設定とアダプター既定が提供したフィールドをログに記録する。ステップ受理時、このウォーターフォールと準備は組み立てと `step/start` の後、システムプロンプトと受理済みユーザーバッチのコミット前に実行する; いずれかの間のキャンセルはいずれもコミットしない。準備済みケイパビリティがプロンプト照合を統治し、呼び出しはディスパッチを通じて 1 つのアダプター登録を保持する。`llm/stream` に届くリクエストは deep-frozen であり変更は throw し、プロセス局所のループ同一性を運ぶため、観測者は別にログ記録された凍結補助呼び出しと会話リクエストを混同しない。
 
-On the wire, a loop-built request is the derived history alone: the rendered prompt travels as the leading `system`-role message (surface node 0, a `system/message` event) and, when the prepared call declares `systemPromptUpdate: 'in-history'`, a non-empty changed prompt may follow the cached history as a later `system`-role message that the model reads as the effective prompt; the request's `system` field is unset — `GenerateOptions.system` serves direct one-shot callers such as title providers. An empty rendering leaves no system messages in derived history, even when earlier requests retained several prompt versions. The logged request ends with the newest `user/message` on a turn's first step and the previous step's tool results on later steps.
+ワイヤー上では、ループ構築リクエストは導出履歴のみである: 描画済みプロンプトは先頭の `system` ロールメッセージ (表面ノード 0、`system/message` イベント) として運ばれ、準備済み呼び出しが `systemPromptUpdate: 'in-history'` を宣言する場合、空でない変更プロンプトがキャッシュ済み履歴の後に後の `system` ロールメッセージとして続き、モデルはそれを有効プロンプトとして読む; リクエストの `system` フィールドは未設定である — `GenerateOptions.system` はタイトルプロバイダーなどの直接ワンショット呼び出し元用である。空の描画は、以前のリクエストが複数のプロンプト版を保持していた場合でも、導出履歴にシステムメッセージを残さない。ログ済みリクエストは、ターンの最初のステップでは最新の `user/message` で終わり、後のステップでは前ステップのツール結果で終わる。
 
 FIXME(call-config-shape): revisit which remaining fields are genuinely epoch-level for cache purposes (`model` and the model-owned reasoning effort are explicit; the sampling scalars sit here out of caution).
 
@@ -816,15 +816,15 @@ interface LlmCallConfigAdapterDefaults {
 }
 ```
 
-## Official DeepSeek request extensions
+## 公式 DeepSeek リクエスト拡張
 
-`ctx.deepseekLlmApiExtensions` is the provider-specific registry for additive top-level fields on `deepseek-official` requests. Contributor plugins use `register(field, provider)` to claim one field; the adapter calls `prepare(request)` after serializing its base body and merges the returned fields before HTTP. The prepared `accept()` transaction runs after 2xx, so a contributor can commit delivery state without treating a transport or provider rejection as acceptance. A contributor whose preparation throws is logged and omitted from that request, and an acceptance failure is logged without failing the request; a base-field collision uses `REQUEST_EXTENSION` and fails the model request. A merged body that fails to serialize is sent without extension fields; acceptance is skipped and the provider plugin logs the omitted field names.
+`ctx.deepseekLlmApiExtensions` は `deepseek-official` リクエスト上の追加トップレベルフィールド向けのプロバイダー固有レジストリーである。コントリビュータープラグインは `register(field, provider)` で 1 フィールドを要求する; アダプターは基本ボディの直列化後に `prepare(request)` を呼び、HTTP 前に返却フィールドをマージする。準備済み `accept()` トランザクションは 2xx 後に実行されるため、コントリビューターは輸送・プロバイダー拒否を受け入れとして扱わずに配送状態をコミットできる。準備が throw するコントリビューターはログ記録されて当該リクエストから省かれ、受け入れ失敗はリクエストを失敗させずにログ記録される; 基本フィールド衝突は `REQUEST_EXTENSION` を使いモデルリクエストを失敗させる。直列化に失敗したマージ済みボディは拡張フィールドなしで送られ、受け入れはスキップされてプロバイダープラグインが省かれたフィールド名をログに記録する。
 
-The [wire reference](../deepseek-llm-api-wire-extensions.md) defines the exact request headers, extension transaction, field versions, and receiver obligations. The shipped composition registers [`dsh_session_log`](../../packages/session/session-log-deepseek/README.md) as a lossless incremental canonical-log suffix and [`dsh_plugin_packages`](../../packages/llm/plugin-package-inventory-deepseek/README.md) as the complete active Loader-backed package set. These fields remain outside model messages and are absent from the pi-ai adapter path.
+[ワイヤー参照](../deepseek-llm-api-wire-extensions.md)は正確なリクエストヘッダー、拡張トランザクション、フィールドバージョン、受信者義務を定義する。出荷コンポジションは、ロスレス増分正準ログ接尾辞として [`dsh_session_log`](../../packages/session/session-log-deepseek/README.md) を、完全な有効 Loader-backed パッケージ集合として [`dsh_plugin_packages`](../../packages/llm/plugin-package-inventory-deepseek/README.md) を登録する。これらのフィールドはモデルメッセージの外に留まり、pi-ai アダプター経路には存在しない。
 
-## Service and provider contracts
+## サービスとプロバイダーコントラクト
 
-`LlmAdapter` is the provider contract: subclass, implement `stream()`, and register one adapter instance with `ctx.llm.registerAdapter(providers, adapter)`. `GenerateOptions.provider` selects the registered adapter; `GenerateOptions.model` is passed to that adapter and need not be registered at lifecycle start. Duplicate provider routes fail atomically. Optional `providerRetryPolicy()` is captured per route with normal defaults, while `providerInfo()` and asynchronous `listModels()` feed `LlmRuntime.listProviders()` / `listModels()` with detached selector metadata. That catalog is advisory rather than a request whitelist: the adapter remains authoritative and may accept unlisted model ids. One asynchronous `resolveModel()` query returns exact model identity plus optional correctness-sensitive context capacity, an adapter-configured `defaultMaxTokens`, and ordered model-owned reasoning ids with an optional deployment default; absent fields mean unavailable metadata or provider-owned behavior, not invalid catalog membership. The resolver receives optional cancellation and must settle promptly after abort. `LlmRuntime.resolveModelInfo()` validates and detaches the aggregate. At the final adapter boundary, `resolveCallConfig()` materializes the output default only when `maxTokens` is absent and validates and materializes reasoning, so direct calls cannot bypass either configured behavior; direct dispatch captures one registration before awaiting that resolution. The agent loop instead uses `prepareCall()` to keep the same registration across model resolution, durable header logging, and dispatch, retain detached context metadata from that exact lookup, and report which config fields the adapter defaulted. Adapter lookup happens at the terminal continuation of the `llm/stream` waterfall, so a listener may short-circuit the call or route a mutable one-shot request before lookup. AgentLoop observes a request attempt once the outer waterfall returns a stream handle; that limited boundary does not prove a lazy terminal adapter was constructed or began provider I/O. The `block-start` / `block-end` `index` correlation and the assembler together mean an adapter only has to emit well-formed chunks — block reassembly is not each adapter's problem. [architecture.md](../architecture.md#turn-flow) shows where `ctx.llm.stream()` and the `llm/stream` waterfall sit in one turn.
+`LlmAdapter` はプロバイダーコントラクトである: サブクラス化し、`stream()` を実装し、1 アダプターインスタンスを `ctx.llm.registerAdapter(providers, adapter)` で登録する。`GenerateOptions.provider` が登録済みアダプターを選択し、`GenerateOptions.model` はそのアダプターへ渡されライフサイクル開始時に登録されている必要はない。重複プロバイダールートは不可分に失敗する。任意の `providerRetryPolicy()` は通常既定付きでルートごとに捕捉され、`providerInfo()` と非同期 `listModels()` は切り離されたセレクターメタデータで `LlmRuntime.listProviders()` / `listModels()` に供給する。そのカタログはリクエストホワイトリストではなく助言的である: アダプターは権威であり続け、未掲載モデル id を受け入れてもよい。1 回の非同期 `resolveModel()` 照会は、正確なモデル同一性と任意の正確性敏感なコンテキスト容量、アダプター設定の `defaultMaxTokens`、任意のデプロイ既定付きの順序付きモデル所有推論 id を返す; フィールド欠落は無効なカタログ所属ではなく利用不可メタデータまたはプロバイダー所有動作を意味する。リゾルバーは任意のキャンセルを受け取り、中止後に速やかに確定しなければならない。`LlmRuntime.resolveModelInfo()` は集約を検証して切り離す。最終アダプター境界では、`resolveCallConfig()` は `maxTokens` 欠落時のみ出力既定を実体化し、推論を検証・実体化するため、直接呼び出しはいずれの設定済み動作も迂回できない; 直接ディスパッチは当該解決の待機前に 1 登録を捕捉する。エージェントループは代わりに `prepareCall()` を使い、モデル解決・永続化ヘッダーログ・ディスパッチを通じて同じ登録を保ち、当該照会由来の切り離されたコンテキストメタデータを保持し、どの設定フィールドをアダプターが既定化したかを報告する。アダプター照会は `llm/stream` ウォーターフォールの終端継続で起こるため、リスナーは照会前に呼び出しを短絡したり可変ワンショットリクエストを振り向けたりできる。AgentLoop は外側ウォーターフォールがストリームハンドルを返した時点でリクエスト試行を観測する; その限定境界は遅延終端アダプターが構築されたことやプロバイダー I/O を開始したことを証明しない。`block-start` / `block-end` の `index` 相関とアセンブラーの組み合わせにより、アダプターは整形式チャンクを送出するだけでよい — ブロック再組み立ては各アダプターの問題ではない。[architecture.md](../architecture.md#turn-flow) は 1 ターン内で `ctx.llm.stream()` と `llm/stream` ウォーターフォールが位置する場所を示す。
 
 ```ts type-equiv
 /** One model call whose config and adapter registration were resolved together. */
@@ -935,7 +935,7 @@ declare abstract class LlmAdapter {
 }
 ```
 
-`ContentBlockType` (the key set the `index`-correlated blocks carry) derives from [`ContentBlockMap`](#content-blocks-and-messages) above.
+`ContentBlockType` (`index` 相関ブロックが運ぶキー集合) は上記の [`ContentBlockMap`](#content-blocks-and-messages) から導出される。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -943,13 +943,13 @@ declare abstract class LlmAdapter {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によりソースから生成 (doc-sync 内の `pnpm run verify-cordis-catalog` で鮮度を検証; `pnpm run gen-cordis-catalog` で再生成) — 言語面の差異はロケール固有の対訳文書パスのみである。署名ブロックは `ts cordis-catalog` フェンスを使い元のソース JSDoc を保持する; ディスパッチモードは [primer](../cordis-primer.md#dispatch-modes) で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxdeepseekllmapiextensions--deepseekllmapiextensionregistry"></a>
 
 ### `ctx.deepseekLlmApiExtensions` — `DeepSeekLlmApiExtensionRegistry`
 
-Registry of independently owned top-level fields for official DeepSeek requests.
+公式 DeepSeek リクエスト向けの独立所有トップレベルフィールドのレジストリー。
 
 ```ts cordis-catalog
 /**
@@ -977,7 +977,7 @@ Source: [`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../../packages
 
 ### `ctx.llm` — `LlmRuntime`
 
-The abstract `llm` service: an adapter registry plus a streaming model-call API, interceptable via the `llm/stream` waterfall.
+抽象 `llm` サービス: アダプターレジストリーとストリーミングモデル呼び出し API であり、`llm/stream` ウォーターフォールで傍受可能。
 
 ```ts cordis-catalog
 /**
@@ -1153,7 +1153,7 @@ Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
 
 #### `llm/adapters-updated` — emit
 
-The provider topology changed: an adapter registered or unregistered routes, or the configurable-provider directory gained or lost entries. This payload-free registry notification fires at each commit point (including registration disposal); consumers re-read `listProviders()`, `listModels()`, or `listConfigurableProviders()` for the new state. Observer failures are contained and cannot veto the registry mutation.
+プロバイダートポロジーが変わった: アダプターがルートを登録/登録解除したか、設定可能プロバイダーディレクトリーがエントリーを得失した。このペイロードなしレジストリー通知は各コミット点 (登録破棄を含む) で発火する; コンシューマーは新状態向けに `listProviders()`、`listModels()`、`listConfigurableProviders()` を読み直す。観測者の失敗は封じ込められ、レジストリー変更を拒否できない。
 
 ```ts cordis-catalog
 /**
@@ -1174,7 +1174,7 @@ Source: [`packages/llm/llm/src/types.ts`](../../packages/llm/llm/src/types.ts)
 
 #### `llm/stream` — waterfall
 
-Waterfall around every streaming model call (retry, replay, routing). Bound to the LlmRuntime; call `next()` to reach the resolved adapter's stream, or yield your own chunks to short-circuit.
+すべてのストリーミングモデル呼び出しを囲むウォーターフォール (再試行、リプレイ、ルーティング)。LlmRuntime に束縛される; 解決済みアダプターのストリームに届くには `next()` を呼び、短絡するには自身のチャンクを yield する。
 
 ```ts cordis-catalog
 /**

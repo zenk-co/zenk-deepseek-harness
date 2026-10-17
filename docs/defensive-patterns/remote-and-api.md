@@ -1,19 +1,19 @@
-# Remote and API rules
+# Remote と API のルール
 
-English | [中文](remote-and-api.zh.md)
+日本語 | [English](remote-and-api.en.md) | [中文](remote-and-api.zh.md)
 
-Rules for the `packages/api` layer and the remote methods it exposes. [api-gateway.md](../api-gateway.md) describes the call model itself. Each section below states the requirement, how a reviewer judges it, what it does not cover, which exception applies and who approves it, and a correct and a wrong example.
+`packages/api` レイヤーとそれが公開する remote メソッドに関するルール。[api-gateway.md](../api-gateway.md) は呼び出しモデル自体を説明する。以下の各節では、要件、レビュー担当者がそれをどう判定するか、何を対象外とするか、どの例外が適用され誰が承認するか、そして正しい例と誤った例を示す。
 
-## A new remote capability gets its own service
+## 新しい remote ケイパビリティには専用のサービスを持たせる
 
-A new remote business capability is a new service — its own package or its own object — and `@Remote` marks that service's concrete methods. Growing an existing large service one method at a time leaves one object answering for auth, Session, workspace, and event carriage at once, mixes per-domain activation policy with history pagination, and makes every later change to one capability touch all of them. Split by business boundary, not by caller count: a capability with a single caller today still gets its own service, and an endpoint that changes owners moves to its new owner instead of joining the object it is leaving.
+新しい remote ビジネスケイパビリティは新しいサービス — 独自のパッケージまたは独自のオブジェクト — であり、`@Remote` はそのサービスの具象メソッドをマークする。既存の大きなサービスにメソッドを 1 つずつ追加していくと、1 つのオブジェクトが認証、Session、ワークスペース、イベント伝送を同時に担うことになり、ドメインごとのアクティベーションポリシーと履歴ページネーションが混在し、以後 1 つのケイパビリティへの変更がそのすべてに触れることになる。分割は呼び出し元の数ではなくビジネス境界で行う。今日呼び出し元が 1 つしかないケイパビリティにも専用のサービスを持たせ、オーナーが変わるエンドポイントは、離れるオブジェクトに加わるのではなく新しいオーナーへ移動する。
 
-- Judged by: which object holds the new remote method. A method for a new business line added to a service that already owns another line is the defect; the fix is a service named for the new capability, with `@Remote` on its concrete methods. A migration is judged the same way — the moved method appears on its new owner, as `SubagentRuntime` does in `packages/subagent/subagent`, not on the object it left.
-- Not covered: a service whose methods all serve one business boundary stays whole, and a new private helper of that capability belongs on it. Data that needs its own protocol does not become a Remote method on the new service either; session event streams, pagination, incremental reduce, projection, and entity substreams keep their separate registration model ([gateway boundaries](../api-gateway.md#boundaries)).
-- Exception: none recorded; a single caller is not a reason to merge. Where the business boundary itself is contested, the domain owner settles it as an architecture question before the change lands.
-- Fix: create the capability's own service object or package, put `@Remote` on its concrete methods, and let callers reach it through `ctx.remote.<namespace>`.
+- 判定基準: 新しい remote メソッドをどのオブジェクトが保持するか。すでに別のラインを担うサービスに新しいビジネスラインのメソッドを追加するのが欠陥であり、修正は新しいケイパビリティにちなんで命名したサービスを作り、その具象メソッドに `@Remote` を付けること。移行も同じ基準で判定する。移動したメソッドは、`packages/subagent/subagent` の `SubagentRuntime` のように新しいオーナーに現れ、離れたオブジェクトには現れない。
+- 対象外: すべてのメソッドが 1 つのビジネス境界に奉仕するサービスはそのまま維持され、そのケイパビリティの新しいプライベートヘルパーはそこに属する。独自のプロトコルを必要とするデータも、新しいサービスの Remote メソッドにはならない。session イベントストリーム、ページネーション、インクリメンタル reduce、プロジェクション、エンティティサブストリームはそれぞれ別の登録モデルを維持する（[gateway boundaries](../api-gateway.md#boundaries)）。
+- 例外: 記録なし。呼び出し元が 1 つであることは統合の理由にならない。ビジネス境界自体が争われている場合は、変更が着地する前にドメインオーナーがアーキテクチャの問いとして決着させる。
+- 修正: ケイパビリティ専用のサービスオブジェクトまたはパッケージを作成し、その具象メソッドに `@Remote` を付け、呼び出し元が `ctx.remote.<namespace>` を通じて到達できるようにする。
 
-The subagent capability owns its own service, and every remote method is a concrete method of that service:
+subagent ケイパビリティは専用のサービスを所有し、すべての remote メソッドはそのサービスの具象メソッドである:
 
 ```ts ignore-check
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
@@ -31,7 +31,7 @@ class SubagentRuntime extends TypertRemoteService {
 }
 ```
 
-The wrong version adds the same capability to the object that already carries other domains:
+誤ったバージョンは、すでに他のドメインを担うオブジェクトに同じケイパビリティを追加する:
 
 ```text
 class ApiProxy {
@@ -40,21 +40,21 @@ class ApiProxy {
 }
 ```
 
-One object then answers for both domains, so a change to either capability's activation policy, pagination, or event handling lands in the same place, and neither capability can move without the other.
+すると 1 つのオブジェクトが両方のドメインを担うことになり、どちらのケイパビリティのアクティベーションポリシー、ページネーション、イベント処理への変更も同じ場所に着地し、どちらのケイパビリティも他方なしには移動できない。
 
-## `@Remote` marks capability methods
+## `@Remote` はケイパビリティのメソッドをマークする
 
-`@Remote` carries five disciplines that a reviewer checks separately: it marks the concrete method that performs a capability; client-facing types come from the existing definitions through the generator instead of a hand-written copy; the payload is JSON and the remote method performs no output-side decode; existing method and field names are additive; and a method names every resource it touches and reads its caller only from the invocation. Each discipline removes a different failure — a wrapper hides which operation is exposed, a second hand-written type set drifts from the generated one, an output-side decode adds a second result path beside the codec the Gateway already runs, a rename breaks every caller in the same change, and an unnamed resource, an unfiltered aggregate, or an argument-supplied caller lets a non-owner reach what no binding grants it.
+`@Remote` には、レビュー担当者が個別に確認する 5 つの規律がある。すなわち、ケイパビリティを実行する具象メソッドをマークすること。クライアント向けの型は手書きのコピーではなく既存の定義からジェネレーターを通じて得ること。ペイロードは JSON であり、remote メソッドは出力側のデコードを行わないこと。既存のメソッド名とフィールド名に対して追加的であること。そしてメソッドは触れるすべてのリソースを名指しし、呼び出し元は呼び出しからのみ読むこと。各規律はそれぞれ異なる失敗を取り除く。ラッパーはどの操作が公開されているかを隠し、2 つ目の手書き型セットは生成されたものからずれ、出力側のデコードは Gateway がすでに実行するコーデックの隣に 2 つ目の結果経路を追加し、リネームは同じ変更内のすべての呼び出し元を壊し、名前のないリソース、フィルタリングされない集約、引数で渡された呼び出し元は、どのバインディングも与えないものに非オーナーが到達できるようにする。
 
-- **Capability methods.** The annotation goes on the concrete method that performs the operation (`list`, `prompt`, `interruptByParent`), never on a wrapper that forwards to the real implementation. Judged by the decorated method's body: a body that only delegates means the annotation is on the wrong method.
-- **Types from inference.** Client-facing types are aliased from what the generator produces — `type SessionRemote = TypertClientRemote['session']` — instead of being written a second time. Judged by a hand-written declaration whose fields repeat a generated Client type; [typert.md](../subsystems/typert.md) owns the generated maps and their declaration merges.
-- **JSON on the wire, no output-side decode.** The **wire payload** of a Remote method is JSON, with binary content expressed field-level. The Host signature keeps what the Gateway already supports — lookup arguments resolved to Host objects, a trailing `AbortSignal`, a stream declared with `@Remote({ mode: 'stream' })` — and `@Remote` performs no decode on the way out; the generated codec and the Gateway validate the result. Judged by a decode, a stream reassembly, or a whole non-JSON value in the payload of a method carrying the decorator; [programming model](../api-gateway.md#programming-model) owns what may cross a Remote method.
-- **Existing names are additive.** A migration does not rename a remote method or field that a Client already calls; a new semantic gets a new entry, and a rename is its own change with its own review. Judged by a diff that renames or removes a name already exposed through `ctx.remote.<namespace>`.
-- **Caller identity and access.** Every Remote method is under access control: the `@Remote({ resources })` / `@RemoteScope(key, { resources })` readers and automatic resolution must name every resource the method touches, because access control never checks a resource they omit, and a method returning several resources filters each item through `this.ctx.remoteAccess.allows(resource)`. The caller is read only from `this.ctx.invocation.peer.principal`, never from arguments; a Remote method that builds a user-message source records it through `principalOf(this.ctx.invocation)` and passes the built source down instead of passing the principal as a function argument. Every call path names its Peer explicitly. Judged by a method whose resolved resources omit one it touches, an unfiltered aggregate, a principal read from wire data or threaded through helper parameters, or a user-message source built in a Remote method without `principalOf`; the [Peer principals Agent Note](../../.agents/notes/implemented/architecture/2026-10-12-peer-principal-and-remote-access.md) owns the design.
-- **Not covered.** A method without the decorator stays an ordinary service method with in-process callers; the five disciplines govern what becomes a Remote method, not what a service may implement.
-- **Exception.** A rename or a new decode path states its benefit and the impact on existing callers first and needs the domain owner's confirmation; the author never self-approves.
+- **ケイパビリティメソッド。** アノテーションは操作を実行する具象メソッド（`list`、`prompt`、`interruptByParent`）に付き、実際の実装へ転送するラッパーには決して付かない。判定はデコレートされたメソッドの本体で行う。本体が委譲するだけなら、アノテーションは間違ったメソッドに付いている。
+- **推論からの型。** クライアント向けの型は、2 度目に書くのではなく、ジェネレーターが生成するものからエイリアスする — `type SessionRemote = TypertClientRemote['session']`。判定は、生成された Client 型のフィールドを繰り返す手書きの宣言で行う。[typert.md](../subsystems/typert.md) が生成されたマップとその宣言マージを所有する。
+- **ワイヤー上は JSON、出力側のデコードなし。** Remote メソッドの **ワイヤーペイロード** は JSON であり、バイナリ内容はフィールドレベルで表現する。Host シグネチャは Gateway がすでにサポートするものを維持する — Host オブジェクトに解決されたルックアップ引数、末尾の `AbortSignal`、`@Remote({ mode: 'stream' })` で宣言されたストリーム — そして `@Remote` は出口でデコードを行わない。生成されたコーデックと Gateway が結果を検証する。判定は、デコレーターを持つメソッドのペイロード中のデコード、ストリーム再構築、非 JSON 値全体で行う。[programming model](../api-gateway.md#programming-model) が Remote メソッドを通過できるものを所有する。
+- **既存の名前は追加的。** 移行で Client がすでに呼び出している remote メソッドやフィールドをリネームしない。新しい意味には新しいエントリを与え、リネームは独自のレビューを伴う独立した変更とする。判定は、`ctx.remote.<namespace>` を通じてすでに公開されている名前をリネームまたは削除する差分で行う。
+- **呼び出し元の識別とアクセス。** すべての Remote メソッドはアクセス制御下にある。`@Remote({ resources })` / `@RemoteScope(key, { resources })` のリーダーと自動解決は、メソッドが触れるすべてのリソースを名指ししなければならない。アクセス制御は省略されたリソースを決してチェックしないためである。また、複数のリソースを返すメソッドは各項目を `this.ctx.remoteAccess.allows(resource)` でフィルタリングする。呼び出し元は `this.ctx.invocation.peer.principal` からのみ読み、決して引数からは読まない。ユーザーメッセージソースを構築する Remote メソッドは、`principalOf(this.ctx.invocation)` を通じてそれを記録し、principal を関数引数として渡すのではなく構築したソースを渡し下ろす。すべての呼び出し経路は Peer を明示的に名指しする。判定は、解決されたリソースが触れるものの 1 つを省略しているメソッド、フィルタリングされない集約、ワイヤーデータから読まれた、またはヘルパーパラメータを通された principal、`principalOf` なしで Remote メソッド内に構築されたユーザーメッセージソースで行う。[Peer principals Agent Note](../../.agents/notes/implemented/architecture/2026-10-12-peer-principal-and-remote-access.md) が設計を所有する。
+- **対象外。** デコレーターのないメソッドは、インプロセス呼び出し元を持つ通常のサービメソッドのままである。5 つの規律は何が Remote メソッドになるかを規定し、サービスが何を実装してよいかは規定しない。
+- **例外。** リネームや新しいデコード経路は、その利点と既存の呼び出し元への影響を先に述べ、ドメインオーナーの確認を必要とする。著者が自己承認することはない。
 
-The generated map is the only source for Client-facing types, the decorator sits on the concrete method, and the payload stays JSON:
+生成されたマップがクライアント向け型の唯一のソースであり、デコレーターは具象メソッドに付き、ペイロードは JSON のままである:
 
 ```ts ignore-check
 import { Remote, TypertRemoteService, type TypertClientRemote } from '@deepseek-ai/dsh-typert-protocol'
@@ -70,7 +70,7 @@ class SessionController extends TypertRemoteService {
 }
 ```
 
-A hand-written second type set, a rename of a shipped name, and an output-side decode each break a different discipline:
+手書きの第 2 の型セット、出荷済みの名前のリネーム、出力側のデコードはそれぞれ異なる規律を破る:
 
 ```text
 type SessionRemote = { list(): ...; rename(id: string): ... }   // hand-written copy
@@ -78,18 +78,18 @@ type SessionRemote = { list(): ...; rename(id: string): ... }   // hand-written 
 @Remote decode(payload: Uint8Array): Result                     // output-side decode
 ```
 
-The hand-written copy drifts from the generated type without failing a build, the rename breaks every existing Client call at once, and the decode replaces the generated codec with a second, unchecked result path.
+手書きのコピーはビルドを失敗させずに生成された型からずれ、リネームは既存のすべての Client 呼び出しを一度に壊し、デコードは生成されたコーデックを 2 つ目の未チェックの結果経路に置き換える。
 
-## `packages/api` carries generic orchestration only
+## `packages/api` が担うのは汎用オーケストレーションのみ
 
-The packages under `packages/api` — the controllers, `gateway`, and `remotes` — carry transport, call shape, Session lifecycle, and other generic orchestration. A business branch never aggregates there: a decision that depends on concrete business state, handling bound to one feature, or a per-feature filter belongs in its own package or module and reaches this layer as projected data or through a registration surface. The criterion is where the logic belongs, not where the file sits, so a branch that only makes sense for one feature is a defect even when the file holding it is generic.
+`packages/api` 配下のパッケージ — コントローラー、`gateway`、`remotes` — は、トランスポート、呼び出し形式、Session ライフサイクル、その他の汎用オーケストレーションを担う。ビジネス分岐がそこに集まることはない。具体的なビジネス状態に依存する判断、1 つのフィーチャーに結び付いた処理、フィーチャーごとのフィルターは、独自のパッケージまたはモジュールに属し、プロジェクテッドデータとして、または登録サーフェスを通じてこのレイヤーに届く。基準はロジックがどこに属するかであり、ファイルがどこにあるかではない。したがって、1 つのフィーチャーにしか意味を持たない分岐は、それを保持するファイルが汎用的であっても欠陥である。
 
-- Judged by: where the branch reads its condition. An `if` or `switch` over feature state, a per-feature filter, or a helper named for one feature inside `packages/api` is the defect; the same decision taken in the owning package and consumed here as projected data or a registered entry is not. The package census shows the impact: `packages/api` holds nine packages — `account-controller`, `gateway`, `job-controller`, `remotes`, `session-controller`, `settings-controller`, `terminal-controller`, `workspace-controller`, `workspace-files` — and `session-controller` is the largest at 34 `src` files (terminal-controller 12, gateway 11, workspace-controller 10, workspace-files 8, job-controller 8, remotes 4, settings-controller 3, account-controller 2).
-- Not covered: generic Session lifecycle, transport, and storage abstraction stay — `gateway` dispatch, `remotes` selection, and shared session-list and catalog reads are infrastructure, not business logic. [Business ownership](../api-gateway.md#business-ownership) states the same split from the Gateway side.
-- Exception: none by default. Adding a business branch here needs an independent-package review, and that review answers why the logic cannot live in the package that owns the feature.
-- Fix: move the decision into the owning package, publish its result as projected data or register it on a registry this layer already injects, and leave only the orchestration that reads it.
+- 判定基準: 分岐がその条件をどこから読むか。`packages/api` 内でのフィーチャー状態に対する `if` や `switch`、フィーチャーごとのフィルター、1 つのフィーチャーにちなんで命名されたヘルパーは欠陥である。所有パッケージで下され、ここではプロジェクテッドデータまたは登録済みエントリとして消費される同じ判断は欠陥ではない。パッケージの内訳が影響を示す。`packages/api` は 9 つのパッケージ — `account-controller`、`gateway`、`job-controller`、`remotes`、`session-controller`、`settings-controller`、`terminal-controller`、`workspace-controller`、`workspace-files` — を保持し、`session-controller` が 34 個の `src` ファイルで最大である（terminal-controller 12、gateway 11、workspace-controller 10、workspace-files 8、job-controller 8、remotes 4、settings-controller 3、account-controller 2）。
+- 対象外: 汎用の Session ライフサイクル、トランスポート、ストレージ抽象化は残る — `gateway` のディスパッチ、`remotes` の選択、共有の session リストとカタログ読み取りはインフラストラクチャであり、ビジネスロジックではない。[Business ownership](../api-gateway.md#business-ownership) は Gateway 側から同じ分割を述べている。
+- 例外: 既定ではなし。ここにビジネス分岐を追加するには独立パッケージレビューが必要で、そのレビューはなぜロジックがフィーチャーを所有するパッケージに置けないかに答える。
+- 修正: 判断を所有パッケージへ移し、その結果をプロジェクテッドデータとして公開するか、このレイヤーがすでに注入しているレジストリに登録し、それを読むオーケストレーションだけを残す。
 
-The owning package decides and registers its unit, and the controller only reads the projected value:
+所有パッケージがそのユニットを決定して登録し、コントローラーはプロジェクテッド値だけを読む:
 
 ```ts ignore-check
 // packages/workspace/<feature>/src/index.ts: the rule lives with the feature it serves.
@@ -105,11 +105,11 @@ ctx.sessionProjections.register({
 const { durable } = ctx.sessionProjections.stateOf(session, 'durablePage')
 ```
 
-The wrong version decides the rule inside the shared layer:
+誤ったバージョンは共有レイヤーの中でルールを決定する:
 
 ```text
 // packages/api/session-controller: a feature branch inside the shared layer
 if (session.page.transport === 'durable') { /* durable-transport handling */ }
 ```
 
-The rule then has a second home, and every later change to it has to find both while the shared layer keeps carrying one feature's semantics.
+するとルールに 2 つ目の拠り所ができ、以後の変更は両方を見つけなければならず、共有レイヤーは 1 つのフィーチャーの意味論を担い続ける。

@@ -1,33 +1,33 @@
 ---
-description: "Bounded model-facing output for tools that must cap how much context they return: item and text retainers plus a standardized omission footer."
+description: "返すコンテキスト量を制限しなければならないツール向けの、上限付きのモデル向け出力: アイテムとテキストのリテーナー、および標準化された省略フッター。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-output-retention
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-output-retention` to cap the items or text a tool returns to a model while reporting what was omitted. `ItemRetainer` keeps an ordered head window and can report an exact omitted-item count; `TextRetainer` keeps head, tail, or head-and-tail byte windows without returning invalid UTF-8 cuts. `formatRetentionNotice` adds a consistent omission clause while each tool supplies its own recovery guidance. `truncateWithoutSplittingSurrogatePair` caps a character-budget preview without leaving a lone high surrogate at the cut. Grouping, line numbering, spill files, and provider errors remain tool responsibilities; consumers import this library directly rather than loading it through `cordis.yml`.
+`dsh-output-retention` を使って、ツールがモデルに返すアイテムまたはテキストを上限付きにしつつ、何が省略されたかを報告する。`ItemRetainer` は順序付きの先頭ウィンドウを保ち、正確な省略アイテム数を報告できる。`TextRetainer` は先頭、末尾、または先頭と末尾のバイトウィンドウを、無効な UTF-8 の切断を返さずに保つ。`formatRetentionNotice` は一貫した省略句を追加し、各ツールが独自の回復ガイダンスを供給する。`truncateWithoutSplittingSurrogatePair` は、切断部に孤立した高位サロゲートを残さずに文字予算のプレビューを上限付きにする。グループ化、行番号、spill ファイル、プロバイダーエラーはツールの責任のままである。コンシューマーは `cordis.yml` を通じてロードするのではなく、このライブラリを直接インポートする。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use a retainer wherever a tool must cap how much of its result reaches the model, and report honestly what was dropped. Choose `ItemRetainer` for ordered logical units and `TextRetainer` for byte-oriented streams.
+ツールがその結果のどれだけをモデルに届けるかを上限付きにし、何が落とされたかを正直に報告する必要があるところでリテーナーを使う。順序付きの論理単位には `ItemRetainer` を、バイト指向のストリームには `TextRetainer` を選ぶ。
 
-### Bounding a list of items
+### アイテムのリストを上限付きにする
 
 ```ts
 import { ItemRetainer } from '@deepseek-ai/dsh-output-retention'
@@ -41,9 +41,9 @@ for await (const entry of candidates) {
 const { items, truncated, omitted } = retainer.finish()
 ```
 
-`push()` reports per item whether it was kept, and `finish()` returns the retained items plus `omitted` — an exact count when the caller kept feeding every observed unit. A search tool can collect the full result set for a spill file while retaining only the first page for the model.
+`push()` はアイテムごとにそれが保たれたかを報告し、`finish()` は保持されたアイテムと `omitted` を返す — 呼び出し元が観察したすべての単位を供給し続けた場合の正確な数。検索ツールは、モデルには最初のページのみを保持しつつ、spill ファイル用に完全な結果セットを収集できる。
 
-### Bounding a text stream
+### テキストストリームを上限付きにする
 
 ```text
 import { TextRetainer } from '@deepseek-ai/dsh-output-retention'
@@ -53,9 +53,9 @@ child.stdout.on('data', (chunk: Buffer) => { out.push(chunk) })
 const { text, omittedBytes } = out.finish()
 ```
 
-`head`, `tail`, and `headTail` count bytes, not characters or lines: a child's pipe and an HTTP body are byte streams. `finish()` trims a partial codepoint at each cut, so the returned text never carries a replacement character introduced by the cut, and a codepoint is never reconstructed across the omitted middle.
+`head`、`tail`、`headTail` は文字や行ではなくバイトを数える: 子のパイプも HTTP ボディもバイトストリームである。`finish()` は各切断部の部分コードポイントを削るため、返されるテキストは切断によって導入された置換文字を運ぶことはなく、コードポイントが省略された中間を越えて再構築されることもない。
 
-### Building the omission footer
+### 省略フッターを構築する
 
 ```ts
 import { formatRetentionNotice } from '@deepseek-ai/dsh-output-retention'
@@ -72,96 +72,96 @@ const footer = formatRetentionNotice(
 )
 ```
 
-The library standardizes the omission clause (`Omitted 3 items.`) and joins it with the tool's own recovery guidance; only the tool knows the recovery action, so the tool supplies those words.
+ライブラリは省略句（`Omitted 3 items.`）を標準化し、それをツール自身の回復ガイダンスと結合する。回復アクションを知っているのはツールだけであるため、その言葉はツールが供給する。
 
-### Capping a character-budget preview
+### 文字予算のプレビューを上限付きにする
 
-`truncateWithoutSplittingSurrogatePair` caps a preview measured in UTF-16 code units. A cut that lands inside a surrogate pair drops the unpaired half instead of returning a lone high surrogate, so the kept text stays a prefix. The persistent `bash` and `pwsh` shells and `str_replace_editor` use it for their character-budget previews; each still owns its truncation notice and its `incomplete` prefix.
+`truncateWithoutSplittingSurrogatePair` は UTF-16 コード単位で測られるプレビューを上限付きにする。サロゲートペアの内側に落ちる切断は、孤立した高位サロゲートを返す代わりにペアでない半分を捨てるため、保持されたテキストはプレフィックスのままである。永続的な `bash` と `pwsh` シェルおよび `str_replace_editor` は、その文字予算プレビューにこれを使う。それぞれが依然として自身の切り詰め通知と `incomplete` プレフィックスを所有する。
 
-### What `truncated` means
+### `truncated` の意味
 
-`truncated` is a budget fact: the retainer omitted otherwise-available content because of a cap. It never means the upstream was incomplete — permission failures, skipped binary files, provider partial failures, and unreadable candidates stay in tool-domain fields, never folded into `truncated`.
+`truncated` は予算の事実である: リテーナーが上限のために他の方法では利用可能なコンテンツを省略した。上流が不完全だったことを意味することは決してない — 権限の失敗、スキップされたバイナリファイル、プロバイダーの部分失敗、読めない候補はツールドメインのフィールドに留まり、`truncated` に畳み込まれることは決してない。
 
-### How the current tools use it
+### 現在のツールがどう使うか
 
-| Tool | Retainer | What the tool still owns |
+| ツール | リテーナー | ツールが依然として所有するもの |
 |---|---|---|
-| `glob` | `ItemRetainer`, `head` | Spill-file collection, path mapping, skipped candidates, `incomplete` |
-| `grep` | `ItemRetainer`, `head` | Spill-file collection, per-match preview truncation, grouping, sorting |
-| `bash` | `TextRetainer`, `tail` or `headTail` | Spill files, exit status, signal, timeout, background jobs |
-| `web_fetch` | `TextRetainer`, `head` or `headTail` | Provider and resource caps, error states |
-| `web_search` | `ItemRetainer`, `head` | The "sources capped" notice wording and provider facts |
+| `glob` | `ItemRetainer`、`head` | spill ファイル収集、パスマッピング、スキップされた候補、`incomplete` |
+| `grep` | `ItemRetainer`、`head` | spill ファイル収集、マッチごとのプレビュー切り詰め、グループ化、ソート |
+| `bash` | `TextRetainer`、`tail` または `headTail` | spill ファイル、終了ステータス、シグナル、タイムアウト、バックグラウンドジョブ |
+| `web_fetch` | `TextRetainer`、`head` または `headTail` | プロバイダーとリソースの上限、エラー状態 |
+| `web_search` | `ItemRetainer`、`head` | 「ソースが上限付き」通知の文言とプロバイダーの事実 |
 
-`read` stays outside this library: its line-window pagination (`offset`/`limit`, line numbers, `totalLines`) is a file-specific renderer that a single omission count cannot represent.
+`read` はこのライブラリの外に留まる: その行ウィンドウページネーション（`offset`/`limit`、行番号、`totalLines`）は、単一の省略数では表現できないファイル固有のレンダラーである。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The library is built on one separation: it owns the mechanical question of what was kept and what was omitted; tool packages own every business meaning.
+このライブラリは 1 つの分離の上に築かれている: 何が保たれ、何が省略されたかという機械的な問いを所有し、すべてのビジネス的意味はツールパッケージが所有する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `ItemRetainer`, `TextRetainer`, `describeOmitted`, `formatRetentionNotice`, and `truncateWithoutSplittingSurrogatePair` |
+| [`src/index.ts`](src/index.ts) | `ItemRetainer`、`TextRetainer`、`describeOmitted`、`formatRetentionNotice`、`truncateWithoutSplittingSurrogatePair` |
 
-### Two retainers, two resource models
+### 2 つのリテーナー、2 つの資源モデル
 
-`ItemRetainer` bounds ordered logical units and keeps only the first `maxItems`; the caller keeps pushing every observed unit so the omission count is exact. `TextRetainer` bounds bytes with one shared prefix/suffix accumulator: `head` is prefix-only, `tail` is suffix-only, `headTail` is both, and the accumulator holds at most `headBytes + tailBytes + one chunk` in memory, so a large stream does not accumulate unbounded.
+`ItemRetainer` は順序付きの論理単位を上限付きにし、最初の `maxItems` のみを保つ。呼び出し元は省略数が正確になるように観察したすべての単位をプッシュし続ける。`TextRetainer` は 1 つの共有プレフィックス/サフィックスアキュムレーターでバイトを上限付きにする: `head` はプレフィックスのみ、`tail` はサフィックスのみ、`headTail` は両方で、アキュムレーターはメモリ内に最大 `headBytes + tailBytes + 1 チャンク` しか保持しないため、大きなストリームが無制限に蓄積されることはない。
 
-### How the budget facts stay honest
+### 予算の事実が正直であり続ける方法
 
-`push()` returns `kept` (this unit or chunk fully retained) and `truncated` (anything dropped yet). `finish()` reports omission against the bytes actually returned, so a UTF-8 boundary trim that drops partial-codepoint bytes is counted too — a notice built from the budget alone would overstate the retained text. `describeOmitted` prints a count only for `exact`; `unknown` prints no count because the caller provided none.
+`push()` は `kept`（この単位またはチャンクが完全に保持された）と `truncated`（これまでに落とされたものがある）を返す。`finish()` は実際に返されたバイトに対して省略を報告するため、部分コードポイントのバイトを落とす UTF-8 境界のトリムも数えられる — 予算だけから構築された通知は保持されたテキストを過大に述べることになる。`describeOmitted` は `exact` の場合にのみ数を表示し、`unknown` は呼び出し元が何も提供しなかったため数を表示しない。
 
-### The read-render exclusion
+### read レンダラーの除外
 
-`read`'s `offset`/`limit` pagination is a line-window renderer with its own byte cap over the selected window; a single `Omitted` value cannot represent both sides of that window, so it stays out of this library.
+`read` の `offset`/`limit` ページネーションは、選択されたウィンドウに対して独自のバイト上限を持つ行ウィンドウレンダラーである。単一の `Omitted` 値はそのウィンドウの両側を表現できないため、このライブラリの外に留まる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when you need the consumers or the boundary decision behind the library.
+コンシューマーまたはライブラリ背後の境界決定が必要なときにこれらのページを読む。
 
-- [Spill policy](../../spill/spill-policy/README.md) — composes `TextRetainer` for a bounded preview around a spill-file notice.
-- [Spill subsystem](../../../docs/subsystems/spill.md) — the spill vocabulary this library's preview mechanics serve.
-- [File search tool](../../fs/tool-fs-search/README.md) — an `ItemRetainer` consumer collecting full results for spill.
+- [Spill ポリシー](../../spill/spill-policy/README.md) — spill ファイル通知の周りの上限付きプレビューのために `TextRetainer` を構成する。
+- [Spill サブシステム](../../../docs/subsystems/spill.md) — このライブラリのプレビュー機構が奉仕する spill 語彙。
+- [ファイル検索ツール](../../fs/tool-fs-search/README.md) — spill 用に完全な結果を収集する `ItemRetainer` コンシューマー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the retention consumers that render retained content and omission metadata.
+間接的に、保持されたコンテンツと省略メタデータをレンダリングするリテンションコンシューマーを通じて。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the retention consumers own any request-prefix changes.
+直接の無効化はない。リテンションコンシューマーがリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the retainers deliberately do not cover. They are current package constraints, not a task backlog.
+これらの制限はリテーナーが意図的にカバーしないものを定義する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Item retention supports `head` only** — tail, head/tail, pagination, grouping, and provider-completeness semantics remain tool-owned.
-- **Text retention is byte-oriented** — `TextRetainer` counts bytes; character-budget head caps go through `truncateWithoutSplittingSurrogatePair`, and line windows such as `read` pagination still require a separate renderer. A cut may discard partial UTF-8 boundary bytes to keep the returned text valid.
+- **アイテム保持は `head` のみをサポートする** — tail、head/tail、ページネーション、グループ化、プロバイダー完全性のセマンティクスはツール所有のままである。
+- **テキスト保持はバイト指向である** — `TextRetainer` はバイトを数える。文字予算の先頭上限は `truncateWithoutSplittingSurrogatePair` を通り、`read` ページネーションのような行ウィンドウは依然として別のレンダラーを必要とする。切断は返されるテキストを有効に保つために部分的な UTF-8 境界バイトを捨てることがある。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,91 +1,91 @@
 ---
-description: "Build Desktop installers locally or through Windows or macOS Actions, choose deployment and signing mode, and retrieve artifacts and diagnostics. This guide keeps build operations separate from publishing and installed-application qualification. Platform signing details and shared-runner risks must be checked before using hardware credentials."
+description: "Desktop インストーラーをローカルまたは Windows / macOS Actions でビルドし、デプロイと署名モードを選択して、成果物と診断を取得する。このガイドはビルド操作を公開やインストール済みアプリケーションの適格性確認から分離する。ハードウェア資格情報を使う前に、プラットフォームの署名詳細と共有ランナーのリスクを確認すること。"
 ---
 
-# Desktop packaging
+# Desktop パッケージング
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Build Desktop installers locally or through Windows or macOS Actions, choose deployment and signing mode, and retrieve artifacts and diagnostics. This guide keeps build operations separate from publishing and installed-application qualification. Platform signing details and shared-runner risks must be checked before using hardware credentials.
+Desktop インストーラーをローカルまたは Windows / macOS Actions でビルドし、デプロイと署名モードを選択して、成果物と診断を取得する。このガイドはビルド操作を公開やインストール済みアプリケーションの適格性確認から分離する。ハードウェア資格情報を使う前に、プラットフォームの署名詳細と共有ランナーのリスクを確認すること。
 
-## Table of Contents
+## 目次
 
-- [Choose a build path](#choose-a-build)
-- [Release versions](#release-versions)
-- [Configuration and local builds](#configuration-and-local-builds)
-- [Windows Actions packaging](#windows-actions)
-- [macOS self-hosted packaging](#macos-actions)
-- [Unsigned Windows test installer](#unsigned-windows-test-installer)
-- [Local macOS DMG without release signing](#local-macos-dmg-without-release-signing)
-- [macOS release signing and diagnostics](#macos-release-signing)
-- [Directory builds and preparation](#directory-and-preparation)
-- [Local Official bundles from a loopback registry](#local-official-bundles-from-a-loopback-registry)
-- [Runtime file selection and installation checks](#runtime-file-selection)
-- [Desktop runtime preparation](#desktop-runtime-preparation)
-- [Installation and release verification](#verification)
+- [ビルドパスの選択](#choose-a-build)
+- [リリースバージョン](#release-versions)
+- [構成とローカルビルド](#configuration-and-local-builds)
+- [Windows Actions パッケージング](#windows-actions)
+- [macOS セルフホストパッケージング](#macos-actions)
+- [未署名 Windows テストインストーラー](#unsigned-windows-test-installer)
+- [リリース署名なしのローカル macOS DMG](#local-macos-dmg-without-release-signing)
+- [macOS リリース署名と診断](#macos-release-signing)
+- [ディレクトリビルドと準備](#directory-and-preparation)
+- [ループバックレジストリからのローカル Official バンドル](#local-official-bundles-from-a-loopback-registry)
+- [ランタイムファイル選択とインストールチェック](#runtime-file-selection)
+- [Desktop ランタイム準備](#desktop-runtime-preparation)
+- [インストールとリリース検証](#verification)
 
 <a id="choose-a-build"></a>
 
-## Choose a build path
+## ビルドパスの選択
 
-Run local commands from the repository root after installing locked dependencies. Use platform-specific commands for a local build, or platform Actions for the registered self-hosted runner. Choose test or production deployment independently from signed or unsigned mode. Read [Windows signing and runner operations](../windows-signing/README.md#trust-and-isolation) before any Windows signed build or shared-runner use. Installation is separate from packaging; [publication](../publishing/README.md) is a further explicit operation.
+ロック済み依存関係をインストールした後、リポジトリルートでローカルコマンドを実行する。ローカルビルドにはプラットフォーム別のコマンドを使い、登録済みセルフホストランナーにはプラットフォーム別の Actions を使う。テストまたは production のデプロイは、署名あり・署名なしモードとは独立に選択する。Windows の署名付きビルドや共有ランナーの利用の前には [Windows 署名とランナーの運用](../windows-signing/README.md#trust-and-isolation)を読むこと。インストールはパッケージングとは別であり、[公開](../publishing/README.md)はさらに明示的な操作である。
 
 <a id="release-versions"></a>
 
-## Release versions
+## リリースバージョン
 
-Before each Desktop packaging run, first confirm the complete version string with the current user. Check the selected deployment, dsh base version, retained release records, and published objects, then propose the exact version for approval. Do not start packaging until the user confirms that version; the deployment setting alone does not authorize a version choice.
+Desktop パッケージングを実行する前に、まず現在のユーザーと完全なバージョン文字列を確認する。選択されたデプロイ、dsh ベースバージョン、保持されているリリースレコード、公開済みオブジェクトを確認し、正確なバージョンを提案して承認を得る。そのバージョンがユーザーに確認されるまでパッケージングを開始しないこと。デプロイ設定だけではバージョン選択を承認したことにならない。
 
-Record the current dsh version as the base. A production Desktop release uses that exact version, including any `alpha`, `beta`, or `rc` identifiers. A test release preserves the complete prerelease base and appends `.YYYYMMDD.index`; a stable base uses `-test.YYYYMMDD.index` instead.
+現在の dsh バージョンをベースとして記録する。production の Desktop リリースは、`alpha`、`beta`、`rc` 識別子を含めてその正確なバージョンを使う。テストリリースは完全なプレリリースベースを保ったまま `.YYYYMMDD.index` を追加し、安定ベースの場合は代わりに `-test.YYYYMMDD.index` を使う。
 
-| dsh base | Production Desktop | Test Desktop example |
+| dsh ベース | Production Desktop | Test Desktop の例 |
 |---|---|---|
 | `0.1.6-alpha.1` | `0.1.6-alpha.1` | `0.1.6-alpha.1.20260916.1` |
 | `0.1.6-beta.2` | `0.1.6-beta.2` | `0.1.6-beta.2.20260916.1` |
 | `0.1.6-rc.3` | `0.1.6-rc.3` | `0.1.6-rc.3.20260916.1` |
 | `0.1.6` | `0.1.6` | `0.1.6-test.20260916.1` |
 
-Use the actual creation date in Asia/Shanghai. For each base and date, start the index at 1 and increment after checking retained release records and published objects; never reuse a published version. Test distribution does not publish the corresponding unsuffixed base.
+実際の作成日を Asia/Shanghai で使う。各ベース・各日付についてインデックスは 1 から始め、保持されているリリースレコードと公開済みオブジェクトを確認してから増やす。公開済みバージョンを再利用しないこと。テスト配布では対応するサフィックスなしベースを公開しない。
 
-Manual Desktop CI uses a separate unpublished build identifier: `auto` appends the UTC date, workflow run number and attempt (`.YYYYMMDD.run.attempt`, with `-test` for a stable base). For example, `0.2.1-alpha.1.20261008.42.2`. These numbers are not reserved release sequence numbers.
+手動の Desktop CI は別個の未公開ビルド識別子を使う。`auto` は UTC 日付、ワークフロー実行番号、試行回数を追加する（`.YYYYMMDD.run.attempt`。安定ベースでは `-test` を付ける）。例: `0.2.1-alpha.1.20261008.42.2`。これらの番号は予約済みリリース連番ではない。
 
-Pass the confirmed version to the packaging command as `--build-version`, which reaches the artifact names, the update feed, and the upload validation as one value. The manifests keep the product version, so a test build no longer rewrites the release family and leaves nothing to revert:
+確認済みバージョンを `--build-version` としてパッケージングコマンドに渡す。この値は成果物名、更新フィード、アップロード検証に単一の値として届く。マニフェストは製品バージョンを保持するため、テストビルドがリリースファミリーを書き換えることはなくなり、 revert すべき変更も残らない。
 
 ```sh
 pnpm --dir apps/desktop run package:win:x64 --build-version 0.1.6-alpha.1.20260916.1
 ```
 
-`--build-version auto` proposes the next index for today, reading the published objects in the destination bucket and falling back to this target's local output directory when no bucket is configured or the listing cannot finish within its deadline. Confirm the proposal it prints before an upload; a run script forwards `--` on its own, and the packaging entry accepts it either way.
+`--build-version auto` は今日の次のインデックスを提案する。宛先バケット内の公開済みオブジェクトを読み、バケットが未構成の場合や一覧が期限内に完了できない場合はこのターゲットのローカル出力ディレクトリにフォールバックする。アップロードの前に表示された提案を確認すること。run スクリプトは `--` を独自に転送し、パッケージング入口はどちらの書き方も受け付ける。
 
-A production release publishes the product version and takes no `--build-version`. Uploading one tags the packaged commit as `desktop-v<version>` once the artifacts are public; a build from a modified checkout is not tagged, and a tagging failure prints the command to run by hand rather than failing a completed upload. Test and local builds are deliberately left untagged, and every artifact records `dshBuildCommit` and `dshBuildDirty` in its manifest so a build handed over directly remains traceable.
+production リリースは製品バージョンを公開し、`--build-version` を取らない。これをアップロードすると、成果物が公開された後にパッケージ化したコミットへ `desktop-v<version>` のタグが付けられる。変更のあるチェックアウトからのビルドにはタグを付けず、タグ付けの失敗は完了済みアップロードを失敗させずに手動実行用のコマンドを表示する。テストビルドとローカルビルドには意図的にタグを付けず、すべての成果物はマニフェストに `dshBuildCommit` と `dshBuildDirty` を記録するため、直接受け渡したビルドも追跡可能である。
 
-The installer embeds `DSH_DESKTOP_UPDATE_CHANNEL` (`nightly` by default, or `latest`) independently of version and deployment. Automatic updates remain on that channel even for a stable version; manually installing the other channel switches it. Latest packages reject prerelease versions. A stable product can produce a nightly `-test.<date>.<sequence>` build, but that version ranks below the stable base and cannot upgrade an already installed higher version. Keep automatic downgrade disabled; stable corrective releases require a product version bump. CI version selection and publication are documented in [CI publication](../publishing/ci/README.md#package-and-publish).
+インストーラーはバージョンやデプロイとは独立に `DSH_DESKTOP_UPDATE_CHANNEL` を埋め込む（既定は `nightly`、`latest` も可）。安定バージョンでも自動更新はそのチャネルに留まり、もう一方のチャネルを手動インストールすると切り替わる。latest パッケージはプレリリースバージョンを拒否する。安定製品は nightly の `-test.<date>.<sequence>` ビルドを生成できるが、そのバージョンは安定ベースより低く評価され、既にインストールされた上位バージョンをアップグレードできない。自動ダウングレードは無効のままにし、安定の修正リリースには製品バージョンのバンプが必要である。CI のバージョン選択と公開は [CI 公開](../publishing/ci/README.md#package-and-publish)に記載されている。
 
 <a id="configuration-and-local-builds"></a>
 
-## Configuration and local builds
+## 構成とローカルビルド
 
-Set `DSH_PACKAGING_CONFIG_DIR` to the absolute machine configuration directory and `DSH_PACKAGING_PRESET` to `test` or `production` for local Windows commands. The loader reads `presets/<preset>.env`; signed commands additionally read `secrets/windows-signing.env`. Relative certificate and SignTool paths resolve beside the file declaring them. Public presets reject credentials, and the signing file cannot override public settings. Missing configuration fails without falling back to `.env.windows`; commands without a preset retain the existing dotenv behavior. Unsigned and preparation-only presets never read the signing file. Cache maintenance also reads only public preset settings. Test signed packages also require the existing download origin and release ID, but no upload credentials. Local preset commands with `--build-version auto` number from local artifacts only; Actions uses its run number and attempt.
+ローカル Windows コマンド用に、`DSH_PACKAGING_CONFIG_DIR` へマシン構成ディレクトリの絶対パスを、`DSH_PACKAGING_PRESET` へ `test` または `production` を設定する。ローダーは `presets/<preset>.env` を読み、署名付きコマンドはさらに `secrets/windows-signing.env` を読む。相対の証明書パスと SignTool パスは、それを宣言したファイルの隣を基準に解決される。公開プリセットは資格情報を拒否し、署名ファイルは公開設定を上書きできない。構成が欠けている場合は `.env.windows` へのフォールバックなしに失敗する。プリセットなしのコマンドは従来の dotenv 動作を保つ。未署名プリセットと準備専用プリセットは署名ファイルを一切読まない。キャッシュメンテナンスも公開プリセット設定のみを読む。テスト署名付きパッケージはさらに既存のダウンロードオリジンとリリース ID を要求するが、アップロード資格情報は不要である。`--build-version auto` 付きのローカルプリセットコマンドはローカル成果物のみから採番し、Actions は実行番号と試行回数を使う。
 
-Both manual packaging workflows accept `test_release_id`. Blank uses the machine preset; a nonblank value must contain 32 lowercase hexadecimal characters and requires the test preset. The loader applies it through `PACKAGE_TEST_RELEASE_ID` without changing the preset file. Keep the same value for successive upgrade tests on that platform. Rotating the default affects future builds only: installed clients retain their original update address, and old objects remain accessible until separately removed. A random prefix reduces discoverability but does not authenticate downloads.
+両方の手動パッケージングワークフローは `test_release_id` を受け付ける。空欄ではマシンプリセットを使い、空でない値は 32 文字の小文字 16 進数でなければならず、テストプリセットを要求する。ローダーはプリセットファイルを変更せず、`PACKAGE_TEST_RELEASE_ID` を通じて適用する。そのプラットフォームで連続するアップグレードテストには同じ値を使い続けること。既定値のローテーションは将来のビルドにのみ影響する。インストール済みクライアントは元の更新アドレスを保持し、古いオブジェクトは別途削除されるまでアクセス可能である。ランダムなプレフィックスは推測しにくくするが、ダウンロードを認証するものではない。
 
-Outside machine-preset mode, packaging, upload, and manual macOS signature verification (except local unsigned macOS builds) read `apps/desktop/.env.windows` or `.env.macos`, selected by target platform. Copy the [Windows template](../.env.windows.example) or [macOS template](../.env.macos.example) and fill in the local settings; Git ignores both local files, and packaged artifacts exclude them. Release fields come only from the selected configuration files, without fallback to system or shell variables; `PATH`, proxies, and build-tool settings remain inherited. The published version is an argument rather than a release field, and upload reads it from the completion record the packaging run wrote. Files use UTF-8 with optional BOM; relative certificate, SignTool, Apple API key, and keychain paths resolve from `apps/desktop`, values are not shell-expanded, and passwords containing `#` or spaces need quotes. Windows CI reads the same machine presets.
+マシンプリセットモードの外では、パッケージング、アップロード、手動 macOS 署名検証（ローカル未署名 macOS ビルドを除く）は対象プラットフォームに応じて `apps/desktop/.env.windows` または `.env.macos` を読む。[Windows テンプレート](../.env.windows.example)または [macOS テンプレート](../.env.macos.example)をコピーしてローカル設定を記入する。Git は両ローカルファイルを無視し、パッケージ成果物もそれらを含まない。リリースフィールドは選択された構成ファイルからのみ取得し、システム変数やシェル変数へのフォールバックはない。`PATH`、プロキシ、ビルドツール設定は引き続き継承される。公開バージョンはリリースフィールドではなく引数であり、アップロードはパッケージング実行が書き込んだ完了レコードから読み取る。ファイルは BOM 付き可の UTF-8 を使い、相対の証明書・SignTool・Apple API キー・キーチェーンパスは `apps/desktop` を基準に解決され、値はシェル展開されず、`#` や空白を含むパスワードには引用符が必要である。Windows CI も同じマシンプリセットを読む。
 
-Every package command checks the application ID and its mode-specific update and signing configuration before building or downloading, then probes the external tools the run will use: the archive reader, and on a Windows target the installer compiler. macOS checks the identity, Team ID, one complete notarization strategy, readable local `CSC_LINK` p12 file, explicit `CSC_KEY_PASSWORD`, and referenced API key and keychain files; Windows checks the public code-signing certificate, SignTool file, container name, and PIN format. Windows preparation-only builds and explicit unsigned builds on either platform do not require signing credentials. Configuration checks do not authenticate the PIN, log in to the token, unlock a keychain, or contact Apple; actual signing and notarization perform those checks. Without a machine preset, `--build-version auto` contacts the destination bucket, including under `--check`. Run the same checks separately:
+各パッケージコマンドは、ビルドやダウンロードの前にアプリケーション ID とモード別の更新・署名構成を確認し、次に実行で使う外部ツールを調べる。アーカイブリーダーと、Windows ターゲットではインストーラーコンパイラである。macOS は ID、Team ID、完全な公証戦略 1 式、読み取り可能なローカル `CSC_LINK` p12 ファイル、明示的な `CSC_KEY_PASSWORD`、参照された API キーとキーチェーンファイルを確認する。Windows は公開コード署名証明書、SignTool ファイル、コンテナー名、PIN 形式を確認する。Windows の準備専用ビルドと両プラットフォームの明示的未署名ビルドは署名資格情報を要求しない。構成チェックは PIN の認証、トークンへのログイン、キーチェーンのアンロック、Apple への問い合わせを行わず、実際の署名と公証がそれらを確認する。マシンプリセットなしでは `--check` 下も含めて `--build-version auto` が宛先バケットに問い合わせる。同じチェックを個別に実行する。
 
 ```sh
 pnpm --dir apps/desktop run check:package
 ```
 
-`prepare:desktop` is not a prerequisite:
+`prepare:desktop` は前提条件ではない。
 
 ```sh
 pnpm run package:desktop
 ```
 
-Release automation uses fixed target commands so runtime preparation, dsh preparation, and electron-builder receive the same platform and architecture:
+リリース自動化は固定ターゲットコマンドを使うため、ランタイム準備、dsh 準備、electron-builder が同じプラットフォームとアーキテクチャを受け取る。
 
 ```sh
 pnpm run package:desktop:mac:arm64
@@ -93,38 +93,38 @@ pnpm run package:desktop:mac:x64
 pnpm run package:desktop:win:x64
 ```
 
-The macOS arm64 command requires Apple Silicon. The macOS x64 command runs on Intel macOS or Apple Silicon with Rosetta. The Windows x64 command requires Windows x64. Linux is not a supported Desktop release target.
+macOS arm64 コマンドは Apple Silicon を要求する。macOS x64 コマンドは Intel macOS または Rosetta 付き Apple Silicon で実行する。Windows x64 コマンドは Windows x64 を要求する。Linux はサポートされた Desktop リリースターゲットではない。
 
-Both release and local unsigned macOS DMGs use LZMA compression (`dmg.format: 'ULMO'`) in [the electron-builder configuration](../scripts/electron-builder-config.mjs). A [build-time patch](../../../patches/app-builder-lib@26.17.0.patch) adds this format to the pinned builder's validation and TypeScript declarations.
+リリースとローカル未署名の両 macOS DMG は [electron-builder 構成](../scripts/electron-builder-config.mjs)で LZMA 圧縮（`dmg.format: 'ULMO'`）を使う。固定ビルダーの検証と TypeScript 宣言にこの形式を追加するのが[ビルド時パッチ](../../../patches/app-builder-lib@26.17.0.patch)である。
 
-Each target owns its packed package inputs, prepared runtime, package set, dsh tree, pnpm preparation state, unpacked application, update metadata, and final artifacts under `apps/desktop/.desktop-build/targets/<target>/`. The Electron archive cache remains shared under `.desktop-build/downloads` because every archive name includes its version, platform, and architecture and is verified before extraction. A target build never consumes another target's mutable preparation state.
+各ターゲットは、パック済みパッケージ入力、準備済みランタイム、パッケージ集合、dsh ツリー、pnpm 準備状態、展開済みアプリケーション、更新メタデータ、最終成果物を `apps/desktop/.desktop-build/targets/<target>/` 配下に所有する。Electron アーカイブキャッシュは `.desktop-build/downloads` 配下で共有されたままである。すべてのアーカイブ名がバージョン・プラットフォーム・アーキテクチャを含み、展開前に検証されるためである。ターゲットビルドが別ターゲットの可変な準備状態を使うことはない。
 
 <a id="windows-actions"></a>
 
-## Windows Actions packaging
+## Windows Actions パッケージング
 
-For supervised runner startup and recovery, follow [Windows runner machine setup](../windows-signing/README.md#machine-setup).
+監督付きランナー起動と復旧については [Windows ランナーマシンセットアップ](../windows-signing/README.md#machine-setup)に従うこと。
 
-The `Package Desktop · Windows` [manual workflow](../../../.github/workflows/windows-package.yml) selects the dedicated Windows x64 runner label `dsh-win-package-trial` and the machine preset `test` or `production`. Choose `signed` (default) or `unsigned`; signed mode uses the existing EV token preflight, signature cache and failure interlock. It does not publish or upload a release. `build_version` defaults to `auto`, using the CI identifier in [Release versions](#release-versions); an explicit value may be the checkout's product version or an extended build version such as `0.2.1-alpha.1.20261009.1` for product `0.2.1-alpha.1`. The version prefix must match the selected checkout; validation errors show its current example. Manifests remain unchanged.
+`Package Desktop · Windows` [手動ワークフロー](../../../.github/workflows/windows-package.yml)は専用 Windows x64 ランナーラベル `dsh-win-package-trial` とマシンプリセット `test` または `production` を選択する。`signed`（既定）または `unsigned` を選択する。署名ありモードは既存の EV トークンプリフライト、署名キャッシュ、障害インターロックを使う。リリースの公開やアップロードは行わない。`build_version` は既定で `auto` であり、[リリースバージョン](#release-versions)の CI 識別子を使う。明示値はチェックアウトの製品バージョンか、製品 `0.2.1-alpha.1` に対する `0.2.1-alpha.1.20261009.1` のような拡張ビルドバージョンでもよい。バージョンのプレフィックスは選択したチェックアウトと一致しなければならず、検証エラーは現在の例を示す。マニフェストは変更されない。
 
-Select the workflow in Actions, choose the source branch, preset, signing mode and version, then click Run workflow. Before merging input changes, test the pushed branch with `gh workflow run windows-package.yml --ref <branch> -f preset=test -f signing=unsigned -f build_version=auto`; verify the web form after merging. There is no push or PR trigger. Logs and successful EXEs are retained for 14 days. Inspect the retained logs and installer before relying on packaging; installation is separate. Before checkout, Node removes the runner-owned source directory without following dependency junctions; the workflow validates its location and rejects linked ancestors. Never point it at a development checkout. Runs share one concurrency group without cancelling an active build; only one run remains pending, and a newer dispatch replaces it. Diagnostics upload requires a successful clean checkout. Machine settings stay outside the checkout and are never uploaded as artifacts.
+Actions でワークフローを選択し、ソースブランチ、プリセット、署名モード、バージョンを選んで Run workflow をクリックする。入力変更をマージする前に、プッシュ済みブランチを `gh workflow run windows-package.yml --ref <branch> -f preset=test -f signing=unsigned -f build_version=auto` でテストし、マージ後に Web フォームを確認する。push や PR トリガーはない。ログと成功した EXE は 14 日間保持される。パッケージングを信用する前に保持されたログとインストーラーを検査すること。インストールは別である。チェックアウトの前に、Node は依存関係ジャンクションをたどらずにランナー所有のソースディレクトリを削除する。ワークフローはその場所を検証し、リンクされた祖先を拒否する。開発用チェックアウトを指定しないこと。実行は 1 つの同時実行グループを共有し、実行中のビルドを取り消さない。保留は 1 件のみ残り、新しいディスパッチが置き換える。診断のアップロードは成功したクリーンチェックアウトを要求する。マシン設定はチェックアウトの外に留まり、成果物としてアップロードされることはない。
 
-Open the completed run in Actions and download its Artifacts. `windows-x64-signed-<version>-<run_id>-<run_attempt>` and `windows-x64-unsigned-<version>-<run_id>-<run_attempt>` contain the corresponding EXE; `windows-package-logs-<run_id>-<run_attempt>` contains packaging diagnostics. The upload steps are `Retain verified signed installer`, `Retain verified unsigned installer`, and `Retain packaging diagnostics`; their step durations and timestamped logs show upload time. These artifacts are not a Release or download-site publication.
+完了した実行を Actions で開き、Artifacts をダウンロードする。`windows-x64-signed-<version>-<run_id>-<run_attempt>` と `windows-x64-unsigned-<version>-<run_id>-<run_attempt>` は対応する EXE を含み、`windows-package-logs-<run_id>-<run_attempt>` はパッケージング診断を含む。アップロードステップは `Retain verified signed installer`、`Retain verified unsigned installer`、`Retain packaging diagnostics` であり、ステップ所要時間とタイムスタンプ付きログがアップロード時間を示す。これらの成果物は Release でもダウンロードサイト公開でもない。
 
 <a id="macos-actions"></a>
 
-## macOS self-hosted packaging
+## macOS セルフホストパッケージング
 
-The `Package Desktop · macOS` [manual workflow](../../../.github/workflows/macos-package.yml) targets an Apple Silicon runner labeled `dsh-mac-package-trial`. It selects `test` or `production`, resolves `build_version=auto` from the UTC date, run number and attempt, and uses the existing signing, notarization and packaged-runtime checks. Successful DMG/ZIP files and diagnostic logs are retained for 14 days; this workflow does not publish a release. The operator must register the runner and verify a complete Actions run before relying on it.
+`Package Desktop · macOS` [手動ワークフロー](../../../.github/workflows/macos-package.yml)は Apple Silicon ランナー（ラベル `dsh-mac-package-trial`）を対象とする。`test` または `production` を選択し、`build_version=auto` を UTC 日付・実行番号・試行回数から解決し、既存の署名・公証・パッケージ済みランタイムチェックを使う。成功した DMG/ZIP と診断ログは 14 日間保持される。このワークフローはリリースを公開しない。オペレーターはランナーを登録し、完全な Actions 実行を検証してからパッケージングを信用しなければならない。
 
-Run `node apps/desktop/scripts/setup-macos-packaging.mjs "$HOME/dsh-ci"` to prepare private `runner/`, `packaging/{presets,secrets,certificates}` and `cache/macos-signatures` directories without overwriting existing files; append `--check` to inspect them. Fill the [preset](../config/macos-packaging/test.env.example) and [signing](../config/macos-packaging/macos-signing.env.example) templates outside the checkout. Set secret and certificate files to mode `0600`. `DSH_PACKAGING_CONFIG_DIR` selects the absolute `packaging` directory and `DSH_PACKAGING_PRESET` selects its preset; missing files fail without falling back to `.env.macos`. Signed and preparation-only Mac builds read `secrets/macos-signing.env`; relative credential paths resolve beside that file. Public presets reject signing credentials, and signing files cannot override public settings. Local unsigned Mac builds retain their configuration-free behavior.
+`node apps/desktop/scripts/setup-macos-packaging.mjs "$HOME/dsh-ci"` を実行して、既存ファイルを上書きせずにプライベートな `runner/`、`packaging/{presets,secrets,certificates}`、`cache/macos-signatures` ディレクトリを準備する。`--check` を追加すると検査のみ行う。チェックアウトの外で[プリセット](../config/macos-packaging/test.env.example)と[署名](../config/macos-packaging/macos-signing.env.example)のテンプレートを記入する。シークレットと証明書ファイルはモード `0600` にする。`DSH_PACKAGING_CONFIG_DIR` は絶対 `packaging` ディレクトリを選択し、`DSH_PACKAGING_PRESET` はそのプリセットを選択する。ファイルが欠けている場合は `.env.macos` へのフォールバックなしに失敗する。署名付きと準備専用の Mac ビルドは `secrets/macos-signing.env` を読む。相対資格情報パスはそのファイルの隣を基準に解決される。公開プリセットは署名資格情報を拒否し、署名ファイルは公開設定を上書きできない。ローカル未署名 Mac ビルドは従来の構成なし動作を保つ。
 
-Run `bash apps/desktop/scripts/start-macos-packaging-runner.sh "$HOME/dsh-ci/runner" "$HOME/dsh-ci/packaging" <absolute-node-24-bin-directory> --check` to check the host tools and configuration files. The script selects the active Xcode and its macOS SDK together and compiles a small linker probe. After registration, omit `--check` to run in the foreground with a cleared inherited environment and prevent idle sleep while the runner is alive. Stop it with Ctrl-C before installing the service below. The runner owns its `_work` checkout, separate from daily development. The account can read its signing files, so run only trusted code. The existing notarization proxy restoration rules apply; after forced termination, inspect retained recovery records before another build. New setup templates set `DSH_DESKTOP_MACOS_SIGNATURE_CACHE_DIR` to the absolute `cache/macos-signatures` directory outside checkout. For existing installations, rerun setup and add that field to each preset; existing files are preserved. This retains signatures across clean checkouts; cache verification and limits are described under [macOS signing](#macos-release-signing).
+`bash apps/desktop/scripts/start-macos-packaging-runner.sh "$HOME/dsh-ci/runner" "$HOME/dsh-ci/packaging" <absolute-node-24-bin-directory> --check` を実行してホストツールと構成ファイルを確認する。スクリプトはアクティブな Xcode とその macOS SDK を一体で選択し、小さなリンカープローブをコンパイルする。登録後は `--check` を外してフォアグラウンドで実行する。継承環境をクリアし、ランナー存命中はアイドルスリープを抑止する。以下のサービスをインストールする前に Ctrl-C で停止する。ランナーは開発日常とは別の `_work` チェックアウトを所有する。アカウントは署名ファイルを読めるため、信頼できるコードのみを実行すること。既存の公証プロキシ復元規則が適用され、強制終了後は保持された復旧レコードを検査してから次のビルドを行うこと。新規セットアップテンプレートは `DSH_DESKTOP_MACOS_SIGNATURE_CACHE_DIR` をチェックアウト外の絶対 `cache/macos-signatures` ディレクトリに設定する。既存インストールではセットアップを再実行し、各プリセットにそのフィールドを追加する。既存ファイルは保持される。これによりクリーンチェックアウトを跨いで署名を保持する。キャッシュ検証と上限は [macOS 署名](#macos-release-signing)に記載されている。
 
 
-The `skip_notarization` workflow option defaults to `false`; the equivalent CLI flag is `--skip-notarization`. It retains Developer ID signing, DMG signature verification and packaged-runtime verification, but omits Apple notarization and stapling and does not require Apple notarization credentials. DMG/ZIP filenames carry `-unnotarized`, are stored under `.desktop-build/targets/<target>/unnotarized-artifacts/`, and are uploaded with an `unnotarized-debug` label. These artifacts are for internal debugging only: Gatekeeper may block downloaded copies, and they are not qualified for distribution or update publishing. No release completion record is written. The flag rejects unsigned, Windows and preparation-only builds.
+`skip_notarization` ワークフローオプションの既定は `false` であり、同等の CLI フラグは `--skip-notarization` である。Developer ID 署名、DMG 署名検証、パッケージ済みランタイム検証は保持し、Apple 公証とステープルを省略して Apple 公証資格情報を要求しない。DMG/ZIP ファイル名には `-unnotarized` が付き、`.desktop-build/targets/<target>/unnotarized-artifacts/` 配下に保存され、`unnotarized-debug` ラベルでアップロードされる。これらの成果物は内部デバッグ専用である。ダウンロードしたコピーは Gatekeeper にブロックされる場合があり、配布や更新公開の適格性はない。リリース完了レコードは書き込まれない。このフラグは未署名ビルド、Windows ビルド、準備専用ビルドを拒否する。
 
-Install the user service from the checkout as the same account that registered the runner, without `sudo`:
+ユーザーサービスは、ランナーを登録したのと同じアカウントで、チェックアウトから `sudo` なしでインストールする。
 
 ```sh
 bash apps/desktop/scripts/macos-runner-service.sh install "$HOME/dsh-ci/runner" "$HOME/dsh-ci/packaging" /opt/homebrew/opt/node@24/bin
@@ -132,148 +132,148 @@ bash apps/desktop/scripts/macos-runner-service.sh start "$HOME/dsh-ci/runner"
 bash apps/desktop/scripts/macos-runner-service.sh status "$HOME/dsh-ci/runner"
 ```
 
-The installer copies its startup script into `runner/dsh-service`, sets the service PATH to Node 24 plus system tools, and uses GitHub's `svc.sh` and `runsvc.sh`. The LaunchAgent survives SSH disconnection, but requires that account's desktop login after reboot and stops on desktop logout. FileVault disk unlock remains an operator step; this does not provide unattended boot. Logs are `runner/dsh-service/stdout.log` and `stderr.log`; verify `Connected to GitHub` and `Listening for Jobs`. To update installed startup code or tool paths, wait until the runner is idle, run `stop`, then `uninstall`, and repeat installation. Neither action unregisters the runner or removes packaging credentials. Uninstall retains `runner/dsh-service` (including logs) and the explicit `.path`; reinstall replaces the startup snapshot and PATH.
+インストーラーは起動スクリプトを `runner/dsh-service` へコピーし、サービス PATH を Node 24 とシステムツールに設定し、GitHub の `svc.sh` と `runsvc.sh` を使う。LaunchAgent は SSH 切断後も存続するが、再起動後はそのアカウントのデスクトップログインが必要であり、デスクトップログアウトで停止する。FileVault のディスクアンロックは引き続きオペレーター手順であり、無人ブートは提供しない。ログは `runner/dsh-service/stdout.log` と `stderr.log` であり、`Connected to GitHub` と `Listening for Jobs` を確認する。インストール済み起動コードやツールパスを更新するには、ランナーがアイドルになるのを待って `stop` から `uninstall` を実行し、再インストールする。どちらの操作もランナーの登録解除やパッケージング資格情報の削除は行わない。アンインストールは `runner/dsh-service`（ログを含む）と明示的 `.path` を保持し、再インストールは起動スナップショットと PATH を置き換える。
 
 <a id="unsigned-windows-test-installer"></a>
 
-## Unsigned Windows test installer
+## 未署名 Windows テストインストーラー
 
-On Windows x64, use the complete unsigned packaging command for local installation testing:
+Windows x64 では、ローカルインストールテストに完全な未署名パッケージングコマンドを使う。
 
 ```sh
 pnpm run package:desktop:win:x64:unsigned
 ```
 
-The command reads `.env.windows` and requires `DSH_DESKTOP_APP_ID` and the [mandatory-update policy settings](../README.md#mandatory-update-policy), including a real HTTPS service origin. The local run and CI use Node 24; the remaining tools are the root `packageManager` version of pnpm, Git, PowerShell, tar, Python, Visual C++ Build Tools and a Windows SDK. Set `PYTHON` when Python is absent from `PATH`. It writes the installer to `.desktop-build/targets/win-x64/unsigned-artifacts/`, omits ordinary automatic-update configuration, strips signing credentials, and creates no release completion record. EV and upload credentials are unnecessary. Signed packaging and upload retain their release requirements.
+このコマンドは `.env.windows` を読み、`DSH_DESKTOP_APP_ID` と実際の HTTPS サービスオリジンを含む[必須更新ポリシー設定](../README.md#mandatory-update-policy)を要求する。ローカル実行と CI は Node 24 を使い、残りのツールはルート `packageManager` バージョンの pnpm、Git、PowerShell、tar、Python、Visual C++ Build Tools、Windows SDK である。`PATH` に Python がなければ `PYTHON` を設定する。インストーラーを `.desktop-build/targets/win-x64/unsigned-artifacts/` に書き込み、通常の自動更新構成を省略し、署名資格情報を除去し、リリース完了レコードを作成しない。EV とアップロードの資格情報は不要である。署名付きパッケージングとアップロードは引き続きリリース要件を保持する。
 
-Run `pnpm install --frozen-lockfile`, then `pnpm run package:desktop:win:x64:unsigned --check` to validate configuration and tooling before the full command above. Packaging performs its own complete build and isolated runtime smoke without an online model. Stage logs remain under `.desktop-build/packaging-runs/`; a successful build alone does not qualify the installer. Dependency installation and runtime preparation need access to npm, GitHub release assets and nodejs.org; use the existing registry and proxy configuration when the network requires it. Caches and tool locations belong to the build machine, not tracked personal paths.
+`pnpm install --frozen-lockfile` を実行し、次に `pnpm run package:desktop:win:x64:unsigned --check` を実行して、上記の完全コマンドの前に構成とツールチェーンを検証する。パッケージングは独自の完全ビルドと隔離されたランタイムスモークをオンラインモデルなしで実行する。ステージログは `.desktop-build/packaging-runs/` 配下に残り、ビルド成功だけではインストーラーの適格性は確立しない。依存関係インストールとランタイム準備は npm、GitHub リリースアセット、nodejs.org へのアクセスを必要とし、ネットワークが要求する場合は既存のレジストリとプロキシ構成を使うこと。キャッシュとツール配置はビルドマシンに属し、追跡される個人パスではない。
 
 <a id="local-macos-dmg-without-release-signing"></a>
 
-## Local macOS DMG without release signing
+## リリース署名なしのローカル macOS DMG
 
-After `pnpm install`, run one command from the repository root. No `.env.macos`, Apple account, certificate, or update service configuration is required:
+`pnpm install` の後、リポジトリルートで 1 つのコマンドを実行する。`.env.macos`、Apple アカウント、証明書、更新サービス構成は不要である。
 
 ```sh
 pnpm run package:desktop:mac:arm64:unsigned
 pnpm run package:desktop:mac:x64:unsigned
 ```
 
-Add `--check` to validate local configuration and tools without building, or `--dir` to stop at the unpacked application. The DMG is `apps/desktop/.desktop-build/targets/<target>/unsigned-artifacts/deepseek-harness-<version>-mac-<arch>-unsigned.dmg`. After all checks pass, the command prints `DMG:` followed by its absolute path. Open it and copy the application to a local test directory.
+`--check` を追加するとビルドせずにローカル構成とツールのみ検証し、`--dir` を付けると展開済みアプリケーションで停止する。DMG は `apps/desktop/.desktop-build/targets/<target>/unsigned-artifacts/deepseek-harness-<version>-mac-<arch>-unsigned.dmg` である。すべてのチェック通過後、コマンドは `DMG:` に続けて絶対パスを表示する。それを開き、アプリケーションをローカルテストディレクトリへコピーする。
 
-These commands ignore `.env.macos` and inherited release settings, use `com.deepseek.harness` as the app ID, and omit automatic-update and mandatory-update configuration. Build tools, standard network proxies, and `DSH_DESKTOP_NPM_REGISTRY` remain available from the shell. They skip Developer ID signing, Apple notarization, temporary signing keychains, and notarization proxy changes. Electron receives a local ad-hoc signature without certificates so the modified executable can run; the DMG is unsigned. Both preparation and the assembled application still run runtime integrity and smoke checks. Local builds omit update feeds, ZIPs, and release completion records, and the upload commands cannot publish them. macOS may require approval in System Settings → Privacy & Security to open an unnotarized application.
+これらのコマンドは `.env.macos` と継承されたリリース設定を無視し、アプリ ID に `com.deepseek.harness` を使い、自動更新と必須更新の構成を省略する。ビルドツール、標準ネットワークプロキシ、`DSH_DESKTOP_NPM_REGISTRY` は引き続きシェルから利用できる。Developer ID 署名、Apple 公証、一時署名キーチェーン、公証プロキシ変更をスキップする。変更済み実行可能ファイルが動作するよう、Electron には証明書なしのローカルアドホック署名が付与され、DMG は未署名である。準備と組み立て済みアプリケーションは引き続きランタイム完全性とスモークのチェックを実行する。ローカルビルドは更新フィード、ZIP、リリース完了レコードを省略し、アップロードコマンドはそれらを公開できない。公証されていないアプリケーションを開くには、システム設定 → プライバシーとセキュリティでの承認が macOS で要求される場合がある。
 
 <a id="macos-release-signing"></a>
 
-## macOS release signing and diagnostics
+## macOS リリース署名と診断
 
-The signed macOS configuration uses the required release environment instead of accepting whichever certificate appears first in a keychain. It rejects empty values, a malformed Team ID, a signing identity that includes electron-builder's unsupported `Developer ID Application:` prefix, and incomplete notarization credentials. Signed macOS packaging requires the configured identity and its private key. Runtime preparation applies that identity, a secure timestamp, and hardened runtime to every embedded Mach-O file; after signing the application, a deep strict check rejects any other leaf authority or Team ID before artifact creation. The signed fixed-target macOS installer commands create separate copies of the signed application and run two artifact lanes concurrently. One lane notarizes and staples the App before generating the ZIP and its update metadata. The other encloses its signed App copy in a signed DMG, then notarizes, staples, and verifies the DMG; its inner App has no individually stapled ticket. Both lanes must finish successfully before their artifacts reach the final directory and the release completion record is written. Signed directory-only commands also require notarization credentials and wait for Apple notarization and App stapling. The [parallel notarization decision](../../../.agents/notes/implemented/process/2026-09-09-parallel-macos-notarization.md) owns copy isolation and container ticket semantics. `CSC_LINK` must name a local p12 containing the Developer ID Application certificate and private key; URLs and Base64 inputs are not supported. `CSC_KEY_PASSWORD` is its export password, not an Apple account or login password; an explicitly empty value supports an unencrypted p12. Before building, packaging creates and unlocks a private temporary keychain, imports the p12, authorizes signing, and signs a small probe. Runtime and App signing use this keychain explicitly; existing login keychains require no setup or manual unlocking. Child processes receive its path without the p12 password. The keychain is deleted after success or ordinary failure; CI must clean temporary credentials after forced termination. Ephemeral CI writes the certificate and `.env.macos` from its secret store, restricts file access, and deletes both after the job; self-hosted machine presets retain private files outside the checkout. Ambient `CSC_NAME` and certificate discovery order do not select the release owner. Notary credentials may instead use electron-builder's complete Apple ID or keychain-profile strategy. The two macOS identity variables are also required when repeating the application check manually with `pnpm --dir apps/desktop run verify:mac-signature -- <path-to-app>`.
+署名付き macOS 構成は、キーチェーン内で最初に見つかった証明書を受け入れるのではなく、要求されるリリース環境を使う。空値、不正な Team ID、electron-builder がサポートしない `Developer ID Application:` プレフィックスを含む署名 ID、不完全な公証資格情報を拒否する。署名付き macOS パッケージングは構成された ID とその秘密鍵を要求する。ランタイム準備はその ID、安全なタイムスタンプ、hardened runtime をすべての組み込み Mach-O ファイルに適用し、アプリケーション署名後に deep strict チェックで他のリーフ権威や Team ID を拒否してから成果物を作成する。署名付き固定ターゲット macOS インストーラーコマンドは署名済みアプリケーションの別コピーを作成し、2 つの成果物レーンを並行実行する。一方のレーンは App を公証・ステープルしてから ZIP とその更新メタデータを生成する。もう一方は署名済み App コピーを署名付き DMG に収め、次に DMG を公証・ステープル・検証する。その内側 App には個別ステープルされたチケットはない。両レーンが成功してから成果物が最終ディレクトリに届き、リリース完了レコードが書き込まれる。署名付きディレクトリ専用コマンドも公証資格情報を要求し、Apple 公証と App ステープルを待つ。[並行公証の決定](../../../.agents/notes/implemented/process/2026-09-09-parallel-macos-notarization.md)はコピー分離とコンテナーチケットの意味を所有する。`CSC_LINK` は Developer ID Application 証明書と秘密鍵を含むローカル p12 を指名しなければならず、URL と Base64 入力はサポートされない。`CSC_KEY_PASSWORD` はそのエクスポートパスワードであり、Apple アカウントやログインパスワードではない。明示的な空値は暗号化されていない p12 をサポートする。ビルドの前に、パッケージングはプライベートな一時キーチェーンを作成・アンロックし、p12 をインポートして署名を認可し、小さなプローブに署名する。ランタイムと App の署名はこのキーチェーンを明示的に使い、既存ログインキーチェーンの設定や手動アンロックは不要である。子プロセスは p12 パスワードなしでそのパスを受け取る。キーチェーンは成功時も通常失敗時も削除され、強制終了後は CI が一時資格情報をクリーンアップしなければならない。短命 CI はシークレットストアから証明書と `.env.macos` を書き込み、ファイルアクセスを制限し、ジョブ後に両方を削除する。セルフホストマシンプリセットはチェックアウト外にプライベートファイルを保持する。環境の `CSC_NAME` と証明書探索順はリリース所有者を選択しない。公証資格情報は代わりに electron-builder の完全な Apple ID またはキーチェーンプロファイル戦略を使える。`pnpm --dir apps/desktop run verify:mac-signature -- <path-to-app>` でアプリケーション検査を手動再実行する場合も、この 2 つの macOS ID 変数が必要である。
 
-macOS signing visits real files without following Framework symlink aliases. PAK resources retain all shipped languages and are sealed by the enclosing Framework or application signature instead of receiving individual signatures. The [release policy](../../../.agents/notes/implemented/architecture/2026-08-25-electron-desktop-packaging-and-updates.md) owns the dependency patch and verification requirements.
+macOS 署名は Framework シンボリックリンクエイリアスをたどらずに実ファイルを訪問する。PAK リソースは出荷される全言語を保持し、個別署名ではなく外側 Framework またはアプリケーション署名で封印される。[リリースポリシー](../../../.agents/notes/implemented/architecture/2026-08-25-electron-desktop-packaging-and-updates.md)は依存関係パッチと検証要件を所有する。
 
-macOS runtime preparation caches verified single-architecture Mach-O signatures in `.desktop-build/targets/<target>/signature-cache` unless `DSH_DESKTOP_MACOS_SIGNATURE_CACHE_DIR` selects external storage. An explicit path must be absolute and already exist, contain no linked ancestors, and be owned by the current account with mode `0700` and read/write/search access; invalid or empty settings fail preflight without fallback. Omit the field to retain target-local storage. Keys include input bytes and permissions, the signing probe’s actual leaf certificate, identifier, entitlement bytes, macOS version, and signing tools and policy. Git commits do not determine reuse: uncommitted byte changes invalidate the affected file. Every hit verifies cached bytes, the strict signature, certificate, identifier, entitlements, secure timestamp and hardened runtime before replacing an unchanged input. Universal binaries are signed each time. Runtime integrity and smoke checks, App signing, and Apple notarization still run. The cache requires trusted local build storage. Cache corruption or unsafe links fail the build; stop packaging before deleting the affected cache directory and retrying. Successful signing stages prune complete entries to a one-GiB payload budget; interrupted temporary entries require manual removal. Concurrent eviction can fail a reader safely. Logs report hit, miss and uncached counts.
+macOS ランタイム準備は、検証済み単一アーキテクチャ Mach-O 署名を `.desktop-build/targets/<target>/signature-cache` にキャッシュする。ただし `DSH_DESKTOP_MACOS_SIGNATURE_CACHE_DIR` が外部ストレージを選択した場合は除く。明示パスは絶対かつ既存でなければならず、リンクされた祖先を含まず、現アカウント所有でモード `0700` かつ読み書き検索アクセスが必要である。不正または空の設定はフォールバックなしにプリフライトで失敗する。フィールドを省略するとターゲットローカルストレージを保つ。キーには入力バイトとパーミッション、署名プローブの実際のリーフ証明書、識別子、エンタイトルメントバイト、macOS バージョン、署名ツールとポリシーが含まれる。Git コミットは再利用を決めない。コミットされていないバイト変更は対象ファイルを無効にする。ヒットするたびにキャッシュバイト、strict 署名、証明書、識別子、エンタイトルメント、安全なタイムスタンプ、hardened runtime を検証してから変更のない入力を置き換える。Universal バイナリは毎回署名する。ランタイム完全性とスモークチェック、App 署名、Apple 公証は引き続き実行する。キャッシュは信頼できるローカルビルドストレージを要求する。キャッシュ破損や安全でないリンクはビルドを失敗させ、影響キャッシュディレクトリを削除して再試行する前にパッケージングを停止する。署名成功ステージは完全エントリーを 1 GiB ペイロード予算まで刈り込む。中断された一時エントリーは手動削除が必要である。並行排除はリーダーを安全に失敗させうる。ログはヒット・ミス・非キャッシュ件数を報告する。
 
-Mac package commands print `DESKTOP_PACKAGING_RECORD` with a unique directory under `apps/desktop/.desktop-build/packaging-runs/`. After reading local configuration, each run retains `run.json` (published version, product version, Git commit, dirty-worktree flag, target and Node version), `events.jsonl` (timestamped phases, durations, parallel output attribution and proxy restoration), redacted child `stdout.log` / `stderr.log`, and `result.json` (overall outcome, stage results and artifact directory). Events also record pack concurrency and whether each proxy is configured. Logs survive failures and later builds; no automatic deletion runs. Missing `result.json` means completion is unconfirmed. Known credential values are redacted; environments and notarytool authentication arguments are not recorded. Runtime preparation records package staging, installation, materialization, signing, manifests, smoke checks, descriptor verification and cleanup separately. Nested phase durations overlap and must not be added together.
+Mac パッケージコマンドは `apps/desktop/.desktop-build/packaging-runs/` 配下の一意ディレクトリとともに `DESKTOP_PACKAGING_RECORD` を表示する。ローカル構成の読み取り後、各実行は `run.json`（公開バージョン、製品バージョン、Git コミット、ダーティワークツリーフラグ、ターゲットと Node バージョン）、`events.jsonl`（タイムスタンプ付きフェーズ、所要時間、並行出力の帰属、プロキシ復元）、秘匿済み子 `stdout.log` / `stderr.log`、`result.json`（全体結果、ステージ結果、成果物ディレクトリ）を保持する。イベントはパック並行度と各プロキシの構成有無も記録する。ログは失敗や後のビルドを超えて残り、自動削除は実行されない。`result.json` の欠落は完了未確認を意味する。既知資格情報値は秘匿され、環境全体や notarytool 認証引数は記録されない。ランタイム準備はパッケージステージング、インストール、マテリアライズ、署名、マニフェスト、スモークチェック、記述子検証、クリーンアップを個別に記録する。入れ子フェーズの所要時間は重複するため合算してはならない。
 
-App and DMG notarization each record a submission ID and separate `notarytool:upload:*` and `notarytool:wait:*` durations. Upload uses `submit --no-wait` and includes authentication, local validation, transfer and server acceptance; it is not pure transfer time. Waiting starts after that command returns and includes polling and remaining Apple processing; Apple can start processing before upload submission returns. Apple status and diagnostic logs are retained, including rejection; signature checks, acceptance checks and stapling remain owned by `@electron/notarize`. Directory-only package commands use this same measured App notarization path. Individual subprocess output remains live in the terminal, while phase failures and nested errors are retained in the journal. Both platforms record parent-process packaging failures and print redacted diagnostics, including proxy recovery instructions, to the terminal. The configuration-only `check:package` command creates no run log.
+App と DMG の公証はそれぞれ submission ID と個別の `notarytool:upload:*`・`notarytool:wait:*` 所要時間を記録する。アップロードは `submit --no-wait` を使い、認証、ローカル検証、転送、サーバー受理を含み、純粋な転送時間ではない。待機はそのコマンド復帰後に始まり、ポーリングと残りの Apple 処理を含む。Apple はアップロード送信復帰前に処理を開始しうる。Apple ステータスと診断ログは拒否を含めて保持され、署名検査・受理検査・ステープルは引き続き `@electron/notarize` が所有する。ディレクトリ専用パッケージコマンドも同じ計測済み App 公証パスを使う。個別サブプロセス出力は引き続きターミナルにライブ表示され、フェーズ失敗と入れ子エラーはジャーナルに保持される。両プラットフォームは親プロセスのパッケージング失敗を記録し、プロキシ復旧手順を含む秘匿済み診断をターミナルに表示する。構成専用 `check:package` コマンドは実行ログを作成しない。
 
-Mac packaging reads three tuning fields from `.env.macos`:
+Mac パッケージングは `.env.macos` から 3 つの調整フィールドを読む。
 
-| Setting | Default | Scope |
+| 設定 | 既定値 | 適用範囲 |
 |---|---|---|
-| `DSH_DESKTOP_MACOS_PACK_CONCURRENCY` | `4` | Workers for first-party and vendor workspace tarballs; requires a positive integer. |
-| `DSH_DESKTOP_MACOS_DOWNLOAD_PROXY` | Empty | HTTP/HTTPS proxy origin for Electron, runtime assets, pnpm installation and builder downloads. |
-| `DSH_DESKTOP_MACOS_NOTARIZATION_PROXY` | Empty | HTTP proxy origin for Apple tools through temporary system proxy settings. |
+| `DSH_DESKTOP_MACOS_PACK_CONCURRENCY` | `4` | ファーストパーティとベンダーワークスペース tarball 用ワーカー数。正の整数を要求する。 |
+| `DSH_DESKTOP_MACOS_DOWNLOAD_PROXY` | 空 | Electron、ランタイムアセット、pnpm インストール、ビルダーダウンロード用の HTTP/HTTPS プロキシオリジン。 |
+| `DSH_DESKTOP_MACOS_NOTARIZATION_PROXY` | 空 | 一時システムプロキシ設定を通じて Apple ツールが使う HTTP プロキシオリジン。 |
 
-The proxy fields are independent and reject URL credentials, paths, queries and fragments. Empty values preserve inherited networking. An explicit download proxy replaces child-process proxy variables and bypasses local hosts only; it does not change system settings. Windows and standalone `release:pack` retain their existing concurrency defaults. Company proxy addresses belong in the ignored local file; see internal documentation for addresses.
+プロキシフィールドは独立であり、URL 資格情報・パス・クエリ・フラグメントを拒否する。空値は継承ネットワークを保つ。明示ダウンロードプロキシは子プロセスのプロキシ変数を置き換え、ローカルホストのみバイパスする。システム設定は変更しない。Windows と単独 `release:pack` は既存の並行度既定値を保つ。会社プロキシアドレスは無視されるローカルファイルに属し、アドレスは内部ドキュメントを参照すること。
 
-Apple tooling uses the active macOS network service's HTTP/HTTPS proxies. Configured notarization routing checks proxy reachability, saves that service's settings, enables the proxy around both artifact lanes, and restores the saved settings after both lanes settle. An originally disabled proxy with an empty server and port zero is restored by disabling it; the temporary server and port may remain stored but inactive. Directory-only builds apply it to App notarization after the signed directory build. This temporarily affects other applications and requires permission to change system proxies; PAC, auto-discovery, SOCKS and authenticated proxy configurations must be disabled first. Packaging and recovery acquire the same per-user POSIX file lock before reading recovery data or changing proxies; process exit releases ownership, while the lock file remains in place. The lock loads `@deepseek-ai/node-addon-system/flock` at first use rather than at script start, so `check:package` and the packaging entry load on a checkout that has not built `native/system`; when the host addon binary or the entry's JavaScript is missing at lock time, the loader runs `pnpm run build:native-system` and `pnpm --dir native/system run build:ts` before locking, so recovery works on such a checkout as well. This prevents overlapping proxy transactions across checkouts; other users and network-setting tools must not change these settings concurrently. SIGINT/SIGTERM wait for active work before restoration. After forced termination or a restoration error, stop any remaining notarization processes and run `pnpm --dir apps/desktop run restore:mac-proxy`; the saved record remains until restoration succeeds. Configuration checks validate URL syntax without changing system settings or contacting the proxy.
+Apple ツールはアクティブ macOS ネットワークサービスの HTTP/HTTPS プロキシを使う。公証ルーティングを構成すると、プロキシ到達性を確認し、そのサービスの設定を保存し、両成果物レーンの前後でプロキシを有効化し、両レーン確定後に保存設定を復元する。元々無効でサーバーが空・ポートがゼロのプロキシは、無効化で復元する。一時サーバーとポートは保存されたまま非アクティブで残る場合がある。ディレクトリ専用ビルドは署名済みディレクトリビルド後の App 公証に適用する。これは一時的に他アプリケーションへ影響し、システムプロキシ変更の権限を要求する。PAC、自動検出、SOCKS、認証付きプロキシ構成は先に無効にしなければならない。パッケージングと復旧は、復旧データ読み取りやプロキシ変更の前に同じユーザー別 POSIX ファイルロックを取得する。プロセス終了で所有権は解放され、ロックファイルは残る。ロックはスクリプト開始時ではなく初回使用時に `@deepseek-ai/node-addon-system/flock` を読み込むため、`check:package` とパッケージング入口は `native/system` をビルドしていないチェックアウトでも読み込める。ロック時にホスト addon バイナリや入口 JavaScript が欠けている場合、ローダーはロック前に `pnpm run build:native-system` と `pnpm --dir native/system run build:ts` を実行するため、復旧はそのようなチェックアウトでも動作する。これによりチェックアウトを跨ぐプロキシトランザクションの重なりを防ぐ。他ユーザーやネットワーク設定ツールは同時にこれらの設定を変更してはならない。SIGINT/SIGTERM は復元前にアクティブ作業を待つ。強制終了や復元エラー後は、残存公証プロセスを停止して `pnpm --dir apps/desktop run restore:mac-proxy` を実行する。保存レコードは復元成功まで残る。構成チェックは URL 構文のみ検証し、システム設定の変更やプロキシへの問い合わせは行わない。
 
 <a id="directory-and-preparation"></a>
 
-## Directory builds and preparation
+## ディレクトリビルドと準備
 
-Create a runnable application directory instead of an installer by using the matching `:dir` command, such as:
+インストーラーの代わりに実行可能なアプリケーションディレクトリを作成するには、次のような対応 `:dir` コマンドを使う。
 
 ```sh
 pnpm run package:desktop:dir
 pnpm run package:desktop:mac:arm64:dir
 ```
 
-To inspect or troubleshoot the prepared host-target resources without invoking electron-builder, stop the same pipeline after preparation:
+準備済みホストターゲットリソースを検査・トラブルシュートするために electron-builder を呼ばずに止めるには、同じパイプラインを準備後に停止する。
 
 ```sh
 pnpm run prepare:desktop
 ```
 
-This diagnostic command is an alternative stopping point, not the first half of a two-command build. A later `package:desktop*` command repeats the official build and preparation so it cannot consume stale dsh packages, runtime files, or dsh content.
+この診断コマンドは代替の停止点であり、2 コマンドビルドの前半ではない。後の `package:desktop*` コマンドは公式ビルドと準備を繰り返すため、古い dsh パッケージ、ランタイムファイル、dsh コンテンツを使うことはない。
 
 <a id="local-official-bundles-from-a-loopback-registry"></a>
 
-## Local Official bundles from a loopback registry
+## ループバックレジストリからのローカル Official バンドル
 
-The test DMG excludes the provider runtimes the Official on-demand catalog advertises, and a release publishes matching bundle versions to npm. To install locally built bundles before that release, start a loopback registry that packs and serves the catalog's complete local dependency closure:
+テスト DMG は Official オンデマンドカタログが宣伝するプロバイダーランタイムを除外し、リリースは対応バンドルバージョンを npm へ公開する。そのリリースの前にローカルビルド済みバンドルをインストールするには、カタログの完全なローカル依存クロージャをパックして提供するループバックレジストリを起動する。
 
 ```sh
 pnpm run dev:bundle-registry
 ```
 
-The command validates the catalog and the workspace inventory, runs `pnpm run build:official`, packs the closure into a new `dist/test-bundles/<run-id>/` directory, writes `bundle-registry.json` last as the completion marker, and only then prints the artifact path, the registry URL, and the exact `name@version` specs. It serves `127.0.0.1` on an allocated port under a fresh namespace until Ctrl+C or SIGTERM, and stopping it leaves both the artifacts and the installed packages on disk. It needs no `.env.macos`, Apple credentials, or npm credentials, and it does not change `pnpm run package:desktop:unsigned`.
+このコマンドはカタログとワークスペースインベントリを検証し、`pnpm run build:official` を実行し、クロージャを新規 `dist/test-bundles/<run-id>/` ディレクトリへパックし、完了マーカーとして `bundle-registry.json` を最後に書き、その後に成果物パス、レジストリ URL、正確な `name@version` 仕様を表示する。新規名前空間で割り当てポート上の `127.0.0.1` を Ctrl+C または SIGTERM まで提供し、停止しても成果物とインストール済みパッケージはディスクに残る。`.env.macos`、Apple 資格情報、npm 資格情報は不要であり、`pnpm run package:desktop:unsigned` を変更しない。
 
-In the packaged application, open Plugins → Add plugin, paste one printed spec, choose **Custom address**, paste the printed registry URL, and install. A custom registry is asked alone, so this process must answer every dependency: repository-owned packages come from the run's own archives, and third-party packages keep npm's real metadata and bytes through a fixed redirect to `registry.npmjs.org`, which still requires network access. The installed entry stays Official because its package name is in the catalog. The registry choice is remembered in this browser; choose an offered registry again to switch back.
+パッケージ済みアプリケーションで プラグイン → プラグインを追加 を開き、表示された仕様を貼り付け、**カスタムアドレス**を選択して、表示されたレジストリ URL を貼り付けてインストールする。カスタムレジストリは単独で問い合わせられるため、この手順はすべての依存関係に応えなければならない。リポジトリ所有パッケージは実行自身のアーカイブから提供され、サードパーティパッケージは `registry.npmjs.org` への固定リダイレクトを通じて npm の実際のメタデータとバイトを保つため、引き続きネットワークアクセスが必要である。パッケージ名がカタログにあるため、インストール済みエントリーは Official のままである。レジストリ選択はこのブラウザーに記憶され、提供レジストリを再度選択すると切り戻せる。
 
-A run's artifacts are immutable, so a rebuild serves a new namespace and a new URL, and the Official **Update** control does not appear while the installed and running versions match. The profile records the previous run's tarball URL in `pnpm-lock.yaml`, and pnpm verifies recorded entries, so installing or reinstalling that bundle against a new URL is refused with `ERR_PNPM_TARBALL_URL_MISMATCH` and can leave the earlier files in place. To test changed code at the same version, clear the stale resolution first — `pnpm clean --lockfile` in `$DSH_HOME/profiles/<profile>`, or install into a fresh profile — then install again from the new URL. `bundle-registry.json` records each archive's version, filename, size, and SHA-512 integrity together with the packing checkout's commit and dirty flag.
+実行の成果物は不変のため、リビルドは新規名前空間と新規 URL を提供し、インストール済みバージョンと実行中バージョンが一致する間は Official の**更新**コントロールは表示されない。プロファイルは前回実行の tarball URL を `pnpm-lock.yaml` に記録し、pnpm は記録済みエントリーを検証するため、そのバンドルを新規 URL に対してインストール・再インストールすると `ERR_PNPM_TARBALL_URL_MISMATCH` で拒否され、以前のファイルが残る場合がある。同じバージョンで変更コードをテストするには、先に古い解決をクリアする（`$DSH_HOME/profiles/<profile>` で `pnpm clean --lockfile`、または新規プロファイルへインストール）。その後、新規 URL から再度インストールする。`bundle-registry.json` は各アーカイブのバージョン・ファイル名・サイズ・SHA-512 完全性を、パックしたチェックアウトのコミットとダーティフラグとともに記録する。
 
-The served `time` is the real packing time, so pnpm 11's default 24-hour `minimumReleaseAge` records the exemption it granted in the profile's `pnpm-workspace.yaml` (`minimumReleaseAgeExclude`); an explicitly stricter policy there fails the installation with pnpm's own message instead of being overridden. A `@scope:registry` route in `~/.npmrc` or the profile's `.npmrc` overrides `--registry` for that scope, so it must not route the served scope.
+提供される `time` は実際のパック時刻のため、pnpm 11 の既定 24 時間 `minimumReleaseAge` はプロファイルの `pnpm-workspace.yaml` に付与した免除を記録する（`minimumReleaseAgeExclude`）。そこで明示的により厳格なポリシーがある場合は、上書きされず pnpm 自身のメッセージでインストールが失敗する。`~/.npmrc` やプロファイルの `.npmrc` の `@scope:registry` 経路はそのスコープに対して `--registry` を上書きするため、提供スコープを経路指定してはならない。
 
 <a id="runtime-file-selection"></a>
 
-## Runtime file selection and installation checks
+## ランタイムファイル選択とインストールチェック
 
-Desktop packs workspace packages locally and installs external dependencies through the target's bundled Node and pnpm. [Desktop's file policy](../scripts/runtime-file-policy.ts) then filters the immutable `resources/app.asar/dsh/node_modules` copy before signing and integrity sealing. It omits TypeScript declarations, recognized JavaScript/CSS/TypeScript source maps, TypeScript build caches, Domino's test directory and Yarn development metadata, selected native compiler outputs, and node-pty prebuilds for other platforms. Non-Windows targets also omit `node-pty/third_party/conpty`; Windows targets retain that directory. It preserves runtime JavaScript, target native modules and their DLL/EXE helpers, WASM, unknown assets, licenses, and notices. Dependency manifests pass through electron-builder's metadata cleanup before integrity sealing, so archiving preserves their recorded bytes. The policy does not alter npm tarballs, the bundled package manager, or user-installed plugin files.
+Desktop はワークスペースパッケージをローカルでパックし、外部依存関係はターゲットのバンドル済み Node と pnpm を通じてインストールする。次に [Desktop のファイルポリシー](../scripts/runtime-file-policy.ts)が不変の `resources/app.asar/dsh/node_modules` コピーを署名・完全性封印の前にフィルタする。TypeScript 宣言、認識済み JavaScript/CSS/TypeScript ソースマップ、TypeScript ビルドキャッシュ、Domino のテストディレクトリと Yarn 開発メタデータ、選択されたネイティブコンパイラ出力、他プラットフォーム用 node-pty prebuild を省略する。非 Windows ターゲットはさらに `node-pty/third_party/conpty` を省略し、Windows ターゲットはそのディレクトリを保持する。ランタイム JavaScript、ターゲットネイティブモジュールとその DLL/EXE ヘルパー、WASM、不明アセット、ライセンス、注意書きを保持する。依存関係マニフェストは完全性封印の前に electron-builder のメタデータクリーンアップを通過するため、アーカイブは記録バイトを保持する。このポリシーは npm tarball、バンドル済みパッケージマネージャー、ユーザーインストール済みプラグインファイルを変更しない。
 
-The [Electron shell file list](../scripts/electron-builder-config.mjs) excludes recognized JavaScript/CSS/TypeScript source maps and TypeScript build caches from the separate `resources/app.asar/node_modules` dependency collection. These exclusions preserve runtime code, native modules, WASM, data files (including ordinary `.map` assets), licenses, and notices; [shell archive tests](../tests/shell-file-selection.spec.ts) check retained bytes and exclusions.
+[Electron シェルファイル一覧](../scripts/electron-builder-config.mjs)は別個の `resources/app.asar/node_modules` 依存関係収集から認識済み JavaScript/CSS/TypeScript ソースマップと TypeScript ビルドキャッシュを除外する。これらの除外はランタイムコード、ネイティブモジュール、WASM、データファイル（通常の `.map` アセットを含む）、ライセンス、注意書きを保持する。[シェルアーカイブテスト](../tests/shell-file-selection.spec.ts)は保持バイトと除外を検査する。
 
-The [Office conversion provider](../../../packages/document/office-to-pdf/README.md) carries the target’s declared native engine, or WASM when the kit declares no matching native target. Preparation rejects a missing target engine before packaging. The complete Office dependencies, including CLI, JavaScript libraries, and the selected engine’s executables, data, licenses, and notices, are unpacked under `resources/app.asar.unpacked/dsh/node_modules/`. The Desktop Host resolves engine manifests to these physical directories and supplies loaded skills with absolute standalone Node and unpacked CLI paths. Node lives in `resources/runtime/primary-runtime/dependencies/node/bin/`; the CLI is the unpacked `@deepseek-ai/libreoffice-kit/lib/cli.js`. On macOS, the native helper receives the JIT entitlement required by [LibreOffice’s UNO bridge](https://github.com/LibreOffice/core/blob/master/sysui/desktop/macosx/hardened_runtime.xcent.in).
+[Office 変換プロバイダー](../../../packages/document/office-to-pdf/README.md)はターゲットの宣言済みネイティブエンジンを運び、キットが対応ネイティブターゲットを宣言しない場合は WASM である。ターゲットエンジン欠落の準備はパッケージング前に拒否される。CLI、JavaScript ライブラリ、選択エンジンの実行ファイル・データ・ライセンス・注意書きを含む完全な Office 依存関係は `resources/app.asar.unpacked/dsh/node_modules/` 配下に展開される。Desktop Host はエンジンマニフェストをこれら物理ディレクトリへ解決し、読み込んだスキルへ絶対のスタンドアロン Node と展開済み CLI パスを提供する。Node は `resources/runtime/primary-runtime/dependencies/node/bin/` に存在し、CLI は展開済み `@deepseek-ai/libreoffice-kit/lib/cli.js` である。macOS では、ネイティブヘルパーは [LibreOffice の UNO ブリッジ](https://github.com/LibreOffice/core/blob/master/sysui/desktop/macosx/hardened_runtime.xcent.in)が要求する JIT エンタイトルメントを受け取る。
 
-The packaged application runs compiled JavaScript and pre-generated Typert metadata; it does not compile TypeScript plugins. Source-level debugger navigation and editor declarations remain available in development packages. [Copy-policy tests](../tests/runtime-file-policy.spec.ts) cover exclusions and retained assets; The [payload smoke](../tests/fixtures/runtime-payload-smoke.mjs) runs under Electron RunAsNode before the Host smoke and final inventory verification. The payload smoke resolves the search tool’s ripgrep executable and verifies text search and file enumeration. Signed Windows builds run these checks after dependency signing; other builds run them during `prepare:dsh`. The [Host smoke](../scripts/smoke-runtime.ts) creates DOCX, XLSX, and PPTX inputs with bundled Python, converts each through the real Office provider, and checks PDF output. Every assembled application, including directory and unsigned builds, repeats the payload and Host checks against ASAR. Archive integrity checks compare the complete archived descriptor with preparation, file bytes and membership in both archive and unpacked trees, recorded executable flags for archived files, and physical permissions for unpacked files. The Host smoke also obtains CLI paths from the loaded skill and runs capabilities and DOCX conversion with an empty PATH. Conversion failures stop packaging before a release record is written; macOS DMG/ZIP builds run these checks before notarization.
+パッケージ済みアプリケーションはコンパイル済み JavaScript と事前生成 Typert メタデータを実行し、TypeScript プラグインをコンパイルしない。ソースレベルのデバッガーナビゲーションとエディター宣言は開発パッケージで利用可能である。[コピーポリシーテスト](../tests/runtime-file-policy.spec.ts)は除外と保持アセットをカバーし、[ペイロードスモーク](../tests/fixtures/runtime-payload-smoke.mjs)は Host スモークと最終インベントリ検証の前に Electron RunAsNode 配下で実行する。ペイロードスモークは検索ツールの ripgrep 実行ファイルを解決し、テキスト検索とファイル列挙を検証する。署名付き Windows ビルドは依存関係署名後にこれらのチェックを実行し、他のビルドは `prepare:dsh` 中に実行する。[Host スモーク](../scripts/smoke-runtime.ts)はバンドル済み Python で DOCX・XLSX・PPTX 入力を作成し、実際の Office プロバイダーで各変換を行い、PDF 出力を検査する。ディレクトリと未署名ビルドを含むすべての組み立て済みアプリケーションは、ASAR に対してペイロードと Host のチェックを繰り返す。アーカイブ完全性チェックは、準備との完全なアーカイブ記述子比較、アーカイブと展開ツリー両方のファイルバイトと所属、アーカイブファイルの記録済み実行フラグ、展開ファイルの物理パーミッションを比較する。Host スモークはさらに読み込み済みスキルから CLI パスを取得し、空の PATH でケイパビリティと DOCX 変換を実行する。変換失敗はリリースレコード書き込み前にパッケージングを停止する。macOS DMG/ZIP ビルドは公証前にこれらのチェックを実行する。
 
-Windows release qualification also runs [directory and replacement checks](../scripts/smoke-windows.ps1) manually after the Desktop build. Set `$Makensis`, `$SevenZip`, and `$PluginDir` to the pinned builder’s NSIS compiler, 7-Zip executable, and x86-unicode NSIS plugin directory; pass the prepared `window-frame.dll` as `-FrameLibrary` to exercise the native extraction path and its failure report as well. From the repository root, run the command below. It verifies directory replacement and rollback, and both locked-file replacement modes; it is not part of the unit-test lane.
+Windows リリース適格性確認はさらに Desktop ビルド後に[ディレクトリと置換のチェック](../scripts/smoke-windows.ps1)を手動実行する。固定ビルダーの NSIS コンパイラへ `$Makensis` を、7-Zip 実行ファイルへ `$SevenZip` を、x86-unicode NSIS プラグインディレクトリへ `$PluginDir` を設定し、準備済み `window-frame.dll` を `-FrameLibrary` として渡してネイティブ展開パスとその失敗報告も試す。リポジトリルートから以下のコマンドを実行する。ディレクトリ置換とロールバック、両ロックファイル置換モードを検証する。単体テストレーンの一部ではない。
 
 ```powershell
 pwsh -NoProfile -File apps/desktop/scripts/smoke-windows.ps1 -Makensis $Makensis -SevenZip $SevenZip -PluginDir $PluginDir -FrameLibrary apps/desktop/.desktop-build/targets/win-x64/installer-ui/window-frame.dll
 ```
 
-The Windows installer checks for a running application at startup and after destination selection, before extracting the new version beside the installation directory. It checks again before replacing directories through same-volume renames. A running application blocks installation; update launches allow up to ten seconds for it to exit. Same-path upgrades preserve the old directory until promotion succeeds; extraction failure leaves it intact, and promotion failure attempts to restore it. The installer removes the old backup before launch. Forced termination or power loss can leave `.new-*` or `.old-*` directories; installation-location and scope migrations retain electron-builder's old-uninstaller flow.
+Windows インストーラーは起動時と宛先選択後、新バージョンをインストールディレクトリの隣に展開する前に、実行中アプリケーションを確認する。同一ボリューム rename によるディレクトリ置換の前にも再確認する。実行中アプリケーションはインストールをブロックし、更新起動では終了まで最大 10 秒待つ。同パスアップグレードは昇格成功まで旧ディレクトリを保持し、展開失敗ではそのまま残し、昇格失敗では復元を試みる。インストーラーは起動前に旧バックアップを削除する。強制終了や電源断は `.new-*` や `.old-*` ディレクトリを残しうる。インストール場所とスコープの移行は electron-builder の旧アンインストーラーフローを保持する。
 
-Directory renames, empty-destination removal, and restoration retry Windows errors 5, 32, and 33 up to ten attempts, with 250 ms increasing delays (11.25 seconds of total waiting per operation). Other errors stop immediately. A replacement failure reports the Windows error, affected paths, and restoration outcome in `directory-failure-<timestamp>.log` beside extraction reports. If restoration fails, the installer removes unlocked staging files and preserves the backup. After reporting that failure, exit cleanup does not retry restoration. Keep the backup path named in the report and contact support before reinstalling. Silent installs save the same diagnostic without a dialog.
+ディレクトリ rename、空宛先削除、復元は Windows エラー 5・32・33 を最大 10 試行まで再試行し、250 ms ずつ増加する遅延を挟む（操作ごとに合計 11.25 秒の待機）。他のエラーは即時停止する。置換失敗は Windows エラー、影響パス、復元結果を抽出レポートの隣の `directory-failure-<timestamp>.log` に報告する。復元に失敗した場合、インストーラーはロックされていないステージングファイルを削除し、バックアップを保持する。その失敗を報告した後の終了クリーンアップは復元を再試行しない。レポートに記載されたバックアップパスを保持し、再インストールの前にサポートへ連絡すること。サイレントインストールはダイアログなしで同じ診断を保存する。
 
-When extraction fails, the installer writes a report with the 7-Zip result and its complete error output to the updater cache directory as `%LOCALAPPDATA%\<package-derived name>-updater\installer-logs\extract-failure-<timestamp>.log` (currently `@deepseek-aidsh-desktop-updater`) and shows the first error line with a **Copy error details** button; silent installs write only the report. Unsigned Windows builds (`DSH_DESKTOP_UNSIGNED=1`) name their installer `deepseek-harness-<version>-win-x64-unsigned.exe` so they cannot be mistaken for release artifacts.
+展開失敗時、インストーラーは 7-Zip 結果とその完全なエラー出力を含むレポートを更新キャッシュディレクトリへ `%LOCALAPPDATA%\<package-derived name>-updater\installer-logs\extract-failure-<timestamp>.log` として書き込む（現在は `@deepseek-aidsh-desktop-updater`）。最初のエラー行を**エラー詳細をコピー**ボタンとともに表示する。サイレントインストールはレポートのみ書き込む。未署名 Windows ビルド（`DSH_DESKTOP_UNSIGNED=1`）はインストーラーを `deepseek-harness-<version>-win-x64-unsigned.exe` と命名するため、リリース成果物と誤認できない。
 
-Windows packaging fixes the 7-Zip filter to `BCJ` for compatibility with the bundled NSIS decoder. This preserves ARM64 binaries carried by dependencies in x64 installers; automatic ARM64 filtering produces entries that this decoder cannot extract.
+Windows パッケージングはバンドル NSIS デコーダーとの互換性のため 7-Zip フィルターを `BCJ` に固定する。これにより x64 インストーラーが運ぶ依存関係の ARM64 バイナリを保持する。自動 ARM64 フィルタリングはこのデコーダーが展開できないエントリーを生成する。
 
-NSIS removes its temporary extraction tree during installation, before the completion page or an automatic launch. The installed production packages remain ordinary files; startup does not extract them again. Installation still writes the complete application tree.
+NSIS はインストール中に一時展開ツリーを削除する。完了ページや自動起動の前である。インストール済み本番パッケージは通常ファイルのまま残り、起動時に再度展開しない。インストールは引き続き完全なアプリケーションツリーを書き込む。
 
 <a id="desktop-runtime-preparation"></a>
 
-## Desktop runtime preparation
+## Desktop ランタイム準備
 
-Desktop [patch policy](../scripts/runtime-patch-policy.ts) explicitly classifies every workspace patch as shared, workspace-only, or runtime-only. Shared entries reuse the root patch bytes and verify their hash against the root lockfile; runtime-only entries use separate repository files without changing workspace installation. Workspace-only patches belong to build tools or dependencies already embedded in client bundles. Unclassified or stale entries, missing files, changed hashes, incompatible resolved versions, and workspace-only packages entering the runtime stop packaging. The [preparation script](../scripts/prepare-runtime-patches.ts) writes only to the temporary project; pnpm applies the selected patches and rejects application failures.
+Desktop の[パッチポリシー](../scripts/runtime-patch-policy.ts)は各ワークスペースパッチを共有・ワークスペース専用・ランタイム専用に明示分類する。共有エントリーはルートパッチバイトを再利用し、ルートロックファイルに対してハッシュを検証する。ランタイム専用エントリーはワークスペースインストールを変更せずに別のリポジトリファイルを使う。ワークスペース専用パッチはビルドツールまたはクライアントバンドルに既に組み込まれた依存関係に属する。未分類や古いエントリー、欠落ファイル、変更されたハッシュ、互換性のない解決バージョン、ランタイムに入るワークスペース専用パッケージはパッケージングを停止する。[準備スクリプト](../scripts/prepare-runtime-patches.ts)は一時プロジェクトにのみ書き込み、pnpm は選択パッチを適用して適用失敗を拒否する。
 
-Desktop dependency overrides are declared separately in the patch-policy module, not inferred from patch versions. The pi-ai constraint keeps its runtime version at the version qualified by the shared patch. Desktop still resolves a fresh runtime lockfile for each build, then installs with `--frozen-lockfile`; dependency resolution across separate builds is not yet reproducible. CLI packed-installation tests and other distribution flows retain their own configuration.
+Desktop 依存関係オーバーライドはパッチバージョンから推論せず、パッチポリシーモジュールに個別宣言する。pi-ai 制約は共有パッチで適格性確認されたバージョンにランタイムバージョンを保つ。Desktop は引き続き各ビルドで新規ランタイムロックファイルを解決し、`--frozen-lockfile` でインストールする。別ビルド間の依存関係解決はまだ再現可能ではない。CLI パックインストールテストなど他の配布フローは独自構成を保持する。
 
-Every package command builds the repository, packs the first-party production closures rooted at dsh and the private Desktop Host, and prepares the target Electron distribution plus primary-runtime with its shared pnpm CLI. `prepare:dsh` installs the production graph once at build time, prepares materialized packages for electron-builder to archive under `app.asar/dsh`, removes package-manager metadata, and writes `desktop-runtime.json` with shared package versions and final file hashes. Signed macOS builds sign and verify native files before inventory generation; electron-builder excludes this already-signed tree from nested re-signing. Resource mappings explicitly include `dsh/node_modules`, which the default root-directory filter omits; the prepared runtime inventory is checked after native signing. Native executables and libraries are unpacked beside ASAR; Python, standalone Node and pnpm remain in external runtime resources. Windows packaging checks every prepared PE against its ASAR unpacked entry and byte-identical disk copy, including unsigned builds. Builder glob rules match braces in PE filenames as single-character wildcards, so a matching neighboring file may also be unpacked. Prepared runtime smoke uses the verified target descriptor rather than the build host architecture. Signed installer, notarization, installed upgrade, and target-specific native-module qualification require the release environment.
+各パッケージコマンドはリポジトリをビルドし、dsh とプライベート Desktop Host を起点とするファーストパーティ本番クロージャをパックし、ターゲット Electron 配布と共有 pnpm CLI 付きプライマリランタイムを準備する。`prepare:dsh` は本番グラフをビルド時に 1 回インストールし、electron-builder が `app.asar/dsh` 配下にアーカイブするためのマテリアライズ済みパッケージを準備し、パッケージマネージャーメタデータを削除し、共有パッケージバージョンと最終ファイルハッシュを含む `desktop-runtime.json` を書く。署名付き macOS ビルドはインベントリ生成前にネイティブファイルへ署名・検証し、electron-builder はこの署名済みツリーを入れ子再署名から除外する。リソースマッピングは既定ルートディレクトリフィルターが省略する `dsh/node_modules` を明示的に含み、準備済みランタイムインベントリはネイティブ署名後に検査される。ネイティブ実行ファイルとライブラリは ASAR の隣に展開され、Python・スタンドアロン Node・pnpm は外部ランタイムリソースに残る。Windows パッケージングは未署名ビルドも含めて準備済み PE のすべてを ASAR 展開エントリーおよびバイト同一ディスクコピーと照合する。ビルダー glob 規則は PE ファイル名の中括弧を単一文字ワイルドカードとして扱うため、隣接する一致ファイルも展開される場合がある。準備済みランタイムスモークはビルドホストアーキテクチャではなく検証済みターゲット記述子を使う。署名済みインストーラー、公証、インストール済みアップグレード、ターゲット別ネイティブモジュール適格性確認はリリース環境を要求する。
 
-Signed macOS packaging writes `Contents/Resources/app-update.yml` while assembling the App and before code signing, including the directory build that feeds the parallel ZIP and DMG lanes. The signing hook verifies the exact feed and updater cache directory. Both lane copies and the promoted App are checked again before the release completion record is written; a missing or mismatched configuration prevents artifact promotion and therefore prevents upload.
+署名付き macOS パッケージングは App 組み立て中かつコード署名前に `Contents/Resources/app-update.yml` を書き込む。並行 ZIP・DMG レーンへ供給するディレクトリビルドも含む。署名フックは正確なフィードと更新キャッシュディレクトリを検証する。両レーンコピーと昇格 App はリリース完了レコード書き込み前に再検査され、構成の欠落や不一致は成果物昇格を防ぐためアップロードも防ぐ。
 
-An unpacked artifact contains Electron, the materialized dsh production tree, pnpm, and the shell application. Installer size and filesystem size differ; release qualification measures both, plus the profile’s plugin storage and first-launch latency. The runtime trades more application files for eliminating core package installation on the user’s machine.
+展開済み成果物は Electron、マテリアライズ済み dsh 本番ツリー、pnpm、シェルアプリケーションを含む。インストーラーサイズとファイルシステムサイズは異なり、リリース適格性確認は両方に加えてプロファイルのプラグインストレージと初回起動レイテンシを測定する。ランタイムはユーザーマシンでのコアパッケージインストールをなくす代わりにアプリケーションファイルを増やしている。
 
 <a id="verification"></a>
 
-## Installation and release verification
+## インストールとリリース検証
 
-Keep the generated installer, its version and packaging records together. Review signatures and runtime checks before installation, then follow the [installed-update qualification procedure](../tests/installed-update/README.md) for installed launch and upgrade evidence. The [Desktop test record](../tests/README.md) owns verification limits; a successful workflow alone does not establish production preset, new-workstation or installed-upgrade acceptance.
+生成されたインストーラー、そのバージョン、パッケージングレコードは一体で保持する。署名とランタイムチェックをインストール前にレビューし、次にインストール済み起動とアップグレード証拠について[インストール済み更新適格性確認手順](../tests/installed-update/README.md)に従う。[Desktop テストレコード](../tests/README.md)は検証の限界を所有し、ワークフロー成功だけでは本番プリセット・新規ワークステーション・インストール済みアップグレードの受け入れは確立しない。
 
-## Dev Note
+## 開発者ノート
 
-None.
+なし。

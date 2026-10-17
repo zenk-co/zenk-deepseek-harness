@@ -1,18 +1,18 @@
 ---
 kind: upgrade-guide
-description: "Non-page Clients default to no forwarded interactions and use raw streams without browser recovery."
+description: "非ページクライアントはデフォルトでインタラクション転送を行わず、ブラウザー回復なしの raw ストリームを使う。"
 ---
 
-# Select interaction participation for non-page clients
+# 非ページクライアントのインタラクション参加を選択する
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-Non-page Connection installations default to `interactions: 'none'`. They do not open `$events`, and `$on()` and the generation-recovery helper `$stream()` are unavailable in that mode. Generated unary and raw stream methods remain usable. Browser authentication, existing browser Cookies, the shared Peer, and recovery behavior are unchanged; browsers need no reauthentication.
+非ページ Connection インストールはデフォルトで `interactions: 'none'` となる。`$events` を開かず、そのモードでは `$on()` と生成回復ヘルパー `$stream()` は利用できない。生成された単項メソッドと raw ストリームメソッドは引き続き使える。ブラウザー認証、既存のブラウザー Cookie、共有 Peer、回復動作は変わらず、ブラウザーの再認証は不要である。
 
-## Migration
+## 移行
 
-1. Exchange the launch token at `GET /connect?token=<launch-token>&interactions=none` with manual redirect handling. Keep the returned API Cookie in client-owned storage and use it for HTTP and the lifecycle WebSocket at the returned 302 Location. HTTP need not wait for the socket to open.
-2. For passive streaming, call the generated raw stream method directly rather than `$stream()`. After lifecycle-socket closure or Host restart, perform a new connect before retrying.
-3. If the caller intentionally answers forwarded interactions, request `interactions=answer` and install Connection with that same mode. Confirm passive callers are refused at both event endpoints while the answering caller can subscribe.
+1. 手動リダイレクト処理で `GET /connect?token=<launch-token>&interactions=none` に対して起動トークンを交換する。返された API Cookie をクライアント所有ストレージに保持し、返された 302 Location に対する HTTP とライフサイクル WebSocket に使う。HTTP はソケットのオープンを待つ必要はない。
+2. パッシブストリーミングには `$stream()` ではなく生成された raw ストリームメソッドを直接呼び出す。ライフサイクルソケットのクローズやホスト再起動の後は、リトライ前に新たに connect する。
+3. 呼び出し側が意図的に転送インタラクションに応答する場合は `interactions=answer` を要求し、同じモードで Connection をインストールする。パッシブな呼び出し側が両方のイベントエンドポイントで拒否され、応答する呼び出し側が購読できることを確認する。

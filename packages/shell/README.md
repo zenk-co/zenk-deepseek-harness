@@ -1,51 +1,51 @@
 ---
-description: "The bash capability family for deployments and maintainers choosing and composing a shell executor, sandboxing, and the model-facing bash and pwsh tools."
+description: "シェルエグゼキューター、サンドボックス、およびモデルに面する bash と pwsh ツールを選択・構成するデプロイとメンテナーのための bash ケイパビリティファミリー。"
 kind: "package-group"
 ---
 
-# shell/ — bash capability family
+# shell/ — bash ケイパビリティファミリー
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The shell group provides command execution to agents: run a foreground command and read its bounded output, or start a background process and poll it, on POSIX with Bash and on Windows with PowerShell. Exactly one executor implementation is mounted per composition; the sandboxing executors confine every command through the sandbox capability, and the model-facing `bash` and `pwsh` tools sit on top of whichever executor is mounted. Choose a Bash executor for POSIX, a PowerShell executor for Windows, and pick the sandboxing variant when commands need file-level confinement.
+shell グループはエージェントにコマンド実行を提供する: フォアグラウンドコマンドを実行してその上限付き出力を読む、またはバックグラウンドプロセスを開始してポーリングする。POSIX では Bash、Windows では PowerShell を使う。コンポジションごとにちょうど 1 つのエグゼキューター実装がマウントされる。サンドボックスエグゼキューターはすべてのコマンドをサンドボックスケイパビリティを通じて閉じ込め、モデルに面する `bash` と `pwsh` ツールはマウントされたエグゼキューターの上に乗る。POSIX には Bash エグゼキューター、Windows には PowerShell エグゼキューターを選び、コマンドにファイルレベルの閉じ込めが必要な場合はサンドボックス版を選ぶ。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`shell`](shell/README.md) | Defines the executor contract: foreground runs, background handles, and request resolution | `ctx.shell` |
-| [`bash-local`](bash-local/README.md) | Runs Bash commands as fresh `bash -c` processes on POSIX | registers `ctx.shell` |
-| [`bash-sandbox`](bash-sandbox/README.md) | Runs Bash commands confined through the sandbox capability, reporting denials as facts | registers `ctx.shell` |
-| [`pwsh-local`](pwsh-local/README.md) | Runs PowerShell commands as fresh `pwsh -Command` processes on Windows | registers `ctx.shell` |
-| [`pwsh-sandbox`](pwsh-sandbox/README.md) | Runs PowerShell commands confined through the sandbox capability | registers `ctx.shell` |
-| [`shell-env`](shell-env/README.md) | Supplies the managed `DSH_*` environment every shell command receives | `ctx.shellEnv` |
-| [`tool-bash`](tool-bash/README.md) | Exposes Bash execution and background jobs to the model as the `bash` tool | registers on `ctx.tools` |
-| [`tool-bash-persistent`](tool-bash-persistent/README.md) | Runs model shell calls in one owner-isolated persistent Bash session | registers on `ctx.tools` |
-| [`tool-pwsh`](tool-pwsh/README.md) | Exposes PowerShell execution to the model as the `pwsh` tool | registers on `ctx.tools` |
-| [`tool-pwsh-persistent`](tool-pwsh-persistent/README.md) | Runs model shell calls in one owner-isolated persistent PowerShell session | registers on `ctx.tools` |
+| [`shell`](shell/README.md) | エグゼキューター契約を定義する: フォアグラウンド実行、バックグラウンドハンドル、リクエスト解決 | `ctx.shell` |
+| [`bash-local`](bash-local/README.md) | POSIX で Bash コマンドを新しい `bash -c` プロセスとして実行する | `ctx.shell` を登録 |
+| [`bash-sandbox`](bash-sandbox/README.md) | サンドボックスケイパビリティを通じて閉じ込めた Bash コマンドを実行し、拒否を事実として報告する | `ctx.shell` を登録 |
+| [`pwsh-local`](pwsh-local/README.md) | Windows で PowerShell コマンドを新しい `pwsh -Command` プロセスとして実行する | `ctx.shell` を登録 |
+| [`pwsh-sandbox`](pwsh-sandbox/README.md) | サンドボックスケイパビリティを通じて閉じ込めた PowerShell コマンドを実行する | `ctx.shell` を登録 |
+| [`shell-env`](shell-env/README.md) | すべてのシェルコマンドが受け取る管理された `DSH_*` 環境を供給する | `ctx.shellEnv` |
+| [`tool-bash`](tool-bash/README.md) | Bash 実行とバックグラウンドジョブを `bash` ツールとしてモデルに公開する | `ctx.tools` に登録 |
+| [`tool-bash-persistent`](tool-bash-persistent/README.md) | モデルのシェル呼び出しを 1 つのオーナー分離された永続 Bash セッションで実行する | `ctx.tools` に登録 |
+| [`tool-pwsh`](tool-pwsh/README.md) | PowerShell 実行を `pwsh` ツールとしてモデルに公開する | `ctx.tools` に登録 |
+| [`tool-pwsh-persistent`](tool-pwsh-persistent/README.md) | モデルのシェル呼び出しを 1 つのオーナー分離された永続 PowerShell セッションで実行する | `ctx.tools` に登録 |
 
-A profile layer selects exactly one executor implementation (the win32 layer swaps the POSIX rows for the pwsh ones; mounting two fails loudly at load time on the duplicate service registration) and the model-facing tools it needs. A sandboxed composition also selects a `ctx.sandbox` provider and `ctx.sandboxPolicy`; the [base bundle](../bundle/base/cordis.patch.yml) owns the shipped wiring.
+プロファイル層がちょうど 1 つのエグゼキューター実装（win32 層は POSIX 行を pwsh のものに差し替える。2 つをマウントするとロード時に重複サービス登録で大声に失敗する）と、必要なモデルに面するツールを選択する。サンドボックスコンポジションは `ctx.sandbox` プロバイダーと `ctx.sandboxPolicy` も選択する。出荷される配線は[ベースバンドル](../bundle/base/cordis.patch.yml)が所有する。
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Bash executor subsystem](../../docs/subsystems/shell.md) — the shared request/spec vocabulary, results, background processes, and the complete service contract.
-- [Sandbox subsystem](../../docs/subsystems/sandbox.md) — the confinement capability the sandboxing executors consume.
+- [Bash エグゼキューターサブシステム](../../docs/subsystems/shell.md) — 共有の request/spec 語彙、結果、バックグラウンドプロセス、完全なサービス契約。
+- [サンドボックスサブシステム](../../docs/subsystems/sandbox.md) — サンドボックスエグゼキューターが消費する閉じ込めケイパビリティ。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
-None.
+なし。

@@ -1,6 +1,6 @@
 # 语音输入
 
-[English](voice-input.md) | 中文
+[日本語](voice-input.md) | [English](voice-input.en.md) | 中文
 
 实验性语音识别包含三个角色：[服务定义](../../packages/experimental/speech-to-text/README.zh.md)路由具名 Provider，[SenseVoice Provider](../../packages/experimental/speech-to-text-sensevoice/README.zh.md)拥有本地推理，[Remote 消费者](../../packages/experimental/api-speech-to-text/README.zh.md)服务浏览器。[可选 Bundle](../../packages/experimental/voice-input-bundle/README.zh.md)将它们与麦克风 UI 组合。
 

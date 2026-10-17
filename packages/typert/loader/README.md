@@ -1,128 +1,128 @@
 ---
-description: "Loader integration for generated Typert artifacts: how mounted packages automatically contribute their host-face reflection and schemas to the runtime registry."
+description: "生成済み Typert 成果物のローダー統合: マウントされたパッケージがホスト面リフレクションとスキーマをランタイムレジストリに自動提供する仕組み。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-typert-loader
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-With `dsh-typert-loader` mounted, every package that mounts in a Loader composition automatically contributes its generated Typert reflection and schema factories to the runtime registry — and withdraws them when the package or the plugin unmounts. Packages without the generated export are skipped, so adding the plugin to any composition is safe. An explicit `packages` list covers plugins nested behind another Loader entry, whose fibers carry no resolvable package specifier. It is a Node-only plugin and needs the config-tree resolution anchor to resolve packages.
+`dsh-typert-loader` をマウントすると、ローダー構成にマウントされるすべてのパッケージが生成済み Typert リフレクションとスキーマファクトリーをランタイムレジストリに自動提供し、パッケージまたはプラグインのアンマウント時に撤回する。生成済み export のないパッケージはスキップされるため、どの構成にもこのプラグインを加えて安全である。別のローダーエントリーの背後にネストされたプラグイン (ファイバーが解決可能なパッケージ指定子を持たない) は明示的な `packages` 一覧でカバーする。Node 専用プラグインであり、パッケージ解決に設定ツリー解決アンカーを要する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin in a Host Loader composition that loads packages publishing generated Typert artifacts. The registry itself comes from `dsh-typert-registry`; this plugin only discovers and registers.
+生成済み Typert 成果物を公開するパッケージを読み込むホストローダー構成にこのプラグインをマウントする。レジストリ自体は `dsh-typert-registry` が提供する。このプラグインは探索と登録だけを行う。
 
-### Minimal configuration
+### 最小構成
 
-Load the registry and the loader; the loader defaults to discovering every Loader entry:
+レジストリとローダーを読み込む。ローダーは既定で全ローダーエントリーを探索する。
 
 ```yaml
 - name: '@deepseek-ai/dsh-typert-registry'
 - name: '@deepseek-ai/dsh-typert-loader'
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `packages` | `[]` | Additional package artifacts to register for plugins nested behind another Loader entry; each must resolve from the config tree and export `./typert` |
+| `packages` | `[]` | 別のローダーエントリー背後にネストされたプラグイン向けに追加登録するパッケージ成果物。各々は設定ツリーから解決でき `./typert` を export しなければならない |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-typert-loader) is the exhaustive source for every accepted field.
+生成済み[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-typert-loader)が受け付ける全フィールドの網羅的な情報源である。
 
-### What gets registered
+### 登録されるもの
 
-Each qualifying Loader entry contributes its generated host-face reflection, schema factories, and `TYPERT.invocations` to the runtime registry. The ordinary artifact's getter exposes descriptors from a private Remote info instance; generated direct descriptors also provide named input and invocation helpers. Registration follows the entry lifecycle: it is withdrawn when the entry or the plugin unmounts, and an import that settles after either owner is gone is discarded.
+適格な各ローダーエントリーは生成済みホスト面リフレクション、スキーマファクトリー、`TYPERT.invocations` をランタイムレジストリに提供する。通常成果物のゲッターはプライベート Remote info インスタンスから記述子を公開する。生成済み直接記述子は名前付き入力ヘルパーと呼び出しヘルパーも提供する。登録はエントリーライフサイクルに従う。エントリーまたはプラグインのアンマウント時に撤回され、いずれかの所有者が去った後に確定した import は破棄される。
 
-Source compositions requiring strict Remote validation prebuild and load the ordinary `./typert` artifact. The loader registers its invocations in `ctx.typert.local`; it does not recover erased constraints, documentation, or schemas from live Services. Limited descriptor-free source fallback remains a Gateway concern, and `local.hasSeen()` prevents downgrading to it after a registered definition is withdrawn.
+厳密なリモート検証を要するソース構成は通常 `./typert` 成果物を事前ビルドして読み込む。ローダーはその呼び出しを `ctx.typert.local` に登録する。ライブサービスから消去された制約、文書、スキーマを復旧しない。記述子なしソースフォールバックの限定分は引き続きゲートウェイの関心事であり、`local.hasSeen()` は登録済み定義の撤回後にそれへ格下げすることを防ぐ。
 
-### Observable behavior and failures
+### 観測可能な動作と失敗
 
-Packages without the export are skipped silently. Resolution verdicts and imported manifests are cached for the process lifetime, so adding a `./typert` export requires a restart. A malformed artifact among already-mounted entries fails activation loudly; a later failure is logged per package without preventing unrelated packages from registering. An explicit `packages` entry that cannot be resolved from the config tree, or that lacks the export, fails loudly and names the package.
+export のないパッケージは黙ってスキップされる。解決判定と import 済みマニフェストはプロセス存続期間キャッシュされるため、`./typert` export の追加には再起動を要する。既マウントエントリー中の不正成果物はアクティブ化を大きく失敗させる。後の失敗は無関係パッケージの登録を妨げずにパッケージごとに記録される。設定ツリーから解決できない明示的 `packages` エントリー、または export のないエントリーは大きく失敗し、パッケージを名指しする。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains how the loader scans, validates, and registers; the observable behavior is covered in [Use this package](#use-this-package).
+この節はローダーが走査、検証、登録する仕組みを説明する。観測可能な動作は[このパッケージを使う](#use-this-package)でカバーされる。
 
-### Design concept
+### 設計コンセプト
 
-The plugin is an incremental scanner mirroring the client-modules node half: every Cordis `internal/plugin` emission marks the fiber's entry name dirty, and a microtask flush reconciles each dirty name against the live Loader entries; the activation pass seeds the same dirty set with all current entries.
+このプラグインは client-modules ノード半分を映す増分スキャナーである。すべての Cordis `internal/plugin` 送出がファイバーのエントリー名を dirty 化し、マイクロタスクフラッシュが dirty 名ごとにライブローダーエントリーと突き合わせる。アクティブ化パスは現在の全エントリーで同じ dirty 集合を seed する。
 
-### Manifest validation
+### マニフェスト検証
 
-`validateTypertManifest()` checks artifacts before they enter the typed registry. A manifest must name its exporting package, carry face `host`, hold schema factories, and contain well-formed reflection records; invocation descriptors require strict codecs with factories. Validation checks parameter `codec` and any supplied `strictCodec` specs and requires generated direct-method `input` and `invoke` to be callable; `result` remains the sole output codec. Documentation and JSON Schema are optional. Registration never calls the input selector, parser factories, or projection getters; validation inspects only supplied static projection data. Every failure names the package and the defect.
+`validateTypertManifest()` は型付きレジストリに入る前に成果物を検査する。マニフェストは export パッケージを名指しし、面 `host` を持ち、スキーマファクトリーを持ち、整形されたリフレクションレコードを含まなければならない。呼び出し記述子はファクトリー付き厳密コーデックを要する。検証はパラメーター `codec` と指定された `strictCodec` 仕様を検査し、生成済み直接メソッド `input` と `invoke` が呼び出し可能であることを要求する。`result` は唯一の出力コーデックのままである。文書と JSON Schema は任意である。登録は入力セレクター、パーサーファクトリー、投影ゲッターを決して呼ばない。検証は指定された静的投影データだけを見る。すべての失敗はパッケージと欠陥を名指しする。
 
-### Caching and ownership
+### キャッシュと所有権
 
-Verdicts (resolvable specifier, export presence) and imported manifests are cached per package name and never expire. Registrations are keyed by entry name and withdrawn through the exact `ctx.typert.register()` disposer; in-flight tasks are tracked per entry so a late import cannot register a contribution after its owner is gone.
+判定 (解決可能な指定子、export 有無) と import 済みマニフェストはパッケージ名ごとにキャッシュされ、期限切れしない。登録はエントリー名でキー化され、正確な `ctx.typert.register()` disposer で撤回される。進行中タスクはエントリーごとに追跡されるため、遅延 import が所有者の消滅後にコントリビューションを登録できない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config`, scanner, manifest validation, registration wiring |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `Config`、スキャナー、マニフェスト検証、登録配線 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough; they move from the loader to what it registers and what produces it.
+パッケージレベルの契約では足りないときにこれらを読むこと。ローダーからそれが登録するものとそれを生むものへ進む。
 
-- [Typert registry](../registry/README.md) — the service this plugin feeds.
-- [Typert generator](../generator/README.md) — what produces the artifacts the loader imports.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-typert-loader) — the `packages` field declaration and JSDoc.
-- [Typert group map](../README.md) — the full type-reflection pipeline.
+- [Typert レジストリ](../registry/README.md) — このプラグインが供給するサービス。
+- [Typert ジェネレーター](../generator/README.md) — ローダーが import する成果物を生むもの。
+- [生成済み設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-typert-loader) — `packages` フィールド宣言と JSDoc。
+- [Typert グループマップ](../README.md) — 完全な型リフレクションパイプライン。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as loader integration only registers generated artifacts; consumers own any model-visible projection.
+なし。ローダー統合は生成済み成果物を登録するだけであり、モデルに見える投影はコンシューマーが所有するためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct effect; registration changes reach a request only through a consumer that reads the registry.
+直接の影響なし。登録の変更はレジストリを読むコンシューマーを通じてのみリクエストに届く。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the loader does not discover or register; they are current package constraints, not a task backlog.
+これらの制限はローダーが探索または登録しないものを定める。現在のパッケージ制約であり、タスクバックログではない。
 
-- **Host face only** — discovery imports only the host `./typert` artifact; client runtimes need a separate composition owner before equivalent discovery is added.
-- **Explicit entries for nested plugins** — Loader entries are discovered automatically, but plugins nested behind another entry, or not loaded by the Loader at all, need an explicit `packages` entry or direct `ctx.typert.register()` ownership.
-- **Cached verdicts never expire** — a package that gains a `./typert` export mid-process needs a restart before the loader registers it.
-- **Host readiness remains composition-owned** — consumers requiring strict metadata must wait for registration before serving calls. The lazy info factory does not make asynchronous Loader registration ready; `local.hasSeen()` only protects definitions already observed.
+- **ホスト面のみ** — 探索はホスト `./typert` 成果物だけを import する。クライアントランタイムは同等の探索追加の前に別の構成所有者を要する。
+- **ネストされたプラグインには明示エントリー** — ローダーエントリーは自動探索されるが、別のエントリー背後にネストされたプラグイン、またはローダーがまったく読み込まないプラグインは明示的 `packages` エントリーまたは直接 `ctx.typert.register()` 所有権を要する。
+- **キャッシュされた判定は期限切れしない** — 処理中に `./typert` export を得たパッケージはローダーが登録する前に再起動を要する。
+- **ホスト準備は引き続き構成所有** — 厳密メタデータを要するコンシューマーは呼び出し提供前に登録を待たなければならない。遅延 info ファクトリーは非同期ローダー登録を ready にしない。`local.hasSeen()` は既観測の定義だけを守る。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

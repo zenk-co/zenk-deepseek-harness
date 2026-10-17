@@ -1,128 +1,128 @@
 ---
-description: "Live graph synchronization and development bundle reloads for Web client plugins."
+description: "Web クライアントプラグイン向けライブグラフ同期と開発バンドル再読み込み。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-hmr
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-client-hmr` keeps open Web pages in sync with the Host plugin graph and reloads rebuilt browser bundles. Ordinary plugin enable/disable changes take effect without reloading the page or restarting the Host. Code rebuilds replace the affected plugin with fresh component state. The model sees no new input or output.
+`dsh-client-hmr` は開いている Web ページをホストプラグイングラフと同期させ、再ビルドされたブラウザーバンドルを再読み込みする。通常のプラグイン有効化/無効化の変更はページ再読み込みもホスト再起動もなしに効く。コード再ビルドは影響プラグインを新しいコンポーネント状態で置き換える。モデルは新しい入出力を見ない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The shipped Web composition mounts this transport for live plugin changes. During development, a bundle watcher also supplies code rebuilds. Disabling the transport stops graph delivery to open pages.
+出荷 Web 構成はライブプラグイン変更向けにこの転送をマウントする。開発中はバンドルウォッチャーもコード再ビルドを供給する。転送を無効にすると開いているページへのグラフ配信が止まる。
 
-### Starting the reload chain
+### 再読み込み連鎖の開始
 
-Run `pnpm run dev:web`, which starts the host and the rebuild watchers together (`--no-serve` attaches only the watchers to a host started elsewhere, as does any watch process using the shared Client tsdown preset); rebuilt plugins are then swapped into the running browser automatically, one at a time. The preset stamps `lib/client.js` after all package-local chunks are written, so a chunk-only rebuild also advances the package revision without Host-side chunk scanning.
+ホストと再ビルドウォッチャーをまとめて起動する `pnpm run dev:web` を実行する (`--no-serve` は他所で起動したホストにウォッチャーだけを付ける。共有クライアント tsdown プリセットを使う任意ウォッチプロセスも同様)。再ビルドされたプラグインは実行中ブラウザーに自動的に 1 件ずつ交換される。プリセットはパッケージローカルチャンク書き込み完了後に `lib/client.js` に刻印するため、チャンクのみの再ビルドもホスト側チャンク走査なしにパッケージリビジョンを進める。
 
-### What a reload does
+### 再読み込みの動作
 
-Each successful reload re-executes the plugin bundle and remounts the plugin with fresh state. Plugins that depend on the reloaded one reload with it automatically. Failures appear in the plugin list, where they can be retried without waiting for another rebuild.
+成功した各再読み込みはプラグインバンドルを再実行し、新しい状態でプラグインを再マウントする。再読み込み対象に依存するプラグインは自動的に共に再読み込みされる。失敗はプラグイン一覧に現れ、別の再ビルドを待たずに再試行できる。
 
-### Configuration
+### 構成
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `pollIntervalMs` | `500` | Bundle stat-poll interval in milliseconds |
+| `pollIntervalMs` | `500` | バンドル stat ポーリング間隔ミリ秒 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-client-hmr) is the exhaustive source for every accepted field and its JSDoc.
+生成済み[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-client-hmr)が受け付ける全フィールドとその JSDoc の網羅的な情報源である。
 
-### Observing success
+### 成功の観測
 
-A successful swap shows the edited UI immediately with no page reload, and the plugin keeps working after the swap. Remember the trade-off: React state inside the reloaded plugin is lost, while session, workspace, and connection state survives.
+成功した交換は編集済み UI をページ再読み込みなしにすぐ表示し、プラグインは交換後も動き続ける。トレードオフを覚えておくこと。再読み込みプラグイン内の React 状態は失われ、セッション、ワークスペース、接続状態は残る。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains how the reload chain is built; observable behavior is covered in [Use this package](#use-this-package).
+この節は再読み込み連鎖の組み立てを説明する。観測可能な動作は[このパッケージを使う](#use-this-package)でカバーされる。
 
-### Design concept
+### 設計コンセプト
 
-The Host half watches each package's stamped entry artifact and serves `/plugins/events`. It forwards existing graph-change and rebuilt notifications; every new connection receives the current full graph. A graph describes the browser’s desired entries and carries no Host cleanup-completion guarantee. Host activation and cleanup remain owned by the Host lifecycle. The entry's mtime, ctime, and size identify the revision without hashing its contents; unchanged metadata requires no content read. Host restarts over unchanged artifacts keep the same revisions, so reconnecting the graph stream does not replace browser plugins. The browser half delegates both frame kinds to Client Modules, which serializes entry changes and waits for browser resource cleanup.
+ホスト半分は各パッケージの刻印済みエントリー成果物を監視し、`/plugins/events` を提供する。既存のグラフ変更と再ビルド通知を転送する。すべての新規接続は現在の完全グラフを受け取る。グラフはブラウザーの望むエントリーを記述し、ホストクリーンアップ完了保証を運ばない。ホスト活性化とクリーンアップは引き続きホストライフサイクルが所有する。エントリーの mtime、ctime、サイズは内容ハッシュなしにリビジョンを識別する。メタデータ不変は内容読み取りを要しない。成果物不変のホスト再起動は同じリビジョンを保つため、グラフストリームの再接続はブラウザープラグインを置き換えない。ブラウザー半分は両フレーム種別を Client Modules に委譲し、エントリー変更を直列化してブラウザーリソースクリーンアップを待つ。
 
-### The browser swap
+### ブラウザー交換
 
-On a `rebuilt` frame, the controller invalidates the old module and prefetches its single-resource script while the old fiber still serves. It then deletes the registry runtime, drains the old fiber, clears its entry reference and removes owned styles. The module system materializes the new exports before `entry.refresh()` mounts them through Loader; this exposes import failures to page diagnostics even when Loader would only log them. CSS is injected after old effects have finished.
+`rebuilt` フレームで、コントローラーは旧モジュールを無効化し、旧ファイバーがまだ提供中に単一リソーススクリプトをプリフェッチする。次にレジストリランタイムを削除し、旧ファイバーを draining し、エントリー参照を消去して所有スタイルを取り除く。モジュールシステムは `entry.refresh()` がローダー経由でマウントする前に新しい export を実体化する。これによりローダーが記録だけにする場合でも import 失敗をページ診断に公開する。CSS は旧エフェクト完了後に注入される。
 
-### Cascade and self-reload
+### カスケードと自己再読み込み
 
-A fiber's activation epoch strings its service providers' uids, so replacing a provider's fiber re-cascades every dependent through Cordis itself with zero HMR-side bookkeeping. This plugin is itself a graph entry, so a rebuilt frame may name it; the in-flight reload keeps running in the old bundle's closure and the new bundle's apply opens a fresh channel.
+ファイバーの活性化エポックはそのサービスプロバイダー uid 群を文字列化するため、プロバイダーファイバーの置き換えは Cordis 自体を通じて依存者全員を HMR 側簿記ゼロで再カスケードする。このプラグイン自体がグラフエントリーであるため、再ビルドフレームがそれを名指し得る。進行中再読み込みは旧バンドルのクロージャーで動き続け、新バンドルの apply が新しいチャネルを開く。
 
-### Failure policy
+### 失敗ポリシー
 
-Download failures leave the running plugin active. After the old fiber is torn down, import or activation failure does not restore the previous bundle. Failures appear as page-local synchronization errors. Settings → Plugins → Plugin list retries the latest graph, even when its revision is unchanged; a later rebuild also retries the affected plugin. Successful unrelated plugins remain active.
+ダウンロード失敗は実行中プラグインを活性のままにする。旧ファイバー破棄後の import または活性化の失敗は以前のバンドルを復元しない。失敗はページローカル同期エラーとして現れる。設定 → プラグイン → プラグイン一覧はリビジョン不変でも最新グラフを再試行する。後の再ビルドも影響プラグインを再試行する。無関係の成功プラグインは活性のままである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Node half: bundle stat-poll, `rebuilt` reporting, `/plugins/events` SSE channel |
-| [`src/client/index.ts`](src/client/index.ts) | Browser half: SSE subscription through the page's `__DSH_TRANSPORT__.fetch` when a shell provides one (the worker preview's tunnel), otherwise through `EventSource`, and delegation to the shared entry controller |
-| [`src/events.ts`](src/events.ts) | Shared frame types (`graph` / `rebuilt`) and the endpoint constant |
+| [`src/index.ts`](src/index.ts) | Node 半分: バンドル stat ポーリング、`rebuilt` 報告、`/plugins/events` SSE チャネル |
+| [`src/client/index.ts`](src/client/index.ts) | ブラウザー半分: シェル提供時はページの `__DSH_TRANSPORT__.fetch` 経由 (ワーカープレビューのトンネル)、それ以外は `EventSource` 経由の SSE 購読と共有エントリーコントローラーへの委譲 |
+| [`src/events.ts`](src/events.ts) | 共有フレーム型 (`graph` / `rebuilt`) と endpoint 定数 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these when the reload contract is not enough: the module system that serves the bundles, the shell that boots them, and the module-graph rules behind the externals.
+再読み込み契約では足りないときにこれらを読むこと。バンドルを提供するモジュールシステム、それを起動するシェル、その externals 背後のモジュールグラフ規則へ進む。
 
-- [Client module system](../modules/README.md) — the lazy-CJS module table and `invalidate`/`prefetch` hooks this driver drives.
-- [Web boot kernel](../web/README.md) — the shell that boots the plugin tree and shows entry status.
-- [Client group map](../README.md) — the browser half this package reloads.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-client-hmr) — every accepted config field and its source declaration.
+- [クライアントモジュールシステム](../modules/README.md) — このドライバーが駆動する遅延 CJS モジュールテーブルと `invalidate`/`prefetch` フック。
+- [Web 起動カーネル](../web/README.md) — プラグインツリーを起動し、エントリー状態を示すシェル。
+- [クライアントグループマップ](../README.md) — このパッケージが再読み込みするブラウザー半分。
+- [生成済み設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-client-hmr) — 受け付ける全設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the reload driver is a browser-side UI plugin layer that registers nothing model-facing.
+なし。再読み込みドライバーはモデル向けに何も登録しないブラウザー側 UI プラグイン層であるためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てず送らない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the reload driver does not preserve or restore. They are current package constraints, not a task backlog.
+これらの制限は再読み込みドライバーが保存または復元しないものを定める。現在のパッケージ制約であり、タスクバックログではない。
 
-- **Reload is coarse by design** — a fresh fiber and fresh components; React state inside the reloaded plugin is lost while the data layer (connection/runtime fibers, Session objects) is untouched. react-refresh-grade state preservation conflicts with re-executing the bundle and is deliberately out.
-- **No failure rollback** — after the old fiber is torn down, a failed replacement does not restore the previous bundle.
-- **Web transport only** — Electron installation and backend restart handling do not use this SSE path. Entry reconciliation itself is transport-independent.
+- **再読み込みは設計上粗い** — 新しいファイバーと新しいコンポーネント。再読み込みプラグイン内の React 状態は失われ、データ層 (接続/ランタイムファイバー、セッションオブジェクト) は untouched である。バンドル再実行と衝突する react-refresh 級の状態保存は意図的に対象外である。
+- **失敗ロールバックなし** — 旧ファイバー破棄後、失敗した置換は以前のバンドルを復元しない。
+- **Web 転送のみ** — Electron インストールとバックエンド再起動処理はこの SSE パスを使わない。エントリー調停自体は転送独立である。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

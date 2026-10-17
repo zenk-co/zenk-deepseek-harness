@@ -5,7 +5,7 @@ description: "Python PTC 组合需要沙箱服务，且直接 Python 文件操�
 
 # Python PTC 应用共享文件沙箱
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

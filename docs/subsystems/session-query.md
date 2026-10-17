@@ -1,14 +1,14 @@
-# Session Query
+# セッションクエリ
 
-English | [中文](session-query.zh.md)
+日本語 | [English](session-query.en.md) | [中文](session-query.zh.md)
 
-Query vocabulary over the live-preferred logical session corpus. The [Service Definition package](../../packages/session-query/session-query) owns exact reads, source precedence, relationship tracing, semantic extraction, and provider-independent filters, while the [SQLite provider](../../packages/session-query/session-query-sqlite) owns the concrete full-text index lifecycle.
+live 優先の論理セッションコーパスに対するクエリ語彙。[Service Definition パッケージ](../../packages/session-query/session-query)は、正確な読み取り、ソースの優先順位、関係のトレース、セマンティック抽出、プロバイダー非依存のフィルターを所有し、[SQLite プロバイダー](../../packages/session-query/session-query-sqlite)は、具体的な全文インデックスのライフサイクルを所有する。
 
-Source: [`packages/session-query/session-query/src/types.ts`](../../packages/session-query/session-query/src/types.ts)
+ソース: [`packages/session-query/session-query/src/types.ts`](../../packages/session-query/session-query/src/types.ts)
 
-## Logical records
+## 論理レコード
 
-`SessionRecord` is returned by the cross-corpus list. It exposes source availability independently from the cloned live-preferred header. `SessionEventRecord` is a lightweight raw-log projection; classification uses the same `foldSurface()` transitions as model-history derivation.
+`SessionRecord` はコーパス横断の一覧によって返される。これは live 優先ヘッダーのクローンとは独立に、ソースの可用性を公開する。`SessionEventRecord` は軽量な raw ログ射影であり、分類にはモデル履歴の導出と同じ `foldSurface()` の遷移を使う。
 
 ```ts type-equiv
 /** Whether an event is current model context, replaced context, or raw-log-only. */
@@ -29,7 +29,7 @@ interface SessionRecord {
 }
 ```
 
-`SessionLogSnapshot` is the complete detached, replay-validated raw log used by resume preflight. `SessionSurfaceSnapshot` is one exact-read surface observation rather than a retained subscription.
+`SessionLogSnapshot` は、resume のプリフライトが使う、完全にデタッチされリプレイ検証済みの raw ログである。`SessionSurfaceSnapshot` は、保持されたサブスクリプションではなく、1 回の正確な読み取りによるサーフェス観測である。
 
 ```ts type-equiv
 /** One validated detached observation of a logical session's complete raw log. */
@@ -57,7 +57,7 @@ interface SessionSurfaceSnapshot {
 }
 ```
 
-`SessionTitleObservation` applies the same atomic-observation rule to title folding, so an authorization consumer can validate the source header that supplied the title. Batch reads return one ordered `SessionTitleObservationResult` per unique requested id: operational failures remain local to that id, while cancellation rejects the complete operation.
+`SessionTitleObservation` は同じアトミック観測ルールをタイトルの畳み込みにも適用するため、認可の Consumer はタイトルを供給したソースヘッダーを検証できる。バッチ読み取りは、要求された一意の id ごとに順序付けられた `SessionTitleObservationResult` を 1 つ返す。運用上の失敗はその id に局所化されたままで、キャンセルは操作全体をリジェクトする。
 
 ```ts type-equiv
 /** Latest folded title bound to the same session-header observation. */
@@ -106,9 +106,9 @@ interface SessionEventRecord {
 }
 ```
 
-## Provider-independent filters and documents
+## プロバイダー非依存のフィルターとドキュメント
 
-Session and event filter arrays are ANDed; values inside one list clause are ORed. Ranges are inclusive. The event `text` clause is a literal Unicode case-insensitive, whitespace-flexible regular-expression scan over extracted semantic text, independent of full-text providers.
+セッションとイベントのフィルター配列は AND で結合され、1 つのリスト句の中の値は OR で結合される。範囲は両端を含む。イベントの `text` 句は、抽出されたセマンティックテキストに対する、リテラルで Unicode の大文字小文字を区別せず、空白に柔軟な正規表現スキャンであり、全文プロバイダーから独立している。
 
 ```ts type-equiv
 /**
@@ -144,11 +144,11 @@ interface SessionEventSearchDocument extends SessionEventRecord {
 }
 ```
 
-`ctx.sessionQuery.filterSessions(filters)` applies `SessionResultFilter` to the complete logical corpus; `ctx.sessionQuery.filterEvents(sessionId, filters)` returns matching documents in ascending seq order. Messages, tool calls/results, todos, and failure/status detail contribute semantic text; reasoning blocks, blocked prompts, structural events, and stream chunks do not.
+`ctx.sessionQuery.filterSessions(filters)` は `SessionResultFilter` を完全な論理コーパスに適用し、`ctx.sessionQuery.filterEvents(sessionId, filters)` は一致するドキュメントを昇順の seq 順で返す。メッセージ、ツール呼び出し/結果、todo、失敗/ステータスの詳細がセマンティックテキストに寄与し、reasoning ブロック、ブロックされたプロンプト、構造イベント、ストリームチャンクは寄与しない。
 
-## Full-text search pages
+## 全文検索ページ
 
-The combined `ctx.sessionQuery` seam has two full-text scopes. `searchSessions()` groups the corpus by strongest matching event; `searchEvents()` searches one session. Requests bind an opaque cursor to the normalized query, metadata filters, and limit. The event text scan is intentionally absent from provider metadata filters.
+統合された `ctx.sessionQuery` シームには 2 つの全文スコープがある。`searchSessions()` はコーパスを最も強く一致したイベントでグループ化し、`searchEvents()` は 1 つのセッションを検索する。リクエストは不透明カーソルを、正規化されたクエリ、メタデータフィルター、limit に束縛する。イベントテキストスキャンは意図的にプロバイダーのメタデータフィルターには含まれない。
 
 ```ts type-equiv
 /** Provider-owned opaque continuation token returned by session search. */
@@ -197,7 +197,7 @@ interface SessionSearchPage<T> {
 }
 ```
 
-Unlike grouped cross-session hits, a within-session search must also expose its observed target header even when the page contains no hits.
+グループ化されたクロスセッションのヒットとは異なり、セッション内検索は、ページにヒットが含まれない場合でも、観測したターゲットヘッダーを公開しなければならない。
 
 ```ts type-equiv
 /** Event-search results bound to the indexed target-session observation. */
@@ -223,9 +223,9 @@ interface SessionSearchHit extends SessionRecord {
 }
 ```
 
-## Session lineage
+## セッション系譜
 
-`SessionLineageTrace` carries known parents in immediate-to-outward order and a forest of recursively nested direct descendants. The completeness discriminant makes a known root and a missing parent mutually exclusive.
+`SessionLineageTrace` は既知の親を直近から外側への順序で運び、再帰的にネストされた直接の子孫のフォレストを運ぶ。completeness 判別子により、既知のルートと欠落した親は互いに排他的になる。
 
 ```ts type-equiv
 /** Recursive descendant node in a session-lineage trace. */
@@ -262,9 +262,9 @@ type SessionLineageTrace = {
 )
 ```
 
-## Bounded event reads
+## 有界イベント読み取り
 
-The request addresses one raw seq and optional neighboring counts. The result carries a `SessionHeader` rather than availability flags so a known live target can remain independent of persistence health.
+リクエストは 1 つの raw seq と省略可能な近傍カウントを指定する。結果は可用性フラグではなく `SessionHeader` を運ぶため、既知の live ターゲットは永続化の健全性から独立したままでいられる。
 
 ```ts type-equiv
 /** Request for one event plus raw neighboring log context. */
@@ -298,9 +298,9 @@ interface SessionEventWindow {
 }
 ```
 
-## Event relationships
+## イベント関係
 
-Event traces distinguish positional surface replacement from events cited as sources. Every seq list contains direct links except `replacementChain`, which follows immediate replacers from the target to the final positional replacement.
+イベントトレースは、位置ベースのサーフェス置換と、ソースとして引用されたイベントを区別する。すべての seq リストは直接リンクを含むが、`replacementChain` だけはターゲットから最終的な位置置換まで即時置換子をたどる。
 
 ```ts type-equiv
 /** Request for direct surface replacements and relationships to cited source events around one event. */
@@ -338,9 +338,9 @@ interface SessionEventTraceObservation extends SessionEventTrace {
 }
 ```
 
-## Errors
+## エラー
 
-The closed code union distinguishes request validation, missing targets, malformed surface logs, optional-backend failure, deployment-disabled search, and contradictory source metadata.
+閉じたコード union は、リクエスト検証、ターゲットの欠落、不正なサーフェスログ、オプショナルバックエンドの失敗、デプロイで無効化された検索、矛盾するソースメタデータを区別する。
 
 ```ts type-equiv
 /** Stable machine-routable failure taxonomy for session reads, traces, and search. */

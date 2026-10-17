@@ -1,6 +1,6 @@
 # 二进制 Office 测试文件
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 `preview.doc`、`preview.xls` 和 `preview.ppt` 包含 `Office preview 中文文档`。它们来自 [LibreOffice Kit](https://github.com/deepseek-ai/dsh-libreoffice-kit) 的 `one-page.doc`、`one-sheet.xls` 和 `one-slide.ppt`，由 Harness 编写的 OOXML 通过 LibreOffice 26.8.0.3 的 Word、Excel 和 PowerPoint 97 过滤器导出。源文档保留 Harness 的 MIT 许可证。
 

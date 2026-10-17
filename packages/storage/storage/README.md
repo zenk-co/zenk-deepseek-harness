@@ -1,37 +1,37 @@
 ---
-description: "Storage hub (ctx.storage) for compositions and maintainers choosing, mounting, or debugging named storage backends and data-form facilities."
+description: "命名済みストレージバックエンドとデータ形式機能の選択・マウント・デバッグを行う構成とメンテナー向けのストレージハブ（ctx.storage）。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-storage
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-storage` to keep typed application data durable without adding it to session history. Mount it with a supported storage medium and domain configuration, then callers can access records through the public `ctx.storageDomain` API. Choose it for workspace records, session sidecars, or other application state that must survive restarts without becoming session events. It is available only to host code and has no model-visible effect; compositions that do not need such data can omit it.
+`dsh-storage` を使うと、セッション履歴に加えずに型付きアプリケーションデータを耐久化できる。対応する記憶媒体とドメイン構成と共にマウントすれば、呼び出し元は公開 `ctx.storageDomain` API 経由でレコードにアクセスできる。ワークスペースレコード、セッションサイドカー、再起動をまたいで生き残るべきその他のアプリケーション状態で、セッションイベントにしないものに選ぶ。host コードからのみ利用でき、モデル可視の効果はない。そのようなデータを必要としない構成は省略できる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use this package to give a composition durable, non-session storage: mount it together with backend and domain-form packages, and host-side packages read and write validated records through `ctx.storageDomain`. The hub itself adds nothing observable — it is the meeting point that makes the family work, and everything below is what a composition gets from it.
+構成に耐久性・非セッションストレージを与えるにはこのパッケージを使う。バックエンドとドメイン形式パッケージと共にマウントすれば、host 側パッケージは `ctx.storageDomain` 経由で検証済みレコードを読み書きする。ハブ自体は何も観察可能を追加しない。それはファミリーを機能させる合流点であり、以下はすべて構成がそれから得るものである。
 
-### When to use it
+### 使う場合
 
-Mount the hub whenever any package in the composition persists data that is not a session event log — workspace records, session sidecars. It is required by the domain form and both shipped backends, so the storage rows of a composition are `storage` plus a backend plus `storage-domain`. Skip the whole group when nothing stores such data; the agent loop never needs it.
+構成内のいずれかのパッケージがセッションイベントログではないデータを永続化する場合は常にハブをマウントする。すなわちワークスペースレコードやセッションサイドカーである。ドメイン形式と出荷済み両バックエンドに必須なので、構成のストレージ行は `storage` にバックエンドと `storage-domain` を加えたものになる。そのようなデータを何も格納しない場合はグループ全体を省く。エージェントループがこれを必要とすることはない。
 
-### A minimal composition
+### 最小構成
 
 ```yaml
 - name: '@deepseek-ai/dsh-storage'
@@ -43,99 +43,99 @@ Mount the hub whenever any package in the composition persists data that is not 
     backend: json
 ```
 
-With these rows, the `json` backend registers itself and the `domain` data form mounts; a consumer such as `dsh-workspace` then opens its domain over the routed backend and reads and writes records through `ctx.storageDomain`. Several backends can stay mounted side by side; which backend serves which domain is the domain form's configuration, never a hub-wide choice.
+これらの行により、`json` バックエンドが自身を登録し、`domain` データ形式がマウントされる。`dsh-workspace` のようなコンシューマーはルーティング済みバックエンド上に自身のドメインを開き、`ctx.storageDomain` 経由でレコードを読み書きする。複数のバックエンドを並べてマウントしたままにでき、どのバックエンドがどのドメインに仕えるかはドメイン形式の構成であり、ハブ全体の選択では決してない。
 
-### What you get
+### 得られるもの
 
-- A mounted backend resolves by name, so a composition with both shipped backends can route each domain to either medium by configuration.
-- A mounted data form resolves as `ctx.storage.<form>`; the domain form is additionally served directly as `ctx.storageDomain`.
-- Misconfiguration fails loud with a stable `StorageError` code instead of silently deferring: an unknown backend name, a form read before its owner mounts, or a duplicate registration all throw.
+- マウント済みバックエンドは名前で解決されるため、出荷済み両バックエンドを持つ構成は各ドメインを構成でいずれの媒体にもルーティングできる。
+- マウント済みデータ形式は `ctx.storage.<form>` として解決される。ドメイン形式はさらに `ctx.storageDomain` として直接提供される。
+- 誤構成は黙って先送りせず安定した `StorageError` コードで loud に失敗する。未知バックエンド名、所有者マウント前の形式読み取り、重複登録はいずれも throw する。
 
-### Failures and recovery
+### 失敗と回復
 
-- `backend-not-found` — the domain form routes to a backend that is not mounted; add the backend package. The form waits for every configured backend to register, so row order is not a failure mode.
-- `form-not-mounted` — a consumer reads `ctx.storage.domain` before `dsh-storage-domain` loads; mount the domain row before the consumer.
-- `duplicate-backend` / `duplicate-mount` — the same name or form registers twice; that is a composition bug and fails loud.
+- `backend-not-found` — ドメイン形式がマウントされていないバックエンドにルーティングする。バックエンドパッケージを追加すること。形式は構成済みすべてのバックエンド登録を待つため、行順は失敗要因にならない。
+- `form-not-mounted` — `dsh-storage-domain` 読み込み前にコンシューマーが `ctx.storage.domain` を読む。コンシューマーの前にドメイン行をマウントすること。
+- `duplicate-backend` / `duplicate-mount` — 同じ名前や形式を 2 回登録する。これは構成バグであり loud に失敗する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The hub is a pure registration table with two faces, designed so backends and data forms stay replaceable without the hub knowing their internals.
+ハブは純粋な登録テーブルであり 2 つの面を持ち、バックエンドとデータ形式がハブに内部を知られず置換可能であり続けるよう設計されている。
 
-### Design concept
+### 設計概念
 
-- **Backends own media, data forms own semantics.** The hub never performs IO; it only holds the name → backend table and the form-name → facility map. Backend packages register their medium owner, data-form packages mount their facility, and neither needs the other's details.
-- **Multiple backends stay side by side.** Which backend serves which consumer is the consumer's configuration (the domain form's route table), never a hub-global either-or.
-- **Registration and mounting are effects.** `register()` and `mount()` return disposers; disposal removes only that registration's contribution, and does not close the backend — the owning plugin closes it after unregistering.
-- **Activation cannot race registration.** Each backend plugin also publishes a lifecycle-only service key (`storage.backend.<name>`); form providers inject those keys, so the domain form activates only after every configured backend registers, while callers still resolve backends by name through the hub.
+- **バックエンドは媒体を所有し、データ形式は意味を所有する。** ハブは IO を決して行わず、名前→バックエンドテーブルと形式名→機能マップを保持するだけである。バックエンドパッケージは自身の媒体所有者を登録し、データ形式パッケージは自身の機能をマウントし、互いの詳細を必要としない。
+- **複数バックエンドは並存する。** どのバックエンドがどのコンシューマーに仕えるかはコンシューマーの構成（ドメイン形式のルートテーブル）であり、ハブ全体の二者択一では決してない。
+- **登録とマウントはエフェクトである。** `register()` と `mount()` は破棄子を返す。破棄はその登録の寄与だけを除去し、バックエンドを閉じない。所有プラグインが登録解除の後に閉じる。
+- **有効化は登録と競合できない。** 各バックエンドプラグインはライフサイクル専用サービスキー（`storage.backend.<name>`）も公開する。形式プロバイダーはそれらのキーを inject するため、ドメイン形式は構成済みすべてのバックエンド登録の後にのみ有効化され、呼び出し元は依然としてハブ経由で名前によりバックエンドを解決する。
 
-### The backend contract
+### バックエンド契約
 
-[`src/backend.ts`](src/backend.ts) is the normative contract for backend implementers, checked clause by clause by the shared conformance suite in `tests/contract.ts`. A backend owns exactly one medium and exposes optional data-shape facets; `kv` is the only facet, and opening a unit yields a versioned, globally-singleton schema handle whose single calls are atomic and durable once resolved. Unit and table names must match `UNIT_NAME_RE`; record keys are arbitrary strings that never reach file paths. The unit does not serialize concurrent writes — ordering belongs to the caller — and a stored version differing from the descriptor rejects `version-mismatch` (no migration).
+[`src/backend.ts`](src/backend.ts)はバックエンド実装者向けの規範契約であり、`tests/contract.ts` の共有適合スイートが条項ごとに検査する。バックエンドは正確に 1 つの媒体を所有し、任意のデータ形状ファセットを公開する。`kv` が唯一のファセットであり、ユニットを開くとバージョン付き・全体単一のスキーマハンドルが生まれ、その単一呼び出しは解決後に原子性と耐久性を持つ。ユニット名とテーブル名は `UNIT_NAME_RE` に一致しなければならず、レコードキーはファイルパスに決して届かない任意文字列である。ユニットは並行書き込みを直列化せず、順序は呼び出し元に属し、記述子と異なる格納バージョンは `version-mismatch` を拒む（移行なし）。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Storage` service, form mounting, `StorageForms` map |
-| [`src/registry.ts`](src/registry.ts) | `BackendRegistry`: name → backend table, registration disposers |
-| [`src/backend.ts`](src/backend.ts) | The backend contract: facets, units, `UNIT_NAME_RE` |
-| [`src/error.ts`](src/error.ts) | `StorageError` codes shared by the hub and every backend |
-| [`tests/contract.ts`](tests/contract.ts) | The shared conformance suite run against each backend |
+| [`src/index.ts`](src/index.ts) | プラグイン入口: `Storage` サービス、形式マウント、`StorageForms` マップ |
+| [`src/registry.ts`](src/registry.ts) | `BackendRegistry`: 名前→バックエンドテーブル、登録破棄子 |
+| [`src/backend.ts`](src/backend.ts) | バックエンド契約: ファセット、ユニット、`UNIT_NAME_RE` |
+| [`src/error.ts`](src/error.ts) | ハブとすべてのバックエンドが共有する `StorageError` コード |
+| [`tests/contract.ts`](tests/contract.ts) | 各バックエンドに対して実行する共有適合スイート |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the hub's view is not enough: the subsystem reference is the authoritative contract, and the Agent Note records the family design and its deferred work.
+ハブの視点では足りないときに、これらのページを読む。サブシステムリファレンスが権威契約であり、Agent Note がファミリー設計と先送り作業を記録する。
 
-- [Storage subsystem](../../../docs/subsystems/storage.md) — the backend contract, domain semantics, change events, and generated API.
-- [Storage package map](../README.md) — the family's packages and their repository position.
-- [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — the design behind the hub, the domain form, and the session-backend migration.
+- [Storage サブシステム](../../../docs/subsystems/storage.md) — バックエンド契約、ドメイン意味、変更イベント、生成 API。
+- [Storage パッケージマップ](../README.md) — ファミリーのパッケージとリポジトリ位置。
+- [domain KV ストレージ Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — ハブ、ドメイン形式、セッションバックエンド移行の背後にある設計。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Backend and form registrations
+### バックエンドと形式の登録
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing. `ctx.storage` is a host-side registration table: the hub registers no tools, injects no prompts, and writes no session events, so no request field ever carries this package's data.
+何もない。`ctx.storage` は host 側登録テーブルである。ハブはツールを登録せず、プロンプトを注入せず、セッションイベントを書かないため、このパッケージのデータがリクエストフィールドに運ばれることはない。
 
-#### Token effect
+#### トークンへの影響
 
-Zero direct tokens on every request.
+すべてのリクエストで直接トークンゼロである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Independent of live requests: the hub never touches a request prefix, so it cannot invalidate provider cache reuse.
+ライブリクエストから独立している。ハブはリクエストプレフィックスに決して触れないため、プロバイダーキャッシュ再利用を無効化できない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the hub cannot do. They are current package constraints, not a task backlog.
+ハブにできないことを定める。これらは現在のパッケージ制約であり、タスク backlog ではない。
 
-- **`kv` is the only data shape** — a backend implements one facet; the `log` facet for session event logs is deferred to the session-backend migration ([Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md)).
-- **Forms resolve lazily** — reading `ctx.storage.domain` before the domain plugin mounts throws `form-not-mounted`; assemblies order plugins accordingly rather than silently deferring.
+- **`kv` が唯一のデータ形状** — バックエンドは 1 ファセットを実装する。セッションイベントログ向け `log` ファセットはセッションバックエンド移行へ先送り（[Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md)）。
+- **形式は遅延解決される** — ドメインプラグインのマウント前に `ctx.storage.domain` を読むと `form-not-mounted` を throw する。黙って先送りせず、アセンブリはそれに応じてプラグインを順序付ける。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

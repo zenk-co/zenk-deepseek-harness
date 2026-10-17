@@ -1,55 +1,55 @@
 ---
-description: "The skill group map: reusable agent instructions discovered from providers and loaded through the session catalog and skill tool, for users and maintainers navigating the group."
+description: "skill グループマップ: プロバイダーから検出し、セッションカタログと skill ツール経由で読み込む再利用可能なエージェント指示。"
 kind: "package-group"
 ---
 
-# skill/ — skill capability family
+# skill/ — skill ケイパビリティファミリー
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The skill family lets agents and users discover and load reusable task instructions only when needed. Use `skill/` to combine catalogs and expose one instruction set per name; choose `skill-filesystem` for project, custom, or user-directory discovery, `skill-office` for Word, PowerPoint, and Excel workflows. Add `tool-skill` when models should receive a sorted, durable session catalog, load full instructions through the `skill` tool, or accept direct `/name` invocation. Different sources produce the same model-visible format, and model access requires at least one source.
+skill ファミリーにより、エージェントとユーザーは再利用可能なタスク指示を必要なときだけ検出して読み込める。カタログを結合して名前ごとに1つの指示セットを公開するには `skill/` を使い、プロジェクト・カスタム・ユーザーディレクトリーの検出には `skill-filesystem`、Word・PowerPoint・Excel ワークフローには `skill-office` を選ぶ。モデルにソート済みで durable なセッションカタログを提供し、`skill` ツール経由で全文指示を読み込み、`/name` による直接呼び出しを受け付けるには `tool-skill` を追加する。異なるソースも同じモデル可視形式を生成し、モデルアクセスには少なくとも1つのソースが必要である。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`skill/`](skill/README.md) | Registry that merges skill catalogs from any provider and resolves the winning skill for a name | `ctx.skills` |
-| [`skill-filesystem/`](skill-filesystem/README.md) | Discovers skills from project, custom, and user directories and watches them for changes | registers on `ctx.skills` |
-| [`skill-office/`](skill-office/README.md) | Bundles Word, PowerPoint, and Excel workflows with structural file checks | registers on `ctx.skills` |
-| [`tool-skill/`](tool-skill/README.md) | Publishes the session skill catalog and the model-facing `skill` loader tool | registers on `ctx.tools` |
-| [`tool-workspace-dependencies/`](tool-workspace-dependencies/README.md) | Reports bundled Office interpreter paths and versions for Desktop and SDK carriers | registers on `ctx.tools` |
+| [`skill/`](skill/README.md) | 任意のプロバイダーからの skill カタログを統合し、名前に対する勝者を解決するレジストリー | `ctx.skills` |
+| [`skill-filesystem/`](skill-filesystem/README.md) | プロジェクト、カスタム、ユーザーディレクトリーから skill を検出し、変更を監視する | `ctx.skills` に登録する |
+| [`skill-office/`](skill-office/README.md) | Word、PowerPoint、Excel ワークフローを構造化ファイルチェック付きで束ねる | `ctx.skills` に登録する |
+| [`tool-skill/`](tool-skill/README.md) | セッション skill カタログとモデル向け `skill` ローダーツールを公開する | `ctx.tools` に登録する |
+| [`tool-workspace-dependencies/`](tool-workspace-dependencies/README.md) | Desktop および SDK キャリア向けにバンドル済み Office インタープリターのパスとバージョンを報告する | `ctx.tools` に登録する |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Start with the subsystem reference for the shared vocabulary, then read the Agent Notes for the design rationale.
+共有語彙はサブシステムリファレンスから、設計根拠は Agent Note から読み進めること。
 
-- [Skill subsystem reference](../../docs/subsystems/skills.md) — the registry, provider contract, local discovery priority, and the catalog and tool.
-- [Skill invocation policy reference](skill/README.md) — the model and user invocation controls.
+- [Skill サブシステムリファレンス](../../docs/subsystems/skills.md) — レジストリー、プロバイダー契約、ローカル検出の優先度、カタログとツール。
+- [Skill 呼び出しポリシーリファレンス](skill/README.md) — モデルとユーザーの呼び出し制御。
 
 -----
 
-See [`skill-badge`](../experimental/skill-badge/README.md) for the experimental optional capability.
+[`skill-badge`](../experimental/skill-badge/README.md) については実験的なオプショナルケイパビリティを参照すること。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

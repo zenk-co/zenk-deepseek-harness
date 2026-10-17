@@ -1,12 +1,12 @@
-# Plugin configuration
+# プラグイン設定
 
-English | [中文](config.zh.md)
+日本語 | [English](config.en.md) | [中文](config.zh.md)
 
-Accept configuration supplied through `cordis.yml`.
+`cordis.yml` 経由で提供される設定を受け付ける。
 
-## Define the Config type
+## Config 型を定義する
 
-Export a `Config` type and a same-named Schemastery schema. Put defaults directly on the schema fields:
+`Config` 型と同名の Schemastery スキーマをエクスポートする。デフォルトはスキーマフィールドに直接置く:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -31,7 +31,7 @@ export function apply(ctx: Context, config: Config) {
 }
 ```
 
-Add the configuration to the inserted local plugin row in `scratch-plugin/cordis.yml`:
+挿入済みローカルプラグイン行の設定を `scratch-plugin/cordis.yml` に追加する:
 
 ```yaml
 - insert:
@@ -42,11 +42,11 @@ Add the configuration to the inserted local plugin row in `scratch-plugin/cordis
         maxRetries: 5
 ```
 
-When loading the plugin, Cordis uses the exported schema to validate configuration and fill defaults. Do not export a plain object as `Config`; it does not implement the Standard Schema interface required by Cordis.
+プラグイン読み込み時、Cordis はエクスポートされたスキーマを使用して設定を検証し、デフォルトを補完する。プレーンオブジェクトを `Config` としてエクスポートしてはならない。Cordis が要求する Standard Schema インターフェースを実装していないためである。
 
-## Schema validation
+## スキーマ検証
 
-Use Schemastery to express stricter validation:
+より厳密な検証を表現するには Schemastery を使用する:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -71,13 +71,13 @@ export function apply(ctx: Context, config: Config) {
 }
 ```
 
-The schema runs while the plugin loads. Invalid configuration fails the load with an actionable error.
+スキーマはプラグイン読み込み中に実行される。不正な設定は、対処可能なエラーで読み込みを失敗させる。
 
-## Design principles
+## 設計原則
 
-### Do not hardcode tunable values
+### 調整可能な値をハードコードしない
 
-Harness requires **anything that two deployments may want to set differently to be a configuration field**.
+Harness では**2 つのデプロイが異なる値に設定したい可能性のあるものはすべて設定フィールドにすること**が求められる。
 
 ```ts
 // Wrong: hardcoded timeout.
@@ -89,18 +89,18 @@ export interface Config {
 }
 ```
 
-The test is whether `cordis.yml` can change the value without a code edit.
+テストは、その値をコード編集なしに `cordis.yml` で変更できるかどうかである。
 
-### Fail loudly on invalid configuration
+### 不正な設定は大きな失敗にする
 
-Express self-contained constraints in the schema so invalid configuration fails while the plugin loads. References to services or registered resources require dependency injection; the [services tutorial](../framework/service.md) introduces that contract.
+自己完結した制約はスキーマで表現し、不正な設定がプラグイン読み込み中に失敗するようにする。サービスや登録済みリソースへの参照には依存性注入が必要である。その契約は[サービスチュートリアル](../framework/service.md)で説明する。
 
-## Work with HMR
+## HMR と共に働く
 
-A configuration edit hot-replaces the plugin: the framework unloads the old instance and loads a new one. Because registrations are effects and clean themselves up, replacement does not retain the old instance's registrations.
+設定編集によりプラグインはホット置換される。フレームワークは古いインスタンスをアンロードして新しいものを読み込む。登録はエフェクトであり自身をクリーンアップするため、置換によって古いインスタンスの登録が残ることはない。
 
-## Next steps
+## 次のステップ
 
-- [Package and install a plugin](./publish.md) — ship the plugin as an installable package
-- [Plugins and lifecycle](../framework/index.md) — understand the full plugin lifecycle
-- [Services and dependencies](../framework/service.md) — provide a service to other plugins
+- [プラグインをパッケージしてインストールする](./publish.md) — プラグインをインストール可能なパッケージとして出荷する
+- [プラグインとライフサイクル](../framework/index.md) — 完全なプラグインライフサイクルを理解する
+- [サービスと依存関係](../framework/service.md) — 他のプラグインにサービスを提供する

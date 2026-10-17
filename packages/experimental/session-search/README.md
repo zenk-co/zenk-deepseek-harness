@@ -5,78 +5,78 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-session-search
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Give every Agent five experimental read-only global tools to search earlier sessions. The content index opens on the first search and is shared by all Agents. The bundle ships switched off in Web and Desktop. Select it in Plugins to enable it.
+すべてのエージェントに、過去セッションを検索する 5 つの実験的読み取り専用グローバルツールを提供する。内容インデックスは最初の検索時に開かれ、すべてのエージェントで共有される。バンドルは Web と Desktop でオフのまま出荷される。有効にするには Plugins で選択する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-In Web or Desktop, open Plugins and enable **Session search** in Official. Switch it off to remove its profile layer.
+Web または Desktop で Plugins を開き、Official 内の **Session search** を有効にする。オフに切り替えるとプロファイル層が除去される。
 
-Enabling or disabling the bundle registers or removes its global tools in the running Host, so every Agent sees the change on its next request, in every preset including minimal.
+バンドルの有効化・無効化により、実行中 Host 内でグローバルツールが登録・除去される。そのため minimal を含むすべてのプリセットで、すべてのエージェントが次のリクエストで変更を認識する。
 
-This bundle enables Agent search tools. Sidebar search keeps its existing behavior.
+このバンドルはエージェント検索ツールを有効にする。サイドバー検索は既存動作を保持する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation details — click to expand</summary>
+<summary>実装詳細 — クリックで展開</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) inserts the Host group `optional-session-search`, which registers the tools in the global tool layer. Later profile patches can override its rows by id. The [profile composer](../../boot/app-boot/README.md) owns patch ordering and errors.
+[`cordis.patch.yml`](cordis.patch.yml)は Host グループ `optional-session-search` を挿入し、グローバルツール層にツールを登録する。後のプロファイルパッチは行を id でオーバーライドできる。[プロファイルコンポーザー](../../boot/app-boot/README.md)がパッチ順序とエラーを所有する。
 
-The group owns an isolated `sessionQuery` provider with a lazy `:memory:` index, released when the bundle is switched off. The host's metadata service keeps `openAt: never`.
+グループは遅延 `:memory:` インデックスを持つ分離 `sessionQuery` プロバイダーを所有し、バンドルをオフにすると解放される。ホストのメタデータサービスは `openAt: never` を保持する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-[Capability implementation](../tool-session-query/README.md)
+[ケイパビリティ実装](../tool-session-query/README.md)
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the [capability implementation](../tool-session-query/README.md), which owns model context and results.
+[ケイパビリティ実装](../tool-session-query/README.md)を通じて間接的に関与する。同実装がモデルコンテキストと結果を所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The layer adds no request content directly; the capability implementation owns cache effects from tools, prompts, and results. Toggling the bundle changes the tool list of live Sessions, which invalidates their cached request prefix once.
+層はリクエスト内容を直接追加しない。ツール・プロンプト・結果からのキャッシュ効果はケイパビリティ実装が所有する。バンドルの切り替えによりライブセッションのツールリストが変わり、キャッシュ済みリクエストプレフィックスが 1 回無効になる。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- The bundle keeps one in-memory index after the first search. The index is rebuilt after restarting the application or switching the bundle off and on. Search remains restricted to authorized workspaces.
+- バンドルは最初の検索後に 1 つのインメモリインデックスを保持する。インデックスはアプリケーション再起動後、またはバンドルのオフ・オン切り替え後に再構築される。検索は認可されたワークスペースに限定されたままである。
 
 -----
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Maintainer context — click to expand</summary>
+<summary>メンテナー向けコンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

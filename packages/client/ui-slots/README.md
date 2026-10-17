@@ -1,111 +1,109 @@
 ---
-description: "Slot registry pure core for the dsh web client: ordinary extension slots, reusable Component Factories, derived props types, store seats, and the renderer install contract."
+description: "dsh Web クライアント向けスロットレジストリ純粋コア。通常拡張スロット、再利用可能コンポーネントファクトリー、導出 props 型、ストア席、レンダラー導入契約。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-client-ui-slots
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-client-ui-slots` lets web client plugins define and compose typed UI regions. Ordinary Slots provide parent-owned extension positions; Component Factories provide reusable assemblies with caller-selected local Components. Both APIs derive scoped state, injection, locale, and child-render props from declaration-merged types and report conflicting definitions during plugin loading. Pair this React-free package with `ui-renderer` when the client needs rendering.
+`dsh-client-ui-slots` を使うと、Web クライアントプラグインは型付き UI 領域を定義・合成できる。通常スロットは親所有の拡張位置を提供し、コンポーネントファクトリーは呼び出し元選択のローカルコンポーネントを持つ再利用可能アセンブリを提供する。両 API は宣言マージ型からスコープ付き状態・注入・ロケール・子描画 props を導出し、プラグイン読み込み中に競合定義を報告する。クライアントに描画が必要な場合は、この React フリーのパッケージを `ui-renderer` と対にする。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Compose UI through this package whenever you write a client plugin: register a component into a slot your parent declared, or declare child slots your component renders. The four kinds cover the composition shapes — `single` (one occupant), `list` (ordered entries), `keyed` (dispatch by a key), and `chain` (entries elect themselves).
+クライアントプラグインを書くときは常にこのパッケージ経由で UI を合成する。親が宣言したスロットにコンポーネントを登録するか、自身のコンポーネントが描画する子スロットを宣言する。4 種類が合成形状をカバーする。`single`（占有者 1 件）、`list`（順序付きエントリ）、`keyed`（キーによる振分）、`chain`（エントリが自薦）である。
 
-### Reusable Component Factories
+### 再利用可能コンポーネントファクトリー
 
-A designer may choose a Component Factory for a component or assembly they consider reusable, even with one current caller; unrelated parents, separate packages, and additional injection or local slots are not prerequisites. A one-off component need not use a Factory. Declare its complete type in `SlotFactoryMap`, install the definition with `ctx.slots.registerFactory()`, render occurrences through the injected `renderFactorySlot()`, and select each declared local Component through the call's `slots` option. The definition reads that choice through `useFactorySlot(name, fallback)`.
+デザイナーは、再利用可能と考えるコンポーネントやアセンブリに、現在の呼び出し元が 1 件でもコンポーネントファクトリーを選べる。無関係な親、別パッケージ、追加の注入やローカルスロットは前提条件ではない。単発コンポーネントはファクトリーを使う必要はない。完全な型を `SlotFactoryMap` で宣言し、定義を `ctx.slots.registerFactory()` で導入し、出現を注入済み `renderFactorySlot()` 経由で描画し、宣言済み各ローカルコンポーネントを呼び出しの `slots` オプション経由で選択する。定義はその選択を `useFactorySlot(name, fallback)` 経由で読む。
+ファクトリー `children` は通常のグローバルスロットのまま `SlotMap` に一致しなければならず、ローカル `slots` は出現ごとにコンポーネントを 1 件選択する。出現は描画位置スコープを継承し、`renderFactorySlot()` はセッション identity を受け付けない。共有ストアハンドルは通常スコープ解決を使う。ストアファクトリーは出現が最初に実体化するまで遅延のままであり、その描画位置向けにハンドルを 1 件作り、出現をまたいで衝突する永続ストア仕様を拒む。
 
-Factory `children` remain ordinary global Slots and must match `SlotMap`, while local `slots` select one Component per occurrence. An occurrence inherits its render-position scope; `renderFactorySlot()` does not accept a Session identity. Shared Store handles use ordinary scope resolution. A Store factory stays lazy until an occurrence first materializes, then creates one handle for that render position and rejects a persistent Store spec whose key would collide across occurrences.
+### 5 つのフレームワーク props 共有
 
-### The five framework props shares
+登録済みすべてのコンポーネントは 5 つのフレームワーク共有から合成された props を受け取る。ランタイム共有（親の描画呼び出し位置由来 `owner` とセッション標準キット・グローバル席）、子描画共有（宣言子へ静的に絞られた `renderSlot`）、ファクトリー描画共有（`renderFactorySlot`）、ストア共有（宣言ハンドルのセレクターフックと draft 除去済みアクション）、業務共有（`inject` から推論）である。コンポーネントは導出 props 別名を参照し、共有をローカルに再型付けしない。
+オープンキー標準フックは `useName(key, selector?, equal?)` として呼ばれ、`useName(key, member)` も受け付ける。文字列第 2 引数は `KeyedStandardSource` リゾルバーの `(key, member)` ソースをセレクターなしに読む。リゾルバーはそのソース生存中に同じ引数へ同じソースオブジェクトを返す。
 
-Every registered component receives props composed from five framework shares: the runtime share (`owner` from the parent's render call site, plus the session standard kit and global seat), the child-render share (`renderSlot` statically narrowed to declared children), the Factory-render share (`renderFactorySlot`), the store share (the declared handle's selector hook and draft-stripped actions), and the business share (inferred from `inject`). Components reference the derived props aliases; they never re-type a share locally.
+### ストア席
 
-An open-key standard Hook, called as `useName(key, selector?, equal?)`, also accepts `useName(key, member)`: a string second argument reads the `KeyedStandardSource` resolver's `(key, member)` source without a selector. The resolver returns the same source object for the same arguments while that source is live.
+登録呼び出しは `store: defineStore(...)` でストア席を宣言できる。`init` は状態スキーマを推論し、`actions` は完全な draft 変換書き込み集合である。コンポーネントはセレクターフック経由で読み、焼き込み済みコールバック経由で書く。`defineStore` のエンジン実装はランタイムパッケージにあり、ここで公開する `DefineStore` 契約を満たす。
 
-### Store seats
+### 宣言規律
 
-A register call may declare a store seat with `store: defineStore(...)`: `init` infers the state schema and `actions` is the complete draft-transform write set. Components read through the selector hook and write through the baked callbacks; the engine implementation of `defineStore` lives in the runtime package and satisfies the `DefineStore` contract exported here.
-
-### Declaration discipline
-
-Declaring a slot is claiming it: the registering entry becomes the only entry allowed to render that key, and registering into an undeclared slot, declaring an already-declared child, mounting one shared handle under two scopes, or registering a chain without `select` throws at load. An entry's disposer collapses its declared child slots recursively — ledger rows, contributions, and store mounts die on one lifecycle axis.
+スロット宣言は主張である。登録エントリはそのキーを描画できる唯一のエントリとなり、未宣言スロットへの登録、既宣言子の再宣言、2 スコープ下での 1 共有ハンドルのマウント、`select` なし chain 登録は読み込み時に throw する。エントリの破棄子は宣言子スロットを再帰的に畳む。台帳行、寄与、ストアマウントは 1 つのライフサイクル軸で死ぬ。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The ordinary Slot design is one table: declaration = render authorization = runtime spec. `SlotMap` is declared empty here and merged by consumers via `declare module` augmentation, exactly like `SlotFactoryMap` and the standard-kit interfaces (`SessionStandardProps`, `GlobalStandardProps`). Factory definitions use a separate single-definition ledger because their occurrences have no parent declaration.
+通常スロット設計は 1 テーブルである。宣言＝描画認可＝ランタイム仕様である。`SlotMap` はここでは空に宣言され、消費者が `declare module` 拡張経由でマージする。`SlotFactoryMap` や標準キットインターフェース（`SessionStandardProps`、`GlobalStandardProps`）とまったく同じである。ファクトリー定義は別個の単一定義台帳を使う。出現に親宣言がないためである。
 
-### Registration and routing
+### 登録とルーティング
 
-`SlotCore` seeds the a-priori `'root'` slot at construction and enforces load-time validation. `ChainSelect` selectors run in ascending `priority` order (ties in registration order); the first non-null return elects its entry and becomes the component's `matched` prop, and all-null falls to the owner's `renderSlotChain` fallback (`ChainRenderOpts`). Each key carries a declaration epoch that advances only on declaration and collapse; `ui-renderer` uses it for `ctx.slots.inject`, independently from ordinary entry versions. Live inspection uses strict `type: 'slot' | 'factory'` nodes and nests Factory-owned child Slots under their definition.
+`SlotCore` は構築時にアプリオリ `'root'` スロットを植え、読み込み時検証を強制する。`ChainSelect` セレクターは昇順 `priority` 順に実行し（同点は登録順）、最初の非 null 戻りがそのエントリを選出してコンポーネントの `matched` prop となり、全 null は所有者の `renderSlotChain` フォールバック（`ChainRenderOpts`）に落ちる。各キーは宣言と畳みにのみ進む宣言エポックを運び、`ui-renderer` は通常エントリバージョンから独立にそれを `ctx.slots.inject` に使う。ライブ検査は厳密な `type: 'slot' | 'factory'` ノードを使い、ファクトリー所有の子スロットをその定義下にネストする。
 
-### The renderer contract
+### レンダラー契約
 
-`renderer.ts` carries the installation contract (`SlotRenderer`, `SlotRendererHost`) plus `StaleAuthorizationError`/`SlotOwnershipError`; ui-renderer owns both the implementation and its plugin-lifecycle installation. Engine products and the renderer host contract carry bare snapshot sources (`getSnapshot`/`subscribe`), never React hooks — hook binding belongs to the render machinery. Factory crashes use the ordinary supervision channel, and an idempotent effect retains per-position Store handles only after commit.
+`renderer.ts` は導入契約（`SlotRenderer`、`SlotRendererHost`）と `StaleAuthorizationError`/`SlotOwnershipError` を運ぶ。ui-renderer が実装とそのプラグインライフサイクル導入の両方を所有する。エンジン成果物とレンダラー host 契約は素のスナップショットソース（`getSnapshot`/`subscribe`）を運び、React フックは決して運ばない。フック結合は描画機構に属する。ファクトリークラッシュは通常監督チャネルを使い、冪等エフェクトはコミット後にのみ位置ごとのストアハンドルを保持する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the engine, the renderer, and the composition model.
+これらのページはエンジン、レンダラー、合成モデルを扱う。
 
-- [ui-renderer](../ui-renderer/README.md) — the React slot renderer implementing this package's install contract.
-- [Slot system standard](../../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) — the definitive composition model.
-- [Component Factories](../../../.agents/notes/implemented/architecture/2026-09-10-component-factories-and-local-slots.md) — reusable definitions, local Component selection, and occurrence lifetimes.
-- [Web client architecture](../../../docs/subsystems/web-client.md) — the loading chain and object layer this registry plugs into.
+- [ui-renderer](../ui-renderer/README.md) — このパッケージの導入契約を実装する React スロットレンダラー。
+- [スロットシステム標準](../../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) — 決定的合成モデル。
+- [コンポーネントファクトリー](../../../.agents/notes/implemented/architecture/2026-09-10-component-factories-and-local-slots.md) — 再利用可能定義、ローカルコンポーネント選択、出現寿命。
+- [Web クライアントアーキテクチャ](../../../docs/subsystems/web-client.md) — このレジストリが差さる読み込み連鎖とオブジェクト層。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+なし。このパッケージはモデル向けに何も登録しないブラウザー側 UI プラグイン層であるためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組立も送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the registry's scaling behavior and accepted type noise; they are current package constraints.
+レジストリのスケーリング動作と受容済み型ノイズを定める。これらは現在のパッケージ制約である。
 
-- **`isLive` scans all records linearly** — fine at UI-plugin registration counts (tens); revisit with an entry→record backref if ledgers ever grow hot.
-- **The `__renders` phantom anchor is visible on `PropsRenderSlots`** — the same accepted noise as the type-chain design's `__accepts`: generic method signatures compare loosely across key unions, so the contravariant marker is what enforces "component key set ⊆ children declaration".
+- **`isLive` は全レコードを線形走査する** — UI プラグイン登録数（数十件）では問題ない。台帳がホットになることがあればエントリ→レコード逆参照で見直す。
+- **`__renders` ファントムアンカーは `PropsRenderSlots` に可視である** — 型連鎖設計の `__accepts` と同じ受容済みノイズである。汎用メソッドシグネチャはキー和集合をまたいで緩く比較するため、反変マーカーが「コンポーネントキー集合 ⊆ 子宣言」を強制するものである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

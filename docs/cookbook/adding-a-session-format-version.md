@@ -1,104 +1,104 @@
-# Cookbook: adding a Session log format version
+# クックブック: セッションログフォーマットのバージョンを追加する
 
-English | [中文](adding-a-session-format-version.zh.md)
+日本語 | [English](adding-a-session-format-version.en.md) | [中文](adding-a-session-format-version.zh.md)
 
-## Summary
+## 概要
 
-Use this tutorial to introduce the next Session log format version without rewriting released data. Read the [version and release-status authority](../session-format-status.md) to identify the checkout writer and the latest released format. Let N denote that verified released format and N+1 the target; substitute numeric values for these placeholders in names and metadata. Start with a working contributor checkout and read the [package checklist](adding-a-package.md), [format library](../../packages/session/session-format/README.md), and [released-format decision](../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md).
+このチュートリアルは、リリース済みデータを書き換えずに次のセッションログフォーマットのバージョンを導入するために使う。[バージョンとリリース状況の権威](../session-format-status.md)を読んで、チェックアウトのライターと最新のリリース済みフォーマットを特定する。N はその検証済みのリリース済みフォーマット、N+1 はターゲットを表す。名前やメタデータの中では、これらのプレースホルダーを実際の数値に置き換える。動作するコントリビューターチェックアウトから始め、[パッケージチェックリスト](adding-a-package.md)、[フォーマットライブラリ](../../packages/session/session-format/README.md)、[リリース済みフォーマットの決定](../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md)を読む。
 
-## Table of Contents
+## 目次
 
-- [1. Choose the version and release base](#choose-the-version)
-- [2. Add an identity edge](#add-an-identity-edge)
-- [3. Implement per-artifact stages and validation](#stages-and-validation)
-- [4. Update current-version consumers](#current-version-consumers)
-- [5. Create snapshot successors](#snapshot-successors)
-- [6. Validate the integrated result](#validate)
-- [Developer V4 corpus trial](#v4-corpus-trial)
-- [Dev Note](#dev-note)
+- [1. バージョンとリリースベースを選ぶ](#choose-the-version)
+- [2. identity エッジを追加する](#add-an-identity-edge)
+- [3. 成果物ごとのステージと検証を実装する](#stages-and-validation)
+- [4. 現行バージョンの Consumer を更新する](#current-version-consumers)
+- [5. スナップショットの後継を作成する](#snapshot-successors)
+- [6. 統合結果を検証する](#validate)
+- [開発者向け V4 コーパス試行](#v4-corpus-trial)
+- [開発ノート](#dev-note)
 
 <a id="choose-the-version"></a>
-## 1. Choose the version and release base
+## 1. バージョンとリリースベースを選ぶ
 
-Bump the format only when an effective discriminator cannot prevent unsafe interpretation. A structural change to headers, event envelopes, event semantics, or reconstruction requires assessment under the [reader-compatibility rule](../../.agents/notes/implemented/process/2026-10-08-session-reader-compatibility-review.md), not an automatic bump. Record safe same-version evolution through the [type-change procedure](reviewing-persistence-type-changes.md). Distinguish the Session format integer from package release versions, SQLite schema versions, projection-unit versions, and protocol-wrapper versions.
+フォーマットをバンプするのは、有効な判別子が安全でない解釈を防げない場合に限る。ヘッダー、イベントエンベロープ、イベントセマンティクス、再構築への構造変更には、自動バンプではなく[リーダー互換性ルール](../../.agents/notes/implemented/process/2026-10-08-session-reader-compatibility-review.md)の下での評価が必要である。安全な同一バージョン内の進化は[型変更手順](reviewing-persistence-type-changes.md)で記録する。Session フォーマットの整数は、パッケージのリリースバージョン、SQLite スキーマバージョン、射影ユニットのバージョン、プロトコルラッパーのバージョンと区別する。
 
-Let N be the accepted or published version in [version/status](../session-format-status.md) when a bump is required. After accepted V4, that bump needs V5 even before V4 publication is recorded; reviewed same-version evolution does not require that step.
+バンプが必要なとき、N は[version/status](../session-format-status.md)にある承認済みまたは公開済みのバージョンとする。V4 が承認された後は、V4 の公開が記録される前であっても、そのバンプには V5 が必要である。レビュー済みの同一バージョン進化にはこのステップは不要である。
 
-Use a shared `release/*` integration base for N+1. The base change adds the writer, codec, catalog wiring, identity migration, and verification. Create each independent child branch from that base and target its PR at the release branch, not another independent child’s branch. Each child adds its structural transformation, validators, consumers, and tests to the same adjacent migration package. Do not allocate extra versions just to represent review order. Merge reviewed children into the release branch through PRs, then validate the combined result before release. Honor release-branch force-push and deletion protections; do not force-sync it.
+N+1 には共有の `release/*` 統合ベースを使う。ベースの変更でライター、コーデック、カタログの配線、identity マイグレーション、検証を追加する。各独立子ブランチはそのベースから作成し、PR は別の独立子のブランチではなくリリースブランチに向ける。各子はその構造変換、バリデーター、Consumer、テストを同じ隣接マイグレーションパッケージに追加する。レビュー順序を表すためだけに余分なバージョンを割り当てない。レビュー済みの子は PR を通じてリリースブランチにマージし、リリース前に統合結果を検証する。リリースブランチの force-push と削除の保護を守り、それを force-sync しない。
 
-Released codecs preserve accepted interpretations. A current-version codec can admit explicitly discriminated variants while retaining historical readability; do not broaden an older codec to admit a current feature. The N→N+1 converter may receive fixes or support additional historical cases after N+1 ships if its output remains compatible with N+1. A fix affects subsequent conversions, not existing N+1 successors. Document changed mappings and continued support for existing output; apply the reader-compatibility rule to any new target representation.
+リリース済みコーデックは承認された解釈を保持する。現行バージョンのコーデックは、歴史的な可読性を維持しつつ、明示的に判別されたバリアントを受け入れられる。現在の機能を受け入れるために古いコーデックを広げてはならない。N→N+1 コンバーターは、その出力が N+1 と互換であり続けるなら、N+1 の出荷後に修正を受けたり、追加の歴史的ケースをサポートしたりしてよい。修正は以後の変換に影響し、既存の N+1 後継には影響しない。変更されたマッピングと既存出力の継続サポートを文書化し、新しいターゲット表現にはリーダー互換性ルールを適用する。
 
-Same-version logs bypass adjacent migrations and can mix historical and newer record variants after resume. Each integer therefore identifies a family of supported representations, not one fixed schema. Owning readers must retain and distinguish those variants; the next outgoing migration must handle them. Do not add same-version migrations or rely on `restoreCurrent` alone for normalization: current-version JSONL reads using transformed validation bypass that hook. Use disposable, isolated Harness homes for interim integration formats; rerun changed adjacent conversions from unchanged historical input rather than rewriting a committed generation or using a real user's home.
+同一バージョンのログは隣接マイグレーションを迂回し、resume の後に歴史的バリアントと新しいバリアントが混在しうる。したがって各整数は、1 つの固定スキーマではなく、サポートされる表現のファミリーを識別する。所有するリーダーはそれらのバリアントを保持し区別しなければならず、次に出ていくマイグレーションがそれらを扱わなければならない。同一バージョンのマイグレーションを追加したり、正規化を `restoreCurrent` だけに頼ったりしない。transformed 検証を使う現行バージョンの JSONL 読み取りはこのフックを迂回する。暫定の統合フォーマットには使い捨ての隔離された Harness ホームを使い、変更された隣接変換は、コミット済み世代を書き換えたり実ユーザーのホームを使ったりするのではなく、変更されていない歴史的入力から再実行する。
 
-Before changing the writer, use the [archive command](../persistence-changes/historical-formats/README.md#maintenance) to preserve its complete persistence schema, then add the bilingual format reference under `docs/persistence-changes/historical-formats/vN.*`. Preserve all earlier records. The format coverage check requires every integer below the new writer to have its own document; the current generated catalog covers only the new writer.
+ライターを変更する前に、[アーカイブコマンド](../persistence-changes/historical-formats/README.md#maintenance)を使ってその完全な永続化スキーマを保存し、`docs/persistence-changes/historical-formats/vN.*` の下にバイリンガルのフォーマットリファレンスを追加する。それ以前のすべてのレコードを保持する。フォーマットカバレッジチェックは、新しいライターより下のすべての整数がそれぞれのドキュメントを持つことを要求する。現在の生成カタログは新しいライターのみを対象とする。
 
 <a id="add-an-identity-edge"></a>
-## 2. Add an identity edge
+## 2. identity エッジを追加する
 
-Follow the package checklist to create a library for N→N+1, not a mounted plugin. An identity body conversion is only an initial wiring scaffold. The [V2-to-V3 specification](../../packages/session/session-format-v2-to-v3/README.md#v2-to-v3-specification) is a fixed example of explicit transformations and preservation rules, not an edge to extend or treat as an identity conversion.
+パッケージチェックリストに従って、N→N+1 のライブラリを作成する（マウントされるプラグインではない）。identity 本体変換は初期の配線足場にすぎない。[V2-to-V3 仕様](../../packages/session/session-format-v2-to-v3/README.md#v2-to-v3-specification)は、明示的な変換と保持ルールの固定された例であり、拡張したり identity 変換として扱ったりするエッジではない。
 
-Declare `dsh.sessionFormatMigration` with numeric `from: N` and `to: N+1`, an export path, and the exported migration, source codec, target codec, target-header validator, and target restorer. Reuse the source codec exported by the preceding edge package and depend on that package; do not copy or redefine a released codec. Export the target codec and validators from the new package. Add the edge as a direct dependency of the catalog and add the workspace’s TypeScript paths and project references.
+`dsh.sessionFormatMigration` を、数値の `from: N` と `to: N+1`、エクスポートパス、そしてエクスポートされるマイグレーション、ソースコーデック、ターゲットコーデック、ターゲットヘッダーバリデーター、ターゲットリストアラーとともに宣言する。ソースコーデックは直前のエッジパッケージがエクスポートするものを再利用し、そのパッケージに依存する。リリース済みコーデックをコピーしたり再定義したりしない。ターゲットコーデックとバリデーターは新しいパッケージからエクスポートする。エッジをカタログの直接依存に追加し、ワークスペースの TypeScript paths とプロジェクト参照を追加する。
 
-Set `SESSION_FORMAT_VERSION` in [core Session types](../../packages/core/session/src/types.ts) to N+1 alongside the new edge declarations, then generate the catalog. The command below generates only the declared chain; it does not implement a new version:
+新しいエッジ宣言と同時に、[core Session types](../../packages/core/session/src/types.ts)の `SESSION_FORMAT_VERSION` を N+1 に設定し、カタログを生成する。以下のコマンドは宣言されたチェーンを生成するだけであり、新しいバージョンを実装するものではない:
 
 ```sh
 pnpm run gen-session-format-catalog
 ```
 
-The [generator](../../scripts/gen-session-format-catalog.ts) requires exactly one adjacent package for every step from zero to the writer version, matching directory/package names, matching adjacent codec exports, and declared dependencies. It rejects gaps, duplicate or extra edges, unknown metadata members, and a catalog that does not share Session through peer plus development dependencies. Fix the declarations rather than hand-editing `generated.ts`. The catalog is build-static; plugin mounting must not determine historical readability.
+[ジェネレーター](../../scripts/gen-session-format-catalog.ts)は、ゼロからライターのバージョンまでの各ステップにちょうど 1 つの隣接パッケージがあり、ディレクトリ名/パッケージ名、隣接コーデックのエクスポート、宣言された依存関係が一致することを要求する。ギャップ、重複または余分なエッジ、未知のメタデータメンバー、peer と開発依存を通じて Session を共有しないカタログをリジェクトする。`generated.ts` を手で編集するのではなく宣言を修正する。カタログはビルド静的であり、プラグインのマウントが歴史的な可読性を決めてはならない。
 
 <a id="stages-and-validation"></a>
-## 3. Implement per-artifact stages and validation
+## 3. 成果物ごとのステージと検証を実装する
 
-Use the [Stage interfaces](../../packages/session/session-format/src/types.ts), not a whole-artifact array-to-array migrator. An immutable `SessionFormatMigration` declaration supplies `migrateHeader`, `validateTargetHeader`, and `createStage`. Every call to `createStage` creates independent state for one source artifact. Keep counters, pending events, and reference maps there; never share a mutable stage across Sessions.
+[Stage インターフェース](../../packages/session/session-format/src/types.ts)を使い、成果物全体を配列から配列へ変換するマイグレーターは使わない。不変の `SessionFormatMigration` 宣言が `migrateHeader`、`validateTargetHeader`、`createStage` を提供する。`createStage` の各呼び出しは、1 つのソース成果物のための独立した状態を生成する。カウンター、保留中のイベント、参照マップはそこに保持し、可変のステージを Session 間で共有しない。
 
-Implement `transformEvent(event, context)`, `transformRun(run, context)`, and `finish(context)`. Emit synchronously through `context.emitEvent` or `context.emitRun`; a call can produce zero, one, or many outputs. Let a stage consume codec-owned compact runs directly, or iterate `run.expand()` without materializing an intermediate array. The caller owns scheduling, and the chain finishes upstream stages before downstream stages.
+`transformEvent(event, context)`、`transformRun(run, context)`、`finish(context)` を実装する。`context.emitEvent` または `context.emitRun` を通じて同期的に emit し、1 回の呼び出しは 0 個、1 個、または多数の出力を生成しうる。ステージはコーデック所有のコンパクト run を直接消費するか、中間配列を実体化せず `run.expand()` を反復する。スケジューリングは呼び出し側が所有し、チェーンは下流ステージより先に上流ステージを完了させる。
 
-Treat the inherited cut as a logical event count, not a physical row count. Expose `headerInheritedEventCount` only when it is known before EOF; `finish` returns the exact target cut. A preceding cardinality-changing edge can make that count unavailable at construction. Derive it from validated seed markers when required, and test seeded multi-hop restoration from each supported historical generation through N+1, not just direct N input. Never substitute zero for an unknown cut.
+継承カットは物理行数ではなく論理イベント数として扱う。`headerInheritedEventCount` は EOF より前に判明している場合にのみ公開し、`finish` が正確なターゲットカットを返す。先行する基数変更エッジは、構築時にそのカウントを利用不能にしうる。必要な場合は検証済みシードマーカーから導出し、直接の N 入力だけでなく、サポートされる各歴史的世代から N+1 までのシード済みマルチホップ復元をテストする。未知のカットをゼロで置き換えない。
 
-Define the new edge's event admission and transformation rules explicitly. The [V2-to-V3 source audit](../../packages/session/session-format-v2-to-v3/README.md#source-audit) and [alpha V0→V1 rule](../../.agents/notes/implemented/architecture/2026-08-31-alpha-historical-unknown-event-refusal.md) own the policies of those released edges, not the new edge. Do not generalize either to every edge. A change to structure or event positions requires classifying source events, payload members, and references, and explicitly deciding whether opaque data can remain valid. [Equal-version retention](../../.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.md) alone does not prove a structural transformation safe. Validate target semantics and give each newly accepted case a rejecting counterexample; never widen older edges to hide an unsupported transformation.
+新しいエッジのイベント受け入れと変換ルールを明示的に定義する。[V2-to-V3 ソース監査](../../packages/session/session-format-v2-to-v3/README.md#source-audit)と [alpha V0→V1 ルール](../../.agents/notes/implemented/architecture/2026-08-31-alpha-historical-unknown-event-refusal.md)は、それらのリリース済みエッジのポリシーを所有しており、新しいエッジのものではない。どちらもすべてのエッジに一般化しない。構造やイベント位置の変更には、ソースイベント、ペイロードメンバー、参照の分類と、不透明データが有効なままでいられるかの明示的な判断が必要である。[同一バージョン保持](../../.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.md)だけでは構造変換の安全を立証できない。ターゲットのセマンティクスを検証し、新たに受け入れる各ケースに拒否の反例を与える。サポートされない変換を隠すために古いエッジを広げない。
 
-Plugin records that `appendPluginRecord()` writes are ignorable events in the `plugin:` namespace, which experimental packages read back by type. Carry them forward under their names when the target format can represent them, and state in the edge README which records it drops otherwise; the [ignorable events decision](../../.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.md) keeps them on a best-effort basis. Apply this policy even when a stored record has no declaration in the [experimental persistence catalog](../experimental-persistence-catalog.md).
+`appendPluginRecord()` が書き込むプラグインレコードは `plugin:` 名前空間の無視可能なイベントであり、実験的パッケージが型で読み戻す。ターゲットフォーマットが表現できる場合はその名前のまま引き継ぎ、そうでなければどのレコードを落とすかをエッジ README に記載する。[無視可能イベントの決定](../../.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.md)はそれらをベストエフォートで保持する。保存されたレコードが[実験的永続化カタログ](../experimental-persistence-catalog.md)に宣言を持たない場合でも、このポリシーを適用する。
 
-Use native writer output as the conversion oracle: replay the same recorded LLM messages, tool outputs, and other inputs through the old and target writers. Compare migrated old output with raw target output before any format-normalizing helper; mask only documented volatile fields. For V4, ordinary tool results become flat tool-role messages with ordinary content blocks. A theoretically permitted old structure alone does not justify a new core content type.
+ネイティブライターの出力を変換のオラクルとして使う。同じ記録済み LLM メッセージ、ツール出力、その他の入力を旧ライターとターゲットライターに再生する。マイグレーション済みの旧出力は、フォーマット正規化ヘルパーを通す前の生のターゲット出力と比較し、マスクするのは文書化された揮発性フィールドだけにする。V4 では、通常のツール結果は通常のコンテンツブロックを持つフラットな tool ロールメッセージになる。理論上許される旧構造だけでは、新しい core コンテンツ型を正当化しない。
 
-Alpha converters may explicitly refuse historical cases without an implemented, evidenced mapping, including otherwise valid logs. Keep the source unchanged and publish no partial successor. Prefer real corpora and reproducible writers when extending support; inspect user corpora read-only and create sanitized regression fixtures.
+alpha コンバーターは、実装され証拠づけられたマッピングを持たない歴史的ケース（それ以外は有効なログを含む）を明示的に拒否してよい。ソースは変更せず、部分的な後継も公開しない。サポートを拡張するときは実コーパスと再現可能なライターを優先し、ユーザーコーパスは読み取り専用で検査して、サニタイズ済みのリグレッションフィクスチャを作成する。
 
-Document only the identifier and field mappings needed by the target format in the edge README, with a reason for each. Do not add namespaces to direct source kinds or ordinary metadata solely because they are extensible. Preserve opaque nested data. Alpha converters may refuse unexpected source fields that would acquire new target meanings rather than invent an interpretation.
+エッジ README にはターゲットフォーマットが必要とする識別子とフィールドのマッピングだけを、それぞれの理由とともに文書化する。拡張可能であるという理由だけで、直接のソース種別や通常のメタデータに名前空間を追加しない。不透明なネストデータを保持する。alpha コンバーターは、新しいターゲット上の意味を獲得してしまう予期しないソースフィールドを、解釈をでっち上げるのではなく拒否してよい。
 
-Maintain the new edge's README as its single complete transformation and admission catalog, following the [V2-to-V3 specification](../../packages/session/session-format-v2-to-v3/README.md#v2-to-v3-specification). Enumerate every converted header, event, message slot, and payload field; exact rename or collision rules; preserved ids, coordinates, references, and inherited cuts; external prerequisites; refusal and opaque-data policies; and unsupported or deferred behavior. Separate historical source conversion from native target admission, and state which codec, restorer, installed validator, and recovery policy performs each check. Record any validation that is deliberately narrower than the declared schema. Update this catalog in the same change as its code; a generated schema inventory or PR description does not replace it.
+新しいエッジの README を、その唯一の完全な変換・受け入れカタログとして維持する（[V2-to-V3 仕様](../../packages/session/session-format-v2-to-v3/README.md#v2-to-v3-specification)に従う）。変換されるすべてのヘッダー、イベント、メッセージスロット、ペイロードフィールド、正確なリネームまたは衝突ルール、保持される id、座標、参照、継承カット、外部前提条件、拒否と不透明データのポリシー、サポートされないまたは延期される動作を列挙する。歴史的ソース変換とネイティブターゲット受け入れを分離し、各チェックをどのコーデック、リストアラー、インストール済みバリデーター、リカバリーポリシーが実行するかを記載する。宣言されたスキーマより意図的に狭い検証は記録する。このカタログはコードと同じ変更で更新し、生成されたスキーマ目録や PR 説明で代用しない。
 
-Prove strict restoration through `sessionFormatCatalog.createRestore(header, { recovery: 'strict', validation: 'current' })`, feeding rows in order and calling `finish()`. This exercises physical decoding, the complete chain, and installed current Session validation. Production's recoverable/transformed policy is not a replacement for strict fixture and publication verification. Preserve documented historical validation exceptions rather than claiming stricter source validation than the edge actually performs.
+`sessionFormatCatalog.createRestore(header, { recovery: 'strict', validation: 'current' })` を通じて厳格な復元を証明し、行を順に投入して `finish()` を呼ぶ。これは物理デコード、完全なチェーン、インストール済みの現行 Session 検証を行使する。本番の recoverable/transformed ポリシーは、厳格なフィクスチャ検証と公開検証の代わりにはならない。エッジが実際に行うより厳格なソース検証を主張するのではなく、文書化された歴史的検証例外を保持する。
 
 <a id="current-version-consumers"></a>
-## 4. Update current-version consumers
+## 4. 現行バージョンの Consumer を更新する
 
-Trace each current-version consumer, including Session creation/restoration, JSONL filename selection and publication, the catalog's current encoder/restorer, projection-cache generation identity, replay and snapshot normalization, [physical fixture-layout validation](../../scripts/session-fixture-layout.ts), and TypeScript/Python SDK recordings. Use the writer constant where a value means current; keep literal historical versions in released codecs and historical fixtures. Update current documentation and generated references through their owners.
+現行バージョンのすべての Consumer を追跡する。Session の作成/復元、JSONL ファイル名の選択と公開、カタログの現行エンコーダー/リストアラー、射影キャッシュの世代 identity、リプレイとスナップショットの正規化、[物理フィクスチャレイアウト検証](../../scripts/session-fixture-layout.ts)、TypeScript/Python SDK の記録などが含まれる。値が現行を意味する場所ではライター定数を使い、リリース済みコーデックと歴史的フィクスチャにはリテラルの歴史的バージョンを残す。現在のドキュメントと生成リファレンスは、それぞれのオーナーを通じて更新する。
 
-Do not bump unrelated versions automatically. A request wrapper's `sessionFormatVersion` identifies its embedded Session generation; its outer schema version has its own meaning. Projection-unit state versions likewise do not replace the cache's Session-generation identity.
+無関係なバージョンを自動的にバンプしない。リクエストラッパーの `sessionFormatVersion` はその埋め込み Session の世代を識別し、外側のスキーマバージョンは独自の意味を持つ。射影ユニットの状態バージョンも同様に、キャッシュの Session 世代 identity を置き換えない。
 
-Verify both read and write paths. Header-only listing must not read bodies or publish. Historical read open may return the migrated in-memory artifact without writing; write open must verify and publish only the final current successor before append. The source path, bytes, and inode stay unchanged. A newer or invalid selected generation must not cause fallback to a predecessor. The [preparation decision](../../.agents/notes/implemented/architecture/2026-09-05-read-only-session-migration-preparation.md) owns publication timing.
+読み取りと書き込みの両方の経路を検証する。ヘッダーのみの一覧は本体を読まず、公開もしない。歴史的読み取りの open は、書き込まずにマイグレーション済みのインメモリ成果物を返してよい。書き込みの open は、append の前に検証して最終的な現行後継のみを公開しなければならない。ソースのパス、バイト、inode は変更されない。より新しいまたは無効な選択世代が、先行世代へのフォールバックを引き起こしてはならない。[準備の決定](../../.agents/notes/implemented/architecture/2026-09-05-read-only-session-migration-preparation.md)が公開のタイミングを所有する。
 
 <a id="snapshot-successors"></a>
-## 5. Create snapshot successors
+## 5. スナップショットの後継を作成する
 
-Read [snapshot ownership](../../snapshots/AGENTS.md) and the [snapshot library](../../packages/test-support/session-snapshot/README.md). The [corpus policy](../../scripts/session-snapshot-corpus-policy.ts) keeps its declared baseline as replay input so upgrades exercise the adjacent chain; a writer bump does not require refreshing that corpus. Select the owning scenario when a current-generation successor is needed, keep each historical file, and use the target version’s canonical parent and child filenames. Never rename a predecessor to the target filename or change only its header.
+[スナップショットの所有権](../../snapshots/AGENTS.md)と[スナップショットライブラリ](../../packages/test-support/session-snapshot/README.md)を読む。[コーパスポリシー](../../scripts/session-snapshot-corpus-policy.ts)は宣言されたベースラインをリプレイ入力として保持し、アップグレードが隣接チェーンを行使するようにする。ライターのバンプはそのコーパスのリフレッシュを必要としない。現行世代の後継が必要な場合は所有シナリオを選択し、各歴史的ファイルを保持し、ターゲットバージョンの正規の親/子ファイル名を使う。先行世代をターゲットのファイル名にリネームしたり、ヘッダーだけを変更したりしない。
 
-For unchanged replay input, use keyless refresh on the owner, then replay without write-back. These SDK commands use `text-turn` and the checkout's writer version. Implement and wire N+1 before using them to generate that version, and select the actual affected owner for a feature:
+変更されていないリプレイ入力には、オーナー上でキーなしリフレッシュを使い、書き戻しなしでリプレイする。以下の SDK コマンドは `text-turn` とチェックアウトのライターのバージョンを使う。それらを使ってそのバージョンを生成する前に N+1 を実装して配線し、機能に対しては実際に影響を受けるオーナーを選択する:
 
 ```sh
 pnpm run test:snapshot:refresh snapshots/sdk/sdk.snapshot.ts -t text-turn
 pnpm run test:snapshot snapshots/sdk/sdk.snapshot.ts -t text-turn
 ```
 
-Review the new generation, request sidecars, and protocol output together. Verify every predecessor remains byte-identical and that parent/child roles remain contiguous. Selection uses the numerically highest generation, so update shared references to the owner's selected parent. Do not use the packed-layout migrator as a version upgrader. If the model transcript must change, the scenario owner uses live recording under the [testing policy](../testing.md), with its required provider key.
+新しい世代、リクエストサイドカー、プロトコル出力をまとめてレビューする。すべての先行世代がバイト単位で同一のままであること、親/子の役割が連続していることを検証する。選択は数値上最も高い世代を使うため、オーナーの選択された親への共有参照を更新する。packed-layout マイグレーターをバージョンアップグレーダーとして使わない。モデルのトランスクリプトを変更しなければならない場合、シナリオオーナーは[テストポリシー](../testing.md)の下でのライブ記録を使い、必要なプロバイダーキーを用意する。
 
-Keep cases older than the retained baseline explicit through `snapshot.yml`'s `sessionFormat.version` and supported `coverage` names; record and refresh leave pinned Session fixtures untouched. Update the [corpus policy](../../scripts/session-snapshot-corpus-policy.ts) for the current generation while retaining focused direct-edge, multi-hop, packed-row, retry/failure, and shipped-profile coverage. Check the corpus and both SDK projections; do not mass-refresh unrelated scenarios merely to silence a validation failure.
+保持ベースラインより古いケースは、`snapshot.yml` の `sessionFormat.version` とサポートされる `coverage` 名を通じて明示的に保つ。record と refresh はピン留めされた Session フィクスチャに触れない。[コーパスポリシー](../../scripts/session-snapshot-corpus-policy.ts)は、的を絞った direct-edge、マルチホップ、packed-row、リトライ/失敗、出荷プロファイルのカバレッジを維持しつつ、現行世代向けに更新する。コーパスと両 SDK 射影を確認し、検証失敗を黙らせるためだけに無関係なシナリオを大量リフレッシュしない。
 
 <a id="validate"></a>
-## 6. Validate the integrated result
+## 6. 統合結果を検証する
 
-Run from the repository root. These commands check catalog declarations, Stage composition, the released V2→V3 edge, and generation selection. They are a baseline; add focused coverage for the new edge:
+リポジトリルートから実行する。これらのコマンドはカタログ宣言、Stage 構成、リリース済み V2→V3 エッジ、世代選択を確認する。これはベースラインであり、新しいエッジ向けの的を絞ったカバレッジを追加する:
 
 ```sh
 pnpm run verify-session-format-catalog
@@ -106,9 +106,9 @@ pnpm exec vitest run scripts/gen-session-format-catalog.spec.ts packages/session
 pnpm run test:snapshot scripts/session-snapshot-corpus.corpus.ts
 ```
 
-After implementing the new edge, add its actual test path to the focused Vitest run. Add the changed JSONL, replay, projection, and SDK tests selected by the actual diff, plus the built publication-Worker smoke when that path changes. Require successful strict migration, identity preservation for the skeleton, malformed and unknown-required-event refusal, deterministic repeated restores, independent concurrent stage state, seeded multi-hop cuts, unchanged predecessors, and no fallback. Report exact commands and failures, not an inferred full-suite result.
+新しいエッジを実装した後、その実際のテストパスを的を絞った Vitest 実行に追加する。実際の差分が選択する変更済みの JSONL、リプレイ、射影、SDK テストに加え、その経路が変わるときはビルド済みの publication-Worker スモークを追加する。厳格なマイグレーションの成功、骨格の identity 保持、不正および未知の必須イベントの拒否、決定論的な反復復元、独立した並行ステージ状態、シード済みマルチホップカット、先行世代の不変、フォールバックなしを要求する。推定の全スイート結果ではなく、正確なコマンドと失敗を報告する。
 
-Update the [owning Agent Note](../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md) rather than adding a redundant decision record. Keep the [release record](../session-format-status.md#updating-the-record) unchanged until publication; after publication, update it with verified release evidence. Audit related active notes for supersession; retain independent rationale and leave archived notes frozen. Update bilingual prose together, re-record each changed pair with the repository tool, then run documentation checks:
+冗長な決定記録を追加するのではなく、[所有する Agent Note](../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md)を更新する。[リリース記録](../session-format-status.md#updating-the-record)は公開まで変更せず、公開後に検証済みのリリース証拠で更新する。関連するアクティブノートの置き換え状況を監査し、独立した根拠は保持し、アーカイブ済みノートは凍結したままにする。バイリンガルの文書をまとめて更新し、リポジトリツールで変更された各ペアを再記録してから、ドキュメントチェックを実行する:
 
 ```sh
 pnpm run verify-translation-pairing --write docs/cookbook/adding-a-session-format-version.md
@@ -119,35 +119,35 @@ git diff --check
 ```
 
 <a id="v4-corpus-trial"></a>
-### Developer V4 corpus trial
+### 開発者向け V4 コーパス試行
 
-Use the one-time [migration script](../../scripts/migrate-sessions-to-v4.ts) from an installed contributor checkout whose writer is V4. Stop DSH processes using the target root before starting so writer locks and changing child logs do not prevent migration. Run from the repository root:
+ライターが V4 であるインストール済みコントリビューターチェックアウトから、一度きりの[マイグレーションスクリプト](../../scripts/migrate-sessions-to-v4.ts)を使う。開始前に対象ルートを使っている DSH プロセスを停止し、ライターのロックと変化する子ログがマイグレーションを妨げないようにする。リポジトリルートから実行する:
 
 ```sh
 pnpm run migrate:sessions-to-v4
 ```
 
-The default root is `~/.dsh/sessions`. Use `--sessions-dir /path/to/sessions-copy` for another corpus, or `--help` for usage. Concurrent jobs default to the available CPU count capped at 16; `--jobs N` accepts any positive safe integer, including larger expert overrides, and `--jobs 1` runs serially. A bounded queue opens only that many Sessions at once, regardless of corpus size. Each historical Session goes through the normal locked, validated publication path to create a V4 successor beside its unchanged source files. Existing V4 Sessions are opened read-only; rerunning does not reconvert them. The script makes no model requests and does not change conversion or refusal rules.
+デフォルトのルートは `~/.dsh/sessions` である。別のコーパスには `--sessions-dir /path/to/sessions-copy` を使い、使い方には `--help` を使う。並行ジョブはデフォルトで利用可能な CPU 数（上限 16）になる。`--jobs N` は任意の正の安全な整数を受け付け、より大きなエキスパートによる上書きも含む。`--jobs 1` は直列に実行する。有界キューはコーパスの大きさに関係なく、その数だけの Session を同時に開く。各歴史的 Session は通常のロック付き検証済み公開経路を通り、変更されていないソースファイルの隣に V4 後継を作成する。既存の V4 Session は読み取り専用で開かれ、再実行しても再変換されない。スクリプトはモデルリクエストを行わず、変換や拒否のルールも変更しない。
 
-The terminal reports each Session's selected file, version, progress, outcome, and elapsed time. Individual errors do not stop later Sessions. The final summary lists every failure and the full diagnostic log under the system temporary directory; any failure returns a nonzero exit status. It also prints JSON and saves the same report as `summary.json` beside `migration.log`: counts by source version and outcome, grouped failure reasons, per-input diagnostics, runtime details, and both report paths. Known diagnostics expose event types, unexpected members, child-log involvement, and sequence numbers; unrecognized errors retain their messages without inferred causes. Include these reports when reporting a migration problem. Sessions converted during this run remain distinct from those already at V4.
+ターミナルは各 Session の選択ファイル、バージョン、進捗、結果、経過時間を報告する。個々のエラーは後続の Session を停止させない。最終サマリーはすべての失敗と完全な診断ログをシステム一時ディレクトリの下に列挙する。失敗があれば非ゼロの終了ステータスを返す。また JSON を出力し、同じレポートを `migration.log` の隣に `summary.json` として保存する。内容はソースバージョンと結果別のカウント、グループ化された失敗理由、入力ごとの診断、実行時の詳細、両方のレポートパスである。既知の診断はイベント種別、予期しないメンバー、子ログの関与、シーケンス番号を明らかにする。認識されないエラーは、原因を推測せずメッセージを保持する。マイグレーションの問題を報告する際はこれらのレポートを含める。この実行で変換された Session は、すでに V4 であるものとは区別されたままである。
 
-Concurrent conversion can invalidate a parent’s child evidence when the child publishes V4. Only that source-change error receives one sequential retry after all initial jobs finish; corruption, unsupported formats, and held locks are reported immediately. Completion lines keep the original input index and a separate completed count, so out-of-order results remain readable.
+並行変換は、子が V4 を公開すると親の子証拠を無効にしうる。このソース変更エラーだけが、初期ジョブがすべて終了した後に 1 回の逐次リトライを受ける。破損、サポートされないフォーマット、保持されたロックは即座に報告される。完了行は元の入力インデックスと別の完了カウントを保持するため、順不同の結果も読み取れる。
 
 <a id="final-v3-vocabulary"></a>
-### Final V3 event vocabulary before V4 publication
+### V4 公開前の最終 V3 イベント語彙
 
-While the published format remains V3 and the integration writer is V4, master can still add valid V3 event types. After each master integration and before the first V4 publication, compare the migration-owned `RELEASED_V3_EVENT_TYPES` with the latest V3-writer commit used by that refresh. Capture its full immutable id while the locally verified `origin/master` still writes V3:
+公開済みフォーマットが V3 のままで統合ライターが V4 である間も、master は有効な V3 イベント型を追加しうる。各 master 統合の後、最初の V4 公開より前に、マイグレーションが所有する `RELEASED_V3_EVENT_TYPES` を、そのリフレッシュが使った最新の V3 ライターコミットと比較する。ローカルで検証済みの `origin/master` がまだ V3 を書いている間に、その完全な不変 id を取得する:
 
 ```sh
 V3_SOURCE_REF="$(git rev-parse --verify 'origin/master^{commit}')"
 pnpm run verify-v3-event-vocabulary --source-ref "$V3_SOURCE_REF"
 ```
 
-The verifier reads only that local commit and requires exact event-name equality. It rejects missing V3 names, extra copied names, and a source writer other than V3. In particular, V4-only `developer/message` must not enter the frozen V3 set. Review each difference against the V3 payload, required conversions, target admission, and consumers; adding the name alone does not establish a complete migration. Add the corresponding migration regression before accepting a new source event.
+検証器はそのローカルコミットだけを読み、イベント名の完全一致を要求する。欠落した V3 名、余分にコピーされた名、V3 以外のソースライターを拒否する。特に、V4 専用の `developer/message` が凍結された V3 セットに入ってはならない。各差分を V3 ペイロード、必要な変換、ターゲット受け入れ、Consumer に対してレビューする。名前を追加するだけでは完全なマイグレーションを確立しない。新しいソースイベントを受け入れる前に、対応するマイグレーションリグレッションを追加する。
 
-This command does not fetch or establish remote freshness. The release operator must verify that the selected commit is the latest V3 writer included in the integration; an old remote-tracking ref or passing result for an older pin is insufficient. Record the checked id with release validation. If master already writes V4, reuse the recorded final V3 commit rather than resolving current master. After V4 ships, keep the V3 vocabulary tied to that historical source; later V4 event additions do not update it. Regular static CI has no dependency on a mutable master ref.
+このコマンドはフェッチもリモートの最新性の確立もしない。リリースオペレーターは、選択したコミットが統合に含まれる最新の V3 ライターであることを検証しなければならない。古いリモート追跡 ref や古いピンでの成功結果では不十分である。確認した id はリリース検証とともに記録する。master がすでに V4 を書いている場合は、現在の master を解決するのではなく、記録された最終 V3 コミットを再利用する。V4 の出荷後は、V3 語彙をその歴史的ソースに結び付けたままにする。その後の V4 イベント追加はそれを更新しない。通常の静的 CI は可変の master ref に依存しない。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
-None.
+なし。

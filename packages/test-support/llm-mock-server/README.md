@@ -1,35 +1,35 @@
 ---
-description: "Scriptable Messages-compatible fault server for testing LLM adapters and recovery policy without a provider key, for test authors and demos."
+description: "プロバイダーキーなしで LLM アダプターとリカバリーポリシーをテストするための、スクリプト可能な Messages 互換フォールトサーバー。テスト作成者とデモ向け。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-llm-mock-server
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package gives tests and demos a scriptable Messages-compatible HTTP/SSE endpoint with named events for native SDK consumers, so they can exercise model-provider failures and successes without a provider key. Each accepted `/v1/messages` request consumes the next scripted behavior, including resets, stalls, malformed chunks, rate limits, server errors, completions, and tool calls. Test authors can run it with `pnpm run mock:llm` or call `startMockLlmServer`, which returns captured requests for assertions. Seeded `random` behavior supports reproducible mixed-failure stress runs.
+このパッケージは、テストとデモに、ネイティブ SDK コンシューマー向けの名前付きイベントを備えた、スクリプト可能な Messages 互換 HTTP/SSE エンドポイントを提供します。これにより、プロバイダーキーなしでモデルプロバイダーの失敗と成功を試せます。受理された各 `/v1/messages` リクエストは、次にスクリプトされた動作を消費します。これにはリセット、ストール、不正なチャンク、レート制限、サーバーエラー、完了、ツール呼び出しが含まれます。テスト作成者は `pnpm run mock:llm` で実行するか、`startMockLlmServer` を呼び出します。後者はアサーション用にキャプチャしたリクエストを返します。シード付きの `random` 動作は、再現可能な混合障害のストレス実行を支えます。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と保留作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-This package lets a test or demo speak the provider protocol without a provider: start the server, script the wire behaviors you want to exercise, and point a real LLM adapter at its base URL.
+このパッケージは、テストやデモがプロバイダーなしでプロバイダープロトコルを話せるようにします。サーバーを起動し、試したいワイヤ動作をスクリプトし、実際の LLM アダプターをそのベース URL に向けます。
 
-### Running it standalone
+### 単体で実行する
 
-Run the source entry from this repository:
+このリポジトリからソースエントリーを実行します:
 
 ```sh
 pnpm run mock:llm \
@@ -39,7 +39,7 @@ pnpm run mock:llm \
   --partial-text "discard this half"
 ```
 
-Point the shipping DeepSeek adapter at the server; it sends requests to `/messages` beneath the server's `/v1` root:
+出荷済みの DeepSeek アダプターをこのサーバーに向けます。アダプターはサーバーの `/v1` ルート配下の `/messages` にリクエストを送ります:
 
 ```sh
 DEEPSEEK_BASE_URL=http://127.0.0.1:8000/v1 \
@@ -47,33 +47,33 @@ DEEPSEEK_API_KEY=mock-key \
 pnpm dsh --profile headless "test provider recovery"
 ```
 
-The repository script writes JSONL to stdout: a `ready` record carries the `/v1` base URL and random seed, followed by request/result records that name both the scripted behavior and the concrete behavior selected. The package exposes no installable binary.
+リポジトリのスクリプトは JSONL を stdout に書き出します: `ready` レコードが `/v1` ベース URL と乱数シードを運び、続いてスクリプトされた動作と選択された具体的な動作の両方を名指すリクエスト/結果レコードが続きます。このパッケージはインストール可能なバイナリーを公開しません。
 
-### Scripting behaviors
+### 動作のスクリプト
 
-`--sequence` is a comma-separated FIFO. Exhaustion returns a structured HTTP 500; `--repeat-last` explicitly reuses the last entry.
+`--sequence` はカンマ区切りの FIFO です。使い果たすと構造化された HTTP 500 を返します。`--repeat-last` は最後のエントリを明示的に再利用します。
 
-| Behavior | Wire result |
+| 動作 | ワイヤ上の結果 |
 |---|---|
-| `connection_reset` | Destroy the socket before HTTP headers |
-| `stream_disconnect` | Send SSE headers, then reset before the first event |
-| `partial_disconnect` | Send text deltas, then reset the socket |
-| `stall` | Send SSE headers and remain idle until client/server cancellation |
-| `empty` | Send a valid content-less stop and `[DONE]` |
-| `empty_body` / `stream_eof` / `partial_eof` | End cleanly without the required `[DONE]` boundary |
-| `malformed_json` / `malformed_event` | Send invalid SSE JSON or an invalid provider chunk shape |
-| `rate_limit` / `server_error` / `service_unavailable` | Return retry-oriented 429/500/503 JSON errors |
-| `auth_error` / `invalid_request` / `context_overflow` / `quota_exceeded` | Return terminal or separately recovered provider errors |
-| `success` / `slow_success` / `reasoning_success` | Stream a complete text response, optionally delayed or preceded by reasoning |
-| `tool_call_success` / `max_tokens` | Complete with a tool call or `length` finish |
-| `wrong_content_type` | Send a valid SSE body under `application/json` |
-| `random` | Select a concrete request behavior from weighted seeded randomness |
+| `connection_reset` | HTTP ヘッダーの前にソケットを破棄する |
+| `stream_disconnect` | SSE ヘッダーを送った後、最初のイベントの前にリセットする |
+| `partial_disconnect` | テキストデルタを送った後、ソケットをリセットする |
+| `stall` | SSE ヘッダーを送り、クライアント/サーバーのキャンセルまでアイドルを保つ |
+| `empty` | 有効な内容なしの stop と `[DONE]` を送る |
+| `empty_body` / `stream_eof` / `partial_eof` | 必須の `[DONE]` 境界なしでクリーンに終了する |
+| `malformed_json` / `malformed_event` | 無効な SSE JSON または無効なプロバイダーチャンクの形を送る |
+| `rate_limit` / `server_error` / `service_unavailable` | リトライ向けの 429/500/503 JSON エラーを返す |
+| `auth_error` / `invalid_request` / `context_overflow` / `quota_exceeded` | 終端または別途回復されるプロバイダーエラーを返す |
+| `success` / `slow_success` / `reasoning_success` | 完全なテキスト応答をストリームする。任意で遅延または推論を先行させる |
+| `tool_call_success` / `max_tokens` | ツール呼び出しまたは `length` 終了で完了する |
+| `wrong_content_type` | 有効な SSE ボディを `application/json` の下で送る |
+| `random` | 重み付きシード乱数から具体的なリクエスト動作を選択する |
 
-`connection_refused` is CLI-only and must be the first entry. It delays binding a caller-specified nonzero port, so requests during `--listen-delay-ms` receive a real TCP refusal; the remaining entries begin after the listener starts.
+`connection_refused` は CLI 専用で、最初のエントリでなければなりません。呼び出し元が指定した非ゼロポートのバインドを遅延させるため、`--listen-delay-ms` の間のリクエストは実際の TCP 拒否を受け取ります。残りのエントリはリスナー開始後に始まります。
 
-### Random mode
+### ランダムモード
 
-Use a repeating `random` entry for an open-ended mixed run:
+終わりのない混合実行には、繰り返し `random` エントリを使います:
 
 ```sh
 pnpm run mock:llm \
@@ -84,86 +84,86 @@ pnpm run mock:llm \
   --random-weights 'success=60,slow_success=10,connection_reset=5,stream_disconnect=5,partial_disconnect=10,empty=5,server_error=5'
 ```
 
-Omitting `--seed` generates one and prints it in the `ready` record. `--random-weights` accepts non-negative relative `behavior=weight` entries and requires at least one positive concrete behavior. The exported default is a success-heavy stress profile containing reset, disconnect, partial output, empty completion, stall, 429/5xx, clean truncation, and malformed JSON; it is test pressure, not an estimate of production incident frequency. `connection_refused` is excluded because a bound request handler cannot produce a true refusal. When random weights include `stall`, configure the client under test with a short stream-idle timeout so the scenario terminates promptly.
+`--seed` を省略すると 1 つ生成され、`ready` レコードに出力されます。`--random-weights` は非負の相対 `behavior=weight` エントリを受理し、少なくとも 1 つの正の重みを持つ具体的な動作を要求します。エクスポートされるデフォルトは成功寄りのストレスプロファイルで、リセット、切断、部分出力、空完了、ストール、429/5xx、クリーンな切り捨て、不正 JSON を含みます。これはテストの負荷であり、本番でのインシデント頻度の推定値ではありません。`connection_refused` は除外されます。バインド済みのリクエストハンドラーは真の拒否を生成できないからです。ランダム重みに `stall` が含まれる場合、テスト対象のクライアントに短いストリームアイドルタイムアウトを設定して、シナリオが速やかに終了するようにしてください。
 
-### Timing and content controls
+### タイミングと内容のコントロール
 
-The CLI exposes `--success-text`, `--partial-text`, `--reasoning-text`, `--chunk-size`, `--chunk-delay-ms`, `--disconnect-delay-ms`, `--retry-after-ms`, `--request-id`, `--tool-name`, and `--tool-arguments`. Millisecond delays are bounded integers within Node's timer range; `retryAfterMs` must also be positive. The library accepts the same camel-case options. An optional exact `apiKey` validates `x-api-key: <token>`; omission accepts any token.
+CLI は `--success-text`、`--partial-text`、`--reasoning-text`、`--chunk-size`、`--chunk-delay-ms`、`--disconnect-delay-ms`、`--retry-after-ms`、`--request-id`、`--tool-name`、`--tool-arguments` を公開します。ミリ秒の遅延は Node のタイマー範囲内の境界付き整数です。`retryAfterMs` も正でなければなりません。ライブラリは同じキャメルケースのオプションを受理します。任意の厳密な `apiKey` は `x-api-key: <token>` を検証します。省略時は任意のトークンを受理します。
 
-### What can go wrong
+### 起こり得る問題
 
-- **The script runs out** — exhaustion returns a structured HTTP 500; set `--repeat-last` or lengthen the sequence when a run needs more requests.
-- **Random weights without a positive concrete behavior are rejected** — every entry must name an existing behavior and at least one must carry positive weight.
-- **Invalid requests do not consume the script** — wrong methods, paths, API keys, and malformed JSON get ordinary 4xx responses, so a misconfigured client can burn retries without advancing the sequence.
+- **スクリプトが尽きる** — 使い果たすと構造化された HTTP 500 を返します。実行にさらにリクエストが必要な場合は `--repeat-last` を設定するか、シーケンスを長くしてください。
+- **正の重みを持つ具体的な動作がないランダム重みは拒否される** — すべてのエントリが既存の動作を名指し、少なくとも 1 つが正の重みを持たなければなりません。
+- **無効なリクエストはスクリプトを消費しない** — 誤ったメソッド、パス、API キー、不正な JSON は通常の 4xx 応答を受けるため、設定を誤ったクライアントはシーケンスを進めずにリトライを浪費し得ます。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains the design of the server; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではサーバーの設計を説明します。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱います。
 
-### Design
+### 設計
 
-The server is built on one rule: each accepted Messages request consumes exactly one behavior from an arrival-ordered FIFO cursor, and the server never retries or interprets harness policy. Validation happens before the cursor advances — only a `POST` whose path ends in `/v1/messages`, with a valid API key when one is configured and a parseable JSON body, consumes the script; everything else receives an ordinary 4xx. `random` entries resolve at request time through a seeded PRNG over the configured weights, so a run is reproducible from its printed seed.
+サーバーは 1 つのルールの上に構築されています: 受理された各 Messages リクエストは、到着順の FIFO カーソルからちょうど 1 つの動作を消費し、サーバーはリトライもハーネスポリシーの解釈も行いません。検証はカーソルが進む前に行われます。パスが `/v1/messages` で終わる `POST` で、設定済みの場合は有効な API キーを持ち、解析可能な JSON ボディを持つものだけがスクリプトを消費し、それ以外はすべて通常の 4xx を受け取ります。`random` エントリはリクエスト時に設定された重みに対するシード付き PRNG で解決されるため、実行は出力されたシードから再現できます。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `startMockLlmServer`: listener, behavior table, seeded randomness, telemetry, captured request records |
-| [`src/cli.ts`](src/cli.ts) | `--sequence` and timing/content option parsing, JSONL stdout telemetry |
-| [`src/bin.ts`](src/bin.ts) | The `pnpm run mock:llm` source entry |
+| [`src/index.ts`](src/index.ts) | `startMockLlmServer`: リスナー、動作テーブル、シード乱数、テレメトリー、キャプチャしたリクエストレコード |
+| [`src/cli.ts`](src/cli.ts) | `--sequence` とタイミング/内容オプションの解析、JSONL stdout テレメトリー |
+| [`src/bin.ts`](src/bin.ts) | `pnpm run mock:llm` のソースエントリー |
 
-### Wire flow
+### ワイヤフロー
 
-A request enters the handler, is validated, and selects a behavior: a concrete script entry runs directly, `random` draws one, and an exhausted script reports `script_exhausted` as a structured 500. `runBehavior` then executes the wire result — socket destroy, SSE stream, JSON error, or completion — while every request and outcome is recorded in arrival order on the returned handle for test assertions. `close()` stops accepting requests and force-terminates stalled connections.
+リクエストがハンドラーに入り、検証され、動作を選択します。具体的なスクリプトエントリは直接実行され、`random` は 1 つを抽選し、尽きたスクリプトは `script_exhausted` を構造化 500 として報告します。次に `runBehavior` がワイヤ結果 — ソケット破棄、SSE ストリーム、JSON エラー、または完了 — を実行し、すべてのリクエストと結果がテストアサーション用に返されたハンドルへ到着順で記録されます。`close()` はリクエストの受理を停止し、ストールした接続を強制終了します。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the fault server to the adapter contract it exercises and the keyless alternative for recorded success transcripts.
+パッケージレベルの契約では足りないときに、これらのページを読んでください。フォールトサーバーから、それが試すアダプター契約と、記録された成功トランスクリプト向けのキー不要の代替へと進みます。
 
-- [LLM package](../../llm/llm/README.md) — the provider stream contract and retry policy this server exercises.
-- [llm-replay](../llm-replay/README.md) — the keyless counterpart that replays recorded success transcripts instead of faulting.
-- [Testing policy](../../../docs/testing.md) — the coverage tiers and recovery tests this server serves.
-- [Test-support group map](../README.md) — sibling harnesses and support packages.
+- [LLM パッケージ](../../llm/llm/README.md) — このサーバーが試すプロバイダーストリーム契約とリトライポリシー。
+- [llm-replay](../llm-replay/README.md) — 障害を起こす代わりに記録された成功トランスクリプトを再生する、キー不要の対応物。
+- [テストポリシー](../../../docs/testing.md) — このサーバーが支えるカバレッジ階層とリカバリーテスト。
+- [test-support グループマップ](../README.md) — 姉妹ハーネスとサポートパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this test server substitutes provider wire behavior without invoking a real model.
+なし。このテストサーバーは実際のモデルを起動せずにプロバイダーのワイヤ動作を代替します。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; requests terminate locally and never reach a provider cache.
+なし。リクエストはローカルで終端し、プロバイダーのキャッシュには決して到達しません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と保留作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the server needs special care. They are current package constraints, not a task backlog.
+これらの制限は、サーバーが特別な注意を必要とする場合を定義します。これらは現在のパッケージ制約であり、タスクバックログではありません。
 
-- **Random weights model test pressure, not production incidence** — callers that want an environment-specific distribution must provide measured weights and record the emitted seed.
-- **Request scripts are arrival-ordered** — concurrent callers share one cursor, so deterministic per-session fault assignment requires separate server instances.
-- **True connection refusal is a listener lifecycle phase** — the CLI delay must overlap the client attempt; request-level random selection can only reset an accepted connection.
+- **ランダム重みがモデル化するのはテストの負荷であり、本番の発生率ではない** — 環境固有の分布を求める呼び出し元は、計測済みの重みを提供し、出力されたシードを記録しなければなりません。
+- **リクエストスクリプトは到着順** — 同時実行の呼び出し元が 1 つのカーソルを共有するため、セッションごとに決定的な障害割り当てを行うには別々のサーバーインスタンスが必要です。
+- **真の接続拒否はリスナーのライフサイクル段階** — CLI の遅延がクライアントの試行と重ならなければなりません。リクエストレベルのランダム選択は受理済みの接続をリセットすることしかできません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

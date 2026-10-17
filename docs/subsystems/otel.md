@@ -1,12 +1,12 @@
-# OTel reporting
+# OTel 報告
 
-English | [中文](otel.zh.md)
+日本語 | [English](otel.en.md) | [中文](otel.zh.md)
 
-The [OTel plugin](../../packages/telemetry/otel/README.md) registers `ctx.otel`, a shared factory for independent ordinary-event and Session-log channels. It owns transport and SDK batching implementations. Business consumers inject the service, supply explicit transport/resource/scope options, and own each returned channel's shutdown.
+[OTel プラグイン](../../packages/telemetry/otel/README.md)は、独立した通常イベント用とセッションログ用のチャネル共有ファクトリーである `ctx.otel` を登録する。トランスポートと SDK バッチ実装を所有する。業務利用者はサービスをインジェクトし、明示的なトランスポート/リソース/スコープオプションを提供し、返された各チャネルのシャットダウンを所有する。
 
-UI feedback reaches the Session feedback services through their existing Remote APIs. Feedback recording authorizes the Session adapter's canonical-prefix capture and redaction before it reports through an OTel channel. Ordinary product consumers submit selected fields through the product adapter. The shared service has no automatic identity or capture policy, and channels never share queues or requests.
+UI フィードバックは既存 Remote API を通じてセッションフィードバックサービスに届く。フィードバック記録は、OTel チャネル経由で報告する前にセッションアダプターの正規プレフィックス取り込みと編集を承認する。通常の製品利用者は選択したフィールドを製品アダプター経由で送信する。共有サービスに自動 ID や取り込みポリシーはなく、チャネル間でキューやリクエストを共有しない。
 
-The [product adapter](../../packages/host/product-telemetry-otel/README.md) and [Session adapter](../../packages/session/session-telemetry-otel/README.md) retain their deployment configuration and disposal deadlines. Consumers must not reuse a channel after shutdown. Mounting only the OTel service allocates no provider or transport.
+[製品アダプター](../../packages/host/product-telemetry-otel/README.md)と[セッションアダプター](../../packages/session/session-telemetry-otel/README.md)はデプロイ設定と破棄期限を保持する。利用者はシャットダウン後のチャネルを再利用してはならない。OTel サービスのみのマウントではプロバイダーやトランスポートを割り当てない。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -14,13 +14,13 @@ The [product adapter](../../packages/host/product-telemetry-otel/README.md) and 
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によりソースから生成（doc-sync の `pnpm run verify-cordis-catalog` で鮮度を検証。`pnpm run gen-cordis-catalog` で再生成） — 言語面の違いはロケール固有のペア文書パスのみである。シグネチャーブロックは `ts cordis-catalog` フェンスを使用し、元のソース JSDoc を保持する。ディスパッチモードは[入門書](../cordis-primer.md#dispatch-modes)で定義し、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) に存在する。
 
 <a id="ctxotel--otel"></a>
 
 ### `ctx.otel` — `OTel`
 
-Shared transport provider. Mounting creates no queue, identity, or network connection.
+共有トランスポートプロバイダー。マウントだけではキュー、ID、ネットワーク接続を作成しない。
 
 ```ts cordis-catalog
 /**
@@ -40,5 +40,5 @@ createEventReporter(options: EventLogOptions): EventLogReporter
 createSessionLogReporter(options: SessionLogOptions): SessionLogReporter
 ```
 
-Source: [`packages/telemetry/otel/src/index.ts`](../../packages/telemetry/otel/src/index.ts)
+ソース: [`packages/telemetry/otel/src/index.ts`](../../packages/telemetry/otel/src/index.ts)
 <!-- END GENERATED cordis-surface -->

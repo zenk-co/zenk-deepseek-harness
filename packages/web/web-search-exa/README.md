@@ -1,39 +1,39 @@
 ---
-description: "The Exa-backed search provider for ctx.web: how deployments mount vendor-native web search with portable snippets and publication dates."
+description: "ctx.web 向け Exa 支援検索プロバイダー。移植可能スニペットと公開日付きベンダーネイティブ Web 検索をどうマウントするか。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-web-search-exa
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-With `dsh-web-search-exa`, the harness searches the web through Exa and gets vendor-native results with portable snippets and publication dates. Choose it when a deployment has an Exa API key and wants Exa's keyword or neural search. Exa returns no generated answer, so results carry no `content` — only citeable sources. A result with no non-blank highlight is dropped, so a call can return fewer sources than requested. The model-facing `web_search` tool lives in `dsh-tool-web`.
+`dsh-web-search-exa` では、ハーネスは Exa 経由で Web を検索し、移植可能スニペットと公開日付きベンダーネイティブ結果を得る。デプロイが Exa API キーを持ち、Exa のキーワードまたはニューラル検索を求める場合に選ぶ。Exa は生成回答を返さないため、結果は `content` を運ばず引用可能ソースのみである。非空白ハイライトを持たない結果は落とされるため、呼び出しは要求より少ないソースを返すことがある。モデルに面した `web_search` ツールは `dsh-tool-web` にある。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Mount the provider in a composition that already loads the web service; it registers as the `exa` search provider, so `ctx.web.search()` resolves it automatically when it is the only usable search backend — or pin it with `searchProvider: exa`.
+Web サービスを既にロードする合成にプロバイダーをマウントする。`exa` 検索プロバイダーとして登録されるため、唯一使用可能な検索バックエンドなら `ctx.web.search()` が自動解決する — または `searchProvider: exa` で固定する。
 
-### When to choose it
+### いつ選ぶか
 
-Choose this backend when a deployment holds an Exa API key and wants Exa's keyword or neural search with per-result highlight snippets and publication dates. The provider is unavailable — and every search call fails with a structured error — when the key is empty or the endpoint base does not parse.
+デプロイが Exa API キーを持ち、結果単位ハイライトスニペットと公開日付きの Exa キーワードまたはニューラル検索を求める場合にこのバックエンドを選ぶ。キーが空、またはエンドポイント基底がパースできない場合、プロバイダーは不可であり、すべての検索呼び出しは構造化エラーで失敗する。
 
-### Minimal configuration
+### 最小構成
 
-Load the web service and the provider; the API key falls back to `$EXA_API_KEY` from the launch environment, and all other settings have safe defaults.
+Web サービスとプロバイダーをロードする。API キーは起動環境の `$EXA_API_KEY` にフォールバックし、他の設定はすべて安全な既定値を持つ。
 
 ```yaml
 - name: '@deepseek-ai/dsh-web'
@@ -42,101 +42,101 @@ Load the web service and the provider; the API key falls back to `$EXA_API_KEY` 
     apiKey: !!js process.env.EXA_API_KEY
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `apiKey` | `$EXA_API_KEY` | Exa API key; empty or absent makes the provider unavailable |
-| `baseURL` | `https://api.exa.ai` | Endpoint base; `/search` is appended. An unparseable value makes the provider unavailable |
-| `searchType` | `auto` | Retrieval mode sent as Exa's `type`: `auto`, `keyword`, or `neural` |
-| `numResults` | (unset) | Default result count when a request carries no `maxResults`; must be a positive integer |
-| `highlightsPerResult` | `1` | Highlight sentences requested per result (Exa's `highlightsPerUrl`); must be a positive integer |
+| `apiKey` | `$EXA_API_KEY` | Exa API キー。空または不在はプロバイダー不可にする |
+| `baseURL` | `https://api.exa.ai` | エンドポイント基底。`/search` が付加される。パース不可値はプロバイダー不可にする |
+| `searchType` | `auto` | Exa の `type` として送られる取得モード。`auto`、`keyword`、`neural` |
+| `numResults` | (未設定) | リクエストが `maxResults` を運ばない場合の既定結果数。正整数でなければならない |
+| `highlightsPerResult` | `1` | 結果単位に要求するハイライト文数 (Exa の `highlightsPerUrl`)。正整数でなければならない |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web-search-exa) is the exhaustive source for every accepted field and its JSDoc.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-web-search-exa)が、受け入れられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### What a search returns
+### 検索が返すもの
 
-Each Exa result maps to a `WebSearchSource`: `url`, `title`, the first non-blank highlight as `snippet`, and `publishedDate` as `publishedAt`; a result with no highlight has no portable snippet and is dropped. A request's `maxResults` wins over the configured `numResults` default and is sent to Exa as a cost and latency optimization — the final bound is enforced by the service, which truncates and flags. Exa returns no generated answer, so the result carries no `content`.
+各 Exa 結果は `WebSearchSource` に対応付けられる。`url`、`title`、最初の非空白ハイライトを `snippet` とし、`publishedDate` を `publishedAt` とする。ハイライトを持たない結果は移植可能スニペットを持たず落とされる。リクエストの `maxResults` は設定 `numResults` 既定に勝ち、コストと遅延最適化として Exa に送られる — 最終上限はサービスが強制し、切り詰めと印付けを行う。Exa は生成回答を返さないため、結果は `content` を運ばない。
 
-### Failures and recovery
+### 失敗と回復
 
-Provider failures — HTTP errors, network failures, unparseable or wrong-shape bodies — surface as `WebError` `WEB_PROVIDER_ERROR`; an aborted request surfaces as `WEB_ABORTED`. HTTP redirects are rejected before the `Location` target is contacted and surface as `WEB_PROVIDER_ERROR`. Callers route on the code; the model-facing `web_search` tool surfaces failures to the model under its own error wrapper.
+プロバイダー失敗 — HTTP エラー、ネットワーク失敗、パース不可や形状違い本体 — は `WebError` `WEB_PROVIDER_ERROR` として現れ、中止されたリクエストは `WEB_ABORTED` として現れる。HTTP リダイレクトは `Location` 先への接続前に拒否され `WEB_PROVIDER_ERROR` として現れる。呼び出し元はコードで分岐する。モデルに面した `web_search` ツールは独自エラー wrapper の下で失敗をモデルに現す。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the provider; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではプロバイダーの背後にある設計上の決定を説明する。観測可能な動作はすべて[このパッケージの使い方](#use-this-package)で扱っている。
 
-### Design philosophy
+### 設計思想
 
-The provider is a thin adapter over Exa's API with two deliberate rules:
+プロバイダーは Exa API 上の薄いアダプターであり、意図的な規則を 2 つ持つ:
 
-- **Portable snippets only.** A source gains a `snippet` only from a real highlight; inventing one from other fields would make the seam lie, so snippet-less results are dropped entirely.
-- **No invented answers.** Exa returns no generated answer, so `content` is omitted rather than fabricating provider prose the model might trust.
+- **移植可能スニペットのみ。**ソースは実ハイライトからのみ `snippet` を得る。他フィールドからの創作はシームを嘘つきにするため、スニペットなし結果は全体を落とす。
+- **創作回答なし。**Exa は生成回答を返さないため、モデルが信頼しうるプロバイダー散文を捏造せず `content` を省く。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config schema, environment fallback, provider registration |
-| [`src/provider.ts`](src/provider.ts) | The `ExaSearchProvider`: request dispatch, abort classification, result mapping |
-| [`src/types.ts`](src/types.ts) | Exa wire types: `ExaSearchResponse`, `ExaResult`, `ExaError` |
+| [`src/index.ts`](src/index.ts) | プラグイン入口。設定スキーマ、環境フォールバック、プロバイダー登録 |
+| [`src/provider.ts`](src/provider.ts) | `ExaSearchProvider`。リクエスト配送、abort 分類、結果対応付け |
+| [`src/types.ts`](src/types.ts) | Exa wire 型。`ExaSearchResponse`、`ExaResult`、`ExaError` |
 
-### Request and mapping flow
+### リクエストと対応付けフロー
 
-`search()` posts the query, retrieval mode, highlight request, and optional result count to `{baseURL}/search` with `redirect: 'error'`, so a redirect fails the request without contacting the target. The parsed `results[]` are mapped one by one, snippet-less entries dropped, and the service applies the final `maxResults` bound on the way back. An abort — a `DOMException` named `AbortError` — becomes `WEB_ABORTED`; anything else becomes `WEB_PROVIDER_ERROR`.
+`search()` はクエリ・取得モード・ハイライト要求・任意結果数を `{baseURL}/search` に `redirect: 'error'` で POST するため、リダイレクトは対象に接続せずリクエストを失敗させる。パースされた `results[]` は 1 件ずつ対応付けられ、スニペットなし項目は落とされ、サービスが帰路で最終 `maxResults` 上限を適用する。abort — `AbortError` 名の `DOMException` — は `WEB_ABORTED` になり、それ以外は `WEB_PROVIDER_ERROR` になる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared vocabulary to the service, the model-facing tools, and the design rationale.
+パッケージレベルの契約では足りない場合にこれらのページを読むとよい。共有語彙からサービス、モデルに面したツール、設計根拠へと進む。
 
-- [Web subsystem](../../../docs/subsystems/web.md) — the exhaustive search request/result vocabulary and error codes.
-- [Web package map](../README.md) — the six-package family and each role.
-- [dsh-web](../web/README.md) — the web service this provider registers into.
-- [dsh-tool-web](../tool-web/README.md) — the model-facing `web_search` tool that renders this provider's sources.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web-search-exa) — every accepted config field and its source declaration.
-- [Web capability seam decision](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) — why search and fetch share one provider-selection service.
+- [Web サブシステム](../../../docs/subsystems/web.md) — 網羅的な検索リクエスト/結果語彙とエラーコード。
+- [Web パッケージマップ](../README.md) — 6 パッケージファミリーと各役割。
+- [dsh-web](../web/README.md) — このプロバイダーが登録する Web サービス。
+- [dsh-tool-web](../tool-web/README.md) — このプロバイダーのソースを描画する、モデルに面した `web_search` ツール。
+- [生成される設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-web-search-exa) — 受け入れられるすべての設定フィールドとそのソース宣言。
+- [Web ケイパビリティシーム決定](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) — 検索と取得が 1 つのプロバイダー選択サービスを共有する理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-tool-web`, which retains this provider's `maxResults`-bounded URLs, titles, first highlights, and publication dates or its exact `Exa search aborted`, `Exa search request failed: <error>`, and `Exa returned an unprocessable response body: <error>` failures under the consumer's error wrapper.
+`dsh-tool-web` 経由で間接的に。このプロバイダーの `maxResults` 上限付き URL・タイトル・先頭ハイライト・公開日、または正確な `Exa search aborted`、`Exa search request failed: <error>`、`Exa returned an unprocessable response body: <error>` 失敗を、コンシューマーのエラー wrapper の下で保持する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+直接の無効化なし。名前付きコンシューマーがリクエスト接頭辞変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the provider is a poor fit. They are current package constraints.
+これらの制限はプロバイダーが不向きな場合を定義する。これらは現在のパッケージ制約である。
 
-- **A result with no non-blank highlight is dropped entirely** — there is no portable snippet to map, so fewer sources than requested can return.
-- **Only `searchType`/`numResults`/`highlightsPerResult` are exposed** — Exa's other controls (livecrawl, category, domain/date filters, full-text contents) wait on provider-neutral service fields ([seam Agent Note](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md)).
-- **Abort classification is error-shape-based** — only a `DOMException` named `AbortError` maps to `WEB_ABORTED`; an abort carrying a custom reason (such as `dsh-timeout`'s `TimeoutReason`) surfaces as `WEB_PROVIDER_ERROR`.
+- **非空白ハイライトを持たない結果は全体を落とす** — 対応付ける移植可能スニペットがないため、要求より少ないソースが返りうる。
+- **公開するのは `searchType`/`numResults`/`highlightsPerResult` のみ** — Exa の他制御 (livecrawl、カテゴリ、ドメイン/日付フィルタ、全文 contents) はプロバイダー中立サービスフィールド待ちである ([シーム Agent Note](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md))。
+- **Abort 分類はエラー形状基準** — `AbortError` 名の `DOMException` のみ `WEB_ABORTED` に対応付けられ、カスタム理由を運ぶ abort (`dsh-timeout` の `TimeoutReason` など) は `WEB_PROVIDER_ERROR` として現れる。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior, limits, and rationale live in the sections above and the linked Agent Notes.
+この Dev Note はメンテナ向け作業コンテキストである。開かれた問いと未決定の方向性であり、明示的に非権威である — 出荷動作・制限・根拠は上記セクションとリンク Agent Note にある。
 
-#### Future: wider Exa control surface
+#### 将来: より広い Exa 制御面
 
-Exa's livecrawl, category, domain and date filters, and full-text contents stay unexposed. Exposing them needs provider-neutral service fields first, so the family adds one coordinated control rather than a vendor-specific argument.
+Exa の livecrawl、カテゴリ、ドメインと日付フィルタ、全文 contents は未公開のままである。公開にはまずプロバイダー中立サービスフィールドが必要であり、ファミリーはベンダー固有引数ではなく 1 つの協調制御を追加する。
 
 </details>

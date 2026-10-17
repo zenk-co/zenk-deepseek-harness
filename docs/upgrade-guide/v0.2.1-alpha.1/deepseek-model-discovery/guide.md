@@ -1,17 +1,17 @@
 ---
 kind: upgrade-guide
-description: "DeepSeek API-key model discovery requires a configured credential."
+description: "DeepSeek API キーのモデル検出には設定済み資格情報が必要である。"
 ---
 
-# DeepSeek API-key model visibility
+# DeepSeek API キーのモデル可視性
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-The `deepseek-official` route previously listed its configured models without an API key. It now returns an empty catalog when its credential is missing, so Desktop and Web hide the DeepSeek group. Model discovery reports malformed credentials and credential lookup failures. A saved or default selection absent from the catalog displays “Select model” without changing the stored selection. The independent DeepSeek account route still uses account login.
+`deepseek-official` ルートは以前 API キーなしで設定済みモデルを列挙していた。現在は資格情報がない場合に空のカタログを返すため、Desktop と Web は DeepSeek グループを隠す。モデル検出は不正な資格情報と資格情報ルックアップ失敗を報告する。カタログにない保存済み・デフォルト選択は、保存された選択を変えずに「Select model」と表示される。独立した DeepSeek アカウントルートは引き続きアカウントログインを使う。
 
-## Migration
+## 移行
 
-1. To use the API-key route, configure its key in Settings → Models or supply the reference named by `apiKeyEnv` (default `DEEPSEEK_API_KEY`) through the launch environment.
-2. Reopen the model selector and confirm the DeepSeek group appears. Custom discovery consumers must handle an empty catalog before credentials are configured; listing models does not verify that the remote API accepts the key.
+1. API キールートを使うには Settings → Models でキーを設定するか、起動環境を通じて `apiKeyEnv` が指名する参照（デフォルト `DEEPSEEK_API_KEY`）を提供する。
+2. モデルセレクターを開き直し、DeepSeek グループが現れることを確認する。カスタム検出コンシューマーは資格情報設定前の空カタログを処理しなければならない。モデル列挙はリモート API がキーを受け付けることを検証しない。

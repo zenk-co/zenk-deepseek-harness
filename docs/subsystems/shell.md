@@ -1,18 +1,18 @@
-# Shell Executor
+# Shell エグゼキューター
 
-English | [中文](shell.zh.md)
+日本語 | [English](shell.en.md) | [中文](shell.zh.md)
 
-The shell execution seam uses [dsh-shell](../../packages/shell/shell) as its Service Definition on `ctx.shell`. The [shell package group](../../packages/shell/README.md) lists its Bash and PowerShell providers and model-facing Consumers. Generic background-job ids, ownership, and controls live in [jobs.md](jobs.md); this seam returns a process handle without job registration. Managed-range mechanics live behind the [subprocess seam](subprocess.md).
+shell 実行シームは [dsh-shell](../../packages/shell/shell) を `ctx.shell` 上の Service Definition として使う。[shell パッケージグループ](../../packages/shell/README.md)は、その Bash と PowerShell のプロバイダーおよびモデル向けの Consumer を列挙する。汎用のバックグラウンドジョブ id、所有権、制御は [jobs.md](jobs.md) にあり、このシームはジョブ登録なしでプロセスハンドルを返す。managed-range の仕組みは [subprocess シーム](subprocess.md)の背後にある。
 
-Source: [`packages/shell/shell/src/types.ts`](../../packages/shell/shell/src/types.ts)
+ソース: [`packages/shell/shell/src/types.ts`](../../packages/shell/shell/src/types.ts)
 
-## Managed shell environment namespace
+## 管理対象の shell 環境名前空間
 
-`DSH_*` variables are Harness-owned child-process facts. The model-facing bash tool collects them through `ctx.shellEnv` and passes them through `ShellExecRequest.dshEnv`; the subprocess service removes inherited `DSH_*` names before merging the current snapshot. The `DshEnvironmentKey`/`DshEnvironment` vocabulary is owned by the [subprocess seam](subprocess.md) and re-exported by `dsh-shell`.
+`DSH_*` 変数は Harness が所有する子プロセスの事実である。モデル向けの bash ツールはそれらを `ctx.shellEnv` を通じて収集し、`ShellExecRequest.dshEnv` で渡す。subprocess サービスは現在のスナップショットをマージする前に継承された `DSH_*` 名を除去する。`DshEnvironmentKey`/`DshEnvironment` の語彙は [subprocess シーム](subprocess.md)が所有し、`dsh-shell` が再エクスポートする。
 
-## Request vs. spec: the `resolve()` split
+## リクエストと spec: resolve() の分離
 
-The seam separates the **model-/plugin-facing request** (optional `workdir`/`timeoutMs`/`stdoutMaxBytes`, filled from config or request policy) from the **fully-resolved spec** the executor acts on (those fields required). The tool layer calls `ctx.shell.resolve(request)` between them (the repo's "explicit > implicit at package boundaries" rule); a `ShellExecSpec` carries resolved values.
+このシームは、**モデル/プラグイン向けのリクエスト**（オプションの `workdir`/`timeoutMs`/`stdoutMaxBytes` で、設定またはリクエストポリシーから補完される）と、実行器が実際に扱う**完全に解決された spec**（これらのフィールドが必須）を分離する。ツール層はその間で `ctx.shell.resolve(request)` を呼ぶ（リポジトリの「パッケージ境界では明示 > 暗黙」ルール）。`ShellExecSpec` は解決済みの値を運ぶ。
 
 ```ts type-equiv
 /**
@@ -102,13 +102,13 @@ interface ShellExecSpec {
 }
 ```
 
-`stdin` and `env` are trusted in-process plugin inputs and are not exposed by `dsh-tool-bash`. The local executor scrubs ambient credentials before merging explicit caller-supplied env.
+`stdin` と `env` は信頼されたプロセス内プラグインの入力であり、`dsh-tool-bash` によって公開されない。ローカル実行器は、呼び出し元が明示的に指定した env をマージする前に、環境の資格情報をスクラブする。
 
-`stdoutMaxBytes` is also trusted-plugin-only. It lets a foreground consumer request complete stdout up to a bounded parser budget without changing stderr, background jobs, or the model-facing bash tool's ordinary output cap.
+`stdoutMaxBytes` も信頼されたプラグイン専用である。これは、stderr、バックグラウンドジョブ、モデル向け bash ツールの通常の出力上限を変更せずに、フォアグラウンドの消費者が解析用の有限予算まで完全な stdout を要求できるようにする。
 
-## Foreground runs: `ShellRunResult`
+## フォアグラウンド実行: ShellRunResult
 
-The outcome of one completed (or killed) foreground run. Orthogonal outcomes are reported **independently** — a process can both time out AND exit 0 because it trapped the signal — so `timedOut`, `aborted`, `signal`, and `exitCode` are each their own field; a caller never reads a cut-short run as a clean success.
+完了した（または kill された）フォアグラウンド実行 1 回の結果。直交する結果は**独立に**報告される。プロセスはシグナルをトラップしたためタイムアウトしつつ exit 0 することもありうる。したがって `timedOut`、`aborted`、`signal`、`exitCode` はそれぞれ独立したフィールドである。呼び出し元が途中で打ち切られた実行を正常成功として読むことはない。
 
 ```ts type-equiv
 /** The outcome of a foreground run, including timeout during preparation. */
@@ -140,13 +140,13 @@ interface ShellRunResult {
 }
 ```
 
-Each stream is a `CollectedOutput` — the (possibly truncated) text plus recovery info; when truncated, `text` is the **tail** and the complete stream spills to a private file. The fields are owned by the [subprocess seam](subprocess.md) and re-exported by `dsh-shell`.
+各ストリームは `CollectedOutput` である。すなわち（切り詰められている可能性のある）テキストと復元情報である。切り詰められた場合、`text` は**末尾**であり、完全なストリームはプライベートファイルへスピルされる。フィールドは [subprocess シーム](subprocess.md)が所有し、`dsh-shell` が再エクスポートする。
 
-## File sandbox: `ShellSandboxInfo`
+## ファイルサンドボックス: ShellSandboxInfo
 
-A sandbox-consuming executor exposes its configured mode fallback through `ShellExecutor.sandboxMode`. The tool layer asks [`@deepseek-ai/dsh-sandbox-policy`](../../packages/sandbox/sandbox-policy/README.md) to resolve each calling session's durable `sandbox/mode` override and immutable cwd into `ShellExecRequest.sandboxPolicy`; a user-approved strictly wider call replaces only the mode. The mode/root/enforcement vocabulary is owned by the [`@deepseek-ai/dsh-sandbox` seam](sandbox.md); modes govern file effects only.
+サンドボックスを利用する実行器は、設定されたモードのフォールバックを `ShellExecutor.sandboxMode` を通じて公開する。ツール層は [`@deepseek-ai/dsh-sandbox-policy`](../../packages/sandbox/sandbox-policy/README.md) に依頼して、呼び出し元セッションごとの永続的な `sandbox/mode` オーバーライドと不変の cwd を `ShellExecRequest.sandboxPolicy` へ解決する。ユーザーが承認した厳密に広い呼び出しはモードだけを置き換える。モード/ルート/enforcement の語彙は [`@deepseek-ai/dsh-sandbox` シーム](sandbox.md)が所有し、モードが支配するのはファイルへの影響のみである。
 
-A sandboxed run reports its mode, conservative denial classification, and enforcement completeness. `runnerFailed` marks a sandbox runner failure before the command ran; foreground execution throws `SANDBOX_UNAVAILABLE`, while a settled background process has only its facts channel.
+サンドボックス化された実行は、そのモード、保守的な拒否分類、および enforcement の完全性を報告する。`runnerFailed` はコマンド実行前のサンドボックスランナー失敗を示す。フォアグラウンド実行は `SANDBOX_UNAVAILABLE` をスローするが、決着済みのバックグラウンドプロセスにはその事実チャネルしかない。
 
 ```ts type-equiv
 /**
@@ -166,11 +166,11 @@ interface ShellSandboxInfo {
 }
 ```
 
-The `SANDBOX_UNAVAILABLE` error code (owned by the [sandbox seam](sandbox.md)) is what the `ctx.sandbox` provider throws — and the executor propagates — when a confined mode has no usable backend. A selected runner refusing its profile reaches the same fail-closed foreground error; a settled background job records `runnerFailed`. The model receives denial/runner facts in results, learns the effective mode only when a denial marker names it, and can request a one-shot strictly wider retry through `sandbox_permissions` plus `justification`; `ctx.approval` must grant that exact call before anything executes. The complete policy and switching design is the [sandbox reference](../../packages/sandbox/sandbox-policy/README.md).
+`SANDBOX_UNAVAILABLE` エラーコード（[sandbox シーム](sandbox.md)が所有）は、封じ込めモードに使用可能なバックエンドがないときに `ctx.sandbox` プロバイダーがスローし、実行器が伝播するものである。選択されたランナーがそのプロファイルを拒否する場合も同じフェイルクローズドのフォアグラウンドエラーに至る。決着済みのバックグラウンドジョブは `runnerFailed` を記録する。モデルは拒否/ランナーの事実を結果で受け取り、拒否マーカーがモードを名指す場合にのみ実効モードを知り、`sandbox_permissions` と `justification` を通じて 1 回限りの厳密に広い再試行を要求できる。何かが実行される前に `ctx.approval` がその正確な呼び出しを許可しなければならない。完全なポリシーと切り替えの設計は [sandbox リファレンス](../../packages/sandbox/sandbox-policy/README.md)にある。
 
-## Background processes: `ShellProcess`
+## バックグラウンドプロセス: ShellProcess
 
-`start()` resolves with a handle after asynchronous launch preparation; cancellation or preparation failure rejects before publication. The handle has no id or owner. `dsh-tool-bash` adapts it into `ctx.jobs.start()` hooks; the generic runtime then owns job identity and lifecycle. `done` resolves when the underlying process settles and never rejects; a subprocess provider rejection becomes a `killed` process with a stage-neutral error on stderr. Reads remain valid after settlement, and sandbox facts are stamped before `done` resolves.
+`start()` は非同期の起動準備の後にハンドルで解決する。キャンセルまたは準備失敗は公開前に拒否する。ハンドルは id もオーナーも持たない。`dsh-tool-bash` がそれを `ctx.jobs.start()` フックへ適合させ、汎用ランタイムがジョブ ID とライフサイクルを所有する。`done` は基盤のプロセスが決着すると解決し、決して拒否しない。subprocess プロバイダーの拒否は、stderr にステージ中立のエラーを持つ `killed` プロセスになる。読み取りは決着後も有効であり、サンドボックスの事実は `done` が解決する前に刻印される。
 
 ```ts type-equiv
 /**
@@ -214,7 +214,7 @@ interface ShellProcess {
 }
 ```
 
-`readOutput()` returns the incremental delta and spill recovery facts:
+`readOutput()` は増分デルタとスピル復元の事実を返す:
 
 ```ts type-equiv
 /** One incremental {@link ShellProcess.readOutput} read. */
@@ -230,9 +230,9 @@ interface ShellProcessRead {
 }
 ```
 
-## The service
+## サービス
 
-`ShellExecutor` owns `resolve`, foreground `run`, background-process `start`, and the `sandboxMode` capability fact. `dsh-bash-local` owns command defaulting, timeout/abort classification, the terminal environment, and the background read merge; managed-range termination, bounded collectors, spill files, credential scrubbing, and disposal quiescence are the [subprocess service](subprocess.md)'s. `dsh-tool-bash` owns model-facing rendering and adapts background handles into the [generic job runtime](jobs.md). `dsh-shell` owns the shell tools' shared exit-status contract: the exported `parseExitStatus`/`ParsedExitStatus` inverts the `[exit code: N]` / `[killed by signal: X]` markers `dsh-tool-bash`'s `renderResult` and `dsh-tool-pwsh`'s `renderPwshResult` append, and both tools' `presentResult` use it to split the rendered text into the terminal card's output body and its exit-status pill.
+`ShellExecutor` は `resolve`、フォアグラウンド `run`、バックグラウンドプロセスの `start`、および `sandboxMode` ケイパビリティの事実を所有する。`dsh-bash-local` はコマンドのデフォルト化、タイムアウト/アボートの分類、ターミナル環境、バックグラウンド読み取りのマージを所有する。managed-range の終了、有限コレクター、スピルファイル、資格情報のスクラブ、破棄時の静止は [subprocess サービス](subprocess.md)のものである。`dsh-tool-bash` はモデル向けのレンダリングを所有し、バックグラウンドハンドルを[汎用ジョブランタイム](jobs.md)へ適合させる。`dsh-shell` は shell ツール群が共有する終了ステータス契約を所有する。エクスポートされた `parseExitStatus`/`ParsedExitStatus` は、`dsh-tool-bash` の `renderResult` と `dsh-tool-pwsh` の `renderPwshResult` が付加する `[exit code: N]` / `[killed by signal: X]` マーカーを反転し、両ツールの `presentResult` がそれを使ってレンダリング済みテキストをターミナルカードの出力本体と終了ステータスのピルに分割する。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -240,23 +240,23 @@ interface ShellProcessRead {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxshell--shellexecutor-abstract-seam"></a>
 
-### `ctx.shell` — `ShellExecutor` (abstract seam)
+### `ctx.shell` — `ShellExecutor`（抽象シーム）
 
-Abstract bash execution service. Subclass, implement the abstract methods, and load the subclass as a plugin — it registers as `ctx.shell` (one implementation per context; loading a second throws, which is cordis' standard duplicate-service behavior).
+抽象 bash 実行サービス。サブクラス化して抽象メソッドを実装し、そのサブクラスをプラグインとしてロードする。`ctx.shell` として登録される（コンテキストごとに実装は 1 つ。2 つ目をロードするとスローされる。これは cordis の標準的な重複サービス動作である）。
 
-execute resolves with the process handle after preparation. "Foreground" is a property of what the caller awaits, not of the spawn — a caller that awaits ShellExecution.result ran the command in the foreground; one that keeps the handle ran it in the background. A caller that waits only for a while runs the command under `onExpiry: 'none'` and bounds its own wait; the handle stays valid after the caller stops waiting.
+execute は準備後にプロセスハンドルで解決する。「フォアグラウンド」は呼び出し元が何を待つかの性質であり、spawn の性質ではない。`ShellExecution.result` を待つ呼び出し元はコマンドをフォアグラウンドで実行し、ハンドルを保持する呼び出し元はバックグラウンドで実行した。しばらくだけ待つ呼び出し元は `onExpiry: 'none'` でコマンドを実行して自身の待機を有限化する。ハンドルは呼び出し元が待機をやめた後も有効なままである。
 
-Implementations must honor these semantics:
+実装は次のセマンティクスを守らなければならない:
 
-- ShellExecution.result rejects only for infrastructure failures. Nonzero exits, timeout kills, and abort kills resolve with a descriptive result: first-cause `timedOut`/`aborted`, the spec's `timeoutMs` echoed.
-- The handle is published after preparation. `done` settles at process close and never rejects; spawn failures settle as `killed` with the error on the read path, while `result()` carries the same failure as its rejection.
-- `onExpiry: 'none'` arms no deadline; `'kill'` kills at expiry. Expiry during preparation returns a settled timed-out handle without output.
-- ShellProcess.readOutput is incremental: consecutive reads never repeat output. Lossy reads report truncation and available spill files.
-- A still-running process is stopped and awaited when its owning composition tears down. With the subprocess seam that boundary is `ctx.subprocess` disposal, so a process survives an executor-only reload.
+- ShellExecution.result が拒否するのはインフラストラクチャー障害のみである。非ゼロ終了、タイムアウトによる kill、アボートによる kill は説明的な結果で解決する。最初の原因である `timedOut`/`aborted` と、spec の `timeoutMs` のエコーを含む。
+- ハンドルは準備後に公開される。`done` はプロセス終了時に決着し、決して拒否しない。spawn 失敗は `killed` として決着し、エラーは読み取りパスに載る。一方 `result()` は同じ失敗を自身の拒否として運ぶ。
+- `onExpiry: 'none'` はデッドラインを設定しない。`'kill'` は期限切れ時に kill する。準備中の期限切れは出力なしの決着済みタイムアウトハンドルを返す。
+- ShellProcess.readOutput は増分的である。連続する読み取りが出力を繰り返すことはない。lossy な読み取りは切り詰めと利用可能なスピルファイルを報告する。
+- 実行中のプロセスは、それを所有する構成の破棄時に停止され、待機される。subprocess シームではその境界は `ctx.subprocess` の破棄なので、プロセスは実行器のみのリロードを生き延びる。
 
 ```ts cordis-catalog
 /**
@@ -277,13 +277,13 @@ abstract resolve(request: ShellExecRequest): ShellExecSpec
 abstract execute(spec: ShellExecSpec): Promise<ShellExecution>
 ```
 
-Source: [`packages/shell/shell/src/index.ts`](../../packages/shell/shell/src/index.ts)
+ソース: [`packages/shell/shell/src/index.ts`](../../packages/shell/shell/src/index.ts)
 
 <a id="ctxshellenv--shellenvregistry"></a>
 
 ### `ctx.shellEnv` — `ShellEnvRegistry`
 
-Registry (`ctx.shellEnv`) for trusted, per-execution `DSH_*` variables. The namespace is rebuilt for every model shell call: ambient `DSH_*` values are discarded by the executor, then the registry's current snapshot is injected. Built-in shell facts remain owned by the registry itself while plugins can register additional, enumerable facts with effect-scoped disposal.
+信頼された実行単位の `DSH_*` 変数のためのレジストリ（`ctx.shellEnv`）。名前空間はモデルの shell 呼び出しごとに再構築される。環境の `DSH_*` 値は実行器によって破棄され、その後レジストリの現在のスナップショットが注入される。組み込みの shell 事実はレジストリ自身が所有したまま、プラグインは effect スコープの破棄を伴う追加の列挙可能な事実を登録できる。
 
 ```ts cordis-catalog
 /**
@@ -308,7 +308,7 @@ collect(execution: ToolExecution): DshEnvironment
 list(): BashEnvVariableInfo[]
 ```
 
-Types: [DshEnvironment](subprocess.md) · [ToolExecution](tools.md)
+型: [DshEnvironment](subprocess.md) · [ToolExecution](tools.md)
 
-Source: [`packages/shell/shell-env/src/index.ts`](../../packages/shell/shell-env/src/index.ts)
+ソース: [`packages/shell/shell-env/src/index.ts`](../../packages/shell/shell-env/src/index.ts)
 <!-- END GENERATED cordis-surface -->

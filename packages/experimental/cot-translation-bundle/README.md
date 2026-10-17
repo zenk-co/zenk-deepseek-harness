@@ -1,81 +1,81 @@
 ---
-description: "Enable machine translation of displayed reasoning from the Plugins page."
+description: "表示されるリーズニングの機械翻訳をプラグインページから有効にする。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-experimental-cot-translation-bundle
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Translate expanded reasoning into the interface language or another chosen language. Enable Reasoning translation on the Web or Desktop Plugins page; shipped profiles leave it disabled. Bing is the default provider, and Google is available in the bundle settings. Original reasoning remains available and stays unchanged in the Session and model input.
+展開されたリーズニングをインターフェース言語または選択した別の言語に翻訳する。Web または Desktop のプラグインページでリーズニング翻訳を有効にすること。出荷プロファイルでは無効のままである。Bing が既定のプロバイダーであり、バンドル設定で Google も利用できる。元のリーズニングは引き続き利用でき、セッションやモデル入力内では変更されないままである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Open Plugins and enable Reasoning translation in the Official group. Open its details to select a translation service and target language. `auto` follows the interface language; an explicit language code such as `zh`, `en`, or `ja` overrides it. Save applies the preferences.
+プラグインを開き、Official グループでリーズニング翻訳を有効にする。詳細を開いて翻訳サービスと対象言語を選択する。`auto` はインターフェース言語に従い、`zh`・`en`・`ja` などの明示的な言語コードはそれを上書きする。保存で設定を適用する。
 
-Expand a Think row to start translation. The row translates completed paragraphs and request-sized prefixes of long streaming paragraphs while retaining the unfinished tail. View original in the translation toolbar switches the expanded body to the source; View translation switches it back. A failed translation leaves the original visible and offers Retry. Disabling the bundle removes its controls and cancels pending calls. Successful translations remain saved in the Session and are reused when the same request is reopened, the page reloads, or the Host restarts.
+Think 行を展開すると翻訳が始まる。行は完了した段落と、長いストリーミング段落の要求サイズ分の先頭部分を翻訳し、未完成の末尾は保持する。翻訳ツールバーの原文表示で展開本文を原文に切り替え、翻訳表示で元に戻す。翻訳に失敗すると原文が表示されたままとなり、再試行が提示される。バンドルを無効にするとその操作部品は消え、保留中の呼び出しは取り消される。成功した翻訳はセッションに保存され、同じ要求を再度開いたとき、ページを再読み込みしたとき、ホストを再起動したときに再利用される。
 
-The selected service receives the expanded reasoning, which can contain private code and conversation details. Google and Bing send source text in POST request bodies. Bing and Google require no additional login or API key, but neither anonymous endpoint guarantees availability or free quotas. Eligible native `deepseek-flash` routes appear as explicit paid choices using the configured DeepSeek Account or Official API credentials. Each uncached fragment issues one independent query with thinking disabled. Reopening reuses saved results; changing provider, language, source or recipe may require another billed query. The model ID is matched without a version number, and pi-ai routes are excluded. Provider failure never sends the text to another service automatically.
+選択したサービスは展開されたリーズニングを受け取り、そこには非公開のコードや会話の詳細が含まれる場合がある。Google と Bing は POST 要求本文で原文を送信する。Bing と Google に追加のログインや API キーは不要だが、どちらの匿名エンドポイントも可用性や無料枠を保証しない。対象のネイティブ `deepseek-flash` ルートは、設定済みの DeepSeek アカウントまたは Official API 資格情報を使う明示的な有料選択肢として表示される。未キャッシュの断片ごとに思考無効の独立したクエリを 1 件発行する。再度開く場合は保存済み結果を再利用し、プロバイダー・言語・原文・レシピの変更には別の課金クエリが必要になる場合がある。モデル ID はバージョン番号なしで照合され、pi-ai ルートは除外される。プロバイダーの失敗でテキストが自動的に別サービスへ送られることはない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Maintainer details — click to expand</summary>
+<summary>メンテナー詳細 — クリックで展開</summary>
 
-The bundle patch inserts `translator` and `cot-translation`, selecting Bing and the interface language. The translator owns provider protocols, network limits, and shared persisted requests and results; the GUI consumer owns settings, paragraph scheduling, and a local cache for the current display. The GUI reuses saved results directly and joins normal Session activation when a new translation needs its existing writer. Its generated Remote contribution is mounted only while the bundle is enabled. The translation wrapper and Chat's default Body entry both call the official reasoning Content Factory.
+バンドルパッチは `translator` と `cot-translation` を挿入し、Bing とインターフェース言語を選択する。translator はプロバイダープロトコル・ネットワーク制限・共有の永続化された要求と結果を所有し、GUI 側の利用者は設定・段落スケジューリング・現在の表示用のローカルキャッシュを所有する。GUI は保存済み結果を直接再利用し、新しい翻訳に既存のライターが必要な場合は通常のセッション有効化に参加する。生成された Remote 寄与はバンドル有効中のみマウントされる。翻訳ラッパーと Chat の既定 Body エントリーはどちらも公式のリーズニング Content Factory を呼ぶ。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-[Text translation subsystem](../../../docs/subsystems/translation.md) · [Translator service](../translator/README.md) · [GUI consumer](../client-ui-cot-translation/README.md)
+[テキスト翻訳サブシステム](../../../docs/subsystems/translation.md) · [Translator サービス](../translator/README.md) · [GUI 側の利用者](../client-ui-cot-translation/README.md)
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through optional independent paid Flash requests and normal Session activation on cache misses; the translator owns translation prompts, and the Session's preset owns startup context.
+間接的に、任意の独立した有料 Flash 要求とキャッシュミス時の通常セッション有効化を通じて関わる。翻訳プロンプトは translator が所有し、起動時コンテキストはセッションのプリセットが所有する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Translation records leave original reasoning intact; normal Session activation and optional paid queries have the cache effects described by the [GUI consumer](../client-ui-cot-translation/README.md#model-experience).
+翻訳記録は元のリーズニングを変更しない。通常のセッション有効化と任意の有料クエリは、[GUI 側の利用者](../client-ui-cot-translation/README.md#model-experience)が説明するキャッシュ効果を持つ。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Collapsed summaries remain in the original language. Translation starts when the reader expands the reasoning body; it may change Markdown or code formatting. Original always remains accessible.
-- Anonymous Google and Bing browser endpoints may fail, rate-limit requests, or change their response formats. Mainland China connectivity depends on the deployment's network and proxy configuration. Successful translations remain in the Session after collapse, bundle removal, or restart. Experimental records have best-effort retention across future Session-format migrations.
+- 折りたたまれた要約は原文のままである。翻訳は読み手がリーズニング本文を展開したときに始まり、Markdown やコード書式が変わる場合がある。原文には常時アクセスできる。
+- 匿名の Google・Bing ブラウザーエンドポイントは失敗・レート制限・応答形式変更がありうる。中国本土での接続はデプロイのネットワークとプロキシ設定に依存する。成功した翻訳は折りたたみ後もバンドル削除後も再起動後もセッションに残る。Experimental 記録は将来のセッションフォーマット移行をまたぐ保持がベストエフォートである。
 
 -----
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

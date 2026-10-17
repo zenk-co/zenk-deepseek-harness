@@ -3,7 +3,7 @@
 
 # 会话持久化事件目录
 
-[English](persistence-catalog.md) | 中文
+[日本語](persistence-catalog.md) | [English](persistence-catalog.en.md) | 中文
 
 本目录列出仓库声明的每个持久化 Session 事件及其源码声明和解析类型，覆盖逻辑与物理 header、事件信封及所有 SessionEventMap 声明合并。回放规则参见 [Session](subsystems/session.zh.md)，存储规则参见[持久化](subsystems/persistence.zh.md)。
 

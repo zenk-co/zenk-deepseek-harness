@@ -5,7 +5,7 @@ description: "会话标题提供方直接注册、拥有自己的策略设置，
 
 # 迁移会话标题提供方
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

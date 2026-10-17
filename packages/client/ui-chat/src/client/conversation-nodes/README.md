@@ -1,331 +1,331 @@
 ---
-description: "Detailed business rules for Chat process grouping and activity summaries."
+description: "Chat のプロセスグループ化とアクティビティサマリーに関する詳細なビジネスルール。"
 ---
-# Chat conversation node rules
+# Chat 会話ノードのルール
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-A Turn shows an answer and lets the reader inspect the work behind it. Start with the complete example below, then read the folding and display rules to understand what is visible. The later sections define exact group boundaries, every tool-name category, counting, and live-detail selection.
+1つのターンは回答を示し、読者がその背景の作業を調べられるようにする。まず下の完全な例から読み、次に折りたたみと表示のルールを読んで何が見えるかを理解すること。以降のセクションでは、厳密なグループ境界、すべてのツール名カテゴリ、件数集計、ライブ詳細の選択を定義する。
 
-## Table of Contents
+## 目次
 
-- [How one Turn becomes a transcript](#reading-model)
-- [Whole-Turn folding](#whole-turn-folding)
-- [Display modes](#display-modes)
-- [Collapse timing](#collapse-timing)
-- [Process grouping](#process-grouping)
-- [Activity summaries and tool rules](#activity-summaries)
+- [1つのターンがトランスクリプトになる仕組み](#reading-model)
+- [ターン全体の折りたたみ](#whole-turn-folding)
+- [表示モード](#display-modes)
+- [折りたたみのタイミング](#collapse-timing)
+- [プロセスのグループ化](#process-grouping)
+- [アクティビティサマリーとツールルール](#activity-summaries)
 
 -----
 
 <a id="reading-model"></a>
-## How one Turn becomes a transcript
+## 1つのターンがトランスクリプトになる仕組み
 
-Grouping, counts, display modes, and whole-Turn folding answer different questions. Grouping decides which process rows belong together. Counts summarize work inside an existing group. Display modes decide how much of each group to show. Without an intervening input, whole-Turn folding can hide the entire process across several groups and intermediate replies.
+グループ化、件数、表示モード、ターン全体の折りたたみは、それぞれ異なる問いに答える。グループ化は、どのプロセス行をまとめるかを決める。件数は、既存のグループ内の作業を要約する。表示モードは、各グループをどれだけ表示するかを決める。間に別の入力がなければ、ターン全体の折りたたみにより、複数のグループや中間返信にまたがるプロセス全体を隠せる。
 
-### A complete example
+### 完全な例
 
-Suppose the assistant thinks, reads a file, runs a command, posts a progress reply, then thinks and runs code before giving its final answer. After completion, that Turn contains:
+アシスタントが思考し、ファイルを読み、コマンドを実行し、進捗返信を投稿してから、さらに思考してコードを実行し、最後に最終回答を返すとする。完了後、そのターンには以下が含まれる。
 
-- User input.
-- Whole-Turn control.
-- Process content controlled by the whole-Turn control:
-  - Group G1: reasoning, `read`, `bash`.
-  - Intermediate reply: outside both groups, but still part of the Turn's process.
-  - Group G2: reasoning, `run_code`.
-- Final response, outside the process fold.
-- Completed-turn footer.
+- ユーザー入力。
+- ターン全体の制御。
+- ターン全体の制御に従うプロセス内容:
+  - グループ G1: 推論、`read`、`bash`。
+  - 中間返信: 両グループの外側だが、ターンのプロセスの一部。
+  - グループ G2: 推論、`run_code`。
+- 最終応答。プロセスの折りたたみの外側。
+- 完了ターンのフッター。
 
-Every reply separates secondary groups; only the final answer is protected from whole-Turn folding. An intermediate reply can be an independent row and still disappear when the Turn is folded. Reasoning attached to the final answer remains process content.
+すべての返信は後続グループを分離する。ターン全体の折りたたみから保護されるのは最終回答のみである。中間返信は独立した行でありながら、ターンが折りたたまれると非表示になる。最終回答に付随する推論はプロセス内容のままである。
 
-| Question | Deciding rule | Result in this example |
+| 問い | 決定ルール | この例での結果 |
 |---|---|---|
-| Which rows belong together? | Group boundaries | The reply separates G1 and G2; changing from `read` to `bash` does not. |
-| What did a group do? | Category counts | G1 has `read=1, commands=1`; G2 has `code=1`. Reasoning adds no tool count. |
-| What does its title say? | Group state and summary | Running groups use their latest running activity; closed groups use their highest-count categories. Counts never decide folding. |
-| How much detail is visible? | Display mode and manual group opening | Compact, Standard, and Detailed retain historical group headers; Detailed shows running bodies directly, while Verbose shows both running and historical bodies directly. |
-| Is the process visible at all? | Whole-Turn opening | Closing the Turn hides G1, the intermediate reply, and G2 together. |
+| どの行をまとめるか。 | グループ境界 | 返信が G1 と G2 を分離する。`read` から `bash` への切り替えでは分離しない。 |
+| グループは何をしたか。 | カテゴリ件数 | G1 は `read=1, commands=1`、G2 は `code=1`。推論はツール件数に加算しない。 |
+| タイトルは何を示すか。 | グループ状態とサマリー | 実行中のグループは最新の実行中アクティビティを使用し、終了済みグループは件数上位のカテゴリを使用する。件数が折りたたみを決めることはない。 |
+| 詳細はどれだけ見えるか。 | 表示モードとグループの手動展開 | Compact、Standard、Detailed は履歴グループのヘッダーを保持する。Detailed は実行中のボディを直接表示し、Verbose は実行中と履歴の両ボディを直接表示する。 |
+| プロセスはそもそも見えるか。 | ターン全体の開閉 | ターンを閉じると G1、中間返信、G2 がまとめて隠れる。 |
 
-### What the reader sees
+### 読者に見える内容
 
-Assume the Turn above completed normally, with no inner disclosure manually opened:
+上記のターンが正常に完了し、内部の開閉を手動で開いていない場合を想定する。
 
-| Viewing state | Visible content |
+| 表示状態 | 表示内容 |
 |---|---|
-| Whole Turn collapsed, Compact/Standard/Detailed | Input, whole-Turn control, final response, and footer. No process headers, bodies, or intermediate reply. |
-| Whole Turn open, Compact/Standard/Detailed | G1/G2 headers, the intermediate reply, and final response. Group bodies start collapsed. |
-| Whole Turn and G1 open, Standard or Detailed | G1's reasoning and tool rows with the settled reasoning preview; G2 remains a header. Full reasoning/tool bodies are still manual. |
-| Verbose | Whole-Turn duration/status header without a collapse action, all process rows, intermediate reply, and final response. No group headers; individual tool/reasoning bodies remain manual. |
+| ターン全体を折りたたみ、Compact/Standard/Detailed | 入力、ターン全体の制御、最終応答、フッター。プロセスヘッダー、ボディ、中間返信はなし。 |
+| ターン全体を開く、Compact/Standard/Detailed | G1/G2 ヘッダー、中間返信、最終応答。グループボディは折りたたんだ状態で開始。 |
+| ターン全体と G1 を開く、Standard または Detailed | 確定済み推論プレビュー付きの G1 の推論行とツール行。G2 はヘッダーのまま。完全な推論/ツールボディは依然として手動。 |
+| Verbose | 折りたたみ操作のない継続時間/状態ヘッダー、すべてのプロセス行、中間返信、最終応答。グループヘッダーなし。個々のツール/推論ボディは依然として手動。 |
 
-Visibility applies from outside inward: whole Turn → secondary group → individual reasoning/tool disclosure. Opening an inner layer cannot bypass a closed outer layer. Category changes never open or close a layer. Mode changes preserve membership and manual opening choices.
+表示は外側から内側へ適用される。ターン全体 → セカンダリグループ → 個々の推論/ツール開閉の順である。内側の層を開いても、閉じた外側の層を迂回できない。カテゴリの変化で層が開閉することはない。モード変更ではメンバーシップと手動開閉の選択を保持する。
 
-If steering, a User message, or a trigger notice follows process output, the Turn offers only individual group disclosures, not whole-Turn collapse. In Compact/Standard, `G1 → steering 1 → G2 → steering 2 → G3` retains all three headers and both inputs in that order, with intermediate replies visible; opening one group reveals only its body. Detailed directly shows group bodies only while the Turn runs; completed Turns retain headers and manual disclosure. Verbose shows group bodies directly in both cases. The Turn control still shows duration or status, without a collapse action.
+プロセス出力の後にステアリング、ユーザーメッセージ、トリガー通知が続く場合、ターンではターン全体の折りたたみではなく、個別グループの開閉のみを提供する。Compact/Standard では、`G1 → steering 1 → G2 → steering 2 → G3` の順序のまま3つのヘッダーと両方の入力を保持し、中間返信も表示する。1つのグループを開いても、そのボディのみが現れる。Detailed はターンの実行中に限りグループボディを直接表示し、完了済みターンではヘッダーと手動開閉を保持する。Verbose はどちらの場合もグループボディを直接表示する。ターン制御には折りたたみ操作なしで継続時間または状態を表示する。
 
 -----
 
 <a id="whole-turn-folding"></a>
-## Whole-Turn folding
+## ターン全体の折りたたみ
 
-Whole-Turn folding controls the loaded process range, independently of secondary groups, in Compact, Standard, and Detailed. Verbose keeps that range visible and retains the duration/status header without a collapse action. A recorded Turn end makes that range eligible even when paging has not loaded the Turn start.
+ターン全体の折りたたみは、Compact、Standard、Detailed において、読み込み済みプロセス範囲をセカンダリグループとは独立に制御する。Verbose ではその範囲を表示したままにし、折りたたみ操作のない継続時間/状態ヘッダーを保持する。記録済みのターン終了により、ページングでターンの先頭を読み込んでいなくても、その範囲が対象になる。
 
-The rules below use the default completion-time folding. The [collapse-timing preference](#collapse-timing) can defer the latest exchange's historical presentation without changing whole-Turn eligibility.
+以下のルールはデフォルトの完了時折りたたみを使用する。[折りたたみのタイミング設定](#collapse-timing)により、ターン全体の対象範囲を変えずに、最新のやり取りの履歴表示を遅延できる。
 
-The Turn control follows all its opening inputs, including human steering and non-human trigger notices, while waiting for the first Assistant output and after that output arrives. Consecutive inputs before the first process evidence are opening inputs, anchored by the last one. Later inputs retain their positions: even when paging has not loaded their inbox insertions and they temporarily appear as ordinary User messages, preceding process content must not move after them.
+ターン制御は、最初のアシスタント出力待ちの間も出力到着後も、人的ステアリングや非人的トリガー通知を含むすべての先行入力に追従する。最初のプロセス証拠より前の連続した入力は先行入力であり、最後の1つが基準になる。以降の入力は位置を保持する。ページングでインボックス挿入を読み込んでおらず一時的に通常のユーザーメッセージとして表示される場合でも、先行するプロセス内容がそれらの後に移動してはならない。
 
-| Admitted input | Chat presentation |
+| 受け付けた入力 | Chat での表示 |
 |---|---|
-| Human message claimed from `next-step` | Steering message, outside process folding. |
-| Non-human message in the current `next-turn` claim | Independent, initially collapsed Turn-trigger notice. |
-| Non-human message in an idle `next-step` claim | Turn-trigger notice only in Step 1, with a loaded Turn start, a claim after that start, no `next-turn` claim in this Turn, and no human in the same `next-step` batch. |
-| Other non-human input | Ordinary Context, retained in the Node Store but omitted from Chat. Unclaimed, canceled, or requeued messages do not establish a waking claim. |
+| `next-step` から取り込んだ人的メッセージ | プロセス折りたたみの外側のステアリングメッセージ。 |
+| 現在の `next-turn` クレーム内の非人的メッセージ | 独立した、初期状態で折りたたまれたターン起動通知。 |
+| アイドル状態の `next-step` クレーム内の非人的メッセージ | ステップ1でのみターン起動通知。読み込み済みのターン開始、その開始後のクレーム、このターン内の `next-turn` クレームなし、同一 `next-step` バッチ内の人間なしが条件。 |
+| その他の非人的入力 | 通常のコンテキスト。Node Store には保持されるが Chat には表示しない。未取得、キャンセル済み、再キュー済みのメッセージは起動クレームを確立しない。 |
 
-Trigger titles and icons use the recorded `source.kind`: `schedule`, `tool-jobs`, and `cordis-host-runner` identify scheduled work, background work, and plugin updates. Schedule notices are labeled Automation task and use the same plain clock icon as the Automation tasks entry. Goal, agent, team, subagent, and webhook sources have their own titles; a webhook with `provider: github` uses the GitHub title. Unknown sources use the generic execution-request title. Expanding the notice shows its recorded body; it does not imply successful execution.
+トリガーのタイトルとアイコンは記録済み `source.kind` を使用する。`schedule`、`tool-jobs`、`cordis-host-runner` はそれぞれスケジュール済み作業、バックグラウンド作業、プラグイン更新を示す。スケジュール通知には自動化タスクのラベルを付け、自動化タスクのエントリと同じシンプルな時計アイコンを使用する。目標、エージェント、チーム、サブエージェント、Webhook の各ソースには専用タイトルがあり、`provider: github` の Webhook は GitHub タイトルを使用する。不明なソースは汎用の実行リクエストタイトルを使用する。通知を展開すると記録済みボディが表示される。実行の成功を意味しない。
 
-| Turn condition | Current behavior |
+| ターン条件 | 現在の動作 |
 |---|---|
-| Not closed | Keep process content open; whole-Turn collapse is unavailable. Secondary groups still follow the mode table. |
-| Stopped or failed | Keep process content open; whole-Turn collapse is unavailable. |
-| Visible input after the first process evidence | Whole-Turn collapse is unavailable. Preserve process segments, intermediate replies, and input order; group disclosures remain available. Consecutive opening inputs do not qualify. |
-| Other closed Turn with loaded process content | Initially collapse the process; allow manual opening and closing. Neither the Turn start nor the rest of Session history must already be loaded. |
-| Closed Turn with no final answer | Collapse all process rows when otherwise eligible. |
-| End is loaded but start is absent | Apply the closed-Turn rules above to loaded content. Show no elapsed duration; do not use the first loaded tool/message time as the start. |
-| Neither start nor end is loaded | Keep process rows visible and withhold the whole-Turn control. |
-| A Turn control exists, but there is no process content | Retain its title, without a collapse action. |
+| 未クローズ | プロセス内容を開いたままにする。ターン全体の折りたたみは不可。セカンダリグループはモード表に従う。 |
+| 停止または失敗 | プロセス内容を開いたままにする。ターン全体の折りたたみは不可。 |
+| 最初のプロセス証拠の後に可視入力 | ターン全体の折りたたみは不可。プロセスセグメント、中間返信、入力順序を保持する。グループ開閉は利用可能。連続した先行入力は対象外。 |
+| 読み込み済みプロセス内容のあるその他のクローズ済みターン | 初期状態でプロセスを折りたたむ。手動の開閉を許可。ターンの開始もセッション履歴の残りも読み込み済みである必要はない。 |
+| 最終回答のないクローズ済みターン | 対象の場合はすべてのプロセス行を折りたたむ。 |
+| 終了は読み込み済みだが開始が未読み込み | 読み込み済み内容に上記のクローズ済みターンルールを適用する。経過時間を表示しない。最初に読み込んだツール/メッセージ時刻を開始時刻として使用しない。 |
+| 開始も終了も未読み込み | プロセス行を表示したままにし、ターン全体の制御を提供しない。 |
+| ターン制御はあるがプロセス内容がない | 折りたたみ操作なしでタイトルを保持する。 |
 
-The final answer is the latest Step's settled Assistant reply, provided it has visible reply content and no tool-call block. Its response remains outside whole-Turn folding; its reasoning remains process content. A Node whose [group-tree position](../contract/group-tree.ts) is `turn` or outer remains independent of whole-Turn folding. Turn inputs stand at `input` or `exchange`: user and steering messages and trigger notices; an input after the process start keeps the whole Turn open. Terminal errors, max-token notices, the completed-turn footer, and the Turn control stand at `turn`. A `process` Node, such as a model retry, separates secondary groups but whole-Turn folding still includes it.
+最終回答は、表示可能な返信内容を持ちツール呼び出しブロックのない、最新ステップの確定済みアシスタント返信である。その応答はターン全体の折りたたみの外側に残り、推論はプロセス内容に残る。[グループツリー位置](../contract/group-tree.ts)が `turn` より外側のノードはターン全体の折りたたみと独立している。ターン入力は `input` または `exchange` に位置する。ユーザー/ステアリングメッセージとトリガー通知が該当し、プロセス開始後の入力はターン全体を開いたままにする。終端エラー、最大トークン通知、完了ターンフッター、ターン制御は `turn` に位置する。モデルリトライなどの `process` ノードはセカンダリグループを分離するが、ターン全体の折りたたみには含まれる。
 
-Loading an older page preserves the reader's group-opening choices. Newly loaded process content follows the same Turn state while the final answer is unchanged and whole-Turn folding remains eligible. If the page reveals an intervening input, individual group disclosures replace whole-Turn hiding. When the real start arrives, the duration becomes available; loading all history is not an additional folding condition. When new content only extends an existing group at its beginning, that group and its old message rows retain their identities and opening choices. Replies, steering, and other real boundaries in the new page still separate groups; not every new row joins the old group.
+古いページの読み込みでは読者のグループ開閉選択を保持する。新規読み込みのプロセス内容は、最終回答が不変でターン全体の折りたたみが対象のままなら、同じターン状態に従う。ページで介在入力が明らかになった場合、個別グループの開閉がターン全体の非表示に置き換わる。実際の開始時刻が到着すれば継続時間が利用可能になる。全履歴の読み込みは追加の折りたたみ条件ではない。新規内容が既存グループの先頭を拡張するだけの場合、そのグループと古いメッセージ行は同一性と開閉選択を保持する。新規ページ内の返信、ステアリング、その他の実境界は依然としてグループを分離する。新規行のすべてが古いグループに結合するわけではない。
 
-Clicking Load older anchors the first visible content item below that button in transcript order, regardless of its position in the viewport. A collapsed group anchors its header; an expanded group skips its header and anchors its first visible member. The whole-Turn process control is excluded because paging can move it ahead of newly loaded work and steering. When a whole Turn is collapsed, the anchor is its first remaining visible message, such as steering or the final answer. Ordinary messages and steering anchor themselves; hidden and empty rows are skipped. Loading more content inside a collapsed group keeps its header stationary; adding earlier groups or rows preserves that same group header while they appear above it.
+「Load older」をクリックすると、ビューポート内の位置にかかわらず、そのボタンの下にあるトランスクリプト順で最初の可視内容アイテムに固定する。折りたたまれたグループはヘッダーに固定し、展開済みグループはヘッダーを飛ばして最初の可視メンバーに固定する。ターン全体のプロセス制御は除外される。ページングにより新規読み込み作業より前に移動し、ステアリングする可能性があるためである。ターン全体が折りたたまれている場合、固定対象はステアリングや最終回答など最初に残った可視メッセージである。通常メッセージとステアリングは自身に固定し、非表示行と空行は飛ばす。折りたたまれたグループ内での追加読み込みではヘッダーを静止させたままにする。以前のグループや行の追加では、それらが上に現れながら同じグループヘッダーを保持する。
 
-Paging adds older content above the retained anchor without jumping to the new top. A capped group absorbs the displacement within its scroll range; the outer transcript absorbs the remainder, including when the group first reaches its cap. If the available scroll range is insufficient, compensation stops at the actual limit without adding bottom space. Later content growth keeps the same anchor until a reading gesture or explicit navigation releases it. Typing or clicking within the composer and non-scrolling transcript keys retain the anchor. If the reader scrolls while a page is loading, scrolling takes priority and its settled reading position becomes the new paging anchor.
+ページングでは保持された固定対象の上に古い内容を追加し、新規先頭へジャンプしない。上限付きグループは変位をスクロール範囲内に吸収し、残りはグループが上限に到達したときを含め外側のトランスクリプトが吸収する。利用可能なスクロール範囲が不足する場合、底部の余白追加なしに実際の上限で補正を止める。以降の内容増加では、読み取りジェスチャーや明示的ナビゲーションが解除するまで同じ固定対象を保持する。コンポーザー内での入力やクリック、非スクロールのトランスクリプトキーは固定対象を保持する。ページ読み込み中に読者がスクロールした場合、スクロールを優先し、確定した読み取り位置が新たなページング固定対象になる。
 
-While the Session runs, Chat appends a Session-level indicator at the bottom of the current transcript, after pending submission or steering rows: a whale tail beside shimmering elapsed time. Before the current Turn start time arrives, the indicator shows status text without a duration. The clock updates in whole seconds, starts at one second, and uses hours from 60 minutes. When the Session stops running, the indicator disappears; the closed Turn process control shows the fixed duration, cancellation, or failure status. Lifecycle changes have a polite announcement; clock ticks do not. The whale is hidden from assistive technology and remains static under reduced motion.
+セッションの実行中、Chat は現在のトランスクリプトの末尾、保留中の送信行やステアリング行の後に、セッションレベルのインジケーターを追加する。きらめく経過時間の横にあるホエールテールである。現在のターン開始時刻が未到来の場合、インジケーターは継続時間なしの状態テキストを表示する。時計は秒単位で更新し、1秒から開始し、60分から時間単位を使用する。セッションの実行が停止するとインジケーターは消える。クローズ済みターンのプロセス制御には確定した継続時間、キャンセル、失敗状態を表示する。ライフサイクル変化はポライトに通知し、時計の tick は通知しない。ホエールは支援技術から隠され、モーション軽減設定では静止する。
 
-The top duration/status control and trigger title use the group-title font size and follow the font-size setting. Completed duration digits use the code font with tabular numerals; running and completed minutes and seconds have no leading zero. The timed running label ends with a space and “···”; completion shows “Completed in”.
+上部の継続時間/状態制御とトリガータイトルはグループタイトルのフォントサイズを使用し、フォントサイズ設定に従う。完了済み継続時間の数字は等幅数字のコードフォントを使用し、実行中と完了済みの分秒に先行ゼロは付けない。時刻付き実行中ラベルは半角スペースと “···” で終わり、完了表示は “Completed in” である。
 
-Automatic collapse keeps the process open if hiding it would hide keyboard focus. Manual closing focuses the process control before hiding its members. Closing a whole Turn resets its groups and inner reasoning/tool disclosures; it does not reset unrelated renderer state. Browser find can reveal searchable hidden content.
+自動折りたたみでは、隠すとキーボードフォーカスが隠れる場合にプロセスを開いたままにする。手動で閉じる際はメンバーを隠す前にプロセス制御へフォーカスを移す。ターン全体を閉じると、そのグループと内部の推論/ツール開閉をリセットする。無関係なレンダラー状態はリセットしない。ブラウザー内検索では隠れた検索可能内容を現せる。
 
 -----
 
 <a id="display-modes"></a>
-## Display modes
+## 表示モード
 
-Settings → General → Work details offers four modes for choosing how much tool-call detail to show: Compact `compact`, Standard `standard`, Detailed `detailed`, and Verbose `verbose`.
+設定 → 一般 → 作業詳細では、ツール呼び出し詳細の表示量を選ぶ4つのモードを提供する。Compact `compact`、Standard `standard`、Detailed `detailed`、Verbose `verbose` である。
 
-| Behavior | Compact | Standard | Detailed | Verbose |
+| 動作 | Compact | Standard | Detailed | Verbose |
 |---|---|---|---|---|
-| Process-group header | Category summary | Summary and live task detail | Hidden in running Turns; retained in historical Turns | Hidden |
-| Process-group body | Initially collapsed | Initially collapsed | Directly visible without a group-level height cap in running Turns; manual disclosure in historical Turns | Directly visible without a group-level height cap in running and historical Turns |
-| Settled reasoning preview | Hidden | First line | First line | First line |
-| Individual reasoning and tool bodies | Manual expansion | Manual expansion | Manual expansion | Manual expansion |
-| Eligible completed Turn | Initially collapsed | Initially collapsed | Initially collapsed | Always open; duration/status header cannot collapse it |
+| プロセスグループヘッダー | カテゴリサマリー | サマリーとライブタスク詳細 | 実行中ターンでは非表示、履歴ターンでは保持 | 非表示 |
+| プロセスグループボディ | 初期状態で折りたたみ | 初期状態で折りたたみ | 実行中ターンではグループレベルの高さ上限なしで直接表示、履歴ターンでは手動開閉 | 実行中と履歴の両ターンでグループレベルの高さ上限なしで直接表示 |
+| 確定済み推論プレビュー | 非表示 | 先頭行 | 先頭行 | 先頭行 |
+| 個々の推論とツールボディ | 手動展開 | 手動展開 | 手動展開 | 手動展開 |
+| 対象の完了済みターン | 初期状態で折りたたみ | 初期状態で折りたたみ | 初期状態で折りたたみ | 常に展開。継続時間/状態ヘッダーでは折りたためない |
 
-### Defaults and saving preferences
+### デフォルトと設定の保存
 
-Work details uses the Host setting `ui-chat.transcriptView`. The client reads it according to these rules:
+作業詳細はホスト設定 `ui-chat.transcriptView` を使用する。クライアントは以下のルールに従って読み取る。
 
-- Saved values for the four modes are used directly, regardless of changes to defaults.
-- Legacy `normal` and `expanded` values display as `detailed`, without automatically rewriting the saved values on disk.
-- When the setting is missing, `null`, or invalid, Desktop uses `standard` and non-Desktop Web uses `detailed`. Each client also uses its default before Host settings arrive; invalid values in other settings still fail validation.
+- 4モードの保存値はデフォルト変更にかかわらず直接使用される。
+- 旧来の `normal` と `expanded` 値は `detailed` として表示され、ディスク上の保存値は自動で書き換えない。
+- 設定が欠落、`null`、無効の場合、Desktop では `standard`、Desktop 以外の Web では `detailed` を使用する。各クライアントはホスト設定到着前にも各自のデフォルトを使用する。他の設定の無効値は依然として検証失敗になる。
 
-Reading a default does not automatically save configuration. When the user changes modes, the selected value is saved through Host settings and stays process-local when settings cannot persist writes. Desktop onboarding writes preferences according to its rules when completed or skipped.
+デフォルトの読み取りで設定を自動保存しない。ユーザーがモードを変更すると、選択値がホスト設定経由で保存され、設定の書き込み永続化が不可の場合はプロセス内に留まる。Desktop のオンボーディングでは、完了時またはスキップ時に各自のルールに従って設定を書き込む。
 
 <a id="collapse-timing"></a>
-### Collapse timing
+### 折りたたみのタイミング
 
-Settings → General → Collapse work details appears directly below Work details and is independent of the display mode. On completion is the default and retains immediate folding and tail positioning. On next message enables delayed folding and its coordinated transitions. The choice is saved as `ui-chat.collapseTiming` through the same Host profile settings as Work details and is restored after reload or reopening the app. Profiles without a saved value use On completion without writing that default. It does not write browser storage or Session data.
+設定 → 一般 → 作業詳細の折りたたみは作業詳細の直下に表示され、表示モードとは独立である。完了時がデフォルトであり、即時の折りたたみと末尾位置を保持する。次のメッセージ時では遅延折りたたみとその連携トランジションを有効にする。選択は作業詳細と同じホストプロファイル設定として `ui-chat.collapseTiming` に保存され、リロードやアプリ再起動後に復元される。保存値のないプロファイルではデフォルト書き込みなしで完了時を使用する。ブラウザーストレージやセッションデータには書き込まない。
 
-With On next message, the latest exchange keeps its running presentation after completion: Compact and Standard retain their process headers, and Detailed retains its flat process rows. An exchange starts with the Turn whose first Step admits human input and includes every later Turn until the next such Turn, so a Turn woken by a notice (a settled subagent, goal round, schedule, or job) leaves the preceding Turns of its exchange expanded. A pending ordinary transcript submission or a Turn that opens a newer exchange ends this exemption without clearing the reader's manual whole-Turn choice; a bare Turn start does not, because the host claims the waking input before it logs Step 1. Inner disclosures reset only when their outer process actually hides. Queued input and steering alone do not end it. The latest exchange of a reopened Session also receives the exemption, starting at the first loaded Turn when the loaded window holds no opening Turn; manual whole-Turn choices still take precedence. Switching back to On completion ends the exemption immediately.
+次のメッセージ時では、完了後も最新のやり取りが実行中の表示を保持する。Compact と Standard はプロセスヘッダーを保持し、Detailed はフラットなプロセス行を保持する。やり取りは、人的入力を受け付ける最初のステップを持つターンから始まり、次のそのようなターンまでのすべての以降ターンを含むため、通知(確定済みサブエージェント、目標ラウンド、スケジュール、ジョブ)で起動したターンは、そのやり取りの先行ターンを展開したままにする。保留中の通常トランスクリプト送信や新規やり取りを開くターンは、読者の手動ターン全体選択を消去せずにこの免除を終了する。ホストがステップ1のログ前に起動入力を要求するため、入力を伴わないターン開始だけでは終了しない。内部開閉は外側プロセスが実際に隠れるときのみリセットする。キュー済み入力や単独のステアリングでは終了しない。再開セッションの最新やり取りもこの免除を受け、読み込みウィンドウに開始ターンがなければ最初に読み込んだターンから開始する。手動のターン全体選択は依然として優先する。完了時に戻すと免除は直ちに終了する。
 
-When a new message triggers a fold, process details close in one movement with no second scroll after the fold. If this client sent the message, or the reader was following the tail, the transcript lands on the new message; otherwise, such as a message from another tab or a queued message delivered after the previous Turn, the content the reader is looking at stays still. Off-screen steps do not add bottom space; only the space needed to preserve the visible movement remains when the retained answer and new message cannot fill it. Content added during the fold updates its remaining movement. Reopening every closing row cancels that movement and releases obsolete bottom space. A reading gesture interrupts automatic following; finishing the fold does not resume it.
+新規メッセージが折りたたみを起動すると、プロセス詳細は折りたたみ後の2度目のスクロールなしに一動作で閉じる。このクライアントがメッセージを送信した場合、または読者が末尾を追跡していた場合、トランスクリプトは新規メッセージに着地する。それ以外、たとえば他タブからのメッセージや前ターン後に届いたキュー済みメッセージの場合、読者が見ている内容は静止する。画面外のステップは底部余白を加えない。保持された回答と新規メッセージで埋められない場合、可視移動の維持に必要な余白のみが残る。折りたたみ中に追加された内容は残りの移動量を更新する。閉じゆくすべての行を再開すると、その移動が取り消され、不要になった底部余白が解放される。読み取りジェスチャーは自動追跡を中断する。折りたたみの完了で再開しない。
 
-Verbose retains its flat process rows under either timing. Failed, stopped, and interleaved-input Turns retain their existing whole-Turn eligibility rules; delayed folding can still postpone Detailed's conversion from flat rows to historical groups.
+Verbose はどちらのタイミングでもフラットなプロセス行を保持する。失敗、停止、入力が介在したターンは既存のターン全体対象ルールを保持する。遅延折りたたみでも、Detailed のフラット行から履歴グループへの変換を延期できる。
 
-### Group-title rules
+### グループタイトルのルール
 
-A closed group's header names the first three categories from its ranked summary, without displaying counts. A group without categories uses the thinking label. A running header names its live tool category, otherwise thinking; Standard appends live detail. Live titles remain visible for at least 150ms, retaining only the newest pending title.
+閉じたグループのヘッダーはランク付けサマリーの先頭3カテゴリを名指しし、件数は表示しない。カテゴリのないグループは思考ラベルを使用する。実行中ヘッダーはライブツールカテゴリを名指しし、なければ思考とする。Standard はライブ詳細を追加する。ライブタイトルは少なくとも150ms表示し、保留中の最新タイトルのみを保持する。
 
-All three stages share the tool-name classification below. A preparing Tool node uses its category's preparation label: read files for `read`, read images for `read_image`, write files for `write`, edit files for `edit` and `apply_patch`, and update the plan for `todo_write` and goal tools. Standard mode appends available argument detail using the same readers as dispatched calls. It contributes one call and renders one non-expandable row. A named live delta can create this node; historical calls start directly from tool/call without replaying preparation.
+3段階すべてが下記のツール名分類を共有する。準備中のツールノードはカテゴリ別の準備ラベルを使用する。`read` はファイルの読み取り、`read_image` は画像の読み取り、`write` はファイルの書き込み、`edit` と `apply_patch` はファイルの編集、`todo_write` と目標ツールはプランの更新である。Standard モードではディスパッチ済み呼び出しと同じリーダーで利用可能な引数詳細を追加する。1呼び出しとして件数に加え、展開不可の1行として描画する。名前付きライブデルタがこのノードを生成できる。履歴呼び出しは準備を再生せずツール/呼び出しから直接開始する。
 
-The labels below describe recorded activity, not successful outcomes. For example, a failed read still participates in the “Read files” category.
+下記のラベルは記録済みアクティビティを表し、成功した結果ではない。たとえば失敗した読み取りも「ファイル読み取り」カテゴリに参加する。
 
-| Category | Running label | Closed label |
+| カテゴリ | 実行中ラベル | 終了ラベル |
 |---|---|---|
-| No live category / no counted categories | Analyzing the request | Analysis completed |
-| `read` | Reading files | Read files |
-| `readImage` | Reading images | Read images |
-| `search` | Searching code | Searched code |
-| `write` | Writing files | Wrote files |
-| `edit` | Editing files | Edited files |
-| `commands` | Running commands | Ran commands |
-| `code` | Running code | Ran code |
-| `webSearch` | Searching the web | Searched the web |
-| `webFetch` | Visiting web pages | Visited web pages |
-| `subagents` | Coordinating subagents | Coordinated subagents |
-| `plan` | Updating the plan | Updated the plan |
-| `questions` | Waiting for your action | Asked questions |
-| `tools` | Calling tools | Called tools |
+| ライブカテゴリなし/件数カテゴリなし | リクエストを分析中 | 分析完了 |
+| `read` | ファイル読み取り中 | ファイル読み取り |
+| `readImage` | 画像読み取り中 | 画像読み取り |
+| `search` | コード検索中 | コード検索済み |
+| `write` | ファイル書き込み中 | ファイル書き込み |
+| `edit` | ファイル編集中 | ファイル編集 |
+| `commands` | コマンド実行中 | コマンド実行 |
+| `code` | コード実行中 | コード実行 |
+| `webSearch` | Web 検索中 | Web 検索済み |
+| `webFetch` | Web ページ訪問中 | Web ページ訪問済み |
+| `subagents` | サブエージェント連携中 | サブエージェント連携済み |
+| `plan` | プラン更新中 | プラン更新 |
+| `questions` | あなたの操作待ち | 質問済み |
+| `tools` | ツール呼び出し中 | ツール呼び出し |
 
-| Group state | Title composition |
+| グループ状態 | タイトル構成 |
 |---|---|
-| Not closed, with a running tool | Use the live category, not the highest-count category. Standard appends nonempty detail with ` · `; Compact omits detail. |
-| Not closed, without a running tool | Use the analysis label even when completed-tool counts are nonzero. Standard may append running reasoning detail. |
-| Closed, zero categories | Use the completed-analysis label. |
-| Closed, one category | Use its closed label without a count. |
-| Closed, two categories | Join ranked labels with “and”. Chinese removes the second leading `已` only when both labels start with it. |
-| Closed, three categories | Join all three ranked labels with commas. |
-| Closed, more than three categories | Show the first three labels followed by “etc.” (`等` in Chinese). |
+| 未クローズ、実行中ツールあり | 件数上位カテゴリではなくライブカテゴリを使用する。Standard は空でない詳細を ` · ` で追加し、Compact は詳細を省く。 |
+| 未クローズ、実行中ツールなし | 完了済みツール件数が0でなくても分析ラベルを使用する。Standard は実行中推論の詳細を追加できる。 |
+| クローズ済み、カテゴリゼロ | 完了分析ラベルを使用する。 |
+| クローズ済み、1カテゴリ | 件数なしでその終了ラベルを使用する。 |
+| クローズ済み、2カテゴリ | ランク付けラベルを “and” で結合する。中国語では両ラベルが `已` で始まる場合のみ2つ目の先頭の已を除去する。 |
+| クローズ済み、3カテゴリ | 3つのランク付けラベルすべてをカンマで結合する。 |
+| クローズ済み、4カテゴリ以上 | 先頭3ラベルに続けて “etc.” を付ける(中国語では `等`)。 |
 
-English lowercases the initial letter of joined labels after the first. Closing a group immediately selects the completed summary; the 150ms minimum applies to running-title changes, not to delaying completion. Detailed hides group headers in running Turns, including groups ended by a reply or steering before their Turn ends. Verbose also hides historical group headers.
+英語では結合したラベルのうち最初の後の先頭文字を小文字化する。グループを閉じると直ちに完了サマリーが選択される。150ms の最小表示は実行中タイトル変更に適用され、完了の遅延には適用しない。Detailed はターンの終了前に返信やステアリングで終了したグループを含め、実行中ターンのグループヘッダーを隠す。Verbose は履歴グループのヘッダーも隠す。
 
-Group headers show a category icon, replace it with a down arrow on hover or keyboard focus, and show an up arrow while open. Manually expanded group bodies use 6px row spacing, a `min(400px, 50vh)` height cap, and 24px directional fades. Wheel scrolling can continue into the outer transcript at an edge. Detailed removes the group-level cap in running Turns; Verbose applies this layout to historical Turns as well. Process rows retain 6px spacing in both modes; Assistant responses have 12px clearance. Expanded group titles sit 8px above their content; Turn process controls retain 16px clearance.
+グループヘッダーにはカテゴリアイコンを表示し、ホバーやキーボードフォーカスで下矢印に変わり、展開中は上矢印を表示する。手動展開したグループボディは行間隔6px、高さ上限 `min(400px, 50vh)`、上下24pxの方向フェードを使用する。端でのホイールスクロールは外側トランスクリプトへ継続できる。Detailed は実行中ターンのグループレベル上限を除去し、Verbose はこのレイアウトを履歴ターンにも適用する。プロセス行は両モードで行間隔6pxを保持し、アシスタント応答は12pxのクリアランスを持つ。展開済みグループのタイトルは内容の8px上に位置し、ターンプロセス制御は16pxのクリアランスを保持する。
 
-An open capped group follows content growth only while its own scroll position is at the bottom. Scrolling away pauses that group's following; returning to the bottom resumes it, independently of outer transcript following. Manually opening an unclosed group starts at the bottom and follows growth; manually opening a closed group starts at the top with following disabled, even when its initial content fits without scrolling. Closing the group in the data or restoring its height cap through a mode change does not reset an already-open reader's position. Browser find retains its own reveal position.
+展開され上限付きのグループは、自身のスクロール位置が最下部にある間のみ内容増加に追従する。離れてスクロールするとそのグループの追従は停止し、最下部に戻ると再開する。外側トランスクリプトの追従とは独立である。未クローズグループの手動展開は最下部から開始して増加に追従し、クローズ済みグループの手動展開は内容がスクロールなしに収まる場合でも先頭から開始して追従は無効である。データ上でのグループクローズやモード変更による高さ上限の復元では、既に開いている読者の位置をリセットしない。ブラウザー内検索は独自の出現位置を保持する。
 
-Only reasoning blocks with non-whitespace text produce individual rows; each retains its original text and expands independently. A blank streaming tail produces no row and does not transfer its running state to an earlier block. Individual reasoning starts collapsed, including while streaming. All modes preview the latest paragraph whose first line ends with a newline; an unfinished single line has no preview. Later text in that paragraph does not change the preview. After settlement, the mode table applies. Expanded reasoning uses compact Markdown typography.
+空白以外のテキストを持つ推論ブロックのみが個別の行になる。各行は元のテキストを保持し、独立に展開する。末尾の空白ストリーミングは行を作らず、実行中状態を以前のブロックへ転送しない。個々の推論はストリーミング中を含め折りたたんだ状態で開始する。すべてのモードで、最初の行が改行で終わる最新の段落をプレビューする。未完成の1行のみにはプレビューはない。その段落の後続テキストでプレビューは変わらない。確定後はモード表を適用する。展開済み推論はコンパクトな Markdown タイポグラフィを使用する。
 
-Switching modes retains manually opened groups and inner disclosures. It changes visibility and sizing without recreating the message rows. Detailed and Verbose do not open every individual disclosure. Only Verbose keeps the whole Turn open.
+モード切り替えでは手動で開いたグループと内部開閉を保持する。可視性とサイズのみを変更し、メッセージ行を作り直さない。Detailed と Verbose ですべての個別開閉が開くわけではない。ターン全体を開いたままにするのは Verbose のみである。
 
 -----
 
 <a id="process-grouping"></a>
-## Process grouping
+## プロセスのグループ化
 
-[process-groups.ts](process-groups.ts) groups visible Chat content; [process-activity.ts](process-activity.ts) summarizes the activity inside each group. Both follow the rules below.
+[process-groups.ts](process-groups.ts) が Chat の可視内容をグループ化し、[process-activity.ts](process-activity.ts) が各グループ内のアクティビティを要約する。両者は下記のルールに従う。
 
-A group collects adjacent process content within one Turn. Step-number changes alone do not split it. All four modes use the same grouping result. A group's `closed` flag means its content segment has ended, not that its UI disclosure is collapsed.
+グループは1ターン内の隣接プロセス内容を集める。ステップ番号の変化だけでは分割しない。4モードすべてが同じグループ化結果を使用する。グループの `closed` フラグは内容セグメントが終了したことを意味し、UI の開閉が折りたたまれていることではない。
 
-Grouping reads each Node's [group-tree position](../contract/group-tree.ts), which its Definition sets, rather than its kind.
+グループ化では種別ではなく、各定義が設定するノードの[グループツリー位置](../contract/group-tree.ts)を読み取る。
 
-| Input | Membership and segmentation |
+| 入力 | メンバーシップと分割 |
 |---|---|
-| Non-blank Assistant reasoning | Append one `reasoning` reference for that Assistant to the current group, creating a group if necessary. |
-| Assistant reply | End the preceding group and emit an independent `response` reference. If the same Node has reasoning, append that reasoning before ending the group. |
-| Node at `process` or an outer position: `model-retry`, Turn inputs, `turn-error`, `turn-max-tokens`, `turn-tail`, and the `turn-process` control | End the preceding group and retain the Node as an independent root. |
-| Other visible Nodes owned by a Turn without a position, including tools | Append the whole Node to the current group, creating a group if necessary. |
-| Node from another Turn or without a Turn | Break the same-Turn sequence. A Node without a Turn remains independent, including an unsplit Assistant. |
-| Hidden Nodes, system prompts, ordinary Context injection, and `permission` commands | Excluded from the grouping input; they neither join nor split a group. |
+| 空白以外のアシスタント推論 | そのアシスタントの `reasoning` 参照を1つ現在のグループに追加し、必要ならグループを作成する。 |
+| アシスタント返信 | 直前のグループを終了し、独立した `response` 参照を送出する。同一ノードに推論があれば、グループ終了前にその推論を追加する。 |
+| `process` または外側位置のノード:`model-retry`、ターン入力、`turn-error`、`turn-max-tokens`、`turn-tail`、`turn-process` 制御 | 直前のグループを終了し、ノードを独立したルートとして保持する。 |
+| 位置のないターン所有のその他の可視ノード(ツールを含む) | ノード全体を現在のグループに追加し、必要ならグループを作成する。 |
+| 他ターンのノードまたはターンなしのノード | 同一ターン連続を切断する。ターンなしのノードは独立したままとなり、未分割のアシスタントも同様である。 |
+| 非表示ノード、システムプロンプト、通常のコンテキスト注入、`permission` コマンド | グループ化入力から除外する。結合も分割もしない。 |
 
-A reply contains non-blank text, an image, or another visible block; reasoning and tool-call protocol blocks do not count as a reply. An Assistant with neither non-blank reasoning nor reply content contributes no reference. Group creation requires a member, so metadata-only Turns create no empty group.
+返信は空白以外のテキスト、画像、その他の可視ブロックを含む。推論やツール呼び出しプロトコルブロックは返信と数えない。空白以外の推論も返信内容もないアシスタントは何も参照しない。グループ作成にはメンバーが必要なため、メタデータのみのターンは空グループを作らない。
 
-### Examples
+### 例
 
-`A` denotes an Assistant Node, `T` a tool Node, and `G[...]` a process group. Arrows show input or root-reference order; examples share one Turn unless stated otherwise.
+`A` はアシスタントノード、`T` はツールノード、`G[...]` はプロセスグループを表す。矢印は入力またはルート参照の順序を示し、例は断りがなければ1ターンを共有する。
 
-| Input sequence | Grouped roots |
+| 入力シーケンス | グループ化後のルート |
 |---|---|
-| `A1(thought, reply) → T1` in one Step | `G[A1.reasoning] → A1.response → G[T1]` |
+| `A1(thought, reply) → T1` (1ステップ内) | `G[A1.reasoning] → A1.response → G[T1]` |
 | `T1(step=1) → A2(thought, step=2) → T2` | `G[T1, A2.reasoning, T2]` |
 | `T1 → steering → T2` | `G[T1] → steering → G[T2]` |
 | `T1(turn=1) → U(no turn) → T2(turn=1)` | `G[T1] → U → G[T2]` |
-| `A1(reply)` | `A1.response`, without a process group |
-| `read → bash → subagent_codex` without an intervening reply or input | One group; changing tool category does not split it. |
-| `run_code` with nested `read` and `bash` calls | One group member for the `run_code` tool Node; its nested calls do not create separate roots. |
-| A tool receives a failed result | Update that member without splitting its group; a separate `turn-error` Node does split the sequence. |
+| `A1(reply)` | プロセスグループなしの `A1.response` |
+| 介在する返信や入力のない `read → bash → subagent_codex` | 1グループ。ツールカテゴリの変化では分割しない。 |
+| ネストされた `read` と `bash` 呼び出しを持つ `run_code` | `run_code` ツールノードのメンバー1つ。ネストされた呼び出しは個別ルートを作らない。 |
+| ツールが失敗結果を受け取る | グループを分割せずにそのメンバーを更新する。個別の `turn-error` ノードはシーケンスを分割する。 |
 
-Replies and independent separators close preceding groups immediately, even while the Turn is running. The final group also closes when another Turn or unscoped Node follows it, or when its Turn has status `closed`. Any other or unavailable Turn status alone does not close that trailing group. Regrouping after a separator disappears may reopen it.
+返信と独立した分離子はターンの実行中であっても直前のグループを直ちに閉じる。最終グループは、他ターンやスコープ外ノードが続く場合、またはターン状態が `closed` の場合にも閉じる。その他や利用不可のターン状態だけでは末尾グループを閉じない。分離子が消えた後の再グループ化では再開できる。
 
 -----
 
 <a id="activity-summaries"></a>
-## Activity summaries
+## アクティビティサマリー
 
-[process-activity.ts](process-activity.ts) derives one group's category counts and live detail from its member Nodes. It does not decide membership or presentation text.
+[process-activity.ts](process-activity.ts) はメンバーノードから1グループのカテゴリ件数とライブ詳細を導出する。メンバーシップや表示テキストは決定しない。
 
-### Category counts
+### カテゴリ件数
 
-Counts describe calls in this group, not successful operations, files changed, child Agents, or elapsed work. The following rules apply before category ranking.
+件数はこのグループ内の呼び出しを表し、成功した操作、変更ファイル、子エージェント、経過作業ではない。カテゴリのランク付けの前に以下のルールを適用する。
 
-| Call evidence in this group | Counting rule |
+| このグループ内の呼び出し証拠 | 集計ルール |
 |---|---|
-| Preparing call, running call, successful result, failed result, or projected interrupted result with its original call | Count one call in the category selected by its recorded tool name. Settlement and failure do not add or subtract a call. |
-| Repeated `callId` | Count only the first occurrence, including when it appears both as a root and as a nested call. Later occurrences and their subtrees are skipped. |
-| Parent and child with different `callId` values | Count both, in their own categories; visit the parent before its children and siblings in recorded order. |
-| Repeated calls to the same tool with different `callId` values | Count each call, even with identical arguments or the same terminal/session target. |
-| Settled root result whose original call is missing | Do not infer its category from result text or metadata. Count no root call; its recorded subcalls still participate. |
-| Assistant reasoning, Assistant tool-call protocol blocks, or another Node kind | Add no tool count. The separately projected tool Node owns that call's count. |
+| 準備中の呼び出し、実行中の呼び出し、成功結果、失敗結果、元呼び出し付きの投影された中断結果 | 記録済みツール名で選んだカテゴリに1呼び出しとして数える。確定や失敗で呼び出しの加減はしない。 |
+| 重複 `callId` | 初出のみ数える。ルートとネスト呼び出しの両方に現れる場合を含む。以降の出現とそのサブツリーは飛ばす。 |
+| `callId` の異なる親子 | 両方数え、それぞれのカテゴリに入れる。親を子の前に、記録順に兄弟を訪問する。 |
+| 同一ツールへの `callId` 違いの繰り返し呼び出し | 引数やターミナル/セッション対象が同一でも呼び出しごとに数える。 |
+| 元呼び出しが欠落した確定済みルート結果 | 結果テキストやメタデータからカテゴリを推測しない。ルート呼び出しは数えず、記録済みサブ呼び出しは依然として参加する。 |
+| アシスタント推論、アシスタントのツール呼び出しプロトコルブロック、その他のノード種別 | ツール件数を加えない。その呼び出しの件数は個別に投影されたツールノードが所有する。 |
 
-Deduplication is group-local. Counts sort descending; ties retain the category's first occurrence in member order and parent-before-child traversal. For `read → bash → read`, the ranking is `read=2, commands=1`; for `bash → read`, it is `commands=1, read=1`. No category has a fixed priority when counts tie.
+重複排除はグループ内のみである。件数は降順に並べ、同点ではメンバー順と親優先走査におけるカテゴリの初出を保持する。`read → bash → read` の場合ランクは `read=2, commands=1` であり、`bash → read` の場合は `commands=1, read=1` である。同点カテゴリに固定の優先度はない。
 
-### Tool-name classification
+### ツール名の分類
 
-Classification uses the recorded tool name exactly: no case folding, namespace stripping, provider lookup, or inference from arguments. Names match the first applicable row below. All nonzero categories remain in the summary.
+分類では記録済みツール名を厳密に使用する。大文字小文字の正規化、名前空間の除去、プロバイダー検索、引数からの推測はしない。名前は下表の最初に該当する行に一致する。0でないカテゴリはすべてサマリーに残る。
 
-| Category | Tool-name match |
+| カテゴリ | ツール名一致 |
 |---|---|
 | `read` | `read` |
 | `readImage` | `read_image` |
-| `search` | `grep`, `glob`, or suffix `_inspect` |
+| `search` | `grep`、`glob`、または接尾辞 `_inspect` |
 | `write` | `write` |
-| `edit` | `edit`, `apply_patch` |
-| `commands` | `bash`, `pwsh`, `exec_command`, `write_stdin`, or prefix `terminal_` |
+| `edit` | `edit`、`apply_patch` |
+| `commands` | `bash`、`pwsh`、`exec_command`、`write_stdin`、または接頭辞 `terminal_` |
 | `code` | `run_code` |
 | `webSearch` | `web_search` |
 | `webFetch` | `web_fetch` |
-| `subagents` | `subagent` or prefix `subagent_` |
-| `plan` | `todo_write`, `create_goal`, `update_goal`, `get_goal` |
-| `questions` | `ask_user_question`, `request_user_input` |
-| `tools` | Every other name, including `list_mcp_resources`, `list_mcp_resource_templates`, and `read_mcp_resource` |
+| `subagents` | `subagent` または接頭辞 `subagent_` |
+| `plan` | `todo_write`、`create_goal`、`update_goal`、`get_goal` |
+| `questions` | `ask_user_question`、`request_user_input` |
+| `tools` | その他のすべての名前。`list_mcp_resources`、`list_mcp_resource_templates`、`read_mcp_resource` を含む |
 
-### Subagents, background jobs, and nested calls
+### サブエージェント、バックグラウンドジョブ、ネストされた呼び出し
 
-A subagent tool follows ordinary group boundaries: it does not create a group merely because it delegates work. Its category describes the parent Session's tool call, not the number or lifecycle of child Sessions.
+サブエージェントツールは通常のグループ境界に従う。作業を委任するからといってグループを作るわけではない。そのカテゴリは親セッションのツール呼び出しを表し、子セッションの数やライフサイクルではない。
 
-| Case | Category and activity behavior |
+| ケース | カテゴリとアクティビティの動作 |
 |---|---|
-| `subagent`, `subagent_codex`, `subagent_claude_code`, or another `subagent_*` name | Count one `subagents` call per distinct `callId`, unless an earlier name rule matches. Provider and model choices do not change the category. |
-| A configured name such as `subagent_inspect` | Classify as `search`: suffix `_inspect` is checked before prefix `subagent_`. The same precedence makes `terminal_inspect` a `search` call rather than `commands`. |
-| Subagent controls `send_message`, `list_agents`, and `list_subagent_models`; job controls `job_output` and `job_kill` | Classify as `tools`, not `subagents`. Their business purpose does not override the name table. |
-| A delegation tool renamed to a name outside the table, such as `research_agent` | Classify as `tools`, even if it invokes the same subagent provider. |
-| Background subagent startup has returned its tool result, while the child is still running | Keep its category count, but remove that call from running-activity candidates. The child does not keep the parent's group in the subagent activity state. |
-| Tool calls recorded only in a child Session | Do not include them in the parent group's counts or live detail. Only calls actually attached to a member's `subCalls` participate recursively. |
+| `subagent`、`subagent_codex`、`subagent_claude_code`、その他の `subagent_*` 名 | 個別 `callId` ごとに `subagents` 呼び出し1件。ただし先行する名前ルールが一致する場合は除く。プロバイダーやモデルの選択でカテゴリは変わらない。 |
+| `subagent_inspect` などの設定済み名前 | `search` に分類する。接尾辞 `_inspect` は接頭辞 `subagent_` より先に検査する。同じ優先度により `terminal_inspect` は `commands` ではなく `search` 呼び出しになる。 |
+| サブエージェント制御 `send_message`、`list_agents`、`list_subagent_models`、ジョブ制御 `job_output`、`job_kill` | `subagents` ではなく `tools` に分類する。業務目的で名前表を上書きしない。 |
+| `research_agent` など表外の名前に改名された委任ツール | 同一サブエージェントプロバイダーを呼び出す場合でも `tools` に分類する。 |
+| バックグラウンドサブエージェントの起動がツール結果を返済みで、子がまだ実行中 | そのカテゴリ件数を保持するが、その呼び出しを実行中アクティビティ候補から外す。子は親グループをサブエージェントのアクティブ状態に留めない。 |
+| 子セッションにのみ記録されたツール呼び出し | 親グループの件数やライブ詳細に含めない。メンバーの `subCalls` に実際に付随した呼び出しのみが再帰的に参加する。 |
 
-A `run_code` root counts once as `code`; its recorded PTC subcalls each count in their own categories. The wrapper is not replaced by leaf-call counts, and children are not all classified as `code`. With distinct call ids, `run_code → [read, bash, subagent_codex]` produces `code=1, read=1, commands=1, subagents=1`, in that tie order. A subcall can supply the live category while the outer `run_code` remains running.
+`run_code` ルートは `code` として1件数え、記録済み PTC サブ呼び出しはそれぞれのカテゴリに数える。ラッパーがリーフ呼び出し件数に置き換わることはなく、子がすべて `code` に分類されるわけでもない。呼び出し ID が異なる場合、`run_code → [read, bash, subagent_codex]` はその同率順で `code=1, read=1, commands=1, subagents=1` になる。外側の `run_code` が実行中のまま、サブ呼び出しがライブカテゴリを提供できる。
 
-Exact-name rules also mean that a recorded name such as `functions.read`, `mcp.read`, or `Read` falls into `tools`, while `browser_inspect` falls into `search`. A `terminal_*` name follows the command rule even when its operation only inspects or closes a terminal, unless the earlier `_inspect` rule matches.
+厳密名ルールにより、`functions.read`、`mcp.read`、`Read` などの記録名は `tools` に入り、`browser_inspect` は `search` に入る。`terminal_*` 名は、先行する `_inspect` ルールに一致しない限り、端末の調査や終了操作であってもコマンドルールに従う。
 
-### Live activity and detail
+### ライブアクティビティと詳細
 
-Preparing calls use their first named delta time; dispatched calls use their tool/call time. Both read detail from the block's lazy `args` view.
+準備中の呼び出しは最初の名前付きデルタ時刻を使用し、ディスパッチ済み呼び出しは `tool/call` 時刻を使用する。両者ともブロックの遅延 `args` ビューから詳細を読み取る。
 
-The Tool Definition alone retains streamed argument fragments. Assistant blocks keep tool identity and timing without accumulating argument deltas; `block-end` and the durable message supply their complete text. A Tool reader compares its fragments directly against `block-end` and `tool/call` arguments, retaining its indexed fields only for an exact match. Final text replaces missing or conflicting deltas.
+ストリーミングされた引数フラグメントを保持するのはツール定義のみである。アシスタントブロックは引数デルタを蓄積せずにツール識別子とタイミングを保持し、`block-end` と永続メッセージが完全なテキストを提供する。ツールリーダーはフラグメントを `block-end` や `tool/call` 引数と直接比較し、完全一致の場合のみインデックス付きフィールドを保持する。最終テキストは欠落や矛盾するデルタを置き換える。
 
-TurnProcess and TurnTail retain tool-argument Matches as Location evidence when the Turn start is outside the loaded window, even when those fragments do not change their State.
+ターン開始が読み込みウィンドウの外にある場合でも、TurnProcess と TurnTail はツール引数の `Match` を Location エビデンスとして保持する。それらのフラグメントが `State` を変更しない場合も同様である。
 
-Among running calls, the greatest `time` selects the live category and detail; equal times select the later visited call. With no running call, the category is absent and detail comes from the last nonempty reasoning paragraph of the latest running Assistant with nonempty reasoning, in member order. Reasoning detail removes `**` markers and does not require a newline-terminated first line; the individual reasoning-row preview has separate rules.
+実行中の呼び出しのうち、最大の `time` がライブカテゴリと詳細を選ぶ。時刻が等しい場合は後に訪問した呼び出しを選ぶ。実行中の呼び出しがなければカテゴリは不在となり、詳細はメンバー順で空でない推論を持つ最新の実行中アシスタントの最後の空でない推論段落から取る。推論詳細は `**` マーカーを除去し、改行終端された先頭行を要求しない。個別推論行のプレビューは別ルールである。
 
-Live selection uses call start `time`, not the latest output/progress time. A call is a running candidate while its projected tool value has no result; pending approval or waiting for a result does not receive a separate category.
+ライブ選択では最新の出力/進捗時刻ではなく呼び出し開始 `time` を使用する。投影ツール値に結果がない間、その呼び出しは実行中候補である。承認待ちや結果待ちに個別カテゴリは与えない。
 
-| Members' current state | Live category and detail source |
+| メンバーの現在の状態 | ライブカテゴリと詳細ソース |
 |---|---|
-| `bash(time=10)` and `read(time=20)` both running | `read`, using the `read` arguments, regardless of which tool most recently emitted output. |
-| The newer `read` settles while the older `bash` remains running | Return to `commands`, using the `bash` arguments. A failed `read` result has the same selection effect. |
-| Running parent and child share the same start time | The child wins because it is visited later; later siblings win equal-time ties. |
-| All tools settled; the group is not closed; a running Assistant has reasoning | No live tool category; use the latest nonempty reasoning paragraph as detail. |
-| No running tool or usable running reasoning; the group is not closed | No live tool category and empty detail, even when category counts are nonzero. |
-| A reply or another group boundary closes the group while a tool still lacks a result | Published live category and detail are cleared. Group closure takes precedence over the unfinished call. |
+| `bash(time=10)` と `read(time=20)` が両方実行中 | どちらが最新に出力したかにかかわらず、`read` 引数を使用した `read`。 |
+| 新しい `read` が確定し、古い `bash` が実行中のまま | `bash` 引数を使用した `commands` に戻る。失敗した `read` 結果も選択効果は同じ。 |
+| 実行中の親子が同じ開始時刻を共有 | 後に訪問される子が勝つ。同率の兄弟は後の方が勝つ。 |
+| ツールはすべて確定、グループ未クローズ、実行中アシスタントに推論あり | ライブツールカテゴリなし。詳細は最新の空でない推論段落を使用。 |
+| 実行中ツールも利用可能な実行中推論もなし、グループ未クローズ | カテゴリ件数が0でなくてもライブツールカテゴリなし、詳細は空。 |
+| 返信や他のグループ境界が結果のないツールの実行中にグループを閉じる | 公開済みライブカテゴリと詳細は消去する。未完了呼び出しよりグループクローズを優先する。 |
 
-Tool detail uses the first nonempty supported argument field in this priority order: `title`, `description`, `objective`, `task`, `task_name`, `name`, `question`, `questions`, `prompt`, `message`, `command`, `cmd`, `queries`, `query`, `pattern`, `url`, `uri`, `file_path`, `path`, `target`, `action`, `status`. Strings may still be streaming; arrays become available when complete and must contain only strings, joined with `, `. The `questions` field instead selects the first nonempty `question` in its object array. Without usable detail, every category stays empty while fields can still arrive and falls back to the tool name only once the view is closed, invalid, or sealed after dispatch.
+ツール詳細は下記の優先順で最初の空でない対応引数フィールドを使用する。`title`、`description`、`objective`、`task`、`task_name`、`name`、`question`、`questions`、`prompt`、`message`、`command`、`cmd`、`queries`、`query`、`pattern`、`url`、`uri`、`file_path`、`path`、`target`、`action`、`status` である。文字列はストリーミング中の場合があり、配列は完成時に利用可能となり、文字列のみを含み `, ` で結合する。`questions` フィールドは代わりにオブジェクト配列内の最初の空でない `question` を選ぶ。利用可能な詳細がなければ、引数が伸長しうる間はすべてのカテゴリが空のままであり、ディスパッチ後にビューがクローズ、無効、封印された時点で初めてツール名にフォールバックする。
 
-The priority list is shared by every tool, not specialized per category. For example, `description` can override `command` on a shell call, and `title` can override a file path. The first field whose supported value remains nonempty after whitespace normalization wins; unsupported values are skipped.
+優先順リストはすべてのツールで共有され、カテゴリ別の特化はない。たとえば `description` はシェル呼び出しの `command` を上書きでき、`title` はファイルパスを上書きできる。空白正規化後に空でなく残る最初の対応値を持つフィールドが勝つ。非対応値は飛ばす。
 
-| Tool and argument example | Resulting detail |
+| ツールと引数の例 | 結果の詳細 |
 |---|---|
-| `subagent` with `{"description":"Review parser","prompt":"Long instructions"}` | `Review parser`; the prompt is not appended. |
-| `send_message` with `{"subagent_id":"child-1","message":"Check tests"}` | `Check tests`; its category is still `tools`. |
-| `exec_command` with `{"cmd":"pnpm test","description":"Run focused tests"}` | `Run focused tests`; without a usable description, `pnpm test`. |
-| `read` with `{"file_path":"src/app.ts","path":"fallback.ts"}` | `src/app.ts`; `file_path` precedes `path`. |
-| `grep` with `{"pattern":"TODO","path":"src"}` | `TODO`; the searched path is not appended. |
-| `web_search` with `{"queries":["React hooks","external store"]}` | `React hooks, external store`. |
-| `web_search` with only `{"queries":[{"query":"React hooks"}]}` | `web_search`; object-array queries are not extracted recursively. |
-| `web_fetch` with `{"url":"https://example.com"}`; `read_mcp_resource` with `{"uri":"resource://guide"}` | The URL or URI itself. |
-| `request_user_input` with `{"questions":[{"header":"Scope","question":"Which package?"},{"question":"Which mode?"}]}` | `Which package?`; ignore headers and later questions once a nonempty question is found. |
-| `run_code` with only `{"code":"print(1)"}` | `run_code`; `code` is not in the detail-field list. |
-| `apply_patch` with raw patch text rather than a JSON object | `apply_patch`; no patch-path extraction. |
-| Any tool with `{"description":" ","command":42,"path":"src/app.ts"}` | `src/app.ts`; whitespace-only strings and numbers are skipped. |
-| No usable field yet | Empty while arguments can grow; otherwise the tool name. |
+| `subagent` (`{"description":"Review parser","prompt":"Long instructions"}` 付き) | `Review parser`。プロンプトは追加しない。 |
+| `send_message` (`{"subagent_id":"child-1","message":"Check tests"}` 付き) | `Check tests`。カテゴリは依然として `tools`。 |
+| `exec_command` (`{"cmd":"pnpm test","description":"Run focused tests"}` 付き) | `Run focused tests`。利用可能な description がなければ `pnpm test`。 |
+| `read` (`{"file_path":"src/app.ts","path":"fallback.ts"}` 付き) | `src/app.ts`。`file_path` が `path` に優先する。 |
+| `grep` (`{"pattern":"TODO","path":"src"}` 付き) | `TODO`。検索対象パスは追加しない。 |
+| `web_search` (`{"queries":["React hooks","external store"]}` 付き) | `React hooks, external store`。 |
+| `web_search` (`{"queries":[{"query":"React hooks"}]}` のみ) | `web_search`。オブジェクト配列の queries は再帰的に抽出しない。 |
+| `web_fetch` (`{"url":"https://example.com"}` 付き)、`read_mcp_resource` (`{"uri":"resource://guide"}` 付き) | URL または URI 自体。 |
+| `request_user_input` (`{"questions":[{"header":"Scope","question":"Which package?"},{"question":"Which mode?"}]}` 付き) | `Which package?`。空でない質問が見つかればヘッダーや以降の質問は無視する。 |
+| `run_code` (`{"code":"print(1)"}` のみ) | `run_code`。`code` は詳細フィールド一覧にない。 |
+| JSON オブジェクトではなく生パッチテキストの `apply_patch` | `apply_patch`。パッチパス抽出はしない。 |
+| `{"description":" ","command":42,"path":"src/app.ts"}` の任意ツール | `src/app.ts`。空白のみの文字列と数値は飛ばす。 |
+| まだ利用可能なフィールドなし | 引数が伸長しうる間は空。そうでなければツール名。 |
 
-All live detail collapses whitespace, trims its ends, and is limited to 160 grapheme clusters, including a final `…` when truncated. String arguments initially supply at most 512 decoded UTF-16 units; normalization expands that prefix only when whitespace or multi-unit clusters leave too little text to determine truncation. Each truncation pass reads at most 161 clusters. A closed group's published summary clears its live category and detail while retaining category counts.
+すべてのライブ詳細は空白を折りたたみ、両端をトリムし、書記素クラスタ160個に制限する。打ち切り時は末尾に `…` を含む。文字列引数は初期状態で最大512デコード済み UTF-16 ユニットを提供する。正規化では、空白や複数ユニットクラスタで打ち切り判定のテキストが不足する場合にのみ、その接頭辞を拡張する。各打ち切りパスは最大161クラスタを読み取る。クローズ済みグループの公開済みサマリーはカテゴリ件数を保持しながらライブカテゴリと詳細を消去する。

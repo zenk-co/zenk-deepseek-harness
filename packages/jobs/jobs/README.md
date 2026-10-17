@@ -1,140 +1,140 @@
 ---
-description: "The background-job registry contract for users and maintainers composing, implementing, or debugging background work: ids, ownership, lifecycle, the output ring, and the event stream."
+description: "バックグラウンド作業をコンポーズ・実装・デバッグするユーザーとメンテナー向けの、バックグラウンドジョブレジストリ契約: id、所有権、ライフサイクル、出力リング、イベントストリーム。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-jobs
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-jobs` lets tools keep long-running work active while an agent continues. Each job receives a stable `<kind>-<short-uuid>` id, and its owning agent can read output, wait with a timeout, or request cancellation. Ownership is scoped to the agent session, so other agents cannot inspect or stop the job; completion arrives as an in-session notice without polling. Users can watch retained live output without consuming what the agent can read. Background jobs can start only when the deployment supplies job execution.
+`dsh-jobs` は、エージェントが継続している間、ツールが長時間実行される作業をアクティブに保てるようにする。各ジョブは安定した `<kind>-<short-uuid>` の id を受け取り、それを所有するエージェントは出力を読み取り、タイムアウト付きで待機し、またはキャンセルを要求できる。所有権はエージェントセッションにスコープされるため、他のエージェントはジョブを検査も停止もできない。完了はポーリングなしのセッション内通知として到着する。ユーザーは、エージェントが読み取れるものを消費することなく、保持されたライブ出力を視聴できる。バックグラウンドジョブは、デプロイがジョブ実行を提供する場合にのみ開始できる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use this package when you are composing a background-job capability or writing a producer that registers long work. The package itself defines the contract; a composition gets the feature by loading an implementation such as `dsh-jobs-local` and, for the model side, `dsh-tool-jobs`.
+バックグラウンドジョブのケイパビリティをコンポーズする場合、または長時間の作業を登録するプロデューサーを書く場合にこのパッケージを使う。パッケージ自体は契約を定義し、コンポジションは `dsh-jobs-local` のような実装と、モデル側のための `dsh-tool-jobs` をロードすることで機能を得る。
 
-### What a background job gives you
+### バックグラウンドジョブが与えるもの
 
-A producer registers work with a kind and a one-line label; the registry returns a `<kind>-<short-uuid>` id such as `bash-<short-uuid>`, where the suffix is 16 lowercase UUID hex characters. Anyone who owns the job can read output, list jobs, wait up to a timeout for settlement, and request cancellation — each call returns a fresh projection of the job's status, from `running` and `stopping` to the terminal `completed`, `killed`, or `failed`. When a job settles, the registry's event stream announces it and `dsh-tool-jobs` turns the settlement into an in-session notice, so no polling is needed. A producer may attach an optional byte cap so each complete model-facing read or notice stays bounded.
+プロデューサーは kind と 1 行のラベルを伴って作業を登録する。レジストリは `bash-<short-uuid>` のような `<kind>-<short-uuid>` の id を返す。接尾辞は 16 文字の小文字 UUID 16 進文字である。ジョブを所有する誰もが出力を読み取り、ジョブを一覧表示し、確定までタイムアウト付きで待機し、キャンセルを要求できる — 各呼び出しは `running` と `stopping` から終端の `completed`、`killed`、`failed` に至るジョブのステータスの新鮮なプロジェクションを返す。ジョブが確定すると、レジストリのイベントストリームがそれを告知し、`dsh-tool-jobs` がその確定をセッション内通知に変えるため、ポーリングは不要である。プロデューサーは任意のバイト上限を付けて、モデル向けの完全な読み取りまたは通知がそれぞれ境界付きに保たれるようにできる。
 
-A producer streams output by naming pull sources on its spec — non-consuming offset readers the registry pumps at its own cadence — or by pushing chunks through the `JobHandle` its starter receives; both land in the job's bounded ring, where `stdout` and `stderr` chunks reach the model and `log` chunks reach observers only. Observers read retained chunks at absolute byte offsets and are signaled on advancement; the settlement that ends the job also ends the stream, and `updateProgress` publishes a live progress line into every projection until then. Observation is invisible to the model: `readAt` consumes nothing and never touches notice state.
+プロデューサーは、その spec に pull ソース — レジストリが自身のケイデンスでポンプする非消費型のオフセットリーダー — を名指しして出力をストリームするか、またはスターターが受け取る `JobHandle` を通じてチャンクをプッシュする。どちらもジョブの上限付きリングに着地し、そこでは `stdout` と `stderr` のチャンクがモデルに届き、`log` チャンクはオブザーバーにのみ届く。オブザーバーは保持されたチャンクを絶対バイトオフセットで読み取り、前進時に通知される。ジョブを終わらせる確定がストリームも終わらせ、それまでは `updateProgress` がライブの進捗行をすべてのプロジェクションに公開する。観測はモデルからは見えない: `readAt` は何も消費せず、通知状態にも触れない。
 
-The shipped provider also records owned-job lifecycle metadata in the Session. Producers attach `JobSpec.toolCall` when a tool creates the job, preserving nested and root call identity. See the [durable event fields](../../../docs/subsystems/jobs.md#session-lifecycle-records) for timing and restart semantics.
+出荷されるプロバイダーは、所有ジョブのライフサイクルメタデータも Session に記録する。プロデューサーは、ツールがジョブを作成するときに `JobSpec.toolCall` を付けて、ネストした呼び出しとルート呼び出しのアイデンティティを保持する。タイミングと再起動のセマンティクスは[耐久イベントフィールド](../../../docs/subsystems/jobs.md#session-lifecycle-records)を参照。
 
-### The ownership boundary
+### 所有権の境界
 
-A job belongs to the agent session that started it: another agent cannot read or stop it. An id may appear in tool output; the registry authorizes every control operation using the owner. A job started without an owner is open to any caller and lasts until the service is disposed.
+ジョブはそれを開始したエージェントセッションに属する: 別のエージェントはそれを読み取りも停止もできない。id はツール出力に現れることがある。レジストリはすべての制御操作をオーナーを使って認可する。オーナーなしで開始されたジョブは任意の呼び出し元に対して開かれ、サービスが破棄されるまで存続する。
 
-### Starting background work needs a controller
+### バックグラウンド作業の開始にはコントローラーが必要である
 
-A producer can start work only while a controller that serves the owner is attached — loading `dsh-tool-jobs` attaches one. An agent whose composition loads no controller cannot start background work; `start()` fails with a message that names the missing controller rather than starting work the agent could never collect or stop.
+プロデューサーは、オーナーにサービスするコントローラーがアタッチされている間のみ作業を開始できる — `dsh-tool-jobs` のロードが 1 つをアタッチする。コントローラーをロードしないコンポジションのエージェントはバックグラウンド作業を開始できない。`start()` は、エージェントが収集も停止もできない作業を開始するのではなく、欠落したコントローラーを名指しするメッセージで失敗する。
 
-### Smallest working composition
+### 最小の動作構成
 
 ```yaml
 - name: '@deepseek-ai/dsh-jobs-local'
 - name: '@deepseek-ai/dsh-tool-jobs'
 ```
 
-Loading these two plugins on a harness base that already provides the agent, tools, and system-prompt services gives the full feature: `dsh-jobs-local` provides the in-process background-job registry, and `dsh-tool-jobs` provides the `job_output`, `job_list`, and `job_kill` tools plus completion-notice delivery.
+エージェント、ツール、システムプロンプトの各サービスをすでに提供するハーネスベースにこれらの 2 つのプラグインをロードすると、完全な機能が得られる: `dsh-jobs-local` がプロセス内のバックグラウンドジョブレジストリを提供し、`dsh-tool-jobs` が `job_output`、`job_list`、`job_kill` の各ツールと完了通知の配送を提供する。
 
-### What can go wrong
+### 何がうまくいかなくなりうるか
 
-Any preflight rejection leaves no job id or registered work. Jobs managed by the shipped in-process registry die with the harness process; durable execution across restarts needs a different backend implementing this contract.
+プリフライトの拒否はジョブ id や登録済みの作業を残さない。出荷されるプロセス内レジストリが管理するジョブはハーネスプロセスとともに死ぬ。再起動をまたぐ耐久実行には、この契約を実装する別のバックエンドが必要である。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the contract and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは契約の背後にある設計上の決定を説明し、それを実現するコードを指し示す。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計哲学
 
-- **Contract and implementation are separate packages.** `JobRegistry` is an abstract Cordis service; loading the class directly throws, so a misconfigured composition fails at load instead of registering an empty `ctx.jobs`.
-- **One registry per process, owner-relative answers.** One instance serves every composition in the process, so registrations and deliveries are relative to the registering scope: a controller or listener registered from an unscoped context serves every owner; one registered under an agent composition's scope serves exactly the agents composed under it.
-- **Access is fenced by the owner's session id.** Ids are predictable, so authorization — not secrecy — is the boundary.
-- **Settlement is first-wins, and its event follows every released waiter.** One terminal record, released waiters, then one round of contained event delivery; the `settled` event reports whether it released a live `wait` (`awaited`), so `dsh-tool-jobs` never announces a completion a waiting caller already collected, whichever plugin was waiting.
-- **Registrations outlive producer and controller fibers.** Owner and service disposal cancel live work and await compliant producers; a throwing teardown cancel force-fails only the record.
+- **契約と実装は別々のパッケージである。** `JobRegistry` は抽象 Cordis サービスであり、クラスを直接ロードすると throw するため、設定ミスのあるコンポジションは空の `ctx.jobs` を登録するのではなくロード時に失敗する。
+- **プロセスごとに 1 つのレジストリ、オーナー相対の答え。** 1 つのインスタンスがプロセス内のすべてのコンポジションにサービスするため、登録と配送は登録したスコープに対して相対である: スコープ外のコンテキストから登録されたコントローラーまたはリスナーはすべてのオーナーにサービスし、エージェントコンポジションのスコープの下で登録されたものはその下にコンポーズされたエージェントにちょうどサービスする。
+- **アクセスはオーナーのセッション id でフェンスされる。** id は予測可能であるため、境界は秘匿ではなく認可である。
+- **確定は先勝ちであり、そのイベントは解放されたすべての待機者に続く。** 1 つの終端レコード、解放された待機者、次に 1 ラウンドの封じ込められたイベント配送。`settled` イベントはライブの `wait` を解放したかどうか（`awaited`）を報告するため、`dsh-tool-jobs` は待機中の呼び出し元がすでに収集した完了を告知しない。どのプラグインが待っていたとしてもである。
+- **登録はプロデューサーとコントローラーのファイバーより長生きする。** オーナーとサービスの破棄はライブ作業をキャンセルし、準拠するプロデューサーを待つ。テイアダウンキャンセルが throw した場合、強制的に失敗するのはレコードのみである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: the abstract `JobRegistry` service and its contract |
-| [`src/types.ts`](src/types.ts) | Shared vocabulary: `JobSpec`, `JobHandle`, `JobHooks`, `JobOutcome`, `JobEvent`, and the read results |
-| [`src/view.ts`](src/view.ts) | Client-safe leaf: `JobView`, `JobChunk`, `JobStatus`, and the merge-extensible `JobKindMap` |
-| [`src/brand.ts`](src/brand.ts) | the `JobId` branded identifier, importable without the agent dependency |
-| [`src/archive-admission.ts`](src/archive-admission.ts) | The `job` family of the Workspace registry's archive admission, installed by the seam's constructor for every implementation |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: 抽象 `JobRegistry` サービスとその契約 |
+| [`src/types.ts`](src/types.ts) | 共有語彙: `JobSpec`、`JobHandle`、`JobHooks`、`JobOutcome`、`JobEvent`、および読み取り結果 |
+| [`src/view.ts`](src/view.ts) | クライアント安全なリーフ: `JobView`、`JobChunk`、`JobStatus`、マージ拡張可能な `JobKindMap` |
+| [`src/brand.ts`](src/brand.ts) | `JobId` ブランド付き識別子。エージェント依存なしでインポート可能 |
+| [`src/archive-admission.ts`](src/archive-admission.ts) | Workspace レジストリのアーカイブアドミッションの `job` ファミリー。シームのコンストラクターがすべての実装のために導入する |
 
-### Service operations
+### サービス操作
 
-Each read or control operation accepts an optional caller `SessionId`; omitting it permits only unowned jobs: `list` and `get` return fresh projections, `read` advances the model's cursor and hands out the producer's result once after settlement, `readAt` reads retained chunks at an absolute offset without consuming anything, `kill` invokes producer cancellation before changing status and records the reason for the terminal `detail`, `wait` blocks up to a timeout, `remove` drops a settled record a caller collected through its own wait and never handed out, and `start()` preflights access, validation, and admission before invoking the producer's `run()` once while refusing any owner no attached controller serves; `events.subscribe` delivers registration, progress, stopping, settlement, removal, and output commits at owner, scope, or process granularity.
+各読み取りまたは制御操作は任意の呼び出し元 `SessionId` を受け付ける。これを省略すると所有なしジョブのみが許可される: `list` と `get` は新鮮なプロジェクションを返し、`read` はモデルのカーソルを前進させて確定後に一度だけプロデューサーの結果を渡し、`readAt` は何も消費せずに保持されたチャンクを絶対オフセットで読み取り、`kill` はステータスを変更する前にプロデューサーのキャンセルを呼び出し、終端 `detail` の理由を記録し、`wait` はタイムアウトまでブロックし、`remove` は呼び出し元が自身の待機を通じて収集し、外に渡さなかった確定レコードを削除し、`start()` はアタッチされたコントローラーがサービスしないオーナーを拒否しつつ、プロデューサーの `run()` を 1 回呼び出す前にアクセス、検証、アドミッションをプリフライトする。`events.subscribe` は登録、進捗、停止、確定、削除、出力コミットをオーナー、スコープ、またはプロセスの粒度で配送する。
 
-Every implementation also answers the Workspace registry's archive admission ([seam](../../workspace/workspace/README.md)), installed by the seam's constructor through the abstract `list` and `kill` alone: `workspace/session-activity` reports the running or stopping jobs the asked Session owns as the `job` family, one item per job with its label; `workspace/session-stop` kills each of them with the reason `session archived`, one at a time, so a producer that throws on cancel is logged while the Session's other jobs still stop. Unowned jobs belong to nobody and are never reported or killed for a Session.
+すべての実装は Workspace レジストリのアーカイブアドミッション（[シーム](../../workspace/workspace/README.md)）にも応答し、これはシームのコンストラクターが抽象の `list` と `kill` だけで導入する: `workspace/session-activity` は、問い合わせられた Session が所有する実行中または停止中のジョブを `job` ファミリーとして、ジョブごとにそのラベルを伴う 1 アイテムで報告し、`workspace/session-stop` はそれらを理由 `session archived` で 1 つずつ kill する。そのためキャンセルで throw するプロデューサーはログに記録されつつ、その Session の他のジョブは停止する。所有なしジョブは誰にも属さず、Session のために報告も kill もされることは決してない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the job types to the shipped implementation, the model-facing controls, and the design records.
+パッケージレベルの契約では不十分なときにこれらのページを読む。ジョブ型から、出荷される実装、モデル向けコントロール、設計記録へと進む。
 
-- [Background task runtime subsystem](../../../docs/subsystems/jobs.md) — the job types, projection fields, and `ctx.jobs` Cordis surface.
-- [jobs group map](../README.md) — the sibling group page and its package table.
-- [Process-local registry](../jobs-local/README.md) — the shipped implementation that runs jobs in this process.
-- [Model-facing job controls](../tool-jobs/README.md) — the `job_output`, `job_list`, and `job_kill` tools and completion notices.
-- [Jobs lifecycle and output ownership](../../../.agents/notes/implemented/architecture/2026-09-03-jobs-seam-consolidation.md) — one lifecycle, output ring, and observation stream.
-- [job-registry seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-job-registry-seam.md) — the owner-fenced registry contract and its rationale.
-- [Jobs seam consolidation Agent Note](../../../.agents/notes/implemented/architecture/2026-09-03-jobs-seam-consolidation.md) — one output ring, one projection, one event stream.
+- [バックグラウンドタスクランタイムサブシステム](../../../docs/subsystems/jobs.md) — ジョブ型、プロジェクションフィールド、`ctx.jobs` の Cordis サーフェス。
+- [jobs グループマップ](../README.md) — 兄弟グループページとそのパッケージテーブル。
+- [プロセスローカルレジストリ](../jobs-local/README.md) — このプロセスでジョブを実行する出荷済み実装。
+- [モデル向けジョブコントロール](../tool-jobs/README.md) — `job_output`、`job_list`、`job_kill` ツールと完了通知。
+- [ジョブのライフサイクルと出力の所有権](../../../.agents/notes/implemented/architecture/2026-09-03-jobs-seam-consolidation.md) — 1 つのライフサイクル、出力リング、観測ストリーム。
+- [job-registry シーム Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-job-registry-seam.md) — オーナーでフェンスされたレジストリ契約とその根拠。
+- [ジョブシーム統合 Agent Note](../../../.agents/notes/implemented/architecture/2026-09-03-jobs-seam-consolidation.md) — 1 つの出力リング、1 つのプロジェクション、1 つのイベントストリーム。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through producer and controller plugins, which own all model rendering over the job registry.
+間接的に、プロデューサーとコントローラーのプラグインを通じて。それらがジョブレジストリ上のモデル向けレンダリングのすべてを所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumers own any request-prefix changes.
+直接の無効化はない。名前指しされたコンシューマーがリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the contract is a poor fit. They are current package constraints, not a task backlog.
+これらの制限は、契約が不適切な選択となる状況を定義する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **The contract is in-process** — `JobSpec.run()` passes callbacks and the registry resolves the live `Agent` behind the owner session; a durable or cross-process backend must reshape identity, restart, ownership, and observation semantics before it can implement this seam.
-- **The model's cursor is the only consuming read** — independent observers use the non-consuming `readAt` and never move it.
-- **A settled record stays listed until it is removed** — by its owner's disposal, service disposal, or an explicit `remove` from the caller that collected it; the registry keeps no retention count of settled jobs.
+- **契約はプロセス内である** — `JobSpec.run()` はコールバックを渡し、レジストリはオーナーセッションの背後にあるライブ `Agent` を解決する。耐久またはプロセスをまたぐバックエンドは、このシームを実装する前にアイデンティティ、再起動、所有権、観測のセマンティクスを作り直さなければならない。
+- **モデルのカーソルが唯一の消費型読み取りである** — 独立したオブザーバーは非消費型の `readAt` を使い、カーソルを動かすことは決してない。
+- **確定したレコードは削除されるまでリストに残る** — オーナーの破棄、サービスの破棄、またはそれを収集した呼び出し元からの明示的な `remove` によって削除される。レジストリは確定済みジョブの保持数を管理しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

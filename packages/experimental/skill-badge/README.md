@@ -1,41 +1,41 @@
 ---
-description: "The bundled 'powered by dsh' badge skill for users and maintainers enabling, using, or debugging the optional badge provider."
+description: "任意バッジプロバイダーを有効化、使用、デバッグするユーザーとメンテナーのための、同梱 'powered by dsh' バッジスキル。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-skill-badge
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Agents can load the official "powered by dsh" badge skill from this bundled provider and follow its instructions for adding attribution badges to documents, PRs, and other content produced with DeepSeek Harness. The provider has no configuration; deployments install it and insert its plugin row explicitly. The skill ships both Markdown snippets and a packaged PNG for systems that cannot reliably import remote images.
+エージェントはこの同梱プロバイダーから公式 "powered by dsh" バッジスキルをロードし、DeepSeek Harness で作成した文書、PR、その他のコンテンツに帰属バッジを付けるための指示に従うことができる。プロバイダーに設定はない。デプロイはそれをインストールし、プラグイン行を明示的に挿入する。スキルは Markdown スニペットと、リモート画像を確実に取り込めないシステムのための同梱 PNG の両方を提供する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Enable the plugin to make the `dsh-badge` skill available in the session skill catalog; the model can then load it like any other skill and follow its instructions for adding a "powered by dsh" badge.
+プラグインを有効化すると `dsh-badge` スキルがセッションスキルカタログで利用可能になる。モデルは他のスキルと同様にそれをロードし、"powered by dsh" バッジ追加の指示に従うことができる。
 
-In Plugins, this component is named **DSH** and uses the DSH tag icon. Its skill is named `dsh-badge`.
+Plugins では、このコンポーネントは **DSH** という名前で DSH タグアイコンを使う。そのスキル名は `dsh-badge` である。
 
-### When to choose it
+### 選ぶ場合
 
-Choose this provider when content produced with DeepSeek Harness should carry official attribution badges, and the deployment wants the badge skill available to agents without storing it in a local skill directory. Skip it when the badge is irrelevant to the deployment. The default composition omits the plugin; installation and an explicit active row are required.
+DeepSeek Harness で作成したコンテンツに公式帰属バッジを付けるべきで、ローカルスキルディレクトリに格納せずにエージェントがバッジスキルを使えるようにしたい場合にこのプロバイダーを選ぶ。バッジがデプロイに無関係な場合は使わない。既定構成はプラグインを省略する。インストールと明示的な有効行が必要である。
 
-### Enable the plugin
+### プラグインの有効化
 
-Install `@deepseek-ai/dsh-skill-badge` into the profile and insert its plugin row. The default composition does not declare it.
+`@deepseek-ai/dsh-skill-badge` をプロファイルにインストールし、そのプラグイン行を挿入する。既定構成はそれを宣言しない。
 
 ```yaml
 - insert:
@@ -43,78 +43,78 @@ Install `@deepseek-ai/dsh-skill-badge` into the profile and insert its plugin ro
       name: '@deepseek-ai/dsh-skill-badge'
 ```
 
-After enabling, `dsh-badge` appears in the available skills of the session catalog. The skill covers remote Markdown badges (Shields.io-based) and a packaged PNG badge asset for targets that cannot fetch remote images reliably.
+有効化後、`dsh-badge` はセッションカタログの利用可能スキルに現れる。スキルはリモート Markdown バッジ（Shields.io 方式）と、リモート画像を確実に取得できない対象のための同梱 PNG バッジアセットをカバーする。
 
-### What the badge skill provides
+### バッジスキルが提供するもの
 
-- **Markdown snippets.** Instructions for embedding the official badge markup in documents, PRs, and merge requests.
-- **Packaged PNG asset.** A `dsh-badge.png` resource (726×120 source, rendered at 121×20) that works where remote images cannot be imported.
+- **Markdown スニペット。** 文書、PR、マージリクエストに公式バッジマークアップを埋め込むための指示。
+- **同梱 PNG アセット。** リモート画像を取り込めない場所で動作する `dsh-badge.png` リソース（726×120 ソース、121×20 で描画）。
 
-### Observable success and failures
+### 観察可能な成功と失敗
 
-An explicitly inserted active row makes `dsh-badge` appear in the catalog and loadable by name. Without an active row, this provider contributes no catalog entry. Because the provider is immutable, discovery always succeeds with exactly one skill and never reports partial results.
+明示的に挿入された有効行により `dsh-badge` がカタログに現れ、名前でロード可能になる。有効行がなければこのプロバイダーはカタログエントリーを寄与しない。プロバイダーは不変であるため、検出は常にちょうど 1 つのスキルで成功し、部分結果を報告することはない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains how the bundled provider is wired; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節は同梱プロバイダーの配線を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で完全にカバーする。
 
-### Design concept
+### 設計概念
 
-The provider is an immutable, synchronously registered skill source: it registers one fixed candidate at the bundled skill rank (600) under the provider name `dsh-badge`, exposes its packaged `assets/` directory as the skill's directory resource base, and reads the skill body from the packaged `assets/dsh-badge.md` file on every load.
+プロバイダーは不変で同期登録されるスキルソースである。プロバイダー名 `dsh-badge` で同梱スキルランク（600）に固定候補を 1 つ登録し、同梱 `assets/` ディレクトリをスキルのディレクトリリソース基盤として公開し、ロードごとに同梱 `assets/dsh-badge.md` ファイルからスキル本体を読む。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry and the immutable provider: one candidate, resource base, body load |
-| [`assets/`](assets/) | Packaged skill body (`dsh-badge.md`) and PNG asset (`dsh-badge.png`) |
+| [`src/index.ts`](src/index.ts) | プラグインエントリーと不変プロバイダー。1 候補、リソース基盤、本体ロード |
+| [`assets/`](assets/) | 同梱スキル本体（`dsh-badge.md`）と PNG アセット（`dsh-badge.png`） |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the registry this provider registers on to how the skill reaches the model.
+パッケージレベルの契約では足りない場合に以下のページを読む。このプロバイダーが登録するレジストリーからスキルがモデルに届く仕組みへ進む。
 
-- [Skill subsystem reference](../../../docs/subsystems/skills.md) — the registry and provider contract this provider implements.
-- [skill package](../../skill/skill/README.md) — the registry the provider registers on, and the shared rendering of loaded skills.
-- [tool-skill package](../../skill/tool-skill/README.md) — how the badge skill reaches the session catalog and the model.
+- [スキルサブシステムリファレンス](../../../docs/subsystems/skills.md) — このプロバイダーが実装するレジストリーとプロバイダー契約。
+- [skill パッケージ](../../skill/skill/README.md) — プロバイダーが登録するレジストリーとロード済みスキルの共有レンダリング。
+- [tool-skill パッケージ](../../skill/tool-skill/README.md) — バッジスキルがセッションカタログとモデルに届く仕組み。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-tool-skill`, which renders the provider's catalog entry and the selected skill body to the model.
+`dsh-tool-skill` を通じた間接的なもの。プロバイダーのカタログエントリーと選択されたスキル本体をモデルに描画する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-An omitted plugin adds no request content. When its inserted row is active, its catalog entry and any loaded body change the provider KV prefix at their insertion points.
+省略されたプラグインは要求内容を追加しない。挿入行が有効な場合、そのカタログエントリーとロードされた本体は挿入点でプロバイダー KV プレフィックスを変える。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the bundled provider does not do. They are current package constraints, not a task backlog.
+これらの制限は同梱プロバイダーが行わないことを定義する。これらは現在のパッケージの制約であり、タスクバックログではない。
 
-- **One fixed skill, no runtime customization** — the provider contributes exactly the `dsh-badge` skill; deployments that need another badge variant author their own skill instead.
-- **Remote Markdown relies on Shields.io** — the remote badge markup embeds a Shields.io image; use the packaged PNG when the target cannot fetch remote images reliably.
+- **1 つの固定スキルのみで実行時カスタマイズなし** — プロバイダーはちょうど `dsh-badge` スキルのみを寄与する。別のバッジ変種が必要なデプロイは独自スキルを作成する。
+- **リモート Markdown は Shields.io に依存する** — リモートバッジマークアップは Shields.io 画像を埋め込む。対象がリモート画像を確実に取得できない場合は同梱 PNG を使う。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

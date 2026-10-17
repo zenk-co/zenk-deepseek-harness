@@ -4,7 +4,7 @@ description: "浏览全部已捕获 DSH alpha/RC tag 之间的 Session 持久化
 
 # DSH 预发行版本的持久化变化
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

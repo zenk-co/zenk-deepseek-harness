@@ -1,41 +1,41 @@
 ---
-description: "The model-facing pwsh tool for users and maintainers choosing, configuring, or debugging one-shot PowerShell execution, background jobs, and sandbox escalation on Windows."
+description: "Windows でのワンショット PowerShell 実行、バックグラウンドジョブ、サンドボックスエスカレーションの選択・設定・デバッグを行うユーザーとメンテナー向けの、モデルに公開される pwsh ツール。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-pwsh
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-tool-pwsh` lets the agent run PowerShell commands through a mounted shell executor. Each call uses a fresh process; with a job registry composed every command is a job from the moment it starts, so `run_in_background` returns the id at once and a foreground command that outlives its timeout returns the same id, with observable output. Commands use native Windows paths and `$env:NAME` variables without dialect translation. Calls receive the managed `DSH_*` environment, and sandboxed execution enforces Windows language-mode and named-pipe requirements. Mount it with a PowerShell executor such as `dsh-pwsh-local` and the `dsh-shell-env` plugin.
+`dsh-tool-pwsh` は、マウントされたシェルエグゼキューターを通じてエージェントが PowerShell コマンドを実行できるようにする。呼び出しごとに新しいプロセスを使用し、ジョブレジストリが構成されている場合はすべてのコマンドが開始した瞬間からジョブになるため、`run_in_background` は即座に id を返し、タイムアウトを超えて生き残ったフォアグラウンドコマンドも同じ id を返して、観察可能な出力を伴う。コマンドは方言変換なしでネイティブの Windows パスと `$env:NAME` 変数を使用する。呼び出しは管理された `DSH_*` 環境を受け取り、サンドボックス実行では Windows の言語モードと名前付きパイプの要件が適用される。`dsh-pwsh-local` のような PowerShell エグゼキューターと `dsh-shell-env` プラグインとともにマウントする。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-New commands start in the Session's current working directory. Relative `workdir` values resolve from that directory; per-call overrides and background jobs do not change it.
+新しいコマンドは Session の現在の作業ディレクトリで開始する。相対的な `workdir` 値はそのディレクトリから解決され、呼び出しごとの上書きとバックグラウンドジョブはこれを変更しない。
 
-Load this plugin in any composition where the agent should run PowerShell commands — typically a Windows composition whose `ctx.shell` is backed by a PowerShell executor. It registers the `pwsh` tool once the executor provider and the `dsh-shell-env` registry are mounted.
+エージェントが PowerShell コマンドを実行すべきあらゆる構成でこのプラグインをロードする — 通常は、`ctx.shell` が PowerShell エグゼキューターに支えられた Windows 構成である。エグゼキュータープロバイダーと `dsh-shell-env` レジストリがマウントされると、`pwsh` ツールを登録する。
 
-### When to choose it
+### どちらを選ぶか
 
-Choose the pwsh tool when commands must be written in PowerShell — native paths and `$env:` variables — or when the deployment is Windows-native. Choose `dsh-tool-bash` when the command set is bash-dialect; there is no translation between the two. When work needs cross-call state (cwd, variables), the persistent counterpart [`dsh-tool-pwsh-persistent`](../tool-pwsh-persistent/README.md) keeps one owner-scoped shell alive.
+コマンドを PowerShell で — ネイティブパスと `$env:` 変数で — 書く必要がある場合、またはデプロイメントが Windows ネイティブである場合は pwsh ツールを選ぶ。コマンドセットが bash 方言である場合は `dsh-tool-bash` を選ぶ。両者の間に変換はない。呼び出しをまたぐ状態 (cwd、変数) が必要な作業には、永続的な対応版 [`dsh-tool-pwsh-persistent`](../tool-pwsh-persistent/README.md) がオーナースコープの 1 つのシェルを生かし続ける。
 
-### Minimal configuration
+### 最小構成
 
-The common path is a PowerShell executor provider, the environment registry, and this tool.
+一般的な経路は、PowerShell エグゼキュータープロバイダー、環境レジストリ、そしてこのツールである。
 
 ```yaml
 - name: '@deepseek-ai/dsh-pwsh-local'
@@ -43,178 +43,178 @@ The common path is a PowerShell executor provider, the environment registry, and
 - name: '@deepseek-ai/dsh-tool-pwsh'
 ```
 
-The config fields govern the background surface.
+設定フィールドはバックグラウンドサーフェスを統制する。
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `enableRunInBackground` | `true` | Expose `run_in_background` while a job registry is composed; when `false`, forced background calls are rejected |
-| `promoteOnTimeout` | `true` | Keep a foreground command that reaches its timeout running as its background job instead of killing it |
+| `enableRunInBackground` | `true` | ジョブレジストリが構成されている間 `run_in_background` を公開する。`false` のとき、強制されたバックグラウンド呼び出しは拒否される |
+| `promoteOnTimeout` | `true` | タイムアウトに達したフォアグラウンドコマンドを kill せず、そのバックグラウンドジョブとして実行し続ける |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-pwsh) is the exhaustive source for every accepted field and its JSDoc; the generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-pwsh) carries the full argument schema.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-pwsh)が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源である。生成された[ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-pwsh)が完全な引数スキーマを収録している。
 
-### Running a command
+### コマンドの実行
 
-The tool executes `pwsh -Command <command>` and returns the combined output. Commands run in a fresh pwsh process every call, so state never persists — pass `workdir` instead of `cd`. Paths use native Windows form and environment variables are read with `$env:NAME`. A non-zero exit is reported as `[exit code: N]`; on Windows a force-killed command settles as `[exit code: 1]` without a signal marker, so the agent treats a bare exit 1 after an interruption as a termination, not a command failure. The schema lists `description` before `command` and asks the model to emit it first, without enforcing JSON member order. The description tells the agent to verify the resolved absolute target path before any delete or move and not to assign to automatic variables such as `$HOME`. Background runs, output truncation, and the `description`/`timeoutMs`/`workdir` arguments behave exactly as in [`dsh-tool-bash`](../tool-bash/README.md#running-long-commands-in-the-background), including job-owned cancellation during asynchronous shell preparation.
+ツールは `pwsh -Command <command>` を実行し、結合された出力を返す。コマンドは呼び出しごとに新しい pwsh プロセスで実行されるため、状態は決して永続化されない — `cd` の代わりに `workdir` を渡す。パスはネイティブ Windows 形式を使い、環境変数は `$env:NAME` で読む。非ゼロ終了は `[exit code: N]` として報告される。Windows では強制 kill されたコマンドはシグナルマーカーなしで `[exit code: 1]` として落ち着くため、エージェントは中断後の裸の exit 1 をコマンド失敗ではなく終了として扱う。スキーマは `description` を `command` より前に列挙し、JSON メンバー順を強制することなく、モデルに最初にそれを出力するよう求める。description は、削除や移動の前に解決された絶対ターゲットパスを検証すること、および `$HOME` のような自動変数に代入しないことをエージェントに伝える。バックグラウンド実行、出力の切り詰め、`description`/`timeoutMs`/`workdir` 引数は、非同期シェル準備中のジョブ所有のキャンセルも含め、[`dsh-tool-bash`](../tool-bash/README.md#running-long-commands-in-the-background) とまったく同じように動作する。
 
-### Foreground commands as jobs
+### ジョブとしてのフォアグラウンドコマンド
 
-With a job registry composed, a foreground command is registered with `ctx.jobs` at its start and the call waits on that job: the command is listed, streams through `job.list` and `job.follow`, and can be stopped from the Web task list for as long as it runs. A command that finishes within the timeout returns the ordinary foreground result and its job record leaves the registry with it, so the model never sees an id. A command that outlives the timeout keeps running as the job it already was, and the call returns `[still running after <timeoutMs>ms; moved to background job <id>]` plus the job hand-off guidance, seeded with one consuming read of the output so far — `job_output` continues exactly after it. A kill from outside the call (the human stopping the job) settles the foreground result with `[stopped: <reason>]` ahead of the exit marker, so the model reads the reason instead of a command failure; cancelling the call itself kills the job. Registration is best-effort: `promoteOnTimeout: false`, a missing job registry, or a registry that refuses the job at its start (the owner's job limit, no controller) run the command under the executor's deadline kill instead, and the `timeoutMs` parameter description advertises the hand-over only when it holds.
+ジョブレジストリが構成されている場合、フォアグラウンドコマンドは開始時に `ctx.jobs` に登録され、呼び出しはそのジョブを待つ。コマンドは一覧に表示され、`job.list` と `job.follow` を通じてストリームされ、実行中は Web タスクリストから停止できる。タイムアウト内に終了したコマンドは通常のフォアグラウンド結果を返し、そのジョブレコードも一緒にレジストリから離れるため、モデルは id を決して見ない。タイムアウトを超えて生き残ったコマンドは、すでにそうであったジョブとして実行を続け、呼び出しは `[still running after <timeoutMs>ms; moved to background job <id>]` とジョブ引き継ぎのガイダンスを返す。ガイダンスには、それまでの出力を 1 回消費する読み取りがシードされ、`job_output` はその続きから正確に読み進める。呼び出しの外部からの kill (人間によるジョブの停止) は、フォアグラウンド結果を終了マーカーより前に `[stopped: <reason>]` として確定するので、モデルはコマンド失敗ではなく理由を読む。呼び出し自体のキャンセルはジョブを kill する。登録はベストエフォートである: `promoteOnTimeout: false`、ジョブレジストリの欠如、または開始時にジョブを拒否するレジストリ (オーナーのジョブ上限、コントローラーなし) では、代わりにエグゼキューターの期限 kill の下でコマンドを実行し、`timeoutMs` パラメーターの説明は引き継ぎが成り立つ場合にのみそれを告知する。
 
-### Windows-specific sandbox behavior
+### Windows 固有のサンドボックス動作
 
-Under a sandboxing executor, denied commands report `[sandbox: file access denied under <mode> mode]`, and the same one-shot escalation path applies: retry the exact command once with `sandbox_permissions` plus a `justification` through user approval. The justification asks the model to use the language of the current user request. The tool also teaches two Windows-restricted-token contracts in its description: read-only pwsh runs in ConstrainedLanguage (`.NET` static calls, `Add-Type`, COM, and reflection fail with "only core types" errors), and in both confined modes programs cannot open named pipes, so a command that captures another program's output through piped stdio fails with EPERM — escalate the exact command once or restructure it to avoid capturing output.
+サンドボックス化エグゼキューターの下では、拒否されたコマンドは `[sandbox: file access denied under <mode> mode]` を報告し、同じワンショットエスカレーション経路が適用される: 正確なコマンドを `sandbox_permissions` と `justification` を付けてユーザー承認を通じて 1 回再試行する。justification は、現在のユーザーリクエストの言語を使うようモデルに求める。ツールはまた、その説明の中で Windows 制限トークンの 2 つの契約を教える: 読み取り専用 pwsh は ConstrainedLanguage で実行され (`.NET` 静的呼び出し、`Add-Type`、COM、リフレクションは "only core types" エラーで失敗する)、両方の隔離モードではプログラムが名前付きパイプを開けないため、パイプ経由の stdio で別のプログラムの出力を取り込むコマンドは EPERM で失敗する — 正確なコマンドを 1 回エスカレーションするか、出力の取り込みを避けるよう再構成する。
 
-### What can go wrong
+### 失敗しうるもの
 
-A composition with no PowerShell executor never activates the tool, and the injected services (`tools`, `shell`, `systemPrompt`, `shellEnv`) must all exist. Background calls without the job runtime fail with `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`, and `sandbox_permissions` without a sandboxing executor fails with `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`.
+PowerShell エグゼキューターのない構成ではツールは決して有効化されず、注入されるサービス (`tools`、`shell`、`systemPrompt`、`shellEnv`) はすべて存在しなければならない。ジョブランタイムのないバックグラウンド呼び出しは `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs` で失敗し、サンドボックス化エグゼキューターのない `sandbox_permissions` は `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)` で失敗する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-Structured foreground and background results expose `cwd`, the executor-resolved launch directory. Persisted presentation metadata carries the same value so settled cards retain the directory used by that call. A command’s own `cd` does not change this launch value; native result text remains stdout, stderr, and status markers.
+構造化されたフォアグラウンドとバックグラウンドの結果は、エグゼキューターが解決した起動ディレクトリである `cwd` を公開する。永続化されるプレゼンテーションメタデータも同じ値を運ぶので、確定したカードはその呼び出しが使用したディレクトリを保持する。コマンド自身の `cd` はこの起動値を変えない。ネイティブの結果テキストは stdout、stderr、ステータスマーカーのままである。
 
-This section explains the design decisions behind the tool and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではツールの背後にある設計判断を説明し、それを実現するコードを示す。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計方針
 
-- **A deliberate twin of `dsh-tool-bash`.** Foreground and background execution, the managed environment, the sandbox escalation surface, and the marker/truncation rendering mirror the bash tool call-for-call, so consumers of one accept the other's wire shape ([pwsh tool bash parity reference](README.md)).
-- **PowerShell-dialect contract.** The tool contract is PowerShell: native paths and `$env:` variables, executed via `pwsh -Command` with no intermediate shell.
-- **Windows sandbox facts taught in the description.** The ConstrainedLanguage and named-pipe contracts are Windows-restricted-token behavior; the gate for teaching them is "any confining executor is mounted", which is safe because every shipped pairing is win32-only.
-- **Non-zero exits are reported, not errored.** Only infrastructure failures (spawn errors, aborts) surface as tool errors, matching the bash story.
+- **`dsh-tool-bash` の意図的な双子。** フォアグラウンドとバックグラウンドの実行、管理環境、サンドボックスエスカレーションサーフェス、マーカー/切り詰めのレンダリングは、bash ツールを呼び出しごとに鏡写しにするので、一方のコンシューマーは他方のワイヤ形式を受け入れられる ([pwsh ツール bash 同等性リファレンス](README.md))。
+- **PowerShell 方言の契約。** ツールの契約は PowerShell である: ネイティブパスと `$env:` 変数、中間シェルなしで `pwsh -Command` を通じて実行する。
+- **説明の中で教える Windows サンドボックスの事実。** ConstrainedLanguage と名前付きパイプの契約は Windows 制限トークンの動作である。それらを教える条件は「何らかの隔離エグゼキューターがマウントされていること」であり、同梱されるすべての組み合わせが win32 専用であるため、これは安全である。
+- **非ゼロ終了はエラーではなく報告される。** インフラストラクチャの失敗 (spawn エラー、中断) のみがツールエラーとして表面化し、bash と同じ筋書きである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: tool registration, prompt section, arg validation, escalation, request assembly |
-| [`src/background.ts`](src/background.ts) | Map a settled process onto generic job outcome vocabulary and render a ring read as a process read |
-| [`src/render.ts`](src/render.ts) | Model-facing result text: streams, markers, truncation notices (bash twin) |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: ツール登録、プロンプトセクション、引数検証、エスカレーション、リクエスト組み立て |
+| [`src/background.ts`](src/background.ts) | 確定したプロセスを汎用ジョブ結果語彙に写像し、リング読み取りをプロセス読み取りとしてレンダリングする |
+| [`src/render.ts`](src/render.ts) | モデルに公開される結果テキスト: ストリーム、マーカー、切り詰め通知 (bash の双子) |
 
-### Rendering and exit markers
+### レンダリングと終了マーカー
 
-The renderer shares the bash tool's structure and the `parseExitStatus` marker contract from `dsh-shell`: a clean exit (0, no signal) produces no marker; the UI card consumes the exit marker as its exit-status pill. Windows forced termination settles as exit 1 without a signal, so `[killed by signal: …]` is POSIX-only there. The `tool:pwsh` prompt section (first-party order 1010) teaches the exit-marker convention and the Windows exit-1-after-interruption reading.
+レンダラーは bash ツールの構造と `dsh-shell` の `parseExitStatus` マーカー契約を共有する: クリーンな終了 (0、シグナルなし) はマーカーを生成しない。UI カードは終了マーカーを終了ステータスピルとして消費する。Windows の強制終了はシグナルなしの exit 1 として落ち着くので、`[killed by signal: …]` はそこでは POSIX 専用である。`tool:pwsh` プロンプトセクション (ファーストパーティ順序 1010) は終了マーカーの慣例と、Windows での中断後 exit 1 の読み方を教える。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the package-level contract is not enough. They move from the shell family to the executor seam and the design notes behind the Windows behavior.
+パッケージレベルの契約では足りないときにこれらのページを読む。シェルファミリーからエグゼキューターシームへ、そして Windows 動作の背後の設計ノートへ進む。
 
-- [shell package map](../README.md) — the bash capability family and its roles.
-- [Bash executor subsystem](../../../docs/subsystems/shell.md) — request/spec vocabulary, results, and background processes.
-- [shell-env](../shell-env/README.md) — the managed `DSH_*` environment every call receives.
-- [tool-jobs](../../jobs/tool-jobs/README.md) — `job_output`, `job_list`, and `job_kill` controls for background runs.
-- [historical pwsh tool bash parity Agent Note](../../../.agents/notes/archived/feature/2026-08-02-pwsh-tool-bash-parity.md) — why the tool mirrors the bash tool.
-- [Windows ACL restricted-token sandbox Agent Note](../../../.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md) — the language-mode and named-pipe contracts.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-pwsh) — the exact `pwsh` argument schema.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-pwsh) — every accepted config field and its source declaration.
+- [shell パッケージマップ](../README.md) — bash ケイパビリティファミリーとその役割。
+- [Bash エグゼキューターサブシステム](../../../docs/subsystems/shell.md) — リクエスト/スペック語彙、結果、バックグラウンドプロセス。
+- [shell-env](../shell-env/README.md) — すべての呼び出しが受け取る管理された `DSH_*` 環境。
+- [tool-jobs](../../jobs/tool-jobs/README.md) — バックグラウンド実行のための `job_output`、`job_list`、`job_kill` コントロール。
+- [歴史的な pwsh ツール bash 同等性 Agent Note](../../../.agents/notes/archived/feature/2026-08-02-pwsh-tool-bash-parity.md) — このツールが bash ツールを鏡写しにする理由。
+- [Windows ACL 制限トークンサンドボックス Agent Note](../../../.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md) — 言語モードと名前付きパイプの契約。
+- [生成されたツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-pwsh) — 正確な `pwsh` 引数スキーマ。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-pwsh) — 受け付けられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-Every request in this plugin's registration scope contains the pwsh guidance below at first-party order 1010. Scoped tool restrictions can hide the schema without removing this independently registered section.
+このプラグインの登録スコープ内のすべてのリクエストは、ファーストパーティ順序 1010 で以下の pwsh ガイダンスを含む。スコープ付きツール制限は、この独立に登録されたセクションを削除せずにスキーマを隠すことができる。
 
-##### Pwsh guidance
+##### pwsh ガイダンス
 
 ```markdown
 Non-zero exits are reported as `[exit code: N]` markers; investigate failures before moving on. On Windows a killed process settles as `[exit code: 1]` without a signal marker; treat a bare exit 1 after an interruption as a termination, not a command failure.
 ```
 
-#### Token effect
+#### トークン効果
 
-Small fixed input cost per request while the plugin is active.
+プラグインがアクティブな間、リクエストごとに小さな固定の入力コスト。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Prefix-stable while the registration scope and prompt text are unchanged. Plugin activation or disposal may invalidate reuse from this prompt section.
+登録スコープとプロンプトテキストが変わらない間はプレフィックス安定。プラグインのアクティブ化または破棄により、このプロンプトセクションからの再利用が無効化されることがある。
 
-### Tool schemas
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The model sees the generated [`pwsh` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-pwsh). Its justification asks the model to use the language of the current user request. Agent-scoped tool restrictions can remove the definition for that agent.
+モデルは生成された [`pwsh` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-pwsh)を見る。その justification は、現在のユーザーリクエストの言語を使うようモデルに求める。エージェントスコープのツール制限は、そのエージェントの定義を削除できる。
 
-#### Token effect
+#### トークン効果
 
-Fixed schema cost on every request where the tool is visible.
+ツールが可視であるすべてのリクエストに固定のスキーマコスト。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Prefix-stable while visibility and the tool definition are unchanged. A restriction or config change may invalidate reuse from the first changed token.
+可視性とツール定義が変わらない間はプレフィックス安定。制限または設定の変更は、最初に変更されたトークンからの再利用を無効化することがある。
 
-### Foreground result
+### フォアグラウンド結果
 
-#### What the model sees
+#### モデルが見るもの
 
-The renderer emits the data-dependent stdout tail, then optional `[stderr]` and the stderr tail. Conditional lines are exactly `[output truncated; full output: <path-or-(unavailable)>]`, `[sandbox: file access denied under <mode> mode]` plus the escalation hint `[sandbox: escalation available — …]` (only when the composition advertises escalation), `[timed out after <timeoutMs>ms]`, `[stopped: <reason>]`, `[killed by signal: <signal>]`, and `[exit code: <exitCode>]` (nonzero exits only); an empty body renders as `(no output)`.
+レンダラーはデータ依存の stdout テールを出力し、続いて省略可能な `[stderr]` と stderr テールを出力する。条件付き行はちょうど `[output truncated; full output: <path-or-(unavailable)>]`、`[sandbox: file access denied under <mode> mode]` に加えてエスカレーションヒント `[sandbox: escalation available — …]` (構成がエスカレーションを告知する場合のみ)、`[timed out after <timeoutMs>ms]`、`[stopped: <reason>]`、`[killed by signal: <signal>]`、`[exit code: <exitCode>]` (非ゼロ終了のみ) である。空の本文は `(no output)` としてレンダリングされる。
 
-#### Token effect
+#### トークン効果
 
-Zero result tokens before a call. Output is bounded per stream, while each emitted line remains in history until compaction.
+呼び出し前はゼロ結果トークン。出力はストリームごとに上限が課され、出力された各行はコンパクションまで履歴に残る。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-### Background result
+### バックグラウンド結果
 
-#### What the model sees
+#### モデルが見るもの
 
-A background start renders exactly `started background job <id>`; subsequent reads and status flow through the generic `job_output`/`job_kill` tools, including the lossy-read spill notice when in-memory truncation dropped unread bytes.
+バックグラウンド開始はちょうど `started background job <id>` をレンダリングする。以後の読み取りとステータスは汎用の `job_output`/`job_kill` ツールを通じて流れる。メモリ内切り詰めが未読バイトを落としたときの損失読み取りスピル通知も含む。
 
-#### Token effect
+#### トークン効果
 
-The ack is a fixed short line; job output is bounded per read.
+ack は固定の短い行であり、ジョブ出力は読み取りごとに上限が課される。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-### Tool errors
+### ツールエラー
 
-#### What the model sees
+#### モデルが見るもの
 
-Validation and infrastructure failures are normalized as `Error: <message>`. This package's stable messages are `invalid command: expected a non-empty string`, `invalid description: expected a non-empty string`, `invalid timeoutMs: expected a positive number, got <value>`, the escalation pairing failures, `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`, the shared escalation failures (not strictly wider / no approval service / no agent to route / no approval channel / user rejected / was cancelled), `run_in_background is disabled for this deployment (enableRunInBackground: false)`, `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`, and `tool call aborted`.
+検証とインフラストラクチャの失敗は `Error: <message>` として正規化される。このパッケージの安定メッセージは `invalid command: expected a non-empty string`、`invalid description: expected a non-empty string`、`invalid timeoutMs: expected a positive number, got <value>`、エスカレーションペアの失敗、`sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`、共有エスカレーションの失敗 (厳密に広くない / 承認サービスなし / ルーティング先エージェントなし / 承認チャネルなし / ユーザー拒否 / キャンセル済み)、`run_in_background is disabled for this deployment (enableRunInBackground: false)`、`background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`、`tool call aborted` である。
 
-#### Token effect
+#### トークン効果
 
-Only the failing call adds these retained tokens; an aborted call adds no command output.
+失敗した呼び出しだけがこれらの保持トークンを追加する。中断された呼び出しはコマンド出力を追加しない。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the tool is a poor fit or needs special care. They are current package constraints, not a task backlog.
+これらの制限は、ツールが不適切になる、または特別な注意を要する条件を定める。それらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Language mode and named-pipe capture under the Windows sandbox** — under the [Windows ACL sandbox](../../sandbox/sandbox-windows-acl/README.md), read-only pwsh starts in ConstrainedLanguage because its temp write denial makes PowerShell's AppLocker probe fail closed: `Add-Type`, non-core .NET statics (`[System.IO.*]::`, `[math]::`), COM objects, and reflection fail with "only core types" errors, and the mode cannot be lifted from inside. Workspace-write's private temp lets the probe complete, so it stays in FullLanguage unless host policy says otherwise. Both confined modes deny named-pipe opens, so a piped-stdio spawn inside a confined command fails with EPERM. The tool description teaches both contracts to the model; the backend README owns the full limitations.
-- **No persistent shell** — every call starts a fresh `pwsh -Command`; the persistent-shell counterpart is [`@deepseek-ai/dsh-tool-pwsh-persistent`](../tool-pwsh-persistent/README.md), which keeps one owner-scoped pwsh alive across calls.
-- **PowerShell-dialect contract** — the model must write PowerShell (native paths, `$env:` variables), not bash; there is no dialect translation.
+- **Windows サンドボックス下の言語モードと名前付きパイプの取り込み** — [Windows ACL サンドボックス](../../sandbox/sandbox-windows-acl/README.md)では、読み取り専用 pwsh は ConstrainedLanguage で開始する。その一時書き込みの拒否により PowerShell の AppLocker プローブがフェイルクローズするからである: `Add-Type`、非コア .NET 静的 (`[System.IO.*]::`、`[math]::`)、COM オブジェクト、リフレクションは "only core types" エラーで失敗し、モードを内部から解除できない。Workspace-write のプライベート一時領域ではプローブが完了できるため、ホストポリシーが別途指示しない限り FullLanguage のままである。両方の隔離モードは名前付きパイプのオープンを拒否するため、隔離されたコマンド内のパイプ stdio での spawn は EPERM で失敗する。ツール説明は両方の契約をモデルに教える。バックエンド README が完全な制限を所有する。
+- **永続シェルなし** — すべての呼び出しは新しい `pwsh -Command` を開始する。永続シェルの対応版は [`@deepseek-ai/dsh-tool-pwsh-persistent`](../tool-pwsh-persistent/README.md) であり、呼び出しをまたいで 1 つのオーナースコープ pwsh を生かし続ける。
+- **PowerShell 方言の契約** — モデルは bash ではなく PowerShell (ネイティブパス、`$env:` 変数) を書かなければならない。方言変換はない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

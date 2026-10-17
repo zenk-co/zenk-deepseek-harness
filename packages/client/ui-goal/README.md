@@ -1,91 +1,91 @@
 ---
-description: "Goal surface for the Web GUI: the composer-context strip that shows the current goal and edits, pauses, resumes, or clears it; for users and maintainers of the goal experience."
+description: "Web GUI のゴールサーフェス。現在のゴールを表示し、編集、一時停止、再開、クリアする composer-context ストリップ。ゴール体験のユーザーとメンテナーのためのもの。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-goal
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The Web GUI goal surface shows both the durable goal state and its current process-local activation, and lets users edit, pause, resume, or clear the goal; rejected changes appear inline. It displays durable `/goal` runs as `Command input` bubbles so commands from users or the model remain visible after reload. Goal creation remains outside this package. Shipped Web presets other than `minimal` make `/goal` available to agents.
+Web GUI のゴールサーフェスは永続的なゴール状態と現在のプロセスローカルな有効化の両方を表示し、ユーザーがゴールを編集、一時停止、再開、クリアできる。拒否された変更はインラインに現れる。永続的な `/goal` 実行を `Command input` バブルとして表示するため、ユーザーやモデルからのコマンドはリロード後も可視のままである。ゴール作成はこのパッケージの範囲外である。`minimal` 以外の出荷 Web プリセットはエージェントが `/goal` を使えるようにする。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin alongside `ui-conversation` and the goal domain package; the strip then appears as the second card in the composer-context stack (after Todo, before Queue) whenever the session has a goal. Todo and Goal use the same panel elevation above the composer. An armed active goal offers pause; an active-but-disarmed or paused goal offers resume; edit rewrites the objective in the ui-primitives `InlineEditor`, so multi-line objectives survive editing; clear removes the goal and suppresses the strip until the projection catches up.
+このプラグインを `ui-conversation` とゴール領域パッケージと並べてマウントする。セッションにゴールがある場合、ストリップは composer-context スタックの 2 番目のカードとして現れる（Todo の後、Queue の前）。Todo とゴールは composer 上で同じパネル隆起を使う。武装済みアクティブゴールは一時停止を提供する。アクティブだが武装していないゴールや一時停止中のゴールは再開を提供する。編集は ui-primitives の `InlineEditor` で目的を書き換えるため、複数行の目的は編集後も残る。クリアはゴールを除去し、射影が追いつくまでストリップを抑制する。
 
-### The command-input bubble
+### コマンド入力バブル
 
-Each durable `/goal` run projects as a right-aligned user-style bubble labeled `Command input` (or `指令输入`), rendered before the generic command result row; the leading `/goal` token renders as a command reference chip in the code face through the shared `conversation.user.text` Factory and the Goal-owned `command` renderer, using the executed token range in `facts.commands`, and the objective stays plain body text. It carries no timestamp, copy, or branch actions, and reloading reconstructs it from the run.
+各永続的な `/goal` 実行は `Command input`（または `指令输入`）とラベル付けされた右寄せのユーザー風バブルとして射影され、汎用コマンド結果行の前に描画される。先頭の `/goal` トークンは `facts.commands` 内の実行トークン範囲を使い、共有 `conversation.user.text` ファクトリーとゴール所有の `command` レンダラーを通じてコードフェイスのコマンド参照チップとして描画され、目的はプレーンな本文テキストのままである。タイムスタンプ、コピー、分岐アクションは持たず、リロードはそれを実行から再構成する。
 
-### Failures
+### 失敗
 
-A rejected mutation surfaces the Remote error inline on the strip; loading, absent, completed, and successfully cleared goals render nothing.
+拒否された変更はストリップ上にリモートエラーをインライン表示する。読み込み中、不在、完了、正常にクリアされたゴールは何も描画しない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The durable goal arrives through `useProjection('goal')` (seeded by the history tail page and updated by `session/projection` frames). The inject face carries a registrant-private activation hook source plus the four mutation verbs. That source starts only while the framework hook observes it, reads `ctx.remote.goals.get`, subscribes to `goal/activation-changed`, and refreshes on running-state or connection resets. Live-event epochs invalidate in-flight reads, so a stale HTTP result cannot overwrite a newer activation edge; running refreshes retain the last known activation until the read resolves. The strip owns no domain store or cross-plugin cache. Each mutation reads the CAS ref from the session's current projected value at call time, and the RPC's compare-and-set is the staleness guard. The strip single-flights mutations synchronously because a pending render cannot fence same-frame clicks. The command-input projection is a separate Conversation Definition that builds a `command-input` Chat Node before the generic command result Node; it never creates `user/message` or a model turn.
+永続的なゴールは `useProjection('goal')` を通じて到着する（履歴末尾ページで種付けされ、`session/projection` フレームで更新される）。注入フェイスは登録者私的な有効化フックソースと 4 つの変更動詞を運ぶ。そのソースはフレームワークフックがそれを観察している間のみ開始し、`ctx.remote.goals.get` を読み、`goal/activation-changed` を購読し、実行状態や接続リセットで更新する。ライブイベントエポックは飛行中の読み取りを無効化するため、古い HTTP 結果が新しい有効化エッジを上書きできない。実行中の更新は読み取りが解決するまで最後に既知の有効化を保持する。ストリップは領域ストアやプラグイン横断キャッシュを所有しない。各変更は呼び出し時にセッションの現在射影値から CAS 参照を読み、RPC の compare-and-set が古さガードである。ストリップは変更を同期的に単一化する。保留中のレンダーは同フレームのクリックを遮断できないためである。コマンド入力射影は汎用コマンド結果ノードの前に `command-input` チャットノードを構築する別の会話定義であり、`user/message` やモデルターンを決して作らない。
 
-Activation reads hold a temporary `goalActivation` Client reference and send `goals.get` only after that Session's initial history open succeeds. A stale binding or failed open sends no RPC. Rejected reads are logged without changing the projected goal or last known activation; the temporary reference is released when the read settles.
+有効化読み取りは一時的な `goalActivation` クライアント参照を保持し、そのセッションの初期履歴開設が成功した後にのみ `goals.get` を送る。古い束縛や失敗した開設では RPC を送らない。拒否された読み取りは射影ゴールや最後に既知の有効化を変えずにログに記録される。一時参照は読み取りの決着時に解放される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the goal surface is not enough. They move from the browser strip to the goal domain and the slots it fills.
+ゴールサーフェスでは足りない場合に以下のページを読む。ブラウザーストリップからゴール領域とそれが埋めるスロットへ進む。
 
-- [dsh-goal](../../goal/goal/README.md) — the goal domain, projection, and `/goal` command this surface reads and mutates.
-- [ui-conversation](../ui-conversation/README.md) — declares the `conversation.input.dock` slot and owns the composer.
-- [Client package map](../README.md) — adjacent browser UI packages.
+- [dsh-goal](../../goal/goal/README.md) — このサーフェスが読み書きするゴール領域、射影、`/goal` コマンド。
+- [ui-conversation](../ui-conversation/README.md) — `conversation.input.dock` スロットを宣言し、composer を所有する。
+- [クライアントパッケージマップ](../README.md) — 隣接するブラウザー UI パッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the `goals/edit`, `goals/pause`, `goals/resume`, and `goals/clear` mutations the strip routes; the host GoalService owns the model-visible goal context message those mutations queue.
+ストリップが経路付ける `goals/edit`、`goals/pause`、`goals/resume`、`goals/clear` 変更を通じた間接的なもの。その変更がキューに入れるモデル可視のゴールコンテキストメッセージはホスト GoalService が所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None unless the queued goal context is admitted. An admitted context extends the history tail like any other message; an insertion discarded before admission does not affect the cache.
+キューに入れられたゴールコンテキストが受付されない限りなし。受付されたコンテキストは他のメッセージと同様に履歴末尾を拡張する。受付前に破棄された挿入はキャッシュに影響しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the current goal surface. They are current package constraints, not a goal-domain comparison or a task backlog.
+これらの制限は現在のゴールサーフェスを定義する。これらは現在のパッケージの制約であり、ゴール領域の比較でもタスクバックログでもない。
 
-- **Preset-independent host state** — switching an active session to `minimal` leaves its host-owned goal intact. `/goal` and goal tools disappear, while this strip can still edit, pause, resume, or clear the goal.
+- **プリセット非依存のホスト状態** — アクティブセッションを `minimal` に切り替えてもホスト所有のゴールは残る。`/goal` とゴールツールは消えるが、このストリップはゴールを編集、一時停止、再開、クリアできる。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

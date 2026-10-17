@@ -1,31 +1,31 @@
 ---
-description: "Choose an Agent’s tools, prompt sections and skills through declarative presets. One process can run several compositions. Failed definitions remain visible, while existing Agents retain the composition they already use."
+description: "宣言的プリセットを通じてエージェントのツール、プロンプトセクション、スキルを選ぶ。1 つのプロセスで複数の構成を実行できる。失敗した定義は可視のまま残り、既存のエージェントは使用中の構成を保持する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-agent-preset-registry
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Choose an Agent’s tools, prompt sections and skills through declarative presets. One process can run several compositions. Failed definitions remain visible, while existing Agents retain the composition they already use.
+宣言的プリセットを通じてエージェントのツール、プロンプトセクション、スキルを選ぶ。1 つのプロセスで複数の構成を実行できる。失敗した定義は可視のまま残り、既存のエージェントは使用中の構成を保持する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-### Minimal configuration
+### 最小構成
 
 ```yaml
 - id: agent-preset-registry
@@ -39,71 +39,71 @@ Choose an Agent’s tools, prompt sections and skills through declarative preset
     plugins: []
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `default` | required | Preset ID used when none is requested |
+| `default` | 必須 | 要求がない場合に使うプリセット ID |
 
-The Web definitions come from the `dsh-web-app` bundle. Definitions are ordinary plugin rows; the registry neither scans directories nor accepts preset paths. The `selectedDefault` volatile field of the `agent-preset-registry` entry retains the user default, which new sessions resolve over the deployment `default`. A profile patch may still carry the retired `modeSelectionEnabled` field; the registry declares no such field and neither reads nor rewrites it.
+Web 定義は `dsh-web-app` バンドルから提供される。定義は通常のプラグイン行であり、レジストリはディレクトリを走査せず、プリセットパスも受け付けない。`agent-preset-registry` エントリーの `selectedDefault` volatile フィールドはユーザーの既定値を保持し、新しいセッションはデプロイの `default` よりそれを優先して解決する。プロファイルパッチが廃止された `modeSelectionEnabled` フィールドを運ぶ場合があるが、レジストリはそのようなフィールドを宣言せず、その読み書きも行わない。
 
-The registry writes no declarations. The `read` Remote renders one declaration’s child list back as entry-list YAML (`!!js` conditions included) so a client can show what a preset composes; nothing accepts YAML back. A new preset or an override of a shipped one is a bundle patch: an `insert` of a `@deepseek-ai/dsh-agent-preset` row, or a patch keyed by that row’s id, installed into the profile with `plugin_manager`; Creator mode authors such bundles in conversation.
+レジストリは宣言を書き込まない。`read` リモートは 1 つの宣言の子リストをエントリーリスト YAML（`!!js` 条件を含む）としてレンダリングして返すため、クライアントはプリセットが何を構成するかを表示できる。YAML を受け付けることはない。新しいプリセットや出荷済みのものの上書きはバンドルパッチである。すなわち `@deepseek-ai/dsh-agent-preset` 行の `insert`、またはその行の id をキーとするパッチであり、`plugin_manager` でプロファイルにインストールする。Creator モードは会話の中でそのようなバンドルを作成する。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-Each declaration eagerly creates a registry-owned scope and an in-memory Loader tree. Updating or removing a declaration retires its previous revision. Agents, children and temporary historical reads retain references; releasing the final reference disposes the retired tree. Plugin registrations inherit the preset scope, and the Agent scope’s parent link controls visibility. The Host continues to share the Agent loop.
+各宣言は即座にレジストリ所有のスコープとインメモリー Loader ツリーを作成する。宣言の更新や削除は以前のリビジョンを廃止する。エージェント、子、過去の一時読み取りは参照を保持し、最後の参照の解放が廃止されたツリーを破棄する。プラグイン登録はプリセットスコープを継承し、エージェントスコープの親リンクが可視性を制御する。ホストは引き続きエージェントループを共有する。
 
-A preset service provider and its consumers must share one `cordis:group` isolation realm. Entry-local isolation does not propagate through the Agent registration scope: ordinary Context lookup outside the group, including `agent.ctx`, still selects the Host realm. `agentPresets.serviceFor()` explicitly inspects the retained composition; it does not change ordinary service lookup.
+プリセットサービスプロバイダーとそのコンシューマーは 1 つの `cordis:group` 分離レルムを共有しなければならない。エントリー単位の分離はエージェント登録スコープを通じて伝搬しない。通常の Context 検索はグループ外では、すなわち `agent.ctx` も含めてホストのレルムを選択する。`agentPresets.serviceFor()` は保持された構成を明示的に検査する。通常のサービス検索は変えない。
 
-Activation auditing checks imports, missing services and globally leaked services. Import failures, activation failures and leaks reject the mount. A row waiting for a Host service stays mounted, and every read and binding re-audits it after the Host Loader tree settles, so startup order does not decide the outcome. Failure prevents new bindings to that definition. Session logs retain the preset ID and blank-session selections; recovery after restart uses the current definition of that ID and rejects a missing definition. `select` leaves a blank Session that records the requested preset and already runs its current revision unchanged, without another selection record or `tools/change`.
+有効化の監査はインポート、不足サービス、グローバルに漏洩したサービスを検査する。インポート失敗、有効化失敗、漏洩はマウントを拒否する。ホストサービス待ちの行はマウントされたまま残り、ホスト Loader ツリーが落ち着くたびにすべての読み取りと束縛が再監査されるため、起動順序が結果を決めることはない。失敗はその定義への新しい束縛を防ぐ。セッションログはプリセット ID と空セッション選択を保持する。再起動後の回復はその ID の現在の定義を使い、欠落した定義は拒否する。`select` は要求されたプリセットを記録した空セッションを残し、その現在のリビジョンをすでに実行中として変更なしに扱い、別の選択記録や `tools/change` は行わない。
 
-`inspectCompositions()` reads all revisions retained by this registry; passing an Agent context selects its exact revision, or returns an empty list when it has no binding here. Each `AgentPresetInspection` contains a preset ID, detached active-module references with their resolution bases, and leaked-service names. Inspectors query the runtime service rather than a module-local mount table; the results contain no Loader trees or fibers. [composition-inventory.ts](src/composition-inventory.ts) defines these records.
+`inspectCompositions()` はこのレジストリが保持するすべてのリビジョンを読む。エージェント Context を渡すとその正確なリビジョンを選択し、ここへの束縛がなければ空リストを返す。各 `AgentPresetInspection` はプリセット ID、解決ベース付きのデタッチされたアクティブモジュール参照、漏洩したサービス名を含む。検査器はモジュール単位のマウントテーブルではなくランタイムサービスに問い合わせる。結果に Loader ツリーやファイバーは含まれない。[composition-inventory.ts](src/composition-inventory.ts) がこれらのレコードを定義する。
 
-| File | Responsibility |
+| ファイル | 責務 |
 |---|---|
-| [index.ts](src/index.ts) | Registration, revisions and Agent bindings |
-| [mount.ts](src/mount.ts) | Scoped plugin trees and activation auditing |
+| [index.ts](src/index.ts) | 登録、リビジョン、エージェント束縛 |
+| [mount.ts](src/mount.ts) | スコープ付きプラグインツリーと有効化監査 |
 
 </details>
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Scope](../../core/scope/README.md) — Registration isolation.
-- [Agent](../../core/agent/README.md) — Session runtime.
-- [Cordis](../../../docs/cordis-primer.md) — Plugin configuration and lifecycle.
+- [Scope](../../core/scope/README.md) — 登録の分離。
+- [Agent](../../core/agent/README.md) — セッションランタイム。
+- [Cordis](../../../docs/cordis-primer.md) — プラグイン設定とライフサイクル。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Preset selection
+### プリセット選択
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing directly: the selected preset’s `plugins` own the model-visible tools and prompt sections.
+直接は何もない。選択されたプリセットの `plugins` がモデル可視のツールとプロンプトセクションを所有する。
 
-#### Token effect
+#### トークンへの影響
 
-None from this package; each mounted `plugins` row declares its own tools and sections.
+このパッケージ自体は何もない。マウントされた各 `plugins` 行が独自のツールとセクションを宣言する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Existing Agents retain their plugins and prompts. New Agents build their prefixes from the current definition.
+既存のエージェントはプラグインとプロンプトを保持する。新しいエージェントは現在の定義からプレフィックスを構築する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Presets are not security sandboxes: YAML and plugins can execute Host code. A user override replaces the complete child list and does not automatically merge future changes to the builtin list. Old revision implementations are not retained across process restarts.
+- プリセットはセキュリティサンドボックスではない。YAML とプラグインはホストコードを実行できる。ユーザー上書きは子リスト全体を置き換え、出荷リストへの将来の変更を自動的にマージしない。古いリビジョン実装はプロセス再起動をまたいで保持されない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,19 +1,19 @@
-# Package surface rules
+# パッケージサーフェスのルール
 
-English | [中文](package-surface.zh.md)
+日本語 | [English](package-surface.en.md) | [中文](package-surface.zh.md)
 
-Rules for what a package exports, how it is built, and how it declares dependencies. [development.md](../development.md#typescript-project-layout) describes the layout itself; [packages/AGENTS.md](../../packages/AGENTS.md) carries the standing orders.
+パッケージが何をエクスポートし、どのようにビルドされ、どのように依存関係を宣言するかのルール。[development.md](../development.md#typescript-project-layout) はレイアウト自体を説明し、[packages/AGENTS.md](../../packages/AGENTS.md) が常設の指示を持ち運ぶ。
 
-## A plugin package exports what the Loader loads
+## プラグインパッケージは Loader がロードするものをエクスポートする
 
-A plugin package's entry point takes one of two forms, and they are not mixed. A **function plugin** named-exports `name`, `inject`, `Config`, and `apply`: `name`, `inject`, and `apply` are lower-case, while `Config` is upper-case and appears both as an `interface` and as its Schemastery schema value. A **service plugin** default-exports its service class, which is how the Loader loads it; a default export beside the four makes the Loader discard the function plugin's namespace. Beyond those, a Host entry may export the Service Definition classes and error types that other packages extend or throw — the capability seam consumes exactly those — and never a test-convenience value. The `/client` entry of a UI plugin package is stricter, and [packages/client/AGENTS.md](../../packages/client/AGENTS.md) owns that discipline: a same-package test reaches internals through a relative `../src/...` path or the `./src/*` subpath, so a test-only need never becomes a permanent export. The rule stops a test convenience from freezing into published API.
+プラグインパッケージのエントリーポイントは 2 つの形式のいずれかを取り、混在しない。**関数プラグイン**は `name`、`inject`、`Config`、`apply` を名前付きエクスポートする: `name`、`inject`、`apply` は小文字で、`Config` は大文字で `interface` としてとその Schemastery スキーマ値の両方として現れる。**サービスプラグイン**はそのサービスクラスを default エクスポートし、Loader はそのようにロードする。4 つに並ぶ default エクスポートは、Loader に関数プラグインの名前空間を破棄させる。それら以外に、Host エントリは他のパッケージが拡張または throw する Service Definition クラスとエラー型をエクスポートしてよい — ケイパビリティシームが消費するのはまさにそれらである — が、テスト便宜の値は決してエクスポートしない。UI プラグインパッケージの `/client` エントリはより厳格で、その規律は [packages/client/AGENTS.md](../../packages/client/AGENTS.md) が所有する: 同一パッケージのテストは相対 `../src/...` パスまたは `./src/*` サブパスを通じて内部に到達するため、テスト専用の必要が恒久のエクスポートになることは決してない。このルールはテスト便宜が公開 API に凍結するのを止める。
 
-- The Loader four and its exact form are defined in [cordis-primer.md](../cordis-primer.md#loader-configuration).
-- Judged condition: a function plugin's entry (`src/index.ts`) exports an entity beyond the four; a default export is added beside the four, or the two forms are mixed; a `/client` entry exports an implementation value or lets another feature plugin import one; a fixture reaches another package by relative path.
-- Boundary: only Loader plugin entry points are constrained. Internal modules, helper functions, and hooks keep exporting values; a Host entry's Service Definition classes and error types are expected exports; and a test fixture stays inside its own package — a relative path into another package's `src` bypasses the `exports` map and the package-boundary checks.
-- Exception: none by default; an exception that is genuinely needed requires the domain owner's confirmation.
+- Loader の 4 つ組とその正確な形式は [cordis-primer.md](../cordis-primer.md#loader-configuration) で定義されている。
+- 判定条件: 関数プラグインのエントリ(`src/index.ts`)が 4 つを超えるエンティティをエクスポートしているか。4 つの並びに default エクスポートが追加されているか、2 つの形式が混在しているか。`/client` エントリが実装値をエクスポートしているか、別の機能プラグインにそれをインポートさせているか。フィクスチャが相対パスで別のパッケージに到達しているか。
+- 境界: 拘束されるのは Loader プラグインのエントリーポイントのみである。内部モジュール、ヘルパー関数、フックは値のエクスポートを続ける。Host エントリの Service Definition クラスとエラー型は期待されるエクスポートである。テストフィクスチャは自身のパッケージ内に留まる — 別のパッケージの `src` への相対パスは `exports` マップとパッケージ境界チェックを迂回する。
+- 例外: デフォルトではなし。真に必要な例外にはドメインオーナーの確認が必要である。
 
-The compliant entry — the four exports, with the same-package test path recorded as a comment rather than as a fifth export.
+準拠したエントリ — 4 つのエクスポートと、5 番目のエクスポートではなくコメントとして記録された同一パッケージのテストパス。
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -29,7 +29,7 @@ export function apply(ctx: Context, config: Config): void { /* … */ }
 // A same-package test imports '../src/internal/header.ts' instead of this entry
 ```
 
-Three ways the entry gains an export it must not have; all three are visible in the diff.
+エントリが持ってはならないエクスポートを得る 3 つの方法。3 つとも差分で可視である。
 
 ```ts ignore-check
 // The entry widened so a test could reach one helper
@@ -42,17 +42,17 @@ export default class WebApp {}
 import { isSurfaceEligibleType } from '../../core/session/src/surface.ts'
 ```
 
-## Two package shapes, and both are dynamic plugin packages
+## 2 つのパッケージ形態があり、どちらも動的プラグインパッケージである
 
-A new package is either a Host package or a Host + Client package, and both are dynamic plugin packages; no third form is available and there is no exception. The static client libraries the shell seeds through `PLATFORM_MODULES` in [packages/client/web/src/platform.ts](../../packages/client/web/src/platform.ts) — `client-store`, `ui-slots`, `ui-primitives`, `ui-dockkit` — and the zero-dependency libraries under [packages/util/](../../packages/util/) predate this rule and are closed: they keep working as they are, and a new package never joins them. Only a genuine both-face package splits its compiler faces, build output goes to `lib`, and the `include`, `external`, and roster lists are derived by scanning the workspace rather than hand-written. A hand-written list or an invented compiler face makes build output and the manifest disagree, and every later package would have to maintain its own list.
+新しいパッケージは Host パッケージまたは Host + Client パッケージのいずれかであり、どちらも動的プラグインパッケージである。第 3 の形態は存在せず、例外もない。シェルが [packages/client/web/src/platform.ts](../../packages/client/web/src/platform.ts) の `PLATFORM_MODULES` を通じてシードする静的クライアントライブラリ — `client-store`、`ui-slots`、`ui-primitives`、`ui-dockkit` — と [packages/util/](../../packages/util/) の下のゼロ依存ライブラリは、このルールより前に存在し、クローズされている: 現状のまま動作し続け、新しいパッケージがそれらに加わることは決してない。真に両面のパッケージのみがコンパイラフェイスを分割し、ビルド出力は `lib` に行き、`include`、`external`、名簿のリストは手書きではなくワークスペースのスキャンによって導出される。手書きのリストや発明されたコンパイラフェイスは、ビルド出力とマニフェストを不一致にし、その後のすべてのパッケージが自身のリストを維持しなければならなくなる。
 
-- Judged condition: a new package built as anything but a dynamic plugin package (static-link bundling, a hand-written all-external list); a third `tsconfig` variant; a hand-written `include`, `external`, or roster list.
-- Recompute the shapes instead of trusting a number here: list the `tsconfig.json` files under `packages/*/*`, then the packages that also carry `tsconfig.client.json` and `tsconfig.host.json`, then those declaring `dsh.client`.
-- Boundary: a both-face package may appear in `include` or `exclude`.
-- Exception: none; there is no approval path. A change to a package's shape or compiler faces starts with the owning documents and needs the domain owner's confirmation.
-- Owners: [development.md](../development.md#typescript-project-layout) for the compiler faces, [packages/README.md](../../packages/README.md) for the package groups, and [adding-a-package.md](../cookbook/adding-a-package.md) for the steps.
+- 判定条件: 新しいパッケージが動的プラグインパッケージ以外としてビルドされているか(静的リンクバンドル、手書きの全 external リスト)。第 3 の `tsconfig` バリアントか。手書きの `include`、`external`、または名簿リストか。
+- ここにある数値を信頼するのではなく、形態を再計算する: `packages/*/*` の下の `tsconfig.json` ファイルを列挙し、次に `tsconfig.client.json` と `tsconfig.host.json` も持つパッケージ、次に `dsh.client` を宣言するものを列挙する。
+- 境界: 両面パッケージは `include` または `exclude` に現れてもよい。
+- 例外: なし。承認パスは存在しない。パッケージの形態またはコンパイラフェイスの変更は、所有ドキュメントから始まり、ドメインオーナーの確認を必要とする。
+- オーナー: コンパイラフェイスは [development.md](../development.md#typescript-project-layout)、パッケージグループは [packages/README.md](../../packages/README.md)、手順は [adding-a-package.md](../cookbook/adding-a-package.md)。
 
-A package in one of the two shapes, with the standard manifest fields and no hand-written external list.
+2 つの形態のいずれかにあるパッケージ。標準のマニフェストフィールドを持ち、手書きの external リストを持たない。
 
 ```json
 {
@@ -66,27 +66,27 @@ A package in one of the two shapes, with the standard manifest fields and no han
 }
 ```
 
-A hand-written `external` list — and a `tsconfig.foo.json` invented beside it for one package — leaves the scans nothing to derive, so build output and manifest stop agreeing.
+手書きの `external` リスト — そしてそれに並んで 1 つのパッケージのために発明された `tsconfig.foo.json` — はスキャンに何も導出させないため、ビルド出力とマニフェストの一致が止まる。
 
 ```json
 { "name": "@deepseek-ai/dsh-example", "external": ["@deepseek-ai/*"] }
 ```
 
-## `package.json` `exports` uses the standard key set
+## `package.json` の `exports` は標準キーセットを使用する
 
-A `package.json` `exports` map uses only the standard key set, in which every key already has one meaning across the repository, and a package never opens a key for its own local purpose. A key that only a handful of packages use without a documenting owner is not a precedent: formalizing a key, including one of the undocumented keys below, means changing the owning document and the check in the same change. The small shared key set is what lets a consumer infer a key's purpose from its name and lets a scan judge the export map at all.
+`package.json` の `exports` マップは標準キーセットのみを使用し、そこではすべてのキーがリポジトリ全体で 1 つの意味をすでに持ち、パッケージが自身のローカル目的のためにキーを開くことは決してない。文書化するオーナーなしにごく少数のパッケージだけが使用するキーは前例ではない: キーの形式化は、以下の文書化されていないキーを含め、所有ドキュメントとチェックを同じ変更で変えることを意味する。小さな共有キーセットが、コンシューマーに名前からキーの目的を推測させ、スキャンにエクスポートマップを判定させられるようにする。
 
-- Standard keys, each with one meaning repo-wide, across `packages/*/*/package.json` and `apps/*/package.json`: `.` (the package entry), `./package.json` (toolchain access, not a semantic export), `./src/*` (source passthrough for tests and tools, whose documented status is still open), `./client` (the browser entry, paired with the `dsh.client` declaration), `./types` (the type entry), `./typert` (the typert type runtime), `./remote` (the `@Remote` call surface), `./locale/*.json` (locale resources), `./cordis.patch.yml` (the bundle patch layer declared by `dsh.bundle`). Counts are not listed here because they rot on the next package; the recompute command below prints them.
-- Keys outside that set (`./brand` in 5 packages, `./worker` in 4, `./startup`, `./runner`, and `./protocol` in 2 each, plus many one-off keys) have no documented meaning; they are pending review, not a pattern to copy.
-- Judged condition: does a change add an export key outside the standard set?
-- Exception: none by default; a new key changes the owning document and the check first, with the domain owner's confirmation.
-- Recompute the distribution:
+- 標準キー(それぞれが `packages/*/*/package.json` と `apps/*/package.json` をまたいでリポジトリ全体で 1 つの意味を持つ): `.`(パッケージエントリ)、`./package.json`(ツールチェーンアクセスであり、セマンティックエクスポートではない)、`./src/*`(テストとツールのためのソースパススルー。その文書化ステータスはまだ未決である)、`./client`(ブラウザーエントリで、`dsh.client` 宣言と対になる)、`./types`(型エントリ)、`./typert`(typert 型ランタイム)、`./remote`(`@Remote` 呼び出しサーフェス)、`./locale/*.json`(ロケールリソース)、`./cordis.patch.yml`(`dsh.bundle` が宣言するバンドルパッチレイヤー)。カウントは次のパッケージで腐るためここには列挙しない。以下の再計算コマンドがそれらを出力する。
+- そのセット外のキー(5 パッケージの `./brand`、4 の `./worker`、それぞれ 2 の `./startup`、`./runner`、`./protocol`、および多数の一回限りのキー)は文書化された意味を持たない。それらはレビュー待ちであり、コピーすべきパターンではない。
+- 判定条件: 変更が標準セット外のエクスポートキーを追加しているか。
+- 例外: デフォルトではなし。新しいキーは、ドメインオーナーの確認を得て、先に所有ドキュメントとチェックを変更する。
+- 分布を再計算する:
 
 ```sh
 python3 -c "import json,glob,collections; c=collections.Counter(); [c.update(json.load(open(p)).get('exports',{}).keys()) for p in glob.glob('packages/*/*/package.json')+glob.glob('apps/*/package.json') if isinstance(json.load(open(p)).get('exports'),dict)]; print(c.most_common())"
 ```
 
-The compliant map — three standard keys used with their repo-wide meanings, in a package that also declares its client entry.
+準拠したマップ — リポジトリ全体の意味で使用される 3 つの標準キー。クライアントエントリも宣言するパッケージにある。
 
 ```json
 {
@@ -100,7 +100,7 @@ The compliant map — three standard keys used with their repo-wide meanings, in
 }
 ```
 
-Keys opened for one package's local purposes — here `./brand` and `./worker`, whose documented status is pending — turn the export map into a per-package convention that neither a consumer nor a scan can read.
+1 つのパッケージのローカル目的のために開かれたキー — ここでは `./brand` と `./worker` で、文書化ステータスは未決 — は、エクスポートマップを、コンシューマーもスキャンも読めないパッケージごとの慣例に変える。
 
 ```json
 {
@@ -112,17 +112,17 @@ Keys opened for one package's local purposes — here `./brand` and `./worker`, 
 }
 ```
 
-## Dependency declarations and version consistency are enforced by the dependency scan
+## 依存関係宣言とバージョン一貫性は依存関係スキャンによって強制される
 
-Dependency declarations and version consistency are guaranteed mechanically by the dependency scan; this page repeats neither the `devDependencies` and `peerDependencies` field rules nor a package admission list of its own. When the scan fails, reproduce it locally and fix the manifest it names, because the scan and its policy file own the rules. Editing the scan or relaxing its policy so that a change can land is not a normal edit and needs the domain owner's confirmation.
+依存関係宣言とバージョン一貫性は依存関係スキャンによって機械的に保証される。このページは `devDependencies` と `peerDependencies` のフィールド規則も、独自のパッケージ承認リストも再掲しない。スキャンが失敗したら、ローカルで再現し、それが名指しするマニフェストを修正する。ルールはスキャンとそのポリシーファイルが所有するからである。変更を着地させるためにスキャンを編集したりポリシーを緩めたりするのは通常の編集ではなく、ドメインオーナーの確認を必要とする。
 
-- Entry point: [verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts), run as `pnpm run verify-package-dependencies`, by `scripts/run-gates.ts` as the `package-dependencies` gate, and directly by `.github/workflows/release.yml`.
-- Policy owner: [package-dependency-policy.ts](../../scripts/package-dependency-policy.ts) exports `PACKAGE_DEPENDENCY_POLICY`; the declaration sections, version forms, and exemptions are defined there, with package-level context in [packages/README.md](../../packages/README.md).
-- Boundary: this page lists no packages, field rules, or thresholds; it points at the owning file instead.
-- Find the wiring: `grep -rn "verify-package-dependencies" package.json .github/workflows scripts/run-gates.ts`.
-- Exception: a change to the scan or to the policy requires the domain owner's confirmation and the reason recorded on the change.
+- エントリーポイント: [verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts)。`pnpm run verify-package-dependencies` として、`scripts/run-gates.ts` によって `package-dependencies` ゲートとして、そして `.github/workflows/release.yml` によって直接実行される。
+- ポリシーオーナー: [package-dependency-policy.ts](../../scripts/package-dependency-policy.ts) が `PACKAGE_DEPENDENCY_POLICY` をエクスポートする。宣言セクション、バージョン形式、免除はそこで定義され、パッケージレベルの文脈は [packages/README.md](../../packages/README.md) にある。
+- 境界: このページはパッケージ、フィールド規則、しきい値を列挙しない。代わりに所有ファイルを指す。
+- 配線を見つける: `grep -rn "verify-package-dependencies" package.json .github/workflows scripts/run-gates.ts`。
+- 例外: スキャンまたはポリシーの変更には、ドメインオーナーの確認と、変更に記録された理由が必要である。
 
-The repeatable procedure: reproduce, read the diagnostic, and fix the manifest it names.
+再現可能な手順: 再現し、診断を読み、それが名指しするマニフェストを修正する。
 
 ```sh
 # 1. Reproduce what CI reports
@@ -138,28 +138,28 @@ pnpm run verify-package-dependencies
 pnpm run verify-package-dependencies
 ```
 
-Two ways to lose the mechanical guarantee: change the check instead of the manifest, or restate the rule here so that it drifts from its owner.
+機械的保証を失う 2 つの方法: マニフェストではなくチェックを変更するか、ルールをここに再掲してそのオーナーから乖離させるか。
 
 ```text
 Relaxing PACKAGE_DEPENDENCY_POLICY, or dropping the scanned section that fails, to go green
 Restating a required-devDependency package list or the field rules on this page instead of linking the policy file
 ```
 
-## Internal dependency syntax follows the package family
+## 内部依存関係の構文はパッケージファミリーに従う
 
-Internal dependency syntax follows the package family: `@deepseek-ai/dsh` and `@deepseek-ai/dsh-*` use `workspace:*`, every other internal package uses `workspace:~`, and `workspace:^` has retired. The same dependency name is written the same way in every workspace, and a mismatch is a hard scan failure rather than a warning a reviewer can waive. The uniform syntax keeps one resolution path and prevents duplicate instances of a dependency and the resolution differences that follow them.
+内部依存関係の構文はパッケージファミリーに従う: `@deepseek-ai/dsh` と `@deepseek-ai/dsh-*` は `workspace:*` を使用し、他のすべての内部パッケージは `workspace:~` を使用し、`workspace:^` は引退した。同じ依存関係名はすべてのワークスペースで同じように書かれ、不一致はレビュアーが免除できる警告ではなく、ハードスキャン失敗である。均一な構文は 1 つの解決パスを保ち、依存関係の重複インスタンスとそれに続く解決の差異を防ぐ。
 
-- Judged by `workspaceRange()` in [verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts): the `@deepseek-ai/dsh` and `@deepseek-ai/dsh-*` families get `workspace:*`, every other internal package gets `workspace:~`; the scan walks the managed manifests and compares every declaration of the same dependency name.
-- Boundary: a same-namespace package that is not a workspace member declares an ordinary third-party range and is outside the family rule — `@deepseek-ai/libreoffice-kit` is declared `^0.1.5` in `apps/desktop-host/package.json` (dependencies), `packages/bundle/web-app/package.json` (devDependencies), `packages/document/office-to-pdf/package.json` (dependencies), and `packages/skill/skill-office/package.json` (dependencies).
-- Distribution is not restated here; the recompute command below prints the current counts of `workspace:*`, `workspace:~`, `workspace:^`, and any exact-range declaration outside the family rule.
-- Exception: the scan decides mechanically; a genuine exception means changing the scan and the policy file with the domain owner's confirmation and the reason on the change.
-- Recompute:
+- 判定: [verify-package-dependencies.ts](../../scripts/verify-package-dependencies.ts) の `workspaceRange()` による。`@deepseek-ai/dsh` と `@deepseek-ai/dsh-*` ファミリーは `workspace:*` を取り、他のすべての内部パッケージは `workspace:~` を取る。スキャンは管理対象マニフェストを走査し、同じ依存関係名のすべての宣言を比較する。
+- 境界: ワークスペースメンバーでない同一名前空間のパッケージは通常のサードパーティ範囲を宣言し、ファミリールールの外にある — `@deepseek-ai/libreoffice-kit` は `apps/desktop-host/package.json`(dependencies)、`packages/bundle/web-app/package.json`(devDependencies)、`packages/document/office-to-pdf/package.json`(dependencies)、`packages/skill/skill-office/package.json`(dependencies)で `^0.1.5` と宣言されている。
+- 分布はここに再掲しない。以下の再計算コマンドが `workspace:*`、`workspace:~`、`workspace:^`、およびファミリールール外の正確な範囲宣言の現在のカウントを出力する。
+- 例外: スキャンが機械的に決定する。真の例外は、ドメインオーナーの確認と変更に記録された理由とともに、スキャンとポリシーファイルを変更することを意味する。
+- 再計算:
 
 ```sh
 python3 -c "import json,glob,collections; c=collections.Counter(); [c.update([r]) for p in glob.glob('apps/*/package.json')+glob.glob('packages/*/*/package.json')+glob.glob('vendor/*/package.json') for s in ('dependencies','devDependencies','optionalDependencies','peerDependencies') for n,r in (json.load(open(p)).get(s) or {}).items() if n.startswith('@deepseek-ai/')]; print(c.most_common())"
 ```
 
-Each family in its form, with the non-member exception left as an ordinary version range.
+各ファミリーをその形式で。非メンバーの例外は通常のバージョン範囲のまま残す。
 
 ```json
 {
@@ -174,7 +174,7 @@ Each family in its form, with the non-member exception left as an ordinary versi
 }
 ```
 
-A `dsh-*` package on `workspace:~` and a workspace member pinned to an external range — each is a hard scan failure, and the retired rule of pinning exact versions is not available as an alternative.
+`workspace:~` 上の `dsh-*` パッケージと、外部範囲に固定されたワークスペースメンバー — それぞれがハードスキャン失敗であり、正確なバージョンに固定するという引退したルールは代替として利用できない。
 
 ```json
 {
@@ -185,16 +185,16 @@ A `dsh-*` package on `workspace:~` and a workspace member pinned to an external 
 }
 ```
 
-## A new resolve hook is refused outright
+## 新しい resolve フックは明確に拒否される
 
-A new `resolve` hook is refused by default — a definite prohibition, not a preference to avoid one. A genuine need has two preconditions together: re-auditing the resolve strategy as a whole rather than patching the specifier that motivated the change, and the domain owner's confirmation before anything lands. An author's own judgment that this case is special is not a confirmation.
+新しい `resolve` フックはデフォルトで拒否される — 回避したいという選好ではなく、明確な禁止である。真の必要には 2 つの前提条件が同時に必要である: 変更を動機付けた指定子にパッチを当てるのではなく、解決戦略を全体として再監査すること、そして何かが着地する前にドメインオーナーの確認を得ることである。このケースは特別だという作者自身の判断は確認ではない。
 
-- Judged condition: does the change add a `resolve` hook, including a wrapper around an existing hook that rewrites the same specifiers?
-- Boundary: this rule decides whether a hook may be added at all; the separation of resolution, hot reload, and plugin management responsibilities is governed separately and does not permit a new hook.
-- The one resolution path is the tsx ESM hook registered by the `dsh` source launch, whose rationale is in the [source-launch Agent Note](../../.agents/notes/implemented/architecture/2026-07-29-dsh-source-launch-tsx-esm.md).
-- Exception: only the two preconditions above, both recorded on the change.
+- 判定条件: 変更が `resolve` フックを追加しているか。同じ指定子を書き換える既存フックのラッパーも含む。
+- 境界: このルールはフックを追加してよいかどうかを決める。解決、ホットリロード、プラグイン管理の責務の分離は別に統治され、新しいフックを許可しない。
+- 唯一の解決パスは `dsh` ソース起動が登録する tsx ESM フックであり、その根拠は[ソース起動の Agent Note](../../.agents/notes/implemented/architecture/2026-07-29-dsh-source-launch-tsx-esm.md)にある。
+- 例外: 上記の 2 つの前提条件のみ。両方とも変更に記録される。
 
-The compliant path when new resolution behavior is genuinely needed, in order.
+新しい解決動作が真に必要な場合の、順を追った準拠パス。
 
 ```text
 A new resolve hook is allowed only after both preconditions hold:
@@ -208,7 +208,7 @@ Until both hold, the answer is no; "this case is special" is the author's judgme
 not a confirmation.
 ```
 
-A hook added so that one specifier lands where this package expects it, or the equivalent wrapper around the existing hook — the resolution path gains a branch, and what the resolver returns no longer matches `node_modules`.
+1 つの指定子がこのパッケージの期待する場所に着地するために追加されたフック、または既存のフックの同等のラッパー — 解決パスは分岐を得て、リゾルバーが返すものは `node_modules` と一致しなくなる。
 
 ```ts ignore-check
 // Added so one specifier resolves to the local source copy
@@ -223,9 +223,9 @@ hooks.resolve = (specifier, context, next) =>
   pinned.has(specifier) ? pinned.get(specifier) : previous(specifier, context, next)
 ```
 
-## Package modules do not await at module scope
+## パッケージモジュールはモジュールスコープで await しない
 
-A package source module starts its asynchronous work inside a function it calls, such as an explicit `main()` that handles its own rejection, and never uses `await`, `for await`, or `await using` at module scope: a module-scope wait makes every importer's evaluation wait, turns a rejection into a module-evaluation failure, and cannot be lowered to the synchronous CommonJS wrapper of the browser-worker image.
+パッケージのソースモジュールは、自身の reject を処理する明示的な `main()` のような、呼び出す関数の中で非同期作業を開始し、モジュールスコープで `await`、`for await`、`await using` を決して使用しない: モジュールスコープの待機はすべてのインポーターの評価を待たせ、reject をモジュール評価失敗に変え、ブラウザーワーカーイメージの同期 CommonJS ラッパーに降ろせない。
 
-- Judged by [verify-no-top-level-await.ts](../../scripts/verify-no-top-level-await.ts), run as `pnpm run verify-no-top-level-await` and by `scripts/run-gates.ts` as the `no-top-level-await` gate; it parses every `packages/*/*/src/**/*.{ts,tsx}` file and excludes executables by declaration only: a source that starts with `#!`, or the source of a `lib/` output that the package's `bin` field names.
-- Exception: none.
+- 判定: [verify-no-top-level-await.ts](../../scripts/verify-no-top-level-await.ts) による。`pnpm run verify-no-top-level-await` として、また `scripts/run-gates.ts` によって `no-top-level-await` ゲートとして実行される。すべての `packages/*/*/src/**/*.{ts,tsx}` ファイルをパースし、実行可能ファイルを宣言によってのみ除外する: `#!` で始まるソース、またはパッケージの `bin` フィールドが名指しする `lib/` 出力のソースである。
+- 例外: なし。

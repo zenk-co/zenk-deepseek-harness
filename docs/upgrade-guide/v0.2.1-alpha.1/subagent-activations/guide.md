@@ -1,21 +1,21 @@
 ---
 kind: upgrade-guide
-description: "Managed subagent activations replace foreground and Job-backed delegation, its configuration keys, and the published in-process driver."
+description: "管理サブエージェント活性化が前面・ジョブ裏打ち委譲、その設定キー、公開プロセス内駆動に置き換わる。"
 ---
 
-# Migrate delegation to managed subagent activations
+# 管理サブエージェント活性化へ委譲を移行する
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-`@deepseek-ai/dsh-tool-subagent` removes `backgroundMode`, `enableRunInBackground`, and the model argument `run_in_background`. Every delegation now returns `{ kind: 'activation', subagentId }` after accepting the child, and the runtime delivers its final answer in a parent completion notice. Foreground results and `{ kind: 'background', jobId }` results are removed; subagents are no longer collected or stopped through `job_output` or `job_kill`.
+`@deepseek-ai/dsh-tool-subagent` は `backgroundMode`・`enableRunInBackground`・モデル引数 `run_in_background` を除去する。すべての委譲は子を受け付けた後に `{ kind: 'activation', subagentId }` を返すようになり、ランタイムは最終回答を親完了通知で届ける。前面結果と `{ kind: 'background', jobId }` 結果は除去され、サブエージェントは `job_output` や `job_kill` 越しに収集・停止されなくなる。
 
-The published `@deepseek-ai/dsh-subagent-in-process-driver` package is removed. Local providers contribute creation inputs through `prepareContinuable()`; the subagent service owns execution. Spawn and Fork children can receive later messages, including after settlement when persistence and Session query are available. External providers execute once and do not accept follow-up messages.
+公開 `@deepseek-ai/dsh-subagent-in-process-driver` パッケージは除去される。ローカルプロバイダーは `prepareContinuable()` 越しに作成入力を寄与し、実行はサブエージェントサービスが所有する。Spawn と Fork の子は後続メッセージを受け取れ、永続化とセッションクエリが利用可能であれば確定後も含む。外部プロバイダーは一度だけ実行し、後続メッセージを受け付けない。
 
-## Migration
+## 移行
 
-1. Remove `backgroundMode` and `enableRunInBackground` from `tool-subagent` rows in `cordis.yml`, profile patches, and overlays. Keep the provider and remaining configuration. For example:
+1. `cordis.yml`・プロファイルパッチ・オーバーレイ内の `tool-subagent` 行から `backgroundMode` と `enableRunInBackground` を除去する。プロバイダーと残りの設定は保つ。例:
 
    ```yaml
    - name: '@deepseek-ai/dsh-tool-subagent'
@@ -24,11 +24,11 @@ The published `@deepseek-ai/dsh-subagent-in-process-driver` package is removed. 
        toolName: subagent
    ```
 
-   Local tool delegation requires Session persistence. Compose it with the [subagent service and provider](../../../../packages/subagent/subagent/README.md#use-this-package).
+   ローカルツール委譲にはセッション永続化が必要である。[サブエージェントサービスとプロバイダー](../../../../packages/subagent/subagent/README.md#use-this-package)と組み合わせること。
 
-2. Remove `run_in_background` from tool calls and update result consumers to read `subagentId`. Collect the completion notice instead of foreground output or a Job result. Use `interrupt_agent` to stop the current execution; use `send_message` only for local children when those control tools are composed.
+2. ツール呼び出しから `run_in_background` を除去し、結果利用者を `subagentId` 読みに更新する。前面出力やジョブ結果の代わりに完了通知を収集する。現実行の停止には `interrupt_agent` を使い、制御ツールが合成されている場合に限りローカルの子向けにのみ `send_message` を使う。
 
-3. For host code that must await a result, replace `ctx.subagents.start()` or `startContinuable()` with `startActivation()` and caller delivery. Given a composed service and live parent:
+3. 結果を待たなければならないホストコードでは、`ctx.subagents.start()` または `startContinuable()` を `startActivation()` と呼び出し側配送に置換する。合成済みサービスと稼働親があれば:
 
    ```ts
    import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -48,12 +48,12 @@ The published `@deepseek-ai/dsh-subagent-in-process-driver` package is removed. 
    }
    ```
 
-   Caller delivery emits no parent completion notice. `result` settles after cleanup and includes `output`, `stopReason`, and optional `structured` and `diagnostic` values; inspect `stopReason` before treating it as success. The startup signal stops owning cancellation after publication: retain the receipt and call `dispose()` to cancel that exact activation. Cleanup failures are reported by `dispose()` separately from the captured result.
+   呼び出し側配送は親完了通知を出さない。`result` は後片付け後に確定し、`output`・`stopReason`・任意の `structured`・`diagnostic` 値を含む。成功として扱う前に `stopReason` を検査すること。起動信号は公開後の所有取り消しを止める。受領を保持し、その正確な活性化を取り消すには `dispose()` を呼ぶ。後片付け失敗は取得結果とは別に `dispose()` が報告する。
 
-4. Remove the driver dependency and imports, including `startInProcessRun`. Mount the existing Spawn or Fork provider and call the service as above. Custom local providers implement `prepareContinuable()` using the [provider API](../../../../docs/subsystems/subagent.md); there is no replacement standalone driver.
+4. ドライバー依存とインポート（`startInProcessRun` を含む）を除去する。既存の Spawn または Fork プロバイダーをマウントし、上記のとおりサービスを呼ぶ。独自ローカルプロバイダーは[プロバイダー API](../../../../docs/subsystems/subagent.md)を使って `prepareContinuable()` を実装する。代替の単体ドライバーは存在しない。
 
-   External providers keep `start()`, but each returned `SubagentRun.id` must be unique across parents, providers, and local Sessions in the runtime. Generate a fresh id for each execution instead of using a parent-local counter.
+   外部プロバイダーは `start()` を保つが、返される各 `SubagentRun.id` は親・プロバイダー・ローカルセッションをまたいで一意でなければならない。親内カウンターではなく、実行ごとに新しい id を生成すること。
 
-   For `dsh-subagent-dsh-sdk`, update any separately configured `dshBin` runtime to support `session/wait`. For directory configuration, follow the [working-directory migration](../working-directory/guide.md).
+   `dsh-subagent-dsh-sdk` では、別設定の `dshBin` 実行時が `session/wait` に対応するよう更新する。ディレクトリ設定は[作業ディレクトリ移行](../working-directory/guide.md)に従うこと。
 
-5. Confirm a delegation returns the activation result variant, its completion notice contains the final answer, and caller delivery returns the result without adding that notice. Confirm local children remain listed after completion and external children cannot be continued.
+5. 委譲が活性化結果種別を返すこと、その完了通知が最終回答を含むこと、呼び出し側配送がその通知を加えずに結果を返すことを確認する。ローカルの子は完了後も一覧に残り、外部の子は継続できないことを確認する。

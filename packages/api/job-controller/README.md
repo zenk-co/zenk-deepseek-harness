@@ -1,67 +1,68 @@
 ---
-description: "Host and Client job control: the roster one session can see and one job's retained output, mirrored to the browser without touching the model's consuming cursor, and a kill on a human's behalf."
+description: "ホストとクライアントのジョブ制御。1 つのセッションが見られる名簿と 1 つのジョブの保持された出力。モデルの消費カーソルに触れずにブラウザーにミラーし、人間に代わって kill する。"
 kind: "package-reference"
 ---
-# Job Controller
 
-English | [中文](README.zh.md)
+# ジョブコントローラー
 
-## Summary
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-`@deepseek-ai/dsh-api-job-controller` owns the Host `ctx.jobController` service and the generated Client `ctx.remote.job` namespace. Its two Remote streams are projections of `ctx.jobs`: `job.list` mirrors the jobs one session can see as whole-set frames, and `job.follow` delivers one job's retained output from an absolute byte offset; its one command, `job.kill`, stops a job on a human's behalf. The Client half installs `ctx.jobs`, the reference-counted service whose rosters and accumulated views the session-header job list renders and whose `kill` its stop control calls. Neither stream touches the model's consuming cursor or its completion notices, and a human kill is not the model's own.
+## 概要
 
-## Table of Contents
+`@deepseek-ai/dsh-api-job-controller` はホストの `ctx.jobController` サービスと生成されたクライアントの `ctx.remote.job` 名前空間を所有する。その 2 つのリモートストリームは `ctx.jobs` の射影である。すなわち `job.list` は 1 つのセッションが見られるジョブを全体セットフレームとしてミラーし、`job.follow` は 1 つのジョブの保持された出力を絶対バイトオフセットから配信する。その 1 つのコマンド `job.kill` は人間に代わってジョブを停止する。クライアント側は `ctx.jobs`（参照カウント付きサービス）をインストールし、セッションヘッダーのジョブリストが描画する名簿と蓄積ビュー、その停止コントロールが呼ぶ `kill` を提供する。どちらのストリームもモデルの消費カーソルや完了通知に触れず、人間による kill はモデル自身のものではない。
 
-- [Use this package](#use-this-package)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+## 目次
+
+- [このパッケージを使う](#use-this-package)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The Host controller requires the live Agent registry and the job registry (`dsh-jobs-local` in the shipped compositions) and fails to load without them. `job.list({ sessionId })` yields the session's visible set — its own jobs plus every unowned job — once on open and again after each coalesced burst of lifecycle commits (registration, progress, stopping, settlement, removal); output appends never refresh the roster, since a settled projection already carries the final byte count. `job.follow({ sessionId?, jobId, from? })` passes `sessionId` to registry `get` and `readAt` — an unowned job needs no session — and yields one `opened` anchor carrying the job projection, coalesced `output` frames, then one terminal `status` once the job has settled and its ring is drained, after which the stream closes normally; a removal announced mid-stream (the owner's teardown) closes it with the removed job's terminal projection. Both reads are non-consuming: the model's `job_output` cursor and notice state never observe them.
+ホストコントローラーはライブエージェントレジストリとジョブ registry（出荷構成では `dsh-jobs-local`）を必須とし、それらなしではロードに失敗する。`job.list({ sessionId })` はセッションの可視セット、すなわち自身のジョブとすべての無所有ジョブを、開設時に 1 回、その後はライフサイクルコミット（登録、進捗、停止中、決着、除去）の合体バーストごとに yields する。出力追記は名簿を更新しない。決着済み射影は最終バイト数をすでに運ぶためである。`job.follow({ sessionId?, jobId, from? })` は registry の `get` と `readAt` に `sessionId` を渡す。無所有ジョブにセッションは不要である。1 つの `opened` アンカー（ジョブ射影を運ぶ）、合体された `output` フレーム、ジョブ決着後にリングが排出されてからの 1 つの終端 `status` を yields し、その後ストリームは正常に閉じる。途中で告知された除去（所有者のテアダウン）は除去されたジョブの終端射影でストリームを閉じる。どちらの読み取りも非消費である。モデルの `job_output` カーソルと通知状態は観察されない。
 
-`job.kill({ sessionId, jobId })` cancels one job the session can see with the reason `cancelled by the user`, which the registry merges into the killed job's detail. It is not a kill the model requested — `dsh-tool-jobs` withholds a notice only for the model's own `job_kill` and for settlements a live wait collected — so the owning agent's completion notice stays due, reason included, and a shell tool still waiting on that job reads the reason as `[stopped: cancelled by the user]` in its own result. It answers `{ outcome: 'requested' }` or `{ outcome: 'already-finished' }` and rejects an id the session cannot see as `job/not-found`; the registry's owner fence is the only access rule, so a child session's own jobs are killable from its list like any other.
+`job.kill({ sessionId, jobId })` はセッションが見られる 1 つのジョブを `cancelled by the user` という理由でキャンセルし、registry は kill されたジョブの詳細にその理由をマージする。これはモデルが要求した kill ではない。`dsh-tool-jobs` はモデル自身の `job_kill` とライブ待機が収集した決着にのみ通知を保留するため、所有エージェントの完了通知は理由付きで依然として必要であり、そのジョブをまだ待つシェルツールは自身の結果に `[stopped: cancelled by the user]` という理由を読む。`{ outcome: 'requested' }` または `{ outcome: 'already-finished' }` と答え、セッションが見られない id は `job/not-found` として拒否する。registry の所有者フェンスが唯一のアクセス規則であるため、子セッション自身のジョブも他と同様にそのリストから kill できる。
 
-The Client entry installs `ctx.jobs` (`IJobs`), backed by the package-internal `ClientJobsModel`. `kill(sessionId, jobId)` forwards to `job.kill` and returns the Remote result for the caller's admission verdict. `watchRows(sessionId)` keeps one roster stream open per watched session however many viewers hold it and drops the rows after the last release; a reconnect's first frame is already the whole truth. `observe(sessionId, jobId)` opens one Gateway stream per job however many viewers expand it, keeps a bounded render tail per job with `gapBefore` marking eviction or resume gaps, closes the view on the terminal frame or records a stream failure on it, and drops the view after the last viewer releases. The plugin resolves the Gateway stream factory and the `job` namespace while its own context is current, because stream (re)opens run on caller stacks whose dynamic context has not declared `remote.job`.
+クライアントエントリーは `ctx.jobs`（`IJobs`）をインストールし、パッケージ内部の `ClientJobsModel` に支えられる。`kill(sessionId, jobId)` は `job.kill` に転送し、呼び出し元の受付判定のためにリモート結果を返す。`watchRows(sessionId)` は視聴者の数に関わらず視聴セッションごとに名簿ストリームを 1 つ保持し、最後の解放後に行を落とす。再接続の最初のフレームはすでに完全な真実である。`observe(sessionId, jobId)` は視聴者を展開する数に関わらずジョブごとに Gateway ストリームを 1 つ開き、ジョブごとに有界レンダーテールを持ち、`gapBefore` で追放や再開の隙間を示し、終端フレームでビューを閉じるかストリーム失敗をその上に記録し、最後の視聴者の解放後にビューを落とす。プラグインはストリーム（再）開設が呼び出し元スタック上で実行されるため、自身のコンテキストが現役のうちに Gateway ストリームファクトリーと `job` 名前空間を解決する。動的なコンテキストは `remote.job` を宣言していないためである。
 
-### Config
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---:|---|
-| `observeFlushMs` | `100` | Coalescing window after a registry commit before the next rows or output read, in milliseconds |
-| `observeMaxFrameBytes` | `65,536` | Soft byte budget per observation output frame; one larger chunk ships whole |
+| `observeFlushMs` | `100` | registry コミット後の次の行または出力読み取りまでの合体ウィンドウ（ミリ秒） |
+| `observeMaxFrameBytes` | `65,536` | 観察出力フレームあたりのソフトバイト予算。1 つの大きなチャンクはそのまま配送される |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-api-job-controller) is the exhaustive source for accepted fields and their JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-api-job-controller)は、受け付けるフィールドとその JSDoc の網羅的な情報源である。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as job observation is browser and Host control state; it registers no prompt, tool, or session event. The model's own view of the same work stays with [`dsh-tool-jobs`](../../jobs/tool-jobs/README.md).
+なし。ジョブ観察はブラウザーとホストの制御状態であり、プロンプト、ツール、セッションイベントを登録しない。同じ作業に対するモデル自身のビューは [`dsh-tool-jobs`](../../jobs/tool-jobs/README.md) にある。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct effect; observation reads never touch model requests.
+直接の影響はない。観察読み取りはモデル要求に触れない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- The ring is a best-effort live preview, not a terminal transcript: producers' pull sources are copied per poll round, so two streams' writes inside one poll window land stdout first, and the client concatenates chunks regardless of `channel`.
-- Both streams are process-local: a Host restart loses every ring and roster; a resumed observation then anchors on an empty registry, and a re-opened roster starts empty.
-- Per-session fencing is enforced by the caller argument of each registry read; the Remote layer itself serves any connected browser.
+- リングはベストエフォートのライブプレビューであり、終端トランスクリプトではない。プルソースの生産者はポーリングラウンドごとにコピーされるため、1 つのポーリングウィンドウ内の 2 つのストリーム書き込みは stdout が先になり、クライアントは `channel` に関わらずチャンクを連結する。
+- どちらのストリームもプロセスローカルである。ホスト再起動はすべてのリングと名簿を失う。再開された観察は空の registry に固定され、開き直された名簿は空で開始する。
+- セッションごとのフェンスは各 registry 読み取りの呼び出し元引数で強制される。リモート層自体は接続されたすべてのブラウザーに配信する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

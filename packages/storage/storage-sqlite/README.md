@@ -1,39 +1,39 @@
 ---
-description: "SQLite storage backend for hosts and maintainers choosing, configuring, or debugging document-per-row KV storage in one database file."
+description: "1 データベースファイル内に文書を行ごと KV 格納する SQLite ストレージバックエンド。選択・構成・デバッグを行う host とメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-storage-sqlite
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-storage-sqlite` is a storage backend that hosts every routed unit in one SQLite database file, storing each record as one JSON document per row, registered as backend `sqlite`. A single record update touches exactly one row, which is what makes this the right medium for high-frequency, point-sized writes. Choose it when a domain's data changes often or the deployment prefers one queryable database; choose the JSON backend when the data should be readable as plain files. The backend is host-side only: it contributes no prompt, tool, or schema, so the model and the agent loop never see it.
+`dsh-storage-sqlite` はルーティングされたすべてのユニットを 1 つの SQLite データベースファイルに host するストレージバックエンドであり、各レコードを 1 行 1 JSON 文書として格納し、バックエンド `sqlite` として登録される。単一レコード更新はちょうど 1 行に触れる。これが高頻度・点サイズ書き込みに適した媒体である理由である。ドメインデータが頻繁に変わる場合やデプロイが 1 つの照会可能データベースを好む場合に選ぶ。データが素のファイルとして可読であるべき場合は JSON バックエンドを選ぶ。バックエンドは host 側専用であり、プロンプト・ツール・スキーマを寄与しないため、モデルとエージェントループは決して見ない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use this package when a composition keeps frequently updated domain data in one database: route the relevant domains to this backend and each unit materializes as tables in the configured database file.
+頻繁に更新されるドメインデータを 1 データベースに保持する構成の場合に、このパッケージを使う。関連ドメインをこのバックエンドにルーティングすれば、各ユニットは構成済みデータベースファイル内のテーブルとして実体化する。
 
-### When to choose it
+### 選ぶ場合
 
-Choose it when writes are frequent and point-sized — each key maps to exactly one row, so updating one record touches one row instead of rewriting a whole file. Choose the JSON backend when humans inspect or edit the stored data as plain files. The synchronous `node:sqlite` driver blocks the JavaScript thread for the duration of each single-statement call, which is fine at domain-data scale but worth accounting for at high write rates.
+書き込みが頻繁かつ点サイズの場合に選ぶ。各キーはちょうど 1 行に対応するため、1 レコード更新はファイル全体書換えではなく 1 行に触れる。人間が格納データを素のファイルとして検査・編集する場合は JSON バックエンドを選ぶ。同期 `node:sqlite` ドライバーは各単一文呼び出しの間 JavaScript スレッドを阻むが、ドメインデータ規模では問題なく、高書き込み率では考慮に値する。
 
-### Configuration
+### 構成
 
-Two fields: the database path and the journal mode. `:memory:` opens an in-process database whose contents disappear with the process.
+2 フィールドである。データベースパスとジャーナルモードである。`:memory:` は内容がプロセスと共に消えるインプロセスデータベースを開く。
 
 ```yaml
 - name: '@deepseek-ai/dsh-storage'
@@ -45,97 +45,97 @@ Two fields: the database path and the journal mode. `:memory:` opens an in-proce
     backend: sqlite
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `path` | required | SQLite database file path, or `:memory:` |
-| `journalMode` | `wal` | Journal mode: `wal`, `delete`, `truncate`, or `persist` |
+| `path` | 必須 | SQLite データベースファイルパス、または `:memory:` |
+| `journalMode` | `wal` | ジャーナルモード: `wal`、`delete`、`truncate`、または `persist` |
 
-`wal` suits local disks; a rollback-journal mode (`delete`/`truncate`/`persist`) fits filesystems where WAL's shared-memory files do not work, such as network mounts. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-storage-sqlite) is the exhaustive source for every accepted field and its JSDoc.
+`wal` はローカルディスクに適し、ロールバックジャーナルモード（`delete`/`truncate`/`persist`）は WAL 共有メモリファイルが動かないファイルシステム（ネットワークマウントなど）に合う。生成された[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-storage-sqlite)は受け入れるすべてのフィールドとその JSDoc の網羅的ソースである。
 
-### Observable behavior
+### 観察可能な動作
 
-Missing directories and database files are created owner-only (`0o700`/`0o600`); an existing database keeps its modes. A unit whose stored format version differs from its descriptor rejects `version-mismatch`, and a database stamped with a physical layout version other than the current one rejects outright — no migration, pre-release stance. Failures carry stable `StorageError` codes, and writes are durable once resolved.
+欠けたディレクトリとデータベースファイルは所有者のみ（`0o700`/`0o600`）で作られ、既存データベースはモードを保持する。格納形式バージョンが記述子と異なるユニットは `version-mismatch` を拒み、現行と異なる物理レイアウトバージョンが刻印されたデータベースは一律拒む。移行なし、プレリリース stance である。失敗は安定した `StorageError` コードを運び、書き込みは解決後に耐久性を持つ。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The backend is a document-per-row layout over one `node:sqlite` connection, designed so a per-key update is a single prepared statement.
+バックエンドは 1 つの `node:sqlite` 接続上の文書行ごとレイアウトであり、キーごとの更新が単一の準備済み文になるよう設計されている。
 
-### Design concept
+### 設計概念
 
-- **Document per row.** Each unit table becomes a physical STRICT table `u_<unit>_<table> (key TEXT PRIMARY KEY, value TEXT)` whose `value` column holds the record's JSON text; the global singleton lives in a shared `unit_globals` table. One key update touches exactly one row — the reason to route a high-churn domain here.
-- **Single-statement atomicity.** Every write primitive is one prepared statement, so SQLite's per-statement atomicity satisfies the KV contract without explicit transactions; write ordering stays the caller's responsibility (the domain layer's write chain).
-- **Names validated before DDL.** Unit and table names must match `UNIT_NAME_RE` before they reach DDL, so no external input is ever interpolated into SQL identifiers.
-- **Versions fail loud.** The physical layout version lives in `PRAGMA user_version` (fresh databases stamp it last); unit format versions live in the `units` table. Any other stamped value rejects — no migrations.
+- **行ごと文書。** 各ユニットテーブルは物理 STRICT テーブル `u_<unit>_<table> (key TEXT PRIMARY KEY, value TEXT)` となり、`value` 列がレコード JSON テキストを持つ。グローバル単一値は共有 `unit_globals` テーブルに存在する。1 キー更新はちょうど 1 行に触れる。高 churn ドメインをここへルーティングする理由である。
+- **単一文原子性。** すべての書き込みプリミティブは 1 準備済み文であり、SQLite の文ごと原子性が明示トランザクションなしに KV 契約を満たす。書き込み順序は呼び出し元責務のままである（ドメイン層の書き込み連鎖）。
+- **DDL 前の名前検証。** ユニット名とテーブル名は DDL に届く前に `UNIT_NAME_RE` に一致しなければならず、外部入力が SQL 識別子へ補間されることはない。
+- **バージョンは loud に失敗する。** 物理レイアウトバージョンは `PRAGMA user_version` に存在する（新規データベースは最後に刻印する）。ユニット形式バージョンは `units` テーブルに存在する。他の刻印値はすべて拒む。移行はない。
 
-### Open sequence
+### 開く順序
 
-Opening the database creates the parent as `0o700`, exclusively creates a missing file as `0o600`, applies `PRAGMA foreign_keys = ON` and the journal mode, checks `user_version`, creates the `units` and `unit_globals` metadata tables, and stamps fresh databases last so a failure leaves the medium unstamped.
+データベースを開くと親を `0o700` で作り、欠けたファイルを `0o600` で排他的に作り、`PRAGMA foreign_keys = ON` とジャーナルモードを適用し、`user_version` を検査し、`units` と `unit_globals` メタテーブルを作り、新規データベースは最後に刻印するため失敗は媒体を未刻印のまま残す。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: backend registration, `path`/`journalMode` config, unit table |
-| [`src/schema.ts`](src/schema.ts) | Open sequence, physical layout version, metadata tables, record table naming |
-| [`src/unit.ts`](src/unit.ts) | One opened unit: prepared statements, JSON value parse, close |
+| [`src/index.ts`](src/index.ts) | プラグイン入口: バックエンド登録、`path`/`journalMode` 構成、ユニットテーブル |
+| [`src/schema.ts`](src/schema.ts) | 開く順序、物理レイアウトバージョン、メタテーブル、レコードテーブル命名 |
+| [`src/unit.ts`](src/unit.ts) | 開かれた 1 ユニット: 準備済み文、JSON 値 parse、close |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when this backend's view is not enough: the subsystem reference is the authoritative contract, and the sibling backend shows the alternative medium.
+このバックエンドの視点では足りないときに、これらのページを読む。サブシステムリファレンスが権威契約であり、兄弟バックエンドが代替媒体を示す。
 
-- [Storage subsystem](../../../docs/subsystems/storage.md) — the backend contract, domain semantics, and generated API.
-- [Storage package map](../README.md) — the family's packages and their repository position.
-- [JSON storage backend](../storage-json/README.md) — the human-readable medium for small, inspectable data.
-- [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — the design behind the backend family and the deferred session-backend migration.
+- [Storage サブシステム](../../../docs/subsystems/storage.md) — バックエンド契約、ドメイン意味、生成 API。
+- [Storage パッケージマップ](../README.md) — ファミリーのパッケージとリポジトリ位置。
+- [JSON ストレージバックエンド](../storage-json/README.md) — 小さく検査可能なデータ向けの人間可読媒体。
+- [domain KV ストレージ Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — バックエンドファミリー背後の設計と先送りセッションバックエンド移行。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Stored domain records
+### 格納ドメインレコード
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing. This backend contributes no prompt, tool, or schema; it persists non-session domain data behind `ctx.storage` for host-side consumers only.
+何もない。このバックエンドはプロンプト・ツール・スキーマを寄与せず、host 側コンシューマー向けに `ctx.storage` 背後で非セッションドメインデータを永続化する。
 
-#### Token effect
+#### トークンへの影響
 
-Zero live-request tokens.
+ライブリクエストトークンゼロである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None — the backend never touches live request prefixes.
+なし。バックエンドはライブリクエストプレフィックスに決して触れない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this backend is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+このバックエンドが不向きな場合や特別な運用注意が必要な場合を定める。これらは現在のパッケージ制約であり、タスク backlog ではない。
 
-- **Synchronous driver blocks the event loop** — each write is a synchronous `DatabaseSync` call; the block lasts a single statement, which is acceptable at domain-data scale.
-- **No busy-wait or retry policy** — a competing connection holding a write lock rejects the operation immediately instead of waiting; the domain layer's write chain serializes writes within one process, and cross-process coordination is out of scope.
-- **Only the current physical layout version opens** — any other stamped `user_version` is rejected rather than migrated (pre-release stance).
-- **Open sequence duplicated with the query provider** — `openDatabase` and `session-query-sqlite` both enforce SQLite file ownership, but each package owns a distinct application identity and schema; no shared medium helper couples them.
+- **同期ドライバーはイベントループを阻む** — 各書き込みは同期 `DatabaseSync` 呼び出しであり、阻むのは単一文の間であり、ドメインデータ規模では許容範囲である。
+- **ビジー待機や再試行方針なし** — 書き込みロックを持つ競合接続があると待たずに操作をただちに拒む。ドメイン層の書き込み連鎖が 1 プロセス内の書き込みを直列化し、プロセス間協調は範囲外である。
+- **現行物理レイアウトバージョンのみ開く** — 他の刻印 `user_version` は移行ではなく拒まれる（プレリリース stance）。
+- **開く順序は照会プロバイダーと重複する** — `openDatabase` と `session-query-sqlite` はいずれも SQLite ファイル所有を強制するが、各パッケージは異なるアプリケーション identity とスキーマを所有する。共有媒体ヘルパーは両者を結合しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

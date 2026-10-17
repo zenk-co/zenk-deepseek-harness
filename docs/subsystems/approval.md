@@ -1,14 +1,14 @@
-# User Approval
+# ユーザー承認
 
-English | [中文](approval.zh.md)
+日本語 | [English](approval.en.md) | [中文](approval.zh.md)
 
-The user-approval seam of [dsh-user-approval](../../packages/interaction/user-approval) answers one question: may this specific action proceed? It owns the shared request/outcome vocabulary, the `ctx.approval` dispatch service, the `approval/request` answerer waterfall, the log-only audit pair, and the per-session `ask`/`never` policy. UI channels may provide human answerers; the [ACP automation bridge](../../packages/acp/acp) provides one-shot machine decisions for its own agents. Callers such as [dsh-tools](../../packages/core/tools) and [dsh-tool-bash](../../packages/shell/tool-bash) consume the closed outcome and fail closed unless it is `allowed-once`.
+[dsh-user-approval](../../packages/interaction/user-approval) のユーザー承認シームは 1 つの問いに答える: この特定のアクションを続行してよいか? 共有されたリクエスト/結果の語彙、`ctx.approval` ディスパッチサービス、`approval/request` アンサラーウォーターフォール、ログ専用の監査ペア、セッションごとの `ask`/`never` ポリシーを所有する。UI チャネルは人間のアンサラーを提供してよい。[ACP 自動化ブリッジ](../../packages/acp/acp)は、自身のエージェント向けにワンショットの機械判断を提供する。[dsh-tools](../../packages/core/tools) や [dsh-tool-bash](../../packages/shell/tool-bash) などの呼び出し元は閉じた結果を消費し、`allowed-once` でない限りフェイルクローズする。
 
-Source: [`packages/interaction/user-approval/src/index.ts`](../../packages/interaction/user-approval/src/index.ts)
+ソース: [`packages/interaction/user-approval/src/index.ts`](../../packages/interaction/user-approval/src/index.ts)
 
-## Identity and outcome
+## アイデンティティと結果
 
-Every request receives a fresh `ApprovalRequestId`. The brand pairs the `approval/asked` and `approval/decided` audit events without making approval ids interchangeable with tool-call or agent/session ids.
+すべてのリクエストは新しい `ApprovalRequestId` を受け取る。このブランドは `approval/asked` と `approval/decided` の監査イベントを対にするが、承認 ID をツール呼び出しやエージェント/セッションの ID と相互交換可能にはしない。
 
 ```ts type-equiv
 /**
@@ -18,7 +18,7 @@ Every request receives a fresh `ApprovalRequestId`. The brand pairs the `approva
 type ApprovalRequestId = Branded<'ApprovalRequestId'>
 ```
 
-`ApprovalOutcome` is closed and fail-closed. `allowed-once` grants only the asked-about action; callers deny on `rejected`, `cancelled`, and `unavailable`. A missing, non-owning, throwing, or non-conforming answerer becomes `unavailable` rather than opening the gate.
+`ApprovalOutcome` は閉じており、フェイルクローズである。`allowed-once` は問い合わせされたアクションのみを許可し、呼び出し元は `rejected`、`cancelled`、`unavailable` で拒否する。欠落した、所有していない、例外をスローする、または規約に適合しないアンサラーは、ゲートを開くのではなく `unavailable` になる。
 
 ```ts type-equiv
 /**
@@ -28,9 +28,9 @@ type ApprovalRequestId = Branded<'ApprovalRequestId'>
 type ApprovalOutcome = 'allowed-once' | 'rejected' | 'cancelled' | 'unavailable'
 ```
 
-## Per-session policy
+## セッションごとのポリシー
 
-`ApprovalPolicy` determines what happens before interactive answerers run. `ask` delegates to the composed answerer chain, whose no-answer default is `unavailable`; `never` deterministically returns `rejected` without dispatching any answerer. The effective value is the last `approval/policy` event in the session log, falling back to the service config. Consumers read it with `ctx.approval.effectivePolicy(session)`; `setApprovalPolicy(session, policy)` is the single write path, so replay reconstructs the override.
+`ApprovalPolicy` は、対話型アンサラーが実行される前に何が起こるかを決定する。`ask` は構成されたアンサラーチェーンに委任し、その無応答のデフォルトは `unavailable` である。`never` はアンサラーを一切ディスパッチせずに決定論的に `rejected` を返す。実効値はセッションログ内の最後の `approval/policy` イベントであり、なければサービス設定にフォールバックする。コンシューマーは `ctx.approval.effectivePolicy(session)` でそれを読み取り、`setApprovalPolicy(session, policy)` が唯一の書き込み経路であるため、リプレイがオーバーライドを再構築する。
 
 ```ts type-equiv
 /**
@@ -46,11 +46,11 @@ type ApprovalOutcome = 'allowed-once' | 'rejected' | 'cancelled' | 'unavailable'
 type ApprovalPolicy = 'ask' | 'never'
 ```
 
-Both policies contribute their complete current meaning to the cache-safe runtime-context snapshot. The sourced `user/message` is the durable model-visible input; changing approval state appends a new full snapshot after retained history without touching the `system/message` nodes that hold the rendered system prompt.
+どちらのポリシーも、キャッシュ安全なランタイムコンテキストスナップショットに現在の完全な意味を寄与する。ソース指定された `user/message` が耐久性のあるモデル可視入力であり、承認状態の変更は、描画されたシステムプロンプトを保持する `system/message` ノードに触れることなく、保持された履歴の後に新しい完全なスナップショットを追加する。
 
-## Approval request
+## 承認リクエスト
 
-`ApprovalRequest` identifies the agent and tool action closely enough to route and audit the question. It deliberately omits tool arguments: an answerer attaches the prompt to the already-streamed tool call through `callId` instead of rendering a second copy that could drift. Optional `displayReason` carries requester-owned locale strings to presentation; `reason` remains the audit text.
+`ApprovalRequest` は、問いをルーティングして監査するのに十分な精度でエージェントとツールのアクションを識別する。ツール引数は意図的に省略される。アンサラーは、ずれる可能性のある 2 つ目のコピーを描画するのではなく、`callId` を通じてすでにストリームされたツール呼び出しにプロンプトを添付する。オプションの `displayReason` はリクエスター所有のロケール文字列を表示に運び、`reason` は監査テキストのままである。
 
 ```ts type-equiv
 /**
@@ -81,11 +81,11 @@ interface ApprovalRequest extends ApprovalRequestEvent {
 }
 ```
 
-## Dispatch and audit
+## ディスパッチと監査
 
-`ctx.approval.request(req)` requires the requesting session to be inside an open turn. It appends `approval/asked`, obtains one outcome, appends the matching `approval/decided`, and resolves with that outcome. The `never` policy is enforced inside the service before waterfall dispatch, so even an answerer registered later with `prepend` cannot bypass it. Answerers return an outcome when they own the request or call `next()` to delegate; the first answer occupies the single decision slot.
+`ctx.approval.request(req)` は、リクエスト元のセッションが開いているターンの中にあることを要求する。`approval/asked` を追加し、1 つの結果を取得し、対応する `approval/decided` を追加して、その結果で解決する。`never` ポリシーはウォーターフォールディスパッチの前にサービス内部で強制されるため、後から `prepend` で登録されたアンサラーでもそれを回避できない。アンサラーは、リクエストを所有する場合は結果を返し、委任する場合は `next()` を呼び出す。最初の回答が単一の決定スロットを占める。
 
-The audit events are log-only and do not enter the model transcript. Model-visible behavior is the caller's derived tool result plus the current runtime-context snapshot. Service disposal removes its context contribution; answerer listeners are independently effect-bound to their owning plugins.
+監査イベントはログ専用であり、モデルのトランスクリプトには入らない。モデル可視の動作は、呼び出し元が導出するツール結果と現在のランタイムコンテキストスナップショットである。サービスの破棄はそのコンテキストへの寄与を削除し、アンサラーリスナーは所有するプラグインに独立して effect バインドされる。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -93,13 +93,13 @@ The audit events are log-only and do not enter the model transcript. Model-visib
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される(doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。再生成は `pnpm run gen-cordis-catalog`)。言語版の違いは、ロケール固有のペアドキュメントパスのみである。シグネチャブロックは `ts cordis-catalog` フェンスを使用し、元のソース JSDoc を保持する。ディスパッチモードは [primer](../cordis-primer.md#dispatch-modes) で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxapproval--approvalservice"></a>
 
 ### `ctx.approval` — `ApprovalService`
 
-Approval service that applies session policy before answerers and logs every ask/outcome pair to the requesting session. It exposes deterministic policy changes to the model through the runtime-context snapshot and switch notices.
+アンサラーの前にセッションポリシーを適用し、すべての ask/結果ペアをリクエスト元セッションに記録する承認サービス。決定論的なポリシー変更を、ランタイムコンテキストスナップショットと切替通知を通じてモデルに公開する。
 
 ```ts cordis-catalog
 /**
@@ -139,19 +139,19 @@ async request(req: ApprovalRequest): Promise<ApprovalOutcome>
 overrideOf(session: Session): ApprovalPolicy | undefined
 ```
 
-Types: [Agent](core.md) · [Session](session.md)
+型: [Agent](core.md) · [Session](session.md)
 
-Source: [`packages/interaction/user-approval/src/index.ts`](../../packages/interaction/user-approval/src/index.ts)
+ソース: [`packages/interaction/user-approval/src/index.ts`](../../packages/interaction/user-approval/src/index.ts)
 
 <a id="approval-events"></a>
 
-### `approval/*` events
+### `approval/*` イベント
 
 <a id="approvalrequest--waterfall"></a>
 
-#### `approval/request` — waterfall
+#### `approval/request` — ウォーターフォール
 
-Ask composed answerers for one decision. Return an outcome to claim the request or call `next()` to delegate. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+構成されたアンサラーに 1 つの決定を求める。結果を返してリクエストを主張するか、`next()` を呼び出して委任する。スコープフィルター付きディスパッチ(`@deepseek-ai/dsh-scope`): エージェントスコープのリスナーはそのエージェントのみを受け取る。
 
 ```ts cordis-catalog
 /**
@@ -164,7 +164,7 @@ Ask composed answerers for one decision. Return an outcome to claim the request 
 'approval/request'( this: Scoped<Agent>, req: ApprovalRequestEvent, next: () => Promise<ApprovalOutcome>, ): Promise<ApprovalOutcome>
 ```
 
-Types: [Agent](core.md) · [Scoped](scope.md)
+型: [Agent](core.md) · [Scoped](scope.md)
 
-Source: [`packages/interaction/user-approval/src/types.ts`](../../packages/interaction/user-approval/src/types.ts)
+ソース: [`packages/interaction/user-approval/src/types.ts`](../../packages/interaction/user-approval/src/types.ts)
 <!-- END GENERATED cordis-surface -->

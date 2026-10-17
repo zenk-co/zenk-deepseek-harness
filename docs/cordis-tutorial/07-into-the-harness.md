@@ -1,12 +1,12 @@
-# 7. Into the harness
+# 7. ハーネスの世界へ
 
-English | [中文](07-into-the-harness.zh.md)
+日本語 | [English](07-into-the-harness.en.md) | [中文](07-into-the-harness.zh.md)
 
-This chapter registers a model-callable tool with the harness's `tools` service, executes it through the harness tool pipeline, and observes the result event. It remains keyless and does not call a model.
+この章ではモデル呼び出し可能なツールをハーネスの `tools` サービスに登録し、ハーネスのツールパイプラインで実行し、結果イベントを観測する。キーレスのままであり、モデルは呼ばない。
 
-## A tool plugin
+## ツールプラグイン
 
-Create `greet-tool.ts` in `tmp/cordis-tutorial`:
+`tmp/cordis-tutorial` に `greet-tool.ts` を作る:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -47,11 +47,11 @@ export function apply(ctx: Context) {
 }
 ```
 
-Every pattern here is from the earlier chapters: `inject: ['tools']` ([chapter 3](03-services.md)) holds the plugin until the tool registry exists; `ctx.tools.register(...)` attaches the registration disposer to the plugin ([chapter 2](02-lifecycle-and-effects.md)), so unloading unregisters the tool. `defineTool` converts the `parameters` spec to the JSON Schema shown to the model, infers the type of `args`, and validates model-supplied arguments before `execute` runs. The tool returns the canonical value declared by `output.schema`; `output.render` separately produces the Native and durable result content.
+ここのすべてのパターンは前の章由来である。`inject: ['tools']`（[第 3 章](03-services.md)）はツールレジストリが存在するまでプラグインを保持し、`ctx.tools.register(...)` は登録破棄子をプラグインに結び付ける（[第 2 章](02-lifecycle-and-effects.md)）ため、アンロードでツールの登録が外れる。`defineTool` は `parameters` 仕様をモデルに示す JSON Schema に変換し、`args` の型を推論し、`execute` 実行前にモデル供給の引数を検証する。ツールは `output.schema` が宣言する正規値を返し、`output.render` が別に Native と耐久の結果内容を作る。
 
-## An observer plugin
+## 観測プラグイン
 
-Create `tool-logger.ts` — a separate plugin that watches every tool call in the app through the harness's `tools/result` event:
+`tool-logger.ts` を作る。アプリ内のすべてのツール呼び出しをハーネスの `tools/result` イベント越しに見る別のプラグインである:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -70,9 +70,9 @@ export function apply(ctx: Context) {
 }
 ```
 
-The `import type {} from '@deepseek-ai/dsh-tools'` line pulls in the package's declaration merges so `'tools/result'` and its payload are typed — the same move as chapter 4's `stats.ts` import, at package scale.
+`import type {} from '@deepseek-ai/dsh-tools'` の行はパッケージの宣言統合を引き込み、`'tools/result'` とそのペイロードに型を付ける。第 4 章の `stats.ts` インポートと同じ手つきをパッケージ規模で行うものである。
 
-## Compose and run
+## 組み立てと実行
 
 ```yaml
 - name: '@deepseek-ai/dsh-system-prompt'
@@ -81,7 +81,7 @@ The `import type {} from '@deepseek-ai/dsh-tools'` line pulls in the package's d
 - name: './greet-tool.ts'
 ```
 
-`@deepseek-ai/dsh-tools` injects the `systemPrompt` service because tools contribute schemas to the system prompt, so the composition lists its provider too. Without it, the tools plugin remains PENDING as described in [chapter 6](06-composition-and-hmr.md).
+`@deepseek-ai/dsh-tools` はツールがシステムプロンプトにスキーマを寄与するため `systemPrompt` サービスを `inject` する。だからコンポジションはそのプロバイダーも列挙する。それがなければツールプラグインは[第 6 章](06-composition-and-hmr.md)のとおり PENDING のままである。
 
 ```sh
 node --import tsx ../../vendor/cordis/bin.js
@@ -92,17 +92,17 @@ node --import tsx ../../vendor/cordis/bin.js
 tool replied: [{"type":"text","text":"Hello, Cordis!"}]
 ```
 
-The logger fired first: `tools/result` is emitted as part of result materialization, before `execute`'s promise resolves to the caller. Neither of your plugins knows the other exists — the registry service and the event connect them.
+ロガーが先に発火した。`tools/result` は結果実体化の一部として、`execute` のプロミスが呼び出し側に解決する前に送出される。あなたの 2 つのプラグインは互いの存在を知らない。レジストリサービスとイベントがそれらを結ぶ。
 
-## From here to a full agent
+## ここから完全なエージェントへ
 
-A real agent is this composition plus more plugins: an LLM adapter, the agent loop, persistence, and an application entry. Compare the [base profile layer](../../packages/bundle/base/cordis.patch.yml) and [headless layer](../../packages/bundle/headless/cordis.patch.yml) — you can read their entries now. Add your `greet-tool.ts` through a small `--patch` overlay.
+実際のエージェントはこのコンポジションにプラグインを足したものである。LLM アダプター、エージェントループ、永続化、アプリケーション入口が加わる。[base プロファイル層](../../packages/bundle/base/cordis.patch.yml)と [headless 層](../../packages/bundle/headless/cordis.patch.yml) を比べること。今ならそのエントリーを読める。あなたの `greet-tool.ts` は小さな `--patch` オーバーレイで追加できる。
 
-Where to go next:
+次に進む先:
 
-- [Build a tool](../user/develop/basic/tool.md) — more of `defineTool`, including presentation and richer schemas.
-- [Three-layer capability design](../user/develop/practice/index.md) — how the harness structures replaceable capabilities.
-- The generated `cordis-surface` regions on the [subsystem pages](../subsystems/core.md) — everything you can inject and listen to, each on its owning page.
-- [Architecture](../architecture.md) — the system map these plugins live in.
+- [ツールを組み立てる](../user/develop/basic/tool.md) — プレゼンテーションや豊かなスキーマを含む `defineTool` の続き。
+- [3 層ケイパビリティ設計](../user/develop/practice/index.md) — ハーネスが置換可能なケイパビリティをどう構造化するか。
+- [サブシステムページ](../subsystems/core.md)上の生成 `cordis-surface` 領域 — 注入・購読できるすべてのものが所有ページごとにある。
+- [アーキテクチャ](../architecture.md) — これらのプラグインが生きる全体像。
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)

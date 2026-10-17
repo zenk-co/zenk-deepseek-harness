@@ -5,7 +5,7 @@ description: "Python 运行时 wheel 的 Office 转换与内置创作环境需�
 
 # 显式下载可选 Python 运行时资源
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

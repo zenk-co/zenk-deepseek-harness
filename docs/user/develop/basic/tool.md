@@ -1,12 +1,12 @@
-# Build a tool
+# ツールを構築する
 
-English | [中文](tool.zh.md)
+日本語 | [English](tool.en.md) | [中文](tool.zh.md)
 
-This tutorial adds a `greet` tool to the Web UI. Complete [Your first plugin](./index.md) first and keep its `scratch-plugin` directory.
+このチュートリアルでは Web UI に `greet` ツールを追加する。先に [最初のプラグイン](./index.md) を完了し、`scratch-plugin` ディレクトリを残しておく。
 
-## Create the tool plugin
+## ツールプラグインを作成する
 
-Replace `scratch-plugin/src/my-plugin.ts` with:
+`scratch-plugin/src/my-plugin.ts` を以下に置き換える:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -33,20 +33,20 @@ export function apply(ctx: Context) {
 }
 ```
 
-`inject` makes Cordis wait for the tool registry. `defineTool` infers and validates `args` from `parameters`; `execute` returns the canonical value declared by `output.schema`, and `output.render` converts that value to model-facing content.
+`inject` は Cordis にツールレジストリを待たせる。`defineTool` は `parameters` から `args` を推論・検証し、`execute` は `output.schema` で宣言された正規値を返し、`output.render` はその値をモデル向けコンテンツに変換する。
 
-## Run and call the tool
+## ツールを実行して呼び出す
 
-Restart the development command if it is not running:
+開発コマンドが動いていなければ再起動する:
 
 ```sh
 pnpm dsh web --patch ./scratch-plugin/cordis.yml
 ```
 
-Open `http://127.0.0.1:3080` and ask: `Use the greet tool to greet Ada.` The model can call `greet` and receives `Hello, Ada!` as the tool result.
+`http://127.0.0.1:3080` を開いて尋ねる: `Use the greet tool to greet Ada.` モデルは `greet` を呼び出せ、`Hello, Ada!` をツール結果として受け取る。
 
-## Next steps
+## 次の手順
 
-- [Plugin configuration](./config.md) — make the greeting configurable.
-- [Tool authoring reference](../../../cookbook/adding-a-tool.md) — look up nested schemas, canonical values, background work, policy hooks, PTC mode, and UI cards.
-- [Capability layering](../practice/index.md) — split a replaceable capability into Service Definition, Service Provider, and Consumer packages.
+- [プラグイン設定](./config.md) — あいさつを構成可能にする。
+- [ツール作成リファレンス](../../../cookbook/adding-a-tool.md) — ネストしたスキーマ、正規値、バックグラウンド作業、ポリシーフック、PTC モード、UI カードを調べる。
+- [ケイパビリティの層化](../practice/index.md) — 置換可能なケイパビリティをサービス定義、サービスプロバイダー、コンシューマーの各パッケージに分割する。

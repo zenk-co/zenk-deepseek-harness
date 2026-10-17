@@ -1,35 +1,35 @@
 ---
-description: "Pure adjacent Session format planning, lossless JSON value checks, header-only migration, and physical codec dispatch."
+description: "純粋な隣接セッションフォーマット計画、ロスレス JSON 値検査、ヘッダーのみのマイグレーション、物理コーデック配送。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-session-format
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-session-format` lets persistence code restore a current Session directly or compose a unique sequence of adjacent migrations while consuming physical rows once. A restore transfers caller-owned parsed values through stateful stages without intermediate artifact copies or freezing. Physical framing, compression, immutable generation naming, exclusive publication, and Cordis lifecycle behavior remain outside this library.
+`dsh-session-format` を使うと、現在のセッションを直接復元する永続化コード、または物理行を 1 回ずつ消費しながら隣接マイグレーションの唯一の連続を構成できる。復元は呼び出し元所有のパース済み値を中間成果物コピーや凍結なしにステートフルな段階を通じて転送する。物理フレーミング、圧縮、不変な生成命名、排他的公開、Cordis ライフサイクル動作はこのライブラリの範囲外である。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-### When to use it
+### 使う場合
 
-Use this library from persistence or format-catalog code that must classify a physical Session header, restore current logical values, or compose released adjacent migrations. It is not a Cordis plugin and has no profile mount row.
+物理セッションヘッダーを分類し、現在の論理値を復元し、リリース済みの隣接マイグレーションを構成しなければならない永続化またはフォーマットカタログのコードからこのライブラリを使う。Cordis プラグインではなく、プロファイルのマウント行はない。
 
-### Entry point
+### エントリーポイント
 
 ```text
 const catalog = createSessionFormatCatalog({ currentVersion, codecs, currentEncoder, migrations, restoreCurrent, restoreTransformedCurrent, restoreCurrentHeader })
@@ -41,72 +41,72 @@ const headerRecord = catalog.encodeCurrentHeader(current.header, current.inherit
 const eventRecords = current.events.map(catalog.encodeCurrentEvent)
 ```
 
-`createSessionFormatCatalog()` accepts one codec for each version's supported representations, the current record encoder, one migration per adjacent version pair, and current artifact and header restorers. `readHeader()` returns a `current`, `migration-required`, `unsupported`, or `malformed` descriptor without reading events. Body readers create one restore, push each parsed physical row through `decodeRow()`, and call `finish()` once for a current artifact. Writers encode its header and events record by record. Established record meanings remain stable; [compatibility review](../../../.agents/notes/implemented/process/2026-10-08-session-reader-compatibility-review.md) governs same-version additions.
+`createSessionFormatCatalog()` はサポートする各表現のための各バージョン 1 つのコーデック、現在のレコードエンコーダー、隣接バージョン対ごとの 1 つのマイグレーション、現在の成果物とヘッダーの復元器を受け取る。`readHeader()` はイベントを読まずに `current`、`migration-required`、`unsupported`、`malformed` のいずれかの記述子を返す。ボディ読み取り器は復元を 1 つ作成し、パース済みの物理行を各々 `decodeRow()` に通し、最後に `finish()` を 1 回呼ぶ。書き込み器はそのヘッダーとイベントをレコードごとに符号化する。確立されたレコード意味は安定したままである。[互換性レビュー](../../../.agents/notes/implemented/process/2026-10-08-session-reader-compatibility-review.md)は同バージョン追加を統治する。
 
-The `recovery` option selects strict row failure or recoverable suffix handling. `validation: 'current'` applies all installed current-format validation. `validation: 'transformed'` applies released current-format validation after historical migration, while already-current input receives only its codec's physical validation.
+`recovery` オプションは厳密な行失敗か回復可能な接尾辞扱いかを選択する。`validation: 'current'` はインストール済みの現在のフォーマット検証をすべて適用する。`validation: 'transformed'` は歴史的マイグレーション後にリリース済みの現在のフォーマット検証を適用し、すでが現在の入力にはそのコーデックの物理検証のみを受けさせる。
 
-The recoverable decoder returns the accepted logical prefix. A codec may drop one malformed or sequence-gapped row and its uncommitted suffix, but a later decoded `turn/end` makes the original issue fatal.
+回復可能なデコーダーは受け入れ済み論理プレフィックスを返す。コーデックは不正または順序欠落の行 1 つとその未コミット接尾辞を落としてよいが、後にデコードされた `turn/end` が元の問題を致命化する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The chain validates unique gap-free ordering at construction. A source cut may be unknown until EOF; stages that require a header cut reject its absence, while marker-based stages derive it from emitted events. Each stage returns its exact target cut at finish, and any predeclared cut must agree. The catalog composes one row decoder with stateful adjacent event transformers, retains only their bounded state and the final current events, and performs target validation at `finish()`; only the caller decides whether and how to publish that result.
+チェーンは構築時に一意で隙間のない順序を検証する。ソースカットは EOF まで不明な場合がある。ヘッダーカットを要求する段階はその不在を拒否し、マーカー起点の段階は放出イベントからそれを導出する。各段階は終了時に正確な目標カットを返し、事前宣言されたカットは一致しなければならない。カタログは状態付き隣接イベント変換器を持つ 1 つの行デコーダーを構成し、その有界状態と最終的な現在イベントのみを保持し、`finish()` 時に目標検証を行う。その結果を公開するかどうかと方法を決めるのは呼び出し元のみである。
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/chain.ts`](src/chain.ts) | Adjacent plan construction and current bypass |
-| [`src/catalog.ts`](src/catalog.ts) | Physical version dispatch and header classification |
-| [`src/json.ts`](src/json.ts) | Detached lossless JSON snapshots and common coordinate checks |
-| [`src/filename.ts`](src/filename.ts) | Canonical `session[.vN].jsonl` basename shared by persistence, export, and fixtures |
+| [`src/chain.ts`](src/chain.ts) | 隣接計画構築と現在のバイパス |
+| [`src/catalog.ts`](src/catalog.ts) | 物理バージョン配送とヘッダー分類 |
+| [`src/json.ts`](src/json.ts) | デタッチされたロスレス JSON スナップショットと共通座標検査 |
+| [`src/filename.ts`](src/filename.ts) | 永続化、エクスポート、フィクスチャが共有する正規 `session[.vN].jsonl` ベース名 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Released v0 to v1 edge](../session-format-v0-to-v1/README.md) — frozen historical decoding and identity conversion.
-- [Static catalog](../session-format-catalog/README.md) — first-party codec and migration assembly.
-- [JSONL persistence](../session-persistence-jsonl/README.md) — durable framing and generation publication.
+- [リリース済み v0 から v1 の辺](../session-format-v0-to-v1/README.md) — 凍結された歴史的デコードと identity 変換。
+- [静的カタログ](../session-format-catalog/README.md) — ファーストパーティのコーデックとマイグレーション集成。
+- [JSONL 永続化](../session-persistence-jsonl/README.md) — 永続的なフレーミングと生成公開。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Session restoration
+### セッション復元
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing directly. Consumers reconstruct model history from the validated current artifact through `deriveMessages()`.
+直接は何もない。コンシューマーは `deriveMessages()` を通じて検証済み現在成果物からモデル履歴を再構成する。
 
-#### Token effect
+#### トークンへの影響
 
-Zero direct tokens.
+直接のトークンはゼロ。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct effect. A migration that changes current history can change the cache identity owned by request reconstruction.
+直接の影響はない。現在履歴を変えるマイグレーションは要求再構成が所有するキャッシュ identity を変え得る。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Final current history remains resident** — streaming retains only bounded intermediate state, but the returned current event array and any required sequence-remap table remain O(event count).
-- **Adjacent integer versions only** — the library does not expose spans, stable event identities, or a general reference-rewrite algebra.
+- **最終的な現在履歴は常駐する** — ストリーミングは有界の中間状態のみを保持するが、返される現在のイベント配列と必要な順序再対応表はイベント数に対して O(イベント数) になる。
+- **隣接する整数バージョンのみ** — このライブラリはスパン、安定イベント identity、一般参照書き換え代数を公開しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,145 +1,145 @@
 ---
-description: "Web Session-log ZIP export: Host streaming, the authenticated download route, the Session Header action, and the /export command."
+description: "Web のセッションログ ZIP エクスポート: Host ストリーミング、認証済みダウンロードルート、セッションヘッダーのアクション、および /export コマンド。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-log-export
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-session-log-export` lets the Web interface download a session's full history: a `Download session log` menu item under the Session Header's more-actions button and an `/export` slash command both hand the session tree — the session, its sub-sessions, and attachments — to the browser as a ZIP download. The package owns the Host archive stream, its authenticated Fetch route, and the browser controls and feedback. The browser chooses the download destination. Setup and usage come first; implementation details follow.
+`dsh-session-log-export` は、Web インターフェースがセッションの全履歴をダウンロードできるようにする。セッションヘッダーのその他アクションボタン配下の `Download session log` メニュー項目と `/export` スラッシュコマンドのどちらも、セッションツリー — セッション、そのサブセッション、添付ファイル — を ZIP ダウンロードとしてブラウザに渡す。このパッケージは Host アーカイブストリーム、その認証済み Fetch ルート、およびブラウザのコントロールとフィードバックを所有する。ダウンロード先はブラウザが選択する。セットアップと使用法を先に、実装の詳細を後に述べる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Use this package when the Web bundle should let users export a session log. It requires Connection, the command registry, Session query and persistence, and attachments. Mount the plugin, then choose `Download session log` from the Session Header's more-actions menu or type `/export`; the browser downloads `dsh-session-<id>.zip`.
+Web バンドルがユーザーにセッションログをエクスポートさせるべき場合にこのパッケージを使用する。Connection、コマンドレジストリ、Session query と永続化、および添付ファイルが必要である。プラグインをマウントし、セッションヘッダーのその他アクションメニューから `Download session log` を選ぶか `/export` と入力すると、ブラウザが `dsh-session-<id>.zip` をダウンロードする。
 
-When `ui-message-feedback` is mounted, the same menu also offers `Feedback`, which opens its existing Session feedback dialog. Opening or dismissing that form does not export the Session or submit feedback. The feedback row follows the feedback plugin's availability; export remains available independently.
+`ui-message-feedback` がマウントされている場合、同じメニューは既存のセッションフィードバックダイアログを開く `Feedback` も提供する。そのフォームを開いたり閉じたりしても、セッションがエクスポートされたりフィードバックが送信されたりすることはない。フィードバック行はフィードバックプラグインの可用性に従う。エクスポートは独立して利用可能なままである。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it for a Web deployment that needs user-facing session export with a visible download dialog. Avoid it when a programmatic or Host-side export is needed: this package produces a browser download, not a Host path write. The logs are serialized from persistence read handles, so any mounted backend is supported.
+可視のダウンロードダイアログを伴う、ユーザー向けのセッションエクスポートを必要とする Web デプロイメントにこれを選ぶ。プログラムによる、または Host 側のエクスポートが必要な場合は避ける。このパッケージはブラウザダウンロードを生成するのであって、Host パスへの書き込みではない。ログは永続化の読み取りハンドルからシリアライズされるため、任意のマウントされたバックエンドがサポートされる。
 
-### Composition
+### 構成
 
 ```yaml
 - id: session-log-download
   name: '@deepseek-ai/dsh-session-log-export'
 ```
 
-The Web bundle mounts the package with Connection, `dsh-commands`, `dsh-client-ui-commands`, and `dsh-client-ui-conversation`.
+Web バンドルはこのパッケージを Connection、`dsh-commands`、`dsh-client-ui-commands`、および `dsh-client-ui-conversation` と共にマウントする。
 
-### Configuration
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `compressionLevel` | `6` | DEFLATE level from 0 through 9 for each ZIP entry. |
+| `compressionLevel` | `6` | 各 ZIP エントリの 0 から 9 までの DEFLATE レベル。 |
 
-### Command contract
+### コマンド契約
 
-| Input | Result |
+| 入力 | 結果 |
 |---|---|
-| `/export` | Records a human-command lifecycle; the submitting browser downloads the document-relative `api/session.export?sessionId=<id>&includeDescendants=true` (Host route `/api/session.export`) |
-| `/export <path>` | An error; browser downloads choose their destination through the browser's ordinary download behavior |
+| `/export` | ヒューマンコマンドのライフサイクルを記録する。送信したブラウザがドキュメント相対の `api/session.export?sessionId=<id>&includeDescendants=true` をダウンロードする(Host ルート `/api/session.export`) |
+| `/export <path>` | エラー。ブラウザのダウンロードはブラウザの通常のダウンロード動作を通じて宛先を選択する |
 
-### What to expect
+### 期待される動作
 
-The dialog reports three phases: preparing, download started, or failed. Closing the dialog does not cancel an in-flight download, and the dialog does not reopen when that operation later settles. One session admits one active download at a time; repeated gestures share that operation. The export includes the live session's newest events: the host endpoint flushes a live root session before reading, so a slash-triggered ZIP includes the `command/run` and `command/done` pair that started the download; cold persisted sessions need no flush. Each logical log uses the current generation's canonical filename inside the archive (`session.jsonl` for v0, otherwise `session.vN.jsonl`), including beneath each sub-session directory. Images use `media/<attachmentId>.<ext>`, and generic files use `files/<digest-prefix>/<digest>/<name>`. Generic-file bytes are read and compressed as bounded chunks, so exporting a large upload does not buffer it in full.
+ダイアログは 3 つのフェーズを報告する: 準備中、ダウンロード開始、または失敗。ダイアログを閉じても進行中のダウンロードはキャンセルされず、その操作が後で完了してもダイアログは再び開かない。1 つのセッションは同時に 1 つのアクティブなダウンロードのみ許可し、繰り返しのジェスチャーはその操作を共有する。エクスポートにはライブセッションの最新イベントが含まれる。ホストエンドポイントは読み取り前にライブのルートセッションをフラッシュするため、スラッシュでトリガーされた ZIP にはダウンロードを開始した `command/run` と `command/done` のペアが含まれる。コールドの永続化済みセッションにはフラッシュは不要である。各論理ログはアーカイブ内で現在の世代の正規ファイル名を使用し(v0 は `session.jsonl`、それ以外は `session.vN.jsonl`)、各サブセッションディレクトリの下でも同様である。画像は `media/<attachmentId>.<ext>` を、汎用ファイルは `files/<digest-prefix>/<digest>/<name>` を使用する。汎用ファイルのバイトは上限付きのチャンクとして読み取られ圧縮されるため、大きなアップロードをエクスポートしても全体がバッファリングされることはない。
 
-Attachment collection reads declared content fields of built-in Session events and completed assistant stream blocks, including flat V4 tool-role messages. Unknown event payloads and unrelated fields remain unchanged in the exported log but do not cause attachment reads.
+添付ファイルの収集は、組み込みのセッションイベントと完了したアシスタントストリームブロックの宣言されたコンテンツフィールドを読み取る。これにはフラットな V4 ツールロールメッセージも含まれる。未知のイベントペイロードと無関係なフィールドはエクスポートされたログ内で変更されないが、添付ファイルの読み取りを引き起こすことはない。
 
-### Failures
+### 失敗
 
-The dialog shows a preparation error when the preflight fails before ZIP streaming starts — for example an unreachable or misconfigured host endpoint. A descendant or attachment read failure after the browser accepts the GET is reported by the browser download manager, not by the dialog.
+ダイアログは、ZIP ストリーミングが開始される前のプリフライトが失敗した場合(たとえば到達不能または設定ミスのホストエンドポイント)に準備エラーを表示する。ブラウザが GET を受け入れた後の子孫または添付ファイルの読み取り失敗は、ダイアログではなくブラウザのダウンロードマネージャーによって報告される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains how the package wires the export control and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、パッケージがエクスポートコントロールをどのように配線し、それを実現するコードをどこに指すのかを説明する。観察可能な動作は[このパッケージの使い方](#use-this-package)で完全にカバーされている。
 
-### Design split
+### 設計の分割
 
-The package has two halves. The Host half ([`src/index.ts`](src/index.ts)) registers the `/export` command and contributes the exact `GET`/`HEAD /api/session.export` Fetch route to Connection; [`src/archive.ts`](src/archive.ts) builds the bounded ZIP stream. The browser half ([`src/client/index.ts`](src/client/index.ts)) provides the shared download controller and UI, and observes `command/executed` so only the submitting browser starts a download.
+パッケージには 2 つの半分がある。Host の半分([`src/index.ts`](src/index.ts))は `/export` コマンドを登録し、正確な `GET`/`HEAD /api/session.export` Fetch ルートを Connection に提供する。[`src/archive.ts`](src/archive.ts) が上限付き ZIP ストリームを構築する。ブラウザの半分([`src/client/index.ts`](src/client/index.ts))は共有ダウンロードコントローラーと UI を提供し、`command/executed` を監視することで送信したブラウザだけがダウンロードを開始する。
 
-The Header’s More action uses the shared compact Button, with a 28px square target and the same radius and hover fill as the right-sidebar expand control.
+ヘッダーのその他アクションは共有のコンパクト Button を使用し、28px の正方形ターゲットと、右サイドバーの展開コントロールと同じ半径とホバー塗りを持つ。
 
-### Download flow
+### ダウンロードフロー
 
-Both entry paths issue a `HEAD` preflight to the document-relative `api/session.export?...`, then hand the GET route to the browser download manager without buffering the ZIP in JavaScript. One controller owns one in-flight download per session, collapses concurrent gestures into that operation, and cancels the preflight on plugin disposal. Modal state lives in a snapshot store keyed by session, so the button and the command share one dialog per session.
+どちらのエントリパスも、ドキュメント相対の `api/session.export?...` に対して `HEAD` プリフライトを発行し、その後 ZIP を JavaScript でバッファリングせずに GET ルートをブラウザのダウンロードマネージャーに渡す。1 つのコントローラーがセッションごとに 1 つの進行中ダウンロードを所有し、同時のジェスチャーをその操作に集約し、プラグインの破棄時にプリフライトをキャンセルする。モーダル状態はセッションをキーとするスナップショットストアに存在するため、ボタンとコマンドはセッションごとに 1 つのダイアログを共有する。
 
-The Host route is a feature-owned exact Fetch contribution. Connection applies its Host/Origin and browser-session checks and bridges the streaming `Response`; this package owns query validation, live-session flushes, handle-based log reads and attachment reads, ZIP generation, and HTTP status semantics.
+Host ルートは機能が所有する正確な Fetch 提供である。Connection はその Host/Origin およびブラウザセッションの検査を適用し、ストリーミング `Response` をブリッジする。このパッケージはクエリ検証、ライブセッションのフラッシュ、ハンドルベースのログ読み取りと添付ファイル読み取り、ZIP 生成、および HTTP ステータスセマンティクスを所有する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the Web control to the host endpoint and the surrounding command and session surfaces.
+パッケージレベルの契約では足りない場合にこれらのページを読むとよい。Web コントロールからホストエンドポイント、そして周辺のコマンドとセッションのサーフェスへと進む。
 
-- [dsh-client-connection](../../client/connection/README.md) — the authenticated Fetch-route carrier used by the Host endpoint.
-- [Commands subsystem reference](../../../docs/subsystems/commands.md) — the human-command registry the `/export` command registers on.
-- [dsh-client-ui-commands](../../client/ui-commands/README.md) — the browser command surface that renders and acknowledges `/export`.
-- [Session Query package map](../README.md) — the retrieval family this package belongs to.
+- [dsh-client-connection](../../client/connection/README.md) — Host エンドポイントが使用する認証済み Fetch ルートキャリアー。
+- [Commands サブシステムリファレンス](../../../docs/subsystems/commands.md) — `/export` コマンドが登録するヒューマンコマンドレジストリ。
+- [dsh-client-ui-commands](../../client/ui-commands/README.md) — `/export` をレンダリングして確認応答するブラウザコマンドサーフェス。
+- [Session Query パッケージマップ](../README.md) — このパッケージが属する検索ファミリー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Human `/export` control
+### ヒューマンの `/export` コントロール
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing. `/export` stays on the human-command plane, and the ZIP download does not enter model history.
+何もない。`/export` はヒューマンコマンドプレーンに留まり、ZIP ダウンロードはモデル履歴に入らない。
 
-#### Token effect
+#### トークンへの影響
 
-Zero. The command creates no model turn.
+ゼロ。このコマンドはモデルターンを生成しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None. The log-only command lifecycle and browser download do not change the derived request prefix.
+なし。ログのみのコマンドライフサイクルとブラウザダウンロードは、導出されるリクエスト接頭辞を変更しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this package is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+これらの制限は、このパッケージが不適切な選択となる場合、または特別な運用上の注意が必要となる場合を定義する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Browser download, not a Host-path writer** — the browser chooses the local destination; no Host path or native folder action is returned.
-- **Preflight reports only pre-stream failures** — a descendant or attachment failure after the browser accepts the GET is reported by the browser download manager, not by the dialog.
+- **ブラウザダウンロードであり、Host パスへの書き込みではない** — ローカルの宛先はブラウザが選択する。Host パスやネイティブフォルダーアクションは返されない。
+- **プリフライトはストリーム開始前の失敗のみを報告する** — ブラウザが GET を受け入れた後の子孫または添付ファイルの失敗は、ダイアログではなくブラウザのダウンロードマネージャーによって報告される。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked pages.
+この Dev Note はメンテナ向けの作業コンテキストである: 未決定のオープンな設計上の問いと方向性。これは明示的に非権威である — 出荷済みの動作、制限、および受け入れられた根拠は、上記のセクション、パッケージコード、およびリンクされたページに存在する。
 
-#### Future: export destinations beyond the browser
+#### 将来: ブラウザを超えたエクスポート先
 
-The download is deliberately browser-scoped; a Host-path or native folder export would need a new endpoint contract and a decision on where the ZIP lands.
+ダウンロードは意図的にブラウザスコープである。Host パスやネイティブフォルダーへのエクスポートには、新しいエンドポイント契約と ZIP の着地点に関する決定が必要になる。
 
 </details>

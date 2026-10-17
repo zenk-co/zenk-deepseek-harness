@@ -1,14 +1,14 @@
-# Session References
+# セッション参照
 
-English | [中文](session-reference.zh.md)
+日本語 | [English](session-reference.en.md) | [中文](session-reference.zh.md)
 
-Host-backed file discovery plus structured cross-session reference requests and prepared message contexts. The [file-reference contract](../../packages/context/file-reference) owns path-only completion records and grammar; the [session-reference contract](../../packages/context/session-reference) defines canonical URIs, current-surface projection, tag-safe JSON and byte retention, stable errors, and the untrusted model prompt. Host adapters use these types instead of passing their UI mention syntax into the agent core.
+Host に裏打ちされたファイル発見に加え、構造化されたクロスセッション参照リクエストと準備済みメッセージコンテキストを提供する。[file-reference 契約](../../packages/context/file-reference)がパスのみの補完レコードと文法を所有し、[session-reference 契約](../../packages/context/session-reference)が正規 URI、現在サーフェスのプロジェクション、タグ安全な JSON とバイト保持、安定したエラー、信頼されないモデルプロンプトを定義する。Host アダプターは UI のメンション構文をエージェントコアに渡す代わりにこれらの型を使う。
 
-Sources: [`packages/context/file-reference/src/types.ts`](../../packages/context/file-reference/src/types.ts) · [`packages/context/session-reference/src/types.ts`](../../packages/context/session-reference/src/types.ts)
+ソース: [`packages/context/file-reference/src/types.ts`](../../packages/context/file-reference/src/types.ts) · [`packages/context/session-reference/src/types.ts`](../../packages/context/session-reference/src/types.ts)
 
-## File candidates
+## ファイル候補
 
-`FileReferenceCandidate` is the path-only discovery result. The addressed agent supplies the working-directory scope; providers decide ranking and namespace access without reading file contents.
+`FileReferenceCandidate` はパスのみの発見結果である。宛先のエージェントが作業ディレクトリのスコープを供給し、プロバイダーはファイル内容を読まずにランキングと名前空間アクセスを決める。
 
 ```ts type-equiv
 /** One path-only completion candidate inside the target session cwd. */
@@ -20,9 +20,9 @@ interface FileReferenceCandidate {
 }
 ```
 
-## Inputs and candidates
+## 入力と候補
 
-`SessionReferenceInput` is the host-independent selection. The id is authoritative; the label is display metadata carried into the snapshot.
+`SessionReferenceInput` はホスト非依存の選択である。id が権威であり、label はスナップショットに運ばれる表示メタデータである。
 
 ```ts type-equiv
 /** One source session selected by a host. */
@@ -34,7 +34,7 @@ interface SessionReferenceInput {
 }
 ```
 
-`SessionReferenceCandidate` is host-facing discovery output. Its `label` uses the latest Session title when present, while its optional display text prefers a subagent's durable creation label; filtering searches both alongside Session id and cwd, never transcript text. The Remote candidate's canonical mention uses the display text when present.
+`SessionReferenceCandidate` はホストに面する発見出力である。その `label` は存在する場合に最新の Session タイトルを使い、省略可能な表示テキストはサブエージェントの永続的な作成ラベルを優先する。フィルタリングは Session id と cwd とともに両方を検索し、トランスクリプトテキストは決して検索しない。Remote 候補の正規メンションは、存在する場合に表示テキストを使う。
 
 ```ts type-equiv
 /** One host-facing candidate from exact session metadata. */
@@ -58,7 +58,7 @@ interface SessionReferenceCandidate {
 }
 ```
 
-The `sessionReferenceResolver/candidates` Remote method serves the same discovery to browser consumers and attaches each candidate's canonical prompt mention.
+`sessionReferenceResolver/candidates` Remote メソッドは同じ発見をブラウザーコンシューマーに提供し、各候補の正規のプロンプトメンションを添付する。
 
 ```ts type-equiv
 /** One discovery candidate carrying its canonical prompt mention. */
@@ -68,9 +68,9 @@ interface SessionReferenceMentionCandidate extends SessionReferenceCandidate {
 }
 ```
 
-## Prepared messages
+## 準備済みメッセージ
 
-Preparation preserves readable current-message content and returns at most one aggregated context. Its durable source records keep `capturedThroughSeq` as a coordinate in the referenced Session's original generation; they never reinterpret it as a seq in the containing Session. `capturedFormatVersion` records that generation, with absence meaning released format v0.
+準備は読み取り可能な現在のメッセージ内容を保ち、最大 1 つの集約されたコンテキストを返す。その永続的なソースレコードは `capturedThroughSeq` を参照先 Session の元の世代における座標として保ち、包含する Session の seq として再解釈することは決してない。`capturedFormatVersion` はその世代を記録し、存在しない場合はリリース済み形式 v0 を意味する。
 
 ```ts type-equiv
 /** Durable source session, cited event seqs, and snapshot facts for prepared cross-session context. */
@@ -106,9 +106,9 @@ interface PreparedReferencedMessage {
 }
 ```
 
-## Errors
+## エラー
 
-`SessionReferenceError.code` separates invalid configuration or input, self-reference, count limits, source-read failure, budget failure, and cancellation. Host protocols map these codes to their own error envelopes without inspecting prompt bytes.
+`SessionReferenceError.code` は、無効な構成または入力、自己参照、件数上限、ソース読み取り失敗、バジェット失敗、キャンセルを区別する。Host プロトコルはプロンプトのバイトを検査せずにこれらのコードを自身のエラーエンベロープにマップする。
 
 ```ts type-equiv
 /** Stable failure codes exposed to host adapters. */
@@ -128,13 +128,13 @@ type SessionReferenceErrorCode =
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxfilereferences--filereferenceservice-abstract-seam"></a>
 
-### `ctx.fileReferences` — `FileReferenceService` (abstract seam)
+### `ctx.fileReferences` — `FileReferenceService` (抽象シーム)
 
-Host capability for cancellable file-reference discovery.
+キャンセル可能なファイル参照発見のための Host ケイパビリティ。
 
 ```ts cordis-catalog
 /**
@@ -147,15 +147,15 @@ Host capability for cancellable file-reference discovery.
 abstract list( agent: Agent, query: string, signal: AbortSignal, ): Promise<FileReferenceCandidate[]>
 ```
 
-Types: [Agent](core.md)
+型: [Agent](core.md)
 
-Source: [`packages/context/file-reference/src/index.ts`](../../packages/context/file-reference/src/index.ts)
+ソース: [`packages/context/file-reference/src/index.ts`](../../packages/context/file-reference/src/index.ts)
 
 <a id="ctxsessionfilereferences--sessionfilereferences"></a>
 
 ### `ctx.sessionFileReferences` — `SessionFileReferences`
 
-Host Remote adapter over the composed file-reference provider.
+構成された file-reference プロバイダーの上の Host Remote アダプター。
 
 ```ts cordis-catalog
 /**
@@ -168,15 +168,15 @@ Host Remote adapter over the composed file-reference provider.
 @Remote list( agent: Agent, query: string, signal: AbortSignal, ): Promise<FileReferenceCandidate[]>
 ```
 
-Types: [Agent](core.md)
+型: [Agent](core.md)
 
-Source: [`packages/api/session-controller/src/file-references.ts`](../../packages/api/session-controller/src/file-references.ts)
+ソース: [`packages/api/session-controller/src/file-references.ts`](../../packages/api/session-controller/src/file-references.ts)
 
 <a id="ctxsessionreferenceresolver--sessionreferenceresolver"></a>
 
 ### `ctx.sessionReferenceResolver` — `SessionReferenceResolver`
 
-Exact-read consumer that prepares immutable cross-session message context.
+不変のクロスセッションメッセージコンテキストを準備する exact-read コンシューマー。
 
 ```ts cordis-catalog
 /**
@@ -218,7 +218,7 @@ async listCandidates( agent: Agent, query: string = '', limit: number = this.con
 async prepare( agent: Agent, content: ContentBlock[], references: SessionReferenceInput[], signal?: AbortSignal, ): Promise<PreparedReferencedMessage>
 ```
 
-Types: [Agent](core.md) · [ContentBlock](llm-streaming.md)
+型: [Agent](core.md) · [ContentBlock](llm-streaming.md)
 
-Source: [`packages/context/session-reference/src/index.ts`](../../packages/context/session-reference/src/index.ts)
+ソース: [`packages/context/session-reference/src/index.ts`](../../packages/context/session-reference/src/index.ts)
 <!-- END GENERATED cordis-surface -->

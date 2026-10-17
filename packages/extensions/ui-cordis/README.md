@@ -1,126 +1,126 @@
 ---
-description: "Historical Cordis cards and controls for process-local runner definitions."
+description: "プロセスローカルな runner 定義に対する履歴 Cordis カードとコントロール。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-cordis
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-client-ui-cordis` renders historical generated-plugin cards and a control panel for process-local definitions. Users can operate definitions supplied by programmatic consumers; persisted cards remain readable after restart without recreating those definitions. New Creator plugins use Plugin Manager.
+`dsh-client-ui-cordis` は、プロセスローカルな定義に対する履歴の生成プラグインカードとコントロールパネルをレンダリングします。ユーザーは、プログラム的なコンシューマーが提供する定義を操作できます。永続化されたカードは、それらの定義を再作成することなく、再起動後も読める状態に保たれます。新しい Creator プラグインは Plugin Manager を使います。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と保留作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Compose this package with the Host and Client runners to render historical tool cards and operate programmatically registered definitions in the panel. New agent-authored plugins use Plugin Manager; this package exposes no model mutation tools.
+このパッケージを Host と Client の runner と共にコンポーズして、履歴のツールカードをレンダリングし、パネルでプログラム的に登録された定義を操作します。新しいエージェント作成プラグインは Plugin Manager を使います。このパッケージはモデル変更ツールを公開しません。
 
-### What the panel shows
+### パネルに表示されるもの
 
-A `sidebar.footer.action` seat shows a badge counting what runs plus what waits; opening it lists every definition with its run controls. The list is never filtered by session: the current session's rows group first, everyone else's stay listed below. Rows come from the host's current inventory and update whenever an announcement changes what exists. A pending run request whose definition the last read does not cover still gets a row, rendered from the request's own session, label, purpose, and identity. Each row shows two independent facts — what the host runs and what this page has loaded — and maps them onto the shared status marker: idle uses idle, client loading and an action in flight use ongoing, a running definition uses done, approval waits use warning, and failures use error. A reloaded page offers "load back into this page" before the global stop, while a host-only definition reads plainly running and offers the stop alone. The row also carries this page's last render failure inline, in the same place as a load failure: one is "it never loaded", the other "it loaded and then threw".
+`sidebar.footer.action` シートは、実行中と待機中の件数を数えるバッジを表示します。開くと、すべての定義とその実行コントロールが一覧表示されます。リストはセッションでフィルタリングされることはありません。現在のセッションの行が最初にグループ化され、他のすべてのものはその下に一覧のまま残ります。行はホストの現在のインベントリから取得され、アナウンスメントが存在するものを変更するたびに更新されます。最後の読み取りがカバーしていない定義を持つ保留中の実行要求にも行が付き、その要求自身のセッション、ラベル、目的、アイデンティティからレンダリングされます。各行は 2 つの独立した事実 — ホストが実行しているものと、このページがロードしたもの — を示し、それらを共有ステータスマーカーにマップします。アイドルは idle、クライアントのロード中と実行中のアクションは ongoing、実行中の定義は done、承認待ちは warning、失敗は error を使用します。リロードされたページはグローバル停止の前に「このページに読み戻す」を提供し、ホスト専用の定義は実行中とだけ表示され、停止のみを提供します。行はまた、このページの最後のレンダー失敗を、ロード失敗と同じ場所にインラインで表示します。一方は「決してロードされなかった」、他方は「ロードされた後に例外を投げた」です。
 
-### What the tool cards show
+### ツールカードに表示されるもの
 
-Preparing calls show their ordinary Cordis icon and title in one non-expandable row. This stage does not derive a package identity, read its live inventory, or mount its business view; those operations require the start/result props.
+準備中の呼び出しは、通常の Cordis アイコンとタイトルを 1 つの非展開行に表示します。この段階ではパッケージアイデンティティを導出せず、そのライブインベントリを読み取らず、そのビジネスビューをマウントしません。それらの操作には start/result プロパティが必要です。
 
-The `cordis_define` card is a record: the name and purpose the model wrote, the source it wrote, and whether the definition is running — no switch, no approval, and a pointer to the panel. The `cordis_run` card shows the mode, the plugin, package, and run ids, the outcome, and offers the package's own business view through the `tool.view.cordis` slot when the package registered one. Define, run, stop, and undefine cards retain their ordinary business glyph when they fail or are interrupted, including a correlated activation failure after a successful run receipt. All cards render from the recorded call and result, so replay shows the same card.
+`cordis_define` カードは記録です: モデルが書いた名前と目的、モデルが書いたソース、定義が実行中かどうか — スイッチも承認もなく、パネルへのポインターだけがあります。`cordis_run` カードは、モード、プラグイン・パッケージ・実行 ID、結果を表示し、パッケージが登録した場合は `tool.view.cordis` スロットを通じてそのパッケージ自身のビジネスビューを提供します。define、run、stop、undefine カードは、失敗または中断された場合でも通常のビジネスグリフを保ちます。これには、実行受領の成功後に相関するアクティベーション失敗が起きた場合も含まれます。すべてのカードは記録された呼び出しと結果からレンダリングされるため、リプレイでも同じカードが表示されます。
 
-### Boundaries to plan around
+### 計画すべき境界
 
-Definitions are process-local: a reloaded page holds nothing until someone runs a package again, and the panel re-reads the inventory on every announcement. Approvals are frame-wide by design, so a person in one tab can approve a run the model asked for while another tab shows the defining session; the first answer wins and the rest converge.
+定義はプロセスローカルです。リロードされたページは、誰かが再びパッケージを実行するまで何も保持せず、パネルはアナウンスメントごとにインベントリを再読み取りします。承認は設計上フレーム全体に及びます。そのため、あるタブの人がモデルが要求した実行を承認し、別のタブが定義元のセッションを表示している、ということが起こり得ます。最初の回答が勝ち、残りは収束します。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains the design behind the surfaces; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではサーフェス背後の設計を説明します。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱います。
 
-### Design philosophy
+### 設計哲学
 
-The surfaces are built on one rule: neither keeps run state in component state, because settling a define call moves its card in the chat flow and remounts it. Facts live in observables owned by whoever can close them — the browser runner owns open requests, orchestration outcomes, this page's live set and its render failures, while this package owns the inventory it read and the announcements it folded. The panel is global because a run request blocks the model and can name a definition belonging to a session nobody is looking at; an approval reachable only inside that session's transcript would be unreachable exactly when it blocks the model.
+サーフェスは 1 つのルールの上に構築されています。どちらも実行状態をコンポーネント状態に保持しません。define 呼び出しを確定するとカードがチャットフロー内で移動し、再マウントされるからです。事実は、それらを閉じることができる所有者が持つ observable に存在します — ブラウザ runner は開いている要求、オーケストレーション結果、このページのライブセットとそのレンダー失敗を所有し、このパッケージは自ら読み取ったインベントリと取り込んだアナウンスメントを所有します。パネルがグローバルなのは、実行要求がモデルをブロックし、誰も見ていないセッションに属する定義を名指すことがあるからです。そのセッションのトランスクリプト内でしか到達できない承認は、まさにモデルをブロックしているときに到達不能になってしまいます。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/client/index.ts`](src/client/index.ts) | Plugin entry: slot registrations and inventory wiring |
-| [`src/client/CordisPanel.tsx`](src/client/CordisPanel.tsx) | The frame-wide panel and its run controls |
-| [`src/client/CordisDefineRow.tsx`](src/client/CordisDefineRow.tsx) | The read-only `cordis_define` card |
-| [`src/client/CordisRunRow.tsx`](src/client/CordisRunRow.tsx) | The `cordis_run` card and its business-view seat |
-| [`src/client/CordisActionRow.tsx`](src/client/CordisActionRow.tsx) | The `cordis_stop` / `cordis_undefine` rows |
-| [`src/client/card-model.ts`](src/client/card-model.ts) | Replay-stable view models derived from frozen call/result slices |
-| [`src/client/inventory.ts`](src/client/inventory.ts) | The single-flight inventory read and its reconnect handling |
-| [`src/client/status.ts`](src/client/status.ts) | The visible status readings over inventory and the page's live set |
-| [`src/client/slots.ts`](src/client/slots.ts) | Injected faces and the package-owned `tool.view.cordis` slot declaration |
-| [`src/client/run-card-index.ts`](src/client/run-card-index.ts) | Per-session index of the latest eligible `cordis_run` card |
+| [`src/client/index.ts`](src/client/index.ts) | プラグインエントリー: スロット登録とインベントリの配線 |
+| [`src/client/CordisPanel.tsx`](src/client/CordisPanel.tsx) | フレーム全体のパネルとその実行コントロール |
+| [`src/client/CordisDefineRow.tsx`](src/client/CordisDefineRow.tsx) | 読み取り専用の `cordis_define` カード |
+| [`src/client/CordisRunRow.tsx`](src/client/CordisRunRow.tsx) | `cordis_run` カードとそのビジネスビューシート |
+| [`src/client/CordisActionRow.tsx`](src/client/CordisActionRow.tsx) | `cordis_stop` / `cordis_undefine` の行 |
+| [`src/client/card-model.ts`](src/client/card-model.ts) | 凍結された呼び出し/結果スライスから導出されるリプレイ安定なビューモデル |
+| [`src/client/inventory.ts`](src/client/inventory.ts) | single-flight のインベントリ読み取りとその再接続処理 |
+| [`src/client/status.ts`](src/client/status.ts) | インベントリとこのページのライブセットに対する可視ステータス表示 |
+| [`src/client/slots.ts`](src/client/slots.ts) | 注入されるフェイスと、パッケージ所有の `tool.view.cordis` スロット宣言 |
+| [`src/client/run-card-index.ts`](src/client/run-card-index.ts) | 最新の適格な `cordis_run` カードのセッション別インデックス |
 
-### How the panel stays current
+### パネルが最新に保たれる仕組み
 
-Announcements (`cordis/dynamic-package`, `cordis/dynamic-retract`, `cordis/request-run`, `cordis/request-run-resolved`) trigger an inventory re-read instead of a patch-in-place update, because they carry no labels and a definition can appear or disappear between them. Reads are single-flight so several announcements settling at once cannot multiply the call; a connection reset both discards the in-flight read and frees the slot for a fresh one, so a reconnect never publishes the old host's rows.
+アナウンスメント (`cordis/dynamic-package`、`cordis/dynamic-retract`、`cordis/request-run`、`cordis/request-run-resolved`) は、その場でのパッチ更新ではなくインベントリの再読み取りをトリガーします。それらはラベルを持たず、定義がそれらの間で現れたり消えたりし得るからです。読み取りは single-flight なので、同時に確定する複数のアナウンスメントが呼び出しを増殖させることはできません。接続リセットは進行中の読み取りを破棄し、新しい読み取りのためにスロットを解放するため、再接続が古いホストの行を公開することはありません。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the surfaces to the face they operate and the tools whose calls they render.
+パッケージレベルの契約では足りないときに、これらのページを読んでください。サーフェスから、それらが操作するフェイスと、その呼び出しをレンダリングするツールへと進みます。
 
-- [Client runner](../cordis-client-runner/README.md) — the browser face the panel reads and calls.
-- [Host runner](../cordis-host-runner/README.md) — the inventory and lifecycle verbs behind the panel.
-- [Tool package](../tool-cordis/README.md) — read-only runtime API discovery.
-- [Extensions subsystem](../../../docs/subsystems/extensions.md) — the generated `ctx.dynamicCordisRunner` API and forwarded `cordis/*` events.
-- [Slots subsystem](../../../docs/subsystems/slots.md) — how slot-registered browser UI is owned by its package.
+- [Client runner](../cordis-client-runner/README.md) — パネルが読み取り、呼び出すブラウザフェイス。
+- [Host runner](../cordis-host-runner/README.md) — パネル背後のインベントリとライフサイクル動詞。
+- [ツールパッケージ](../tool-cordis/README.md) — 読み取り専用のランタイム API ディスカバリー。
+- [extensions サブシステム](../../../docs/subsystems/extensions.md) — 生成された `ctx.dynamicCordisRunner` API と転送される `cordis/*` イベント。
+- [スロットサブシステム](../../../docs/subsystems/slots.md) — スロット登録されたブラウザ UI がどのようにそのパッケージに所有されるか。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the runner lifecycle actions that own session steering and permission outcomes; this package renders historical calls and results and adds no tools or prompt sections.
+間接的に、セッションステアリングと権限の結果を所有する runner ライフサイクルアクションを通じて。このパッケージは履歴の呼び出しと結果をレンダリングし、ツールやプロンプトセクションを追加しません。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None directly: this package owns rendering; runner-originated steering changes the session history.
+直接にはなし: このパッケージはレンダリングを所有し、runner 由来のステアリングがセッション履歴を変更します。
 
-## Known Limitations and Deferred Work
+## 既知の制限と保留作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the surfaces need special care. They are current package constraints, not a task backlog.
+これらの制限は、サーフェスが特別な注意を必要とする箇所を定義します。これらは現在のパッケージ制約であり、タスクバックログではありません。
 
-- **An open panel does not see registry changes that announce nothing** — programmatic `define` and inactive `undefine` can leave the current rows unchanged until the next inventory read. A run request triggers a read.
-- **A request-only row is answerable but not operable** — it offers approve and decline only, because the run and stop controls need the registry row the read has yet to deliver.
-- **A row can disappear for the width of one read** — the activity's orchestrating arm carries the session but deliberately no label, so an approved request whose registry read has not landed leaves no row until it does; in practice the read is triggered when the request arrives.
-- **Render failures are page-local and follow the load receipt** — the panel displays this page’s crash; the Host runner steers the owning session separately.
-- **A second page's load failure is invisible to the others** — the host settles a dispatch on the first load report, so a page whose browser half failed after another page acknowledged keeps reading as running on the other pages.
-- **Any page may answer any request** — approvals are frame-wide by design, so a person in one tab can approve a run the model asked for while another tab is in front of the defining session; narrowing who may answer is deferred.
-- **A card whose call head left the event window loses its labels** — the define card derives name and purpose from the call arguments, so a session long enough to truncate them leaves the card naming its call id; the panel is unaffected because the host inventory carries the labels.
+- **開いているパネルは何もアナウンスしないレジストリ変更を見ない** — プログラム的な `define` と非アクティブ時の `undefine` は、次のインベントリ読み取りまで現在の行を変えないことがあります。実行要求は読み取りをトリガーします。
+- **要求のみの行は回答可能だが操作不能** — 承認と拒否のみを提供します。実行と停止のコントロールには、読み取りがまだ配信していないレジストリ行が必要だからです。
+- **行は 1 回の読み取りの間だけ消えることがある** — アクティビティのオーケストレーションアームはセッションを運びますが、意図的にラベルを持ちません。そのため、承認された要求のレジストリ読み取りが着地していない場合、着地するまで行が残りません。実際には、要求が到着したときに読み取りがトリガーされます。
+- **レンダー失敗はページローカルで、ロード受領に従う** — パネルはこのページのクラッシュを表示します。Host runner は所有するセッションを別途ステアリングします。
+- **あるページのロード失敗は他のページには見えない** — ホストは最初のロードレポートでディスパッチを確定するため、別のページが確認応答した後にブラウザ側が失敗したページは、他のページでは実行中と読み取られ続けます。
+- **どのページも任意の要求に回答できる** — 承認は設計上フレーム全体に及ぶため、あるタブの人がモデルが要求した実行を承認し、別のタブが定義元のセッションの前にいることがあります。回答できる人を狭めることは保留されています。
+- **呼び出しヘッドがイベントウィンドウから外れたカードはラベルを失う** — define カードは名前と目的を呼び出し引数から導出するため、それらを切り捨てるほど長いセッションでは、カードは呼び出し ID を名指すだけになります。パネルは影響を受けません。ホストインベントリがラベルを運ぶからです。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

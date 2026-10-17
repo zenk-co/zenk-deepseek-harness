@@ -1,12 +1,12 @@
-# 4. Events
+# 4. イベント
 
-English | [中文](04-events.zh.md)
+日本語 | [English](04-events.en.md) | [中文](04-events.zh.md)
 
-Services support direct calls; **events** let a plugin announce something without knowing which plugins listen. The harness uses events for interactions such as tool results, model requests, and approval decisions.
+サービスは直接呼び出しを支える。**イベント**を使うと、プラグインはどのプラグインが聞いているかを知らずに何かを告知できる。ハーネスはツール結果、モデル要求、承認決定などの相互作用にイベントを使う。
 
-## Declare, emit, listen
+## 宣言、発行、受信
 
-Create `stats.ts` in `tmp/cordis-tutorial` — a service that counts things and announces each change:
+`tmp/cordis-tutorial` に `stats.ts` を作成する。物事を数えて各変更を告知するサービスである。
 
 ```ts
 import { Service, type Context } from '@deepseek-ai/cordis'
@@ -41,9 +41,9 @@ export function apply(ctx: Context) {
 }
 ```
 
-The `interface Events` merge is the event-system twin of the `interface Context` merge from chapter 3: it declares the event name and its listener signature, so `ctx.emit` and `ctx.on` are fully typed. The `namespace/action` naming convention keeps the flat event namespace readable.
+`interface Events` マージは第 3 章の `interface Context` マージのイベントシステム版である。イベント名とリスナーシグネチャを宣言するため、`ctx.emit` と `ctx.on` は完全に型付けされる。`namespace/action` 命名規則によりフラットなイベント名前空間は読みやすく保たれる。
 
-Create `reporter.ts`:
+`reporter.ts` を作成する。
 
 ```ts ignore-check
 import type { Context } from '@deepseek-ai/cordis'
@@ -62,7 +62,7 @@ export function apply(ctx: Context) {
 }
 ```
 
-The `import type {} from './stats.ts'` line imports nothing at runtime; it exists so TypeScript sees the declaration merges. Compose and run:
+`import type {} from './stats.ts'` 行は実行時には何もインポートしない。TypeScript が宣言マージを見るために存在する。構成して実行する。
 
 ```yaml
 - name: './stats.ts'
@@ -75,25 +75,25 @@ The `import type {} from './stats.ts'` line imports nothing at runtime; it exist
 [stats] prompt -> 1
 ```
 
-Because `ctx.on()` is an effect, the listener disappears with the plugin — no manual `removeListener` bookkeeping, ever.
+`ctx.on()` はエフェクトであるため、リスナーはプラグインと共に消える。手動の `removeListener` 記帳は一切不要である。
 
-## Dispatch modes
+## 配送モード
 
-`emit` is one of five dispatch modes. Which one an event uses is part of its contract — it decides whether listeners can return values, run concurrently, or short-circuit each other:
+`emit` は 5 つの配送モードの 1 つである。イベントがどれを使うかは契約の一部であり、リスナーが値を返せるか、並行実行できるか、互いに短絡できるかを決める。
 
-| Mode | Call | Semantics |
+| モード | 呼び出し | 意味 |
 |---|---|---|
-| emit | `ctx.emit(name, ...args)` | Synchronous broadcast; returned promises and values are not awaited or collected. |
-| parallel | `await ctx.parallel(name, ...args)` | All listeners run concurrently; awaited together. |
-| serial | `await ctx.serial(name, ...args)` | Listeners run in order, awaited; the first non-`null`/`false`/`undefined` return wins and stops the rest. |
-| bail | `ctx.bail(name, ...args)` | Synchronous version of serial. |
-| waterfall | `ctx.waterfall(name, ...args, next)` | Around-middleware; see below. |
+| emit | `ctx.emit(name, ...args)` | 同期ブロードキャスト。返された Promise と値は待機も収集もされない。 |
+| parallel | `await ctx.parallel(name, ...args)` | すべてのリスナーが並行実行される。一緒に待機される。 |
+| serial | `await ctx.serial(name, ...args)` | リスナーは順番に実行され、待機される。最初の非 `null`・`false`・`undefined` 戻り値が勝ち、残りを停止する。 |
+| bail | `ctx.bail(name, ...args)` | serial の同期版。 |
+| waterfall | `ctx.waterfall(name, ...args, next)` | Around ミドルウェア。以下参照。 |
 
-Every harness event documents its mode in the generated reference on its owning [subsystem page](../subsystems/core.md).
+すべてのハーネスイベントは、所有する[サブシステムページ](../subsystems/core.md)上の生成リファレンスにモードを文書化する。
 
-## Waterfall: transform or short-circuit
+## ウォーターフォール: 変換または短絡
 
-Waterfall is the mode that powers interception. Each listener receives the arguments plus a `next()` continuation; it can transform what `next()` returns, or return without calling `next()` and short-circuit the rest of the chain — what the Cordis docs call the veto. Create `waterfall-demo.ts`:
+ウォーターフォールはインターセプトを動かすモードである。各リスナーは引数に加えて `next()` 継続を受け取る。`next()` の戻り値を変換することも、`next()` を呼ばずに復帰してチェーンの残りを短絡することもできる。Cordis ドキュメントが veto と呼ぶものである。`waterfall-demo.ts` を作成する。
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -126,19 +126,19 @@ export function apply(ctx: Context) {
 }
 ```
 
-Point `cordis.yml` at just this file and run:
+`cordis.yml` をこのファイルだけに向けて実行する。
 
 ```
 HELLO
 ** BLOCKED **
 ```
 
-Walk through the second line: listener 1 runs first, calls `next()`, which invokes listener 2; listener 2 sees `blocked` and returns without calling `next()` — the innermost default (the function passed to `ctx.waterfall`) never runs — and listener 1 uppercases the replacement message on the way out.
+2 行目をたどる。リスナー 1 が先に実行され、`next()` を呼び、それがリスナー 2 を起動する。リスナー 2 は `blocked` を見て `next()` を呼ばずに復帰する。最も内側の既定値（`ctx.waterfall` に渡した関数）は決して実行されない。そしてリスナー 1 は復路で置換メッセージを大文字化する。
 
-The discipline that follows: **a waterfall listener that only observes or annotates must call `next()`**; returning without it is a deliberate short-circuit. Forgetting `next()` in a logging listener silently swallows the default behavior for everyone downstream. It is a standing rule of this repository ([waterfall semantics](../cordis-primer.md#cordis-waterfall-semantics)).
+従うべき規律はこうである。**観察や注釈だけを行う waterfall リスナーは `next()` を呼ばなければならない**。それなしに復帰することは意図的な短絡である。ログ記録リスナーで `next()` を忘れると、下流全員の既定動作を黙って飲み込んでしまう。これはこのリポジトリの常設規則である（[waterfall セマンティクス](../cordis-primer.md#cordis-waterfall-semantics)）。
 
-The harness uses waterfalls for decisions that cooperating plugins may wrap or answer: [`agent/request`](../subsystems/core.md#agentrequest--waterfall) lets a plugin replace the model-call config, and [`approval/request`](../subsystems/approval.md#approvalrequest--waterfall) lets a policy answer instead of the user.
+ハーネスは協調するプラグインがラップまたは回答し得る決定にウォーターフォールを使う。[`agent/request`](../subsystems/core.md#agentrequest--waterfall) はプラグインによるモデル呼び出し設定の置換を可能にし、[`approval/request`](../subsystems/approval.md#approvalrequest--waterfall) はユーザー代わりのポリシー回答を可能にする。
 
-Next: [Configuration](05-config.md) — plugin options from `cordis.yml`.
+次へ: [設定](05-config.md) — `cordis.yml` からのプラグインオプション。
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)

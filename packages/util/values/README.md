@@ -5,28 +5,28 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-util-values
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Callers can validate lossless JSON, read streamed arguments, detach a JSON snapshot, freeze a published value, compare JSON-compatible data, or terminate an unreachable branch without importing a capability package. Each streamed call uses its own `PartialArguments` reader; `PartialArguments.EMPTY` is a shared sealed view with no fields.
+呼び出し側はケイパビリティパッケージのインポートなしに、損失なし JSON の検証、ストリーム引数の読取、JSON スナップショットの分離、公開値の deep freeze、JSON 互換データの比較、到達不能分岐の終了ができます。各ストリーム呼び出しは独自の `PartialArguments` リーダーを使います。`PartialArguments.EMPTY` はフィールドなしの共有封印ビューです。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-### Validate or snapshot JSON data
+### JSON データの検証またはスナップショット
 
-Use `isJsonValue()` for a predicate and `snapshotJsonValue()` when the caller also needs a detached copy. Both accept only lossless JSON roots: `null`, booleans, finite numbers other than negative zero, strings, dense intrinsic arrays, and plain or null-prototype records with enumerable string keys. Cycles, sparse arrays, symbol or non-enumerable own properties, functions, and class instances are rejected.
+述語には `isJsonValue()` を使い、呼び出し側が分離コピーも必要な場合は `snapshotJsonValue()` を使います。両者は損失なし JSON ルートのみ受け付けます。`null`、真偽値、負ゼロ以外の有限数、文字列、密な組込み配列、列挙可能文字列キーを持つプレーンまたは null プロトタイプレコードです。循環、疎配列、シンボルまたは列挙不可 own プロパティー、関数、クラスインスタンスは拒否されます。
 
 ```ts
 import { isJsonValue, snapshotJsonValue, type JsonValue } from '@deepseek-ai/dsh-util-values'
@@ -37,33 +37,33 @@ if (!isJsonValue(input)) throw new TypeError('expected lossless JSON')
 const snapshot = snapshotJsonValue(input) as JsonValue
 ```
 
-### Read streamed arguments
+### ストリーム引数の読取
 
-`PartialArguments` reads a JSON object's top-level fields lazily. `append()` retains separate fragments without scanning or concatenating them. Readers index new key/value ranges, skipping unrequested contents; only requested strings are decoded or counted, and only requested complete non-string values are parsed. `complete()` reports a closing delimiter, not validated contents; `invalid` reports errors already discovered by indexing or content reads. It is not a substitute for tool-input validation.
+`PartialArguments` は JSON オブジェクトのトップレベルフィールドを遅延読取します。`append()` は断片を走査や結合なしに別々に保持します。リーダーは新しいキー/値範囲を索引付けし、未要求内容を飛ばします。要求文字列のみ復号または計数し、要求された完全な非文字列値のみ解析します。`complete()` は検証済み内容ではなく閉じ区切りを報告します。`invalid` は索引付けや内容読取で既に発見したエラーを報告します。ツール入力検証の代替ではありません。
 
-`refresh()` reports changes to previously observed answers at publication time; intervening reads do not acknowledge pending changes. It evaluates content before comparing completion, so decoding errors cannot suppress a completion update. String readers provide decoded text, bounded prefixes, and exact UTF-16 length, with optional step and offset for change detection. `settle(finalText)` compares fragments directly against the complete text: equal input seals the same view and retains its caches; missing or conflicting deltas produce a new sealed view. `fromText()` and `fromObject()` also create sealed views that reject appends. `isSealed` reads that append restriction without scanning or observing content; `closed()` also covers a closed outer object or failed indexing. See [the readers](src/partial-json.ts) for return distinctions.
+`refresh()` は公開時に prior 観測回答への変更を報告します。途中の読取は保留変更を確認しません。完了比較前に内容を評価するため、復号エラーが完了更新を抑制できません。文字列リーダーは復号テキスト、有界接頭辞、正確な UTF-16 長を提供し、変更検出向けに任意の step と offset を持ちます。`settle(finalText)` は断片を完全テキストと直接比較します。等価入力は同じビューを封印してキャッシュを保持します。欠落または競合デルタは新規封印ビューを生成します。`fromText()` と `fromObject()` も追記を拒否する封印ビューを作成します。`isSealed` は内容の走査や観測なしにその追記制限を読みます。`closed()` は閉じた外側オブジェクトや失敗索引付けも含みます。戻り値の区別は [the readers](src/partial-json.ts) を見てください。
 
-### Publish, compare, or retain keyed values
+### キー付き値の公開、比較、保持
 
-`deepFreeze(value)` freezes an object graph in place and returns the same value. It walks enumerable string-keyed children and deliberately leaves live `AbortSignal` objects mutable. `deepEqualJson(a, b)` compares JSON-compatible arrays and records structurally; callers must validate hostile or unconstrained values before comparison.
+`deepFreeze(value)` はオブジェクトグラフをその場で凍結し、同じ値を返します。列挙可能文字列キーの子をたどり、ライブ `AbortSignal` オブジェクトは意図的に可変のまま残します。`deepEqualJson(a, b)` は JSON 互換配列とレコードを構造比較します。呼び出し側は比較前に hostile または無制約値を検証しなければなりません。
 
-`WeakMapWithValues<Key, Value>` combines weak object-key lookup with a strongly retained, insertion-ordered `values` set. Each value belongs to one key. The owner must call `delete(key)` or `clear()` at the corresponding lifecycle boundary; the collection does not perform automatic cleanup.
+`WeakMapWithValues<Key, Value>` は弱いオブジェクトキー検索と強保持の挿入順 `values` 集合を組み合わせます。各値は 1 キーに属します。所有者は対応ライフサイクル境界で `delete(key)` または `clear()` を呼ばなければなりません。コレクションは自動クリーンアップしません。
 
-### Close a discriminated union
+### 判別共用体の閉鎖
 
-Use `assertNever(value, context?)` in the default branch of a closed discriminated union. A newly added variant then fails TypeScript compilation at every exhaustive switch, while a runtime value that escaped its declared type throws with the optional context label.
+閉じた判別共用体の default 分岐で `assertNever(value, context?)` を使います。新規バリアント追加はすべての網羅 switch で TypeScript コンパイル失敗となり、宣言型を逃れたランタイム値は任意のコンテキストラベル付きでスローします。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The JSON validator uses an explicit work stack and tracks only the active ancestor chain, so deeply nested values do not consume the JavaScript call stack and repeated non-cyclic references remain valid. Intrinsic arrays and plain objects are recognized across JavaScript realms using native constructor representations from the running engine. Snapshot writes use own data properties, including for names such as `__proto__`. Value operations derive their result only from their arguments; `WeakMapWithValues` stores only instance-owned associations.
+JSON 検証器は明示作業スタックを使い、有効祖先チェーンのみ追跡するため、深く入れ子の値は JavaScript 呼出しスタックを消費せず、繰返し非循環参照は有効のままです。組込み配列とプレーンオブジェクトは実行エンジンのネイティブコンストラクター表現で JavaScript レルムまたぎに認識されます。スナップショット書込みは `__proto__` のような名前も含め own データプロパティーを使います。値操作は引数のみから結果を導出します。`WeakMapWithValues` はインスタンス所有の関連のみ保存します。
 
-### Source map
+### ソースマップ
 
 | File | Role |
 |---|---|
@@ -83,16 +83,16 @@ The JSON validator uses an explicit work stack and tracks only the active ancest
 
 -----
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **`deepEqualJson` assumes JSON-compatible inputs** — it is not a general object comparator and does not define semantics for prototypes, symbols, accessors, cycles, maps, or sets.
-- **`deepFreeze` follows enumerable string-keyed children** — it does not turn arbitrary host objects into immutable data, and it intentionally skips live `AbortSignal` instances.
-- **`WeakMapWithValues` requires explicit cleanup and unique values** — values remain strongly held until their owning key is deleted or the collection is cleared, and one value must not be shared by several keys.
+- **`deepEqualJson` assumes JSON-compatible inputs** — 一般オブジェクト比較子ではなく、プロトタイプ、シンボル、アクセサー、循環、マップ、集合の意味は定めません。
+- **`deepFreeze` follows enumerable string-keyed children** — 任意ホストオブジェクトを不変データ化せず、ライブ `AbortSignal` インスタンスを意図的に飛ばします。
+- **`WeakMapWithValues` requires explicit cleanup and unique values** — 所有キーの削除またはコレクションクリアまで値は強保持され、1 値を複数キーで共有してはなりません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

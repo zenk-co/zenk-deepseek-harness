@@ -1,37 +1,36 @@
 ---
-description: "Local-workspace @file completion provider for users and maintainers enabling, sizing, or debugging ctx.fileReferences discovery."
+description: "ctx.fileReferences 検出の有効化・サイズ調整・デバッグを行うユーザーとメンテナー向けのローカルワークスペース @file 補完プロバイダー。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-file-reference-local
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Agents and host UIs can complete `@file` mentions with ranked paths from each agent's local workspace, with bounded discovery that stays responsive in large repositories. Results refresh after tool activity without blocking completion, and directory symlinks are never followed. When `read` is available, the model also receives stable guidance for interpreting referenced paths. Choose this package when `read` uses the Harness host filesystem; remote or virtual namespaces need matching discovery.
+エージェントと host UI は、各エージェントのローカルワークスペースからの順位付きパスで `@file` 言及を補完できる。大規模リポジトリでも応答性を保つ境界付き検出であり、結果はツール活動後に更新されて補完を阻まず、ディレクトリ symlink を決してたどらない。`read` が利用可能な場合、モデルは参照パス解釈のための安定ガイダンスも受け取る。`read` が Harness host ファイルシステムを使う場合に、このパッケージを選ぶ。リモートや仮想名前空間には一致する検出が必要である。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Changing the Session's working directory discards the previous directory's search index; the next completion searches the new directory.
+セッションの作業ディレクトリ変更は前ディレクトリの検索索引を破棄する。次の補完は新ディレクトリを検索する。
+`@file` 補完が Harness host 自身のファイルシステムを検出すべき場合に、このプロバイダーをマウントする。出荷済み `read` ツールが操作する名前空間である。各エージェントのワークスペースはそのセッションの現作業ディレクトリ起点で索引付けされる。
 
-Mount this provider when `@file` completion should discover the Harness host's own filesystem — the namespace the shipped `read` tool operates on. Each agent's workspace is indexed from its Session's current working directory.
+### プロバイダーの有効化
 
-### Enabling the provider
-
-The defaults suit a typical workspace, so the minimal mount needs no configuration:
+既定値は典型ワークスペースに適するため、最小マウントに構成は不要である。
 
 ```yaml
 - name: '@deepseek-ai/dsh-file-reference-local'
@@ -39,102 +38,102 @@ The defaults suit a typical workspace, so the minimal mount needs no configurati
     maxResults: 20
 ```
 
-### What you get
+### 得られるもの
 
-Typing `@` in a host UI returns up to `maxResults` ranked path candidates for the addressed agent. A query containing `/` lists the matching directory's entries directly; a bare query fuzzy-ranks the bounded recursive index. Directory candidates keep the mention open with a trailing slash. After any tool result the agent's index is marked stale: the next query still answers from it and its replacement builds in the background, so a rebuild never sits in front of the caret.
+host UI で `@` を打つと、対象エージェント向けに最大 `maxResults` 件の順位付きパス候補が返る。`/` を含むクエリーは一致ディレクトリのエントリを直接列挙し、素のクエリーは境界付き再帰索引をファジー順位付けする。ディレクトリ候補は末尾スラッシュ付きで言及を開いたままにする。ツール結果の後はいずれもエージェントの索引が古いと印付けられる。次のクエリーは依然としてそれから答え、置換はバックグラウンドで構築されるため、再構築がキャレットの前に座ることはない。
 
-### Configuration
+### 構成
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `maxResults` | `20` | Maximum ranked candidates returned for one query |
-| `maxEntries` | `50000` | Maximum files and directories indexed per agent workspace |
-| `excludedDirectories` | `['.git', 'node_modules', 'dist', 'build', 'out', 'coverage', 'target', '.next', '.nuxt', '.turbo', '.venv', '__pycache__', '.pytest_cache', '.mypy_cache', '.gradle']` | Directory basenames omitted from traversal and candidates |
+| `maxResults` | `20` | 1 クエリーに返す最大順位付き候補数 |
+| `maxEntries` | `50000` | エージェントワークスペースごとに索引付ける最大ファイル・ディレクトリ数 |
+| `excludedDirectories` | `['.git', 'node_modules', 'dist', 'build', 'out', 'coverage', 'target', '.next', '.nuxt', '.turbo', '.venv', '__pycache__', '.pytest_cache', '.mypy_cache', '.gradle']` | 走査と候補から省くディレクトリ基底名 |
 
-Every numeric value must be a positive safe integer, and every excluded name must be a non-empty basename without `/` or `\`.
+すべての数値は正の安全整数でなければならず、除外名はすべて `/` や `\` を含まない空でない基底名でなければならない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design of the provider; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションではプロバイダーの設計を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design concept
+### 設計概念
 
-The provider maintains one reusable `WorkspaceFileSearch` per agent, rooted at that session's `cwd`. Directory-scoped queries (`a/b/...`) list live directory state, while bare fuzzy queries share one bounded recursive traversal. Only a workspace's first bare query waits for that traversal; a `tool/result` event marks the settled entries stale, and the next bare query serves them while the replacement builds. The model guidance is a per-agent prompt section contributed only while the addressed agent has a `read` tool; creation awaits prompt installation and rolls back on failure; agent disposal releases both the index and the prompt fiber.
+プロバイダーはエージェントごとに再利用可能 `WorkspaceFileSearch` を 1 件維持し、そのセッションの `cwd` を根とする。ディレクトリスコープクエリー（`a/b/...`）はライブディレクトリ状態を列挙し、素のファジークエリーは 1 つの境界付き再帰走査を共有する。走査を待つのはワークスペースの最初の素クエリーだけである。`tool/result` イベントは決着済みエントリを古いと印付け、次の素クエリーはそれらに仕えながら置換を構築する。モデルガイダンスは、対象エージェントが `read` ツールを持つ間のみ寄与されるエージェントごとのプロンプト節である。生成はプロンプト導入を待ち、失敗時はロールバックし、エージェント破棄は索引とプロンプトファイバーの両方を解放する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `LocalFileReferenceService`: config validation, per-agent searches, prompt install |
-| [`src/search.ts`](src/search.ts) | `WorkspaceFileSearch`: traversal, ranking, exclusion, staleness and background rebuild |
+| [`src/index.ts`](src/index.ts) | `LocalFileReferenceService`: 構成検証、エージェントごと検索、プロンプト導入 |
+| [`src/search.ts`](src/search.ts) | `WorkspaceFileSearch`: 走査、順位付け、除外、古さとバックグラウンド再構築 |
 
-### Main flow
+### 主な流れ
 
-A `list(agent, query, signal)` call either lists one directory's entries or reads the shared bounded index, ranks the candidates (exact, prefix, substring, then subsequence scores with directory bonuses), and returns at most `maxResults` in deterministic order. `tool/result` events mark the addressed agent's index stale so a later bare query observes a fresh tree. An unreadable or excluded subtree contributes no candidates, while an unreadable root fails its traversal instead: a transient failure must not replace still-good entries with an empty index.
+`list(agent, query, signal)` 呼び出しは 1 ディレクトリのエントリを列挙するか、共有境界付き索引を読み、候補を順位付けし（完全・接頭辞・部分文字列・次に部分列スコアとディレクトリボーナス）、確定的順序で最大 `maxResults` 件返す。`tool/result` イベントは対象エージェントの索引を古いと印付け、後の素クエリーが新しいツリーを観察する。読めないまたは除外サブツリーは候補を寄与せず、読めないルートは走査を失敗させる。一時的失敗が良好な既存エントリを空索引で置換してはならない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the seam this provider implements to the tools its candidates point at.
+パッケージレベルの契約では足りないときに、これらのページを読む。このプロバイダーが実装するシームから、その候補が指すツールへと進む。
 
-- [File-reference seam](../file-reference/README.md) — the service contract and `@file` grammar this provider implements.
-- [Session-reference subsystem](../../../docs/subsystems/session-reference.md) — the shared file-reference contract behind host UIs.
-- [Filesystem tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-fs) — the `read` tool whose namespace discovery must match.
-- [Context group map](../README.md) — sibling request-context packages.
+- [ファイル参照シーム](../file-reference/README.md) — このプロバイダーが実装するサービス契約と `@file` 文法。
+- [セッション参照サブシステム](../../../docs/subsystems/session-reference.md) — host UI 背後の共有ファイル参照契約。
+- [ファイルシステムツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-fs) — 検出が一致しなければならない `read` ツールの名前空間。
+- [Context グループマップ](../README.md) — 兄弟リクエストコンテキストパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### File-reference guidance when read is available
+### read 利用可能時のファイル参照ガイダンス
 
-#### What the model sees
+#### モデルが見るもの
 
-When the addressed agent has an effective `read` tool, the provider contributes this stable system-prompt section:
+対象エージェントが実効 `read` ツールを持つ場合、プロバイダーはこの安定したシステムプロンプト節を寄与する。
 
-##### File-reference instruction
+##### ファイル参照指示
 
 ```markdown
 Tokens prefixed with @ are paths the user explicitly referenced. Relative paths resolve from the workspace root; absolute paths identify files or directories on the host. A trailing slash marks a directory: list it when its contents matter. Anything else is a file: use the read tool when its contents are needed, and do not claim to have inspected it before reading. @"..." quotes a path containing spaces.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Conditional and fixed: the one sentence is present while `read` is visible to the addressed agent; candidate lookup itself adds no tokens, and a selected path contributes only its ordinary user-message characters.
+条件付きかつ固定である。1 文は対象エージェントに `read` が可視の間存在する。候補検索自体はトークンを追加せず、選択パスは通常のユーザーメッセージ文字のみ寄与する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The stable sentence joins the system-prompt prefix. Mounting or removing this provider, or changing whether `read` is visible, changes that prefix; queries, candidates, and index staleness do not.
+安定した文はシステムプロンプトプレフィックスに加わる。このプロバイダーのマウント・除去や `read` 可視の変更はそのプレフィックスを変える。クエリー・候補・索引の古さは変えない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the provider is a poor fit. They are current package constraints.
+プロバイダーが不向きな場合を定める。これらは現在のパッケージ制約である。
 
-- **Host-local namespace** — the provider scans the Harness host filesystem, so remote or virtual `read` implementations require a provider whose namespace matches the tool.
-- **Bounded advisory index** — very large workspaces may omit paths after `maxEntries`, and excluded or unreadable directories do not appear. The default exclusions name only build outputs no ecosystem also uses for sources; `lib` is deliberately absent, so a workspace that builds into it adds that name through `excludedDirectories`.
-- **One invalidation of staleness** — a bare query answered right after a tool result reflects the tree as of the previous traversal; the following query sees the rebuild.
-- **No ignore-file semantics** — `.gitignore` and other project ignore files do not influence discovery; only configured directory basenames are excluded.
+- **Host ローカル名前空間** — プロバイダーは Harness host ファイルシステムを走査するため、リモートや仮想 `read` 実装には名前空間が一致するプロバイダーが必要である。
+- **境界付き助言索引** — 非常に大きなワークスペースは `maxEntries` 後にパスを省くことがあり、除外または読めないディレクトリは現れない。既定除外はエコシステムがソースにも使うビルド出力だけを名指しし、`lib` は意図的に含まれない。そこへビルドするワークスペースは `excludedDirectories` 経由でその名前を追加する。
+- **古さの 1 回の無効化** — ツール結果直後の素クエリーは前回走査時点のツリーを反映し、次のクエリーは再構築を見る。
+- **ignore ファイル意味なし** — `.gitignore` や他のプロジェクト ignore ファイルは検出に影響せず、構成済みディレクトリ基底名のみ除外される。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

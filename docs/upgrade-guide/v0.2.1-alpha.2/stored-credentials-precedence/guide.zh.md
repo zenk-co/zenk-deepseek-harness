@@ -5,7 +5,7 @@ description: "挂载存储时，已保存凭据现在优先于环境后备；随
 
 # 存储的密钥优先于导出的变量
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

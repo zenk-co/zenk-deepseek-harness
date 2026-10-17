@@ -1,120 +1,120 @@
 ---
-description: "Right-Sidebar browser tabs for sandboxed HTTP(S) pages, including loopback services."
+description: "サンドボックス化された HTTP(S) ページ（ループバックサービスを含む）の右サイドバータブ。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-sidebar-browser
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Browse HTTP(S) pages, including loopback services, inside independent right-Sidebar tabs. Web uses an iframe with application-managed history; Desktop uses Electron `<webview>` with native navigation history and retained pages. The package never injects Electron or Node access into visited content.
+サンドボックス化された HTTP(S) ページ（ループバックサービスを含む）を、独立した右サイドバータブ内で閲覧します。Web はアプリケーション管理の履歴を持つ iframe を使用し、Desktop はネイティブのナビゲーション履歴と保持されたページを持つ Electron `<webview>` を使用します。このパッケージは訪問したコンテンツに Electron や Node へのアクセスを決して注入しません。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送りされた作業](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Browser is disabled by default in Web profiles and enabled on Desktop. Enable the shipped entry through the Web profile patch to use it. Open **Browser** from the right-Sidebar guide and enter an HTTP(S) URL. Chat HTTP(S) links open here when the [link preference](../ui-chat/README.md) selects **In-App Sidebar**. A host name without a scheme becomes HTTPS. Public and loopback targets use the same default sandbox. Each guide action or delegated message-link activation creates another Browser tab.
+Browser は Web プロファイルではデフォルトで無効、Desktop では有効です。Web プロファイルパッチを通じて出荷されるエントリーを有効にして使用します。右サイドバーのガイドから **Browser** を開き、HTTP(S) URL を入力します。チャットの HTTP(S) リンクは、[リンク設定](../ui-chat/README.md) が **In-App Sidebar** を選択している場合ここで開きます。スキームのないホスト名は HTTPS になります。パブリックとループバックのターゲットは同じデフォルトサンドボックスを使用します。各ガイドアクションまたは委譲されたメッセージリンクのアクティベーションが、別の Browser タブを作成します。
 
-### When to choose it
+### いつ選択するか
 
-Choose Browser for a Web page that should remain beside the current Session. Choose [Document Preview](../ui-sidebar-documentpreview/README.md) for local files, and use the explicit external-browser action when a site refuses iframe embedding or needs browser capabilities this package withholds.
+現在のセッションのそばに残すべき Web ページには Browser を選びます。ローカルファイルには [ドキュメントプレビュー](../ui-sidebar-documentpreview/README.md) を選び、サイトが iframe 埋め込みを拒否する場合や、このパッケージが保留するブラウザ機能を必要とする場合は明示的な外部ブラウザアクションを使用します。
 
-### Minimal configuration
+### 最小構成
 
-The package has no plugin configuration. A Web profile enables the shipped entry through its profile patch:
+このパッケージにはプラグイン設定がありません。Web プロファイルはプロファイルパッチを通じて出荷されるエントリーを有効にします:
 
 ```yaml
 - id: ui-sidebar-browser
   disabled: false
 ```
 
-Client plugins can open a tab through `ctx.sidebarRight.openTab('browser', { params: { url } })`. The optional URL passes the same validation as address-bar input before navigation.
+クライアントプラグインは `ctx.sidebarRight.openTab('browser', { params: { url } })` を通じてタブを開けます。任意の URL はナビゲーション前にアドレスバー入力と同じ検証を受けます。
 
-The `browser.new` command opens a separate Browser page in the focused dock pane, replacing a guide and retaining existing content pages. From the conversation or a floating content page, it uses the active dock pane. Desktop defaults to Cmd+T on macOS and Ctrl+T on Windows; Windows and macOS Web use the [shortcut service’s platform defaults](../shortcuts/README.md); Linux Web leaves the command unbound. The guide button uses a blue globe and displays the effective shortcut inline without a duplicate tooltip.
+`browser.new` コマンドは、フォーカスされたドックペインに別の Browser ページを開き、ガイドを置き換えて既存のコンテンツページを保持します。会話またはフローティングコンテンツページからは、アクティブなドックペインを使用します。Desktop は macOS では Cmd+T、Windows では Ctrl+T がデフォルトです。Windows と macOS の Web は [ショートカットサービスのプラットフォームデフォルト](../shortcuts/README.md) を使用し、Linux Web ではコマンドは未バインドのままです。ガイドボタンは青い地球アイコンを使用し、重複ツールチップなしで有効なショートカットをインライン表示します。
 
-The toolbar provides Back, Forward, Reload, Go, and Open in system browser. Web also offers a per-tab sandbox toggle; disabling it is temporary and displays an amber warning with neutral text. Desktop shows the observed page title. After a restart, Browser shows the saved title and URL; Restore or Reload opens that address only when requested.
+ツールバーは Back、Forward、Reload、Go、Open in system browser を提供します。Web はタブごとのサンドボックストグルも提供します。無効化は一時的で、中立のテキストとともに琥珀色の警告を表示します。Desktop は観測されたページタイトルを表示します。再起動後、Browser は保存されたタイトルと URL を表示します。Restore または Reload は要求されたときにのみそのアドレスを開きます。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-### Protocol policy
+### プロトコルポリシー
 
-The address parser accepts HTTP and HTTPS, including loopback targets. It rejects `file:` URLs, script/data/blob input, embedded credentials, the DSH application origin, and malformed addresses. Document Preview owns local-file rendering.
+アドレスパーサーは HTTP と HTTPS（ループバックターゲットを含む）を受け付けます。`file:` URL、script/data/blob 入力、埋め込み認証情報、DSH アプリケーションオリジン、不正なアドレスを拒否します。ローカルファイルのレンダリングはドキュメントプレビューが所有します。
 
-### Iframe carrier
+### iframe キャリア
 
-Web uses `sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"` by default. The frame has no direct download or top-navigation flag. Popups leave the sandbox; in Web, an escaped popup retains its opener and can navigate the top-level application. The visited origin can use its own cookies and Web storage but a cross-origin target cannot read DSH DOM, storage, or API responses. The iframe sends no referrer and adds no package-owned Permissions Policy, so browser defaults and user grants apply. The toolbar can remove the sandbox for the current tab occurrence; the choice is not persisted. An unsandboxed page can navigate the top-level application under browser activation rules and use downloads, modal dialogs, and input locks. The package does not proxy or probe remote pages.
+Web はデフォルトで `sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"` を使用します。フレームには直接ダウンロードやトップナビゲーションのフラグはありません。ポップアップはサンドボックスを離れます。Web では、エスケープしたポップアップが opener を保持し、トップレベルのアプリケーションをナビゲートできます。訪問したオリジンは自身の Cookie と Web ストレージを使用できますが、クロスオリジンのターゲットは DSH の DOM、ストレージ、API 応答を読み取れません。iframe はリファラーを送信せず、パッケージ所有の Permissions Policy を追加しないため、ブラウザのデフォルトとユーザーの許可が適用されます。ツールバーは現在のタブ出現に対してサンドボックスを除去できます。この選択は永続化されません。サンドボックス化されていないページは、ブラウザのアクティベーションルールの下でトップレベルのアプリケーションをナビゲートでき、ダウンロード、モーダルダイアログ、入力ロックを使用できます。このパッケージはリモートページをプロキシせず、プローブしません。
 
-Web records toolbar submissions and typed tab opens. A navigation state machine treats the first iframe load for each controlled revision as known and a later load as proof that the page changed to an unreadable URL. In that unknown state the address is marked, Back, Forward, and external-open are disabled, and Reload returns to the last controlled URL. A remounted body reloads the latest application-known URL and uses its optional initial URL only before the first controlled target. History API and fragment changes that emit no iframe load remain invisible. An iframe `error` event displays a transient load-failure notice until the next controlled load without changing URL history.
+Web はツールバーの送信とタイプされたタブオープンを記録します。ナビゲーション状態機械は、各制御されたリビジョンの最初の iframe ロードを既知とみなし、後のロードをページが読み取り不能な URL に変わった証拠とみなします。その未知の状態ではアドレスがマークされ、Back、Forward、外部オープンが無効化され、Reload は最後の制御された URL に戻ります。再マウントされたボディは最新のアプリケーション既知の URL を再ロードし、その任意の初期 URL は最初の制御されたターゲットの前にのみ使用します。iframe ロードを発行しない History API とフラグメントの変更は不可視のままです。iframe の `error` イベントは、URL 履歴を変えずに次の制御されたロードまで一時的なロード失敗通知を表示します。
 
-### Controller
+### コントローラー
 
-Each tab's `BrowserController` owns address validation, commands and explicit restoration. `BrowserFrame` supplies carrier-neutral navigation state; `IframeImpl` uses `BrowserNavigation`, while `ElectronWebViewImpl` observes Chromium history. `BrowserPresentation` owns physical DOM attachment. Slot injection supplies `useBrowserState` and plain callbacks, keeping provider objects and observables out of the React body.
+各タブの `BrowserController` がアドレス検証、コマンド、明示的な復元を所有します。`BrowserFrame` はキャリア中立のナビゲーション状態を供給し、`IframeImpl` は `BrowserNavigation` を、`ElectronWebViewImpl` は Chromium 履歴を観測します。`BrowserPresentation` が物理 DOM のアタッチを所有します。スロット注入が `useBrowserState` とプレーンコールバックを供給し、プロバイダーオブジェクトと observable を React ボディから遠ざけます。
 
-Desktop's main process approves guest leases and enforces attachment, navigation and permission policy. Preload exposes only scoped Browser operations. Shared declarations use the standard `/types` export with `import type`; the Host and Client compile through separate tsconfig files. Desktop Browser tabs declare `keepMounted`, so Sidebar preserves their DOM across tab changes, Session switches, collapse and floating.
+Desktop のメインプロセスはゲストリースを承認し、アタッチメント、ナビゲーション、権限ポリシーを強制します。Preload はスコープされた Browser 操作のみを公開します。共有宣言は標準の `/types` エクスポートと `import type` を使用し、Host と Client は別々の tsconfig ファイルでコンパイルします。Desktop の Browser タブは `keepMounted` を宣言するため、サイドバーはタブ変更、セッション切り替え、折りたたみ、フローティングをまたいでその DOM を保持します。
 
-The page refresh shortcut calls the same reload operation as the toolbar. Its tooltip and ARIA key combination follow the effective binding. Desktop routes accepted shortcuts from an approved guest through its owning window; the focused webview must still carry that guest’s lease. Web leaves browser-reserved combinations unchanged.
+ページリフレッシュショートカットはツールバーと同じ再ロード操作を呼び出します。そのツールチップと ARIA キーの組み合わせは有効なバインディングに従います。Desktop は承認されたゲストからの受け入れられたショートカットを所有ウィンドウ経由でルーティングします。フォーカスされた webview は依然としてそのゲストのリースを運ぶ必要があります。Web はブラウザ予約の組み合わせを変更しません。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Right Sidebar](../../../docs/subsystems/sidebar-right.md) — tab composition, navigation, and lifecycle.
-- [Document Preview](../ui-sidebar-documentpreview/README.md) — local source, Markdown, images, HTML, and PDF rendering.
-- [Sidebar Browser decision](../../../.agents/notes/implemented/feature/2026-09-16-sidebar-browser.md) — iframe behavior and controller ownership.
-- [Desktop Browser decision](../../../.agents/notes/implemented/feature/2026-09-20-desktop-browser-webview.md) — webview leases, CWD storage grouping and manual restoration.
+- [右サイドバー](../../../docs/subsystems/sidebar-right.md) — タブ構成、ナビゲーション、ライフサイクル。
+- [ドキュメントプレビュー](../ui-sidebar-documentpreview/README.md) — ローカルソース、Markdown、画像、HTML、PDF のレンダリング。
+- [Sidebar Browser の決定](../../../.agents/notes/implemented/feature/2026-09-16-sidebar-browser.md) — iframe の動作とコントローラーの所有権。
+- [Desktop Browser の決定](../../../.agents/notes/implemented/feature/2026-09-20-desktop-browser-webview.md) — webview リース、CWD ストレージグルーピング、手動復元。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as Browser tabs are user-facing presentation state and register no tool, prompt section, or Session event.
+なし。Browser タブはユーザー向けプレゼンテーション状態であり、ツール、プロンプトセクション、セッションイベントを登録しません。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; browsing does not enter a model request.
+なし。ブラウジングはモデルリクエストに入りません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送りされた作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-The isolation policy deliberately gives up some browser compatibility:
+隔離ポリシーは意図的に一部のブラウザ互換性を放棄しています:
 
-- Many sites refuse iframe embedding or need downloads or top-level navigation withheld from the frame by the default sandbox. An HTTPS application can also block public HTTP pages as mixed content. Disabling the sandbox trades its restrictions for compatibility but does not bypass mixed-content or private-network policy. The unsandboxed frame can navigate the top-level application under browser activation rules and use downloads, modal dialogs, and input locks. It does not isolate the visited origin's cookies per Browser tab or prevent an in-frame page from choosing its own next URL.
-- In Web, a popup that escapes the sandbox retains its opener and can use that chain to navigate the top-level application. Desktop handles popup creation separately.
-- A later iframe load reveals that navigation occurred but not the new cross-origin URL. History API and fragment changes may remain invisible; Web Back and Forward are unavailable after the state becomes unknown.
-- Browsers conceal many iframe failures for security: DNS, TLS, mixed-content, CSP, and `X-Frame-Options` failures may emit `load` or no actionable event instead of `error`. The load-failure notice is best-effort.
-- Saved title and URL survive reloads and plugin unload while the tab remains in Sidebar's layout. Closing the tab removes its checkpoint. Restart restoration does not recover page memory, unsaved forms or Chromium's history stack.
-- Local files are rejected and remain owned by Document Preview.
-- Desktop shares process-local storage partitions by canonical workspace CWD; Sessions without a resolved Workspace are isolated separately. Cookies and Web storage do not survive application restart. Guest permissions, downloads and native popups are denied; approved HTTP(S) popup requests open Sidebar tabs. Host-address filtering is not a general private-network or DNS-rebinding firewall.
+- 多くのサイトは iframe 埋め込みを拒否するか、デフォルトサンドボックスによってフレームから保留されるダウンロードやトップレベルナビゲーションを必要とします。HTTPS アプリケーションはパブリック HTTP ページを混合コンテンツとしてブロックすることもあります。サンドボックスの無効化はその制限を互換性と引き換えますが、混合コンテンツやプライベートネットワークポリシーをバイパスしません。サンドボックス化されていないフレームは、ブラウザのアクティベーションルールの下でトップレベルのアプリケーションをナビゲートでき、ダウンロード、モーダルダイアログ、入力ロックを使用できます。訪問したオリジンの Cookie を Browser タブごとに隔離したり、フレーム内ページが自身の次の URL を選ぶことを防いだりしません。
+- Web では、サンドボックスをエスケープしたポップアップが opener を保持し、その連鎖を使ってトップレベルのアプリケーションをナビゲートできます。Desktop はポップアップ作成を別途処理します。
+- 後の iframe ロードはナビゲーションが発生したことを明かしますが、新しいクロスオリジン URL は明かしません。History API とフラグメントの変更は不可視のままになることがあります。状態が未知になった後、Web の Back と Forward は利用できません。
+- ブラウザはセキュリティのため多くの iframe 失敗を隠します。DNS、TLS、混合コンテンツ、CSP、`X-Frame-Options` の失敗は `error` ではなく `load` または実行可能なイベントなしを発行することがあります。ロード失敗通知はベストエフォートです。
+- 保存されたタイトルと URL は、タブがサイドバーのレイアウトに残る間、リロードとプラグインアンロードをまたいで存続します。タブを閉じるとそのチェックポイントが削除されます。再起動時の復元はページメモリ、未保存のフォーム、Chromium の履歴スタックを回復しません。
+- ローカルファイルは拒否され、ドキュメントプレビューが所有したままです。
+- Desktop はプロセスローカルのストレージパーティションを正規のワークスペース CWD で共有します。解決されたワークスペースのないセッションは別々に隔離されます。Cookie と Web ストレージはアプリケーション再起動をまたいで存続しません。ゲスト権限、ダウンロード、ネイティブポップアップは拒否されます。承認された HTTP(S) ポップアップリクエストはサイドバータブを開きます。ホストアドレスフィルタリングは汎用のプライベートネットワークや DNS リバインディングファイアウォールではありません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

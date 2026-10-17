@@ -8,4 +8,4 @@ head:
 
 # DeepSeek Harness
 
-English | [中文](index.zh.md)
+日本語 | [English](index.en.md) | [中文](index.zh.md)

@@ -1,45 +1,45 @@
 ---
-description: "The model-facing goal tools for users and maintainers choosing, composing, or debugging get_goal, create_goal, and update_goal."
+description: "get_goal、create_goal、update_goal を選択・構成・デバッグするユーザーとメンテナー向けの、モデル向け目標ツール。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-goal
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-tool-goal` lets a model read persisted goals and infer and create a long-running goal from a direct human request. Creating, editing, pausing, or resuming requires that direct request in a top-level agent turn; completing or blocking also works in an autonomous goal round. Updates require the exact goal id and revision returned by a prior read. `resume` rearms active-but-disarmed or blocked goals, while users resume durable paused goals through Web or `/goal resume`. Autonomous blocking requires the same condition for a configurable threshold of three consecutive rounds by default.
+`dsh-tool-goal` は、モデルが永続化された目標を読み取り、人間の直接のリクエストから長期実行される目標を推論して作成できるようにする。作成、編集、一時停止、再開には、トップレベルエージェントのターン内でのその直接のリクエストが必要であり、完了またはブロックは自律的な目標ラウンドでも機能する。更新には、先行する読み取りが返した正確な目標 id とリビジョンが必要である。`resume` はアクティブだが解除された、またはブロックされた目標を再アームし、ユーザーは耐久性のある一時停止中の目標を Web または `/goal resume` を通じて再開する。自律的なブロックは、デフォルトで 3 連続ラウンドという設定可能なしきい値の間、同じ条件が持続することを要求する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount `dsh-tool-goal` beside the goal service when the model should create and update persisted goals itself. The tools are the model-facing half of the goal surface; the `/goal` command is the human-facing half, and the continuation driver uses the same tools to complete or block goals at the end of autonomous rounds.
+モデル自身が永続化された目標を作成・更新すべき場合は、目標サービスの隣に `dsh-tool-goal` をマウントする。これらのツールは目標サーフェスのモデル向けの半分であり、`/goal` コマンドが人間向けの半分であり、継続ドライバーは同じツールを使って自律ラウンドの終わりに目標を完了またはブロックする。
 
-### Tools
+### ツール
 
-All three tools return the same compact JSON — `{ goal: null }` when no goal is current, otherwise the goal's id, revision, objective, phase, rounds started, round cap, optional blocker reason, and whether continuation is armed — matching what Native callers already render.
+3 つのツールはすべて同じコンパクトな JSON を返す — 現在の目標がない場合は `{ goal: null }`、それ以外は目標の id、リビジョン、目的、フェーズ、開始済みラウンド数、ラウンド上限、任意のブロッカー理由、継続がアームされているかどうか — であり、Native の呼び出し元がすでにレンダリングしているものと一致する。
 
-| Tool | What it does |
+| ツール | 何をするか |
 |---|---|
-| `get_goal()` | Reads the current goal, or `null` when none is current |
-| `create_goal(objective, max_goal_rounds?)` | Creates one goal from a direct top-level human turn |
-| `update_goal(goal_id, revision, action, objective?, max_goal_rounds?, blocked_reason?)` | `edit`, `pause`, `resume`, `complete`, or `blocked` on the exact goal revision |
+| `get_goal()` | 現在の目標を読み取る。存在しない場合は `null` |
+| `create_goal(objective, max_goal_rounds?)` | トップレベルの人間による直接のターンから 1 つの目標を作成する |
+| `update_goal(goal_id, revision, action, objective?, max_goal_rounds?, blocked_reason?)` | 正確な目標リビジョンに対して `edit`、`pause`、`resume`、`complete`、`blocked` のいずれかを行う |
 
-Call `get_goal` before `update_goal` and copy the exact `goal_id` and `revision`; all calls are exclusive, so a model-ordered batch observes earlier mutations and their new revisions. Replacements belong only to `edit`; `blocked_reason` is required only for `blocked` and is persisted with the stable code `model-reported`. Strict-schema empty-string and zero fillers count as omitted, while meaningful values remain limited to their action.
+`update_goal` の前に `get_goal` を呼び、正確な `goal_id` と `revision` をコピーする。すべての呼び出しは排他的であるため、モデルが順序付けたバッチは先行する変更とその新しいリビジョンを観察する。置換は `edit` にのみ属し、`blocked_reason` は `blocked` にのみ必須で、安定したコード `model-reported` とともに永続化される。厳格スキーマの空文字列とゼロのフィラーは省略として扱われ、意味のある値はそのアクションに制限されたままである。
 
-### Configure it
+### 設定する
 
 ```yaml
 - id: tool-goal
@@ -48,115 +48,115 @@ Call `get_goal` before `update_goal` and copy the exact `goal_id` and `revision`
     blockedAfterConsecutiveRounds: 3
 ```
 
-The value must be a positive safe integer. It supplies both the hard lower bound on model self-blocking and the number named in model guidance. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-goal) is the exhaustive source for every accepted field.
+値は正の安全な整数でなければならない。それはモデルの自己ブロックに対するハードな下限と、モデルガイダンスに記載される数値の両方を提供する。生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-goal)が、受け付けられるすべてのフィールドの網羅的な情報源である。
 
-### Authority rules
+### 権限ルール
 
-The tools execute only for the exact live calling agent inside its active driver with an open turn. `create`, `edit`, `pause`, and `resume` additionally require a direct human message in a runtime-root agent's current turn — a subagent or a non-human producer cannot create or edit goals. `resume` rejects a durable paused goal before the goal service runs; that state belongs to the user-facing resume path. `complete` and `blocked` also accept the exact current goal round: a goal-sourced round may complete the goal immediately, but a blocked call is mechanically rejected until the configured number of consecutive rounds has passed — the model judges whether the same condition actually persisted and must describe it in `blocked_reason`. A direct human request may stop a goal immediately.
+ツールは、正確なライブの呼び出し元エージェントが、開かれたターンを持つそのアクティブなドライバー内にいる場合にのみ実行される。`create`、`edit`、`pause`、`resume` はさらに、ランタイムルートエージェントの現在のターン内の人間による直接のメッセージを必要とする — subagent や人間以外のプロデューサーは目標を作成・編集できない。`resume` は目標サービスが実行される前に耐久性のある一時停止中の目標を拒否する。その状態はユーザー向けの再開経路に属する。`complete` と `blocked` は正確な現在の目標ラウンドも受け付ける: 目標由来のラウンドは目標を即座に完了してよいが、ブロックされた呼び出しは設定された連続ラウンド数が経過するまで機械的に拒否される — モデルが同じ条件が実際に持続したかを判断し、`blocked_reason` にそれを記述しなければならない。人間の直接のリクエストは目標を即座に停止してよい。
 
-An autonomous round that successfully reports `complete` or `blocked` also ends the physical turn after that step, and the model receives a closing instruction to write the final message to the user. Direct-human mutations never trigger that stop: the assistant may acknowledge the change and the loop keeps concurrent human steering available.
+`complete` または `blocked` を正常に報告した自律ラウンドは、そのステップの後に物理的なターンも終了し、モデルはユーザーへの最終メッセージを書くための締めくくりの指示を受け取る。人間による直接の変更はその停止を引き起こさない: アシスタントは変更を承認してよく、ループは並行する人間のステアリングを利用可能なまま保つ。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the tools enforce authority and render output; the observable contract is covered in [Use this package](#use-this-package).
+このセクションでは、ツールが権限をどう強制し出力をどうレンダリングするかを説明する。観察可能な契約は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design
+### 設計
 
-- **Authority at execution.** Every call resolves the exact live agent, its inherited `AgentRegistry` initiator, running status, and an open turn; `create`, `edit`, `pause`, and `resume` additionally require an accepted `{ kind: 'user' }` message or steering event in a runtime-root agent's current turn. A durable paused goal fails the `resume` action with `GOAL_TOOL_RESUME_PAUSED`; the user-facing command or Web control owns that transition. Durable fork lineage does not demote a resumed root; live subagent ownership does.
-- **Host attestation of human input.** `{ kind: 'user' }` is assigned by `Agent.followup()` and `steer()` when their caller omits a source, so plugins, schedulers, and other non-human producers must pass their own source rather than inheriting human authority.
-- **System-prompt guidance with the configured threshold.** The package registers one `tool:goal` system-prompt section whose fixed text interpolates `blockedAfterConsecutiveRounds`; the same value is the hard lower bound enforced at execution.
-- **Wrap-up context for terminal rounds.** A successful autonomous `complete` or `blocked` defers a closing `<goal_complete>` or `<goal_blocked>` instruction so the model addresses the user once before the turn ends; direct-human mutations never defer this context.
+- **実行時の権限。** すべての呼び出しは正確なライブエージェント、その継承された `AgentRegistry` イニシエーター、実行中ステータス、開かれたターンを解決する。`create`、`edit`、`pause`、`resume` はさらに、ランタイムルートエージェントの現在のターンで受け入れられた `{ kind: 'user' }` メッセージまたはステアリングイベントを必要とする。耐久性のある一時停止中の目標は `resume` アクションを `GOAL_TOOL_RESUME_PAUSED` で失敗させる。ユーザー向けコマンドまたは Web コントロールがその遷移を所有する。耐久性のあるフォークのリネージは再開されたルートを降格させないが、ライブの subagent 所有権は降格させる。
+- **人間入力の Host による証明。** `{ kind: 'user' }` は、呼び出し元がソースを省略したときに `Agent.followup()` と `steer()` によって割り当てられるため、プラグイン、スケジューラー、その他の人間以外のプロデューサーは人間の権限を継承するのではなく、自身のソースを渡さなければならない。
+- **設定されたしきい値を伴うシステムプロンプトガイダンス。** このパッケージは `tool:goal` システムプロンプトセクションを 1 つ登録し、その固定テキストが `blockedAfterConsecutiveRounds` を補間する。同じ値が実行時に強制されるハードな下限である。
+- **終端ラウンドのための締めくくりコンテキスト。** 成功した自律的な `complete` または `blocked` は、ターンが終わる前にモデルがユーザーに一度応答できるよう、締めくくりの `<goal_complete>` または `<goal_blocked>` 指示を遅延させる。人間による直接の変更はこのコンテキストを遅延させることは決してない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: tool registration, config, system-prompt section, result rendering |
-| [`src/authority.ts`](src/authority.ts) | Execution-time authority checks and goal-round acceptance |
-| [`src/wrapup.ts`](src/wrapup.ts) | Closing-message instruction for terminal autonomous updates |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: ツール登録、設定、システムプロンプトセクション、結果レンダリング |
+| [`src/authority.ts`](src/authority.ts) | 実行時の権限チェックと目標ラウンドの受け入れ |
+| [`src/wrapup.ts`](src/wrapup.ts) | 終端の自律更新のための締めくくりメッセージ指示 |
 
-### Tool output
+### ツール出力
 
-All three tools share one canonical output: the compact JSON `{ goal: null }` or `{ goal: { id, revision, objective, phase, roundsStarted, maxGoalRounds, blockedReason? }, activation }`. `activation` in a result is a live observation and never becomes replay authority. UI clients receive pure generic cards — read for `get_goal`, other for mutations.
+3 つのツールはすべて 1 つの正規出力を共有する: コンパクトな JSON `{ goal: null }` または `{ goal: { id, revision, objective, phase, roundsStarted, maxGoalRounds, blockedReason? }, activation }`。結果内の `activation` はライブの観察であり、リプレイの権威になることは決してない。UI クライアントは純粋な汎用カードを受け取る — `get_goal` には read、変更には other。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-The tools are the model-facing half of the goal surface; read these pages for the state they mutate and the policy they defer to.
+これらのツールは目標サーフェスのモデル向けの半分である。それらが変更する状態と、従うポリシーについてこれらのページを読む。
 
-- [Goal service](../goal/README.md) — the goal state and lifecycle the tools mutate.
-- [Goal group map](../README.md) — the goal packages and how they compose.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-goal) — the exact schemas the model receives.
-- [Goal-tool Agent Note](../../../.agents/notes/implemented/feature/2026-07-19-model-facing-goal-tools.md) — the authority split and UX decisions.
+- [目標サービス](../goal/README.md) — ツールが変更する目標状態とライフサイクル。
+- [目標グループマップ](../README.md) — 目標パッケージとその構成方法。
+- [生成されるツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-goal) — モデルが受け取る正確なスキーマ。
+- [目標ツール Agent Note](../../../.agents/notes/implemented/feature/2026-07-19-model-facing-goal-tools.md) — 権限の分割と UX の決定。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-A fixed goal policy allows inferring goal intent in any language, explains rearming after resume/fork, and limits completion/blocking claims; creation scope and read-before-update refs live in the tool definitions. Durable paused resume is rejected at execution with `GOAL_TOOL_RESUME_PAUSED`; the user-facing goal control owns that transition. The configured threshold is interpolated into that guidance.
+固定の目標ポリシーが、任意の言語での目標意図の推論を許可し、再開/フォーク後の再アームを説明し、完了/ブロックの主張を制限する。作成のスコープと更新前読み取りの参照はツール定義にある。耐久性のある一時停止の再開は実行時に `GOAL_TOOL_RESUME_PAUSED` で拒否され、ユーザー向けの目標コントロールがその遷移を所有する。設定されたしきい値はそのガイダンスに補間される。
 
-##### Goal policy
+##### 目標ポリシー
 
 ```markdown
 create_goal may infer goal intent from a direct human request in any language. After session resume or fork, an active goal is disarmed: when a human asks to continue or resume in any wording or language, use update_goal action resume to rearm it. Mark complete only when the objective is actually achieved. Mark blocked only after the same blocking condition persists for at least 3 consecutive goal rounds, and report that concrete condition in blocked_reason; difficulty, uncertainty, or useful remaining work is not blocked.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Small fixed input cost on every request where this plugin's prompt registration is in scope.
+このプラグインのプロンプト登録がスコープ内にあるすべてのリクエストに、小さな固定の入力コストがかかる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the plugin scope, configured threshold, and guidance text are unchanged. Activation, disposal, or configuration changes may invalidate reuse from this prompt section.
+プラグインのスコープ、設定されたしきい値、ガイダンステキストが変わらない間はプレフィックス安定である。アクティブ化、破棄、または設定変更は、このプロンプトセクションからの再利用を無効化することがある。
 
-### Tool schemas and results
+### ツールスキーマと結果
 
-#### What the model sees
+#### モデルが見るもの
 
-The generated [`get_goal`, `create_goal`, and `update_goal` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-goal). Successful results are compact JSON. A mutation appends the goal domain's durable `goal/change` event without queuing model context. `activation` in a result is a live observation and never becomes replay authority.
+生成される [`get_goal`、`create_goal`、`update_goal` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-goal)。成功した結果はコンパクトな JSON である。変更はモデルコンテキストをキューに入れることなく、目標ドメインの耐久性のある `goal/change` イベントを追記する。結果内の `activation` はライブの観察であり、リプレイの権威になることは決してない。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost plus one compact result per call. The durable mutation adds no separate model-visible context.
+固定のスキーマコストと、呼び出しごとに 1 つのコンパクトな結果。耐久性のある変更は別個のモデル可視コンテキストを追加しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Schemas are prefix-stable while their definitions and visibility are unchanged. Calls and results append after the reusable request prefix without invalidating earlier entries.
+スキーマはその定義と可視性が変わらない間はプレフィックス安定である。呼び出しと結果は、以前のエントリーを無効化することなく再利用可能なリクエストプレフィックスの後に追記される。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the goal tools are a poor fit or need special care. They are current package constraints, not a task backlog.
+これらの制限は、目標ツールが不適切な選択となる、または特別な注意を要する状況を定義する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Semantic intent remains model judgment** — execution can prove that the current turn contains a direct human message, not whether the request is substantial enough to merit a goal.
-- **Same-condition blocking remains model judgment** — the runtime enforces distinct admitted-round count, not semantic equivalence of obstacles; an independent evaluator is deferred.
-- **No scheduling or direct human rendering** — these tools mutate state only; the same-session driver and `dsh-command-goal` are independent consumers of the same domain.
-- **Goal-round authority requires a driver** — the autonomous `complete`/`blocked` path is dormant unless a continuation driver admits goal-sourced user turns; mounting this tool package alone does not create them.
-- **Prompt registration is independent of filtering** — a scope may hide the tools while retaining their guidance unless the deployment scopes both registrations together.
+- **意味的な意図はモデルの判断のままである** — 実行が証明できるのは、現在のターンに人間による直接のメッセージが含まれることだけで、そのリクエストが目標に値するほど実質的かどうかではない。
+- **同一条件のブロックはモデルの判断のままである** — ランタイムが強制するのは受け入れられた別個のラウンド数であり、障害の意味的な等価性ではない。独立した評価器は先送りされている。
+- **スケジューリングや直接の人間向けレンダリングはない** — これらのツールは状態を変更するだけである。同一セッションのドライバーと `dsh-command-goal` は同じドメインの独立したコンシューマーである。
+- **目標ラウンドの権限にはドライバーが必要である** — 自律的な `complete`/`blocked` の経路は、継続ドライバーが目標由来のユーザーターンを受け入れるのでなければ休眠している。このツールパッケージを単独でマウントしてもそれらは作成されない。
+- **プロンプト登録はフィルタリングから独立している** — スコープはガイダンスを保持したままツールを隠すことがある。デプロイが両方の登録を一緒にスコープしない限り。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers; it is explicitly non-authoritative. Open question: whether the goal-policy section should be independently scoped from the tool registrations, so a scope cannot hide the tools while keeping the guidance.
+この開発者ノートはメンテナー向けの作業コンテキストであり、明示的に非権威である。未解決の疑問: 目標ポリシーセクションをツール登録から独立してスコープすべきかどうか。そうすれば、あるスコープがガイダンスを保ったままツールを隠すことはできなくなる。
 
 </details>

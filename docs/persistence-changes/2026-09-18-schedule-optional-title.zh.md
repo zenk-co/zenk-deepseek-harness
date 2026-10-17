@@ -5,7 +5,7 @@ kind: persistence-change
 
 # 2026-09-18-schedule-optional-title
 
-[English](2026-09-18-schedule-optional-title.md) | 中文
+[日本語](2026-09-18-schedule-optional-title.md) | [English](2026-09-18-schedule-optional-title.en.md) | 中文
 
 ## 概述
 

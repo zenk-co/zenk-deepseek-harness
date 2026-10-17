@@ -1,35 +1,35 @@
 ---
-description: "User-facing permission presets for users and maintainers choosing, configuring, or debugging the Permissions selector that bundles sandbox mode with an approval policy."
+description: "ユーザーとメンテナーが、サンドボックスモードと承認ポリシーを束ねる Permissions セレクターを選択、構成、またはデバッグするためのユーザー向け権限プリセット。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-permission-presets
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Offer named permission modes that set sandbox and approval together while each enforcement service keeps its own value. Configured presets supply future-session defaults; an explicitly loaded Auto review integration can add one current-session-only option. Clients read selectable entries from a process catalog and the current choice from the Session projection. Unmatched knob combinations appear as `custom`, which users can leave but cannot select. This package owns selection and defaults; the sandbox, approval, and Auto integration own execution.
+サンドボックスと承認をまとめて設定する名前付き権限モードを提供する。ただし、各 enforcement サービスは自身の値を保つ。構成済みプリセットは将来のセッションのデフォルトを供給し、明示的にロードされた Auto review 統合は現在のセッション限りの選択肢を 1 つ追加できる。クライアントは選択可能なエントリーをプロセスカタログから、現在の選択を Session プロジェクションから読む。一致しないノブの組み合わせは `custom` として現れ、ユーザーはそこから離れられるが選択はできない。選択とデフォルトはこのパッケージが所有し、実行はサンドボックス、承認、Auto 統合が所有する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Choose this service when a deployment wants to offer users one Permissions selector instead of separate sandbox and approval controls. It bundles the knobs; execution and approval keep their own values, so removing the package later leaves the last selection in effect.
+デプロイが、ユーザーに別々のサンドボックスと承認のコントロールではなく 1 つの Permissions セレクターを提供したいときにこのサービスを選ぶ。それがノブを束ね、実行と承認は自身の値を保つので、後でパッケージを外しても最後の選択は有効なままである。
 
-### Configuring presets
+### プリセットの構成
 
-The plugin config defines the preset table and the default for fresh sessions. Each preset name bundles one sandbox mode with one approval policy; `name` and `description` are optional client presentation. The reserved names `custom` and `auto` cannot appear in this table.
+プラグイン設定はプリセットテーブルと新規セッションのデフォルトを定義する。各プリセット名は 1 つのサンドボックスモードと 1 つの承認ポリシーを束ねる。`name` と `description` は省略可能なクライアント表示である。予約名 `custom` と `auto` はこのテーブルに現れてはならない。
 
 ```yaml
 - name: '@deepseek-ai/dsh-permission-presets'
@@ -44,104 +44,104 @@ The plugin config defines the preset table and the default for fresh sessions. E
     defaultPreset: workspace-write
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `presets` | `workspace-write`, `danger-full-access` | Table of preset name → sandbox/approval bundle |
-| `defaultPreset` | inferred | Preset pinned into fresh sessions; required when composition defaults match no preset |
+| `presets` | `workspace-write`, `danger-full-access` | プリセット名 → サンドボックス/承認バンドルのテーブル |
+| `defaultPreset` | 推論 | 新規セッションに固定されるプリセット。構成のデフォルトがどのプリセットにも一致しない場合に必須 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-permission-presets) is the exhaustive source for every accepted field and its JSDoc. `custom` is reserved for the derived not-a-preset state, while `auto` is reserved for the Auto review integration. Mounting requires a confining bash executor (one that reports a `sandboxMode`) and the approval service.
+生成された[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-permission-presets)が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源である。`custom` は導出される非プリセット状態のために予約され、`auto` は Auto review 統合のために予約されている。マウントには閉じ込め型の bash エグゼキューター（`sandboxMode` を報告するもの）と承認サービスが必要である。
 
-### Switching presets
+### プリセットの切り替え
 
-Switching to Auto first runs its synchronous admission check; every preset switch then changes only the knobs whose effective value differs, and selecting the preset already in effect changes nothing. The current value resolves as the still-matching last recorded selection, including a recorded Auto selection under the `never` approval policy, else the first matching configured entry, else `custom`. Users switch through the `/permission` command: a bare invocation reports the current preset and every available entry, and a preset argument switches to it.
+Auto への切り替えはまずその同期的なアドミッションチェックを実行する。その後、どのプリセット切り替えも実効値が異なるノブだけを変更し、すでに有効なプリセットの選択は何も変えない。現在値は、まだ一致している最後に記録された選択として解決される。`never` 承認ポリシー下で記録された Auto 選択も含む。それ以外は最初に一致する構成済みエントリー、それもなければ `custom` である。ユーザーは `/permission` コマンドで切り替える。引数なしの呼び出しは現在のプリセットと利用可能なすべてのエントリーを報告し、プリセット引数はそれへ切り替える。
 
-### What users see
+### ユーザーに見えるもの
 
-Clients render selectable entries from the process catalog: configured presets in table order followed by Auto while its integration is live. They join that snapshot with the Session's current value; an unmatched `custom` value may label the current control but never appears as a selectable catalog row. Auto's identity and knob bundle, Full access sandbox with the `ask` approval policy, are fixed inside this service; a recorded Auto selection also matches the `never` policy that delegated children pin. The shipped client locale dictionaries own Auto's label and description, while configured presets retain Host-supplied presentation. Callers cannot publish another preset through a generic contribution API, and they can switch away from `custom` but cannot select or persist a named custom preset through this service.
+クライアントはプロセスカタログから選択可能なエントリーをレンダリングする。構成済みプリセットがテーブル順で並び、その統合が生きている間は Auto が続く。クライアントはこのスナップショットを Session の現在値と結合する。一致しない `custom` 値は現在のコントロールにラベルを付けられるが、選択可能なカタログ行として現れることは決してない。Auto の識別とノブのバンドル（`ask` 承認ポリシー付きの Full access サンドボックス）はこのサービス内部で固定されている。記録された Auto 選択は、委譲された子が固定する `never` ポリシーにも一致する。出荷されるクライアントロケール辞書が Auto のラベルと説明を所有し、構成済みプリセットは Host 提供の表示を保つ。呼び出し側は汎用のコントリビューション API を通じて別のプリセットを公開できず、`custom` から離れることはできるが、このサービスを通じて名前付きカスタムプリセットを選択したり永続化したりすることはできない。
 
-### Session defaults
+### セッションのデフォルト
 
-The `permission` settings namespace holds `defaultPreset` for future sessions and accepts configured presets only. Session creation reads it, applies it to the sandbox mode and approval policy, and records the applied preset as a `permission/preset` selection. Later settings changes never alter an existing session. A resumed seed, including an explicitly empty one marked by `session/end-seed`, preserves its effective permission and receives only missing durable facts rather than the latest user default; a persisted `auto` identity requires the live Auto registration and its admission before publication.
+`permission` 設定名前空間は将来のセッション用の `defaultPreset` を保持し、構成済みプリセットのみを受け付ける。セッション作成はそれを読み、サンドボックスモードと承認ポリシーに適用し、適用したプリセットを `permission/preset` 選択として記録する。その後の設定変更が既存のセッションを変えることはない。再開されたシードは、`session/end-seed` でマークされた明示的に空のシードも含め、その実効権限を保ち、最新のユーザーデフォルトではなく不足している永続的な事実だけを受け取る。永続化された `auto` 識別は、公開前に生きた Auto 登録とそのアドミッションを必要とする。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The observable behavior is covered in [Use this package](#use-this-package); this section explains the write path, the process catalog, the projection-backed current value, and the optional command.
+観察可能な挙動は[このパッケージを使う](#use-this-package)でカバーされている。このセクションでは、書き込み経路、プロセスカタログ、プロジェクションに裏打ちされた現在値、および省略可能なコマンドを説明する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `PermissionPresetService`: configured table, fixed Auto registration, write path, settings namespace, session pinning, children |
-| [`src/types.ts`](src/types.ts) | Process catalog, catalog-change event, and `permissions` current-selection types |
+| [`src/index.ts`](src/index.ts) | `PermissionPresetService`: 構成済みテーブル、固定の Auto 登録、書き込み経路、設定名前空間、セッション固定、子 |
+| [`src/types.ts`](src/types.ts) | プロセスカタログ、カタログ変更イベント、`permissions` 現在選択の型 |
 
-### Write path
+### 書き込み経路
 
-`set()` resolves the preset and synchronously runs Auto admission when applicable. Transitions append `permission/preset` only when the effective preset changes, then write each changed knob through its canonical setter — `setSandboxMode` from `dsh-sandbox-policy` and `setApprovalPolicy` from `dsh-user-approval`. The selection event therefore preserves user intent when two presets share a bundle. Switching between Auto and Full access records the new identity and the changed approval policy. A net-zero selection appends nothing.
+`set()` はプリセットを解決し、該当する場合は同期的に Auto アドミッションを実行する。遷移は実効プリセットが変わるときだけ `permission/preset` を追記し、次に変更された各ノブをその正規のセッター —— `dsh-sandbox-policy` の `setSandboxMode` と `dsh-user-approval` の `setApprovalPolicy` —— を通じて書き込む。したがって、2 つのプリセットがバンドルを共有する場合でも、選択イベントはユーザーの意図を保つ。Auto と Full access の間の切り替えは、新しい識別と変更された承認ポリシーを記録する。差し引きゼロの選択は何も追記しない。
 
-### Read side and `custom`
+### 読み取り側と `custom`
 
-`current(session)` reads the required `permissions` projection, whose unit folds the three whole-value knob events over the composition defaults (`ctx.shell.sandboxMode` and the approval config). The host state also retains whether `session/end-seed` has occurred, so session pinning distinguishes an explicitly empty restored seed from a genuinely fresh session without rescanning the log. A still-matching last selection wins shared-bundle ties, and a recorded Auto selection also matches the `never` approval policy; otherwise the first configured match wins; otherwise the derived `CUSTOM_PRESET` is returned. A missing projection key fails explicitly.
+`current(session)` は必須の `permissions` プロジェクションを読み、そのユニットは 3 つの全体値ノブイベントを構成のデフォルト（`ctx.shell.sandboxMode` と承認設定）の上に畳み込む。ホスト状態は `session/end-seed` が発生したかどうかも保持するので、セッション固定は、ログを再スキャンせずに、明示的に空の復元シードと本当に新規のセッションを区別する。まだ一致する最後の選択が共有バンドルの同着に勝ち、記録された Auto 選択は `never` 承認ポリシーにも一致する。そうでなければ最初の構成済み一致が勝ち、それもなければ導出された `CUSTOM_PRESET` が返される。欠けているプロジェクションキーは明示的に失敗する。
 
-`optionOf(name)` returns a configured entry, the live Auto entry, or the display-only `custom` entry. It throws only when the name matches none of those; a withdrawn Auto entry is unavailable.
+`optionOf(name)` は構成済みエントリー、生きた Auto エントリー、または表示専用の `custom` エントリーを返す。名前がそのいずれにも一致しないときだけ throw する。撤回された Auto エントリーは利用不可である。
 
-### Session pinning and blank reuse
+### セッション固定とブランク再利用
 
-Mounting pins every live and future session: a genuinely fresh session gains the configured default preset and both knob facts, while seeded or partially initialized sessions keep their effective knob values and gain only missing durable facts. The projection-owned seed marker makes this decision from the same incremental state as the knob values. A stored `auto` identity fails publication when the Auto integration is absent or rejects admission; the service neither rewrites it nor silently derives Full access.
+マウントはすべての生きたセッションと将来のセッションを固定する。本当に新規のセッションは構成済みのデフォルトプリセットと両方のノブ事実を得るのに対し、シード済みまたは部分的に初期化されたセッションは実効ノブ値を保ち、欠けている永続的な事実だけを得る。プロジェクション所有のシードマーカーは、ノブ値と同じ増分状態からこの決定を行う。保存された `auto` 識別は、Auto 統合が存在しないかアドミッションを拒否する場合に公開に失敗する。サービスはそれを書き換えず、Full access を暗黙に導出することもない。
 
-### Catalog, projection, and optional command
+### カタログ、プロジェクション、省略可能なコマンド
 
-The service requires `ctx.sessionProjections` and registers a `permissions` projection containing only `currentValue`. Its process-level `catalog()` Remote returns one complete selectable snapshot. Registering or removing Auto emits the payload-free `permission-presets/catalog-changed` notification, so clients subscribe first and then re-read the catalog without appending a Session event, publishing a Session projection frame, or changing Session sequence. The `/permission` command registers only when a `ctx.commands` registry is composed. Calls that derive the current preset or pin an initial selection fail explicitly when the projection key is absent.
+サービスは `ctx.sessionProjections` を必要とし、`currentValue` だけを含む `permissions` プロジェクションを登録する。そのプロセスレベルの `catalog()` Remote は、完全な選択可能スナップショットを 1 つ返す。Auto の登録または削除はペイロードなしの `permission-presets/catalog-changed` 通知を発行するので、クライアントは先に購読してからカタログを再読み取りする。Session イベントを追記したり、Session プロジェクションフレームを公開したり、Session シーケンスを変更したりはしない。`/permission` コマンドは `ctx.commands` レジストリが構成されているときにだけ登録する。現在のプリセットを導出したり初期選択を固定したりする呼び出しは、プロジェクションキーが欠けている場合に明示的に失敗する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the preset vocabulary to the enforcement knobs and the design rationale.
+パッケージレベルの契約では足りないときにこれらのページを読む。プリセットの語彙から enforcement ノブと設計根拠へと進む。
 
-- [Permission presets subsystem reference](../../../docs/subsystems/permission-presets.md) — the preset table, process catalog, current selection, and `ctx.permissionPresets` Cordis API.
-- [historical Sandbox switching design Agent Note](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) — how sandbox mode and approval policy compose and switch.
-- [Approval subsystem reference](../../../docs/subsystems/approval.md) — the approval policy knob this service bundles.
-- [Interaction group map](../README.md) — adjacent command, approval, and question packages.
+- [権限プリセットサブシステムリファレンス](../../../docs/subsystems/permission-presets.md) — プリセットテーブル、プロセスカタログ、現在の選択、`ctx.permissionPresets` Cordis API。
+- [過去のサンドボックス切り替え設計 Agent Note](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) — サンドボックスモードと承認ポリシーがどのように構成され切り替わるか。
+- [承認サブシステムリファレンス](../../../docs/subsystems/approval.md) — このサービスが束ねる承認ポリシーノブ。
+- [インタラクショングループの地図](../README.md) — 隣接するコマンド、承認、質問のパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-user-approval` and `dsh-tool-bash`, which render the approval-policy prompt, switch notice, and sandboxed tool outcomes selected by this service's knob events; `permission/preset` itself is log-only.
+間接的。`dsh-user-approval` と `dsh-tool-bash` を通じ、このサービスのノブイベントが選択した承認ポリシーのプロンプト、切り替え通知、サンドボックス化ツール結果をレンダリングする。`permission/preset` 自体はログ専用である。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+直接の無効化はない。リクエストプレフィックスの変更は、名指されたコンシューマーが所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the preset service does not offer. They are current package constraints, not a permission-system comparison.
+これらの制限は、このプリセットサービスが提供しないものを定義する。現在のパッケージ制約であり、権限システムの比較ではない。
 
-- **Only two mechanism knobs are bundled** — presets select sandbox mode and approval policy; the fixed Auto integration adds admission behavior, but an agent/profile choice is not part of `PresetSpec`.
-- **`custom` is derived-only** — callers can switch away from an unmatched knob combination but cannot target or persist a named custom preset through this service.
-- **The configured preset table is fixed for the plugin lifetime** — only the fixed Auto contribution can change the live process catalog without reloading this service.
-- **Auto cannot become a default** — it exists only while its integration effect is live and is intentionally absent from the `permission` settings schema.
-- **Configured defaults must name a configured preset** — removing a referenced preset requires changing `defaultPreset` in the same Config edit.
+- **束ねられるメカニズムノブは 2 つだけ** — プリセットはサンドボックスモードと承認ポリシーを選択する。固定の Auto 統合はアドミッション挙動を加えるが、エージェント/プロファイルの選択は `PresetSpec` の一部ではない。
+- **`custom` は導出専用** — 呼び出し側は一致しないノブの組み合わせから離れられるが、このサービスを通じて名前付きカスタムプリセットを対象にしたり永続化したりはできない。
+- **構成済みプリセットテーブルはプラグインの生存期間中固定** — このサービスをリロードせずに生きたプロセスカタログを変えられるのは、固定の Auto コントリビューションだけである。
+- **Auto はデフォルトになれない** — その統合エフェクトが生きている間だけ存在し、`permission` 設定スキーマから意図的に外されている。
+- **構成済みデフォルトは構成済みプリセットを名指さなければならない** — 参照されているプリセットを削除するには、同じ Config 編集で `defaultPreset` を変更する必要がある。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

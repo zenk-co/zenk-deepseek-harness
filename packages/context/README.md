@@ -3,52 +3,52 @@ description: "The context group map: request-context plugins that add durable, m
 kind: "package-group"
 ---
 
-# context/ — Request-context plugins
+# context/ — リクエストコンテキストプラグイン
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The context group provides plugins that add model-visible context to each request without defining any tool: workspace instruction files become guidance, `@file` mentions offer path completion, other sessions can be referenced as bounded snapshots, and the model can see the current time and the agent's tmux location. Only `agent-instructions` (`dsh-base`) ships mounted by default; the rest are opt-in. Context is durable: injected instructions and references enter session history as user-role messages, so they persist, replay, and compact like other conversation content. This page maps the group; each package README owns the per-package contract.
+context グループは、ツールを定義せずに各リクエストへモデル可視コンテキストを追加するプラグインを提供する。ワークスペース命令ファイルはガイダンスとなり、`@file` メンションはパス補完を提供し、他セッションは境界付きスナップショットとして参照でき、モデルは現在時刻とエージェントの tmux 位置を認識できる。`agent-instructions`（`dsh-base`）のみがデフォルトでマウントされたまま出荷され、残りは任意である。コンテキストは durable である。注入された命令と参照はユーザーロールメッセージとしてセッション履歴に入るため、他の会話内容と同様に永続化、リプレイ、圧縮される。このページはグループを対応付ける。各パッケージ契約は各パッケージ README が所有する。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`agent-instructions/`](agent-instructions/README.md) | Loads `AGENTS.md`/`CLAUDE.md` workspace instructions into context and refreshes them after file edits | — |
-| [`session-reference/`](session-reference/README.md) | References other sessions: mention one and its bounded read-only snapshot becomes context | `ctx.sessionReferenceResolver` |
-| [`file-reference/`](file-reference/README.md) | `@file` mention discovery and the shared mention grammar for host-backed UIs | `ctx.fileReferences` |
-| [`file-reference-local/`](file-reference-local/README.md) | Local-workspace completion provider for `@file` mentions | — |
-| [`time-context/`](time-context/README.md) | Current time, browser zone, and elapsed time per step | — |
-| [`tmux-context/`](tmux-context/README.md) | The agent's tmux session, window, and pane location | — |
-| [`harness-dev-context/`](harness-dev-context/README.md) | The harness checkout and Web GUI URL as runtime context, keeping the system prompt stable across processes | — |
+| [`agent-instructions/`](agent-instructions/README.md) | `AGENTS.md`/`CLAUDE.md` ワークスペース命令をコンテキストに読み込み、ファイル編集後に更新する | — |
+| [`session-reference/`](session-reference/README.md) | 他セッションの参照。1 件にメンションすると境界付き読み取り専用スナップショットがコンテキストになる | `ctx.sessionReferenceResolver` |
+| [`file-reference/`](file-reference/README.md) | ホスト支援 UI 用の `@file` メンション検出と共有メンション文法 | `ctx.fileReferences` |
+| [`file-reference-local/`](file-reference-local/README.md) | `@file` メンション用ローカルワークスペース補完プロバイダー | — |
+| [`time-context/`](time-context/README.md) | 現在時刻、ブラウザーゾーン、ステップごとの経過時間 | — |
+| [`tmux-context/`](tmux-context/README.md) | エージェントの tmux セッション、ウィンドウ、ペイン位置 | — |
+| [`harness-dev-context/`](harness-dev-context/README.md) | ランタイムコンテキストとしての harness チェックアウトと Web GUI URL。プロセスをまたいでシステムプロンプトを安定させる | — |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Session-reference subsystem](../../docs/subsystems/session-reference.md) — canonical mention URIs, snapshot semantics, and the stable error taxonomy.
-- [Workspace-context decision record](../../.agents/notes/archived/feature/2026-06-24-workspace-context.md) — why instruction context is per-agent/per-session and durably logged.
-- [Generated configuration catalog](../../docs/config-catalog.md) — every config field the group's packages accept.
+- [セッション参照サブシステム](../../docs/subsystems/session-reference.md) — 正規メンション URI、スナップショット意味、安定エラー分類。
+- [ワークスペースコンテキスト決定記録](../../.agents/notes/archived/feature/2026-06-24-workspace-context.md) — 命令コンテキストがエージェント/セッションごとで durable にログされる理由。
+- [生成設定カタログ](../../docs/config-catalog.md) — グループのパッケージが受け付けるすべての設定フィールド。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

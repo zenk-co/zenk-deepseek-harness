@@ -5,7 +5,7 @@ description: "自定义 TerminalBlock 消费者必须为横向溢出的命令行
 
 # 终端命令标签
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

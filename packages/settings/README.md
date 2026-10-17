@@ -1,43 +1,43 @@
 ---
-description: "Schema-derived forms for live plugin configuration."
+description: "ライブプラグイン設定のためのスキーマ由来フォーム。"
 kind: "package-group"
 ---
 
 # settings/ — plugin configuration forms
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Edit live plugin configuration through forms derived from each plugin’s Config schema. The active profile patch stores edits, and Loader applies them. Plugins read their own volatile references.
+各プラグインの Config スキーマから導出されたフォームを通じてライブプラグイン設定を編集する。アクティブなプロファイルパッチが編集を保存し、Loader が適用する。プラグインは自身の volatile 参照を読む。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-The package README owns the form behavior; the settings reference documents its types.
+フォーム動作はパッケージ README が所有し、型は settings リファレンスが文書化する。
 
 | Package | Purpose | ctx key |
 |---|---|---|
 | [`settings`](settings/README.md) | Config projection and revisioned form edits | `settings` |
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Settings reference](../../docs/subsystems/settings.md) — descriptors and edits.
-- [Configuration editor](../boot/config-editor/README.md) — profile persistence.
-- [Volatile configuration](../../vendor/loader/README.md) — updates without remounting.
+- [設定リファレンス](../../docs/subsystems/settings.md) — descriptors and edits.
+- [設定エディター](../boot/config-editor/README.md) — profile persistence.
+- [Volatile 設定](../../vendor/loader/README.md) — updates without remounting.
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
 None.
 

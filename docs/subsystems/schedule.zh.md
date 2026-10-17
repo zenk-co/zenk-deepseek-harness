@@ -1,6 +1,6 @@
 # 宿主级 Schedule
 
-[English](schedule.md) | 中文
+[日本語](schedule.md) | [English](schedule.en.md) | 中文
 
 Schedule 独立于 Session 的加载状态存储提醒，并将其投递到原 Session。本页记录 [`types.ts`](../../packages/schedule/schedule/src/types.ts) 中的持久与模型可见类型；[包 README](../../packages/schedule/schedule/README.zh.md) 负责组合方式与提醒文本格式。
 

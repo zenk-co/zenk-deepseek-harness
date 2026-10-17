@@ -1,14 +1,14 @@
-# LLM adapters
+# LLM アダプター
 
-English | [中文](llm-adapter.zh.md)
+日本語 | [English](llm-adapter.en.md) | [中文](llm-adapter.zh.md)
 
-This guide connects a new LLM provider to Harness.
+このガイドでは、新しい LLM プロバイダーを Harness に接続します。
 
-## Overview
+## 概要
 
-An LLM adapter extends `LlmAdapter` and implements `stream()`, translating Harness's provider-neutral request into a provider API call and translating the response back into Harness chunks.
+LLM アダプターは `LlmAdapter` を拡張し、`stream()` を実装することで、Harness のプロバイダー中立なリクエストをプロバイダー API 呼び出しに変換し、応答を Harness チャンクに逆変換します。
 
-## Minimal implementation
+## 最小実装
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -49,9 +49,9 @@ export function apply(ctx: Context, config: Config) {
 }
 ```
 
-## StreamChunk protocol
+## StreamChunk プロトコル
 
-`stream()` yields chunks using this protocol:
+`stream()` は次のプロトコルでチャンクを yield します:
 
 ```ts
 import { brandString } from '@deepseek-ai/dsh-brand'
@@ -101,29 +101,29 @@ async function* exampleChunks(): AsyncIterable<StreamChunk> {
 }
 ```
 
-### Key rules
+### 主要な規則
 
-- Every `block-start` has a matching `block-end`.
-- `index` increases from 0 and identifies content-block order.
-- A `tool-call-delta` carries raw JSON text in `argumentsDelta`, either all at once or over multiple chunks.
-- `finish` is the final chunk.
-- Emit `usage` before `finish`.
+- すべての `block-start` に対応する `block-end` があります。
+- `index` は 0 から増加し、コンテンツブロックの順序を識別します。
+- `tool-call-delta` は `argumentsDelta` に生 JSON テキストを運び、一度にまとめて、または複数チャンクに分けて送ります。
+- `finish` は最後のチャンクです。
+- `usage` は `finish` より前に送出します。
 
 ## GenerateOptions
 
-`stream()` receives the exported `GenerateOptions` type. It includes the model, adapter-owned reasoning-effort id, conversation history, system prompt, tool schemas, generation parameters, stop sequences, and abort signal; treat the TypeScript type exported by `@deepseek-ai/dsh-llm` as authoritative. Map supported fields to the provider API. If the provider cannot honor a field, throw `LlmError` with a stable code instead of silently dropping it.
+`stream()` は公開された `GenerateOptions` 型を受け取ります。これにはモデル、アダプター所有の reasoning-effort ID、会話履歴、システムプロンプト、ツールスキーマ、生成パラメーター、停止シーケンス、中止シグナルが含まれます。`@deepseek-ai/dsh-llm` が公開する TypeScript 型を正として扱ってください。サポートするフィールドをプロバイダー API にマッピングします。プロバイダーがフィールドに対応できない場合、黙って破棄せず、安定したコードを持つ `LlmError` をスローしてください。
 
-Override `resolveModel(provider, model, signal?)` to return exact provider/model identity plus optional `context` and `reasoning` metadata in one lookup. Reasoning metadata contains ordered opaque ids and display names plus an optional configured default; preserve the adapter's authoritative selectable list, including `off` when its upstream capability API returns it, instead of promoting those values into a core enum. Honor the optional signal for asynchronous lookup so cancellation and disposal reach quiescence. The service validates the aggregate and rejects unsupported explicit efforts before `stream()`; omitting `reasoning` means that model has no selectable reasoning-effort capability.
+`resolveModel(provider, model, signal?)` をオーバーライドして、正確なプロバイダー/モデル同一性に任意の `context` および `reasoning` メタデータを加えて 1 回の検索で返します。reasoning メタデータは順序付きの不透明 ID と表示名、および任意の設定済み既定値を含みます。アダプターの正となる選択可能リストを保持し、上流ケイパビリティ API が返す場合の `off` も含め、それらの値をコア enum に格上げしないでください。非同期検索では任意のシグナルを尊重し、キャンセルと破棄が静止に到達するようにします。サービスは集約を検証し、サポート外の明示的 effort を `stream()` の前に拒否します。`reasoning` の省略は、そのモデルに選択可能な reasoning-effort ケイパビリティがないことを意味します。
 
-## Register an adapter
+## アダプターの登録
 
 ```ts ignore-check
 ctx.llm.registerAdapter(['my-provider'], adapter)
 ```
 
-The first argument lists provider routes handled by the adapter. `GenerateOptions.provider` selects the registered adapter, while `GenerateOptions.model` passes an adapter-owned model id without lifecycle registration. Override `listModels()` when the adapter can advertise model choices to selectors.
+最初の引数はアダプターが処理するプロバイダールートの一覧です。`GenerateOptions.provider` が登録済みアダプターを選択し、`GenerateOptions.model` はライフサイクル登録なしのアダプター所有モデル ID を渡します。アダプターがセレクター向けにモデル選択肢を宣伝できる場合、`listModels()` をオーバーライドしてください。
 
-## Use it from cordis.yml
+## cordis.yml からの利用
 
 ```yaml
 - id: my-llm
@@ -142,18 +142,18 @@ The first argument lists provider routes handled by the adapter. `GenerateOption
         model: my-model-v1
 ```
 
-## Reference implementations
+## リファレンス実装
 
-The repository contains complete implementations:
+リポジトリには完全な実装が含まれています:
 
-- `packages/llm/llm-deepseek/` — DeepSeek adapter using the Messages API
-- `packages/llm/llm-pi-ai/` — Pi AI adapter using a different API format
+- `packages/llm/llm-deepseek/` — Messages API を使う DeepSeek アダプター
+- `packages/llm/llm-pi-ai/` — 異なる API 形式を使う Pi AI アダプター
 
-Compare the two shipped adapters to see the same harness contract implemented over different provider SDKs.
+同じハーネス契約が異なるプロバイダー SDK 上で実装されている様子を、2 つの同梱アダプターで比較してください。
 
-## Error handling
+## エラー処理
 
-Adapters throw transport and protocol failures as `LlmError` values with stable codes. The agent loop preserves the error and code for diagnostics and policy; it does not convert an ordinary `Error` automatically. Every provider HTTP request must also merge `attributionHeaders()` and forward `options.signal`.
+アダプターは転送およびプロトコル失敗を、安定したコードを持つ `LlmError` 値としてスローします。エージェントループは診断とポリシーのためにエラーとコードを保持し、通常の `Error` を自動変換しません。すべてのプロバイダー HTTP リクエストは `attributionHeaders()` をマージし、`options.signal` を転送しなければなりません。
 
 ```ts
 import {

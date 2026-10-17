@@ -5,7 +5,7 @@ description: "Claude Code 与 Codex bundle 添加全局委派工具，同时保�
 
 # 原生子代理 bundle 包含全局工具
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

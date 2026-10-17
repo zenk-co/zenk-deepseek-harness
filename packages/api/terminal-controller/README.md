@@ -1,106 +1,106 @@
 ---
-description: "Interactive user terminals with execution-environment shell defaults, bounded screen recovery and typed Remote control."
+description: "実行環境のシェル既定値、境界付き画面リカバリー、型付き Remote 制御を備えた対話型ユーザーターミナル。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-api-terminal-controller
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Open the execution environment's default shell in the Session's current working directory from the Web sidebar. Reconnect to existing processes and close their complete provider-owned process ranges. Terminal output stays outside the Agent transcript. Keeping a terminal open retains its process and a bounded screen buffer.
+Web サイドバーから、Session の現在の作業ディレクトリで実行環境の既定シェルを開く。既存プロセスに再接続し、プロバイダーが所有するプロセス範囲全体をクローズする。ターミナル出力は Agent トランスクリプトの外に留まる。ターミナルを開いたままにすると、そのプロセスと境界付きの画面バッファが保持される。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The Web bundle mounts this package with the subprocess provider, working-directory service, sandbox policy and Typert Gateway. `remote.terminal` exposes `environment`, `shells`, `list`, `create`, `retain`, `attach`, `rename` and `close`; each operation is scoped by Session identity. Listing reads retained Host terminals directly, so viewing an offline Session neither activates an Agent nor produces a recovery error.
+Web バンドルはこのパッケージを subprocess プロバイダー、作業ディレクトリサービス、サンドボックスポリシー、Typert Gateway とともにマウントする。`remote.terminal` は `environment`、`shells`、`list`、`create`、`retain`、`attach`、`rename`、`close` を公開し、各操作は Session 同一性でスコープされる。一覧表示は保持された Host ターミナルを直接読むので、オフライン Session を見ても Agent をアクティブ化したりリカバリーエラーを生成したりしない。
 
-Shell discovery lists the execution environment's declared default shell first. Only when the provider omits that default does resolution use `/bin/sh` on POSIX or `cmd.exe` on Windows. An optional `shell` profile overrides that choice with executable `path`, display `name` and `args` (default `[]`). The selector also probes `shellCandidates` through the execution provider and omits confirmed lookup misses. It lists each executable name once, ignoring letter case and `.exe`, and keeps the earliest entry, because PATH lookup can reach the default through another directory, such as `/usr/bin/bash` for `/bin/bash` on merged-`/usr` systems. Creation accepts a discovered `shellPath` and verifies it again; resolution or transport failure is reported without launching a different shell. Environment lookup reads the current directory and limits without filesystem validation or shell resolution, so unavailable directories or default shells do not prevent reattaching to an existing process. Automatic POSIX profiles start interactively, and PowerShell uses `-NoLogo`, so completion and startup configuration remain shell-owned. New terminals validate the current directory through the [working-directory service](../../session/working-directory/README.md) before spawning, including its recovery behavior. Existing terminals keep their process directories. User terminals run with the execution environment’s system-user permissions, independently of the Agent’s sandbox mode and approval policy. Operating-system and container restrictions still apply; DSH does not elevate the user. The subprocess provider retains its credential-environment scrubbing.
+シェル検出は、実行環境が宣言した既定シェルを最初に列挙する。プロバイダーがその既定値を省略した場合にのみ、解決は POSIX では `/bin/sh`、Windows では `cmd.exe` を使用する。任意の `shell` プロファイルは、実行可能 `path`、表示 `name`、`args` (既定 `[]`) でその選択を上書きする。セレクターは実行プロバイダーを通して `shellCandidates` もプローブし、確認されたルックアップミスを省略する。各実行可能名を 1 回だけ列挙し、大文字小文字と `.exe` を無視して、最も早いエントリーを保つ。PATH ルックアップは別のディレクトリを通して既定値に到達しうるためである (例: merged-`/usr` システムでの `/bin/bash` に対する `/usr/bin/bash`)。作成は検出された `shellPath` を受け入れ、それを再検証する。解決やトランスポートの失敗は、別のシェルを起動することなく報告される。環境ルックアップは現在のディレクトリと制限を読み取り、ファイルシステム検証やシェル解決を行わないので、利用不可のディレクトリや既定シェルがあっても既存プロセスへの再アタッチは妨げられない。自動 POSIX プロファイルは対話的に起動し、PowerShell は `-NoLogo` を使用するので、補完と起動設定はシェルの所有のままである。新しいターミナルは spawn 前に[作業ディレクトリサービス](../../session/working-directory/README.md)を通して現在のディレクトリを検証する (そのリカバリー挙動を含む)。既存のターミナルは自身のプロセスディレクトリを保つ。ユーザーターミナルは、Agent のサンドボックスモードと承認ポリシーとは独立に、実行環境のシステムユーザー権限で実行される。オペレーティングシステムとコンテナの制限は依然として適用される。DSH がユーザーを昇格させることはない。subprocess プロバイダーはクレデンシャル環境のスクラビングを保持する。
 
-| Configuration | Default | Meaning |
+| 構成 | 既定値 | 意味 |
 |---|---|---|
-| `shell` | omitted | Use the execution environment's default shell, or one explicit profile |
-| `shellCandidates` | `zsh`, `bash`, `fish`, `pwsh`, `powershell`, `cmd` | Additional executable names or paths offered when installed |
-| `maxTerminals` | `8` | Retained terminals and pending allocations per Session |
-| `maxCols`, `maxRows` | `500`, `200` | Maximum PTY dimensions |
-| `scrollback` | `1000` | Retained screen history rows |
-| `maxBufferedBytes` | `2097152` | Encoded output per follower and buffered Client input |
-| `maxInputBytes` | `65536` | Maximum raw UTF-8 bytes per input command and across unacknowledged Client input |
-| `disposeGraceMs` | `1000` | Provider termination grace in milliseconds |
-| `unattendedTimeoutMs` | `7200000` | Continuous confirmed idle time without window holds before cleanup; `0` disables automatic reclamation |
-| `activityPollIntervalMs` | `30000` | Interval between unattended activity observations |
-| `cleanupRetryMs` | `60000` | Delay before retrying failed cleanup |
+| `shell` | 省略 | 実行環境の既定シェル、または 1 つの明示的プロファイルを使用する |
+| `shellCandidates` | `zsh`, `bash`, `fish`, `pwsh`, `powershell`, `cmd` | インストールされている場合に提示される追加の実行可能名またはパス |
+| `maxTerminals` | `8` | Session ごとに保持されるターミナルと保留中の割り当て |
+| `maxCols`, `maxRows` | `500`, `200` | PTY の最大次元 |
+| `scrollback` | `1000` | 保持される画面履歴行数 |
+| `maxBufferedBytes` | `2097152` | フォロワーごとのエンコード済み出力とバッファリングされた Client 入力 |
+| `maxInputBytes` | `65536` | 入力コマンドごと、および未確認の Client 入力全体での生 UTF-8 バイト数の上限 |
+| `disposeGraceMs` | `1000` | プロバイダー終了の猶予 (ミリ秒) |
+| `unattendedTimeoutMs` | `7200000` | ウィンドウ保持なしで確認された連続アイドル時間がクリーンアップ前に達する値。`0` は自動回収を無効化する |
+| `activityPollIntervalMs` | `30000` | 無人アクティビティ観測の間隔 |
+| `cleanupRetryMs` | `60000` | 失敗したクリーンアップを再試行する前の遅延 |
 
-An open tab in any connected window retains its terminal, including hidden tabs and inactive Sessions. After the last hold disappears, only positively confirmed idle time counts toward reclamation. Running, stopped, input-waiting and background work remains protected; unknown activity clears the idle deadline. Completion starts a fresh full grace period. The Host uses a monotonic clock, rechecks current ownership and activity before cleanup, and resets evidence after an observation gap exceeding twice the polling interval. The timing fields use milliseconds and safe integers; polling and retry intervals must be positive.
+接続された任意のウィンドウで開いているタブは、非表示のタブや非アクティブな Session を含めて、そのターミナルを保持する。最後の保持が消えた後、回収に算入されるのは積極的に確認されたアイドル時間のみである。実行中、停止中、入力待ち、バックグラウンドの作業は保護されたままである。不明なアクティビティはアイドル期限をクリアする。完了は新たな完全な猶予期間を開始する。Host は単調クロックを使用し、クリーンアップ前に現在の所有権とアクティビティを再チェックし、ポーリング間隔の 2 倍を超える観測ギャップの後は証拠をリセットする。タイミングフィールドはミリ秒と安全な整数を使用する。ポーリングと再試行の間隔は正でなければならない。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The Host uses `ctx.subprocess.spawnTerminal` with `TERM=xterm-256color`; it never launches a desktop terminal application. Streaming UTF-8 decoding preserves split characters and leading BOMs, and replaces incomplete trailing bytes at EOF. The duplex `attach` Remote stream carries output and ordered `write`/`resize` commands on the Gateway mux. Each command has a consecutive attachment-local sequence; an `ack` confirms provider acceptance or reports control refusal. Snapshots and state frames carry the receiving attachment's `writable` flag. Headless xterm and its serializer produce each opening screen after all preceding output writes, then monotone output sequences identify subsequent frames. Slow followers fail explicitly; a new attachment restores the current screen.
+Host は `TERM=xterm-256color` を伴う `ctx.subprocess.spawnTerminal` を使用する。デスクトップターミナルアプリケーションを起動することは決してない。ストリーミング UTF-8 デコードは分割された文字と先頭 BOM を保持し、EOF では不完全な末尾バイトを置き換える。全二重の `attach` Remote ストリームは、Gateway mux 上で出力と順序付けられた `write`/`resize` コマンドを運ぶ。各コマンドはアタッチメントローカルの連続シーケンスを持つ。`ack` はプロバイダーの受け入れを確認するか、制御拒否を報告する。スナップショットと状態フレームは、受信側アタッチメントの `writable` フラグを運ぶ。ヘッドレス xterm とそのシリアライザーは、先行するすべての出力書き込みの後に各オープニング画面を生成し、以降のフレームは単調な出力シーケンスで識別される。遅いフォロワーは明示的に失敗する。新しいアタッチメントは現在の画面を復元する。
 
-The latest attachment owns input and resize. Detachment releases input control without killing the process. Explicit close awaits process cleanup and final output; cleanup failure retains the resource for retry. The Session remembers closed identities and rejects their delayed or repeated creation, including creation already in progress when close arrives. A new terminal uses a new identity. Pending allocations remain owned even if cancellation and cleanup both fail. Session owner disposal and controller disposal also terminate owned processes. Changing the Session’s sandbox mode leaves user terminals running with the same permissions. Input or resize refused after control transfer or process exit leaves the output attachment intact and disables input; rejected input is not replayed. Provider completion disables input before output drainage finishes, and late input failures cannot discard a gracefully finished follower's final frames.
+最新のアタッチメントが入力とリサイズを所有する。デタッチはプロセスを殺さずに入力制御を解放する。明示的なクローズはプロセスのクリーンアップと最終出力を待つ。クリーンアップの失敗はリソースを再試行のために保持する。Session はクローズされた同一性を記憶し、その遅延または繰り返しの作成を拒否する — クローズが到着したときにすでに進行中の作成も含む。新しいターミナルは新しい同一性を使用する。保留中の割り当ては、キャンセルとクリーンアップの両方が失敗しても所有されたままである。Session オーナーのディスポーズとコントローラーのディスポーズも所有プロセスを終了させる。Session のサンドボックスモードを変更しても、ユーザーターミナルは同じ権限で実行され続ける。制御移転またはプロセス終了の後に拒否された入力やリサイズは、出力アタッチメントを無傷のまま残し、入力を無効化する。拒否された入力はリプレイされない。プロバイダーの完了は出力排出が終わる前に入力を無効化し、遅延した入力失敗が正常に終了したフォロワーの最終フレームを破棄することはできない。
 
-The opening snapshot advertises the carrier's complete-frame `inputWindow`; in-process carriers without an inbox limit omit it. The Client counts JSON escaping, command fields, and the carrier envelope for both writes and resizes. Commands wait locally while unacknowledged frames fill that window; provider acknowledgements release capacity. `maxInputBytes` bounds raw UTF-8 input, while `maxBufferedBytes` bounds all queued and unacknowledged encoded input frames. A single frame that cannot fit the carrier window, or an exhausted Client buffer, reports `inputFull` and cancels the attachment without replaying queued commands.
+オープニングスナップショットはキャリアの完全フレーム `inputWindow` をアドバタイズする。受信箱制限のないインプロセスキャリアはそれを省略する。Client は書き込みとリサイズの両方について、JSON エスケープ、コマンドフィールド、キャリアエンベロープを数える。未確認フレームがそのウィンドウを埋めている間、コマンドはローカルで待機する。プロバイダーの確認応答が容量を解放する。`maxInputBytes` は生 UTF-8 入力を制限し、`maxBufferedBytes` はキューに入ったすべての未確認エンコード済み入力フレームを制限する。キャリアウィンドウに収まらない単一フレーム、または枯渇した Client バッファは `inputFull` を報告し、キューに入ったコマンドをリプレイせずにアタッチメントをキャンセルする。
 
-The Client saves each Session/content-to-terminal association before allocation under its own `dsh.terminal.binding.v1.*` localStorage key. The content identity is globally unique; layout-local tab ids only identify live view occurrences. Independent record writes and deletes preserve other windows' bindings. Restored views reuse that identity; the sidebar terminal provider restores its views before querying unrepresented Host terminals. A new view may create a process, while a recovered view reports a missing target without creating a replacement. Explicit close removes the association after saving its cleanup request. The Host supplies current process metadata and screen contents; neither is saved in the browser. The Client model acknowledges screen writes after the browser emulator processes them, pipelines input within its unacknowledged UTF-8 byte budget and ignores stale attachment responses. Reconnection creates a fresh command sequence and never replays unacknowledged input. Provider input failures end the attachment; its process and recovery screen remain available for explicit reconnection. Client-owned errors carry locale keys. Plugin disposal awaits active and previously detached output streams without closing Host processes.
+Client は割り当て前に各 Session/コンテンツからターミナルへの関連付けを、独自の `dsh.terminal.binding.v1.*` localStorage キーの下に保存する。コンテンツ同一性はグローバルに一意である。レイアウトローカルのタブ ID は、ライブビューの出現のみを識別する。独立したレコードの書き込みと削除は他のウィンドウのバインディングを保持する。復元されたビューはその同一性を再利用する。サイドバーのターミナルプロバイダーは、表現されていない Host ターミナルを照会する前に自身のビューを復元する。新しいビューはプロセスを作成してよいが、復旧したビューは置き換えを作成せずに欠落したターゲットを報告する。明示的なクローズは、クリーンアップ要求を保存した後に関連付けを削除する。Host は現在のプロセスメタデータと画面内容を提供する。いずれもブラウザには保存されない。Client モデルは、ブラウザエミュレーターが画面書き込みを処理した後にそれを確認し、未確認の UTF-8 バイト予算内で入力をパイプライン化し、古いアタッチメント応答を無視する。再接続は新しいコマンドシーケンスを作成し、未確認の入力をリプレイすることは決してない。プロバイダーの入力失敗はアタッチメントを終了させる。そのプロセスとリカバリー画面は明示的な再接続のために利用可能なままである。Client 所有のエラーはロケールキーを運ぶ。プラグインのディスポーズは、Host プロセスをクローズせずに、アクティブな出力ストリームと以前にデタッチされた出力ストリームを待つ。
 
-Client discovery belongs to each Session in the current window. Concurrent and later restored views share one list, including an empty result; new identities allocate directly from `create`. Explicit retry replaces a settled result or failure, and reconnection refreshes each previously discovered Session once. Remounting a failed view preserves its error without retrying. Confirmed mutations and attachment metadata take precedence over an older pending list response, and responses from replaced connections cannot publish. A view releasing its DOM or lifetime does not cancel another view’s lookup. Plugin disposal discards cached metadata and joins outstanding discovery. Other windows’ unrepresented terminals become discoverable through explicit refresh or reconnection; current attachments carry their own live metadata. Environment lookup remains separate because its working directory can change.
+Client の検出は現在のウィンドウの各 Session に属する。同時および後から復元されたビューは、空の結果を含めて 1 つのリストを共有する。新しい同一性は `create` から直接割り当てる。明示的な再試行は確定済み結果または失敗を置き換え、再接続は以前に検出された各 Session を 1 回更新する。失敗したビューを再マウントしても、再試行せずにそのエラーが保持される。確認された変更とアタッチメントメタデータは、古い保留中のリスト応答より優先され、置き換えられた接続からの応答は公開できない。DOM やライフタイムを解放するビューが、別のビューのルックアップをキャンセルすることはない。プラグインのディスポーズはキャッシュされたメタデータを破棄し、未完了の検出に加わる。他のウィンドウの表現されていないターミナルは、明示的なリフレッシュまたは再接続によって検出可能になる。現在のアタッチメントは自身のライブメタデータを運ぶ。環境ルックアップは、その作業ディレクトリが変化しうるため分離されたままである。
 
-The separate `retain(sessionId, id, signal)` Remote stream acknowledges a window hold without Agent activation, screen output, input transfer or process creation. The terminal provider supplies the sidebar's complete open-tab inventory, and the Client intersects it with its own saved identities. Duplicate occurrences share one hold per window; stale associations alone retain nothing. Restored output attachments wait for an acknowledged current hold. Transport cancellation releases exactly that physical generation; plugin disposal joins all hold streams. Failed cleanup retains ownership and retries without reopening admission or restarting the idle grace.
+別個の `retain(sessionId, id, signal)` Remote ストリームは、Agent のアクティブ化、画面出力、入力転送、プロセス作成なしでウィンドウ保持を確認応答する。ターミナルプロバイダーはサイドバーの完全なオープンタブインベントリを提供し、Client はそれを自身の保存済み同一性と交差させる。重複する出現はウィンドウごとに 1 つの保持を共有する。古い関連付けだけでは何も保持されない。復元された出力アタッチメントは、確認された現在の保持を待つ。トランスポートのキャンセルはまさにその物理世代を解放する。プラグインのディスポーズはすべての保持ストリームに加わる。失敗したクリーンアップは所有権を保持し、アドミッションを再開したりアイドル猶予を再開したりせずに再試行する。
 
-New views start automatically, using an explicit guide selection or the remembered available shell. The last selected shell path is stored under `dsh.terminal.shell` in origin-scoped localStorage. Default launches verify the saved path through Host discovery and fall back to the current default when it is absent. The guide records a selection before opening its tab; each new tab retains its own chosen path and allocation identity. Storage failures do not prevent startup. Restoring existing terminals neither reads this preference nor discovers shells.
+新しいビューは自動的に起動し、明示的なガイド選択または記憶された利用可能シェルを使用する。最後に選択されたシェルパスは、origin スコープの localStorage の `dsh.terminal.shell` の下に保存される。既定の起動は Host 検出を通して保存されたパスを検証し、それが存在しない場合は現在の既定値にフォールバックする。ガイドはタブを開く前に選択を記録する。各新しいタブは自身が選択したパスと割り当て同一性を保持する。ストレージの失敗は起動を妨げない。既存のターミナルの復元は、この設定を読むこともシェルを検出することもない。
 
-Closing saves an unfinished cleanup request before releasing the tab, then awaits Host cleanup in the background. A failure exposes a retry notification. Each request has its own terminal-ID localStorage key and is removed after successful cleanup or a definitive `session/not-found` response; startup retries saved requests. Transport failures retain the request. Cleanup requests persist independently of tab associations and sidebar layout. If browser storage is unavailable, cleanup remains usable in memory but cannot be recovered after reload.
+クローズはタブを解放する前に未完了のクリーンアップ要求を保存し、その後バックグラウンドで Host のクリーンアップを待つ。失敗は再試行通知を表示する。各要求は独自のターミナル ID localStorage キーを持ち、クリーンアップの成功または決定的な `session/not-found` 応答の後に削除される。起動時に保存済み要求を再試行する。トランスポートの失敗は要求を保持する。クリーンアップ要求はタブの関連付けとサイドバーレイアウトとは独立に永続化される。ブラウザストレージが利用できない場合、クリーンアップはメモリ内で使用可能なままであるが、リロード後に復元できない。
 
 </details>
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
 - [Subprocess](../../subprocess/subprocess/README.md)
-- [Right Sidebar](../../client/ui-sidebar-right/README.md)
-- [User-terminal permissions](../../../.agents/notes/implemented/architecture/2026-09-16-user-terminal-permissions.md)
-- [Web terminal decision](../../../.agents/notes/implemented/feature/2026-09-09-web-sidebar-terminal.md)
+- [右サイドバー](../../client/ui-sidebar-right/README.md)
+- [ユーザーターミナルの権限](../../../.agents/notes/implemented/architecture/2026-09-16-user-terminal-permissions.md)
+- [Web ターミナルの決定](../../../.agents/notes/implemented/feature/2026-09-09-web-sidebar-terminal.md)
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through [working-directory recovery](../../session/working-directory/README.md): creating a terminal may update directory user context, while terminal output stays outside model history.
+間接的。[作業ディレクトリのリカバリー](../../session/working-directory/README.md)を通じて: ターミナルの作成がディレクトリのユーザーコンテキストを更新することがある一方、ターミナル出力はモデル履歴の外に留まる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Directory recovery appends user context without replacing the system-prompt prefix; terminal output stays outside model requests.
+ディレクトリリカバリーはシステムプロンプトプレフィックスを置き換えずにユーザーコンテキストを追記する。ターミナル出力はモデルリクエストの外に留まる。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Processes and screens survive browser reloads, but not Host or Session owner disposal. There is no durable terminal restoration or automatic shell respawn. Exited terminals count toward `maxTerminals`; close unused tabs to release their screens and quota.
-- The subprocess provider determines native PTY availability and process-tree cleanup guarantees. Finding an executable does not prove PTY allocation will succeed.
-- Automatic reclamation depends on the provider's [supported shell activity observation](../../subprocess/subprocess-local/README.md#running-terminal-sessions). Unsupported shells, custom launch arguments and uncertain process observations may retain resources until explicit close or owner disposal. No maximum runtime kills busy commands.
-- Screen recovery retains bounded history, not a complete transcript. Only one attachment at a time can write or resize.
+- プロセスと画面はブラウザのリロードを超えて存続するが、Host または Session オーナーのディスポーズは超えない。永続的なターミナル復元や自動シェル再 spawn は存在しない。終了したターミナルも `maxTerminals` に算入される。未使用のタブをクローズして、その画面とクォータを解放する。
+- ネイティブ PTY の可用性とプロセスツリーのクリーンアップ保証は subprocess プロバイダーが決める。実行可能ファイルが見つかったからといって、PTY の割り当てが成功するとは限らない。
+- 自動回収はプロバイダーの[サポートされるシェルアクティビティ観測](../../subprocess/subprocess-local/README.md#running-terminal-sessions)に依存する。サポートされないシェル、カスタム起動引数、不確実なプロセス観測は、明示的なクローズまたはオーナーのディスポーズまでリソースを保持しうる。ビジーなコマンドを殺す最大実行時間は存在しない。
+- 画面リカバリーは完全なトランスクリプトではなく、境界付きの履歴を保持する。書き込みやリサイズを行えるのは同時に 1 つのアタッチメントのみである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

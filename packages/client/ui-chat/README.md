@@ -1,206 +1,206 @@
 ---
-description: "Browser Chat target that renders Session conversation nodes, historical images, actions, localization, and scroll state."
+description: "Session の会話ノード、過去の画像、アクション、ローカライズ、スクロール状態を描画するブラウザー Chat ターゲット。"
 kind: "package-reference"
 ---
 # @deepseek-ai/dsh-client-ui-chat
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Desktop product events use the optional [product analytics service](../product-analytics/README.md); ordinary Web interactions are excluded.
+デスクトップのプロダクトイベントは、オプションの [プロダクト分析サービス](../product-analytics/README.md) を使用する。通常の Web 操作は除外される。
 
-## Summary
+## 概要
 
-Use this package to render a browser chat from recorded Session conversations, including historical images, localized actions, and restored scroll position. Work-details modes control reasoning previews and process visibility without hiding final answers; Verbose keeps completed-turn process rows visible. Local transcript and steering submissions appear immediately, remain in their original surface, and disappear atomically when authoritative Session records arrive, while queued submissions stay outside Chat. The package does not assemble or modify model requests.
+このパッケージは、記録された Session の会話からブラウザー Chat を描画するために使う。過去の画像、ローカライズされたアクション、復元されたスクロール位置を含む。Work-details モードは、最終回答を隠すことなく reasoning プレビューとプロセス可視性を制御する。Verbose は完了ターンのプロセス行を表示したままにする。ローカルのトランスクリプトとステアリングの送信は即座に表示され、元のサーフェスに留まり、権威ある Session レコードが到着したときに不可分に消える。一方、キューに入った送信は Chat の外に留まる。このパッケージはモデルリクエストを組み立てたり変更したりしない。
 
-File-mention providers receive the viewed Session ID with the closing-turn owner, so links into inherited history can address the fork itself.
+ファイルメンションプロバイダーは、表示中の Session ID をクローズするターンのオーナーとともに受け取る。これにより、継承された履歴へのリンクがフォーク自体を指すことができる。
 
-## Table of Contents
+## 目次
 
-- [Reference previews](#reference-previews)
-- [Hidden Chat rows](#system-prompt-row)
-- [Command and failure rows](#command-and-failure-rows)
-- [Turn token usage](#turn-token-usage)
-- [Completed-turn footer](#completed-turn-footer)
-- [Turn Process Folding](#turn-process-folding)
-- [Grouped rendering](#grouped-rendering)
-- [Scroll ownership](#scroll-ownership)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [参照プレビュー](#reference-previews)
+- [非表示の Chat 行](#system-prompt-row)
+- [コマンド行と失敗行](#command-and-failure-rows)
+- [ターンのトークン使用量](#turn-token-usage)
+- [完了ターンのフッター](#completed-turn-footer)
+- [ターンプロセスの折りたたみ](#turn-process-folding)
+- [グループ化レンダリング](#grouped-rendering)
+- [スクロールの所有権](#scroll-ownership)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="reference-previews"></a>
-## Reference previews
+## 参照プレビュー
 
-Sent generic-file attachments retain the draft's [file-card radius](../../../docs/ui-radius.md#radius-scale).
+送信済みの汎用ファイル添付は、下書きの [ファイルカード半径](../../../docs/ui-radius.md#radius-scale) を保持する。
 
-`ChatView` supplies file and HTTP(S) navigation through the existing `MarkdownDelegateProvider` around its node list, passing `requestOpenFile`, `openExternalLink`, and `fileImages` directly. Its file opener retains Chat's failure feedback and retry handling. Assistant Markdown file links open in the right Sidebar after the message settles, including references to unmodified files. Relative paths resolve in the viewed Session's workspace; absolute paths retain the same Session's filesystem access. `#L24` and `#L24-L30` navigate to the first specified line and reuse an existing file tab. Missing files show the preview's error state.
+`ChatView` は、ノードリストの周囲にある既存の `MarkdownDelegateProvider` を通じてファイルと HTTP(S) のナビゲーションを提供し、`requestOpenFile`、`openExternalLink`、`fileImages` を直接渡す。そのファイルオープナーは Chat の失敗フィードバックと再試行処理を保持する。Assistant の Markdown ファイルリンクは、メッセージが確定した後に右 Sidebar で開く。未変更のファイルへの参照も含む。相対パスは表示中の Session のワークスペースで解決され、絶対パスは同じ Session のファイルシステムアクセスを保持する。`#L24` と `#L24-L30` は指定された最初の行に移動し、既存のファイルタブを再利用する。存在しないファイルはプレビューのエラー状態を表示する。
 
-Native message images use separate user and output positions. The `conversation.chat.user.content` Factory declares `conversation.chat.user.images`, which `UserContent` renders; the Assistant node registration declares `conversation.chat.message.images`, which `AssistantMarkdown` renders. Both receive image sources, the authorized `loadImage`, and layout options through explicit props. Their official `MessageImages` entries call the shared root-scoped `conversation.images.content` Factory. Each position can be replaced independently without duplicating the gallery implementation.
+ネイティブのメッセージ画像は、ユーザー用と出力用の別々の位置を使用する。`conversation.chat.user.content` Factory は `conversation.chat.user.images` を宣言し、`UserContent` がそれをレンダリングする。Assistant ノードの登録は `conversation.chat.message.images` を宣言し、`AssistantMarkdown` がそれをレンダリングする。どちらも画像ソース、認可された `loadImage`、レイアウトオプションを明示的な props として受け取る。それぞれの公式 `MessageImages` エントリは、共有のルートスコープ `conversation.images.content` Factory を呼び出す。各位置は、ギャラリー実装を複製することなく独立に置き換えられる。
 
-The session-scoped `conversation.chat.user.content` Factory renders only the user content stack: text, extra blocks, image/file attachments in input order, and reference summaries. Its [`UserContentInput`](src/client/contract/slots.ts) carries prepared `content`, transform `facts`, display props, and explicit `loadImage`; node-owned injections provide reference actions. It calls the shared `conversation.user.text` Factory for text and its own image Slot for images. Direct callers need a Session binding and supply their own row wrapper.
+セッションスコープの `conversation.chat.user.content` Factory は、ユーザーコンテンツのスタックのみをレンダリングする。テキスト、追加ブロック、入力順の画像/ファイル添付、参照サマリーである。その [`UserContentInput`](src/client/contract/slots.ts) は、準備済みの `content`、変換 `facts`、表示 props、明示的な `loadImage` を持つ。ノード所有の注入が参照アクションを提供する。テキストには共有の `conversation.user.text` Factory を呼び、画像には自身の画像 Slot を呼ぶ。直接の呼び出し元は Session バインディングを必要とし、自身の行ラッパーを用意する。
 
-`UserStyleBubble` and the [source-specific wrappers](<src/client/chat/MessageItem.tsx#L157-L309>) retain the user row, keys, pending/echo markers, timestamps, copy controls, and other message actions. The content Factory reads neither source-specific models nor private Context, and is not a global user-content override entry point.
+`UserStyleBubble` と [ソース固有のラッパー](<src/client/chat/MessageItem.tsx#L157-L309>) は、ユーザー行、キー、pending/echo マーカー、タイムスタンプ、コピーコントロール、その他のメッセージアクションを保持する。コンテンツ Factory はソース固有のモデルもプライベート Context も読まず、グローバルなユーザーコンテンツ上書きのエントリーポイントではない。
 
-Standalone Markdown images show contained previews and open the shared image lightbox; local paths resolve against the viewed workspace after settlement. Image file links keep their sidebar activation and show a thumbnail after hover dwell or keyboard focus. Escape dismisses the thumbnail. Failed images retain a localized status and their description; no duplicate-image filtering is applied.
+スタンドアロンの Markdown 画像は、収まったプレビューを表示し、共有の画像ライトボックスを開く。ローカルパスは確定後に表示中のワークスペースを基準に解決される。画像ファイルリンクはサイドバー起動を保持し、ホバー滞留またはキーボードフォーカスの後にサムネイルを表示する。Escape でサムネイルを閉じる。失敗した画像はローカライズされたステータスとその説明を保持する。重複画像のフィルタリングは適用されない。
 
-Settings → General → Open chat links in selects the destination for ordinary clicks on Chat HTTP(S) links: In-App Sidebar (default) opens a new right-Sidebar Browser tab, while Default Browser opens an external tab. The setting follows Keyboard shortcuts and is shown only while the Sidebar Browser is available. If the Sidebar Browser is not registered, both choices use the external browser; modified clicks retain native behavior. The `ui-chat.linkOpening` preference persists on the Host for authenticated browsers and stays process-local when settings cannot persist writes. Sent file references and skills confirmed by the message’s logged invocation also open in the right Sidebar. File paths use the viewed Session; skill names resolve through its current input-trigger source. Both use the prose file-link dotted underline on hover or focus. Sessions, directories, and command labels remain non-navigating references.
+Settings → General → Open chat links in は、Chat の HTTP(S) リンクを通常クリックしたときの移動先を選択する。In-App Sidebar（デフォルト）は右 Sidebar の Browser タブを新規に開き、Default Browser は外部タブを開く。この設定は Keyboard shortcuts に続いて表示され、Sidebar Browser が利用可能な間だけ表示される。Sidebar Browser が登録されていない場合、どちらの選択肢も外部ブラウザーを使う。修飾キー付きクリックはネイティブの挙動を保持する。`ui-chat.linkOpening` 設定は認証済みブラウザーに対して Host に永続化され、設定が書き込みを永続化できない場合はプロセスローカルに留まる。送信済みのファイル参照と、メッセージに記録された呼び出しで確認されたスキルも右 Sidebar で開く。ファイルパスは表示中の Session を使い、スキル名は現在の入力トリガーソースを通じて解決される。どちらもホバーまたはフォーカス時に本文ファイルリンクの点線下線を使う。Session、ディレクトリ、コマンドラベルはナビゲートしない参照のままである。
 
 <a id="system-prompt-row"></a>
-## Hidden Chat rows
+## 非表示の Chat 行
 
-Chat omits system-prompt, ordinary Context injection, and `permission` command rows in every work-details mode. Context containing tool additions or removals remains visible. The filter changes neither recorded Session events nor Trajectory inspection. Non-human Turn triggers remain independent, bordered notices with a contrasting neutral background; other command rows remain in Chat.
+Chat は、すべての work-details モードでシステムプロンプト、通常の Context 注入、`permission` コマンド行を省略する。ツールの追加や削除を含む Context は表示されたままである。このフィルターは記録された Session イベントも Trajectory 検査も変更しない。人間以外によるターン起動は、対照的なニュートラル背景を持つ独立した境界付き通知のままである。その他のコマンド行は Chat に残る。
 
-When an Assistant attempt retires without a visible message, Chat hides its already-published Node instead of removing its key. A retry in the same Step reuses that key when visible content returns. This also applies when the loaded window lacks the Step start.
+Assistant の試行が可視メッセージなしで退去すると、Chat はすでに公開された Node をキーを削除するのではなく非表示にする。同じ Step での再試行は、可視コンテンツが戻ったときにそのキーを再利用する。これは、読み込まれたウィンドウに Step 開始が欠けている場合にも当てはまる。
 
 <a id="command-and-failure-rows"></a>
-## Command and failure rows
+## コマンド行と失敗行
 
-Generic command rows retain the ordinary command glyph in every lifecycle state; failure remains explicit through the row state and summary. Every terminal Turn failure renders its inline red-dot row; a quota failure's row states the neutral `message.failure.quota` copy instead of the provider message. The transient notice for a newly appended `QUOTA` or `ACCOUNT_QUOTA` comes from this package's frame-wide entry in `shell.overlay`, which outlives the Chat panel: it offers the one live notice to the `shell.quota-notice` chain and falls back to its own warning Toast, while an entry that claims the code replaces that fallback. Only Sessions this Client has bound and materialized publish; quota failures in Sessions it never opened do not. A newer notice replaces the current one unless a claiming entry retains it with `keepOpen()`: that call returns a release the caller owns and must run on unmount, any live hold keeps the claiming entry mounted and drops later notices, and releasing resumes later notices without replaying the dropped ones. The fallback Toast has no deferral of its own: while the Desktop account's opaque native Platform page covers the document, it still runs underneath and its display timer may elapse unseen, dismissing the notice itself, so only the persistent failure row remains. A release drops only its own hold, so one that runs after a dismissal or a newer hold leaves that newer hold intact. Dismissal and sign-out clear every hold, and dropped notices are not queued while their persistent failure rows still render. History replacement and pagination never publish a notice. Intermediate retries do not create a terminal row; output-token limits use the amber warning dot. A Turn that restart recovery closed as `interrupted` renders a localized stopped row stating that the DSH process exited mid-Turn, without a code chip, and its process summary reads Stopped.
+汎用コマンド行は、どのライフサイクル状態でも通常のコマンドグリフを保持する。失敗は行の状態とサマリーを通じて明示されたままである。すべての終端ターン失敗は、インラインの赤ドット行をレンダリングする。クォータ失敗の行は、プロバイダーのメッセージの代わりにニュートラルな `message.failure.quota` の文言を述べる。新たに追加された `QUOTA` または `ACCOUNT_QUOTA` の一時通知は、このパッケージの `shell.overlay` 内のフレーム全体のエントリから発せられ、Chat パネルより長生きする。これは唯一のライブ通知を `shell.quota-notice` チェーンに提供し、フォールバックとして自身の警告 Toast を使うが、コードを要求するエントリがそのフォールバックを置き換える。公開するのは、この Client がバインドして実体化した Session のみである。一度も開いていない Session のクォータ失敗は公開しない。新しい通知は現在の通知を置き換える。ただし、要求側エントリが `keepOpen()` で保持している場合を除く。その呼び出しは呼び出し元が所有し、アンマウント時に必ず実行しなければならない release を返す。ライブの保持がある間は、要求側エントリはマウントされたままで、以降の通知は破棄される。release は以降の通知を再開するが、破棄された通知を再生することはない。フォールバック Toast 自体には先送りがない。デスクトップアカウントの不透明なネイティブ Platform ページがドキュメントを覆っている間も、Toast はその下で動作し続け、表示タイマーが気づかれないうちに経過して通知自体を閉じてしまうことがある。その場合、永続的な失敗行だけが残る。release は自身の保持のみを解除する。したがって、閉じた後やより新しい保持の後に実行された release も、その新しい保持をそのままにする。閉じることとサインアウトはすべての保持をクリアし、破棄された通知は、その永続的な失敗行がまだレンダリングされている間はキューに積まれない。履歴の置き換えとページネーションは通知を決して発行しない。中間の再試行は終端行を作らない。出力トークン制限はアンバーの警告ドットを使う。再起動リカバリが `interrupted` として閉じたターンは、DSH プロセスがターン途中で終了したことを述べるローカライズされた停止行を、コードチップなしでレンダリングし、そのプロセスサマリーは Stopped と表示する。
 
 -----
 
 <a id="turn-token-usage"></a>
-## Turn token usage
+## ターンのトークン使用量
 
-A completed Turn shows an expandable usage row only when the loaded window includes `turn/start` and every started model attempt reports safe, exact usage. The row omits unavailable optional buckets. Incomplete or contradictory accounting hides the complete disclosure instead of presenting a partial total.
+完了したターンは、読み込まれたウィンドウに `turn/start` が含まれ、開始されたすべてのモデル試行が安全で正確な使用量を報告する場合にのみ、展開可能な使用量行を表示する。この行は利用できないオプションのバケットを省略する。不完全または矛盾する集計は、部分的な合計を提示するのではなく、完全な開示を隠す。
 
-Settings → General → Performance & usage appears after Send behavior while busy and before Session Log upload, and stores `ui-chat.performanceUsage` as `detailed` (default) or `compact`. Compact shows only available output speed and cache-hit percentage beneath the composer, without interactive statistic dialogs or per-Turn usage. Detailed exposes session statistics and per-Turn token usage. Neither mode shows elapsed time in the completed-turn footer. The preference changes presentation only; accounting and Session events remain intact.
+Settings → General → Performance & usage は、Send behavior while busy の後、Session Log upload の前に表示され、`ui-chat.performanceUsage` を `detailed`（デフォルト）または `compact` として保存する。Compact はコンポーザーの下に利用可能な出力速度とキャッシュヒット率のみを表示し、対話的な統計ダイアログやターンごとの使用量は表示しない。Detailed はセッション統計とターンごとのトークン使用量を公開する。どちらのモードも完了ターンのフッターに経過時間を表示しない。この設定は表示のみを変更する。集計と Session イベントはそのままである。
 
-The composer statistics are two `conversation.composer.dock` list entries: `activity` (order 0, turn and step counts and output speed, with LLM time, tool time, and TTFT) and `usage` (order 1, token total and cache hit). The controls follow the shared [statistics-control radius](../../../docs/ui-radius.md#radius-scale). Another plugin replaces one control by registering the same id and the same `order`; the dock orders rows by `order`, while a lower `priority` picks the replacement: a dynamic plugin receives one automatically, and a statically composed plugin passes it explicitly. A new id adds a control. Each control carries its id in `data-composer-stat`. An open statistics dialog closes on Escape or on a pointerdown or click outside it, so activating another control by pointer or keyboard swaps dialogs instead of stacking them.
+コンポーザーの統計は 2 つの `conversation.composer.dock` リストエントリである。`activity`（order 0、ターン数とステップ数および出力速度、LLM 時間、ツール時間、TTFT 付き）と `usage`（order 1、トークン合計とキャッシュヒット）である。コントロールは共有の [統計コントロール半径](../../../docs/ui-radius.md#radius-scale) に従う。別のプラグインが同じ id と同じ `order` を登録することで 1 つのコントロールを置き換える。dock は `order` で行を並べ、より低い `priority` が置き換えを選ぶ。動的プラグインは priority を自動的に受け取り、静的構成のプラグインはそれを明示的に渡す。新しい id はコントロールを追加する。各コントロールは `data-composer-stat` に自身の id を持つ。開いている統計ダイアログは Escape、またはその外側での pointerdown かクリックで閉じる。そのため、ポインターやキーボードで別のコントロールを起動すると、ダイアログが積み重なるのではなく入れ替わる。
 
-Explicit selections update every consumer immediately; accepted Host settings reconcile the live value, so a refused or pending write keeps the selected mode until the Host answers.
+明示的な選択はすべての消費者に即座に反映される。受け入れられた Host 設定がライブ値を調整し、拒否された書き込みや保留中の書き込みでも Host が応答するまで選択されたモードが保持される。
 
-Preference menus restore focus to their trigger without scrolling before publishing a new selection.
+設定メニューは、新しい選択を公開する前に、スクロールせずにフォーカスをトリガーに戻す。
 
 <a id="completed-turn-footer"></a>
-## Completed-turn footer
+## 完了ターンのフッター
 
-Artifact extensions can subscribe to one Turn and Node kind through `ChatNodeStore.turnDataSource`. The source includes hidden Nodes and exposes their business data in anchor order. Membership updates incrementally; only observed collections materialize ordered arrays, and unrelated Turns or kinds do not notify them.
+Artifact 拡張は `ChatNodeStore.turnDataSource` を通じて 1 つの Turn と Node 種別を購読できる。このソースは非表示の Node を含み、それらのビジネスデータをアンカー順に公開する。メンバーシップは増分的に更新される。監視対象のコレクションのみが順序付き配列を実体化し、無関係な Turn や種別はそれらに通知しない。
 
-The completed-turn action footer follows the recorded Turn end. Its action row starts 20px below preceding prose or extension content. Actions remain visible only on the latest Turn when its final visible content is a reply; other endings and historical Turns reveal actions on hover or keyboard focus. Devices without hover keep actions visible.
+完了ターンのアクションフッターは、記録されたターン終了に従う。そのアクション行は、先行する本文または拡張コンテンツの 20px 下から始まる。アクションは、最新のターンでその最後の可視コンテンツが返信である場合にのみ表示されたままになる。その他の終わり方と過去のターンは、ホバーまたはキーボードフォーカスでアクションを表示する。ホバーのないデバイスではアクションは表示されたままである。
 
 -----
 
 <a id="turn-process-folding"></a>
-## Turn Process Folding
+## ターンプロセスの折りたたみ
 
-During uninterrupted following, local transcript and steering echoes remain mounted through Inbox acceptance and claim until the durable message arrives, without triggering tail following twice. Pending steering follows Inbox order across clients, using matching local echoes in place. Admitted local steering also suppresses matching stale Inbox rows until the claim projection arrives; steering without a locally tracked submission continues to follow the Inbox projection. After reconnect, Host-owned rows replace receipt-confirmed local echoes; a claim awaiting admission may briefly have no bubble.
+中断のない追従中、ローカルのトランスクリプトとステアリングのエコーは、Inbox の受理と claim を通じて、永続メッセージが到着するまでマウントされたままになり、末尾追従を二重にトリガーしない。保留中のステアリングはクライアント間で Inbox 順に従い、一致するローカルエコーをその場で使う。受理されたローカルステアリングは、claim プロジェクションが到着するまで、一致する古い Inbox 行も抑制する。ローカルに追跡された送信のないステアリングは、引き続き Inbox プロジェクションに従う。再接続後は、Host 所有の行が受領確認済みのローカルエコーを置き換える。受理待ちの claim は一時的にバブルを持たないことがある。
 
-When Chat ends with an open Turn control and that Turn has no visible input, the first local transcript echo precedes the control. Other echoes remain at the flow tail. The control and echoes share one keyed list, so arrival of the control preserves the echo's mounted identity. Durable inputs replace their matching echoes in the same render.
+Chat が開いたターンコントロールで終わり、そのターンに可視入力がない場合、最初のローカルトランスクリプトエコーがコントロールの前に置かれる。その他のエコーはフローの末尾に留まる。コントロールとエコーは 1 つのキー付きリストを共有するため、コントロールの到着はエコーのマウント済み同一性を保つ。永続入力は同じレンダーで一致するエコーを置き換える。
 
-Work-details modes control process-group display and reasoning previews. Compact, Standard, and Detailed fold eligible completed Turns without hiding the final answer; Verbose retains the duration/status header without a collapse action and shows historical process rows directly. The [business-rule reference](src/client/conversation-nodes/README.md#display-modes) contains the mode table, title behavior, whole-Turn eligibility, clocks, and disclosure resets.
+Work-details モードはプロセスグループ表示と reasoning プレビューを制御する。Compact、Standard、Detailed は、最終回答を隠さずに条件を満たす完了ターンを折りたたむ。Verbose は折りたたみアクションなしで duration/status ヘッダーを保持し、過去のプロセス行を直接表示する。[ビジネスルール参照](src/client/conversation-nodes/README.md#display-modes) にモード表、タイトル挙動、ターン全体の適格性、クロック、開示リセットがある。
 
-The Settings row below Work details offers an [independent collapse-timing preference](src/client/conversation-nodes/README.md#collapse-timing), saved through the same Host profile configuration.
+Work details の下の Settings 行は、[独立した折りたたみタイミング設定](src/client/conversation-nodes/README.md#collapse-timing) を提供し、同じ Host プロファイル設定を通じて保存される。
 
 -----
 
 <a id="grouped-rendering"></a>
-## Grouped rendering
+## グループ化レンダリング
 
-Chat registers its process Group Definition through `uiConversation.groups`. React renders the mixed `node`/`group` root sequence through stable Group and Node seats; group headers subscribe to data separately from member arrays. Settled group titles remain independent of the live-detail preference; only running titles update when that preference changes. [Process-group business rules](src/client/conversation-nodes/README.md#process-grouping) define segmentation and activity summaries.
+Chat は `uiConversation.groups` を通じてプロセス Group Definition を登録する。React は混在する `node`/`group` ルートシーケンスを安定した Group と Node のシートを通じてレンダリングする。グループヘッダーはメンバー配列とは別にデータを購読する。確定したグループタイトルはライブ詳細設定から独立したままである。その設定が変わったときに更新されるのは実行中タイトルのみである。[プロセスグループのビジネスルール](src/client/conversation-nodes/README.md#process-grouping) が分割とアクティビティサマリーを定義する。
 
-`groupPart` selects reasoning or response in the Assistant renderer without copying Node payloads. A Tool node owns its preparing, dispatched, and result stages under one callId. Each part has a distinct DOM anchor for reading-position restoration; Turn navigation addresses the original Node key and lands on its first visible part. Group sources, member parents, and keys survive display-mode changes and newly loaded prefixes that extend an intact group. The source Node Store remains the only Node-data owner, and a replaced Builder rebinds keyed subscriptions without remounting seats. Mode changes retain size observers and reuse the Turn-state selector.
+`groupPart` は、Node ペイロードをコピーせずに Assistant レンダラーで reasoning または response を選択する。ツールノードは、1 つの callId の下で preparing、dispatched、result のステージを所有する。各部分は読み取り位置の復元のために固有の DOM アンカーを持ち、ターンナビゲーションは元の Node キーを指定してその最初の可視部分に着地する。グループソース、メンバーの親、キーは、表示モードの変更と、無傷のグループを延長する新たに読み込まれたプレフィックスを越えて存続する。ソース Node Store が唯一の Node データ所有者のままであり、置き換えられた Builder はシートを再マウントせずにキー付き購読を再バインドする。モード変更はサイズオブザーバーを保持し、ターン状態セレクターを再利用する。
 
-The Chat Builder publishes `bottomSource` per Node: true for visible Nodes belonging to the latest loaded exchange, not just the final row. Nodes declare their group-tree position through `groupTree`; a Turn holding an `exchange` Node opens an exchange, and the exchange lasts until the next opening Turn. The positions, from outermost inward `exchange`, `input`, `turn`, and `process`, are defined in [group-tree.ts](src/client/contract/group-tree.ts); process grouping, whole-Turn folding, and Turn-input detection read them, so an external Definition places its Chat rows by declaring one. Moving the exchange start notifies only Nodes in Turns that entered or left it. Groups read their first member's position. Pending-input deduplication and collapse decisions remain in the Chat view, outside the Builder.
+Chat Builder は Node ごとに `bottomSource` を公開する。最新の読み込み済み exchange に属する可視 Node に対して true であり、最終行だけではない。Node は `groupTree` を通じて自身のグループツリー位置を宣言する。`exchange` Node を持つターンが exchange を開き、その exchange は次に開くターンまで続く。位置は外側から内側へ `exchange`、`input`、`turn`、`process` であり、[group-tree.ts](src/client/contract/group-tree.ts) で定義される。プロセスグループ化、ターン全体の折りたたみ、ターン入力検出がこれらを読み取るため、外部 Definition は位置を宣言することで自身の Chat 行を配置する。exchange の開始を移動すると、そこに出入りしたターンの Node にのみ通知する。グループは最初のメンバーの位置を読む。保留入力の重複排除と折りたたみの決定は Builder の外、Chat ビューに残る。
 
-Live tool deltas share reasoning's frame-batched publication; durable calls and results publish immediately. Native and nested results retain event presentation metadata, so historical file and command labels use the operation’s location. Repeated deltas retain the Tool node when observed argument answers, the anchor, location, and visibility are unchanged. The Definition supplies the same lazy argument reader to tool rows and group detail, without tool-specific registration.
+ライブのツールデルタは reasoning のフレームバッチ公開を共有する。永続的な呼び出しと結果は即座に公開される。ネイティブおよびネストされた結果はイベント表示メタデータを保持するため、過去のファイルラベルとコマンドラベルは操作の場所を使う。観測された引数の答え、アンカー、場所、可視性が変わらない場合、繰り返されるデルタは Tool ノードを保持する。Definition はツール固有の登録なしで、同じ遅延引数リーダーをツール行とグループ詳細に提供する。
 
-The process group uses a stable `div` layout box, a scroll body, and an uncapped content box that reports growth inside the body. Business styles must adapt spacing within and across groups, including hidden or empty members and the answer-spacing exception. The `conversation.chat.flow` slot adds a `display: contents` DOM anchor; row selectors match that anchor directly, without repeating its column ancestry. The running status shares the rows' parent, so its divider uses the same visible-sibling rules. The anchor contributes no spacing of its own. CSS variables do not belong in the Group Definition.
+プロセスグループは、安定した `div` レイアウトボックス、スクロールボディ、およびボディ内の成長を報告する上限なしのコンテンツボックスを使う。ビジネススタイルは、非表示または空のメンバーや回答スペーシングの例外を含め、グループ内およびグループ間のスペーシングを適応させなければならない。`conversation.chat.flow` スロットは `display: contents` の DOM アンカーを追加する。行セレクターはそのアンカーに直接一致し、その列の祖先を繰り返さない。実行中ステータスは行の親を共有するため、そのディバイダーは同じ可視兄弟ルールを使う。アンカー自体はスペーシングに寄与しない。CSS 変数は Group Definition に属さない。
 
-Running group titles, reasoning previews, tool and command rows, the active retry line, and the bottom running status use the shared [TextShimmer](../ui-primitives/README.md#component-catalog). Each row’s text shares one left-to-right highlight, including collapsed group titles; icons and hover chevrons retain their base appearance. Tool and process rows sit 6px apart. An expanded group title has 8px before its content, Assistant responses have 12px from adjacent process rows, and completed-Turn duration/status controls have 16px around them. Hidden and empty rows, including retained empty slot anchors, add no gap. The running “Deep diving” text retains its blue base while its theme-specific highlight sweeps across it.
+実行中のグループタイトル、reasoning プレビュー、ツール行とコマンド行、アクティブな再試行行、下部の実行中ステータスは共有の [TextShimmer](../ui-primitives/README.md#component-catalog) を使う。各行のテキストは、折りたたまれたグループタイトルも含め、1 つの左から右へのハイライトを共有する。アイコンとホバーシェブロンは基本の外観を保持する。ツール行とプロセス行は 6px 離れている。展開されたグループタイトルはコンテンツの前に 8px、Assistant の応答は隣接するプロセス行から 12px、完了ターンの duration/status コントロールは周囲に 16px を持つ。非表示行と空の行は、保持された空のスロットアンカーも含め、ギャップを追加しない。実行中の “Deep diving” テキストは、テーマ固有のハイライトが掃引する間も青の基本色を保持する。
 
-The running status shows a whale whose APNG mask inherits the text color. CSS selects the static SVG when reduced motion or forced colors are active, or alpha masks are unsupported. The build embeds the image in the plugin stylesheet; React does not pass image data through DOM styles.
+実行中ステータスは、APNG マスクがテキスト色を継承するクジラを表示する。CSS は、低モーションまたは強制カラーズがアクティブな場合、あるいはアルファマスクがサポートされない場合に静的 SVG を選択する。ビルドは画像をプラグインスタイルシートに埋め込む。React は画像データを DOM スタイル経由で渡さない。
 
-Scroll-edge fades initialize when `ResizeObserver` reports the open group's layout; opening the group performs no immediate scroll-dimension read in a layout effect.
+スクロールエッジのフェードは、`ResizeObserver` が開いているグループのレイアウトを報告したときに初期化される。グループを開いても、レイアウトエフェクト内でスクロール寸法を即座に読み取ることはない。
 
-Each group owns local `useDisclosure` state that survives mode changes while its component stays mounted.
+各グループはローカルの `useDisclosure` 状態を所有し、コンポーネントがマウントされている間はモード変更を越えて存続する。
 
-The session-scoped `conversation.chat.reasoning.body` single Slot offers the original reasoning text and streaming state only when its body is expanded. Its official entry registers at priority 100 and calls the `conversation.chat.reasoning.content` Factory. A replacement uses a lower priority number and may call that same Factory with original or derived text. The root-scoped Factory requires no Session and fixes compact typography. Its optional `labels` accepts complete `MarkdownLabels` unchanged; omission uses Chat's localized defaults. The host supplies no inline fallback or plugin action state. Display extensions must preserve access to the original text and own their controls inside their Body wrapper. Extensions do not replace the reasoning preview or its disclosure policy. The [reasoning display rules](src/client/conversation-nodes/README.md#display-modes) define which blocks produce rows.
+セッションスコープの `conversation.chat.reasoning.body` 単一 Slot は、そのボディが展開されている場合にのみ、元の reasoning テキストとストリーミング状態を提供する。その公式エントリは priority 100 で登録され、`conversation.chat.reasoning.content` Factory を呼び出す。置き換えはより低い priority 番号を使い、元のテキストまたは派生テキストで同じ Factory を呼んでよい。ルートスコープの Factory は Session を必要とせず、コンパクトなタイポグラフィを固定する。そのオプションの `labels` は完全な `MarkdownLabels` を変更せずに受け取る。省略時は Chat のローカライズされたデフォルトを使う。ホストはインラインのフォールバックやプラグインアクション状態を提供しない。表示拡張は元のテキストへのアクセスを保持しなければならず、自身の Body ラッパー内に自身のコントロールを所有する。拡張は reasoning プレビューやその開示ポリシーを置き換えない。[reasoning 表示ルール](src/client/conversation-nodes/README.md#display-modes) がどのブロックが行を生成するかを定義する。
 
-The Chat-node slot injects a reset-bound `useDisclosure` Hook for reasoning and tools. Intermediate renderers forward it without subscribing; each invocation owns independent open state. Source callbacks retain their receiver and stable identity. When an enclosing Turn actually hides a process member, its seat resets those disclosures without replacing component keys or changing the Hook reference. Display-mode changes preserve their open state.
+Chat-node スロットは reasoning とツール用に reset バインドされた `useDisclosure` Hook を注入する。中間レンダラーは購読せずにそれを転送し、各呼び出しは独立した open 状態を所有する。ソースコールバックはレシーバーと安定した同一性を保持する。囲むターンが実際にプロセスメンバーを非表示にすると、そのシートはコンポーネントキーを置き換えたり Hook 参照を変更したりせずに、それらの開示をリセットする。表示モードの変更は開いた状態を保持する。
 
-Process rows share one text and icon color in every Work details mode: tertiary at rest and secondary on hover, while error and warning text keeps its semantic color. Leading icons, disclosure chevrons, and their boxes scale with the content font-size delta.
+プロセス行は、すべての Work details モードで 1 つのテキスト色とアイコン色を共有する。静止時は tertiary、ホバー時は secondary で、エラーと警告のテキストはセマンティックカラーを保つ。先頭アイコン、開示シェブロン、およびそれらのボックスは、コンテンツのフォントサイズ差分に合わせて拡大縮小する。
 
 -----
 
 <a id="scroll-ownership"></a>
-## Scroll ownership
+## スクロールの所有権
 
-Chat waits for initial history before automatic content, scroll, or size updates initialize reading state. Running Sessions restore their initial visibility and position before fold animations become eligible.
+Chat は、自動コンテンツ更新、スクロール更新、サイズ更新が読み取り状態を初期化する前に、初期履歴を待つ。実行中の Session は、折りたたみアニメーションが対象になる前に、初期の可視性と位置を復元する。
 
-Chat restores semantic anchors across history prepend and renderer remounts, with browser scroll anchoring disabled on its scrollport only while following the tail. Pinned scroll deliveries without reader movement, and reader input that reaches the floor within subpixel rounding, update follow ownership immediately, before subsequent layout changes can invalidate their floor. Other reader movement remains pending until the sampling interval or `scrollend`, even inside the follow threshold, so layout growth cannot erase small scroll gestures. Under completion-time folding, submitting transcript input or steering immediately restores tail following and clears an older pending reader sample. While the reader is pinned to the floor, `ResizeObserver` follows the new floor and selects the latest loaded Turn without reading row geometry. Once the reader moves away, flow-height changes preserve the top position and the reading-line geometry selects the active Turn. Turn-rail previews paint above sticky Markdown code-block banners, while the rail frame remains inside the transcript band above the composer.
+Chat は履歴の先頭追加とレンダラーの再マウントを越えてセマンティックアンカーを復元し、ブラウザーのスクロールアンカーリングは末尾を追従している間のみスクロールポートで無効になる。読者の動きのない固定スクロール配信と、サブピクセルの丸め内でフロアに到達する読者入力は、後続のレイアウト変更がフロアを無効化する前に、追従所有権を即座に更新する。その他の読者の動きは、追従しきい値内であっても、サンプリング間隔または `scrollend` まで保留のままになり、レイアウトの成長が小さなスクロールジェスチャーを消せないようにする。完了時折りたたみでは、トランスクリプト入力またはステアリングを送信すると末尾追従が即座に復元され、古い保留中の読者サンプルがクリアされる。読者がフロアに固定されている間、`ResizeObserver` は新しいフロアに従い、行のジオメトリを読まずに最新の読み込み済みターンを選択する。読者が離れると、フロー高さの変更は上部位置を保持し、読み取り行のジオメトリがアクティブなターンを選択する。ターンレールのプレビューは、スティッキーな Markdown コードブロックバナーの上に描画され、レールフレームはコンポーザーの上のトランスクリプトバンド内に留まる。
 
-The turn rail and back-to-bottom button sit outside the clipped transcript. They use the shared conversation scrollport for sticky positioning, or the Chat frame for absolute positioning when Chat owns its scrollport. The rail hides when the transcript's available width, excluding its horizontal padding, is at most 900px; the browser viewport width is not the criterion.
+ターンレールと最下部へ戻るボタンは、クリップされたトランスクリプトの外側に位置する。スティッキー配置には共有の会話スクロールポートを、Chat が自身のスクロールポートを所有する場合の絶対配置には Chat フレームを使う。レールは、トランスクリプトの利用可能な幅（水平パディングを除く）が 900px 以下のときに隠れる。ブラウザーのビューポート幅は基準ではない。
 
-The transcript root uses `overflow-x: visible; overflow-y: clip`: vertical overflow is clipped without creating a scroll container. Sticky Markdown code banners and expanded compaction headers therefore retain the actual conversation scrollport as their reference when no nearer scrolling ancestor exists. Capped process groups and terminal sections keep their own scrollports.
+トランスクリプトルートは `overflow-x: visible; overflow-y: clip` を使う。垂直オーバーフローはスクロールコンテナを作らずにクリップされる。そのため、スティッキーな Markdown コードバナーと展開されたコンパクションヘッダーは、より近いスクロール祖先が存在しない場合、実際の会話スクロールポートを基準として保持する。上限付きのプロセスグループとターミナルセクションは自身のスクロールポートを保つ。
 
-Outer transcript following and each open capped group's following are independent. Native animation progress retains follow intent; only that scrollport's own `scrollend` settles its animation. Browsers without `scrollend` may retain the native follow target until a later bottom-aligned update or reader gesture. A reader gesture interrupts the animation, and actual movement determines whether following remains enabled. Scroll chaining can move the outer transcript, which then applies its own distance threshold. The back-to-bottom button restores only outer following.
+外側トランスクリプトの追従と、各開いている上限付きグループの追従は独立している。ネイティブアニメーションの進行は追従意図を保持し、そのスクロールポート自身の `scrollend` だけがアニメーションを確定させる。`scrollend` のないブラウザーは、後の下部揃え更新または読者ジェスチャーまでネイティブの追従ターゲットを保持することがある。読者ジェスチャーはアニメーションを中断し、実際の移動が追従が有効のままかを決定する。スクロールチェーンは外側トランスクリプトを動かすことがあり、その場合は自身の距離しきい値が適用される。最下部へ戻るボタンは外側の追従のみを復元する。
 
-Next-message folding moves every batch of closing rows and the scrollport on one frame clock, with browser scroll anchoring disabled during the fold; there is no separate reserve-then-follow path. A row that starts closing or revealing while a batch runs keeps its size until that batch settles and then changes in the next batch; a batch continues each row from the size it already has. The batch lands at the tail when this client's own input caused it (including a subagent child's continuation) or when the reader was following; otherwise the reader's visible content stays still, whoever sent the message. Content above the reading line never slides back down: when the retained answer and the new content cannot fill the viewport, only that deficit remains as bottom space, and new content fills it before following advances again. Reader gestures cancel the automatic target and active native following; resize cannot revive it in the same fold, but new submitted input can. Acknowledged scrolling releases only space that can be removed without clamping the reader. Unloading Chat cancels waiting callbacks and row transitions. Reduced-motion users receive immediate visibility and positioning changes.
+次メッセージの折りたたみは、閉じる行の各バッチとスクロールポートを 1 つのフレームクロックで移動し、折りたたみ中はブラウザーのスクロールアンカーリングが無効になる。別個の「予約してから追従」経路は存在しない。バッチの実行中に閉じ始めた行または現れ始めた行は、そのバッチが確定するまでサイズを保ち、次のバッチで変化する。バッチは各行をすでに持っているサイズから続ける。バッチは、このクライアント自身の入力が原因だった場合（サブエージェントの子の継続を含む）、または読者が追従していた場合に末尾に着地する。それ以外の場合、メッセージを誰が送ったかに関わらず、読者の可視コンテンツは静止したままである。読み取り行より上のコンテンツは決して下に滑り戻らない。保持された回答と新しいコンテンツがビューポートを埋められない場合、その不足分だけが下部スペースとして残り、新しいコンテンツが追従が再び進む前にそれを埋める。読者ジェスチャーは自動ターゲットとアクティブなネイティブ追従をキャンセルする。リサイズは同じ折りたたみ内でそれを復活させられないが、新しく送信された入力は復活させられる。確認済みのスクロールは、読者をクランプせずに削除できるスペースのみを解放する。Chat をアンロードすると、待機中のコールバックと行遷移がキャンセルされる。低モーション設定のユーザーには、可視性と位置の変更が即座に適用される。
 
-Changing Work details clears reserved bottom space after active folds finish and reconciles the scroll range with the selected mode. Readers already following the tail stay at the new bottom; other readers are not forced to follow.
+Work details を変更すると、アクティブな折りたたみの終了後に予約済みの下部スペースがクリアされ、スクロール範囲が選択されたモードに調整される。すでに末尾を追従している読者は新しい最下部に留まる。他の読者は追従を強制されない。
 
-Fold coordination is viewport-local: fold batches, bottom space, and idle callbacks never broadcast to other Chat views. ChatView supplies its motion capability once to `conversation.chat.flow` through the render's `hookContext`. Flow binds the group and header behavior hooks, owns node dispatch, supplies Factory rendering for local echoes, and shares the existing Chat store and Session node sources. The image entry Factory owns the replaceable image Slot. Layout nodes and inline reasoning receive the bound hooks without receiving the motion controller or changing content parents. Generic searchable hiding applies before paint and owns focus protection and beforematch handling; pending-input reconciliation remains in ChatView.
+折りたたみの調整はビューポートローカルである。折りたたみバッチ、下部スペース、アイドルコールバックは他の Chat ビューにブロードキャストされない。ChatView はモーション機能をレンダーの `hookContext` を通じて `conversation.chat.flow` に一度だけ提供する。Flow はグループとヘッダーの挙動フックをバインドし、ノードディスパッチを所有し、ローカルエコー用の Factory レンダリングを提供し、既存の Chat ストアと Session ノードソースを共有する。画像エントリ Factory は置き換え可能な画像 Slot を所有する。レイアウトノードとインライン reasoning は、モーションコントローラーを受け取らず、コンテンツの親を変更せずに、バインドされたフックを受け取る。汎用の検索可能非表示はペイント前に適用され、フォーカス保護と beforematch 処理を所有する。保留入力の調整は ChatView に残る。
 
-| Outer follows | Open group follows | Back-to-bottom button | New content |
+| 外側が追従 | 開いているグループが追従 | 最下部へ戻るボタン | 新規コンテンツ |
 |---|---|---|---|
-| Yes | Yes | Hidden | Each scrollport follows its own floor. |
-| Yes | No | Hidden | The outer transcript follows; the group retains its position. |
-| No | Yes | Visible | The group follows; the outer transcript retains its reading position. |
-| No | No | Visible | Both retain their reading positions. |
+| はい | はい | 非表示 | 各スクロールポートが自身のフロアに従う。 |
+| はい | いいえ | 非表示 | 外側トランスクリプトが追従し、グループは位置を保つ。 |
+| いいえ | はい | 表示 | グループが追従し、外側トランスクリプトは読み取り位置を保つ。 |
+| いいえ | いいえ | 表示 | どちらも読み取り位置を保つ。 |
 
-The turn rail mounts only visible marks, overscan, and the focused mark's neighbors. Its fixed pitch and observed viewport size determine scroll offsets without reading the DOM scroll extent. Initial placement waits for the body's restored active Turn and the rail's first usable viewport size. The ref controls activate a Turn or scroll the rail independently; the transcript itself remains fully mounted.
+ターンレールは、可視マーク、オーバースキャン、フォーカスされたマークの隣接マークのみをマウントする。固定ピッチと観測されたビューポートサイズが、DOM のスクロール範囲を読まずにスクロールオフセットを決定する。初期配置は、ボディの復元されたアクティブターンと、レールの最初の使用可能なビューポートサイズを待つ。ref コントロールはターンをアクティブ化するか、レールを独立にスクロールする。トランスクリプト自体は完全にマウントされたままである。
 
-While the pointer is outside the rail, automatic follow keeps the rail still when the active mark's center is inside the fade-free band and centers it after it leaves that band. Previews follow pointer movement or focus; marks scrolling under a stationary pointer do not select another preview.
+ポインターがレールの外側にある間、自動追従は、アクティブマークの中心がフェードなしバンド内にあるときはレールを静止させ、バンドを離れた後に中央に置く。プレビューはポインターの動きまたはフォーカスに従う。静止したポインターの下をスクロールするマークは別のプレビューを選択しない。
 
 <details>
-<summary>Scroll implementation — click to expand</summary>
+<summary>スクロール実装 — クリックで展開</summary>
 
-Within a process group, wheel, touchstart, and any pointerdown interrupt an active smooth animation, including presses on tool cards. ArrowUp/ArrowDown, PageUp/PageDown, Home/End, and Space keys also interrupt it unless a child has prevented the key's default action; editable controls are not excluded. These events stop the animation without requiring a scroll displacement. Subsequent position sampling determines whether following continues.
+プロセスグループ内では、wheel、touchstart、および任意の pointerdown がアクティブなスムーズアニメーションを中断する。ツールカード上の押下も含む。ArrowUp/ArrowDown、PageUp/PageDown、Home/End、Space キーも、子がキーのデフォルトアクションを prevent していない限り中断する。編集可能なコントロールは除外されない。これらのイベントは、スクロール変位を必要とせずにアニメーションを停止する。その後の位置サンプリングが、追従が続くかどうかを決定する。
 
-`useScrollFollow` supplies independent controllers for shared bottom thresholds, follow intent, and native scrolling. `useProcessScroll` owns group observation, initial placement, and edge fades. Outer following remains immediate; group growth uses native smooth scrolling unless reduced motion is requested. Growth retains an in-flight target until `scrollend`; arrival at that target or its shrink-clamped position continues toward the latest floor, while another endpoint releases following. Opening placement remains immediate. A bottom-follow request within tolerance uses immediate positioning when no animation is outstanding, so a fractional no-op cannot leave a pending smooth target.
+`useScrollFollow` は、共有の下部しきい値、追従意図、ネイティブスクロールのための独立したコントローラーを提供する。`useProcessScroll` はグループの観測、初期配置、エッジフェードを所有する。外側の追従は即座のままである。グループの成長は、低モーションが要求されない限りネイティブのスムーズスクロールを使う。成長は `scrollend` まで実行中のターゲットを保持する。そのターゲットまたはその縮小クランプ位置への到達は最新のフロアに向かって続行し、別のエンドポイントは追従を解除する。開く際の配置は即座のままである。許容範囲内の下部追従要求は、未完了のアニメーションがない場合に即時配置を使うため、小数のノーオペレーションが保留中のスムーズターゲットを残すことはない。
 
-`useChatViewport` owns turn-aware DOM reads, clamped writes, native events, and one retained paging anchor. For Load older, Node and Group seats mark eligible anchors from their existing disclosure state. The viewport selects the first nonempty, unhidden marker in transcript order without hit testing or geometry-based search, then measures that element and its scroll containers. It compensates the anchor's capped group first, then gives the remaining displacement to the transcript scrollport. An inner compensation write cancels that group's animation through its bound controller and pauses following; reader scrolling back to the bottom resumes it. Commits and later content resizes reuse that anchor; a remounted row is resolved by the same semantic key. Compensation stays within the actual scroll ranges without adding bottom space.
+`useChatViewport` は、ターン対応の DOM 読み取り、クランプされた書き込み、ネイティブイベント、および 1 つの保持されたページングアンカーを所有する。Load older では、Node と Group のシートが既存の開示状態から適格なアンカーをマークする。ビューポートは、ヒットテストやジオメトリベースの探索なしに、トランスクリプト順で最初の空でない非表示でないマーカーを選択し、その要素とそのスクロールコンテナを測定する。最初にアンカーの上限付きグループを補正し、残りの変位をトランスクリプトスクロールポートに与える。内部補正の書き込みは、バインドされたコントローラーを通じてそのグループのアニメーションをキャンセルし、追従を一時停止する。読者が最下部までスクロールし直すと再開する。コミットとその後のコンテンツリサイズはそのアンカーを再利用し、再マウントされた行は同じセマンティックキーで解決される。補正は下部スペースを追加せずに実際のスクロール範囲内に留まる。
 
-`useChatReading` owns follow policy, sampled reader input, and semantic memory; `useChatNavigation` owns turn jumps and requests preservation from the viewport. Reading gestures release the paging anchor, but composer clicks, typing, and non-scrolling keys retain it; while a page is still loading, `scrollend` captures the reader's new position. `useChatScroll` coordinates their committed inputs. Explicit navigation carries its measured landing into reading policy, so it does not rediscover the known target with a hit test.
+`useChatReading` は追従ポリシー、サンプリングされた読者入力、セマンティックメモリを所有する。`useChatNavigation` はターンジャンプと、ビューポートからの保持要求を所有する。読み取りジェスチャーはページングアンカーを解放するが、コンポーザーのクリック、タイピング、スクロールしないキーはそれを保持する。ページがまだ読み込み中の場合、`scrollend` が読者の新しい位置を捕捉する。`useChatScroll` はそれらのコミットされた入力を調整する。明示的なナビゲーションは測定された着地点を読み取りポリシーに持ち込むため、既知のターゲットをヒットテストで再発見しない。
 
-Active-Turn highlighting is approximate: `readVisibleTurn` binary-searches the flow slot's direct Node/Group boxes (or the column's in standalone rendering) and retains the preceding candidate in gaps. It neither hit-tests the document nor searches Group members or all Turn markers. Empty Seats retain zero-height in-flow boxes so outer positions remain ordered without extra spacing. This lookup does not change semantic position capture or paging compensation.
+アクティブターンのハイライトは近似である。`readVisibleTurn` はフロースロットの直接の Node/Group ボックス（スタンドアロンレンダリングではカラム）を二分探索し、ギャップでは先行する候補を保持する。ドキュメントのヒットテストも、グループメンバーやすべてのターンマーカーの探索も行わない。空のシートは高さ 0 のフロー内ボックスを保持するため、外側の位置は余分なスペーシングなしで整列したままになる。このルックアップはセマンティック位置の捕捉やページング補正を変更しない。
 
 </details>
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package renders logged conversation state in the browser and registers nothing model-facing.
+なし。このパッケージは記録された会話状態をブラウザーでレンダリングし、モデル向けのものを何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; Chat presentation does not assemble or mutate provider requests.
+なし。Chat の表示はプロバイダーリクエストを組み立てたり変更したりしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Running-icon resolution** — the animated whale uses a 28×28 image at a default 14×14 CSS size. Larger content fonts or device pixel ratios above 2 can soften the raster stroke; the static fallback remains vector-based. Browser image caching owns the animation clock, so remounting does not guarantee playback restarts at the first frame.
+- **実行中アイコンの解像度** — アニメーションするクジラは 28×28 の画像をデフォルトの 14×14 CSS サイズで使う。より大きなコンテンツフォントや 2 を超えるデバイスピクセル比では、ラスターストロークが柔らかくなることがある。静的フォールバックはベクターベースのままである。ブラウザーの画像キャッシュがアニメーションクロックを所有するため、再マウントしても再生が先頭フレームから再開される保証はない。
 
-- **Tool-change presentation** — The `developer-message` Definition shares context presentation with `input-message`. Tool-only developer messages name a single added or removed tool inline without expansion. Multiple changes show added/removed counts and expand to comma-separated tool lists, one line per change kind. Mixed content uses the generic context presentation.
+- **ツール変更の表示** — `developer-message` Definition は `input-message` とコンテキスト表示を共有する。ツールのみの developer メッセージは、展開なしでインラインに追加または削除された単一のツールを名指しする。複数の変更は追加/削除の件数を示し、変更種別ごとに 1 行で、カンマ区切りのツールリストに展開する。混在コンテンツは汎用のコンテキスト表示を使う。
 
-- **Opening echoes predict local order** — several submissions made before the running update can all remain in Chat. Their initial order follows local submission order, not Host queue order; admission can reposition them when the Host receives requests in a different order.
+- **開くときのエコーはローカル順序を予測する** — 実行中の更新前にされた複数の送信は、すべて Chat に残ることがある。それらの初期順序は Host のキュー順ではなくローカル送信順に従う。Host が異なる順序でリクエストを受け取ると、受理によって位置が変わることがある。
 
-- **The transcript reflects the loaded Session window** — older transcript nodes become available only after Session Controller loads the preceding event page. Turn navigation is wider than the window: the rail merges the loaded Turns with the host `turnOutline` projection, so every started Turn gets a fixed-pitch mark (10px apart; a ladder taller than the frame scrolls inside it with gradient fades), and activating an unloaded mark pages history through the Turn's `turn/start` seq before landing on its row. Without the projection (assemblies not mounting `dsh-session-turn-outline`) the rail falls back to loaded Turns only.
-- **Rail previews are card-sized** — one prompt line (50 characters) and up to three response lines (120), on loaded and unloaded Turns alike; an unloaded Turn's response arrives from the outline only once the Turn settled, so an open Turn previews its prompt (or just the Turn number) until then.
+- **トランスクリプトは読み込み済み Session ウィンドウを反映する** — 古いトランスクリプトノードは、Session Controller が先行するイベントページを読み込んだ後にのみ利用可能になる。ターンナビゲーションはウィンドウより広い。レールは読み込み済みのターンとホストの `turnOutline` プロジェクションを統合するため、開始されたすべてのターンが固定ピッチのマークを得る（10px 間隔。フレームより高いラダーはグラデーションフェード付きでその内部をスクロールする）。未読み込みのマークをアクティブ化すると、その行に着地する前にターンの `turn/start` seq を通じて履歴をページングする。プロジェクションがない場合（`dsh-session-turn-outline` をマウントしないアセンブリ）、レールは読み込み済みターンのみにフォールバックする。
+- **レールプレビューはカードサイズ** — 読み込み済み・未読み込みのターンいずれでも、プロンプト 1 行（50 文字）と最大 3 行の応答（120 文字）。未読み込みターンの応答はターンが確定して初めて outline から届くため、開いているターンはそれまでプロンプト（またはターン番号のみ）をプレビューする。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

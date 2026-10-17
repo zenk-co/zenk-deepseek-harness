@@ -1,47 +1,47 @@
 ---
-description: "Retrospective Session persistence types and adjacent-release changes for dsh-v0.1.2-alpha.3."
+description: "dsh-v0.1.2-alpha.3 の遡及的セッション永続化型と隣接リリース変更。"
 kind: persistence-release
 ---
 
-# Persistence release: dsh-v0.1.2-alpha.3
+# 永続化リリース: dsh-v0.1.2-alpha.3
 
-English | [中文](dsh-v0.1.2-alpha.3.zh.md)
+日本語 | [English](dsh-v0.1.2-alpha.3.en.md) | [中文](dsh-v0.1.2-alpha.3.zh.md)
 
-## Summary
+## 概要
 
-All reconstructed persistence root digests match the preceding alpha tag. The writer format remains 0.
+再構築された永続化ルートダイジェストはすべて直前の alpha タグと一致する。ライター形式は 0 のままである。
 
-## Table of Contents
+## 目次
 
-- [Release evidence](#evidence)
-- [Declaration](#declaration)
-- [Structural changes](#changes)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [リリース証跡](#evidence)
+- [宣言](#declaration)
+- [構造上の変更](#changes)
+- [検証](#verification)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="evidence"></a>
-## Release evidence
+## リリース証跡
 
-This approximate backfill supports reading and format validation; it is not a contemporaneous compatibility acknowledgement. See the [archive reference](README.md) for extraction and coverage limits.
+この概算バックフィルは読み取りと形式検証を支えるものであり、当時の互換性承認ではない。抽出とカバレッジの制限は [アーカイブリファレンス](README.md) を参照すること。
 
-| Item | Recorded value |
+| 項目 | 記録値 |
 |---|---|
-| Source tag | `dsh-v0.1.2-alpha.3` |
-| Source date | 2026-08-31T15:53:17.000Z |
-| Release record | Release object present. |
-| Previous release | [dsh-v0.1.2-alpha.2](dsh-v0.1.2-alpha.2.md) |
-| Session writer version | 0 |
-| Reconstructed inventory | <!-- persistence-release-inventory:start -->54 roots / 417 types<!-- persistence-release-inventory:end --> |
-| This snapshot | [dsh-v0.1.2-alpha.3.schema.json](dsh-v0.1.2-alpha.3.schema.json) |
+| ソースタグ | `dsh-v0.1.2-alpha.3` |
+| ソース日付 | 2026-08-31T15:53:17.000Z |
+| リリースレコード | Release オブジェクトあり。 |
+| 直前リリース | [dsh-v0.1.2-alpha.2](dsh-v0.1.2-alpha.2.md) |
+| セッションライター版 | 0 |
+| 再構築インベントリー | <!-- persistence-release-inventory:start -->54 ルート / 417 型<!-- persistence-release-inventory:end --> |
+| このスナップショット | [dsh-v0.1.2-alpha.3.schema.json](dsh-v0.1.2-alpha.3.schema.json) |
 
-Source evidence for the writer version constant at this tag:
+このタグにおけるライター版定数のソース証跡:
 
 - `packages/core/session/src/types.ts`: `export const SESSION_FORMAT_VERSION = 0`
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-release
 schemaVersion: 1
@@ -52,24 +52,24 @@ changes: []
 ```
 
 <a id="changes"></a>
-## Structural changes
+## 構造上の変更
 
 <!-- persistence-release-changes:start -->
 
-Normalized root types and their transitive digests are unchanged from the preceding tag.
+正規化ルート型とその推移ダイジェストは直前タグから不変である。
 
 <!-- persistence-release-changes:end -->
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Extraction passed canonical-graph, root-digest, and reachable-type-digest validation, permitting the original optional `surfaceOp` only for historical surface events. The in-tree check reconstructs each tag from its predecessor and verifies before/after values, snapshot coverage, and bilingual machine declarations.
+抽出は正規グラフ、ルートダイジェスト、到達可能型ダイジェストの検証を通過し、歴史的サーフェイスイベント向けに元からオプショナルな `surfaceOp` のみを許可した。ツリー内チェックは各タグを直前タグから再構築し、前後値、スナップショットカバレッジ、バイリンガル機械宣言を検証する。
 
 ```sh
 pnpm run verify-persistence-releases
 ```
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
-None.
+なし。

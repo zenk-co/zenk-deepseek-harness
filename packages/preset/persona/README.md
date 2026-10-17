@@ -1,33 +1,33 @@
 ---
-description: "The composable persona row presets mount to give one agent its own system-prompt persona, for users and maintainers configuring or debugging it."
+description: "1 エージェントに独自システムプロンプトペルソナを与えるプリセットがマウントする合成可能ペルソナ行。それを設定またはデバッグするユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-persona
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-persona` gives one agent its own persona: a preset mounts this composable row to register persona prefix and suffix sections, shadowing the deployment-wide defaults for that session. It can also make the prefix the session's complete system prompt, suppressing every other section, and can turn off optional runtime context for the session. Mount it inside a preset composition — mounting it globally collides with the prompt registry's own persona registration and fails loud. Without this row, a preset could change an agent's tools but never its identity.
+`dsh-persona` は 1 エージェントに独自ペルソナを与える。プリセットはこの合成可能行をマウントしてペルソナ接頭辞と接尾辞区分を登録し、そのセッション向けにデプロイ全体の既定を隠す。接頭辞をセッションの完全なシステムプロンプトにもでき、他のすべての区分を抑止し、セッション向けの任意ランタイムコンテキストを切ることもできる。プリセット構成内にマウントすること — グローバルにマウントするとプロンプトレジストリ自身のペルソナ登録と衝突して大きく失敗する。この行がなければ、プリセットはエージェントの道具を変えられてもそのアイデンティティは決して変えられない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this row inside a preset composition to give that preset's sessions their own persona. The row needs an agent scope: mounted outside one it collides with the prompt registry's own `deployment:persona-prefix` registration and fails loud — the deployment persona already has an owner, and the whole point of this row is to shadow it for one agent.
+そのプリセットのセッションに独自ペルソナを与えるためにプリセット構成内に行をマウントする。行はエージェントスコープを要する。それを外にマウントするとプロンプトレジストリ自身の `deployment:persona-prefix` 登録と衝突して大きく失敗する — デプロイペルソナには既に所有者がおり、この行の存在意義こそ 1 エージェント向けにそれを隠すことだからである。
 
-### Configuration
+### 構成
 
 ```yaml
 - name: '@deepseek-ai/dsh-persona'
@@ -35,93 +35,93 @@ Mount this row inside a preset composition to give that preset's sessions their 
     prefix: You are a terse systems engineer who answers in short commands.
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `prefix` | required | Persona prose rendered as the `deployment:persona-prefix` section |
-| `suffix` | `''` | Template for `deployment:persona-suffix`; omitted or empty text shadows the global suffix away |
-| `complete` | `false` | Use only the rendered prefix as the system prompt; ignore the suffix |
-| `includeRuntimeContext` | `true` | Include optional runtime context for this agent scope; false suppresses optional contributions without disabling their owning services; required contributions remain |
+| `prefix` | 必須 | `deployment:persona-prefix` 区分として描画されるペルソナ散文 |
+| `suffix` | `''` | `deployment:persona-suffix` 向けテンプレート。省略または空テキストはグローバル接尾辞を隠す |
+| `complete` | `false` | 描画済み接頭辞のみをシステムプロンプトとして使う。接尾辞を無視する |
+| `includeRuntimeContext` | `true` | このエージェントスコープ向けに任意ランタイムコンテキストを含める。false は所有サービスを無効にせずに任意寄与を抑止する。必須寄与は残る |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-persona) is the exhaustive source for every accepted field and its JSDoc.
+生成済み[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-persona)が受け付ける全フィールドとその JSDoc の網羅的な情報源である。
 
-### Persona behavior
+### ペルソナ動作
 
-The persona `prefix` and `suffix` are templates: complete `{{…}}` groups resolve strictly against registered prompt variables when the prompt renders, not when it assembles. Each empty template still shadows its deployment-wide section, then disappears at render. Omitted `suffix` defaults to empty; it does not inherit the global suffix. With `complete: true`, assembly still resolves contexts, tools, variables, and cooperative listeners, but the prompt registry restores this exact prefix as the sole section; no identity, suffix, tool guidance, or listener can append prompt text. With `includeRuntimeContext: false`, optional context providers are not evaluated for this scope, and assembly-listener contributions are discarded unless registered as required. Required providers remain active at assembly and request admission.
+ペルソナ `prefix` と `suffix` はテンプレートである。完全な `{{…}}` 群は組み立て時ではなくプロンプト描画時に登録済みプロンプト変数に対して厳密に解決される。各空テンプレートも依然デプロイ全体区分を隠し、描画時に消える。省略された `suffix` は既定で空になる。グローバル接尾辞を継承しない。`complete: true` では組み立ては引き続きコンテキスト、道具、変数、協調リスナーを解決するが、プロンプトレジストリはこの正確な接頭辞を唯一の区分として復元する。アイデンティティ、接尾辞、道具ガイダンス、リスナーはプロンプトテキストを追加できない。`includeRuntimeContext: false` では、このスコープ向けに任意コンテキストプロバイダーは評価されず、組み立てリスナー寄与は必須登録でない限り破棄される。必須プロバイダーは組み立てと要求承認時に活性のままである。
 
-### When to use it
+### 使うべきとき
 
-Use this row when a preset must change an agent's identity and not only its tools. The deployment-wide persona itself is configured on the `dsh-system-prompt` row, not here; this row exists only to shadow or replace it for one agent.
+プリセットがエージェントの道具だけでなくアイデンティティを変えなければならないときに行を使う。デプロイ全体ペルソナ自体は `dsh-system-prompt` 行上で設定する。ここではない。この行は 1 エージェント向けにそれを隠すか置き換えるためだけに存在する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-### How the row registers
+### 行の登録方法
 
-The row registers scoped persona prefix and suffix sections using the registry's shared names and named orders. Each shadows its deployment default instead of appearing beside it; the registry owns ordering, interpolation, and complete-prompt enforcement. `includeRuntimeContext: false` calls `ctx.systemPrompt.suppressRuntimeContext()`.
+行はレジストリの共有名と名前付き順序を使ってスコープ付きペルソナ接頭辞と接尾辞の区分を登録する。各々は脇に現れるのではなくデプロイ既定を隠す。レジストリは順序付け、補間、完全プロンプト強制を所有する。`includeRuntimeContext: false` は `ctx.systemPrompt.suppressRuntimeContext()` を呼ぶ。
 
-### Why the row is scope-only
+### 行がスコープ専用である理由
 
-`dsh-system-prompt` owns the global persona as its own config and registers `deployment:persona-prefix` unconditionally, so a process has exactly one. This row collides with that registration outside an agent scope, by design: the row exists because a preset cannot mount the prompt registry itself.
+`dsh-system-prompt` はグローバルペルソナを自身の設定として所有し、`deployment:persona-prefix` を無条件に登録するため、プロセスはちょうど 1 件持つ。この行はエージェントスコープ外では設計上その登録と衝突する。プリセットはプロンプトレジストリ自体をマウントできないためこの行が存在する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, persona section registration, runtime-context suppression |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `Config` スキーマ、ペルソナ区分登録、ランタイムコンテキスト抑止 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough; they move from the preset composition to the prompt registry this row feeds.
+パッケージレベルの契約では足りないときにこれらを読むこと。プリセット構成からこの行が供給するプロンプトレジストリへ進む。
 
-- [agent-presets package](../agent-preset-registry/README.md) — the preset composition this row mounts into.
-- [System prompt subsystem](../../../docs/subsystems/system-prompt.md) — sections, assembly, and the persona slot this row shadows.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-persona) — every accepted config field and its source declaration.
+- [agent-presets パッケージ](../agent-preset-registry/README.md) — この行がマウントされるプリセット構成。
+- [システムプロンプトサブシステム](../../../docs/subsystems/system-prompt.md) — この行が隠す区分、組み立て、ペルソナスロット。
+- [生成済み設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-persona) — 受け付ける全設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### The persona section
+### ペルソナ区分
 
-#### What the model sees
+#### モデルが見るもの
 
-The `deployment:persona-prefix` section at order `0` carries this row's `prefix`; `deployment:persona-suffix` at order `10200` carries its `suffix`, after first-party guidance. Both replace their deployment defaults and resolve prompt variables. In complete mode, the model sees only the rendered prefix section as its system prompt. Runtime context remains enabled by default. With `includeRuntimeContext: false`, the model still receives required context, such as the current working directory; optional context is omitted.
+順序 `0` の `deployment:persona-prefix` 区分はこの行の `prefix` を運ぶ。順序 `10200` の `deployment:persona-suffix` は一次ガイダンスの後にその `suffix` を運ぶ。両者はデプロイ既定を置き換え、プロンプト変数を解決する。完全モードでは、モデルは描画済み接頭辞区分のみをシステムプロンプトとして見る。ランタイムコンテキストは既定で有効のままである。`includeRuntimeContext: false` では、モデルは引き続き必須コンテキスト (現在の作業ディレクトリ等) を受け取る。任意コンテキストは省かれる。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed for a given preset: the persona prefix and suffix tokens on every request that agent makes, and none for any other agent. Empty text contributes nothing. Complete mode removes every other system-prompt token for that agent. Required runtime context still contributes tokens when optional context is disabled.
+所与のプリセットで固定である。そのエージェントが行うすべての要求にペルソナ接頭辞と接尾辞のトークン、他のすべてのエージェントにはなし。空テキストは寄与しない。完全モードはそのエージェント向けの他のすべてのシステムプロンプトトークンを取り除く。任意コンテキスト無効時も必須ランタイムコンテキストは引き続きトークン寄与する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the rendered template variables and text are unchanged. Suffix changes leave preceding instructions unchanged when the model, prefix, and tools match. Prefix changes affect the early prefix; provider cache sharing is not guaranteed.
+描画済みテンプレート変数とテキストが変わらない間接頭辞安定。モデル、接頭辞、道具が一致すれば接尾辞変更は先行指示を変えない。接頭辞変更は早い接頭辞に影響する。プロバイダーキャッシュ共有は保証されない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the row is a poor fit. They are current package constraints, not a task backlog.
+これらの制限は行が不向きな場合を定める。現在のパッケージ制約であり、タスクバックログではない。
 
-- **No global mount** — the prompt registry owns the unscoped persona slot, so this row is usable only from a scoped composition. A deployment-wide persona change belongs in the `system-prompt` row's own config.
-- **No per-provider runtime-context filter** — `includeRuntimeContext: false` suppresses all optional contributions for the scope; it cannot suppress required contributions.
+- **グローバルマウントなし** — プロンプトレジストリはスコープなしペルソナスロットを所有するため、この行はスコープ付き構成からのみ使える。デプロイ全体ペルソナ変更は `system-prompt` 行自身の設定に属する。
+- **プロバイダーごとのランタイムコンテキストフィルターなし** — `includeRuntimeContext: false` はスコープのすべての任意寄与を抑止する。必須寄与は抑止できない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

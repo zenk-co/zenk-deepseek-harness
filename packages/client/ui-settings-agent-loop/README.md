@@ -1,77 +1,77 @@
 ---
-description: "The agent loop's settings page on the dsh web client's Plugins page: the parallel tool-call cap of the agent-loop namespace."
+description: "dsh web クライアントの Plugins ページにある agent loop の設定ページ。agent-loop 名前空間の並列ツール呼び出し上限を扱う。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-settings-agent-loop
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Open **Plugins** in the sidebar and select **Agent loop** in the Official group to set how many parallel-safe tool calls one step may run at once. The page stages what is typed and writes it only on save, marks a value the user overrode, and offers to reset it to the deployment's default. The page exists while the Host serves the `agent-loop` namespace.
+サイドバーで **Plugins** を開き、Official グループの **Agent loop** を選択すると、1 ステップで同時に実行できる並列安全なツール呼び出しの数を設定できる。このページは入力内容をいったん保持し、保存時にのみ書き込み、ユーザーが上書きした値には印を付け、デプロイのデフォルトにリセットする手段を提供する。このページは Host が `agent-loop` 名前空間を提供している間だけ存在する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The **Agent loop** card in the Official group opens the page. **Parallel tool calls** bounds the calls the loop runs at once within one step; the field renders the effective value, and once overridden carries an **Overridden** badge with **Reset to default** beside it. Nothing is written until **Save**; leaving the page drops the draft, an empty field saves as a reset, and text that is not a number blocks the save and says so under the field.
+Official グループの **Agent loop** カードがこのページを開く。**Parallel tool calls** は、1 ステップ内でループが同時に実行する呼び出し数を制限する。フィールドには有効な値が表示され、上書きされるとその横に **Overridden** バッジと **Reset to default** が付く。**Save** するまで何も書き込まれず、ページを離れると下書きは破棄され、空のフィールドはリセットとして保存され、数値でないテキストは保存をブロックし、その旨がフィールドの下に表示される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The Host half is an empty `apply`, present only so the package holds a Loader row the client module system serves the browser half for. The browser half binds the `agent-loop` namespace through `ctx.configForms.get`, keeps the staged form in `AgentLoopCardController` over the shared `SettingsFormModel` of `ui-primitives`, and registers `AgentLoopCard` into the Plugins page's `plugins.item` slot through `ctx.configForms.whileServed`. The page's copy lives in this package's `settings.agentLoop` dictionary.
+Host 側は空の `apply` であり、このパッケージが Loader 行を持ち、クライアントのモジュールシステムがブラウザー側を提供するためにだけ存在する。ブラウザー側は `ctx.configForms.get` を通じて `agent-loop` 名前空間をバインドし、`ui-primitives` の共有 `SettingsFormModel` 上で `AgentLoopCardController` にステージングしたフォームを保持し、`ctx.configForms.whileServed` を通じて `AgentLoopCard` を Plugins ページの `plugins.item` スロットへ登録する。ページの文言はこのパッケージの `settings.agentLoop` 辞書にある。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [ui-plugin-manager](../ui-plugin-manager/README.md) — the Plugins page and the `plugins.item` slot the page registers into.
-- [ui-settings](../ui-settings/README.md) — the settings scope and the served-namespace watch the page rides.
-- [ui-primitives](../ui-primitives/README.md) — the settings form model and fields the page renders.
-- [agent-loop](../../core/agent-loop/README.md) — the loop that registers the `agent-loop` namespace.
+- [ui-plugin-manager](../ui-plugin-manager/README.md) — Plugins ページと、このページが登録する `plugins.item` スロット。
+- [ui-settings](../ui-settings/README.md) — 設定スコープと、このページが利用する提供済み名前空間の監視。
+- [ui-primitives](../ui-primitives/README.md) — このページが描画する設定フォームモデルとフィールド。
+- [agent-loop](../../core/agent-loop/README.md) — `agent-loop` 名前空間を登録するループ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side settings surface that registers no model surface.
+なし。このパッケージはモデル向けの面を登録しない、ブラウザー側の設定面である。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストの組み立てや送信を行わない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **One field of the namespace** — the Host section carries only the parallel cap; the composed `agents` array is boot composition, not a user setting, and has no field here.
+- **名前空間のフィールドは 1 つだけ** — Host セクションが持つのは並列上限のみである。構成される `agents` 配列は起動構成であってユーザー設定ではなく、ここにフィールドはない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

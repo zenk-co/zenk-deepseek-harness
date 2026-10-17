@@ -1,39 +1,39 @@
 ---
-description: "Advisory loop-hygiene guard that nudges the model out of identical tool-call loops, for users and maintainers choosing, configuring, or debugging the plugin."
+description: "同一のツール呼び出しループからモデルを促し出すアドバイザリーなループ衛生ガード。このプラグインを選択、設定、またはデバッグするユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-repeat-tool-reminder
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package helps a model escape loops in which it calls the same tool with identical arguments without making progress. At configured repeat counts, it asks the model to inspect the previous result and change approach or finish. The reminder is advisory: it never blocks or delays a legitimate repeated call. Repeats are tracked separately for each agent and cleared by a new user message. The `dsh` base bundle enables the package with reminders at 3, 5, and 8 repeats.
+このパッケージは、進展がないまま同じツールを同一の引数で呼び続けるループからモデルが抜け出すのを助ける。設定された繰り返し回数で、モデルに前の結果を検査し、アプローチを変えるか終了するよう求める。リマインダーはアドバイザリーである: 正当な繰り返し呼び出しをブロックしたり遅延させたりすることは決してない。繰り返しはエージェントごとに別々に追跡され、新しいユーザーメッセージでクリアされる。`dsh` ベースバンドルは 3、5、および 8 回の繰り返しでリマインダーを出す設定でこのパッケージを有効にする。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [本パッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 本パッケージを使う
 
-Mount this plugin when the model should catch itself looping on identical tool calls. There is nothing to learn or wire: the `dsh` base bundle already runs it, and the defaults work for most sessions — tune the thresholds and tool scope below when you want the nudge sooner, later, or on fewer tools.
+モデルが同一のツール呼び出しでループしていることに自ら気づくべき場合にこのプラグインをマウントする。学ぶべきことや配線すべきことは何もない: `dsh` ベースバンドルは既にこれを実行しており、デフォルトはほとんどのセッションで機能する — より早く、より遅く、またはより少ないツールで促しを出したい場合は、以下のしきい値とツールスコープを調整する。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it when the model works autonomously for long stretches and a stuck loop is the failure you want to break with advice rather than force. Avoid it when identical repeats are legitimate and must run undisturbed — the guard only reminds, and a reminder is a small extra message after the repeated call — and when near-identical variants must be caught, because only exact repeats (same tool, same arguments regardless of property order) are detected.
+モデルが長時間自律的に作業し、スタックしたループを力ずくではなく助言で断ち切りたい失敗としたい場合にこれを選ぶ。同一の繰り返しが正当で邪魔されずに実行される必要がある場合 — ガードはリマインドするだけで、リマインダーは繰り返し呼び出しの後の小さな追加メッセージである — や、ほぼ同一のバリアントを捕まえる必要がある場合は避ける。検出されるのは正確な繰り返し (同じツール、プロパティの順序によらず同じ引数) のみであるためである。
 
-### Setting the thresholds and scope
+### しきい値とスコープの設定
 
-When you want to change when reminders fire or which tools they cover, mount the plugin with configuration:
+リマインダーが発火するタイミングや対象ツールを変更したい場合は、設定付きでプラグインをマウントする:
 
 ```yaml
 - name: '@deepseek-ai/dsh-repeat-tool-reminder'
@@ -44,103 +44,103 @@ When you want to change when reminders fire or which tools they cover, mount the
     argumentsPreviewChars: 500   # cap on arguments shown in the detailed reminder
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `thresholds` | `[3, 5, 8]` | Repeat counts that trigger a reminder |
-| `include` | `[]` | Only these tools are tracked; empty means every tool |
-| `exclude` | `[]` | These tools are never tracked; calls to them neither count nor reset |
-| `argumentsPreviewChars` | `500` | How many characters of the repeated arguments the detailed reminder shows |
+| `thresholds` | `[3, 5, 8]` | リマインダーをトリガーする繰り返し回数 |
+| `include` | `[]` | これらのツールのみを追跡する; 空はすべてのツールを意味する |
+| `exclude` | `[]` | これらのツールは決して追跡されない; それらへの呼び出しはカウントもリセットもしない |
+| `argumentsPreviewChars` | `500` | 詳細リマインダーが表示する繰り返し引数の文字数 |
 
-Invalid configuration fails at startup with a clear error — an empty `thresholds` list, a repeat count below 2, or a duplicate — never a silent change of behavior. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-repeat-tool-reminder) documents every accepted value.
+無効な設定は起動時に明確なエラーで失敗する — 空の `thresholds` リスト、2 未満の繰り返し回数、または重複 — 挙動が黙って変わることは決してない。生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-repeat-tool-reminder)が受け入れられるすべての値を文書化する。
 
-### What you get
+### 得られるもの
 
-With the defaults, a model that repeats the same call with identical arguments receives a short reminder on the third repeat — to analyze the previous result before calling again — and detailed reminders on the fifth and eighth, naming the tool and the repeated arguments so it can decide whether to change approach, gather more evidence, or finish. A new user message clears the count, so a fresh instruction is never treated as a loop. Reminders appear in the conversation after the repeated call's result, attributed to the plugin, so the model reads them like any other message.
+デフォルトでは、同一の引数で同じ呼び出しを繰り返すモデルは、3 回目の繰り返しで短いリマインダー — 再度呼び出す前に前の結果を分析するよう — を受け取り、5 回目と 8 回目で詳細なリマインダーを受け取り、ツールと繰り返された引数を名指すため、アプローチを変えるか、さらに証拠を集めるか、終了するかを決められる。新しいユーザーメッセージがカウントをクリアするため、新しい指示がループとして扱われることは決してない。リマインダーは繰り返し呼び出しの結果の後にプラグインに帰属されて会話に現れるため、モデルは他のメッセージと同様にそれらを読む。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the guard detects repeats and delivers reminders, and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションはガードが繰り返しを検出してリマインダーを届ける方法を説明し、それを実現するコードを指し示す; 観察可能な挙動は[本パッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計哲学
 
-The guard is built on four commitments:
+ガードは 4 つのコミットメントの上に構築されている:
 
-- **Advisory, not veto.** The guard enriches post-execute decisions with model context; it never blocks or rewrites a call, so `PostToolDecision` blocking stays a later listener's job.
-- **Count in post-execute.** Detection runs on `tools/post-execute`, which also fires for denied calls; counting there lets one listener cover every attempt with no cross-event state.
-- **Exact-match canonicalization.** Arguments reach the guard as the loop's `JSON.parse` output (or its raw-string fallback), so JSON's value domain is the whole input domain and a deep key-sort plus `JSON.stringify` is a complete, deterministic identity — no bigint, cycle, or `undefined` handling exists because no input path can produce them.
-- **Fail loud at load.** `thresholds` and `argumentsPreviewChars` validate in `apply` and throw, never falling back to defaults.
+- **拒否権ではなく助言。** ガードは post-execute の決定をモデルコンテキストで enrich する; 呼び出しをブロックしたり書き換えたりすることは決してないため、`PostToolDecision` のブロックは後続のリスナーの仕事のままである。
+- **post-execute でカウントする。** 検出は `tools/post-execute` で実行され、拒否された呼び出しでも発火する; そこでカウントすることで、1 つのリスナーがクロスイベント状態なしにすべての試行をカバーできる。
+- **完全一致の正規化。** 引数はループの `JSON.parse` 出力 (またはその生文字列フォールバック) としてガードに到達するため、JSON の値領域が入力領域の全体であり、深いキーソートと `JSON.stringify` が完全で決定論的な同一性である — 入力経路がそれらを生成しえないため、bigint、サイクル、または `undefined` の処理は存在しない。
+- **ロード時に大声で失敗する。** `thresholds` と `argumentsPreviewChars` は `apply` で検証されスローする; デフォルトへのフォールバックは決してしない。
 
-### Detection: the repeat chain
+### 検出: 繰り返しチェーン
 
-Each agent's chain is keyed by `(tool name, canonical arguments)` — two calls with the same tool and canonically identical arguments (property order ignored) count as consecutive, and a different tracked call resets the count to 1. The chain lives in a `WeakMap<Agent, Chain>`.
+各エージェントのチェーンは `(tool name, canonical arguments)` でキーされる — 同じツールと同じ正規化済み引数を持つ 2 つの呼び出し (プロパティ順序は無視) は連続としてカウントされ、異なる追跡対象の呼び出しはカウントを 1 にリセットする。チェーンは `WeakMap<Agent, Chain>` に置かれる。
 
-- **Untracked calls are transparent to the chain.** A call excluded by `include`/`exclude` neither increments nor resets the counter, so `grep X → todo_write → grep X` still counts as two consecutive `grep X` when `todo_write` is excluded — bookkeeping tools interleaved into a loop do not launder it.
-- **Denied calls count.** Detection sits on `tools/post-execute`, which also runs for calls a `tools/pre-execute` listener denied; a model hammering a denied call is exactly the loop worth breaking.
-- **Calls without an agent are ignored.** A direct `ctx.tools.execute()` caller has no model to remind and no live agent object to key on.
-- **Per-agent keying, reset on user prompts.** One agent's repetition never trips another's reminder; a user prompt (`agent/pre-step`) deletes the submitting agent's chain, and object lifetime bounds the weak entry without a disposal listener.
-- **In-memory only.** A session resumed from persistence starts with a fresh chain — the guard is a heuristic nudge, not a logged invariant, so reminders after a resume are the accepted cost.
+- **追跡されない呼び出しはチェーンに対して透明である。** `include`/`exclude` で除外された呼び出しはカウンターを増やしもリセットもしないため、`todo_write` が除外されている場合、`grep X → todo_write → grep X` は依然として 2 つの連続する `grep X` としてカウントされる — ループに挟まれたブックキーピングツールはそれを洗浄しない。
+- **拒否された呼び出しもカウントされる。** 検出は `tools/post-execute` に位置し、これは `tools/pre-execute` リスナーが拒否した呼び出しでも実行される; 拒否された呼び出しを叩き続けるモデルはまさに断ち切る価値のあるループである。
+- **エージェントのない呼び出しは無視される。** 直接の `ctx.tools.execute()` 呼び出し元にはリマインドすべきモデルがなく、キーとする生きた agent オブジェクトもない。
+- **エージェントごとのキー付け、ユーザープロンプトでリセット。** あるエージェントの繰り返しが別のエージェントのリマインダーをトリガーすることは決してない; ユーザープロンプト (`agent/pre-step`) が送信したエージェントのチェーンを削除し、オブジェクトの寿命が破棄リスナーなしに弱エントリーを境界付ける。
+- **インメモリのみ。** 永続化から再開されたセッションは新しいチェーンで始まる — ガードはヒューリスティックな促しであり、ログに記録された不変条件ではないため、再開後のリマインダーは受け入れられたコストである。
 
-### Reminder delivery
+### リマインダーの配信
 
-Reminders ride the post-execute decision's `additionalContexts` (source `{kind: 'repeat-tool-reminder', form: 'notice', summary: '<tool> × <count>'}`), never a `content` replacement: the `tool/result` event stays the tool's own output for audit. The loop buffers the context and appends it as an injected `user/message` after the step's tool results, which the session renders as a plain synthetic user message — model-visible, source-attributed, and reconstructable from the session log with no new session event. The guard always delegates via `next()` and prepends its reminder to the downstream decision's context array, so both decision variants (a blocked call included) still get the nudge while every entry retains its own source and metadata.
+リマインダーは post-execute の決定の `additionalContexts` (ソース `{kind: 'repeat-tool-reminder', form: 'notice', summary: '<tool> × <count>'}`) に乗り、`content` の置換には決してならない: `tool/result` イベントは監査のためにツール自身の出力のままである。ループはそのコンテキストをバッファし、ステップのツール結果の後に注入された `user/message` として追加し、セッションはそれをプレーンな合成ユーザーメッセージとしてレンダリングする — モデル可視で、ソースが帰属され、新しいセッションイベントなしにセッションログから再構築可能である。ガードは常に `next()` を通じて委譲し、リマインダーを下流の決定のコンテキスト配列の先頭に付加するため、どちらの決定バリアント (ブロックされた呼び出しを含む) も促しを受け取り、すべてのエントリーが自身のソースとメタデータを保つ。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, fail-loud validation, chain listeners |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `Config` スキーマ、フェイルラウド検証、チェーンリスナー |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the tools waterfall to exhaustive configuration and the guard group map.
+パッケージレベルの契約では不十分なときにこれらのページを読む。ツール waterfall から網羅的な設定とガードグループマップへ進む。
 
-- [Tools subsystem reference](../../../docs/subsystems/tools.md) — the `tools/execute` waterfall, `additionalContexts`, and decision shapes this guard consumes.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-repeat-tool-reminder) — every accepted config field and its source declaration.
-- [guard group map](../README.md) — the sibling guard packages and the loop-hygiene family.
+- [Tools サブシステムリファレンス](../../../docs/subsystems/tools.md) — このガードが消費する `tools/execute` waterfall、`additionalContexts`、および決定の形。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-repeat-tool-reminder) — 受け入れられるすべての設定フィールドとそのソース宣言。
+- [guard グループマップ](../README.md) — 兄弟ガードパッケージとループ衛生ファミリー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### First-threshold context message
+### 最初のしきい値のコンテキストメッセージ
 
-#### What the model sees
+#### モデルが見るもの
 
-At the first configured consecutive-repeat threshold, that agent receives the reminder below. No tool schema or normal-call text is added.
+最初に設定された連続繰り返しのしきい値で、そのエージェントは以下のリマインダーを受け取る。ツールスキーマや通常呼び出しのテキストは追加されない。
 
-##### First-threshold reminder
+##### 最初のしきい値のリマインダー
 
 ```markdown
 You are repeating the exact same tool call with identical arguments. Carefully analyze the previous result before calling again: if the task is not complete, try a different approach or different arguments instead of repeating the call.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Zero tokens before the threshold. The reminder is retained history for that agent.
+しきい値前はゼロトークン。リマインダーはそのエージェントの保持された履歴である。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ; 新たに可視になった内容は再利用可能なリクエストプレフィックスに従い、既存の KV キャッシュエントリーを無効化しない。
 
-### Later-threshold context message
+### 後続しきい値のコンテキストメッセージ
 
-#### What the model sees
+#### モデルが見るもの
 
-A later threshold receives the detailed reminder template below. A capped argument preview ends exactly `… (+<omitted> more chars)`.
+後続のしきい値は以下の詳細リマインダーテンプレートを受け取る。上限付きの引数プレビューは正確に `… (+<omitted> more chars)` で終わる。
 
-##### Later-threshold reminder
+##### 後続しきい値のリマインダー
 
 ```markdown
 Repeated tool call detected:
@@ -150,36 +150,36 @@ Repeated tool call detected:
 The repeated calls are not making progress. Do not call this tool with these exact arguments again. Inspect the latest result and choose a different action, different arguments, or finish the task if enough evidence has been gathered.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Each reminder is retained history; `argumentsPreviewChars` bounds its data-dependent argument text, while agents keep independent counters.
+各リマインダーは保持された履歴である; `argumentsPreviewChars` がそのデータ依存の引数テキストを制限し、エージェントは独立したカウンターを保つ。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ; 新たに可視になった内容は再利用可能なリクエストプレフィックスに従い、既存の KV キャッシュエントリーを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the guard is a poor fit. They are current package constraints, not a task backlog.
+これらの制限は、このガードが適さない場合を定義する。それらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **Exact-match detection only** — canonicalization is a deep key-sort, so near-identical variants (a tweaked path, extra whitespace inside a value) evade the chain; fuzzy matching is rejected pending evidence of need.
-- **Compaction does not reset chains** — a chain spanning a compaction checkpoint keeps counting.
-- **Advisory only** — escalating to a blocking form at a high threshold is not implemented, though `PostToolDecision` already supports blocking.
-- **No subagent chain-sharing** — chains stay isolated per agent; a parent and its subagent repeating the same call never combine.
-- **Legitimate idempotent polling still draws nudges** past the thresholds — the pressure valves are the `thresholds`/`exclude` config.
-- **Past the highest threshold a chain goes silent** — reminders fire only at exact configured counts, never beyond them.
+- **完全一致検出のみ** — 正規化は深いキーソートであるため、ほぼ同一のバリアント (微調整されたパス、値内の余分な空白) はチェーンを逃れる; ファジーマッチングは必要性の証拠が出るまで拒否されている。
+- **compaction はチェーンをリセットしない** — compaction チェックポイントをまたぐチェーンはカウントを続ける。
+- **助言のみ** — 高いしきい値でブロッキング形式へエスカレートすることは実装されていないが、`PostToolDecision` は既にブロッキングをサポートしている。
+- **subagent 間のチェーン共有なし** — チェーンはエージェントごとに分離されたままである; 親とその subagent が同じ呼び出しを繰り返しても決して合算されない。
+- **正当な冪等ポーリングもしきい値を超えると促しを引く** — 圧力弁は `thresholds`/`exclude` の設定である。
+- **最高しきい値を超えるとチェーンは沈黙する** — リマインダーは設定された正確な回数でのみ発火し、それを超えて発火することは決してない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-This Dev Note is working context for maintainers: open questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発メモはメンテナー向けの作業コンテキストである: 未解決の質問と未決定の方向性。明示的に非権威である — 出荷済みの挙動、制限、および受け入れられた根拠は上記のセクション、パッケージコード、およびリンクされた Agent Notes にある。
 
-The [repeat-tool-guard feature note](../../../.agents/notes/archived/feature/2026-07-08-repeat-tool-guard.md) records the original design and alternatives under the former package name; the [naming ledger](../../../.agents/notes/archived/architecture/2026-08-11-repository-naming-contract-and-rename-ledger.md) records the rename to `repeat-tool-reminder` and its reason.
+[repeat-tool-guard 機能ノート](../../../.agents/notes/archived/feature/2026-07-08-repeat-tool-guard.md)は旧パッケージ名の下の元の設計と代替案を記録している; [命名台帳](../../../.agents/notes/archived/architecture/2026-08-11-repository-naming-contract-and-rename-ledger.md)は `repeat-tool-reminder` への改名とその理由を記録している。
 
 </details>

@@ -1,152 +1,152 @@
 ---
-description: "Models settings and product-onboarding plugin for the dsh web client: provider rows, API-key management, model lists, and the DeepSeek first-run dialogs."
+description: "dsh Web クライアントのモデル設定と製品オンボーディングのプラグイン: プロバイダー行、API キー管理、モデルリスト、DeepSeek 初回実行ダイアログ。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-settings-models
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Desktop product events use the optional [product analytics service](../product-analytics/README.md); ordinary Web interactions are excluded.
+デスクトップ製品イベントはオプションの[プロダクト分析サービス](../product-analytics/README.md)を使用する。通常の Web インタラクションは除外される。
 
-## Summary
+## 概要
 
-`dsh-client-ui-settings-models` is the Models settings page of the dsh web client: users configure API keys (stored write-only under the profile's credential reference), edit each provider's model list, and hand-declare custom pi-ai routes, with provider rows and one editor card at a time. The page joins the provider directory, the settings document, and the credential descriptions into one shared snapshot, so a row's state stays consistent across all three. It also walks first-run users through two ordered dialogs — a versioned preview notice and the conditional official-DeepSeek credential step.
+`dsh-client-ui-settings-models` は dsh Web クライアントのモデル設定ページである。ユーザーは API キーを構成し（プロファイルの資格情報参照の下に書き込み専用で保存される）、各プロバイダーのモデルリストを編集し、カスタムの pi-ai ルートを手動宣言する。プロバイダー行と編集カードは一度に 1 つずつ表示される。このページはプロバイダーディレクトリ、設定ドキュメント、資格情報の説明を 1 つの共有スナップショットに結合するため、行の状態は 3 者間で一貫し続ける。また、初回実行のユーザーを 2 つの順序付けられたダイアログ（バージョン付きプレビュー通知と、条件付きの公式 DeepSeek 資格情報ステップ）へ案内する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Saving credentials or a custom provider preserves the selected model. The user can select an available model from the composer.
+資格情報やカスタムプロバイダーを保存しても、選択されたモデルは保持される。ユーザーはコンポーザーから利用可能なモデルを選択できる。
 
-DeepSeek Account appears first and DeepSeek second in the provider list; third-party providers retain their directory order.
+プロバイダーリストでは DeepSeek Account が最初に、DeepSeek が 2 番目に表示され、サードパーティプロバイダーはディレクトリ順を保つ。
 
-Open the Models page from the Settings navigation to see every configured provider as a row. A whole-section provider whose key is not configured anywhere renders as its open setup card instead, but only in the first-run posture and only until the user closes that card. Each card kind owns its own open state, so closing one never discards a draft in another.
+設定ナビゲーションからモデルページを開くと、構成済みのすべてのプロバイダーが行として表示される。キーがどこにも構成されていないプロバイダー全体は、代わりに開いたセットアップカードとして描画されるが、それは初回実行の姿勢においてのみであり、ユーザーがそのカードを閉じるまでである。各カード種別は独自の開閉状態を持つため、1 つを閉じても別のドラフトが破棄されることはない。
 
-A provider with a stored catalog error remains visible with its diagnostic and edit/delete actions. Add actions are offered only for registered settings namespaces, so an unavailable namespace cannot leave a button that opens no editor. A rejected save leaves the editor open and displays the Host diagnostic.
+保存されたカタログエラーを持つプロバイダーは、その診断と編集/削除アクションとともに表示され続ける。追加アクションは登録済みの設定名前空間に対してのみ提供されるため、利用できない名前空間がエディターを開かないボタンを残すことはない。拒否された保存はエディターを開いたままにし、Host の診断を表示する。
 
-After Apply closes an editor, its saved status appears when the current provider, settings, and credential snapshot is ready. Opening any row's editor, adding a provider, and opening a removal confirmation wait for that refresh. A newly opened Models section, or one retrying after a page-load failure, waits for a ready snapshot before mounting editors. A background refresh preserves an open draft while its editor remains mounted; a failed page load or provider removal can close it.
+適用がエディターを閉じた後、現在のプロバイダー、設定、資格情報のスナップショットが準備できると、保存済みステータスが表示される。任意の行のエディターを開くこと、プロバイダーを追加すること、削除確認を開くことは、その更新を待つ。新しく開かれたモデルセクション、またはページ読み込み失敗後に再試行するセクションは、エディターをマウントする前に準備済みスナップショットを待つ。バックグラウンド更新は、そのエディターがマウントされている間は開いたドラフトを保持する。失敗したページ読み込みまたはプロバイダー削除はそれを閉じ得る。
 
-Host configuration `credentialOnboarding` defaults to `true`. The Electron preload marker suppresses automatic credential onboarding and the Web welcome notice; Models settings and explicit API-key editing remain available. The [account plugin](../ui-settings-account/README.md#desktop-onboarding) owns the Desktop introduction. Other native shells can disable only the credential step with `credentialOnboarding: false`. Host publishes this public boolean through `webserver/index-inject`, and Client validates it before registering dialogs. It is page initialization data, not a durable completion marker.
+Host 構成 `credentialOnboarding` の既定値は `true` である。Electron プリロードマーカーは自動の資格情報オンボーディングと Web のウェルカム通知を抑制する。モデル設定と明示的な API キー編集は引き続き利用できる。[アカウントプラグイン](../ui-settings-account/README.md#desktop-onboarding)がデスクトップの紹介を所有する。他のネイティブシェルは `credentialOnboarding: false` で資格情報ステップのみを無効化できる。Host はこの公開 boolean を `webserver/index-inject` を通じて公開し、Client はダイアログを登録する前にそれを検証する。これはページ初期化データであり、永続的な完了マーカーではない。
 
-### API keys
+### API キー
 
-API-key inputs start empty and use `autocomplete="new-password"` to ask browsers not to autofill saved login passwords. A nonempty draft has the same eye control as masked conversation text: **Show secret** reveals the current input and **Hide secret** masks it. Changing or clearing the input masks it again. Stored credentials are never read into the input.
+API キー入力は空で始まり、`autocomplete="new-password"` を使用して、保存済みログインパスワードを自動入力しないようブラウザーに求める。空でないドラフトには、マスクされた会話テキストと同じ目のコントロールがある。**シークレットを表示** は現在の入力を表示し、**シークレットを隠す** はそれをマスクする。入力を変更またはクリアすると再びマスクされる。保存された資格情報が入力に読み込まれることは決してない。
 
-The primary field on an editor card is a single **API key** input — the page never asks for an environment-variable name. A typed key stores write-only through `credentials.set` under the profile's reference, deriving `<ROUTE>_API_KEY` when the profile has none, and the pi-ai profile records that derivation as `apiKeyEnv`, so `cordis.patch.yml` never carries a key value. Leaving a new pi-ai provider's key blank saves a reference-free profile and preserves provider-native authentication (for example the Bedrock credential chain or Vertex ADC). The field's placeholder and help tooltip use the profile's `apiKeyEnv` when it has one; otherwise they use the credential variables of the route's `nativeAuth`, excluding `baseURLEnv` address variables, in lookup order, as the configurable-provider directory reports them. These display hints omit references containing `oauth` (case-insensitively), and describe saved credentials followed by the displayed environment fallbacks. This presentation filter does not change the [credential resolution order](../../../docs/subsystems/credentials.md#resolution), the adapter's complete environment list, or an explicit reference. A filtered explicit reference still has a usable key input with the plain placeholder and no tooltip. A native route that has no key authentication omits the key field and authentication help entirely; an explicit reference still enables the field. A profile without a reference on a route without `nativeAuth`, such as a hand-declared route, shows the plain key placeholder and no tooltip. A row labels API-key state with a green solid dot only when a referenced credential is confirmed configured, and with a red solid dot only when a named reference is confirmed missing. A successful Apply emits a local accessible status message without echoing secret material.
+エディターカードの主フィールドは単一の **API キー** 入力であり、ページが環境変数名を尋ねることはない。入力されたキーは、プロファイルの参照の下で `credentials.set` を通じて書き込み専用で保存される。プロファイルに参照がない場合は `<ROUTE>_API_KEY` を導出し、pi-ai プロファイルはその導出を `apiKeyEnv` として記録するため、`cordis.patch.yml` がキー値を運ぶことはない。新しい pi-ai プロバイダーのキーを空のままにすると、参照のないプロファイルが保存され、プロバイダーネイティブの認証（たとえば Bedrock の資格情報チェーンや Vertex ADC）が保持される。フィールドのプレースホルダーとヘルプツールチップは、プロファイルに `apiKeyEnv` がある場合はそれを使用する。ない場合は、ルートの `nativeAuth` の資格情報変数（`baseURLEnv` アドレス変数を除く）を、構成可能プロバイダーディレクトリが報告する検索順で使用する。これらの表示ヒントは `oauth` を含む参照（大文字小文字を区別しない）を省略し、保存された資格情報と、それに続く表示される環境フォールバックを記述する。この表示フィルターは[資格情報の解決順序](../../../docs/subsystems/credentials.md#resolution)、アダプターの完全な環境リスト、明示的な参照を変更しない。フィルターされた明示的な参照にも、プレーンなプレースホルダーとツールチップなしの使用可能なキー入力がある。キー認証を持たないネイティブルートは、キーフィールドと認証ヘルプを完全に省略する。明示的な参照はそれでもフィールドを有効にする。手動宣言ルートのように `nativeAuth` を持たないルート上の参照のないプロファイルは、プレーンなキーのプレースホルダーを示し、ツールチップを表示しない。行は、参照された資格情報が構成済みであることが確認された場合にのみ緑の塗りつぶしドットで API キー状態をラベル付けし、名前付き参照が欠如していることが確認された場合にのみ赤の塗りつぶしドットでラベル付けする。成功した適用は、シークレット素材をエコーせずにローカルのアクセシブルなステータスメッセージを発行する。
 
-The editor uses redacted `CredentialInfo` to choose the saved-credential placeholder or environment detection, without displaying a credential-source label. Refreshing the snapshot updates an open editor without a separate probe. The hint never receives a credential value or changes field writability.
+エディターは秘匿化された `CredentialInfo` を使用して、保存された資格情報のプレースホルダーまたは環境検出を選択し、資格情報ソースのラベルは表示しない。スナップショットの更新は、別個のプローブなしで開いているエディターを更新する。ヒントが資格情報値を受け取ったり、フィールドの書き込み可否を変えたりすることは決してない。
 
-### Editing a provider
+### プロバイダーの編集
 
-A blank key field offers a saved credential when one is detected, with no status text below the input; otherwise it offers environment authentication. Redacted `credentials.describe` checks distinguish a detected environment reference, no detected variables, and an unconfirmed read. A missing-variable hint uses the warning color and names the first variable to configure. A detected environment reference uses green. Address configuration variables do not count as credentials. Hidden authentication references still participate in detection; a generic detected hint keeps their names hidden. Detection does not validate credentials, test a connection, or inspect provider-managed files such as AWS profiles and Google application-default credentials. A nonempty input shows no authentication status text. The page reads native variable names as well as named references, in batches of at most 64, and never reads their values into the Client.
+空のキーフィールドは、資格情報が検出された場合は保存された資格情報を提示し、入力の下にステータステキストはない。そうでなければ環境認証を提示する。秘匿化された `credentials.describe` チェックは、検出された環境参照、変数なしの検出、未確認の読み取りを区別する。変数欠如のヒントは警告色を使用し、構成すべき最初の変数を名指す。検出された環境参照は緑を使用する。アドレス構成変数は資格情報として数えられない。隠された認証参照も検出には参加する。汎用の検出済みヒントはその名前を隠したままにする。検出は資格情報を検証したり、接続をテストしたり、AWS プロファイルや Google のアプリケーション既定資格情報のようなプロバイダー管理ファイルを検査したりしない。空でない入力は認証ステータステキストを表示しない。ページはネイティブ変数名と名前付き参照を最大 64 のバッチで読み取り、その値を Client に読み込むことは決してない。
 
-An endpoint without a fixed catalog default shows the provider's `baseURLEnv` configuration names below the input. A profile endpoint remains the first placeholder choice.
+固定のカタログ既定値を持たないエンドポイントは、入力の下にプロバイダーの `baseURLEnv` 構成名を表示する。プロファイルのエンドポイントは最初のプレースホルダー候補のままである。
 
-The collapsed 自定义设置 fold carries the curated extras: `baseURL` for both families (the placeholder shows the endpoint the profile resolves to, the public endpoint for deepseek, else the `defaultBaseURL` the configurable-provider directory reports for a pi-ai catalog route), each adapter's model catalog, and the **display name** and **API protocol** of a pi-ai route the adapter does not ship. Profile `headers` remain deployment configuration in `cordis.patch.yml` or Cordis config and have no Models-page editor. The Provider ID stays fixed: it is the settings key, the name every other namespace and every logged session references, and the stem of a credential reference the page cannot read back to move. There is no provider-scoped reasoning-effort field: effort is a per-model capability, so a provider-scoped control could only be set to a value some models reject. Each model row edits `id`, optional display `name`, optional `contextWindow`/`maxTokens`, input types, and, on a hand-declared pi-ai route, reasoning levels; unrelated model fields survive edits.
+折りたたまれたカスタマイズ設定フォールドは、厳選された追加項目を運ぶ。両ファミリーの `baseURL`（プレースホルダーはプロファイルが解決するエンドポイントを表示する。deepseek では公開エンドポイント、それ以外では pi-ai カタログルートに対して構成可能プロバイダーディレクトリが報告する `defaultBaseURL`）、各アダプターのモデルカタログ、およびアダプターが同梱しない pi-ai ルートの **表示名** と **API プロトコル** である。プロファイルの `headers` は `cordis.patch.yml` または Cordis 構成におけるデプロイ構成のままで、モデルページのエディターを持たない。プロバイダー ID は固定のままである。それは設定キーであり、他のすべての名前空間とすべての記録済みセッションが参照する名前であり、ページが読み戻して移動できない資格情報参照の語幹である。プロバイダースコープの推論強度フィールドは存在しない。強度はモデルごとのケイパビリティであり、プロバイダースコープのコントロールは一部のモデルが拒否する値にしか設定できないためである。各モデル行は `id`、オプションの表示 `name`、オプションの `contextWindow`/`maxTokens`、入力タイプ、および手動宣言の pi-ai ルートでは推論レベルを編集し、無関係なモデルフィールドは編集後も残る。
 
-The DeepSeek card edits the `llm-deepseek` endpoint, credentials, and model catalog. It uses Messages, with the default endpoint placeholder `https://api.deepseek.com/anthropic`.
+DeepSeek カードは `llm-deepseek` のエンドポイント、資格情報、モデルカタログを編集する。Messages を使用し、既定のエンドポイントプレースホルダーは `https://api.deepseek.com/anthropic` である。
 
-Expand **Customized settings → Model options** to edit each model. Both provider families share the same row layout, labels, and icons: context window and max output tokens occupy two columns, and **Input types** occupies a separate row with **Text** and **Image** checkboxes. A row without an input declaration displays the installed model’s input types, then the provider default, then Text. Known pi-ai providers load their installed catalog without endpoint I/O; opening a row does not write an override. Explicit input selections take precedence, including text-only overrides of vision models. Checkbox edits save the selected types, with at least one type required. DeepSeek writes `inputModalities`; pi-ai writes `input`. Unchecking Image for DeepSeek also removes `imagePixelBudget` and `imageMaxBytes`, because the adapter rejects those limits without image input. Clearing the input field in `cordis.patch.yml` restores adapter inheritance; **Restore default models** resets the entire catalog override. Declare only input types the upstream model can actually process.
+**カスタマイズ設定 → モデルオプション** を展開して各モデルを編集する。両プロバイダーファミリーは同じ行レイアウト、ラベル、アイコンを共有する。コンテキストウィンドウと最大出力トークンは 2 列を占め、**入力タイプ** は **テキスト** と **画像** のチェックボックスを伴う別の行を占める。入力宣言のない行は、インストール済みモデルの入力タイプ、次にプロバイダーの既定値、最後にテキストを表示する。既知の pi-ai プロバイダーはエンドポイント I/O なしでインストール済みカタログを読み込む。行を開いても上書きは書き込まれない。明示的な入力選択は優先され、ビジョンモデルのテキストのみへの上書きも含む。チェックボックスの編集は選択されたタイプを保存し、少なくとも 1 つのタイプが必要である。DeepSeek は `inputModalities` を書き込み、pi-ai は `input` を書き込む。DeepSeek で画像のチェックを外すと `imagePixelBudget` と `imageMaxBytes` も削除される。アダプターは画像入力なしではそれらの制限を拒否するためである。`cordis.patch.yml` の入力フィールドをクリアするとアダプターの継承が復元され、**既定のモデルを復元** はカタログ上書き全体をリセットする。アップストリームモデルが実際に処理できる入力タイプだけを宣言する。
 
-A model row on a hand-declared pi-ai route also edits its **Reasoning levels**, the `reasoningEfforts` the adapter already reads from `cordis.patch.yml`; the **?** beside the label explains the two columns. With the switch off the field is absent, so the model does not reason and the model picker offers no level; a stored `false` is kept until the switch is used. Turning it on always starts from rows for off, low, medium, and high; it does not restore levels removed earlier, and **Cancel** discards the edit instead. Each row pairs a level select — the keys `llm-pi-ai`'s configuration schema accepts in `reasoningEfforts`, read from the namespace schema like the protocol choices and today `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`, each usable once — with the **API value** sent for it, which starts as the level name; a field cleared while typing stores the level name and shows it once the field is left. Off only turns reasoning off, so its value field is disabled; a value already written for it in `cordis.patch.yml` is shown and kept. Changing a row's level resets a value still spelled as the old level; a custom value carries over only between two thinking levels, so changing a row to or from Off resets it. A stored key the schema does not list keeps its row and stays selectable there. Rows can be added and deleted and are saved in row order, while the model picker lists the levels in escalation order. The section refuses what the adapter refuses: no level besides Off — including a `reasoningEfforts:` left without a value, which shows the switch on with no rows — or a value that is missing on a level besides Off or empty on any level. A refused value marks its field invalid, and leaving that field fills in the level name. The rows keep no state of their own, so a model row reused after a deletion, a reset, or a fold shows only its own model. Routes served from the installed catalog and the DeepSeek card keep the adapter's levels and show no reasoning control.
+手動宣言の pi-ai ルート上のモデル行は、その **推論レベル**、つまりアダプターがすでに `cordis.patch.yml` から読み取る `reasoningEfforts` も編集する。ラベルの横の **?** が 2 つの列を説明する。スイッチがオフのときフィールドは存在しないため、モデルは推論せず、モデルピッカーはレベルを提供しない。保存された `false` はスイッチが使用されるまで保たれる。オンにすると常に off、low、medium、high の行から始まる。以前に削除されたレベルは復元されず、代わりに **キャンセル** が編集を破棄する。各行は、レベル選択（`llm-pi-ai` の構成スキーマが `reasoningEfforts` で受け入れるキーで、プロトコル選択と同様に名前空間スキーマから読み取られ、現在は `off`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max` で、それぞれ 1 回だけ使用できる）と、そのために送信される **API 値**（レベル名として始まる。入力中にクリアされたフィールドはレベル名を保存し、フィールドを離れるとそれを表示する）を対にする。Off は推論をオフにするだけなので、その値フィールドは無効である。`cordis.patch.yml` にすでに書き込まれた値は表示され、保たれる。行のレベルを変更すると、まだ古いレベルとして綴られている値はリセットされる。カスタム値は 2 つの思考レベルの間でのみ引き継がれるため、行を Off に、または Off から変更するとリセットされる。スキーマが列挙しない保存済みキーはその行を保ち、そこで選択可能なままである。行は追加・削除でき、行の順序で保存される。一方、モデルピッカーはレベルを強度の昇順に列挙する。このセクションはアダプターが拒否するものを拒否する。Off 以外のレベルがない場合（値なしで残された `reasoningEfforts:` を含み、これはスイッチがオンで行が 0 の状態を示す）、Off 以外のレベルで値が欠如している場合、または任意のレベルで空の場合である。拒否された値はそのフィールドを無効としてマークし、そのフィールドを離れるとレベル名が埋められる。行は独自の状態を保たないため、削除、リセット、フォールド後に再利用されたモデル行は、自分のモデルだけを表示する。インストール済みカタログから提供されるルートと DeepSeek カードはアダプターのレベルを保ち、推論コントロールを表示しない。
 
-### Adding and deleting providers
+### プロバイダーの追加と削除
 
-**Add model provider** is the one entry to the add card, offered while any editor-backed settings namespace is mounted and enabled while either mode below can proceed. The card opens on a segmented mode switch with a one-line purpose beneath it: **Third-party model provider** carries the dormant-directory provider select over the provider editor — a bare-mounted `llm-pi-ai` offers its whole installed catalog before any route exists — and **Custom model API** carries the create form for a route pi-ai does not ship: a relay, a self-hosted server, or any other OpenAI- or Anthropic-compatible endpoint. A mode is offered only while its namespace is mounted; with one mode the card shows that form alone under the mode's name, and a mode whose namespace has nothing left to adopt or no protocol to declare is disabled with the reason as its hover text. A panel mounts the first time its mode is shown and stays mounted, hidden, while the card is open and its mode stays offered, so switching modes discards neither draft; the switch locks while either panel has a write or an endpoint interrogation in flight, since a switch underneath one would orphan its answer. Each tab controls its panel through ids, and closing either panel forgets the catalog draft's target. The custom form asks for a unique **Provider ID**, an endpoint, a protocol, and at least one uniquely-identified model, because nothing can default those. The protocol picker names each protocol by its product name — OpenAI Chat Completions, OpenAI Responses, Anthropic Messages — while the stored value stays the schema identifier; a protocol the adapter adds before this page names it shows that identifier. The endpoint placeholder follows the selected protocol: OpenAI Chat Completions and Responses show `https://gateway.example/v1`, while Anthropic Messages shows `https://gateway.example` because its SDK appends `/v1/messages`. Changing the protocol preserves any address already entered. The endpoint must be a parseable HTTP or HTTPS URL; localhost, IPv4 and IPv6 literals, and custom ports remain valid. A syntax error blocks both discovery and creation at the field, while a request failure remains a separate provider error. **Fetch available models** asks the `llm/discoverModels` Remote about the endpoint the form shows, so adding a provider is one pass instead of save-then-return; the reply opens a searchable picker rather than being written, and nothing is written until **Add selected**. Each candidate displays its original model id in a monospace font to distinguish models with the same name. Rows stay on one line; hovering reveals the model name, falling back to the full id when no name is supplied. Selection and configuration retain the original model id. Each selected candidate copies its id, display name, context window, output-token cap, and disclosed input types into the editable row when disclosed, while an existing row retains its user-tuned values. Search matches model ids and optional display names without clearing hidden selections. **Select all** adds the visible results, while **Deselect all** clears the entire selection so hidden results cannot be adopted accidentally. A row is deletable only when the user layer alone carries it (removal restores the composition base), and its confirmation dialog names the provider.
+**モデルプロバイダーを追加** は追加カードへの唯一の入口であり、エディター裏付けの設定名前空間がマウントされている間に提供され、以下のいずれかのモードが進行できる間に有効になる。カードは分割モードスイッチで開き、その下に 1 行の目的を表示する。**サードパーティモデルプロバイダー** は休止ディレクトリのプロバイダー選択をプロバイダーエディターの上に運び（素のマウント状態の `llm-pi-ai` はルートが存在する前にインストール済みカタログ全体を提供する）、**カスタムモデル API** は pi-ai が同梱しないルート（リレー、セルフホストサーバー、その他の OpenAI 互換または Anthropic 互換エンドポイント）の作成フォームを運ぶ。モードはその名前空間がマウントされている間だけ提供される。モードが 1 つだけの場合は、カードはそのモード名の下にそのフォームだけを表示する。採用するものが残っていない、または宣言するプロトコルがない名前空間のモードは、理由をホバーテキストとして無効化される。パネルはそのモードが最初に表示されたときにマウントされ、カードが開いていてそのモードが提供され続ける間は、隠れたままマウントされ続けるため、モードを切り替えてもどちらのドラフトも破棄されない。いずれかのパネルに書き込みまたはエンドポイント問い合わせが進行中の間はスイッチがロックされる。その下での切り替えはその回答を孤立させるためである。各タブは id を通じてそのパネルを制御し、どちらかのパネルを閉じるとカタログドラフトのターゲットが忘れられる。カスタムフォームは一意の **プロバイダー ID**、エンドポイント、プロトコル、および少なくとも 1 つの一意に識別されたモデルを求める。これらを既定値にできるものは何もないためである。プロトコルピッカーは各プロトコルを製品名（OpenAI Chat Completions、OpenAI Responses、Anthropic Messages）で名指すが、保存される値はスキーマ識別子のままである。このページが名指す前にアダプターが追加したプロトコルは、その識別子を表示する。エンドポイントプレースホルダーは選択されたプロトコルに従う。OpenAI Chat Completions と Responses は `https://gateway.example/v1` を示し、Anthropic Messages は `https://gateway.example` を示す。その SDK が `/v1/messages` を追加するためである。プロトコルを変更しても、すでに入力されたアドレスは保持される。エンドポイントは解析可能な HTTP または HTTPS URL でなければならない。localhost、IPv4 および IPv6 リテラル、カスタムポートは有効なままである。構文エラーはフィールドで検出と作成の両方をブロックし、リクエスト失敗は別個のプロバイダーエラーとして残る。**利用可能なモデルを取得** はフォームが示すエンドポイントについて `llm/discoverModels` Remote に問い合わせるため、プロバイダーの追加は保存してから戻るのではなく 1 回の操作で済む。返信は書き込まれるのではなく検索可能なピッカーを開き、**選択項目を追加** まで何も書き込まれない。各候補は同じ名前のモデルを区別するために元のモデル id を等幅フォントで表示する。行は 1 行に収まる。ホバーするとモデル名が現れ、名前が提供されていない場合は完全な id にフォールバックする。選択と構成は元のモデル id を保つ。選択された各候補は、開示されている場合、その id、表示名、コンテキストウィンドウ、出力トークン上限、および開示された入力タイプを編集可能な行にコピーする。一方、既存の行はユーザーが調整した値を保つ。検索は隠れた選択をクリアせずにモデル id とオプションの表示名に一致する。**すべて選択** は可視の結果を追加し、**すべて選択解除** は選択全体をクリアするため、隠れた結果が誤って採用されることはない。行はユーザーレイヤーだけがそれを運ぶ場合にのみ削除可能であり（削除は構成ベースを復元する）、その確認ダイアログはプロバイダーを名指す。
 
-### First-run dialogs
+### 初回実行ダイアログ
 
-After the versioned notice step completes, the DeepSeek step projects first-run readiness from the same joined snapshot. ANY provider the user can already reach ends it without rendering; only a user with none is asked for the official DeepSeek key. Configure later completes only this coordinator pass, and an absent adapter, inactive route, failed join, read-only deployment, or unusable capability completes the step without rendering — Models remains the diagnostic surface.
+バージョン付き通知ステップが完了すると、DeepSeek ステップは同じ結合済みスナップショットから初回実行の準備状況を投影する。ユーザーがすでに到達できるプロバイダーが 1 つでもあれば、描画なしで終了する。1 つもないユーザーだけが公式 DeepSeek キーを求められる。**後で構成** はこのコーディネーターのパスだけを完了し、アダプターの欠如、非アクティブなルート、失敗した結合、読み取り専用デプロイ、または使用不能なケイパビリティは、描画なしでステップを完了する。モデルが診断サーフェスとして残る。
 
-### Extension slots
+### 拡張スロット
 
-The section declares two seats for plugins distributed outside this repository, typed in [`src/client/slot-contract.ts`](src/client/slot-contract.ts) and exported from `./client`. `settings.models.provider-card` (keyed) renders inside every card that shows a directory row — a saved row's card, its first-run setup posture, and the add-provider draft — dispatched with `entryKey = settingsNs` and owner props carrying the row's `ConfigurableProviderView`, its configured state, and its confirmed api-key credential state, so one registration under an adapter family's namespace receives every card of that family, hand-declared routes included; the hand-declared draft card has no directory row yet and dispatches nothing until saved. `settings.models.footer` (list) renders after the rows and the add controls. A registrant activates through `ctx.slots.inject` with a type-only import of this package's `/client` entry; without registrants both seats render nothing.
+このセクションは、このリポジトリ外で配布されるプラグイン用に 2 つの座席を宣言する。それらは [`src/client/slot-contract.ts`](src/client/slot-contract.ts) で型付けられ、`./client` からエクスポートされる。`settings.models.provider-card`（キー付き）は、ディレクトリ行を表示するすべてのカード（保存済み行のカード、その初回実行セットアップ姿勢、追加プロバイダードラフト）の内側に描画され、`entryKey = settingsNs` と、その行の `ConfigurableProviderView`、その構成済み状態、その確認済み API キー資格情報状態を運ぶオーナープロップでディスパッチされる。そのためアダプターファミリーの名前空間の下の 1 つの登録が、そのファミリーのすべてのカード（手動宣言ルートを含む）を受け取る。手動宣言ドラフトカードはまだディレクトリ行を持たず、保存されるまで何もディスパッチしない。`settings.models.footer`（リスト）は行と追加コントロールの後に描画される。登録者は、このパッケージの `/client` エントリーの型のみのインポートとともに `ctx.slots.inject` を通じて有効化する。登録者がいなければ、どちらの座席も何も描画しない。
 
-The Models page includes **DeepSeek Account** (`deepseek-account`, **DeepSeek 账号** in Chinese). The row shows a **Signed in** status and offers no editor: the account listing supplies its models, and [model overrides](../../llm/llm-deepseek-account/README.md#use-this-package) live in `cordis.patch.yml`. The account row is hidden when its available model catalog is empty, including before sign-in and after sign-out; it returns when account models become available.
+モデルページには **DeepSeek Account**（`deepseek-account`、中国語では **DeepSeek 账号**）が含まれる。この行は **ログイン済み** ステータスを表示し、エディターを提供しない。アカウントリスティングがそのモデルを提供し、[モデル上書き](../../llm/llm-deepseek-account/README.md#use-this-package)は `cordis.patch.yml` にある。アカウント行は、利用可能なモデルカタログが空のときに隠される（サインイン前とサインアウト後を含む）。アカウントモデルが利用可能になると再び現れる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The page never holds a full settings section: it holds only the REDACTED descriptor, so every edit lands as `settings.mutate` path ops against the stored section — a set per changed field, an unset per cleared one, and a single unset for a deleted provider row.
+このページは完全な設定セクションを保持することはなく、秘匿化された記述子のみを保持する。そのため、すべての編集は保存されたセクションに対する `settings.mutate` のパス操作として着地する。変更されたフィールドごとに 1 つの set、クリアされたフィールドごとに 1 つの unset、削除されたプロバイダー行には 1 つの unset である。
 
-### Validation
+### 検証
 
-A typed API key is judged on its own field: after trimming, it must be non-empty and every character must be printable ASCII (`[\x21-\x7E]`), which is exactly what an HTTP header value can carry — the twin of `normalizeApiKey` in `@deepseek-ai/dsh-llm`, mirrored here because the source-plane split forbids importing it. A value matching a pasted `NAME=value` environment line or wrapped in matching quotes is refused as the same format failure. Empty ids, duplicate ids, empty explicit names, and unreadable, non-positive, or fractional capacities fail before any write. DeepSeek's `models` is one replace-by-value array: the editor shows inherited effective rows until the first model edit materializes the complete array in the user layer, while reset unsets that override.
+入力された API キーはそのフィールド単体で判定される。トリム後、空でなく、すべての文字が印刷可能 ASCII（`[\x21-\x7E]`）でなければならない。これは HTTP ヘッダー値が運べるものそのものであり、`@deepseek-ai/dsh-llm` の `normalizeApiKey` の双子である。ソースプレーンの分離がそのインポートを禁じるため、ここに複製されている。貼り付けられた `NAME=value` 環境行に一致する値、または対応する引用符で囲まれた値は、同じ形式失敗として拒否される。空の id、重複した id、空の明示名、読み取り不能・非正・小数の容量は、書き込みの前に失敗する。DeepSeek の `models` は値による置換の 1 配列である。エディターは、最初のモデル編集がユーザーレイヤーで完全な配列を実体化するまで、継承された実効行を表示する。リセットはその上書きを unset する。
 
-### Concurrency and credentials
+### 並行性と資格情報
 
-Each settings write carries the card's current `revision`, so a concurrent write from another tab or an external `cordis.patch.yml` edit is refused as `settings/conflict`. After settings commit, the card adopts the returned redacted user subtree and revision before storing the credential, so a failed credential stage retries only that stage. Deletion removes a configured, writable credential only when the profile names the page's derived `<ROUTE>_API_KEY` target, then unsets the profile; both operations are idempotent. Once loaded, the page subscribes to forwarded `settings/document-updated`, `credentials/reference-updated`, and `llm/adapters-updated` owner events, plus local `connection/reset`, so external edits converge without polling.
+各設定書き込みはカードの現在の `revision` を運ぶため、別のタブからの同時書き込みや外部の `cordis.patch.yml` 編集は `settings/conflict` として拒否される。設定のコミット後、カードは資格情報を保存する前に、返された秘匿化されたユーザーサブツリーとリビジョンを採用する。そのため、失敗した資格情報ステージはそのステージだけを再試行する。削除は、プロファイルがページの導出する `<ROUTE>_API_KEY` ターゲットを名指す場合にのみ、構成済みで書き込み可能な資格情報を削除し、その後プロファイルを unset する。どちらの操作も冪等である。一度読み込まれると、ページは転送された `settings/document-updated`、`credentials/reference-updated`、`llm/adapters-updated` のオーナーイベント、およびローカルの `connection/reset` を購読するため、外部編集はポーリングなしで収束する。
 
-Concurrent `ModelsSettingsStore.load()` callers resolve after the current refresh publishes its ready or error snapshot, including callers whose reads were superseded. Older responses cannot publish or settle callers; a refresh started synchronously by a snapshot subscriber owns the waiting callers. Expected Remote failures remain snapshot diagnostics, while an unexpected rejection of the current read rejects its waiting callers.
+並行する `ModelsSettingsStore.load()` 呼び出し元は、現在の更新が準備完了またはエラーのスナップショットを公開した後に解決する。読み取りが追い越された呼び出し元も含む。古い応答は公開または呼び出し元の決着を行えない。スナップショット購読者によって同期的に開始された更新が待機中の呼び出し元を所有する。予期される Remote の失敗はスナップショット診断のままで、現在の読み取りの予期しない拒否は待機中の呼び出し元を拒否する。
 
-### Onboarding coordinator
+### オンボーディングコーディネーター
 
-The notice step owns its exact copy in `src/client/locales.ts` and its acknowledgement version in `src/onboarding-copy.ts`. Authenticated browsers compare and write `ui-settings-general.welcomeNoticeVersion` through the shared configuration form; only an explicit Continue records the current version, and an unavailable namespace or a refused write leaves the notice unacknowledged. Users who acknowledged an earlier version see the current notice again. The DeepSeek step targets `deepseek-official` in `llm-deepseek` and renders the existing `ProviderEditor` in credential-only mode inside the shared onboarding modal; `credentials.set` stays the only secret write, and no provider settings are changed.
+通知ステップは、その正確なコピーを `src/client/locales.ts` に、その確認バージョンを `src/onboarding-copy.ts` に所有する。認証済みブラウザーは共有構成フォームを通じて `ui-settings-general.welcomeNoticeVersion` を比較して書き込む。明示的な **続行** だけが現在のバージョンを記録し、利用できない名前空間または拒否された書き込みは通知を未確認のままにする。以前のバージョンを確認したユーザーには現在の通知が再び表示される。DeepSeek ステップは `llm-deepseek` の `deepseek-official` を対象とし、共有オンボーディングモーダル内で資格情報のみモードの既存の `ProviderEditor` を描画する。`credentials.set` が唯一のシークレット書き込みであり、プロバイダー設定は変更されない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the settings base, the seams this page joins, and the design rationale.
+これらのページは、設定の基盤、このページが結合するシーム、および設計根拠を扱う。
 
-- [ui-settings](../ui-settings/README.md) — the domain base whose scope and schema services this page builds on.
-- [settings](../../settings/README.md) — the durable user-settings seam and its file provider.
-- [credentials](../../credentials/README.md) — the credential-reference seam this page writes keys through.
-- [llm](../../llm/README.md) — the adapter registry whose providers this page configures.
-- [Web config plane](../../../.agents/notes/archived/architecture/2026-07-30-web-config-plane.md) — the hand-written editor's design rationale.
+- [ui-settings](../ui-settings/README.md) — このページが基盤とするスコープとスキーマサービスを持つドメイン基盤。
+- [settings](../../settings/README.md) — 永続的なユーザー設定シームとそのファイルプロバイダー。
+- [credentials](../../credentials/README.md) — このページがキーの書き込みに使用する資格情報参照シーム。
+- [llm](../../llm/README.md) — このページがプロバイダーを構成するアダプターレジストリ。
+- [Web config plane](../../../.agents/notes/archived/architecture/2026-07-30-web-config-plane.md) — 手書きエディターの設計根拠。
 
 -----
 
-The `settings.models.sign-in` slot lets account login offer a choice before the credential editor; without a contributor the editor renders directly. Closing the account choice completes the whole onboarding step. Explicit reopening from the account menu enters the same editor even when a provider is already configured.
+`settings.models.sign-in` スロットにより、アカウントログインが資格情報エディターの前に選択肢を提示できる。貢献者がいなければエディターが直接描画される。アカウント選択を閉じるとオンボーディングステップ全体が完了する。アカウントメニューからの明示的な再オープンは、プロバイダーがすでに構成されていても同じエディターに入る。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+なし。このパッケージはブラウザー側の UI プラグイン層であり、モデルに面するものを何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the editor's field coverage and the page's reach; they are current package constraints, not a settings roadmap.
+これらの制限は、エディターのフィールド範囲とページの到達範囲を定義する。それらは現在のパッケージ制約であり、設定のロードマップではない。
 
-- **Only the API key and curated fold fields are editable on the card** — the hand-written editor traded schema-generic field coverage for the mockup layout. Retry policy, timeouts, DeepSeek model descriptions, and other advanced fields remain in `cordis.patch.yml`; existing model fields the editor does not show are preserved.
-- **Credential cleanup is intentionally narrow** — deleting a row removes the configured, writable credential only when its reference is the exact `<ROUTE>_API_KEY` target this page derives. Custom references, environment credentials, and unidentifiable targets are retained because the row cannot prove ownership of them.
-- **Only pi-ai routes can be hand-declared** — the custom-API form writes into `llm-pi-ai`, the one namespace whose profiles describe a whole provider. A `llm-deepseek` route is a composition fact, not something this page can create.
-- **The catalog select lists route identifiers** — `moonshotai`, `zai`, and the other pi-ai catalog ids appear as they are, with no product names, aliases, or search. A searchable picker with the custom form as one pinned entry would let the mode switch go; it needs the directory to carry display names first.
-- **Interrogation covers OpenAI-compatible and Anthropic Messages endpoints** — OpenAI protocols accept a standard `data` array or an enriched `models` map, while Anthropic uses its native model-listing route; every other protocol reports that it cannot be asked and its models are entered by hand.
-- **Undeclared live routes render nowhere** — a route registered without a configurable-provider declaration has no settings address; it stays visible in pickers but not on this page's rows.
+- **カード上で編集できるのは API キーと厳選されたフォールドのフィールドだけである** — 手書きエディターはスキーマ汎用のフィールド範囲をモックアップレイアウトと引き換えにした。再試行ポリシー、タイムアウト、DeepSeek モデル説明、その他の高度なフィールドは `cordis.patch.yml` に残る。エディターが表示しない既存のモデルフィールドは保持される。
+- **資格情報のクリーンアップは意図的に狭い** — 行の削除は、その参照がこのページの導出する正確な `<ROUTE>_API_KEY` ターゲットである場合にのみ、構成済みで書き込み可能な資格情報を削除する。カスタム参照、環境資格情報、識別不能なターゲットは保持される。行がそれらの所有権を立証できないためである。
+- **手動宣言できるのは pi-ai ルートだけである** — カスタム API フォームは `llm-pi-ai` に書き込む。プロファイルがプロバイダー全体を記述する唯一の名前空間である。`llm-deepseek` ルートは構成上の事実であり、このページが作成できるものではない。
+- **カタログ選択はルート識別子を列挙する** — `moonshotai`、`zai`、およびその他の pi-ai カタログ id がそのまま現れ、製品名、エイリアス、検索はない。カスタムフォームを 1 つの固定エントリーとする検索可能なピッカーならモードスイッチを不要にできるが、そのためにはまずディレクトリが表示名を運ぶ必要がある。
+- **問い合わせが対応するのは OpenAI 互換と Anthropic Messages のエンドポイントである** — OpenAI プロトコルは標準の `data` 配列または拡張された `models` マップを受け入れ、Anthropic はネイティブのモデル列挙ルートを使用する。その他のすべてのプロトコルは問い合わせできないと報告し、そのモデルは手動で入力される。
+- **未宣言のライブルートはどこにも描画されない** — 構成可能プロバイダー宣言なしで登録されたルートは設定アドレスを持たない。それはピッカーには表示され続けるが、このページの行には表示されない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

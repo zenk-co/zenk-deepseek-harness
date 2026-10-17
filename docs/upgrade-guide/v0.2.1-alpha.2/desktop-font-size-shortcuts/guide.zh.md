@@ -5,7 +5,7 @@ description: "桌面端字号快捷键占用了原先可用于自定义快捷键
 
 # 桌面端字号快捷键占用部分自定义组合键
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

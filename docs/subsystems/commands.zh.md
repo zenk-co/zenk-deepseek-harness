@@ -1,6 +1,6 @@
 # 用户命令
 
-[English](commands.md) | 中文
+[日本語](commands.md) | [English](commands.en.md) | 中文
 
 [`dsh-commands`](../../packages/interaction/commands) 提供的用户命令注册表服务。交互式适配器用它发现插件拥有的命令，并针对确切的 agent（智能体）直接执行这些命令，而不创建模型消息。[历史命令 Agent Note](../../.agents/notes/archived/feature/2026-07-19-plugin-command-registration.md) 负责分发与生命周期的决策依据；[包 README](../../packages/interaction/commands/README.zh.md) 负责组合方式与限制。
 

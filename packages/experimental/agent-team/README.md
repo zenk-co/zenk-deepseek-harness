@@ -1,41 +1,41 @@
 ---
-description: "Run named teammates with direct inbox messages and a durable shared task board in experimental Team compositions."
+description: "実験的な Team 構成で、名前付きチームメイトを直接のインボックスメッセージと永続的な共有タスクボードと共に実行する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-experimental-agent-team
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-experimental-agent-team` gives one session a Lead, named teammates, direct messages, and a durable shared task board. Sends use each target Agent’s inbox and can cold-resume stored teammates. Team retains roster and task state; message persistence follows the target Agent’s normal policy. Mount `dsh-experimental-tool-agent-team` for model tools. The package is experimental and requires durable session storage.
+`dsh-experimental-agent-team` は、1 つのセッションにリード、名前付きチームメイト、直接メッセージ、および永続的な共有タスクボードを与える。送信は各ターゲット Agent のインボックスを使用し、保存されたチームメイトをコールドレジュームできる。Team はロスターとタスク状態を保持し、メッセージの永続化はターゲット Agent の通常のポリシーに従う。モデルツールには `dsh-experimental-tool-agent-team` をマウントする。このパッケージは実験的であり、永続セッションストレージを必要とする。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Add this package when one agent needs named helpers in a shared working directory, direct peer messages, and durable roster and task state. Mount it with `@deepseek-ai/dsh-experimental-tool-agent-team` to expose the model tools.
+1 つのエージェントが、共有作業ディレクトリ内の名前付きヘルパー、直接のピアメッセージ、および永続的なロスターとタスク状態を必要とする場合にこのパッケージを追加する。モデルツールを公開するには `@deepseek-ai/dsh-experimental-tool-agent-team` と共にマウントする。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it for cooperation in one shared workspace with durable roster and task state. Separate working directories, coordination across processes, and automatic task-owner release are unsupported. Durable session storage is required.
+永続的なロスターとタスク状態を伴う 1 つの共有ワークスペースでの協働に選ぶ。別々の作業ディレクトリ、プロセス間の連携、およびタスクオーナーの自動解放はサポートされない。永続セッションストレージが必要である。
 
-### Smallest working setup
+### 最小の動作セットアップ
 
 <a id="smallest-working-setup"></a>
 
-The smallest addition to an existing composition is durable session storage plus both Team packages:
+既存の構成に加える最小のものは、永続セッションストレージと両方の Team パッケージである:
 
 ```yaml
 # smallest team setup — durable storage plus both Team packages
@@ -44,182 +44,182 @@ The smallest addition to an existing composition is durable session storage plus
 - name: '@deepseek-ai/dsh-experimental-tool-agent-team'
 ```
 
-With the tools installed, the model does the rest on request — for example, "create a teammate named reviewer to check the diff", then "send reviewer the change summary". All limits are optional and validated at startup:
+ツールがインストールされると、あとはモデルが要求に応じて行う。例えば「diff を確認する reviewer という名前のチームメイトを作成して」、次に「reviewer に変更サマリーを送って」などである。すべての制限はオプションで、起動時に検証される:
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `maxMembers` | `16` | Maximum teammates a team may ever create, including failed ones |
-| `maxTasks` | `256` | Maximum active tasks on the board |
-| `maxMessageBytes` | `65,536` | Maximum size of one sent message |
-| `disposalTimeoutMs` | `5,000` | Time allowed for shutdown cleanup |
+| `maxMembers` | `16` | チームが作成し得るチームメイトの最大数 (失敗したものを含む) |
+| `maxTasks` | `256` | ボード上のアクティブタスクの最大数 |
+| `maxMessageBytes` | `65,536` | 1 つの送信メッセージの最大サイズ |
+| `disposalTimeoutMs` | `5,000` | シャットダウンクリーンアップに許可される時間 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-agent-team) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-experimental-agent-team)が、受け入れられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### Teammates
+### チームメイト
 
-Ask the Lead to create a teammate: give it a unique lowercase name such as `reviewer` and describe its job. A teammate starts fresh with no memory of the Lead's conversation, or as a fork that inherits the Lead's completed turns; the creation request chooses which. Teammate names are permanent — even a teammate whose creation failed keeps its name, and no name is ever reused.
+リードにチームメイトの作成を依頼する。`reviewer` のような一意の小文字名を付け、その仕事を説明する。チームメイトはリードの会話の記憶を持たない新規として、またはリードの完了済みターンを継承するフォークとして開始し、作成リクエストがどちらかを選ぶ。チームメイト名は永続である。作成に失敗したチームメイトも名前を保ち、名前が再利用されることは決してない。
 
-The roster shows every member with its role (`lead` or `teammate`) and current status: `running`, `inactive` (no turn is executing, whether loaded or stored), `provisioning`, or `failed`. A member that is not loaded receives its messages when it wakes.
+ロスターはすべてのメンバーを、その役割 (`lead` または `teammate`) と現在のステータス付きで表示する。ステータスは `running`、`inactive` (ロード済みか保存済みかにかかわらず、実行中のターンがない)、`provisioning`、または `failed` である。ロードされていないメンバーは、起きるときにメッセージを受け取る。
 
-Only the Lead can create teammates or interrupt them.
+チームメイトを作成したり中断したりできるのはリードだけである。
 
-### Messages between teammates
+### チームメイト間のメッセージ
 
-Any member can send to another member or the Lead. Each attempt either returns the target inbox `MessageId` or throws. Team does not retain unaccepted send intent, retry new messages after restart, or deduplicate explicit resends.
+どのメンバーも、別のメンバーまたはリードに送信できる。各試行は、ターゲットインボックスの `MessageId` を返すか、スローするかのいずれかである。Team は受け入れられなかった送信意図を保持せず、再起動後に新しいメッセージを再試行せず、明示的な再送を重複排除しない。
 
-Steer gives a running target the message at its nearest step boundary and starts or cold-resumes an inactive target. Success means inbox acceptance, not model processing or a separate synchronous storage flush. Accepted messages follow ordinary Agent persistence and inbox recovery.
+Steer は実行中のターゲットに最も近いステップ境界でメッセージを渡し、非アクティブなターゲットを開始またはコールドレジュームする。成功はインボックスの受け入れを意味し、モデルによる処理や別個の同期ストレージフラッシュを意味しない。受け入れられたメッセージは通常の Agent 永続化とインボックス回復に従う。
 
-### Shared task board
+### 共有タスクボード
 
-Any member can add a task with a title, details, optional dependencies on other tasks, and optional hints about which files it will touch. A task is claimable only when everything it depends on is complete.
+どのメンバーも、タイトル、詳細、他のタスクへのオプションの依存関係、および触れるファイルについてのオプションのヒントを伴うタスクを追加できる。タスクがクレーム可能になるのは、依存するすべてが完了している場合のみである。
 
-Tasks have an owner: a member claims a task to start work, completes it when done, releases it back, or reopens it; the Lead can assign a task to any member. Every change is compare-and-set: an update based on an outdated copy is rejected, so two members cannot silently overwrite each other's work.
+タスクにはオーナーがいる。メンバーは作業を開始するためにタスクをクレームし、完了したら完了させ、解放して戻し、または再オープンする。リードはどのメンバーにもタスクを割り当てられる。すべての変更は compare-and-set である。古いコピーに基づく更新は拒否されるため、2 人のメンバーが互いの作業を黙って上書きすることはできない。
 
-File hints produce warnings when two in-progress tasks plan to touch overlapping paths — they never block anything. Deleted tasks remain in history but disappear from the active list.
+ファイルヒントは、2 つの進行中タスクが重複するパスに触れる予定の場合に警告を生成する。何もブロックすることは決してない。削除されたタスクは履歴に残るが、アクティブリストからは消える。
 
-### Waiting and interruption
+### 待機と中断
 
-A member can wait for the next team change — a teammate's status, an incoming message, or a task update — instead of polling repeatedly; the wait reports only whether it timed out, and the caller re-reads the current state afterward.
+メンバーは、繰り返しポーリングする代わりに、次のチーム変更 (チームメイトのステータス、受信メッセージ、またはタスク更新) を待機できる。待機はタイムアウトしたかどうかのみを報告し、呼び出し元はその後で現在の状態を読み直す。
 
-The Lead can stop a teammate's current turn without deleting its queued messages; task ownership is unchanged.
+リードは、キュー済みメッセージを削除せずにチームメイトの現在のターンを停止できる。タスクの所有権は変わらない。
 
-### What success and failure look like
+### 成功と失敗の現れ方
 
-Success returns a teammate roster row, an accepted inbox message id, or an updated task revision. Invalid member names, unready tasks, stale revisions, exhausted limits, and failed message admission report errors.
+成功は、チームメイトのロスター行、受け入れられたインボックスメッセージ id、または更新されたタスクリビジョンを返す。無効なメンバー名、準備ができていないタスク、古いリビジョン、使い果たされた制限、および失敗したメッセージ受付はエラーを報告する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the service and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、このサービスの背後にある設計判断を説明し、それを実現するコードを示す。観察可能な動作は[このパッケージを使う](#use-this-package)で網羅されている。
 
-### Design philosophy
+### 設計思想
 
-The service is built on one separation and three commitments:
+このサービスは 1 つの分離と 3 つの約束に基づいて構築されている:
 
-- **Durable log, derived state.** The Lead log owns roster and tasks; each target Agent owns its accepted messages.
-- **Process-local ownership.** Continuation delivery owns target locking, cold recovery, and lifecycle authorization.
-- **Explicit authority.** Every service method takes the exact live calling `Agent`; only the Lead spawns, reassigns, or interrupts.
-- **Bounds that fail loud.** Every limit is a validated deployment value, and exhaustion reports a typed error instead of reusing an id or name.
+- **永続ログ、派生状態。** リードのログがロスターとタスクを所有し、各ターゲット Agent が受け入れられたメッセージを所有する。
+- **プロセスローカルな所有権。** 継続配信がターゲットのロック、コールドリカバリ、およびライフサイクル認可を所有する。
+- **明示的な権限。** すべてのサービスメソッドは、正確なライブの呼び出し元 `Agent` を受け取る。生成、再割り当て、または中断を行えるのはリードだけである。
+- **明示的に失敗する制限。** すべての制限は検証済みのデプロイ値であり、使い果たすと id や名前を再利用するのではなく型付きエラーを報告する。
 
-The [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md) owns the roster, mailbox, task, and shared-checkout decisions. The [runtime-context identity decision](../../../.agents/notes/implemented/architecture/2026-10-13-team-identity-runtime-context.md) owns model-facing identity.
+[Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md)がロスター、メールボックス、タスク、および共有チェックアウトの決定を所有する。[ランタイムコンテキスト identity の決定](../../../.agents/notes/implemented/architecture/2026-10-13-team-identity-runtime-context.md)がモデル向け identity を所有する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, service registration, recovery scheduling |
-| [`src/roster.ts`](src/roster.ts) | Team identity, membership resolution, provisioning, and roster teardown |
-| [`src/task-board.ts`](src/task-board.ts) | Task CAS commands, DAG validation, and derived views |
-| [`src/journal.ts`](src/journal.ts) | Serialized Lead-log transactions and commit notification |
-| [`src/projection.ts`](src/projection.ts) | Strict replay projection that decodes and validates Team events and publishes the `agentTeam` client view |
-| [`src/task-view.ts`](src/task-view.ts) | Pure task readiness, owner-name, and write-overlap derivation shared by the task board and the client view |
-| [`src/activity.ts`](src/activity.ts) | One-shot change waiters and disposal release |
-| [`src/lifecycle.ts`](src/lifecycle.ts) | Shared admission cutoff and bounded settlement |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: `Config` スキーマ、サービス登録、リカバリのスケジューリング |
+| [`src/roster.ts`](src/roster.ts) | チーム identity、メンバーシップ解決、プロビジョニング、およびロスターのテアダウン |
+| [`src/task-board.ts`](src/task-board.ts) | タスク CAS コマンド、DAG 検証、および派生ビュー |
+| [`src/journal.ts`](src/journal.ts) | 直列化されたリードログトランザクションとコミット通知 |
+| [`src/projection.ts`](src/projection.ts) | Team イベントをデコード・検証して `agentTeam` クライアントビューを公開する厳密なリプレイ射影 |
+| [`src/task-view.ts`](src/task-view.ts) | タスクボードとクライアントビューが共有する純粋なタスク準備状態、オーナー名、書き込み重複の導出 |
+| [`src/activity.ts`](src/activity.ts) | ワンショットの変更ウェイターと破棄時の解放 |
+| [`src/lifecycle.ts`](src/lifecycle.ts) | 共有アドミッションカットオフと有界の決着 |
 
-### Team identity and roster
+### チーム identity とロスター
 
-Every ordinary runtime root is the implicit Lead of a Team whose `TeamId` equals its `SessionId`; there is no creation event, and durable Team state begins with the first member or task record. `spawnTeammate()` first appends and flushes a `provisioning` member record, then asks the configured provider to create the reserved child; a provider failure appends a durable `failed` member. A fresh child starts with no Lead history; a fork child captures the Lead's completed-turn prefix once. Recovery reconciles an unterminated provisioning record against the child's independently persisted Session: a matching direct-parent and continuable descriptor plus a recorded initial user message produces `active`, and anything else produces `failed`. If recovery wins a same-process race, the creator accepts the terminal state or reports `TEAM_PROVISIONING_CONFLICT` and drains the child. Names are reserved by the first provisioning record and never reused.
+通常のランタイムルートはすべて、`TeamId` が自身の `SessionId` と等しい Team の暗黙のリードである。作成イベントはなく、永続 Team 状態は最初のメンバーまたはタスクレコードから始まる。`spawnTeammate()` はまず `provisioning` メンバーレコードを追記してフラッシュし、その後、構成されたプロバイダーに予約済みの子の作成を求める。プロバイダーの失敗は永続的な `failed` メンバーを追記する。新規の子はリード履歴なしで開始し、フォークの子はリードの完了済みターンプレフィックスを一度だけ捕捉する。リカバリは、未終結のプロビジョニングレコードを、子が独立に永続化した Session と突き合わせる。一致する直接親と継続可能の記述子、および記録された初期ユーザーメッセージがあれば `active` になり、それ以外は `failed` になる。リカバリが同一プロセスの競合に勝った場合、作成者は終端状態を受け入れるか、`TEAM_PROVISIONING_CONFLICT` を報告して子を排出する。名前は最初のプロビジョニングレコードによって予約され、決して再利用されない。
 
-### Direct messages and historical compatibility
+### 直接メッセージと歴史的な互換性
 
-`sendMessage()` checks exact caller membership, rejects self-messaging, and bounds the complete sender-framed UTF-8 content. It returns the existing inbox identity and emits Team activity only after acceptance. The target stores `agent-message` source with the actual `senderSessionId`; the first content block is `Team message from <name>:`. No new `team/message/queued` or `team/message/delivered` records are written for these sends. Team adds no per-target send ordering; delivery order belongs to the target inbox. The client presents these messages with the ordinary Agent title and icon; the message body retains the sender name.
+`sendMessage()` は正確な呼び出し元メンバーシップを確認し、自己メッセージングを拒否し、送信者フレーム付きの完全な UTF-8 内容を制限する。既存のインボックス identity を返し、受け入れられた後にのみ Team アクティビティを発行する。ターゲットは実際の `senderSessionId` を持つ `agent-message` ソースを保存し、最初のコンテンツブロックは `Team message from <name>:` である。これらの送信のために新しい `team/message/queued` や `team/message/delivered` レコードは書き込まれない。Team はターゲットごとの送信順序を追加せず、配信順序はターゲットインボックスに属する。クライアントはこれらのメッセージを通常の Agent タイトルとアイコンで提示し、メッセージ本文は送信者名を保つ。
 
-Lead delivery calls `Agent.steer()` directly. Teammate delivery uses the continuation owner's host-only Steer path, which preserves the Team sender source while authorizing the Lead-to-child edge and cold-resuming inactive targets. Sibling messages never impersonate the Lead through the public adjacent-Agent messaging operation.
+リードへの配信は `Agent.steer()` を直接呼び出す。チームメイトへの配信は継続オーナーのホスト専用 Steer 経路を使用し、Team 送信者ソースを保ちながら、リードから子へのエッジを認可し、非アクティブなターゲットをコールドレジュームする。兄弟間メッセージが公開の隣接 Agent メッセージング操作を通じてリードになりすますことは決してない。
 
-### Shared task board
+### 共有タスクボード
 
-Tasks are complete versioned snapshots; every mutation carries `expectedRevision`, and a stale caller receives `TEAM_TASK_STALE_REVISION` instead of overwriting a newer value. Numeric `task-<n>` ids require a safe-integer suffix, and id-space exhaustion reports `TEAM_TASK_LIMIT` instead of reusing the final id. Deleted tasks remain tombstones for replay and id stability but do not consume `maxTasks` or appear in `listTasks()`. `writeScopes` are normalized workspace-relative prefixes; views warn on overlap with in-progress tasks but never block claim or authorize writes.
+タスクは完全なバージョン付きスナップショットである。すべての変更は `expectedRevision` を運び、古い呼び出し元はより新しい値を上書きする代わりに `TEAM_TASK_STALE_REVISION` を受け取る。数値の `task-<n>` id は安全な整数のサフィックスを必要とし、id 空間の枯渇は最後の id を再利用する代わりに `TEAM_TASK_LIMIT` を報告する。削除されたタスクはリプレイと id の安定性のためにトゥームストーンとして残るが、`maxTasks` を消費せず、`listTasks()` にも現れない。`writeScopes` は正規化されたワークスペース相対プレフィックスである。ビューは進行中タスクとの重複について警告するが、クレームをブロックしたり書き込みを認可したりすることは決してない。
 
-### Waiting and interruption
+### 待機と中断
 
-`waitForChange()` waits for one roster, task, message-acceptance, or live-status edge that occurs after registration, from ten seconds through one hour, and reports only whether it timed out; runtime disposal releases current waits. Cancellation preserves an Error reason or reports a non-Error reason through `TEAM_WAIT_ABORTED`. `interrupt()` is Lead-only and delegates to the continuable-subagent interrupt path, which cancels only a live teammate's current turn with `keepInbox`; it neither releases task ownership nor deletes durable mail.
+`waitForChange()` は、登録後に発生する 1 つのロスター、タスク、メッセージ受付、またはライブステータスのエッジを、10 秒から 1 時間まで待機し、タイムアウトしたかどうかのみを報告する。ランタイムの破棄は現在の待機を解放する。キャンセルは Error 理由を保つか、`TEAM_WAIT_ABORTED` を通じて非 Error の理由を報告する。`interrupt()` はリード専用で、継続可能サブエージェントの割り込み経路に委譲する。これは `keepInbox` を伴ってライブのチームメイトの現在のターンのみをキャンセルし、タスクの所有権を解放もせず、永続メールを削除もしない。
 
-### Durability model
+### 永続性モデル
 
-Roster and task mutations append `team/member` and `team/task` to the exact live Lead Session and flush before reporting success or waking waiters. Historical `team/message/queued` and `team/message/delivered` records remain readable; Team writes neither. All four event types are log-only: they never enter the conversation surface, so derived model history is untouched by coordination records. Session event `seq` and `time` own ordering and timing; snapshots do not duplicate them.
+ロスターとタスクの変更は、正確なライブのリード Session に `team/member` と `team/task` を追記し、成功を報告したりウェイターを起こしたりする前にフラッシュする。歴史的な `team/message/queued` と `team/message/delivered` レコードは読み取り可能なままであるが、Team はどちらも書き込まない。4 つのイベントタイプはすべてログ専用である。会話サーフェスに入ることは決してないため、派生モデル履歴が連携レコードによって変更されることはない。Session イベントの `seq` と `time` が順序とタイミングを所有し、スナップショットはそれらを複製しない。
 
-Historical mailbox events and `team-message` sources remain readable, and the projection still reports queued-minus-delivered records. Team never delivers or acknowledges them: a historical message that its target had not recorded stays undelivered.
+歴史的なメールボックスイベントと `team-message` ソースは読み取り可能なままで、射影は依然として queued から delivered を差し引いたレコードを報告する。Team はそれらを配信も確認もしない。ターゲットが記録していなかった歴史的メッセージは未配信のままである。
 
-Mailbox projection and checkpoint admission preserve every decoded JSON field of accepted content outside the locally declared validators, including an own `__proto__` key. Local field checks cover `text`, `reasoning`, `image`, and `tool-call`; accepted unknown tags remain opaque. Team projection cache version 4 rebuilds checkpoints from earlier cache versions from the Session log; the Session format version is unchanged.
+メールボックス射影とチェックポイント受付は、ローカルに宣言されたバリデーターの外側にある、受け入れられた内容のすべてのデコード済み JSON フィールド (独自の `__proto__` キーを含む) を保持する。ローカルフィールドチェックは `text`、`reasoning`、`image`、および `tool-call` をカバーし、受け入れられた未知のタグは不透明のままである。Team 射影キャッシュバージョン 4 は、以前のキャッシュバージョンのチェックポイントを Session ログから再構築する。Session フォーマットのバージョンは変わらない。
 
-### Disposal
+### 破棄
 
-The runtime lifecycle tracks sends and complete creation transactions in one operation set. Disposal closes admission, aborts and awaits those operations, then releases the roster’s live children and descendants. Non-Team children remain untouched. Admitted operations share one `disposalTimeoutMs` settlement deadline; each subsequent Team child drain has its own deadline. This value is not a whole-service shutdown bound. Cleanup failures are reported.
+ランタイムライフサイクルは、送信と完全な作成トランザクションを 1 つの操作セットで追跡する。破棄は受付を閉じ、それらの操作を中断して待機し、その後ロスターのライブの子と子孫を解放する。Team 以外の子はそのまま残る。受け入れられた操作は 1 つの `disposalTimeoutMs` 決着期限を共有し、その後の各 Team 子の排出には独自の期限がある。この値はサービス全体のシャットダウン上限ではない。クリーンアップの失敗は報告される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared subsystem types to the tool surface and the decisions behind the design.
+パッケージレベルの契約では不十分な場合にこれらのページを読む。共有サブシステム型からツールサーフェス、そして設計の背後の決定へと進む。
 
-- [Agent Teams subsystem](../../../docs/subsystems/agent-team.md) — durable Team types and the `ctx.agentTeams` service API.
-- [tool-agent-team package](../tool-agent-team/README.md) — the tools that let the model create, message, and coordinate teammates.
-- [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md) — roster, mailbox, task, and shared-checkout decisions.
-- [Experimental package reference](../AGENTS.md) — placement, publication, and dependency isolation.
+- [Agent Teams サブシステム](../../../docs/subsystems/agent-team.md) — 永続 Team 型と `ctx.agentTeams` サービス API。
+- [tool-agent-team パッケージ](../tool-agent-team/README.md) — モデルがチームメイトを作成、メッセージ、連携できるようにするツール群。
+- [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md) — ロスター、メールボックス、タスク、および共有チェックアウトの決定。
+- [実験的パッケージリファレンス](../AGENTS.md) — 配置、公開、および依存関係の分離。
 
 -----
 
 <a id="model-experience"></a>
 
-### Browser projection
+### ブラウザー射影
 
-The `agentTeam` Session projection publishes the Lead Session's durable roster identities and phases, member errors, non-deleted task views, and any `failure` beside the last valid state. Its `apply` replaces only the touched collection; mailbox-only changes retain the client view reference and produce no frame. The [subsystem reference](../../../docs/subsystems/agent-team.md#web-projection) defines the wire types.
+`agentTeam` Session 射影は、リード Session の永続的なロスター identity とフェーズ、メンバーエラー、削除されていないタスクビュー、および最後の有効な状態に並ぶ任意の `failure` を公開する。その `apply` は触れたコレクションのみを置き換える。メールボックスのみの変更はクライアントビューの参照を保ち、フレームを生成しない。[サブシステムリファレンス](../../../docs/subsystems/agent-team.md#web-projection)が wire 型を定義する。
 
-The [Web UI](../client-ui-agent-team/README.md) reads the shared Session projections and overlays activity from Session status. Task creation and updates belong to Team agents through the service and model tools. The `./client` export supplies browser-safe roster, task, and projection types.
+[Web UI](../client-ui-agent-team/README.md) は共有 Session 射影を読み、Session ステータスからアクティビティを重ね合わせる。タスクの作成と更新は、サービスとモデルツールを通じて Team エージェントに属する。`./client` エクスポートはブラウザーセーフなロスター、タスク、および射影型を供給する。
 
-## Model Experience
+## モデル体験
 
-### Peer messages
+### ピアメッセージ
 
-#### What the model sees
+#### モデルが見るもの
 
-Each peer message is a user-role message prefixed with its sender name, followed by the original content blocks. Roster, task, and historical mailbox records remain log-only.
+各ピアメッセージは、送信者名をプレフィックスとして先頭に付けた user ロールメッセージであり、その後に元のコンテンツブロックが続く。ロスター、タスク、および歴史的なメールボックスレコードはログ専用のままである。
 
-#### Token effect
+#### トークンへの影響
 
-Each peer delivery adds the sender prefix plus message content to the target history. Task and roster mutations add no model tokens; their model-facing representation belongs to `@deepseek-ai/dsh-experimental-tool-agent-team` results.
+各ピア配信は、送信者プレフィックスとメッセージ内容をターゲット履歴に追加する。タスクとロスターの変更はモデルトークンを追加しない。それらのモデル向け表現は `@deepseek-ai/dsh-experimental-tool-agent-team` の結果に属する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Peer messages append after the target's reusable history prefix. Cold resume reuses the persisted conversation before appending the new message.
+ピアメッセージはターゲットの再利用可能な履歴プレフィックスの後に追記される。コールドレジュームは、新しいメッセージを追記する前に永続化された会話を再利用する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits describe what a team cannot do yet or what needs special operational care. They are current package constraints, not a comparison with other coordination mechanisms.
+これらの制限は、チームがまだできないこと、または特別な運用上の注意が必要なことを記述する。これらは現在のパッケージの制約であり、他の連携機構との比較ではない。
 
-- **Whole-view broadcasts** — each roster or task change sends the complete roster and non-deleted task board, including descriptions, to every connected browser, even when it is viewing another Session.
-- **Experimental prototype with no stability promise** — the package is public, but its contracts can change freely while it incubates.
-- **One process and one shared checkout** — members share cwd and observe edits immediately; this package provides no worktree, remote member, merge, or filesystem lock.
-- **Advisory write scopes** — Bash, formatters, code generators, and direct external writers can bypass filesystem version checks; Leads must coordinate ownership and review the final diff.
-- **Flat immutable roster** — only the Lead creates direct teammates; there is no nested Team, rename, deletion, or name reuse.
-- **No automatic ownership release** — inactivity, interruption, process exit, and failed work do not release a task owner.
-- **No send retry guarantee** — Team does not retain or deduplicate new attempts; concurrent processes over one Team are unsupported. Historical queued messages that never reached their target are not delivered.
+- **ビュー全体のブロードキャスト** — 各ロスターまたはタスクの変更は、完全なロスターと削除されていないタスクボード (説明を含む) を、別の Session を表示中であっても接続されたすべてのブラウザーに送信する。
+- **安定性を約束しない実験的プロトタイプ** — このパッケージは公開されているが、その契約はインキュベーション中に自由に変更され得る。
+- **1 プロセスと 1 つの共有チェックアウト** — メンバーは cwd を共有し、編集を即座に観察する。このパッケージは worktree、リモートメンバー、マージ、またはファイルシステムロックを提供しない。
+- **勧告的な書き込みスコープ** — Bash、フォーマッター、コードジェネレーター、および直接の外部ライターはファイルシステムのバージョンチェックを迂回できる。リードは所有権を調整し、最終 diff をレビューしなければならない。
+- **フラットで不変のロスター** — 直接のチームメイトを作成できるのはリードだけである。ネストされた Team、名前変更、削除、または名前の再利用はない。
+- **自動の所有権解放はない** — 非アクティブ、中断、プロセス終了、および失敗した作業はタスクオーナーを解放しない。
+- **送信の再試行保証はない** — Team は新しい試行を保持も重複排除もしない。1 つの Team に対する並行プロセスはサポートされない。ターゲットに到達しなかった歴史的なキュー済みメッセージは配信されない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers and is explicitly non-authoritative.
+この開発者ノートはメンテナー向けの作業コンテキストであり、明示的に非権威である。
 
-#### Promotion
+#### プロモーション
 
-Promotion to a product-role group requires reviewing the public contract, limitations, test evidence, release payload, runtime dependents, and a named stable owner, per the [experimental subtree rules](../AGENTS.md).
+製品ロールグループへのプロモーションには、[実験的サブツリーのルール](../AGENTS.md)に従い、公開契約、制限、テスト証拠、リリースペイロード、ランタイム依存先、および名前付きの安定オーナーのレビューが必要である。
 
-#### Future directions
+#### 将来の方向性
 
-Undecided directions include nested Teams, automatic ownership release policies, cross-process mailbox transactions, and filesystem isolation via worktrees; none of these are committed.
+未決定の方向性には、ネストされた Team、自動所有権解放ポリシー、クロスプロセスのメールボックストランザクション、および worktree によるファイルシステム分離が含まれる。いずれも確約されていない。
 
 </details>

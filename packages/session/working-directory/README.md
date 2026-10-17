@@ -1,31 +1,31 @@
 ---
-description: "Change one Session’s working directory while existing processes retain theirs. The selected directory survives replay and appears in user context. A missing directory restores the original project when it remains available."
+description: "既存プロセスは独自ディレクトリを保持したまま、1 セッションの作業ディレクトリを変更する。選択ディレクトリはリプレイ後も残り、利用者コンテキストに現れる。欠落ディレクトリは利用可能なままの元プロジェクトを復元する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-working-directory
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Change one Session’s working directory while existing processes retain theirs. The selected directory survives replay and appears in user context. A missing directory restores the original project when it remains available.
+既存プロセスは独自ディレクトリを保持したまま、1 セッションの作業ディレクトリを変更する。選択ディレクトリはリプレイ後も残り、利用者コンテキストに現れる。欠落ディレクトリは利用可能なままの元プロジェクトを復元する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount alongside `fs`, `sessionProjections`, and `systemPrompt`. `defaultDirectory` selects an absolute fallback for Sessions without an original directory; omission uses the launch directory. See the [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-working-directory).
+`fs`・`sessionProjections`・`systemPrompt` と並べてマウントする。`defaultDirectory` は元ディレクトリのないセッション向けの絶対フォールバックを選ぶ。省略時は起動ディレクトリを使う。[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-working-directory)を見ること。
 
 ```yaml
 - name: '@deepseek-ai/dsh-working-directory'
@@ -34,57 +34,57 @@ Mount alongside `fs`, `sessionProjections`, and `systemPrompt`. `defaultDirector
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-The Session projection owns the effective directory and exposes it in Session observations, so cold readers can use it without activating an Agent; the header continues to identify the original project. Changes serialize per Session, validate through the filesystem provider, check cancellation and Agent lifetime, commit an event, and queue a user-context notice. If notice queuing fails after commit, the operation returns the committed directory and logs a warning; the next request or resume still receives the required directory context. Prompt assembly validates the current directory before publishing its required context contribution. Existing processes and sandbox grants keep their independent ownership. The [service implementation](src/index.ts) defines the API.
+セッション投影が実効ディレクトリを所有し、セッション観測で公開するため、冷読者はエージェントを有効化せずに使える。ヘッダーは引き続き元プロジェクトを識別する。変更はセッションごとに直列化され、ファイルシステムプロバイダー越しに検証され、取り消しとエージェント存続期間を確認し、イベントを確定し、利用者コンテキスト通知を待ち行列に入れる。確定後の通知待ち行列入れが失敗した場合、操作は確定済みディレクトリを返して警告を記録する。次要求や resume は依然として必須ディレクトリコンテキストを受け取る。プロンプト組み立ては必須コンテキスト寄与の公開前に現在ディレクトリを検証する。既存プロセスと sandbox 許可は独立所有のままである。[サービス実装](src/index.ts)が API を定義する。
 
-No runtime invariant companion is published because the service reads its only directory state from the Session projection and checks filesystem validity at use.
+サービスが唯一のディレクトリ状態をセッション投影から読み、利用時にファイルシステム妥当性を確認するため、実行時不変条件の伴走文書は公開しない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Working directories](../../../docs/subsystems/working-directory.md) — shared runtime behavior.
-- [Session group](../README.md) — durable Session services.
-- [Testing](../../../docs/testing.md) — composition and replay verification.
+- [作業ディレクトリ](../../../docs/subsystems/working-directory.md) — 共有実行時動作。
+- [セッショングループ](../README.md) — 耐久セッションサービス。
+- [テスト](../../../docs/testing.md) — コンポジションとリプレイ検証。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Working directory context
+### 作業ディレクトリコンテキスト
 
-#### What the model sees
+#### モデルが見るもの
 
-The current value is `Current working directory: <JSON-quoted absolute path>.` Each committed change, including automatic recovery, attempts to queue a user-context notice through the ordinary Agent inbox. Cancellation or disposal may discard unadmitted notices; the durable directory remains available to the next request. Directory context stays outside the system prompt and remains enabled when optional runtime context is disabled.
+現在値は `Current working directory: <JSON-quoted absolute path>.` である。自動復旧を含む各確定変更は、通常エージェント受信箱越しに利用者コンテキスト通知の待ち行列入れを試みる。取り消しや破棄は未承認通知を捨てる場合がある。耐久ディレクトリは次要求が利用可能なままである。ディレクトリコンテキストはシステムプロンプトの外に留まり、任意実行時コンテキスト無効時も有効のままである。
 
-#### Token effect
+#### トークン効果
 
-The initial snapshot and changed values add user-context tokens; unchanged snapshots are not repeated.
+初期スナップショットと変更値が利用者コンテキストトークンを増やし、不変のスナップショットは繰り返さない。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Directory transitions append context without replacing the stable system-prompt prefix. A changed directory or recovery creates new context after retained history.
+ディレクトリ遷移は安定システムプロンプト接頭辞を置換せずにコンテキストを追記する。変更ディレクトリや復旧は保持履歴の後に新しいコンテキストを作る。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Missing original project** — when the current directory and the original project are both unavailable, prompt assembly rejects every model turn, including chat-only turns. The service does not choose or recreate a repository. Restore the original directory, or use SDK `setWorkingDirectory` (`set_working_directory` in Python) or `ctx.workingDirectory.set` to select an existing absolute directory before retrying. Existing shells retain their process-local directories.
+- **欠落した元プロジェクト** — 現在ディレクトリと元プロジェクトの両方が利用できない場合、プロンプト組み立ては雑談ターンを含むすべてのモデルターンを拒否する。サービスはリポジトリを選定も再作成もしない。元ディレクトリを復元するか、再試行前に SDK `setWorkingDirectory`（Python では `set_working_directory`）または `ctx.workingDirectory.set` で既存の絶対ディレクトリを選ぶこと。既存シェルはプロセス独自ディレクトリを保持する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

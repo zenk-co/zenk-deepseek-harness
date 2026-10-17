@@ -1,175 +1,175 @@
 ---
-description: "Shared compaction contract for backend implementers and deployers: what conversation condensation does, when to use it, and how to build a backend."
+description: "バックエンド実装者とデプロイヤー向けの共有コンパクション契約: 会話の凝縮が何をするか、いつ使うか、バックエンドをどう構築するか。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-compaction
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-compaction` lets a long session condense its older history into a single summary message, keep the recent conversation intact, and continue as if the summary had always been there — with a backend such as `dsh-compaction-basic` and the optional `/compact` command. The shadowed content stays in the session log, so replaying the session deterministically reproduces the same condensed conversation. Reach for this package when you implement a condensation backend, build something that triggers condensation, or need to recognize condensed messages — it performs no condensation itself. Choose the shipped backend when you want the feature working out of the box.
+`dsh-compaction` は、長いセッションが古い履歴を単一のサマリーメッセージに凝縮し、直近の会話をそのまま維持して、まるでサマリーが最初からあったかのように継続できるようにします — `dsh-compaction-basic` のようなバックエンドと、オプションの `/compact` コマンドを使用します。影に入ったコンテンツはセッションログに残るため、セッションを再生すると同じ凝縮された会話が確定的に再現されます。このパッケージが役立つのは、凝縮バックエンドを実装する場合、凝縮をトリガーするものを作る場合、または凝縮されたメッセージを認識する必要がある場合です — それ自体は凝縮を行いません。機能をそのまま使いたい場合は、同梱のバックエンドを選んでください。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送りされた作業](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Decide first what you need. The shipped backend plus the `/compact` command give you automatic and on-demand condensation with no code; this package only matters when you extend or reimplement the feature. The sections below describe what condensation does, how to turn it on, and how to write a backend.
+まず何が必要かを決めます。同梱のバックエンドと `/compact` コマンドを使えば、コードなしで自動およびオンデマンドの凝縮が得られ、このパッケージが重要になるのは機能を拡張または再実装する場合だけです。以下のセクションでは、凝縮が何をするか、有効化する方法、バックエンドの書き方を説明します。
 
-### When to choose it
+### いつ選択するか
 
-Choose `dsh-compaction-basic` when a model-written summary fits your needs: you get condensation automatically as the conversation grows, and on demand through `dsh-command-compact`. Choose this package when you write a backend with a different summarizer — a fixed template or a remote service — or when you build something that triggers condensation programmatically. Do not mount it alone: without a backend nothing condenses.
+モデルが書いたサマリーで要件を満たせるなら `dsh-compaction-basic` を選びます。会話が成長するにつれて自動的に、また `dsh-command-compact` を通じてオンデマンドで凝縮が得られます。別のサマライザー — 固定テンプレートやリモートサービス — でバックエンドを書く場合や、プログラムから凝縮をトリガーするものを作る場合は、このパッケージを選びます。単独でマウントしないでください。バックエンドがなければ何も凝縮されません。
 
-### What condensation looks like
+### 凝縮とはどのようなものか
 
-When condensation runs, the selected older span of the conversation is replaced by one summary message; recent history is untouched and the conversation continues from the summary. Condensation can be triggered automatically as token pressure builds, on demand, or over an explicit span; the result reports which history was condensed and the estimated tokens freed.
+凝縮が実行されると、選択された会話の古い区間が 1 つのサマリーメッセージに置き換えられ、直近の履歴はそのままに、会話はサマリーから続きます。凝縮は、トークンの圧力が高まるにつれて自動的に、オンデマンドで、または明示的な範囲に対してトリガーできます。結果は、どの履歴が凝縮されたかと、解放された推定トークンを報告します。
 
-### Turning condensation on
+### 凝縮を有効にする
 
-Mount the shipped backend to register the condensation service, and add `dsh-command-compact` for the on-demand command:
+同梱のバックエンドをマウントして凝縮サービスを登録し、オンデマンドコマンド用に `dsh-command-compact` を追加します。
 
 ```yaml
 - name: '@deepseek-ai/dsh-compaction-basic'
 - name: '@deepseek-ai/dsh-command-compact'
 ```
 
-With these two rows the feature is on: the conversation condenses automatically as it grows, and `/compact` condenses immediately on request and reports how many history items were replaced. If no backend is mounted, nothing condenses and `/compact` fails; the full dependency chain for the shipped backend is in its own README.
+これらの 2 行で機能が有効になります。会話は成長するにつれて自動的に凝縮され、`/compact` は要求に応じて即座に凝縮し、何件の履歴項目が置き換えられたかを報告します。バックエンドがマウントされていない場合、何も凝縮されず `/compact` は失敗します。同梱バックエンドの完全な依存関係チェーンはその README にあります。
 
-### Implementing a backend
+### バックエンドを実装する
 
-Extend the provided base class and implement three operations: one that decides and performs condensation for an automatic trigger, one that condenses on demand, and one that condenses an explicit range of the conversation. Load your class as a plugin and it becomes the condensation service for the composition. The exact signatures, the failure rules, and the checkpoint marker every backend must produce are in the implementation section below and in the [compaction subsystem reference](../../../docs/subsystems/compaction.md).
+提供される基底クラスを拡張し、3 つの操作を実装します。自動トリガーのために凝縮を判断して実行するもの、オンデマンドで凝縮するもの、会話の明示的な範囲を凝縮するものです。クラスをプラグインとしてロードすると、その構成の凝縮サービスになります。正確なシグネチャ、失敗ルール、すべてのバックエンドが生成すべきチェックポイントマーカーは、下の実装セクションと [compaction サブシステムリファレンス](../../../docs/subsystems/compaction.md) にあります。
 
-### Recognizing condensed history
+### 凝縮された履歴を認識する
 
-Messages a backend wrote as summaries carry a stable marker, so any consumer can recognize condensed history after persistence or cloning without knowing which backend produced it. The marker is exported from the package root and from a Cordis-free subpath that client and wire programs can import.
+バックエンドがサマリーとして書き込んだメッセージには安定したマーカーが付くため、どのコンシューマーも、どのバックエンドが生成したかを知らなくても、永続化やクローンの後に凝縮された履歴を認識できます。マーカーはパッケージルートと、クライアントおよび wire プログラムがインポートできる Cordis 非依存のサブパスからエクスポートされます。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the contract in API terms and the design decisions behind it; the feature-level behavior is covered in [Use this package](#use-this-package).
+このセクションでは契約を API の用語で、およびその背後にある設計判断を説明します。機能レベルの動作は [このパッケージを使う](#use-this-package) で説明されています。
 
-### Design philosophy
+### 設計哲学
 
-The seam is built on one split and three commitments:
+このシームは 1 つの分割と 3 つのコミットメントの上に成り立っています。
 
-- **Abstract contract, concrete backends.** The interface states what condensation does; providers own policy, retention, and summarization so each role evolves and swaps independently.
-- **Session and LLM vocabulary are part of the contract.** The operations act on a `Session` and the summary uses `ContentBlock`, so the Service Definition depends on `dsh-session` and `dsh-llm` despite the general Cordis-only guidance — a deliberate deviation recorded in the [historical compaction capability-seam Agent Note](../../../.agents/notes/archived/feature/2026-06-18-compaction-capability-seam.md).
-- **The log-recorded bracket is the lock.** `compaction/start` is appended before summarization yields and `compaction/end` releases; every failure makes exactly one close attempt, and a failed close leaves the unmatched start as the intentional busy signal.
-- **The surface is mutated exactly once.** The summary rides on a `user/message` replacement inside the bracket; all `compaction/*` events stay log-only.
+- **抽象契約、具象バックエンド。** インターフェースは凝縮が何をするかを述べ、プロバイダーがポリシー、保持、サマリー化を所有するため、各ロールは独立して進化し交換できます。
+- **Session と LLM の語彙は契約の一部です。** 操作は `Session` に対して作用し、サマリーは `ContentBlock` を使用するため、サービス定義は Cordis のみという一般的なガイダンスにもかかわらず `dsh-session` と `dsh-llm` に依存します — この意図的な逸脱は [historical compaction capability-seam Agent Note](../../../.agents/notes/archived/feature/2026-06-18-compaction-capability-seam.md) に記録されています。
+- **ログに記録されるブラケットがロックです。** `compaction/start` はサマリー化が yield する前に追記され、`compaction/end` が解放します。すべての失敗はちょうど 1 回のクローズ試行を行い、クローズに失敗すると、不一致の start が意図的なビジー信号として残ります。
+- **サーフェスはちょうど 1 回変更されます。** サマリーはブラケット内の `user/message` 置換に乗ります。すべての `compaction/*` イベントはログ専用のままです。
 
-### Service API
+### サービス API
 
-The contract is three abstract operations a backend implements: `compactIfNeeded` for automatic `pressure` or `context-overflow` triggers, `compactNow` for one explicit on-demand reduction, and `compactRegion` for a caller-selected surface range. Reusable request measurement is a separate service, `ctx.tokenMeter`. The exhaustive per-operation semantics live in the [compaction subsystem reference](../../../docs/subsystems/compaction.md); the exact signatures are in [`src/index.ts`](src/index.ts).
+契約はバックエンドが実装する 3 つの抽象操作です。自動の `pressure` または `context-overflow` トリガー用の `compactIfNeeded`、1 回の明示的なオンデマンド削減用の `compactNow`、呼び出し元が選択したサーフェス範囲用の `compactRegion` です。再利用可能なリクエスト計測は別のサービス `ctx.tokenMeter` です。網羅的な操作ごとのセマンティクスは [compaction サブシステムリファレンス](../../../docs/subsystems/compaction.md) にあり、正確なシグネチャは [`src/index.ts`](src/index.ts) にあります。
 
-A backend that summarizes through `ctx.llm.stream()` must forward the abort signal into the call's `GenerateOptions.signal`, so an abort or fiber dispose tears down the in-flight summarization. Automatic and explicit-region brackets recover their numeric owner from the open turn; manual brackets require no open turn and stamp `turn: null`.
+`ctx.llm.stream()` を通じてサマリー化するバックエンドは、呼び出しの `GenerateOptions.signal` に中止シグナルを転送する必要があります。これにより、中止やファイバーの破棄が進行中のサマリー化を確実に停止します。自動および明示的範囲のブラケットは、開いているターンから数値の所有者を回復します。手動ブラケットは開いているターンを必要とせず、`turn: null` を刻印します。
 
-### Manual failure taxonomy
+### 手動失敗の分類
 
-The synchronous `compaction/summary-error` waterfall lets a backend request durable input recovery for a failed summary and an explicit selection. A listener returns true only after recording progress, or calls `next()` to delegate. The backend checks cancellation and selection stability before dispatch, then re-derives and re-prices input before retrying. The event declaration documents its payload; image policy belongs to `dsh-compaction-image-offload`.
+同期の `compaction/summary-error` waterfall により、バックエンドは失敗したサマリーと明示的な選択に対して永続的な入力回復を要求できます。リスナーは進捗を記録した後にのみ true を返すか、`next()` を呼び出して委譲します。バックエンドはディスパッチ前にキャンセルと選択の安定性を確認し、再試行前に input を再導出して再価格付けします。イベント宣言がそのペイロードを文書化しており、画像ポリシーは `dsh-compaction-image-offload` に属します。
 
-Expected manual failures throw `ManualCompactionError` with a stable `code` from a small closed set; only failures after the `compaction/start` marker are recorded — as a `compaction/end` carrying the error — while a `busy` rejection or pre-start cancellation leaves no record. The per-code semantics live in the [compaction subsystem reference](../../../docs/subsystems/compaction.md).
+予期される手動失敗は、小さな閉集合の安定した `code` を持つ `ManualCompactionError` をスローします。記録されるのは `compaction/start` マーカー以降の失敗のみ — エラーを運ぶ `compaction/end` として — であり、`busy` 拒否や start 前のキャンセルは記録を残しません。コードごとのセマンティクスは [compaction サブシステムリファレンス](../../../docs/subsystems/compaction.md) にあります。
 
 <a id="tool-pairing-boundaries"></a>
-### Tool-pairing boundaries
+### ツールペアリングの境界
 
-The Service Definition exports `toolPairingBalancedBefore(session, seq)` and `toolPairingBalancedAfter(session, seq)` for snapping and validating compaction edges. A safe edge has no unanswered assistant tool call crossing it. Each helper validates that the event sequence is in the current surface and answers from balances cached per cut in surface order, so repeated checks read no events; a replace generation rebuilds the cache, and missing seqs or an orphan `tool/result` reject as corrupt surface state.
+サービス定義は、コンパクション境界のスナップと検証のために `toolPairingBalancedBefore(session, seq)` と `toolPairingBalancedAfter(session, seq)` をエクスポートします。安全な境界は、未応答の assistant ツール呼び出しがそれを横切らないものです。各ヘルパーはイベントシーケンスが現在のサーフェスにあることを検証し、サーフェス順にカットごとにキャッシュされたバランスから応答するため、繰り返しのチェックはイベントを読みません。replace 世代はキャッシュを再構築し、欠落した seq や孤立した `tool/result` は破損したサーフェス状態として拒否します。
 
-### The surface contract
+### サーフェス契約
 
-`SurfaceEventType` is a closed union — `user/message`, `assistant/message`, and `tool/result` require `surfaceOp`, and other events forbid it, so a `compaction/*` event cannot appear on the surface. A successful backend run instead brackets the operation in the log: it appends `compaction/start` (log-only) to acquire the lock, summarizes the range, appends the log-only `compaction/summary` record, replaces the selected span with one `user/message` carrying the summary — the only surface mutation — and appends `compaction/end` (log-only) to release the lock.
+`SurfaceEventType` は閉じたユニオンです — `user/message`、`assistant/message`、`tool/result` は `surfaceOp` を要求し、その他のイベントはそれを禁止するため、`compaction/*` イベントはサーフェスに現れません。成功したバックエンド実行は代わりに、ログ内で操作をブラケットします。ロックを取得するために `compaction/start`（ログ専用）を追記し、範囲をサマリー化し、ログ専用の `compaction/summary` レコードを追記し、選択された区間をサマリーを運ぶ 1 つの `user/message` で置き換え（唯一のサーフェス変更）、ロックを解放するために `compaction/end`（ログ専用）を追記します。
 
-The replacement sits inside the lock bracket, so a crash between `compaction/start` and `compaction/end` leaves a detectable orphaned lock rather than a `compaction/end` that falsely claims success. `deriveMessages()` renders the summary as a user-role message followed by the retained nodes; the shadowed events stay in the raw log, so replay is deterministic. The per-event payloads are enumerated in the [compaction subsystem reference](../../../docs/subsystems/compaction.md).
+置換はロックブラケットの内側にあるため、`compaction/start` と `compaction/end` の間でクラッシュすると、成功を偽って主張する `compaction/end` ではなく、検出可能な孤立ロックが残ります。`deriveMessages()` はサマリーを user ロールのメッセージとして、それに続く保持ノードとともにレンダリングします。影に入ったイベントは生ログに残るため、再生は確定的です。イベントごとのペイロードは [compaction サブシステムリファレンス](../../../docs/subsystems/compaction.md) に列挙されています。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: abstract `CompactionEngine`, `CompactionTrigger`, `ManualCompactionError`, `ctx.compaction` merge |
-| [`src/types.ts`](src/types.ts) | `CompactionResult` and the declaration-merged `compaction/*` session events |
-| [`src/tool-pairing.ts`](src/tool-pairing.ts) | Per-session cut-balance cache behind the two boundary helpers |
-| [`src/checkpoint.ts`](src/checkpoint.ts) | Cordis-free checkpoint source constructor and predicate (`./checkpoint` leaf) |
-| [`src/brand.ts`](src/brand.ts) | `CompactionId` branded identity |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: 抽象 `CompactionEngine`、`CompactionTrigger`、`ManualCompactionError`、`ctx.compaction` マージ |
+| [`src/types.ts`](src/types.ts) | `CompactionResult` と宣言マージされた `compaction/*` セッションイベント |
+| [`src/tool-pairing.ts`](src/tool-pairing.ts) | 2 つの境界ヘルパーの背後にあるセッションごとのカットバランスキャッシュ |
+| [`src/checkpoint.ts`](src/checkpoint.ts) | Cordis 非依存のチェックポイントソースコンストラクターと述語（`./checkpoint` リーフ） |
+| [`src/brand.ts`](src/brand.ts) | `CompactionId` ブランド付き同一性 |
 
-### Locking and serialization
+### ロックと直列化
 
-One log-recorded lock is shared by all entry points. Tail inspection finds the latest unmatched `compaction/start` and the newest `session/end-seed`; an unmatched start after that boundary is live and reports `busy`, while an older one is stale evidence from a prior process lifecycle. A live bracket cannot cross a `turn/start` or `turn/end`. The markers are lock time points, not an exclusive container: an idle `inject()` may append unrelated context between a manual start and end, so the manual path revalidates its selected span rather than demanding whole-surface equality.
+1 つのログ記録ロックをすべてのエントリーポイントが共有します。テール検査は最新の不一致 `compaction/start` と最新の `session/end-seed` を見つけます。その境界より後の不一致 start はライブであり `busy` を報告し、より古いものは以前のプロセスライフサイクルの古い証拠です。ライブブラケットは `turn/start` や `turn/end` を横切れません。マーカーはロック時点であり、排他的コンテナーではありません。アイドル状態の `inject()` が手動の start と end の間に関連のないコンテキストを追記する可能性があるため、手動パスはサーフェス全体の等価性を要求せずに選択範囲を再検証します。
 
-### Events
+### イベント
 
-The `compaction/*` events extend `SessionEventMap` (merge-extensible) via declaration merging — session events, not Cordis `Events`, and all log-only. The generated [persistence log event catalog](../../../docs/persistence-catalog.md) owns the per-event payloads; `compaction/prune` documents the shadow-price protocol shared with the tool-result pruner.
+`compaction/*` イベントは宣言マージによって `SessionEventMap`（マージ拡張可能）を拡張します — Cordis の `Events` ではなくセッションイベントであり、すべてログ専用です。生成される [永続化ログイベントカタログ](../../../docs/persistence-catalog.md) がイベントごとのペイロードを所有し、`compaction/prune` はツール結果プルーナーと共有されるシャドウ価格プロトコルを文書化しています。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough; they move from the shared vocabulary to the shipped backend and the decision evidence.
+パッケージレベルの契約では足りないときにこれらのページを読んでください。共有語彙から同梱バックエンドと意思決定の証拠へと進みます。
 
-- [Compaction subsystem reference](../../../docs/subsystems/compaction.md) — the condensation vocabulary, results, and generated service API.
-- [Compaction basic backend](../compaction-basic/README.md) — the shipped backend that condenses automatically and on demand.
-- [Tool-result pruner](../compaction-tool-result-pruner/README.md) — the optional companion that trims oversized tool outputs first.
-- [Human /compact command](../command-compact/README.md) — the on-demand trigger for condensation.
-- [Token meter](../../llm/token-meter/README.md) — the measurement service that decides when to condense.
-- [historical Compaction capability-seam Agent Note](../../../.agents/notes/archived/feature/2026-06-18-compaction-capability-seam.md) — the split and the session/llm dependency rationale.
+- [Compaction サブシステムリファレンス](../../../docs/subsystems/compaction.md) — 凝縮の語彙、結果、生成されるサービス API。
+- [Compaction basic バックエンド](../compaction-basic/README.md) — 自動およびオンデマンドで凝縮する同梱バックエンド。
+- [ツール結果プルーナー](../compaction-tool-result-pruner/README.md) — 巨大なツール出力を最初に削るオプションのコンパニオン。
+- [Human /compact コマンド](../command-compact/README.md) — 凝縮のオンデマンドトリガー。
+- [トークンメーター](../../llm/token-meter/README.md) — いつ凝縮するかを決める計測サービス。
+- [historical Compaction capability-seam Agent Note](../../../.agents/notes/archived/feature/2026-06-18-compaction-capability-seam.md) — 分割と session/llm 依存の根拠。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Conversation history, when a backend is invoked
+### バックエンドが呼び出されたときの会話履歴
 
-#### What the model sees
+#### モデルが見るもの
 
-A successful backend replaces an older surface range with one user-role summary checkpoint — a `user/message` carrying `surfaceOp: { op: 'replace', startSeq, endSeq }`. The raw events stay logged but stop appearing in derived model messages; the seam itself performs no rewrite.
+成功したバックエンドは、古いサーフェス範囲を 1 つの user ロールのサマリーチェックポイント — `surfaceOp: { op: 'replace', startSeq, endSeq }` を運ぶ `user/message` — で置き換えます。生のイベントはログに残りますが、派生モデルメッセージには現れなくなります。シーム自体は書き換えを行いません。
 
-#### Token effect
+#### トークンへの影響
 
-Zero direct tokens from this Service Definition. A backend trades many retained history tokens for one summary and leaves the recent tail unchanged.
+このサービス定義による直接トークンはゼロです。バックエンドは保持された多数の履歴トークンを 1 つのサマリーと引き換えにし、直近の末尾は変更しません。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-A successful backend replacement invalidates reuse from the first shadowed history token; the seam itself does not alter a request.
+成功したバックエンドの置換は、影に入った最初の履歴トークンからの再利用を無効化します。シーム自体はリクエストを変更しません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送りされた作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits describe what condensation cannot do, regardless of which backend is loaded; they are the current package constraints.
+これらの制限は、どのバックエンドがロードされていても凝縮ができないことを説明します。これらは現在のパッケージ制約です。
 
-- **Human command, not a model tool** — condensation is triggered by the `/compact` command and by automatic pressure; no model-facing compaction tool is registered.
-- **Some single-unit overflow is out of contract** — balanced summary compaction cannot split one indivisible unit. The optional pruning companion can still repair a closed tool pair when text-bearing tool-result bulk is removable; a large non-tool node or a tool unit whose non-prunable remainder is oversized cannot be compacted.
-- **An envelope that alone approaches the window is not surface-compaction work** — compaction shrinks derived history, never the system prompt, tools, or session prefix.
+- **モデルツールではなく人間のコマンド** — 凝縮は `/compact` コマンドと自動 pressure によってトリガーされます。モデル向けのコンパクションツールは登録されません。
+- **一部の単一単位オーバーフローは契約外** — バランスの取れたサマリーコンパクションは 1 つの不可分な単位を分割できません。オプションの枝刈りコンパニオンは、テキストを含むツール結果の大部分が除去可能な場合に閉じたツールペアを修復できますが、大きな非ツールノードや、枝刈りできない残りが過大なツール単位はコンパクションできません。
+- **単体でウィンドウに迫るエンベロープはサーフェスコンパクションの仕事ではない** — コンパクションは派生履歴を縮小するだけで、システムプロンプト、ツール、セッションプレフィックスは縮小しません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers and is explicitly non-authoritative; shipped behavior lives in the sections above, the package code, and the linked Agent Notes.
+この開発ノートはメンテナー向けの作業コンテキストであり、明示的に非権威です。出荷される動作は上のセクション、パッケージコード、リンクされた Agent Note にあります。
 
-- **Model-facing tool, undecided** — compaction is human-command only. A model-facing compaction tool remains an open question; it would need its own schema and interaction with the existing command path.
-- **Template and remote backends, undecided** — the `SummaryResult` contract already carries an unmarked `rawOutput` variant for summarizers that do not identify a call through `ctx.llm.stream()`, but no such backend ships.
-- **Range arguments for `/compact`, undecided** — the argument-free form keeps behavior stable across command adapters; explicit ranges stay the programmatic `compactRegion()` path.
+- **モデル向けツール、未決定** — コンパクションは人間コマンド専用です。モデル向けコンパクションツールは未解決の問いであり、独自のスキーマと既存のコマンドパスとの相互作用が必要になります。
+- **テンプレートおよびリモートバックエンド、未決定** — `SummaryResult` 契約には、`ctx.llm.stream()` を通じて呼び出しを識別しないサマライザー用のマークなし `rawOutput` バリアントがすでにありますが、そのようなバックエンドは出荷されていません。
+- **`/compact` の範囲引数、未決定** — 引数なしの形式はコマンドアダプター間で動作を安定させます。明示的な範囲はプログラム的な `compactRegion()` パスに残ります。
 
 </details>

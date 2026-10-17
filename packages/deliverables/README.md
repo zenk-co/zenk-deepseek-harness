@@ -1,50 +1,50 @@
 ---
-description: "The deliverables group map: the Host plugins that record what a turn hands to the user, explicit file deliveries and observed workspace changes, for users and maintainers navigating the group."
+description: "デリバラブルグループマップ: ターンがユーザーに手渡すものを記録する Host プラグイン。明示的なファイル納品と観測されたワークスペース変更。"
 kind: "package-group"
 ---
 
 # packages/deliverables
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The deliverables family records what a turn hands to the user as durable Session events that only clients read: the `present` tool declares final files the model delivered, and the workspace-changes recorder captures the files a turn changed with their line counts from git snapshots and whole-file captures, and serves each file's comparison. The Web [deliverables plugin](../client/ui-deliverables/README.md) renders both at the end of a turn. Choose this family for a product that shows delivered files and per-turn changes; `present` needs `ctx.tools` and `ctx.fs`, the recorder needs `ctx.subprocess` and a git executable.
+デリバラブルファミリーは、ターンがユーザーに手渡すものをクライアントのみが読む durable セッションイベントとして記録する。`present` ツールはモデルが納品した最終ファイルを宣言し、ワークスペース変更レコーダーは git スナップショットと全体ファイルキャプチャからターンが変更したファイルをその行数とともに記録し、各ファイルの比較を提供する。Web の [デリバラブルプラグイン](../client/ui-deliverables/README.md) は両方をターン末尾に描画する。納品ファイルとターンごとの変更を表示する製品にはこのファミリーを選ぶこと。`present` には `ctx.tools` と `ctx.fs` が必要であり、レコーダーには `ctx.subprocess` と git 実行ファイルが必要である。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`tool-present`](tool-present/README.md) | Declares existing files as final deliverables through the `present` tool | registers on `ctx.tools` |
-| [`workspace-changes`](workspace-changes/README.md) | Summarizes each top-level turn's changed files from git working-tree snapshots and whole-file captures, and serves their comparisons | provides `ctx.workspaceChanges`; listens to `session/event`, appends `workspace/changes` |
+| [`tool-present`](tool-present/README.md) | 既存ファイルを `present` ツール経由で最終納品物として宣言する | `ctx.tools` に登録する |
+| [`workspace-changes`](workspace-changes/README.md) | 最上位ターンの変更ファイルを git 作業ツリースナップショットと全体ファイルキャプチャから要約し、その比較を提供する | `ctx.workspaceChanges` を提供する。`session/event` を購読し、`workspace/changes` を追加する |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Deliverables subsystem](../../docs/subsystems/deliverables.md) — the `PresentedFile` and `WorkspaceChangesSummary` vocabulary, the two durable events, and the summary service.
-- [Web deliverables](../client/ui-deliverables/README.md) — the turn-tail cards and file mentions that render these events.
-- [Present declares workspace source files](../../.agents/notes/implemented/feature/2026-09-08-present-workspace-source-files.md) — the delivery decision.
-- [Turn changed-files card](workspace-changes/README.md) — the snapshot design and coverage rules.
+- [Deliverables サブシステム](../../docs/subsystems/deliverables.md) — `PresentedFile` と `WorkspaceChangesSummary` の語彙、2つの durable イベント、要約サービス。
+- [Web デリバラブル](../client/ui-deliverables/README.md) — これらのイベントを描画するターン末尾カードとファイル言及。
+- [Present はワークスペースソースファイルを宣言する](../../.agents/notes/implemented/feature/2026-09-08-present-workspace-source-files.md) — 納品の決定。
+- [ターン変更ファイルカード](workspace-changes/README.md) — スナップショット設計とカバレッジ規則。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

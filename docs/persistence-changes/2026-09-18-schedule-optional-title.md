@@ -1,25 +1,25 @@
 ---
-description: "Records a persistence type transition and its compatibility acknowledgement."
+description: "永続化型の移行とその互換性の承認を記録する。"
 kind: persistence-change
 ---
 
 # 2026-09-18-schedule-optional-title
 
-English | [中文](2026-09-18-schedule-optional-title.zh.md)
+日本語 | [English](2026-09-18-schedule-optional-title.en.md) | [中文](2026-09-18-schedule-optional-title.zh.md)
 
-## Summary
+## 概要
 
-Makes the stored title optional on the after, at, and every variants of a persisted schedule/change create record.
+永続化された schedule/change 作成レコードの after、at、every バリアントで、保存されるタイトルを任意にする。
 
-## Table of Contents
+## 目次
 
-- [Declaration](#declaration)
-- [Compatibility](#compatibility)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [宣言](#declaration)
+- [互換性](#compatibility)
+- [検証](#verification)
+- [開発者ノート](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -33,16 +33,16 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-A version-1 Session event written before titles existed has no title member, so those logs decode and fold without one instead of being refused. Readers that require a name treat an absent title as an unnamed task. The Host task record still requires the member: the storage decoder rejects a stored task without it, and creation, update, and the schedule tools still require it.
+タイトルが存在する前に書かれたバージョン 1 の Session イベントには title メンバーがなく、そのようなログは拒否される代わりにタイトルなしでデコード・フォールドされる。名前を必要とするリーダーは、存在しないタイトルを無名タスクとして扱う。ホストタスクレコードでは依然としてこのメンバーが必須である: ストレージデコーダーはタイトルのない保存タスクを拒否し、作成、更新、schedule ツールでも引き続き必須である。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-pnpm exec vitest run packages/schedule/schedule/tests: 18 files, 789 tests passed.
+pnpm exec vitest run packages/schedule/schedule/tests: 18 ファイル、789 テストが合格した。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 None.

@@ -5,7 +5,7 @@ description: "dsh plugin 只在被转发的 pnpm 参数之前读取 --profile，
 
 # `dsh plugin` 选项位置
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

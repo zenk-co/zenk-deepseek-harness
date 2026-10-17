@@ -1,6 +1,6 @@
 # 配置模型
 
-[English](providers.md) | 中文
+[日本語](providers.md) | [English](providers.en.md) | 中文
 
 本指南假定你已按照[根 README](../../../README.zh.md#run)启动 Web UI。模型变更会在下一次请求时生效，不需要重启服务器。
 

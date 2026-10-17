@@ -1,144 +1,144 @@
 ---
-description: "The shared hook rules behind the Claude Code and Codex bridges — what a hook can do and what happens when it runs — for users and maintainers of the hooks subsystem."
+description: "Claude Code と Codex ブリッジの背後にある共有フックルール — フックができることと、それが実行されるとき何が起きるか — を扱う、フックサブシステムのユーザーとメンテナー向けの解説。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-hook-protocol
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-hook-protocol` makes both bridges handle your hooks identically: it defines what a hook can do and what happens when it runs. You never install or configure it yourself — choose `dsh-hooks-claude-code` or `dsh-hooks-codex`, point it at your existing `hooks.json`, and these rules apply to your hooks. Through either bridge, a hook can block a prompt or tool call with a message the model sees, attach extra context to the conversation, or ask the run to stop. Only command hooks run; `http`, `mcp_tool`, `prompt`, and `agent` handlers are skipped with a warning.
+`dsh-hook-protocol` は両方のブリッジがあなたのフックを同じように扱うようにする: フックが何をできるか、実行されたときに何が起きるかを定義する。あなたがこれを自分でインストールしたり設定したりすることはない — `dsh-hooks-claude-code` または `dsh-hooks-codex` を選び、既存の `hooks.json` を指定すれば、これらのルールがあなたのフックに適用される。どちらのブリッジでも、フックはモデルが見るメッセージでプロンプトやツール呼び出しをブロックし、会話に追加コンテキストを付加し、または実行の停止を要求できる。実行されるのはコマンドフックのみであり、`http`、`mcp_tool`、`prompt`、`agent` ハンドラーは警告付きでスキップされる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-You don't install or configure this package directly — mounting `dsh-hooks-claude-code` or `dsh-hooks-codex` applies these rules to your existing `hooks.json` hooks. Use this page to learn what a hook can do and what happens when it runs; the two bridge pages list which events each dialect supports.
+このパッケージを直接インストールしたり設定したりすることはない — `dsh-hooks-claude-code` または `dsh-hooks-codex` をマウントすると、これらのルールが既存の `hooks.json` フックに適用される。このページはフックができることと実行時に何が起きるかを学ぶために使う。各イベントをどの方言がサポートするかは 2 つのブリッジのページに列挙されている。
 
-### When to choose it
+### いつ選択するか
 
-Choose `dsh-hooks-claude-code` or `dsh-hooks-codex` when you have existing Claude Code or Codex hooks and want them to keep working during agent runs. You never choose this package directly. Avoid the whole group for bespoke behavior with no reference-tool equivalent: a native Cordis plugin has the full harness API with no hook protocol in between.
+既存の Claude Code または Codex フックがあり、それらがエージェント実行中も動き続けてほしい場合は `dsh-hooks-claude-code` または `dsh-hooks-codex` を選ぶ。このパッケージを直接選ぶことはない。参照ツールに対応物のない独自の動作にはグループ全体を避ける: ネイティブな Cordis プラグインはその間のフックプロトコルなしで完全なハーネス API を使える。
 
-### What a hook can do
+### フックができること
 
-- **Block an action with a message** — a hook that exits with code 2 stops the prompt or tool call, and its error output is shown as the reason.
-- **Ask before a tool runs** — a Claude Code hook can request confirmation instead of blocking outright; the Codex bridge does not surface this option.
-- **Attach context** — a hook can return extra text that the model sees in the next request.
-- **Run on chosen moments** — a hook config selects which events it fires on by name or pattern; an absent, empty, or `'*'` pattern means every event of that kind.
-- **Fail without stopping the run** — any exit code other than 2 is a non-blocking failure: the action proceeds and the failure is logged, and a hook that cannot be started at all is treated the same way.
-- **Ask the run to stop** — a hook can request that the run halt (`{"continue": false}`); the request is recorded but has no run-level effect (see Known Limitations).
+- **メッセージ付きでアクションをブロックする** — 終了コード 2 で終了するフックはプロンプトやツール呼び出しを停止し、そのエラー出力が理由として表示される。
+- **ツール実行前に確認する** — Claude Code フックは完全にブロックする代わりに確認を要求できる。Codex ブリッジはこのオプションを表面化しない。
+- **コンテキストを付加する** — フックはモデルが次のリクエストで見る追加テキストを返せる。
+- **選んだ時点で実行する** — フック設定はそれが発火するイベントを名前またはパターンで選択する。欠落、空、または `'*'` パターンはその種別のすべてのイベントを意味する。
+- **実行を止めずに失敗する** — 2 以外の終了コードは非ブロッキングの失敗である: アクションは続行し、失敗はログに記録される。起動すらできないフックも同じように扱われる。
+- **実行の停止を要求する** — フックは実行の停止（`{"continue": false}`）を要求できる。要求は記録されるが実行レベルの効果はない（既知の制限を参照）。
 
-### What you see when hooks run
+### フック実行時に見えるもの
 
-- When a hook blocks, the action does not happen and the hook's message is shown.
-- When a hook attaches context, the model sees that text in its next request.
-- A hook that fails — a bad command, a crash, or any exit other than 2 — is logged and does not stop the agent.
-- If the hook config cannot be read or parsed, the bridge logs a warning and no hooks run; the agent still starts.
-- Configs that mix hook types still work: `http`, `mcp_tool`, `prompt`, and `agent` handlers are skipped with a warning, and their command hooks run.
+- フックがブロックすると、アクションは起こらず、フックのメッセージが表示される。
+- フックがコンテキストを付加すると、モデルは次のリクエストでそのテキストを見る。
+- 失敗したフック — 不正なコマンド、クラッシュ、または 2 以外のあらゆる終了 — はログに記録され、エージェントを停止しない。
+- フック設定が読めない、または解析できない場合、ブリッジは警告をログに記録し、どのフックも実行されない。エージェントはそれでも起動する。
+- フック種別を混ぜた設定も機能する: `http`、`mcp_tool`、`prompt`、`agent` ハンドラーは警告付きでスキップされ、それらのコマンドフックは実行される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the library and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではライブラリ背後の設計判断を説明し、それを実現するコードを指し示す。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Processing pipeline
+### 処理パイプライン
 
-`selectHookGroups` selects nonempty matching groups in config order. Each bridge resolves the current working directory only when this selection contains commands to run. `appendHookInvoked` omits absent or undefined matchers from the recorded event.
+`selectHookGroups` は設定順に空でない一致グループを選択する。各ブリッジは、この選択が実行すべきコマンドを含むときにのみ現在の作業ディレクトリを解決する。`appendHookInvoked` は記録されるイベントから欠落または未定義のマッチャーを省く。
 
-The library is a chain of single-purpose steps, one function each: validate the matcher pattern, run the command through the `dsh-shell` executor, decode the outcome, merge every matched hook's outcome into one most-restrictive result, and record the durable `hook/*` event pair. The matcher's `mode` parameter is the single axis the dialects differ on — `claude-code` interprets a pattern as literal alternatives or a regex, `codex` always as an unanchored regex. Every step degrades to a contained outcome instead of throwing, so a hook can never crash the calling turn: an invalid regex is a non-match, an executor rejection becomes a `HookOutput` with no exit code, exit 2 blocks with stderr as the reason, and every other failure stays non-blocking. Merging applies `deny > ask > allow` precedence, keeps the first `continue: false` stop sticky, and accumulates context in hook order. Detached runs are tracked so `fiber.dispose()` reaches quiescence. The steps live in [`src/matcher.ts`](src/matcher.ts), [`src/runner.ts`](src/runner.ts), [`src/codec.ts`](src/codec.ts), [`src/merge.ts`](src/merge.ts), [`src/events.ts`](src/events.ts), and [`src/detached.ts`](src/detached.ts).
+ライブラリは単一目的のステップの連鎖であり、各ステップが 1 つの関数である: マッチャーパターンを検証し、`dsh-shell` エグゼキューターを通じてコマンドを実行し、結果をデコードし、一致したすべてのフックの結果を 1 つの最も制限的な結果にマージし、耐久イベントペア `hook/*` を記録する。方言が異なる唯一の軸はマッチャーの `mode` パラメーターである — `claude-code` はパターンをリテラルの選択肢または正規表現として解釈し、`codex` は常に非アンカー正規表現として解釈する。すべてのステップは投げる代わりに封じ込められた結果に劣化するため、フックが呼び出し元のターンをクラッシュさせることは決してできない: 不正な正規表現は非一致になり、エグゼキューターの拒否は終了コードのない `HookOutput` になり、終了 2 は stderr を理由としてブロックし、他のすべての失敗は非ブロッキングにとどまる。マージは `deny > ask > allow` の優先順位を適用し、最初の `continue: false` 停止を粘着的に保ち、コンテキストをフック順に蓄積する。デタッチされた実行は追跡されるため、`fiber.dispose()` が静止に到達する。ステップは [`src/matcher.ts`](src/matcher.ts)、[`src/runner.ts`](src/runner.ts)、[`src/codec.ts`](src/codec.ts)、[`src/merge.ts`](src/merge.ts)、[`src/events.ts`](src/events.ts)、[`src/detached.ts`](src/detached.ts) にある。
 
-### `hook/*` session events
+### `hook/*` セッションイベント
 
-The `hook/invoked` and `hook/result` events are declaration-merged into `SessionEventMap` as log-only records: like `compaction/*`, they are not surface events and carry no `surfaceOp`. A `hook/result` pairs with its `hook/invoked` by `handlerId`, and `appendHookResult` owns the decision rule. Payloads and per-event JSDoc live in the generated [persistence log event catalog](../../../docs/persistence-catalog.md).
+`hook/invoked` と `hook/result` イベントはログ専用レコードとして `SessionEventMap` に宣言マージされる: `compaction/*` と同様に、それらはサーフェスイベントではなく、`surfaceOp` を運ばない。`hook/result` は `handlerId` によって対応する `hook/invoked` と対になり、`appendHookResult` が決定ルールを所有する。ペイロードとイベントごとの JSDoc は生成される[永続化ログイベントカタログ](../../../docs/persistence-catalog.md)にある。
 
-Invocation and result records must sit inside an open turn: `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, and `Stop` satisfy that relation by construction, while `SessionStart` runs before turn 1 and gets no `hook/*` record — its injected context is delivered instead.
+呼び出しと結果のレコードは開いたターンの中に位置しなければならない: `UserPromptSubmit`、`PreToolUse`、`PostToolUse`、`Stop` は構造上この関係を満たす。一方 `SessionStart` はターン 1 の前に実行され、`hook/*` レコードを得ない — 代わりに注入されたコンテキストが届けられる。
 
-### Design philosophy
+### 設計哲学
 
-- **One axis of difference collapsed into `mode`.** The dialects differ only in how a matcher pattern is interpreted, so the matcher takes the mode as a parameter instead of duplicating the engine.
-- **The executor owns process control.** Commands run through the `dsh-shell` executor rather than a bespoke spawn: the executor already provides the scrubbed-but-overridable environment, process-group cancellation, and timeout the protocol needs.
-- **Never throw into the loop.** Every failure mode — malformed JSON, an invalid regex, an executor rejection — degrades to a contained outcome or a non-match, so a hook can never crash the calling turn.
-- **Log-only, turn-enclosed events.** The `hook/*` records are durable evidence of what ran and what it decided; they are not surface events.
+- **違いの 1 軸を `mode` に畳み込む。** 方言はマッチャーパターンの解釈の仕方だけが異なるため、マッチャーはエンジンを複製するのではなく mode をパラメーターとして受け取る。
+- **エグゼキューターがプロセス制御を所有する。** コマンドは特注の spawn ではなく `dsh-shell` エグゼキューターを通じて実行される: エグゼキューターはプロトコルが必要とする、洗浄済みだが上書き可能な環境、プロセスグループのキャンセル、タイムアウトをすでに提供している。
+- **ループへ決して投げない。** すべての失敗モード — 不正な JSON、不正な正規表現、エグゼキューターの拒否 — は封じ込められた結果または非一致に劣化するため、フックが呼び出し元のターンをクラッシュさせることは決してできない。
+- **ログ専用でターンに囲まれたイベント。** `hook/*` レコードは何が実行され何を決定したかの耐久証拠である。それらはサーフェスイベントではない。
 
-The [hook-protocol-lib Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-protocol-lib.md) records the shared-versus-per-dialect split and the alternatives considered.
+[hook-protocol-lib Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-protocol-lib.md)が、共有部分と方言ごとの部分の分割、および検討された代替案を記録している。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Public exports of every primitive and event helper |
-| [`src/matcher.ts`](src/matcher.ts) | Matcher validation, dialect matching, and nonempty command-group selection |
-| [`src/runner.ts`](src/runner.ts) | `runHook` execution through `ctx.shell` and `DEFAULT_HOOK_TIMEOUT_MS` |
-| [`src/codec.ts`](src/codec.ts) | Exit-code and structured-stdout decoding into `HookOutput` |
-| [`src/merge.ts`](src/merge.ts) | Most-restrictive merge and the `MergedHookOutcome` type |
-| [`src/events.ts`](src/events.ts) | `hook/*` event declaration, append helpers, stderr summary |
-| [`src/detached.ts`](src/detached.ts) | Detached-run quiescence tracking |
-| [`src/types.ts`](src/types.ts) | `HookOutput`, `MatcherGroup`, `CommandHook`, and the `hook/*` payload types |
+| [`src/index.ts`](src/index.ts) | すべてのプリミティブとイベントヘルパーの公開エクスポート |
+| [`src/matcher.ts`](src/matcher.ts) | マッチャー検証、方言マッチング、空でないコマンドグループの選択 |
+| [`src/runner.ts`](src/runner.ts) | `ctx.shell` と `DEFAULT_HOOK_TIMEOUT_MS` を通じた `runHook` 実行 |
+| [`src/codec.ts`](src/codec.ts) | 終了コードと構造化 stdout の `HookOutput` へのデコード |
+| [`src/merge.ts`](src/merge.ts) | 最も制限的なマージと `MergedHookOutcome` 型 |
+| [`src/events.ts`](src/events.ts) | `hook/*` イベント宣言、追加ヘルパー、stderr サマリー |
+| [`src/detached.ts`](src/detached.ts) | デタッチされた実行の静止追跡 |
+| [`src/types.ts`](src/types.ts) | `HookOutput`、`MatcherGroup`、`CommandHook`、`hook/*` ペイロード型 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared rules to the bridges that apply them and the extension points they program against.
+パッケージレベルの契約では不十分なときにこれらのページを読む。共有ルールから、それらを適用するブリッジ、そしてそれらがプログラムする拡張ポイントへと進む。
 
-- [Hooks group map](../README.md) — the sibling group page and its package table.
-- [Hook protocol library Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-protocol-lib.md) — why the protocol core is shared and what each bridge owns.
-- [Hook bridges Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-bridges.md) — how the two bridges use these primitives.
-- [Interception extension-points reference](../../../docs/tool-execution-pipeline.md) — the typed-Decision surface the bridges map onto.
-- [Generated persistence log event catalog](../../../docs/persistence-catalog.md) — the `hook/*` event payloads and per-event JSDoc.
+- [Hooks グループマップ](../README.md) — 兄弟グループページとそのパッケージ表。
+- [Hook protocol library Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-protocol-lib.md) — プロトコルコアが共有される理由と各ブリッジが所有するもの。
+- [Hook bridges Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-bridges.md) — 2 つのブリッジがこれらのプリミティブをどう使うか。
+- [インターセプション拡張ポイントリファレンス](../../../docs/tool-execution-pipeline.md) — ブリッジがマップする型付き Decision サーフェス。
+- [生成される永続化ログイベントカタログ](../../../docs/persistence-catalog.md) — `hook/*` イベントペイロードとイベントごとの JSDoc。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-hooks-claude-code` and `dsh-hooks-codex`, which are the only consumers that render decoded hook output into model context.
+間接的に、`dsh-hooks-claude-code` と `dsh-hooks-codex` を通じて。これらはデコードされたフック出力をモデルコンテキストにレンダリングする唯一のコンシューマーである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumers own any request-prefix changes.
+直接の無効化はない。名前指しされたコンシューマーがリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits describe what hooks cannot do through the shared engine yet. They are current package constraints, not a task backlog.
+これらの制限は、共有エンジンを通じてフックがまだできないことを説明する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **`HookOutput.updatedInput` is parsed but not honored** — input rewrite is a deferred consistency-design problem ([the pre-tool-input-rewrite Agent Note](../../../.agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.md)); a bridge logs and warns when a hook sets it.
-- **A folded halt has no run-level effect** — `mergeHookOutputs` folds `continue: false` into a sticky `stop`, but the interception points have no hard-halt primitive, so a bridge records the halt and keeps the hook's per-point effect.
-- **Only the command-hook shape runs** — the protocol executes `{ type: 'command', command, timeout? }`; a bridge parses-and-skips the other shapes its dialect defines (`http`, `mcp_tool`, `prompt`, `agent`).
+- **`HookOutput.updatedInput` は解析されるが尊重されない** — 入力の書き換えは先送りされた整合性設計の問題である（[pre-tool-input-rewrite Agent Note](../../../.agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.md)）。フックがこれを設定すると、ブリッジはログに記録して警告する。
+- **折り畳まれた停止は実行レベルの効果を持たない** — `mergeHookOutputs` は `continue: false` を粘着的な `stop` に折り畳むが、インターセプションポイントにハード停止プリミティブがないため、ブリッジは停止を記録し、フックのポイントごとの効果は保つ。
+- **実行されるのはコマンドフック形状のみである** — プロトコルは `{ type: 'command', command, timeout? }` を実行する。ブリッジはその方言が定義する他の形状（`http`、`mcp_tool`、`prompt`、`agent`）を解析してスキップする。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発者ノートはメンテナー向けの作業コンテキストである: 未解決の疑問と未決定の方向性。これは明示的に非権威である — 出荷される動作、制限、受け入れられた根拠は上記のセクション、パッケージコード、リンクされた Agent Notes にある。
 
-#### Future: run-level halt
+#### 将来: 実行レベルの停止
 
-A hook that asks to halt the whole run (`continue: false`) is folded into `MergedHookOutcome.stop` but not applied anywhere: the interception points lack a hard-halt primitive, and mid-turn requests record the halt in `hook/result` instead. A run-level halt mechanism would let the bridges honor it; no design exists yet.
+実行全体の停止（`continue: false`）を要求するフックは `MergedHookOutcome.stop` に折り畳まれるが、どこにも適用されない: インターセプションポイントにハード停止プリミティブがなく、ターン途中の要求は代わりに `hook/result` に停止を記録する。実行レベルの停止機構があればブリッジはそれを尊重できるが、設計はまだ存在しない。
 
 </details>

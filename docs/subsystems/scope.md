@@ -1,21 +1,21 @@
-# Scoped Registration
+# 適用範囲付き登録
 
-English | [中文](scope.zh.md)
+日本語 | [English](scope.en.md) | [中文](scope.zh.md)
 
-The [scope package](../../packages/core/scope) supplies the identity, carrier, and scoped-layer vocabulary that makes one registration context mean both per-agent visibility and shared lifetime ownership. It is a library primitive rather than a Cordis service; the [agent-scope runtime-design reference](../../packages/core/agent-loop/README.md) owns the lifecycle rationale, and the package [README](../../packages/core/scope/README.md) owns the callable API and filtering semantics.
+[scope パッケージ](../../packages/core/scope) は 1 つの登録文脈に、応答者ごとの可視性と共有寿命所有の両意味を持たせる同一性、運搬子、適用範囲層語彙を供給する。Cordis サービスではなく蔵書素材であり、[agent-scope 実行時設計参照](../../packages/core/agent-loop/README.md)が寿命根拠を所有し、包 [README](../../packages/core/scope/README.md) が呼出可能 API と濾過意味論を所有する。
 
-Sources: [`packages/core/scope/src/index.ts`](../../packages/core/scope/src/index.ts) and [`packages/core/scope/src/store.ts`](../../packages/core/scope/src/store.ts).
+源: [`packages/core/scope/src/index.ts`](../../packages/core/scope/src/index.ts) と [`packages/core/scope/src/store.ts`](../../packages/core/scope/src/store.ts)。
 
-## Identity and dispatch carrier
+## 同一性と送出運搬子
 
-`ScopeKey` is an opaque object identity. The shipped loop uses the live `Agent` object as its own key, but the primitive never inspects the object.
+`ScopeKey` は不透明な対象同一性である。出荷循環は生きている `Agent` 対象を自身鍵として使うが、素材は対象を決して検査しない。
 
 ```ts type-equiv
 /** An opaque, identity-compared scope key. */
 type ScopeKey = object
 ```
 
-`Scoped<T>` is the compile-time brand on the opaque routing receiver returned by `scopeTarget(base, key)`. Scope-filtered event declarations require this carrier as their `this` type, while the real event subject remains an explicit argument.
+`Scoped<T>` は `scopeTarget(base, key)` が返す不透明経路受手上の製作時銘である。適用範囲濾過イベント宣言はこの運搬子を `this` 型として要求し、真のイベント主題は明示引数のままである。
 
 ```ts type-equiv
 /**
@@ -26,9 +26,9 @@ type ScopeKey = object
 type Scoped<T extends object> = object & { readonly [ScopedBrand]: T }
 ```
 
-## Owned registration context
+## 所有登録文脈
 
-`Scope` pairs the tagged registration context with two teardown paths. `rawDispose` preserves the exact Cordis disposer identity needed by an ordered composite effect; `dispose()` is the public shared quiescence boundary for direct and racing callers.
+`Scope` は印付き登録文脈を 2 つの解体経路と対にする。`rawDispose` は順序複合エフェクトに要る厳密 Cordis 破棄子同一性を保ち、`dispose()` は直接と競合呼出者向け公開共有静寂境界である。
 
 ```ts type-equiv
 /** A minted registration scope and its quiescent disposal boundaries. */
@@ -42,9 +42,9 @@ interface Scope {
 }
 ```
 
-## Scoped registry layer
+## 適用範囲付き登録層
 
-`ScopeLayer` represents one registry's complete contribution at the global or exact-scope level. A concrete layer may aggregate multiple named and anonymous tables; whole-layer emptiness lets `ScopedLayers` reclaim scoped state without discarding a sibling table.
+`ScopeLayer` は全域または厳密適用範囲水準での 1 登録の完全寄与を表す。具体層は複数名付き表と無名表を集約しうる。全層空により `ScopedLayers` は兄弟表を捨てずに適用範囲状態を回収できる。
 
 ```ts type-equiv
 /** One scope's aggregate contribution to a registry. */
@@ -54,6 +54,6 @@ interface ScopeLayer {
 }
 ```
 
-`ScopedLayers<L>` owns the eager global layer and lazily created exact-scope layers. Reads do not create layers: `peek(undefined)` means no overlay, while `merge()` materializes insertion-ordered global named entries followed by scoped shadows. Registrations use one context for both visibility and Cordis effect ownership, collect one synchronous undo before optional notification, return Cordis's exact disposer, and reclaim a scoped layer only when its complete `ScopeLayer` is empty.
+`ScopedLayers<L>` は熱心全域層と遅延作成厳密適用範囲層を所有する。読みは層を作らない。`peek(undefined)` は上掛けなしを意味し、`merge()` は挿入順全域名項目の後に適用範囲影を実体化する。登録は可視性と Cordis エフェクト所有の両方に 1 文脈を使い、任意通知の前に同期取消 1 つを集め、Cordis 厳密破棄子を返し、完全 `ScopeLayer` が空の場合にのみ適用範囲層を回収する。
 
-`NamedEntries<V>` supplies insertion-ordered lookup and live iteration with caller-owned duplicate errors. `AnonymousEntries<V>` gives every append a unique identity so equal values remain independent. Iteration stays live within one nonempty table generation; draining the table detaches existing iterators from later insertions. Both return idempotent exact-entry undos; the shared `EntryValues` implementation interface is not public.
+`NamedEntries<V>` は挿入順参照と呼出者所有重複誤りを伴う生き反復を供給する。`AnonymousEntries<V>` は各追加に唯一同一性を与え、等値が独立に残る。反復は 1 つの非空表世代内では生き続け、表排出は既存反復子を後続挿入から切り離す。両者は冪等厳密項目取消を返す。共有 `EntryValues` 実装界面は公開されない。

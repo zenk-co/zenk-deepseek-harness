@@ -1,64 +1,64 @@
-# Configure models
+# モデルを構成する
 
-English | [中文](providers.zh.md)
+日本語 | [English](providers.en.md) | [中文](providers.zh.md)
 
-This guide assumes you started the Web UI through the [root README](../../../README.md#run). Model changes take effect on the next request without restarting the server.
+このガイドは、[ルート README](../../../README.md#run)を通じて Web UI を起動したことを前提とする。モデルの変更はサーバーを再起動することなく次のリクエストで有効になる。
 
-## Configure DeepSeek
+## DeepSeek を構成する
 
-Open **Settings → Models**. The DeepSeek card exposes one API-key field; enter the key and save it.
+**Settings → Models** を開く。DeepSeek カードは API キーフィールドを 1 つ公開する。キーを入力して保存する。
 
-![The Models page: the DeepSeek card, with Add model provider below it](providers-models-page.png)
+![Models ページ: DeepSeek カードと、その下の Add model provider](providers-models-page.png)
 
-Keys are write-only. The page receives a redacted descriptor after saving, never the literal secret. The key is stored in `$DSH_HOME/.credentials.yaml`, while settings retain only its credential reference.
+キーは書き込み専用である。ページは保存後にリダクトされた記述子を受け取り、生のシークレットを受け取ることはない。キーは `$DSH_HOME/.credentials.yaml` に保存され、設定はその資格情報参照のみを保持する。
 
-## Add a third-party provider
+## サードパーティプロバイダーを追加する
 
-Choose **Add model provider**. The card opens on **Third-party model provider**: pick a provider dsh ships with — the list shows provider ids such as `anthropic`, `openai`, `moonshotai` for Kimi, or `zai` for GLM — enter its API key, and save. The installed catalog supplies the endpoint, protocol, and model list.
+**Add model provider** を選ぶ。カードは **Third-party model provider** で開く。dsh が同梱するプロバイダーを選び（リストには `anthropic`、`openai`、Kimi 用の `moonshotai`、GLM 用の `zai` などのプロバイダー id が表示される）、その API キーを入力して保存する。インストール済みカタログがエンドポイント、プロトコル、モデルリストを提供する。
 
-The authentication **?** explains saved-credential priority and environment fallbacks. Leave the key blank to use a saved credential or try the listed environment variables. A green hint identifies a detected environment variable. A yellow hint means no credential variable was detected; enter an API key or configure the listed variable. An unconfirmed hint means the status read failed. Detection does not validate the credential or test the connection. Provider-managed credential files, including AWS profiles and Google application-default credentials, are outside this check. Providers without native key authentication, such as `openai-codex`, show no key field unless the profile explicitly names a credential reference.
+認証の **?** は、保存済み資格情報の優先順位と環境フォールバックを説明する。キーを空欄にすると、保存済み資格情報を使うか、列挙された環境変数を試す。緑のヒントは検出された環境変数を示す。黄色のヒントは資格情報変数が検出されなかったことを意味し、API キーを入力するか列挙された変数を設定する。未確認のヒントはステータス読み取りが失敗したことを意味する。検出は資格情報を検証せず、接続もテストしない。プロバイダー管理の資格情報ファイル（AWS プロファイルや Google アプリケーションデフォルト資格情報を含む）はこのチェックの対象外である。`openai-codex` のようなネイティブキー認証を持たないプロバイダーは、プロファイルが資格情報参照を明示的に名指さない限りキーフィールドを表示しない。
 
-A saved credential uses the placeholder **Leave blank to use saved credentials**, with no status text below the input. Environment fallback uses **Leave blank to use env as auth** and one detection hint while the input is empty. A nonempty input shows no authentication status text. Address configuration variables appear under **Base URL** and do not count as credentials.
+保存済み資格情報は **Leave blank to use saved credentials** というプレースホルダーを使い、入力の下にステータステキストはない。環境フォールバックは **Leave blank to use env as auth** を使い、入力が空の間は検出ヒントを 1 つ表示する。空でない入力は認証ステータステキストを表示しない。アドレス構成変数は **Base URL** の下に現れ、資格情報として数えられない。
 
-A nonempty key input has an eye button. Select **Show secret** to check what you typed, and **Hide secret** to mask it again. Changing the input masks it again. Stored credentials remain write-only.
+空でないキー入力には目のボタンがある。**Show secret** を選ぶと入力内容を確認でき、**Hide secret** で再びマスクされる。入力を変更すると再びマスクされる。保存済み資格情報は書き込み専用のままである。
 
-## Add a custom model API
+## カスタムモデル API を追加する
 
-Switch the card to **Custom model API** for a relay, a company gateway, a self-hosted server, or any provider absent from the installed catalog. Supply a lowercase Provider ID, base URL, API protocol, credential, and at least one model. The **API protocol** must be the one your gateway speaks, and the picker offers three: OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages, stored in the active profile's `cordis.patch.yml` as `openai-completions`, `openai-responses`, and `anthropic-messages`. A provider speaks one protocol, so a gateway that serves two needs two providers.
+リレー、社内ゲートウェイ、セルフホストサーバー、またはインストール済みカタログにないプロバイダーには、カードを **Custom model API** に切り替える。小文字の Provider ID、ベース URL、API プロトコル、資格情報、および少なくとも 1 つのモデルを指定する。**API protocol** はゲートウェイが話すものにしなければならず、ピッカーは 3 つを提供する。OpenAI Chat Completions、OpenAI Responses、Anthropic Messages であり、アクティブなプロファイルの `cordis.patch.yml` に `openai-completions`、`openai-responses`、`anthropic-messages` として保存される。プロバイダーは 1 つのプロトコルを話すので、2 つを提供するゲートウェイには 2 つのプロバイダーが必要である。
 
-![The custom model API form: Provider ID, display name, base URL, API protocol, and API key](providers-custom-form.png)
+![カスタムモデル API フォーム: Provider ID、表示名、ベース URL、API プロトコル、API キー](providers-custom-form.png)
 
-The Provider ID is permanent because requests, saved sessions, model defaults, and credential references use it. To rename a provider, add a new provider and delete the old one. The display name, base URL, protocol, credential, and models remain editable.
+Provider ID は永続である。リクエスト、保存済みセッション、モデル既定、資格情報参照がそれを使うためである。プロバイダーを改名するには、新しいプロバイダーを追加して古いものを削除する。表示名、ベース URL、プロトコル、資格情報、モデルは編集可能なままである。
 
-### Discover models
+### モデルを検出する
 
-Under **Model catalog**, choose **Fetch available models** to ask the endpoint which models it serves. The request uses the base URL, protocol, and key currently in the form, or a saved provider's stored key, and the reply opens a searchable picker: search, tick the models you want, and choose **Add selected**. Nothing is stored until you save or create the provider.
+**Model catalog** の下で **Fetch available models** を選ぶと、エンドポイントに提供しているモデルを問い合わせる。リクエストは現在フォームにあるベース URL、プロトコル、キー、または保存済みプロバイダーの保存キーを使い、応答が検索可能なピッカーを開く。検索し、欲しいモデルにチェックを入れ、**Add selected** を選ぶ。プロバイダーを保存または作成するまで何も保存されない。
 
-Discovery reads the listing formats common gateways publish, but not every endpoint answers in one of them, so treat it as a convenience rather than a guarantee: when it fails or lists nothing, add the model ids by hand and they work just the same. A built-in provider is always answered from the installed catalog, even when its base URL points at a gateway, so fetch through a custom provider to see what the gateway really serves.
+検出は一般的なゲートウェイが公開するリスト形式を読み取るが、すべてのエンドポイントがそのいずれかで応答するわけではないので、保証ではなく便利機能として扱う。失敗したり何も列挙しなかったりした場合は、モデル id を手動で追加すれば同様に機能する。組み込みプロバイダーは、ベース URL がゲートウェイを指していても、常にインストール済みカタログから応答される。ゲートウェイが実際に提供するものを確認するには、カスタムプロバイダーを通じてフェッチする。
 
-## Select a model
+## モデルを選択する
 
-Configured providers appear in the model picker. Selecting a model also makes it the default for new sessions. A session that has already sent a request retains the model recorded in its own log.
+構成済みのプロバイダーはモデルピッカーに現れる。モデルを選択すると、新しいセッションの既定にもなる。すでにリクエストを送信したセッションは、自身のログに記録されたモデルを保持する。
 
-If a saved default names a provider that was deleted, the composer displays **Select model** and blocks input until another model is selected.
+保存済みの既定が削除されたプロバイダーを名指す場合、コンポーザーは **Select model** を表示し、別のモデルが選択されるまで入力をブロックする。
 
-## Advanced configuration
+## 高度な構成
 
-The generated [plugin configuration catalog](../../config-catalog.md) lists every supported field and default for every plugin; [`dsh-llm-pi-ai`](../../config-catalog.md#deepseek-aidsh-llm-pi-ai) is the provider section this page configures. The [`dsh-llm-pi-ai`](../../../packages/llm/llm-pi-ai/README.md) and [`dsh-llm-deepseek`](../../../packages/llm/llm-deepseek/README.md) references own direct `cordis.patch.yml` configuration, catalog resolution, reasoning controls, credentials, and adapter errors.
+生成された[プラグイン設定カタログ](../../config-catalog.md)は、すべてのプラグインのサポートされるすべてのフィールドと既定値を列挙する。[`dsh-llm-pi-ai`](../../config-catalog.md#deepseek-aidsh-llm-pi-ai) がこのページで構成するプロバイダーセクションである。[`dsh-llm-pi-ai`](../../../packages/llm/llm-pi-ai/README.md) と [`dsh-llm-deepseek`](../../../packages/llm/llm-deepseek/README.md) のリファレンスが、直接の `cordis.patch.yml` 構成、カタログ解決、reasoning 制御、資格情報、アダプターエラーを所有する。
 
-::: tip Additional settings
-The Models page exposes the API key, display name, base URL, API protocol, and each model's id, display name, context window, max output tokens, and input types, plus the reasoning levels of a model on a custom model API provider. Configure the reasoning levels of a built-in provider's models, request-compatibility switches, headers, timeouts, and retry policy in `$DSH_HOME/profiles/<profile>/cordis.patch.yml`, the same document the page writes. Edit it directly, or, when the browser runs on the same machine as the server, open it with **Open configuration file** in the Settings header; the adapters re-read it on the next request, so nothing needs a restart. The subsections below cover the fields most gateways need.
+::: tip 追加設定
+Models ページは、API キー、表示名、ベース URL、API プロトコル、および各モデルの id、表示名、コンテキストウィンドウ、最大出力トークン、入力タイプ、さらにカスタムモデル API プロバイダーのモデルの reasoning レベルを公開する。組み込みプロバイダーのモデルの reasoning レベル、リクエスト互換スイッチ、ヘッダー、タイムアウト、再試行ポリシーは `$DSH_HOME/profiles/<profile>/cordis.patch.yml` で構成する。これはページが書き込むのと同じドキュメントである。直接編集するか、ブラウザーがサーバーと同じマシンで動いている場合は、Settings ヘッダーの **Open configuration file** で開く。アダプターは次のリクエストでそれを再読込するので、再起動は不要である。以下のサブセクションは、ほとんどのゲートウェイが必要とするフィールドを扱う。
 
-For the standard Web UI launch with `dsh web`, `<profile>` is `web`, so the path is `$DSH_HOME/profiles/web/cordis.patch.yml`. If you launch a custom profile, use the name selected at startup instead.
+`dsh web` による標準の Web UI 起動では `<profile>` は `web` なので、パスは `$DSH_HOME/profiles/web/cordis.patch.yml` である。カスタムプロファイルを起動する場合は、起動時に選択した名前を使う。
 :::
 
-### Image input
+### 画像入力
 
-In **Settings → Models**, edit the provider, open **Customized settings**, and expand the model's **Model options**. **Input types** occupies its own row below the capacity fields. Select **Image** for a model that accepts images, and save. **Text** starts selected for a new custom model with no inherited image capability. At least one type must remain selected; select Image before clearing Text for an image-only model.
+**Settings → Models** でプロバイダーを編集し、**Customized settings** を開き、モデルの **Model options** を展開する。**Input types** は容量フィールドの下の独自の行を占める。画像を受け入れるモデルには **Image** を選択して保存する。継承された画像ケイパビリティのない新しいカスタムモデルでは **Text** が選択された状態で始まる。少なくとも 1 つのタイプが選択されたままである必要があり、画像専用モデルでは Text を外す前に Image を選択する。
 
-The checkboxes save `input` for pi-ai models and `inputModalities` for the direct DeepSeek adapter. You can also edit the model in `$DSH_HOME/profiles/<profile>/cordis.patch.yml`; for example, this custom pi-ai provider declares one text-only model and one vision model:
+チェックボックスは pi-ai モデルには `input` を、直接の DeepSeek アダプターには `inputModalities` を保存する。`$DSH_HOME/profiles/<profile>/cordis.patch.yml` でモデルを編集することもできる。たとえば、このカスタム pi-ai プロバイダーはテキスト専用モデルとビジョンモデルを 1 つずつ宣言する:
 
-These examples show config fields inside a profile patch. A Cordis config override replaces the complete entry config; preserve other providers and fields when editing an existing override.
+これらの例は、プロファイルパッチ内の設定フィールドを示す。Cordis の設定オーバーライドはエントリーの設定全体を置き換えるので、既存のオーバーライドを編集するときは他のプロバイダーとフィールドを保持すること。
 
 ```yaml
 - id: llm-pi-ai
@@ -74,13 +74,13 @@ These examples show config fields inside a profile patch. A Cordis config overri
             input: [text, image]
 ```
 
-Pi-ai's `input` accepts `text` and `image` and applies to that model alone. An explicit nonempty selection takes priority. An omitted or empty `input` inherits the installed catalog's input types, then the route's `defaultInput`, which defaults to `[text]`. The checkboxes display these inherited values without saving an override when you merely open the row.
+Pi-ai の `input` は `text` と `image` を受け入れ、そのモデルだけに適用される。明示的な空でない選択が優先される。省略または空の `input` は、インストール済みカタログの入力タイプ、次にルートの `defaultInput`（既定は `[text]`）を継承する。行を開いただけでは、チェックボックスはこれらの継承値を表示し、オーバーライドを保存しない。
 
-DeepSeek treats an omitted `inputModalities` as text-only and rejects an empty list. Clearing Image also removes that model's `imagePixelBudget` and `imageMaxBytes`, because DeepSeek rejects image limits on a text-only model. Set those limits again if you later enable images and need custom limits.
+DeepSeek は省略された `inputModalities` をテキスト専用として扱い、空のリストを拒否する。Image を外すとそのモデルの `imagePixelBudget` と `imageMaxBytes` も削除される。DeepSeek はテキスト専用モデルの画像制限を拒否するためである。後で画像を有効にしてカスタム制限が必要になった場合は、それらの制限を再設定する。
 
-To restore inheritance after editing the checkboxes, remove the model's `input` or `inputModalities` field from `cordis.patch.yml`. **Restore defaults** removes the entire model-catalog override, including other model edits, so use it only when you want to restore the whole catalog.
+チェックボックスを編集した後に継承を復元するには、`cordis.patch.yml` からそのモデルの `input` または `inputModalities` フィールドを削除する。**Restore defaults** は他のモデル編集を含むモデルカタログオーバーライド全体を削除するので、カタログ全体を復元したいときにのみ使う。
 
-If every model you entered by hand takes images, set the fallback once on the route instead of on each of them:
+手動で入力したすべてのモデルが画像を受け入れる場合は、各モデルではなくルートでフォールバックを 1 回設定する:
 
 ```yaml
 - id: llm-pi-ai
@@ -96,7 +96,7 @@ If every model you entered by hand takes images, set the fallback once on the ro
           - id: second-model
 ```
 
-`defaultInput` is a fallback, not an override, and defaults to `[text]`: on a built-in provider it answers only for models its catalog does not describe, so it never removes images from a catalog model that has them. Narrow one of those with that model's own `input`. When a built-in provider has no explicit `models` list, write it under `modelOverrides`, keyed by model id:
+`defaultInput` はオーバーライドではなくフォールバックであり、既定は `[text]` である。組み込みプロバイダーでは、カタログが記述しないモデルにのみ応答するので、画像を持つカタログモデルから画像を削除することはない。それらの 1 つを絞り込むには、そのモデル自身の `input` を使う。組み込みプロバイダーに明示的な `models` リストがない場合は、モデル id をキーとして `modelOverrides` の下に書く:
 
 ```yaml
 - id: llm-pi-ai
@@ -108,13 +108,13 @@ If every model you entered by hand takes images, set the fallback once on the ro
             input: [text]
 ```
 
-In pi-ai configuration, every list must name at least one modality except a model's own `input`, where an empty list means the same as omitting it. An unknown modality is refused wherever it is written.
+pi-ai 構成では、モデル自身の `input` を除くすべてのリストが少なくとも 1 つのモダリティを名指さなければならない。モデル自身の `input` では、空のリストは省略と同じ意味である。未知のモダリティはどこに書かれても拒否される。
 
-Both fields state a claim about your endpoint rather than checking it. A model that declares images its endpoint does not serve is not caught here; the provider rejects the request instead.
+どちらのフィールドも、エンドポイントについての主張を述べるものであり、それを検査するものではない。エンドポイントが提供しない画像を宣言したモデルはここでは捕捉されず、代わりにプロバイダーがリクエストを拒否する。
 
-### DeepSeek account models
+### DeepSeek アカウントのモデル
 
-A signed-in DeepSeek account lists its models from the account service, so the Models page offers no model editor for it. Adjust a single model with `modelOverrides` in `$DSH_HOME/profiles/<profile>/cordis.patch.yml`; the fields match a DeepSeek `models` entry, and unset fields keep the listed values:
+サインイン済みの DeepSeek アカウントはアカウントサービスからモデルを列挙するので、Models ページはそれ用のモデルエディターを提供しない。単一のモデルを調整するには `$DSH_HOME/profiles/<profile>/cordis.patch.yml` の `modelOverrides` を使う。フィールドは DeepSeek の `models` エントリーと一致し、未設定のフィールドは列挙された値を保つ:
 
 ```yaml
 - id: llm-deepseek-account
@@ -125,15 +125,15 @@ A signed-in DeepSeek account lists its models from the account service, so the M
         maxTokens: 131072
 ```
 
-A model that needs a newer DeepSeek Harness fails with `CLIENT_UPGRADE_REQUIRED`, which names the version to install. The [account provider reference](../../../packages/llm/llm-deepseek-account/README.md) owns the listing, fallback, and gating rules.
+より新しい DeepSeek Harness を必要とするモデルは `CLIENT_UPGRADE_REQUIRED` で失敗し、インストールすべきバージョンを名指す。[アカウントプロバイダーリファレンス](../../../packages/llm/llm-deepseek-account/README.md)が列挙、フォールバック、ゲーティングの規則を所有する。
 
-### Reasoning effort
+### 推論エフォート
 
-The model picker offers an **Effort** menu for a model that declares reasoning levels. A built-in provider's models inherit their levels from the installed catalog, and DeepSeek's models keep the adapter's levels. A model you enter by hand declares none until you add them, so until then the Effort entry does not appear in the menu and the endpoint's own default decides whether the model thinks.
+モデルピッカーは、reasoning レベルを宣言するモデルに **Effort** メニューを提供する。組み込みプロバイダーのモデルはインストール済みカタログからレベルを継承し、DeepSeek のモデルはアダプターのレベルを保つ。手動で入力したモデルは追加するまでレベルを宣言しないので、それまでは Effort エントリーがメニューに現れず、モデルが思考するかどうかはエンドポイント自身の既定が決める。
 
-On a custom model API provider, declare the levels in **Settings → Models**: edit the provider, open **Customized settings**, expand the model's **Model options**, and turn on **Reasoning levels**. The rows start with off, low, medium, and high. Each row pairs a level with the **API value** sent for it, which defaults to the level name; change it only where the model provider's API documentation spells the level differently. Add or delete rows to match what the endpoint supports, keep at least one level besides off, and save. Turning the switch off removes the declaration.
+カスタムモデル API プロバイダーでは、**Settings → Models** でレベルを宣言する。プロバイダーを編集し、**Customized settings** を開き、モデルの **Model options** を展開し、**Reasoning levels** をオンにする。行は off、low、medium、high で始まる。各行はレベルと、そのために送られる **API value** を対にする。API value の既定はレベル名であり、モデルプロバイダーの API ドキュメントがレベルを異なる綴りで示す場合にのみ変更する。エンドポイントがサポートするものに合わせて行を追加または削除し、off のほかに少なくとも 1 つのレベルを保ち、保存する。スイッチをオフにすると宣言が削除される。
 
-The page writes `reasoningEfforts` in `$DSH_HOME/profiles/<profile>/cordis.patch.yml`, where you can also declare the levels directly:
+ページは `$DSH_HOME/profiles/<profile>/cordis.patch.yml` に `reasoningEfforts` を書き込む。そこではレベルを直接宣言することもできる:
 
 ```yaml
 - id: llm-pi-ai
@@ -152,9 +152,9 @@ The page writes `reasoningEfforts` in `$DSH_HOME/profiles/<profile>/cordis.patch
               max: max
 ```
 
-Each key is a level the menu offers, and its value is the spelling sent on the wire as `reasoning_effort`, so `max: xhigh` renames a level for a gateway with its own vocabulary. Only `off` may stay empty, because for most endpoints not thinking is the parameter's absence. The route's `reasoning` is the level used while a session has picked none; choosing an effort in the picker saves it, with the model, as the default for new sessions.
+各キーはメニューが提供するレベルであり、その値は `reasoning_effort` として wire で送られる綴りである。したがって `max: xhigh` は独自の語彙を持つゲートウェイ向けにレベルを改名する。空のままでよいのは `off` のみである。ほとんどのエンドポイントでは、思考しないことはパラメーターの不在だからである。ルートの `reasoning` は、セッションがまだ何も選んでいない間に使われるレベルである。ピッカーでエフォートを選ぶと、モデルとともに新しいセッションの既定として保存される。
 
-An `off` left empty sends nothing, which only stops a model that thinks on request; an `off` given a value sends that value as `reasoning_effort` instead. A model that thinks unless told not to — DeepSeek V4 behind an OpenAI-compatible gateway, for example — needs `compat.thinkingFormat: deepseek`, which makes `off` send `thinking: {type: disabled}` and every other level send `thinking: {type: enabled}` beside the effort:
+空のままの `off` は何も送らず、これは要求に応じて思考するモデルを止めるだけである。値を持つ `off` は代わりにその値を `reasoning_effort` として送る。止められない限り思考するモデル（たとえば OpenAI 互換ゲートウェイの背後の DeepSeek V4）には `compat.thinkingFormat: deepseek` が必要であり、これにより `off` は `thinking: {type: disabled}` を送り、他のすべてのレベルはエフォートと並んで `thinking: {type: enabled}` を送る:
 
 ```yaml
         models:
@@ -167,7 +167,7 @@ An `off` left empty sends nothing, which only stops a model that thinks on reque
               max: max
 ```
 
-A built-in provider's model whose gateway does not reason loses its levels with `reasoningEfforts: false` under `modelOverrides`; selecting an effort for it is then refused as `UNSUPPORTED_REASONING_EFFORT`. DeepSeek's own route needs none of this: its models already offer `off`, `low`, `high`, and `max`, and `llm-deepseek.reasoningEffort` sets the default the picker starts from:
+ゲートウェイが reasoning しない組み込みプロバイダーのモデルは、`modelOverrides` の下の `reasoningEfforts: false` でレベルを失う。そのモデルにエフォートを選択すると `UNSUPPORTED_REASONING_EFFORT` として拒否される。DeepSeek 自身のルートにはこれらは不要である。そのモデルはすでに `off`、`low`、`high`、`max` を提供し、`llm-deepseek.reasoningEffort` がピッカーが開始する既定を設定する:
 
 ```yaml
 - id: llm-deepseek
@@ -175,11 +175,11 @@ A built-in provider's model whose gateway does not reason loses its levels with 
     reasoningEffort: max
 ```
 
-### Request compatibility
+### リクエスト互換性
 
-A gateway can hold a working key at a reachable address and still refuse every request. pi-ai decides the shape of a request — which role carries the system prompt, which field caps the output, how a thinking level travels — from the endpoint's URL, and an address it does not recognize is addressed as though it were OpenAI itself. Most OpenAI-compatible gateways refuse at least one thing OpenAI accepts.
+ゲートウェイは、到達可能なアドレスで有効なキーを持ちながら、すべてのリクエストを拒否することがある。pi-ai はリクエストの形（どのロールがシステムプロンプトを運ぶか、どのフィールドが出力を制限するか、思考レベルがどう運ばれるか）をエンドポイントの URL から決め、認識しないアドレスは OpenAI 自身であるかのように扱う。ほとんどの OpenAI 互換ゲートウェイは、OpenAI が受け入れるもののうち少なくとも 1 つを拒否する。
 
-Two account for most of it. A model that declares reasoning has its system prompt sent as `role: "developer"`, which many gateways reject outright, and the output cap is sent as `max_completion_tokens`, which a server that only knows `max_tokens` refuses. The form has no field for either; correct them on the route in `$DSH_HOME/profiles/<profile>/cordis.patch.yml`:
+そのほとんどは 2 つで説明できる。reasoning を宣言するモデルはシステムプロンプトが `role: "developer"` として送られ、多くのゲートウェイがこれを即座に拒否する。また出力上限が `max_completion_tokens` として送られ、`max_tokens` しか知らないサーバーがこれを拒否する。フォームにはどちらのフィールドもないので、`$DSH_HOME/profiles/<profile>/cordis.patch.yml` のルートで修正する:
 
 ```yaml
 - id: llm-pi-ai
@@ -196,7 +196,7 @@ Two account for most of it. A model that declares reasoning has its system promp
           - id: my-model
 ```
 
-A route's `compat` is the default for its models, and a model's own wins field by field, so one model can be corrected without restating the route:
+ルートの `compat` はそのモデルの既定であり、モデル自身のものがフィールド単位で優先するので、ルートを繰り返すことなく 1 つのモデルを修正できる:
 
 ```yaml
         models:
@@ -206,22 +206,22 @@ A route's `compat` is the default for its models, and a model's own wins field b
               thinkingFormat: deepseek
 ```
 
-What neither sets keeps the installed catalog's value for that model, and what the catalog does not describe falls to pi-ai's detection. Give every switch you name a value: a key left empty (`supportsDeveloperRole:`) is refused rather than ignored, because an empty value would erase what the catalog knows while saying nothing in its place. A name no protocol accepts is refused too, and the message lists the ones that are available.
+どちらも設定しないものはそのモデルのインストール済みカタログの値を保ち、カタログが記述しないものは pi-ai の検出に委ねられる。名指すすべてのスイッチに値を与えること。空のままのキー（`supportsDeveloperRole:`）は無視されるのではなく拒否される。空の値は、カタログが知っていることを消し去りながら、その代わりに何も言わないからである。どのプロトコルも受け入れない名前も拒否され、メッセージが利用可能なものを列挙する。
 
-Each switch belongs to the protocols that declare it, so a switch valid on one `api` may be refused on another — the message names what that protocol does offer. Like `input` above, a switch states a claim about your endpoint rather than checking it: setting one your gateway does not actually need simply sends a different request.
+各スイッチはそれを宣言するプロトコルに属するので、ある `api` で有効なスイッチが別のもので拒否されることがある。メッセージはそのプロトコルが提供するものを名指す。上記の `input` と同様、スイッチはエンドポイントについての主張を述べるものであり、検査するものではない。ゲートウェイが実際には必要としないスイッチを設定しても、単に異なるリクエストが送られるだけである。
 
-Every switch, its accepted values, and the protocols that take it are listed under `PiAiCompatProfile` in the [generated `dsh-llm-pi-ai` configuration reference](../../config-catalog.md#deepseek-aidsh-llm-pi-ai) — which is derived from the source, so it cannot fall behind what the adapter accepts.
+すべてのスイッチ、その受け入れ値、それを取るプロトコルは、[生成された `dsh-llm-pi-ai` 設定リファレンス](../../config-catalog.md#deepseek-aidsh-llm-pi-ai)の `PiAiCompatProfile` の下に列挙される。これはソースから導出されるので、アダプターが受け入れるものから遅れることはない。
 
-## Troubleshooting
+## トラブルシューティング
 
-- **`MISSING_CREDENTIAL`** — Store the provider key through the Models page or supply the referenced environment variable.
-- **`UNKNOWN_MODEL`** — Select a configured model or add the missing model to the custom provider.
-- **Fetching available models returns 401** — Check the key. Model discovery calls the OpenAI-compatible `GET /models` endpoint; enter models manually for endpoints that do not provide it.
-- **Fetching available models reports neither a `data` array nor a `models` object** — The endpoint's listing is in a format discovery does not read. Enter the models by hand.
-- **The gateway refuses every request although the key and URL are right** — Its request shape differs from OpenAI's. Start with `compat.supportsDeveloperRole: false` and `compat.maxTokensField: max_tokens` on the route.
-- **Only reasoning models fail** — pi-ai sends their system prompt as the `developer` role, which the gateway rejects. Set `compat.supportsDeveloperRole: false`.
-- **The Effort menu does not appear for a model you entered by hand** — It declares no levels. On a custom model API provider, turn on **Reasoning levels** in the model's **Model options**; elsewhere, add `reasoningEfforts` to the model in `cordis.patch.yml`.
-- **`off` does not stop a DeepSeek model from thinking** — An empty `off` sends no reasoning field at all, and an endpoint that thinks by default keeps thinking. Set `compat.thinkingFormat: deepseek` on the model or the route.
-- **A compat switch is refused as having no value** — A key written with nothing after the colon. Give it a value, or remove the key to keep the installed catalog's.
-- **An image is refused before sending** — The model declares no image modality. Give a custom provider's model `input: [text, image]`; on DeepSeek's own route, select an image-capable entry from the configured catalog (`deepseek-flash` by default) and confirm that your gateway serves that model with image input.
-- **The provider rejects a request carrying an image** — The model declares images its endpoint does not actually serve. Remove `image` from whichever list granted it — the model's `input`, or the route's `defaultInput` — then start a new session: the attached image stays in the session log, so the same request repeats until the session moves off it.
+- **`MISSING_CREDENTIAL`** — Models ページを通じてプロバイダーキーを保存するか、参照された環境変数を提供する。
+- **`UNKNOWN_MODEL`** — 構成済みのモデルを選択するか、カスタムプロバイダーに欠けているモデルを追加する。
+- **利用可能なモデルのフェッチが 401 を返す** — キーを確認する。モデル検出は OpenAI 互換の `GET /models` エンドポイントを呼ぶ。それを提供しないエンドポイントにはモデルを手動で入力する。
+- **利用可能なモデルのフェッチが `data` 配列も `models` オブジェクトも報告しない** — エンドポイントのリストは検出が読まない形式である。モデルを手動で入力する。
+- **キーと URL は正しいのにゲートウェイがすべてのリクエストを拒否する** — そのリクエストの形が OpenAI のものと異なる。ルートで `compat.supportsDeveloperRole: false` と `compat.maxTokensField: max_tokens` から始める。
+- **reasoning モデルだけが失敗する** — pi-ai がそれらのシステムプロンプトを `developer` ロールとして送り、ゲートウェイが拒否する。`compat.supportsDeveloperRole: false` を設定する。
+- **手動で入力したモデルに Effort メニューが現れない** — そのモデルはレベルを宣言していない。カスタムモデル API プロバイダーでは、モデルの **Model options** で **Reasoning levels** をオンにする。それ以外では、`cordis.patch.yml` のモデルに `reasoningEfforts` を追加する。
+- **`off` が DeepSeek モデルの思考を止めない** — 空の `off` は reasoning フィールドをまったく送らず、既定で思考するエンドポイントは思考し続ける。モデルまたはルートに `compat.thinkingFormat: deepseek` を設定する。
+- **compat スイッチが値なしとして拒否される** — コロンの後に何も書かれていないキーである。値を与えるか、キーを削除してインストール済みカタログの値を保つ。
+- **画像が送信前に拒否される** — そのモデルは画像モダリティを宣言していない。カスタムプロバイダーのモデルには `input: [text, image]` を与える。DeepSeek 自身のルートでは、構成済みカタログから画像対応のエントリー（既定では `deepseek-flash`）を選択し、ゲートウェイがそのモデルを画像入力付きで提供することを確認する。
+- **プロバイダーが画像を含むリクエストを拒否する** — そのモデルはエンドポイントが実際には提供しない画像を宣言している。それを許可したリスト（モデルの `input`、またはルートの `defaultInput`）から `image` を削除し、新しいセッションを開始する。添付された画像はセッションログに残るため、セッションがそこから離れるまで同じリクエストが繰り返される。

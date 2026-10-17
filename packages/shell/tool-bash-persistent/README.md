@@ -1,41 +1,41 @@
 ---
-description: "The model-facing persistent bash tool for users and maintainers choosing, configuring, or debugging owner-scoped shell state that survives across calls."
+description: "呼び出しをまたいで存続するオーナースコープのシェル状態を選択・設定・デバッグするユーザーとメンテナー向けの、モデルに公開される永続 bash ツール。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-bash-persistent
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package gives an agent a `bash` tool whose cwd, exported variables, functions, and background jobs persist across calls. Each agent receives an isolated shell, and its commands run sequentially. Choose it for workflows that depend on cross-call state; use `dsh-tool-bash` when every command should start clean. Configure the PTY backend and per-command timeout; `exit`, timeout, or cancellation resets the shell, while interactive commands that wait for stdin may run until timeout.
+このパッケージは、エージェントに、cwd、エクスポートされた変数、関数、バックグラウンドジョブを呼び出しをまたいで保持する `bash` ツールを与えます。各エージェントは隔離されたシェルを受け取り、そのコマンドは順番に実行されます。呼び出しをまたぐ状態に依存するワークフローにはこれを選んでください。すべてのコマンドをクリーンに開始したい場合は `dsh-tool-bash` を使ってください。PTY バックエンドとコマンドごとのタイムアウトを設定します。`exit`、タイムアウト、またはキャンセルはシェルをリセットし、stdin を待つ対話的コマンドはタイムアウトまで実行される場合があります。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送りされた作業](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-A new shell starts in the Session's current working directory. Once created, its directory and environment remain independent of later Session directory changes.
+新しいシェルはセッションの現在の作業ディレクトリで開始します。一度作成されると、そのディレクトリと環境は以降のセッションのディレクトリ変更から独立したままです。
 
-Load this plugin in any composition where the agent should keep shell state between commands — for example long build sessions, activated environments, or scripts that export variables for later steps. It registers the `bash` tool and requires the `ctx.tools` and `ctx.terminals` services plus an owning agent session at execution time.
+エージェントがコマンド間でシェル状態を保つべき構成ならどこでもこのプラグインをロードします — たとえば長いビルドセッション、アクティブ化された環境、後のステップのために変数をエクスポートするスクリプトです。`bash` ツールを登録し、`ctx.tools` と `ctx.terminals` サービス、および実行時の所有エージェントセッションを必要とします。
 
-### When to choose it
+### いつ選択するか
 
-Choose the persistent tool when work depends on cross-call state: a one-shot `dsh-tool-bash` call cannot remember a `cd` or an exported variable. Choose the one-shot tool when every command should start from a known, clean environment, or when the command is short and self-contained. Commands that need interactive stdin are unsupported here — a foreground child that reads input blocks until the command timeout — so interactive work belongs to the terminal tools.
+作業が呼び出しをまたぐ状態に依存する場合は永続ツールを選んでください: ワンショットの `dsh-tool-bash` 呼び出しは `cd` やエクスポートされた変数を覚えられません。すべてのコマンドを既知のクリーンな環境から開始したい場合、またはコマンドが短く自己完結している場合はワンショットツールを選んでください。対話的な stdin を必要とするコマンドはここではサポートされません — 入力を読むフォアグラウンドの子はコマンドタイムアウトまでブロックします — そのため対話的な作業はターミナルツールに属します。
 
-### Minimal configuration
+### 最小構成
 
-The default `shell` backend starts an interactive bash through `dsh-terminal-bash`; deployments may register another PTY backend and select it by name.
+デフォルトの `shell` バックエンドは、`dsh-terminal-bash` を通じて対話的な bash を起動します。デプロイは別の PTY バックエンドを登録し、名前で選択することもできます。
 
 ```yaml
 - name: '@deepseek-ai/dsh-terminal'
@@ -43,118 +43,118 @@ The default `shell` backend starts an interactive bash through `dsh-terminal-bas
 - name: '@deepseek-ai/dsh-tool-bash-persistent'
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `backendType` | `shell` | Registered PTY backend used for each agent's shell |
-| `timeoutMs` | `300,000` | Wall-clock limit for one command; timeout closes the shell |
-| `maxOutputChars` | `16,000` | Maximum retained command-output characters; fixed diagnostics are added afterward |
-| `description` | `Run commands in a persistent bash shell. State, including the current directory and exported environment variables, persists across calls for this agent.` | Model-facing environment contract; deployments may describe their environment |
+| `backendType` | `shell` | 各エージェントのシェルに使用される登録済み PTY バックエンド |
+| `timeoutMs` | `300,000` | 1 つのコマンドの実時間制限。タイムアウトはシェルを閉じます |
+| `maxOutputChars` | `16,000` | 保持されるコマンド出力の最大文字数。固定の診断が後から追加されます |
+| `description` | `Run commands in a persistent bash shell. State, including the current directory and exported environment variables, persists across calls for this agent.` | モデル向けの環境契約。デプロイは自環境を記述できます |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-bash-persistent) is the exhaustive source for every accepted field and its JSDoc.
+生成される [設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-bash-persistent) が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源です。
 
-### What the agent can rely on
+### エージェントが依存できること
 
-Commands share one shell per agent, so state persists until an `exit`, a timeout, or a reset — each of which closes the shell and tells the agent the next call starts from the workspace with a fresh directory and environment. Results exclude the private completion markers; every settled command appends `[Command finished with exit code N]`, and a shell that exits before reporting that status instead appends `[shell exited: code N]`, `[shell killed by signal: SIG]`, or `[shell exited]`, then resets. Long output keeps the earliest retained prefix plus a clipping notice; if the terminal has already dropped that prefix, the result says so explicitly rather than presenting a tail as complete output.
+コマンドはエージェントごとに 1 つのシェルを共有するため、状態は `exit`、タイムアウト、またはリセットまで存続します — いずれもシェルを閉じ、次の呼び出しはワークスペースから新しいディレクトリと環境で開始することをエージェントに伝えます。結果からはプライベートな完了マーカーが除外され、確定したすべてのコマンドに `[Command finished with exit code N]` が追加されます。そのステータスを報告する前にシェルが終了した場合は代わりに `[shell exited: code N]`、`[shell killed by signal: SIG]`、または `[shell exited]` が追加され、その後リセットされます。長い出力は保持された最も早いプレフィックスとクリッピング通知を保ちます。ターミナルがすでにそのプレフィックスを破棄している場合、結果は末尾を完全な出力として提示するのではなく、そのことを明示的に述べます。
 
-### What can go wrong
+### 何がうまくいかないことがあるか
 
-A call without an owning agent session fails with `bash requires an owning agent session`, and a composition without a PTY backend activates the tool but fails its first call with `no PTY backend registered for "shell"`. An interactive foreground child (for example a REPL) returns early with partial output only where the backend proves its stdin wait; elsewhere the call runs to `timeoutMs`, which closes the uncertain shell and reports the reset. Cancellation also resets and discards the result, even when a complete status marker is already observable. After cleanup settles, ToolRuntime publishes `Error: tool call aborted` with code `ABORTED`; cancellation reasons are not rendered as command output. A queued cancelled call sends no command.
+所有エージェントセッションのない呼び出しは `bash requires an owning agent session` で失敗し、PTY バックエンドのない構成ではツールはアクティブ化されますが、最初の呼び出しが `no PTY backend registered for "shell"` で失敗します。対話的なフォアグラウンドの子（たとえば REPL）が部分出力とともに早期に戻るのは、バックエンドがその stdin 待ちを証明する場合のみです。それ以外の場所では呼び出しは `timeoutMs` まで実行され、不確実なシェルを閉じてリセットを報告します。キャンセルもシェルをリセットして結果を破棄します。完全なステータスマーカーがすでに観察可能であっても同様です。クリーンアップが落ち着いた後、ToolRuntime はコード `ABORTED` とともに `Error: tool call aborted` を発行します。キャンセル理由はコマンド出力としてレンダリングされません。キューに入ったキャンセル済み呼び出しはコマンドを送信しません。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the tool and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではツールの背後にある設計判断を説明し、それを実現するコードを示します。観測可能な動作は [このパッケージを使う](#use-this-package) で完全に説明されています。
 
-### Design philosophy
+### 設計哲学
 
-- **One shell per owner, nothing shared.** The shell registry keys every session by the calling `Agent`, so concurrent agents never share state, and commands for the same agent are serialized through a per-owner queue.
-- **Marker-anchored extraction.** Each command is wrapped with unique start/end markers carrying the exit status; the tool polls the PTY scrollback and extracts the span between the real markers, so prompts and echoed input never leak into results.
-- **Reset, never repair.** Any uncertain state — an explicit `exit`, a timeout, a send failure, an abort — closes the shell and starts the next call fresh, because a half-known shell is worse than a clean one.
-- **Owner-scoped lifecycle.** Shells are created lazily on first use and killed on plugin disposal or owner teardown; the owner-scoped `ctx.terminals` service fences every operation to the owning agent.
+- **オーナーごとに 1 つのシェル、何も共有しない。** シェルレジストリはすべてのセッションを呼び出し元の `Agent` でキー付けするため、並行するエージェントが状態を共有することはなく、同じエージェントのコマンドはオーナーごとのキューを通じて直列化されます。
+- **マーカーアンカー抽出。** 各コマンドは終了ステータスを運ぶ一意の start/end マーカーでラップされます。ツールは PTY のスクロールバックをポーリングし、本当のマーカー間の範囲を抽出するため、プロンプトやエコーされた入力が結果に漏れることはありません。
+- **修理せずリセット。** 不確実な状態 — 明示的な `exit`、タイムアウト、送信失敗、中止 — はシェルを閉じ、次の呼び出しを新しく開始します。半分しか分からないシェルはクリーンなシェルより悪いからです。
+- **オーナースコープのライフサイクル。** シェルは初回使用時に遅延作成され、プラグインの破棄またはオーナーのテアダウンで kill されます。オーナースコープの `ctx.terminals` サービスがすべての操作を所有エージェントにフェンスします。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: shell registry, command wrapping, scrollback polling, extraction and rendering |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: シェルレジストリ、コマンドラッピング、スクロールバックポーリング、抽出とレンダリング |
 
-### Command flow
+### コマンドフロー
 
-A first command spawns the shell through `ctx.terminals.spawn`, disables input echo (`stty -echo`), and waits for readiness. Each command is then wrapped into one physical line — a printf of the start marker, the command body escaped with `$'…'`, and a printf of the end marker plus `$?` — so embedded newlines cannot leak terminal prompts into the result. The tool polls the scrollback in 1,000-line pages until the end marker appears, extracts the span, and renders it with any status marker. A timeout aborts the deadline, captures the partial output, and resets the shell.
+最初のコマンドは `ctx.terminals.spawn` を通じてシェルを起動し、入力エコーを無効化し（`stty -echo`）、レディネスを待ちます。その後、各コマンドは 1 つの物理行にラップされます — start マーカーの printf、`$'…'` でエスケープされたコマンド本体、end マーカーと `$?` の printf — これにより埋め込まれた改行がターミナルプロンプトを結果に漏らすことができません。ツールは end マーカーが現れるまでスクロールバックを 1,000 行のページでポーリングし、範囲を抽出し、ステータスマーカーとともにレンダリングします。タイムアウトは期限を中止し、部分出力を捕捉し、シェルをリセットします。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the terminal family to the seam, the backends, and the design note behind owner-scoped sessions.
+パッケージレベルの契約では足りないときにこれらのページを読んでください。ターミナルファミリーからシーム、バックエンド、そしてオーナースコープセッションの背後の設計ノートへと進みます。
 
-- [terminal package map](../../terminal/README.md) — the persistent PTY capability family.
-- [terminal seam](../../terminal/terminal/README.md) — the `ctx.terminals` service behind the tool.
-- [terminal-bash backend](../../terminal/terminal-bash/README.md) — the default `shell` backend.
-- [tool-terminal](../../experimental/tool-terminal/README.md) — six model-facing terminal tools for interactive work.
-- [Persistent PTY sessions Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — the owner-scoped session design and its rationale.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-bash-persistent) — the exact `bash` argument schema.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-bash-persistent) — every accepted config field and its source declaration.
+- [terminal パッケージマップ](../../terminal/README.md) — 永続 PTY ケイパビリティファミリー。
+- [terminal シーム](../../terminal/terminal/README.md) — ツール背後の `ctx.terminals` サービス。
+- [terminal-bash バックエンド](../../terminal/terminal-bash/README.md) — デフォルトの `shell` バックエンド。
+- [tool-terminal](../../experimental/tool-terminal/README.md) — 対話的な作業のための 6 つのモデル向けターミナルツール。
+- [Persistent PTY sessions Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — オーナースコープのセッション設計とその根拠。
+- [生成ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-bash-persistent) — 正確な `bash` 引数スキーマ。
+- [生成設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-bash-persistent) — 受け付けられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Tool schema
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The generated [`bash` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-bash-persistent), including the configured `description`. The plugin contributes no standalone system-prompt section; the deployment owns persona and environment guidance.
+生成される [`bash` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-bash-persistent)。設定された `description` を含みます。このプラグインは単独のシステムプロンプトセクションを提供しません。ペルソナと環境のガイダンスはデプロイが所有します。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost while `bash` is visible.
+`bash` が可視の間は固定のスキーマコストです。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the configured description and schema remain unchanged.
+設定された description とスキーマが変わらなければプレフィックス安定です。
 
-### Tool results
+### ツール結果
 
-#### What the model sees
+#### モデルが見るもの
 
-Commands share one shell per agent, so cwd, exported variables, activated environments, functions, and background jobs persist across calls. Results exclude private completion markers. When the shell reads stdin again without having printed the completion marker — after `exec`, an interrupt, or an interactive foreground child whose stdin wait the provider proves — the call returns the captured partial output, which can end with the backend's own prompt text. Every settled command appends `[Command finished with exit code N]`; a shell that exits before reporting that status instead appends `[shell exited: code N]`, `[shell killed by signal: SIG]`, or `[shell exited]` when the backend supplies neither, then resets and tells the model that the next call starts fresh. Long output keeps the earliest retained prefix plus a clipping notice. If the PTY has already dropped that prefix, the result says so explicitly instead of presenting a tail as complete output. Timeout returns bounded partial output followed by `[Command timed out or OOM]`, closes the uncertain shell, and reports the reset.
+コマンドはエージェントごとに 1 つのシェルを共有するため、cwd、エクスポートされた変数、アクティブ化された環境、関数、バックグラウンドジョブは呼び出しをまたいで存続します。結果からはプライベートな完了マーカーが除外されます。シェルが完了マーカーを出力せずに再び stdin を読む場合 — `exec` の後、割り込み、またはプロバイダーが stdin 待ちを証明した対話的フォアグラウンドの子 — 呼び出しは捕捉された部分出力を返し、それはバックエンド自身のプロンプトテキストで終わる場合があります。確定したすべてのコマンドに `[Command finished with exit code N]` が追加されます。そのステータスを報告する前にシェルが終了した場合は代わりに `[shell exited: code N]`、`[shell killed by signal: SIG]`、またはバックエンドがどちらも提供しない場合は `[shell exited]` が追加され、その後リセットされて、次の呼び出しは新しく開始することをモデルに伝えます。長い出力は保持された最も早いプレフィックスとクリッピング通知を保ちます。PTY がすでにそのプレフィックスを破棄している場合、結果は末尾を完全な出力として提示するのではなく、そのことを明示的に述べます。タイムアウトは上限付きの部分出力とそれに続く `[Command timed out or OOM]` を返し、不確実なシェルを閉じ、リセットを報告します。
 
-#### Token effect
+#### トークンへの影響
 
-Data-dependent. `maxOutputChars` bounds retained command output; fixed clipping, lost-prefix, status, timeout, and reset diagnostics can extend the result.
+データ依存です。`maxOutputChars` が保持されるコマンド出力を制限し、固定のクリッピング、損失プレフィックス、ステータス、タイムアウト、リセットの診断が結果を拡張する場合があります。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only tool results follow the reusable request prefix.
+追記専用のツール結果は再利用可能なリクエストプレフィックスに続きます。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送りされた作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the tool is a poor fit or needs special care. They are current package constraints, not a task backlog.
+これらの制限は、ツールが不向きな場合、または特別な注意が必要な場合を定義します。これらは現在のパッケージ制約であり、タスクバックログではありません。
 
-- **The tool requires an owning agent and a real PTY backend** — agent-less calls and backends that cannot start an interactive shell fail.
-- **An interactive foreground child returns early with partial output only where the subprocess provider proves its stdin wait** — elsewhere the call runs to `timeoutMs`.
-- **Explicit `exit` and timeout discard shell state** — cancellation also resets and discards the result, even when a complete status marker is already observable; the next call starts a fresh shell.
-- **Environment facts such as network access and package mirrors belong in the configured `description`** — not this package's default.
+- **このツールは所有エージェントと実の PTY バックエンドを必要とする** — エージェントのない呼び出しと、対話的シェルを起動できないバックエンドは失敗します。
+- **対話的なフォアグラウンドの子が部分出力とともに早期に戻るのは、サブプロセスプロバイダーがその stdin 待ちを証明する場合のみである** — それ以外の場所では呼び出しは `timeoutMs` まで実行されます。
+- **明示的な `exit` とタイムアウトはシェル状態を破棄する** — キャンセルもシェルをリセットして結果を破棄します。完全なステータスマーカーがすでに観察可能であっても同様です。次の呼び出しは新しいシェルを開始します。
+- **ネットワークアクセスやパッケージミラーのような環境ファクトは設定された `description` に属する** — このパッケージのデフォルトではありません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

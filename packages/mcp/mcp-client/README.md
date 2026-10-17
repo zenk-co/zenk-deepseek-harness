@@ -1,35 +1,35 @@
 ---
-description: "MCP client bridge for deployments and maintainers choosing, configuring, or debugging connections to external MCP servers whose tools register on ctx.tools."
+description: "外部 MCP サーバーへの接続を選択、設定、デバッグするデプロイメントとメンテナーのための MCP クライアントブリッジ。そのサーバーのツールは ctx.tools に登録される。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-mcp-client
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-mcp-client` lets the model use tools and resources from external Model Context Protocol (MCP) servers. Configure one server per entry; its tools use names such as `mcp__github__create_issue`. No server is enabled by default. Shipped profiles already provide [shared resource discovery and reading](../mcp-resources/README.md). An empty caller scope adds no MCP tools or prompt text. Server instructions join the logged system prompt as literal text; MCP prompt templates are unsupported. Slow or crashed servers can delay startup or fail calls until recovery.
+`dsh-mcp-client` は、モデルが外部の Model Context Protocol (MCP) サーバーのツールとリソースを使えるようにする。エントリーごとに 1 つのサーバーを設定する。そのツールは `mcp__github__create_issue` のような名前を使う。既定ではどのサーバーも有効にならない。出荷済みプロファイルはすでに[共有のリソース探索と読み取り](../mcp-resources/README.md)を提供している。空の呼び出し元スコープは MCP ツールもプロンプトテキストも追加しない。サーバーの instructions はリテラルテキストとしてログ記録されるシステムプロンプトに加わる。MCP プロンプトテンプレートはサポートされない。低速またはクラッシュしたサーバーは、復旧するまで起動を遅らせたり呼び出しを失敗させたりしうる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Add `dsh-mcp-client` when the model should call tools from an external MCP server as if they were native. Give each server a unique name and transport. The official SDK selects the 2026-07-28 protocol when available and falls back to supported legacy revisions. Choose stdio for a local program and Streamable HTTP for a service; stdio negotiation starts a temporary probe process before the serving process.
+モデルが外部 MCP サーバーのツールをネイティブのものと同様に呼び出すべきときに `dsh-mcp-client` を追加する。各サーバーに一意の名前とトランスポートを与える。公式 SDK は利用可能な場合に 2026-07-28 プロトコルを選択し、サポートされる旧リビジョンにフォールバックする。ローカルプログラムには stdio を、サービスには Streamable HTTP を選ぶ。stdio のネゴシエーションは、サービス提供プロセスの前に一時的なプローブプロセスを起動する。
 
-### Minimal configuration
+### 最小構成
 
-Add one entry per server; nothing else is required. After the harness starts, the server's tools appear in the model's tool list.
+サーバーごとに 1 つのエントリーを追加する。他には何も必要ない。ハーネスの起動後、そのサーバーのツールがモデルのツールリストに現れる。
 
 ```yaml
 - id: mcp-github
@@ -52,178 +52,178 @@ Add one entry per server; nothing else is required. After the harness starts, th
       Authorization: !!js '`Bearer ${process.env.MCP_TOKEN}`'
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `transport` | required | `stdio` or `streamable-http` |
-| `serverName` | required | Namespace for the server's tool names; `[A-Za-z0-9_-]{1,32}`, unique inside one registration scope |
-| `command` / `args` / `env` / `cwd` | — | stdio: executable, arguments, extra env merged over scrubbed ambient env, working directory |
-| `url` / `headers` | — | streamable-http: endpoint URL and extra request headers |
-| `toolCallTimeoutMs` | `60,000` | Timeout per `tools/call` or resource request |
-| `maxInstructionBytes` | `32,768` | Maximum UTF-8 bytes of server instructions including attribution; an oversized value rejects the connection |
-| `failOnStartupError` | `false` | Reject plugin activation when the initial connection or tool synchronization fails |
-| `reconnect.enabled` | `true` | Reconnect automatically after a lost connection |
-| `reconnect.initialDelayMs` | `500` | First reconnect delay; doubles per consecutive failed attempt |
-| `reconnect.maxDelayMs` | `30,000` | Backoff ceiling; also the uptime after which the attempt budget resets |
-| `reconnect.maxAttempts` | `10` | Consecutive failed attempts per outage before giving up |
+| `transport` | 必須 | `stdio` または `streamable-http` |
+| `serverName` | 必須 | サーバーのツール名の名前空間。`[A-Za-z0-9_-]{1,32}` で、1 つの登録スコープ内で一意 |
+| `command` / `args` / `env` / `cwd` | — | stdio: 実行ファイル、引数、スクラブ済みの環境 env にマージされる追加 env、作業ディレクトリ |
+| `url` / `headers` | — | streamable-http: エンドポイント URL と追加のリクエストヘッダー |
+| `toolCallTimeoutMs` | `60,000` | `tools/call` またはリソースリクエストごとのタイムアウト |
+| `maxInstructionBytes` | `32,768` | 帰属表示を含むサーバー instructions の最大 UTF-8 バイト数。超過値は接続を拒否する |
+| `failOnStartupError` | `false` | 初回接続またはツール同期が失敗したときにプラグインのアクティベーションを拒否する |
+| `reconnect.enabled` | `true` | 接続喪失後に自動再接続する |
+| `reconnect.initialDelayMs` | `500` | 最初の再接続遅延。連続する失敗試行ごとに倍になる |
+| `reconnect.maxDelayMs` | `30,000` | バックオフの上限。試行予算がリセットされる稼働時間でもある |
+| `reconnect.maxAttempts` | `10` | 諦めるまでの 1 回の障害あたりの連続失敗試行数 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-mcp-client) is the exhaustive source for every accepted field.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-mcp-client)が、受け入れられるすべてのフィールドの網羅的な情報源である。
 
-After startup, the server's tools appear as `mcp__<serverName>__<tool>` — try a prompt that uses one. If the initial connection fails, the harness still starts but no tools from that server appear, and an error is logged. Setting `failOnStartupError: true` rejects plugin activation; [app-boot's startup policy](../../boot/app-boot/README.md) still permits an optional MCP entry to fail without aborting the harness.
+起動後、そのサーバーのツールは `mcp__<serverName>__<tool>` として現れる。それを使うプロンプトを試してみるとよい。初回接続が失敗してもハーネスは起動するが、そのサーバーのツールは現れず、エラーがログに記録される。`failOnStartupError: true` を設定するとプラグインのアクティベーションが拒否される。[app-boot の起動ポリシー](../../boot/app-boot/README.md)は、オプションの MCP エントリーがハーネスを中断させずに失敗することを引き続き許容する。
 
-### Tool naming and coexistence
+### ツール名と共存
 
-The model sees each tool under a stable server-qualified name: `mcp__<serverName>__<rawName>`, for example `mcp__github__create_issue` — the same naming shape Claude Code and Codex use. Names stay stable while the server keeps the same tool name, so session history and permission rules survive restarts and reloads. Two servers can both offer a tool named `search` and coexist as `mcp__github__search` and `mcp__web__search`.
+モデルは各ツールを安定したサーバー修飾名で見る。`mcp__<serverName>__<rawName>`、たとえば `mcp__github__create_issue` であり、Claude Code と Codex が使うのと同じ命名形態である。名前はサーバーが同じツール名を保つ限り安定するので、セッション履歴と許可ルールは再起動とリロードを生き延びる。2 つのサーバーがともに `search` というツールを提供しても、`mcp__github__search` と `mcp__web__search` として共存できる。
 
-- Two servers publishing the same tool name (for example `search`) coexist under their own namespaces.
-- Two entries using the same server name: the later one fails to load with a clear error.
-- A server that lists the same tool twice gets its tool list rejected as invalid, and the previous tool set stays active.
-- The SDK owns discovery pagination and its page limit. A discovery failure preserves the previous tools; malformed cursor chains follow the SDK's behavior.
-- An update that conflicts with an already-registered tool name is rejected entirely — you never get a partial tool set from that server.
+- 同じツール名（たとえば `search`）を公開する 2 つのサーバーは、それぞれの名前空間の下で共存する。
+- 同じサーバー名を使う 2 つのエントリーでは、後のものが明確なエラーでロードに失敗する。
+- 同じツールを 2 回列挙するサーバーはツールリストが無効として拒否され、以前のツールセットが有効なまま残る。
+- SDK が探索のページネーションとそのページ上限を所有する。探索の失敗は以前のツールを保持する。不正なカーソルチェーンは SDK の動作に従う。
+- すでに登録済みのツール名と競合する更新は丸ごと拒否される。そのサーバーから部分的なツールセットが得られることはない。
 
-### Calling tools and reading results
+### ツールの呼び出しと結果の読み取り
 
-When the model calls an MCP tool, the call runs against the remote server with a per-call timeout (default 60 seconds) and can be cancelled like any other tool call. The result comes back as ordinary text in block order; resource links appear as text with their name and URI. If the server reports an error, the call fails visibly — the model does not see a fake success.
+モデルが MCP ツールを呼び出すと、その呼び出しは呼び出しごとのタイムアウト（既定 60 秒）付きでリモートサーバーに対して実行され、他のツール呼び出しと同様にキャンセルできる。結果はブロック順の通常のテキストとして返る。リソースリンクはその名前と URI を持つテキストとして現れる。サーバーがエラーを報告した場合、呼び出しは目に見える形で失敗する。モデルが偽の成功を見ることはない。
 
-Images are supported when the current model accepts image input and the harness attachment feature is enabled; they then appear in the conversation like other images. Otherwise — and for audio or embedded resources — the model sees a clear diagnostic message instead of nothing.
+現在のモデルが画像入力を受け入れ、ハーネスのアタッチメント機能が有効な場合、画像がサポートされる。その場合、画像は他の画像と同様に会話に現れる。それ以外の場合（および audio や埋め込みリソースの場合）、モデルは何も見えない代わりに明確な診断メッセージを受け取る。
 
-### Startup, updates, and reconnection
+### 起動、更新、再接続
 
-The server's tools appear before the harness starts its first turn. When the server changes its tool list, the model's tool set updates automatically; if the update fails, the previous tool set keeps working.
+そのサーバーのツールは、ハーネスが最初のターンを開始する前に現れる。サーバーがツールリストを変更すると、モデルのツールセットは自動的に更新される。更新が失敗した場合、以前のツールセットが引き続き機能する。
 
-When a server connection drops — for example a local server process crashes — the plugin reconnects automatically with delays that double from 500 ms up to 30 s and then refreshes the tool set; reconnect progress is visible in the logs. During an outage the last known tools stay listed but calls to them fail until the server recovers. After ten consecutive failed attempts the server's tools are removed and reconnection stops until you reload the configuration or restart the harness; a server that stays connected for a while resets that counter. Set `reconnect.enabled: false` to disable automatic reconnection — tools then stay listed but fail until you reload. Editing the configuration entry reloads the server connection in place, and unchanged names stay unchanged.
+サーバー接続が切れると（たとえばローカルサーバープロセスがクラッシュした場合）、プラグインは 500 ms から 30 s まで倍になる遅延で自動再接続し、その後ツールセットを更新する。再接続の進行状況はログで確認できる。障害中は最後に既知だったツールが一覧に残るが、サーバーが復旧するまでそれらへの呼び出しは失敗する。10 回連続で失敗すると、そのサーバーのツールは削除され、設定をリロードするかハーネスを再起動するまで再接続は停止する。しばらく接続が維持されたサーバーはそのカウンターをリセットする。`reconnect.enabled: false` を設定すると自動再接続が無効になる。その場合もツールは一覧に残るが、リロードするまで失敗する。設定エントリーを編集するとサーバー接続がその場でリロードされ、変更のない名前は変更されないままである。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the bridge and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節はブリッジの背後にある設計判断を説明し、それを実現するコードを示す。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱っている。
 
-### Design philosophy
+### 設計方針
 
-- **Server-qualified identity.** Every MCP tool has the stable identity `(serverName, rawName)`. The namespace is local configuration, never the remote `serverInfo.name` — the remote name is untrusted, not unique across deployments, and can change on upgrade, none of which may silently rename model-facing tools.
-- **Naming is a pinned contract.** Public names are pure functions of `(serverName, rawName)` and satisfy the DeepSeek function-name contract; lossy normalization appends a 12-hex-char SHA-256 hash so distinct identities never collapse. Session history and permission rules therefore survive HMR swaps, re-syncs, and other servers' changes.
-- **The raw name is the only wire name.** `tools/call` always receives the raw name; the public name is never sent to the server and never parsed to recover the raw name.
-- **Full generation or none.** Syncs swap generations atomically: a fetch failure keeps the previous generation, and a registration conflict rolls back the entire attempted generation.
-- **One canonical value, one projection.** The executor preserves the complete canonical MCP value and prepares ordered text/image content. `projectContent` installs that content before `tools/post-execute`, so retention sees real images. Subsequent content replacement, value replacement, and blocking remain authoritative.
+- **サーバー修飾の ID。** すべての MCP ツールは安定した ID `(serverName, rawName)` を持つ。名前空間はローカル設定であり、リモートの `serverInfo.name` では決してない。リモート名は信頼できず、デプロイメント間で一意ではなく、アップグレードで変わりうる。そのいずれも、モデル向けツールを暗黙に改名してはならない。
+- **命名は固定された契約である。** 公開名は `(serverName, rawName)` の純粋関数であり、DeepSeek の関数名契約を満たす。不可逆な正規化では 12 文字の 16 進 SHA-256 ハッシュを付加するので、異なる ID が縮退することはない。したがってセッション履歴と許可ルールは、HMR スワップ、再同期、他のサーバーの変更を生き延びる。
+- **raw 名だけが wire 名である。** `tools/call` は常に raw 名を受け取る。公開名がサーバーへ送られることはなく、raw 名を復元するためにパースされることもない。
+- **全世代か、さもなくば無か。** 同期は世代をアトミックに交換する。フェッチ失敗は以前の世代を維持し、登録の競合は試みられた世代全体をロールバックする。
+- **単一の正規値、単一の投影。** 実行者は完全な正規 MCP 値を保持し、順序付きのテキスト/画像コンテンツを準備する。`projectContent` は `tools/post-execute` の前にそのコンテンツを設置するので、保持処理は本物の画像を見る。その後のコンテンツ置換、値置換、ブロックは引き続き優先される。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, `serverName` reservation, activation await |
-| [`src/connection.ts`](src/connection.ts) | Connection supervisor: client generations, reconnect policy, attempt budget, disposal |
-| [`src/server-context.ts`](src/server-context.ts) | Resource-provider registration and literal server instructions |
-| [`src/tools.ts`](src/tools.ts) | Tool bridge: discovery, naming, registration swap, execution, image projection |
-| [`src/transport.ts`](src/transport.ts) | Transport factory: stdio spawn with scrubbed env, Streamable HTTP |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `Config` スキーマ、`serverName` の予約、アクティベーションの待機 |
+| [`src/connection.ts`](src/connection.ts) | 接続スーパーバイザー: クライアント世代、再接続ポリシー、試行予算、破棄 |
+| [`src/server-context.ts`](src/server-context.ts) | リソースプロバイダーの登録とリテラルのサーバー instructions |
+| [`src/tools.ts`](src/tools.ts) | ツールブリッジ: 探索、命名、登録の交換、実行、画像投影 |
+| [`src/transport.ts`](src/transport.ts) | トランスポートファクトリー: スクラブ済み env での stdio spawn、Streamable HTTP |
 
-The exported `createMcpToolDefinition(ctx, options)` adapts an upstream tool schema and raw-result callback to the same canonical values, errors, and durable image projection. Each callback receives the exact `ToolExecution`, including its Agent and cancellation signal; SDK spec-type validation checks its result before projection. Callers own registration, cancellation deadlines, and provider teardown. The native Cua Driver provider uses this adapter without opening an MCP transport.
+エクスポートされた `createMcpToolDefinition(ctx, options)` は、アップストリームのツールスキーマと raw 結果コールバックを、同じ正規値、エラー、永続的な画像投影へ適合させる。各コールバックは正確な `ToolExecution` を受け取り、その Agent とキャンセルシグナルも含む。SDK の spec 型検証が投影前に結果を検査する。登録、キャンセルのデッドライン、プロバイダーの破棄は呼び出し元が所有する。ネイティブの Cua Driver プロバイダーは、MCP トランスポートを開かずにこのアダプターを使う。
 
-### Lifecycle and sync
+### ライフサイクルと同期
 
-`apply` resolves the reconnect policy, reserves the `serverName` inside the current registration scope, starts the supervisor, and awaits the initial connection plus discovery. Independent Agent scopes may reuse the same namespace because their tools and transports are isolated; a duplicate inside one scope fails at load. The supervisor serializes every sync — initial, notification, and reconnect — through one queue so two syncs can never interleave their dispose-previous/register-next swap. Disposal cancels pending reconnects, closes the negotiating transport or attached client, waits for the in-flight attempt and queued syncs to quiesce, and unregisters the current generation.
+`apply` は再接続ポリシーを解決し、現在の登録スコープ内で `serverName` を予約し、スーパーバイザーを起動し、初回接続と探索を待つ。独立した Agent スコープは同じ名前空間を再利用できる。ツールとトランスポートが隔離されているからである。1 つのスコープ内の重複はロード時に失敗する。スーパーバイザーはすべての同期（初回、通知、再接続）を 1 つのキューで直列化するので、2 つの同期が「前の世代を破棄して次の世代を登録する」交換をインターリーブすることは決してない。破棄は保留中の再接続をキャンセルし、ネゴシエーション中のトランスポートまたは接続済みクライアントを閉じ、進行中の試行とキュー済みの同期が静止するのを待ち、現在の世代を登録解除する。
 
-The SDK receives tool-list changes through legacy notifications or a modern subscription. The supervisor queues each re-sync; a fetch failure keeps the previous generation registered, while a registration conflict rolls back the attempted generation. Each outage shares one attempt budget: after `maxAttempts` consecutive failures the tools are unregistered and reconnection stops, and a connection that stays up past `maxDelayMs` resets the budget.
+SDK はレガシー通知またはモダンなサブスクリプションを通じてツールリストの変更を受け取る。スーパーバイザーは各再同期をキューに入れる。フェッチ失敗は以前の世代を登録したまま維持し、登録の競合は試みられた世代をロールバックする。各障害は 1 つの試行予算を共有する。`maxAttempts` 回連続で失敗するとツールは登録解除され、再接続は停止する。`maxDelayMs` を超えて接続が維持されると予算がリセットされる。
 
-### Tool execution internals
+### ツール実行の内部
 
-A tool call uses the SDK with the raw name, complete tool definition, JSON arguments, abort signal, and configured timeout. The SDK owns protocol validation, advertised output-schema validation, and modern request headers. Canonical success is `{ content: JsonValue[], structuredContent? }`, preserving valid MCP JSON blocks for programmatic and PTC mode callers. An MCP `isError` result throws before image persistence. The bridge validates each image batch before saving it; a refusal projects every image as diagnostic text.
+ツール呼び出しは、raw 名、完全なツール定義、JSON 引数、アボートシグナル、設定されたタイムアウトを使って SDK を利用する。SDK はプロトコル検証、広告された出力スキーマの検証、モダンなリクエストヘッダーを所有する。正規の成功は `{ content: JsonValue[], structuredContent? }` であり、プログラム的および PTC モードの呼び出し元のために有効な MCP JSON ブロックを保持する。MCP の `isError` 結果は画像の永続化前にスローする。ブリッジは各画像バッチを保存前に検証し、拒否はすべての画像を診断テキストとして投影する。
 
-### Environment scrubbing (stdio)
+### 環境のスクラブ (stdio)
 
-The child environment starts from the subprocess seam's `scrubbedParentEnv()` — ambient names matching `/KEY|PASSWORD|SECRET|TOKEN/i` and ambient `DSH_*` names are dropped — and the configured `env` merges on top, so explicit overrides survive. The MCP SDK owns the actual spawn; this package shares the scrub definition, not the spawn path.
+子環境は subprocess シームの `scrubbedParentEnv()` から始まる。`/KEY|PASSWORD|SECRET|TOKEN/i` に一致する環境名と環境の `DSH_*` 名は破棄される。設定された `env` がその上にマージされるので、明示的なオーバーライドは生き残る。実際の spawn は MCP SDK が所有する。このパッケージが共有するのはスクラブの定義であり、spawn パスではない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared tool registry to the bridge's design evidence and worked example configurations.
+パッケージレベルの契約では足りないときにこれらのページを読む。共有ツールレジストリからブリッジの設計根拠と実例構成へ進む。
 
-- [Tools subsystem reference](../../../docs/subsystems/tools.md) — the `ToolRuntime` and `ctx.tools.register()` contract that receives the bridged tools.
-- [historical MCP client plugin Agent Note](../../../.agents/notes/archived/feature/2026-07-07-mcp-client-plugin.md) — the naming invariants, discovery and execution design, alternatives, and consequences.
-- [Canonical tool output contract reference](../../core/tools/README.md) — how MCP results map into the canonical tool-output contract.
-- [Third-party memory MCP guide](../../../docs/user/guide/mcp-memory.md) — three memory-server overlays using this package.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-mcp-client) — every accepted config field and its source declaration.
+- [Tools サブシステムリファレンス](../../../docs/subsystems/tools.md) — ブリッジされたツールを受け取る `ToolRuntime` と `ctx.tools.register()` の契約。
+- [MCP クライアントプラグインの過去の Agent Note](../../../.agents/notes/archived/feature/2026-07-07-mcp-client-plugin.md) — 命名の不変条件、探索と実行の設計、代替案、結果。
+- [正規ツール出力契約リファレンス](../../core/tools/README.md) — MCP の結果が正規のツール出力契約へどのようにマップされるか。
+- [サードパーティのメモリ MCP ガイド](../../../docs/user/guide/mcp-memory.md) — このパッケージを使う 3 つのメモリサーバーオーバーレイ。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-mcp-client) — 受け入れられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Discovered MCP tools
+### 探索された MCP ツール
 
-#### What the model sees
+#### モデルが見るもの
 
-After discovery succeeds, SDK-admitted MCP tools appear as native tools named `mcp__<serverName>__<rawName>` (or their deterministic normalized form), with the server description and input schema. A re-sync replaces the generation; disposal or an exhausted reconnect budget removes it. A server without the tools capability connects with an empty tool set.
+探索が成功すると、SDK が受け入れた MCP ツールは、サーバーの説明と入力スキーマを伴って、`mcp__<serverName>__<rawName>`（またはその決定論的な正規化形）という名前のネイティブツールとして現れる。再同期は世代を置き換え、破棄または試行予算の枯渇はそれを除去する。tools ケイパビリティを持たないサーバーは空のツールセットで接続する。
 
-#### Token effect
+#### トークンへの影響
 
-The tool descriptions and input schemas enter every request while the tools are registered; re-syncs replace rather than accumulate schemas, and the server-qualified name adds tokens to every tool definition and call. A configured client also enables the [shared resource tools and server-name prompt](../mcp-resources/README.md#model-experience).
+ツールが登録されている間、ツールの説明と入力スキーマはすべてのリクエストに入る。再同期はスキーマを蓄積せず置き換え、サーバー修飾名はすべてのツール定義と呼び出しにトークンを追加する。クライアントを構成すると、[共有リソースツールとサーバー名プロンプト](../mcp-resources/README.md#model-experience)も有効になる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The tool-definition prefix stays stable while the discovered set and schemas are unchanged. A re-sync that adds, removes, renames, or changes a tool replaces definitions and may invalidate reuse from the first changed schema token onward; a reconnect that recovers an unchanged list reproduces identical definitions and stays prefix-stable.
+探索された集合とスキーマが変わらない間、ツール定義のプレフィックスは安定したままである。ツールを追加、削除、改名、変更する再同期は定義を置き換え、最初に変わったスキーマトークン以降の再利用を無効化しうる。変更のないリストを回復する再接続は同一の定義を再現し、プレフィックスは安定したままである。
 
-### Tool-call history and results
+### ツール呼び出し履歴と結果
 
-#### What the model sees
+#### モデルが見るもの
 
-The public tool name and JSON arguments remain in assistant history. The canonical value retains the complete MCP JSON blocks and optional structured content for programmatic and PTC mode callers; supported image blocks project beside text in their original order after exact route-capability proof. Refused images, audio, embedded resources, resource links, and unknown blocks remain visible as bounded text diagnostics, and MCP `isError` rejects the call before image persistence.
+公開ツール名と JSON 引数はアシスタント履歴に残る。正規値は、プログラム的および PTC モードの呼び出し元のために、完全な MCP JSON ブロックとオプションの structured content を保持する。サポートされる画像ブロックは、正確なルートケイパビリティの証明の後、元の順序でテキストの隣に投影される。拒否された画像、audio、埋め込みリソース、リソースリンク、未知のブロックは有限のテキスト診断として可視のまま残り、MCP の `isError` は画像の永続化前に呼び出しを拒否する。
 
-#### Token effect
+#### トークンへの影響
 
-Arguments, mapped text, and durable image references are retained until compaction. Inline MCP base64 stays only in the execution-local canonical value and is never copied into a session event; the provider reads verified bytes from the attachment store. Audio and embedded-resource payloads stay out of model context.
+引数、マップされたテキスト、永続的な画像参照はコンパクションまで保持される。インラインの MCP base64 は実行ローカルの正規値にのみ留まり、セッションイベントへコピーされることはない。プロバイダーは検証済みのバイトをアタッチメントストアから読む。audio と埋め込みリソースのペイロードはモデルコンテキストに入らない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-### Server instructions
+### サーバー instructions
 
-#### What the model sees
+#### モデルが見るもの
 
-One server-labeled section contains the nonblank instructions returned by each successful connection. Absent or blank instructions add no prompt text. Braces remain literal. A replacement connection publishes its instructions only after discovery succeeds; disposal or exhausted recovery removes the section.
+1 つのサーバーラベル付きセクションが、接続に成功した各サーバーが返した空白でない instructions を含む。instructions がないか空の場合、プロンプトテキストは追加されない。波括弧はリテラルのままである。置き換え接続は探索が成功した後にのみ instructions を公開する。破棄または回復の枯渇はそのセクションを除去する。
 
-#### Token effect
+#### トークンへの影響
 
-Server instructions contribute text to model requests while their scoped section is active. Resource documents enter history only through explicit resource reads.
+サーバー instructions は、そのスコープ付きセクションが有効な間、モデルリクエストにテキストを加える。リソースドキュメントは明示的なリソース読み取りを通じてのみ履歴に入る。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Unchanged instructions retain identical prompt text. Updated or removed instructions change the next assembled system message and its reusable prefix.
+変更のない instructions は同一のプロンプトテキストを保つ。更新または削除された instructions は、次に組み立てられるシステムメッセージとその再利用可能なプレフィックスを変える。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits describe what you cannot do with this plugin and when it needs operational attention. They are current package constraints, not a comparison with other MCP clients or a task backlog.
+これらの制限は、このプラグインでできないことと、運用上の注意が必要になる場面を説明する。それらは現在のパッケージ制約であり、他の MCP クライアントとの比較でもタスクバックログでもない。
 
-- **Resources are read on demand** — shipped profiles provide the [shared resource service](../mcp-resources/README.md); resource subscriptions and MCP prompt templates are unsupported.
-- **Startup and discovery timeouts are inherited from the MCP SDK** — the plugin exposes no separate connection or discovery timeout. Negotiation and discovery use the SDK's 60-second request default; discovery also uses its page limit. Plugin unload closes the transport to interrupt pending startup requests before awaiting teardown.
-- **Reconnect handles failed negotiation and transport close** — a failed initial probe or crashed stdio child uses the configured reconnect budget. Once HTTP is connected, request failures use the SDK transport's recovery rather than respawning the connection.
-- **Image is the only durable rich-result bridge** — PNG, JPEG, WebP, and GIF enter Native context after exact capability proof. Audio and embedded-resource payloads remain execution-local with explicit diagnostics, while resource links preserve only their name and URI as text.
-- **Invalid protocol results or output schemas fail through the SDK** — the bridge does not accept legacy `toolResult` substitutes or bypass advertised schema validation.
-- **Task-required MCP tools are rejected at call time** — a tool that requires the task-based execution extension throws instead of bridging; the extension is not implemented.
+- **リソースはオンデマンドで読まれる** — 出荷済みプロファイルは[共有リソースサービス](../mcp-resources/README.md)を提供する。リソースサブスクリプションと MCP プロンプトテンプレートはサポートされない。
+- **起動と探索のタイムアウトは MCP SDK から継承される** — プラグインは別個の接続または探索タイムアウトを公開しない。ネゴシエーションと探索は SDK の 60 秒のリクエスト既定値を使い、探索はそのページ上限も使う。プラグインのアンロードはトランスポートを閉じて、破棄を待つ前に保留中の起動リクエストを中断する。
+- **再接続は失敗したネゴシエーションとトランスポートのクローズを扱う** — 初回プローブの失敗または stdio 子プロセスのクラッシュは、設定された再接続予算を使う。HTTP が接続された後は、リクエスト失敗は接続を再 spawn するのではなく SDK トランスポートの回復を使う。
+- **画像だけが永続的なリッチ結果ブリッジである** — PNG、JPEG、WebP、GIF は正確なケイパビリティの証明の後、ネイティブコンテキストに入る。audio と埋め込みリソースのペイロードは明示的な診断を伴って実行ローカルに留まり、リソースリンクはその名前と URI のみをテキストとして保存する。
+- **無効なプロトコル結果または出力スキーマは SDK を通じて失敗する** — ブリッジはレガシーの `toolResult` 代替を受け入れず、広告されたスキーマ検証を迂回しない。
+- **タスク必須の MCP ツールは呼び出し時に拒否される** — タスクベースの実行拡張を必要とするツールはブリッジされずにスローする。その拡張は実装されていない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発者ノートはメンテナー向けの作業コンテキストであり、未決定の設計上の問いと方向性である。明示的に非権威である。出荷済みの動作、制限、受け入れられた根拠は、上のセクション、パッケージのコード、リンクされた Agent Note にある。
 
-- The public-name algorithm is a v1 contract pinned by tests; changing it after release would break session history and permission rules.
-- An explicit DSH-owned connection and discovery timeout is an open direction; the SDK's 60-second default bounds startup requests.
-- Reconnect ownership for Streamable HTTP is open: per-request retry is SDK behavior, and the supervisor could also own the HTTP generation.
-- MCP prompt templates need a separate user-selection and invocation mechanism.
-- The pinned MCP SDK is still evolving; a breaking upstream change requires updating the bridge.
+- 公開名のアルゴリズムはテストで固定された v1 契約であり、リリース後に変更するとセッション履歴と許可ルールが壊れる。
+- DSH が所有する明示的な接続・探索タイムアウトは未決の方向性である。SDK の 60 秒の既定値が起動リクエストを制限する。
+- Streamable HTTP の再接続の所有権は未決である。リクエストごとの再試行は SDK の動作であり、スーパーバイザーが HTTP 世代も所有することもありうる。
+- MCP プロンプトテンプレートには、別個のユーザー選択と起動の仕組みが必要である。
+- 固定された MCP SDK は今も進化しており、アップストリームの破壊的変更はブリッジの更新を必要とする。
 
 </details>

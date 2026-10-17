@@ -1,90 +1,90 @@
 ---
-description: "Native directory-picker surface: the browser half that drives the local Desktop or Host OS chooser for workspace-directory flows; for users and maintainers choosing a picking interaction."
+description: "ネイティブディレクトリピッカーサーフェス。ワークスペースディレクトリフロー用にローカル Desktop またはホスト OS チューザーを駆動するブラウザー側。選択操作を選ぶユーザーとメンテナーのためのもの。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-directory-picker-native
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package provides the native directory-picking surface for the Web GUI: when a workspace flow asks for a directory, a renderless browser occupant opens the operating system's own chooser on the local machine and reports the single outcome — a picked path, a cancellation, or a failure. It fills the two directory-flow slots declared by `ui-workspace`, composing the client side of the native picking interaction in one `cordis.yml` row. Choose it when the browser runs on the same machine as the Host; in-process and remote-browser deployments need the [`-browse`](../ui-directory-picker-browse/README.md) surface instead.
+このパッケージは Web GUI のネイティブディレクトリ選択サーフェスを提供する。ワークスペースフローがディレクトリを求めると、描画なしのブラウザー占有者がローカルマシン上でオペレーティングシステム独自のチューザーを開き、単一の結果（選択パス、取り消し、失敗）を報告する。`ui-workspace` が宣言する 2 つのディレクトリフロー スロットを埋め、1 つの `cordis.yml` 行でネイティブ選択操作のクライアント側を構成する。ブラウザーがホストと同じマシンで動作する場合に選ぶ。インプロセスとリモートブラウザーのデプロイは代わりに [`-browse`](../ui-directory-picker-browse/README.md) サーフェスが必要である。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin alongside `ui-workspace` and the host backend [`dsh-host-directory-picker-native`](../../host/directory-picker-native/README.md); one `cordis.yml` row then composes the whole native picking interaction. When a workspace add or picker flow opens a directory request, the user sees the operating system's folder dialog; the picked path is adopted by the workspace flow, and cancelling closes the dialog.
+このプラグインを `ui-workspace` とホストバックエンド [`dsh-host-directory-picker-native`](../../host/directory-picker-native/README.md) と並べてマウントする。1 つの `cordis.yml` 行がネイティブ選択操作全体を構成する。ワークスペース追加やピッカーフローがディレクトリ要求を開くと、ユーザーはオペレーティングシステムのフォルダーダイアログを見る。選択パスはワークスペースフローに採用され、取り消しはダイアログを閉じる。
 
-In the local Electron application, this flow uses the narrow preload directory-picker bridge. Cancellation and failure never retry through the Host chooser. Ordinary Web uses the Host call; the separate browse composition always lists Host directories.
+ローカル Electron アプリケーションでは、このフローは狭い preload ディレクトリピッカーブリッジを使う。取り消しと失敗はホストチューザー経由で再試行しない。通常 Web はホスト呼び出しを使う。別の browse 構成は常にホストディレクトリを列挙する。
 
-### When to choose it
+### 選ぶ場合
 
-Choose this surface when the browser runs on the same machine as the Host, so an OS dialog can open there. Choose the [`-browse`](../ui-directory-picker-browse/README.md) surface when the browser is remote or in-process and no local chooser exists. The two surfaces fill the same slots, so switching is a composition change, not a code change.
+ブラウザーがホストと同じマシンで動作し、OS ダイアログをそこで開ける場合にこのサーフェスを選ぶ。ブラウザーがリモートまたはインプロセスでローカルチューザーが存在しない場合は [`-browse`](../ui-directory-picker-browse/README.md) サーフェスを選ぶ。2 つのサーフェスは同じスロットを埋めるため、切り替えはコード変更ではなく構成変更である。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-Both slot registrations install as one transactional effect through nested `ctx.slots.inject()` calls, because either declaring entry may activate later or replace its declaration. The occupant arms once per rising `open` edge, so re-renders never launch a second chooser; settlements ride a ref so the answer reaches the owner's latest handlers. An unmount (HMR replacing the occupant) discards the settlement wholesale: the wire carries no per-request abort, so the native chooser survives until answered and its answer lands nowhere. The node half is an empty `apply` that keeps the plugin on the host roster.
+両スロット登録は入れ子の `ctx.slots.inject()` 呼び出しを通じて 1 つのトランザクションエフェクトとしてインストールされる。宣言エントリーのいずれかが後に有効化したり宣言を置換したりし得るためである。占有者は `open` の立ち上がり辺りごとに 1 回武装するため、再レンダーが 2 つ目のチューザーを起動することはない。決着は ref に乗るため、回答は所有者の最新ハンドラーに到達する。アンマウント（HMR が占有者を置換）は決着を全体として破棄する。wire に要求ごとの中止はなく、ネイティブチューザーは回答まで生き残り、その回答はどこにも届かない。node 側はホスト名簿にプラグインを残す空の `apply` である。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the picking surface is not enough. They move from the browser half to the host backend and the slots it fills.
+選択サーフェスでは足りない場合に以下のページを読む。ブラウザー側からホストバックエンドとそれが埋めるスロットへ進む。
 
-- [dsh-host-directory-picker-native](../../host/directory-picker-native/README.md) — the OS chooser backend this surface drives.
-- [ui-workspace](../ui-workspace/README.md) — declares the directory-flow slots and owns the picking conversation.
-- [ui-directory-picker-browse](../ui-directory-picker-browse/README.md) — the in-app browsing alternative for remote and in-process deployments.
-- [Web client architecture](../../../docs/subsystems/web-client.md) — how browser plugin rows load and register slots.
+- [dsh-host-directory-picker-native](../../host/directory-picker-native/README.md) — このサーフェスが駆動する OS チューザーバックエンド。
+- [ui-workspace](../ui-workspace/README.md) — ディレクトリフロースロットを宣言し、選択会話を所有する。
+- [ui-directory-picker-browse](../ui-directory-picker-browse/README.md) — リモートとインプロセスのデプロイのためのアプリ内閲覧代替。
+- [Web クライアントアーキテクチャ](../../../docs/subsystems/web-client.md) — ブラウザープラグイン行がスロットを読み込み登録する仕組み。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the directory chooser is browser chrome; nothing here reaches a model request.
+なし。ディレクトリチューザーはブラウザー chrome であり、ここにあるものはモデル要求に届かない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダー要求を組み立てず送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the native chooser fits. They are current package constraints, not a general picker comparison or a task backlog.
+これらの制限はネイティブチューザーが適合する場合を定義する。これらは現在のパッケージの制約であり、一般的なピッカー比較でもタスクバックログでもない。
 
-- **No cancellation of an open chooser** — the wire has no per-request abort, so a chooser already on the local display cannot be closed from the browser; a discarded settlement is ignored.
-- **Local carriers only** — the Electron dialog selects local paths; ordinary Web opens the Host chooser. Remote-browser and in-process deployments use the `-browse` composition. Platform failures surface through the owner's retryable folder dialog.
-- **Linux automatic selection** — without zenity or kdialog, the Host selects browse even in Desktop; the Electron dialog is not used.
+- **開いているチューザーの取り消しなし** — wire に要求ごとの中止はないため、ローカル表示上のチューザーをブラウザーから閉じることはできない。破棄された決着は無視される。
+- **ローカルキャリアのみ** — Electron ダイアログはローカルパスを選択する。通常 Web はホストチューザーを開く。リモートブラウザーとインプロセスのデプロイは `-browse` 構成を使う。プラットフォーム失敗は所有者の再試行可能なフォルダーダイアログを通じて現れる。
+- **Linux 自動選択** — zenity または kdialog がなければ、Desktop でもホストは browse を選択する。Electron ダイアログは使われない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

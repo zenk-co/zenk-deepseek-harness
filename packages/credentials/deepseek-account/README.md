@@ -5,73 +5,73 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-deepseek-account
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-getPlatformSession returns a Host-only origin/token snapshot for native Platform embedding, or null when signed out. Its userId repeats the stable account ID from the most recent successful getProfile, and is null until one succeeds or when that profile holds no ID. The snapshot reuses that ID without issuing a profile request, so an unknown ID leaves userId null instead of delaying the caller; a profile read whose stable ID first becomes available or changes notifies only Host subscribers using `watch(signal, true)`, which lets identity consumers re-read the snapshot. Consumers key persistent browser preference storage by origin and userId and use temporary storage while userId is null. It is absent from account-controller RPC and Client state. Consumers destroy documents holding a snapshot when the account changes. The snapshot carries deployment request headers only; the embedding client composes the Platform client identity of its own UI.
+getPlatformSession はネイティブ Platform 埋め込み向けホスト専用 origin/token スナップショットを返し、サインアウト時は null を返します。その userId は直近成功 getProfile 由来の安定アカウント ID を繰り返し、1 回成功するまで、またはそのプロファイルが ID を持たない場合は null です。スナップショットはプロファイル要求を発行せずその ID を再利用するため、不明 ID では呼び出し側を遅延させず userId を null のままにします。安定 ID が初めて利用可能になるか変化したプロファイル読取は、`watch(signal, true)` を使うホスト購読者にのみ通知し、同一性コンシューマーがスナップショットを再読できるようにします。コンシューマーは永続ブラウザー設定保存を origin と userId でキー付けし、userId が null の間は一時保存を使います。アカウントコントローラー RPC とクライアント状態には現れません。コンシューマーはアカウント変更時にスナップショットを保持するドキュメントを破棄します。スナップショットは配置要求ヘッダーのみ運びます。埋め込みクライアントは独自 UI の Platform クライアント同一性を合成します。
 
-`platformClientHeaders` builds the five Platform client headers for one call from its `AccountClientMetadata` and the composition's desktop platform: `x-client-bundle-id` is intentionally empty, `x-client-platform` is `web` unless the Desktop profile supplies `darwin` or `win32`, `x-client-version` is the calling build's version, `x-client-locale` reduces the active UI language to `zh_CN` or `en_US` through the exported `platformWireLocale`, and `x-client-timezone-offset` is whole seconds east of UTC. A consumer whose request body carries that same wire locale reuses `platformWireLocale` so the header and body cannot disagree.
+`platformClientHeaders` はその `AccountClientMetadata` と構成のデスクトッププラットフォームから 1 呼び出し分の 5 つの Platform クライアントヘッダーを構築します。`x-client-bundle-id` は意図的に空、`x-client-platform` は Desktop プロファイルが `darwin` または `win32` を提供しない限り `web`、`x-client-version` は呼出しビルドのバージョン、`x-client-locale` は有効 UI 言語を公開 `platformWireLocale` 経由で `zh_CN` または `en_US` に縮約、`x-client-timezone-offset` は UTC 東への秒数 (整数) です。要求本体が同じワイヤーロケールを運ぶコンシューマーは `platformWireLocale` を再利用し、ヘッダーと本体が不一致にならないようにします。
 
-getUnnotifiedBonuses returns the granted bonuses Platform has not yet recorded as displayed, together with the account they belong to; ackBonusNotified records one bonus the user actually saw. The acknowledgement names that account, so a notification read under one account is never confirmed for another.
+getUnnotifiedBonuses は Platform が表示済みとしてまだ記録していない付与ボーナスを、それが属するアカウントと共に返します。ackBonusNotified はユーザーが実際に見た 1 ボーナスを記録します。確認はそのアカウントを名指しするため、あるアカウントでの通知読取が別アカウントに確認されることはありません。
 
-`rejectToken` accepts a Host inference request’s rejected token and removes only the matching current login; a late rejection cannot clear a replacement credential.
+`rejectToken` はホスト推論要求の拒否トークンを受け付け、一致する現行ログインのみ除去します。遅延拒否は置換認証情報をクリアできません。
 
-`deepseek-account/session-expired` notifies current subscribers once after a rejected credential is removed. Account snapshots carry no expiry notice, so reconnecting does not repeat the toast.
+`deepseek-account/session-expired` は拒否認証情報除去後に現行購読者へ一度だけ通知します。アカウントスナップショットは有効期限通知を運ばないため、再接続でトーストは繰り返されません。
 
-## Summary
+## 概要
 
-Account consumers read stored login state, start or cancel a browser login, and sign out without editing API keys. Host model consumers resolve account credentials only for the provider-configured inference origin.
+アカウントコンシューマーは保存済みログイン状態を読み、ブラウザーログインを開始またはキャンセルし、API キー編集なしにサインアウトします。ホストモデルコンシューマーはプロバイダー設定推論オリジン向けのみアカウント認証情報を解決します。
 
-`SignInErrorCode` distinguishes `no-response` (fetch returned no Response) from HTTP and response-validation failures so clients can offer network troubleshooting.
+`SignInErrorCode` は `no-response` (fetch が Response を返さなかった) を HTTP および応答検証失敗と区別し、クライアントがネットワーク対処を提供できるようにします。
 
-`getDeviceIdentity()` returns existing device and account IDs plus the login OS version string, without credentials or device creation.
+`getDeviceIdentity()` は認証情報やデバイス作成なしに既存デバイスおよびアカウント ID とログイン OS バージョン文字列を返します。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの利用](#use-this-package)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-`AccountProfile.avatarUrl` is an optional profile image URL; null or absence means no avatar.
+`AccountProfile.avatarUrl` は任意のプロファイル画像 URL です。null または欠落はアバターなしを意味します。
 
-Successful local sign-out emits `deepseek-account/signed-out`. The platform provider installs the account-owned cancellation listener, which checks running Agents against `session.requestContext().provider` and cancels account tasks while retaining inboxes. The account controller uses the same predicate for its confirmation dialog. No additional Agent state is maintained. Before a new turn binds its first request, this predicate still sees the previous turn’s provider.
+成功ローカルサインアウトは `deepseek-account/signed-out` を送出します。プラットフォームプロバイダーはアカウント所有キャンセルリスナーを導入し、実行中エージェントを `session.requestContext().provider` と照合してアカウントタスクをキャンセルし、受信箱は保持します。アカウントコントローラーは確認ダイアログに同じ述語を使います。追加エージェント状態は保持しません。新ターンが最初の要求を束縛する前、この述語はなお prior ターンのプロバイダーを見ます。
 
-The service defines account operations and reconnectable state snapshots. The platform provider owns the protocol and stored grant. Credentials are Host-only; the API controller exports state and commands without resolveToken.
+サービスはアカウント操作と再接続可能状態スナップショットを定めます。プラットフォームプロバイダーはプロトコルと保存済み許可を所有します。認証情報はホスト専用です。API コントローラーは resolveToken なしに状態とコマンドを公開します。
 
-Account model failures with `ACCOUNT_SIGN_IN_REQUIRED` emit `deepseek-account/model-sign-in-required`; the Client receives this live event for sign-in guidance. Other request errors do not emit it.
+`ACCOUNT_SIGN_IN_REQUIRED` のアカウントモデル失敗は `deepseek-account/model-sign-in-required` を送出します。クライアントはサインイン案内のためこのライブイベントを受け取ります。他の要求エラーは送出しません。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
-The service defines account operations without maintaining a second credential index. The provider owns persistence and login lifecycle checks.
+サービスは 2 つ目の認証情報索引を保持せずアカウント操作を定めます。プロバイダーは永続化とログインライフサイクル確認を所有します。
 
 <a id="further-exploration"></a>
 ## Further Exploration
 
-The [credentials subsystem](../../../docs/subsystems/credentials.md) owns storage APIs; the [architecture](../../../docs/architecture.md) explains application composition.
+[credentials サブシステム](../../../docs/subsystems/credentials.md)は保存 API を所有します。[architecture](../../../docs/architecture.md) はアプリケーション構成を説明します。
 
-A ready AccountDetails.balance keeps recharge wallets in value and bonus wallets in bonusWallets; both arrays preserve decimal strings and currency. Query failure supplies neither amount.
+準備済み AccountDetails.balance はチャージウォレットを value に、ボーナスウォレットを bonusWallets に保ちます。両配列は 10 進文字列と通貨を保持します。照会失敗は金額を提供しません。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
 None, as account credentials affect HTTP authentication and never enter model prompts, Session logs, or tool results.
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-No model request prefix changes.
+モデル要求プレフィックス変更なし。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Account tokens have no expiry or refresh flow. Sign-out removes the local grant before background provider revocation; remote logout failures never restore local login. Profile and balance query failures retain the stored grant. getProfile / getBalance reports profile and balance query outcomes independently.
+- アカウントトークンに有効期限や更新フローはありません。サインアウトはバックグラウンドプロバイダー取消前にローカル許可を除去します。リモートログアウト失敗はローカルログインを復元しません。プロファイルおよび残高照会失敗は保存済み許可を保持します。getProfile / getBalance はプロファイルと残高の照会結果を独立に報告します。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
-The [desktop login decision](../../../.agents/notes/implemented/architecture/2026-09-14-deepseek-account-login.md) records cancellation and storage ownership.
+[desktop ログイン決定](../../../.agents/notes/implemented/architecture/2026-09-14-deepseek-account-login.md)はキャンセルと保存所有権を記録します。
 
-PlatformSession may carry Host-only requestHeaders from Host to Electron main: deployment headers only, because the embedded document's client identity is composed where its locale, timezone and version are known. Consumers must exclude those headers from renderer bootstrap and restrict them to the configured origin. userId is Host-only on the same terms and never enters renderer bootstrap. mergePlatformCookies preserves unrelated cookie pairs while replacing matching names.
+PlatformSession はホストから Electron main へホスト専用 requestHeaders を運ぶことがあります。配置ヘッダーのみです。埋め込みドキュメントのクライアント同一性はロケール、タイムゾーン、バージョンが既知の場所で合成されるためです。コンシューマーはそれらのヘッダーをレンダラーブートストラップから除外し、設定オリジンに制限しなければなりません。userId は同じ条件でホスト専用であり、レンダラーブートストラップに入りません。mergePlatformCookies は一致名を置換しつつ無関係 Cookie ペアを保持します。

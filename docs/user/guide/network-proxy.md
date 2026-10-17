@@ -1,23 +1,23 @@
-# Run DSH behind a network proxy
+# ネットワークプロキシーの背後で DSH を実行する
 
-English | [中文](network-proxy.zh.md)
+日本語 | [English](network-proxy.en.md) | [中文](network-proxy.zh.md)
 
-DSH routes its outbound requests — model calls, web search, page fetches, and MCP servers over HTTP — through the proxy named by the standard proxy environment variables. It reads them at launch; nothing else needs configuring. A few paths stay direct by design or by runtime limit, listed under "What stays direct" below.
+DSH は送出要求 — モデル呼び出し、Web 検索、ページ取得、HTTP 越し MCP サーバー — を標準プロキシー環境変数が指名するプロキシー経由でルーティングします。起動時に読みます。他に設定は不要です。一部の経路は設計またはランタイム制限で直接のままです。以下の「直接のまま残るもの」に列挙します。
 
-## Export the variables
+## 変数をエクスポートする
 
 ```sh
 export HTTPS_PROXY=http://127.0.0.1:7890
 export HTTP_PROXY=http://127.0.0.1:7890
 ```
 
-Put both lines in your shell profile so every `dsh` invocation inherits them, or in `$DSH_HOME/.env` (`~/.dsh/.env` by default) next to your API key; an exported variable always wins over that file. A project's own `.env` cannot set them: it arrives with `git clone`, and DSH refuses to start rather than let a repository decide where your traffic goes.
+両行をシェルプロファイルに置き、すべての `dsh` 呼出しが継承するようにします。または API キーの隣の `$DSH_HOME/.env` (既定 `~/.dsh/.env`) に置きます。エクスポート済み変数は常にそのファイルを優先します。プロジェクト独自の `.env` は設定できません。`git clone` で到着し、リポジトリーにトラフィック送出先を決定させないため DSH は起動を拒否します。
 
-A proxy that needs credentials takes them in the URL: `http://user:password@proxy.example:8080`. DSH never prints the URL back: a diagnostic names the variable it rejected, so neither the username nor the password appears anywhere.
+認証情報を必要とするプロキシーは URL に含めます。`http://user:password@proxy.example:8080`。DSH は URL を出力に戻しません。診断は拒否した変数を名指しするため、ユーザー名もパスワードもどこにも現れません。
 
-## Why your browser is proxied but your terminal is not
+## ブラウザーはプロキシーされるのにターミナルはされない理由
 
-This is the most common surprise, and it is not specific to DSH. There is no single "system proxy" that all software obeys — there are three unrelated mechanisms:
+これは最もよくある驚きであり、DSH 固有ではありません。すべてのソフトウェアが従う単一の「システムプロキシー」はありません。無関係な 3 機構があります:
 
 | Mechanism | Who follows it |
 |---|---|
@@ -25,60 +25,60 @@ This is the most common surprise, and it is not specific to DSH. There is no sin
 | The `HTTP_PROXY` / `HTTPS_PROXY` environment variables | `curl`, `git`, `npm`, `pip`, and DSH |
 | TUN mode (a virtual network interface) | Everything, transparently |
 
-The "system proxy" switch in a proxy application such as Clash writes only the first one. Browsers pick it up; command-line tools never see it. That is why exporting the variables is a separate step, and why turning on TUN mode makes both work without any variables at all.
+Clash のようなプロキシーアプリの「システムプロキシー」スイッチは最初のもののみ書きます。ブラウザーは拾います。コマンドラインツールは見ません。そのため変数のエクスポートは別手順であり、TUN モード有効化は変数なしに両方を動作させます。
 
-DSH does not read the operating system's proxy settings. Export the variables, or use TUN mode.
+DSH は OS のプロキシー設定を読みません。変数をエクスポートするか、TUN モードを使います。
 
-## Choose what stays direct
+## 直接残す対象の選択
 
-`NO_PROXY` lists hosts to reach directly:
+`NO_PROXY` は直接到達するホストを列挙します:
 
 ```sh
 export NO_PROXY=internal.example.com,.corp.example.com,registry.local
 ```
 
-An entry names a host and matches it together with every subdomain under it: `NO_PROXY=example.com` also sends `api.example.com` direct. A leading `.` or `*.` is accepted and means the same thing. An entry may carry a `:port`, and `*` bypasses everything.
+エントリーはホストを指名し、その配下のすべてのサブドメインと共に一致します。`NO_PROXY=example.com` は `api.example.com` も直接送ります。先頭 `.` や `*.` は受付けられ同じ意味です。エントリーは `:port` を持てます。`*` はすべて回避します。
 
-**CIDR ranges do not work.** An operating system bypass list often contains entries like `10.0.0.0/8` or `192.168.0.0/16`; copying those into `NO_PROXY` has no effect. Use host names or domain suffixes instead.
+**CIDR 範囲は働きません。** OS 回避一覧は `10.0.0.0/8` や `192.168.0.0/16` のようなエントリーを含むことが多いですが、それらを `NO_PROXY` に複写しても効果ありません。ホスト名やドメイン接尾辞を使います。
 
-You do not need to list `localhost` or `127.0.0.1`. DSH always bypasses loopback, because its own Web UI and local servers would otherwise route through the proxy and loop.
+`localhost` や `127.0.0.1` の列挙は不要です。DSH は常にループバックを回避します。自 Web UI やローカルサーバーがプロキシー経由でループしなくなるためです。
 
-## Limits worth knowing
+## 知っておく価値のある制限
 
-**SOCKS proxies are not supported.** A `socks5://` value is reported at startup and skipped, and DSH connects directly for the scheme that named it — setting `HTTPS_PROXY=socks5://…` alongside a usable `HTTP_PROXY` leaves `https:` direct rather than borrowing the HTTP proxy. Point the variables at your proxy application's HTTP port instead — most expose both, and the HTTP one is usually a neighbouring port number.
+**SOCKS プロキシーは未対応です。** `socks5://` 値は起動時に報告され飛ばされ、DSH はそれを指名したスキームを直接接続します。利用可能な `HTTP_PROXY` と並べて `HTTPS_PROXY=socks5://…` を設定すると、`https:` は HTTP プロキシーを借りず直接のままです。プロキシーアプリの HTTP ポートを指します。多くは両方を公開し、HTTP 側は通常隣接ポート番号です。
 
-**`ALL_PROXY` alone is enough.** DSH falls back to it for both schemes, even though Node and curl differ on this. Setting `HTTPS_PROXY` explicitly is still clearer.
+**単独 `ALL_PROXY` で十分です。** Node と curl の相違にもかかわらず DSH は両スキームにフォールバックします。`HTTPS_PROXY` 明示設定はなお明確です。
 
-**A TLS-intercepting corporate proxy needs its certificate.** If requests fail with a certificate error once the proxy is reachable, point Node at your organisation's CA bundle before launching:
+**TLS 横取り企業プロキシーは証明書が必要です。** プロキシー到達後に証明書エラーで要求失敗する場合、起動前に組織 CA バンドルを Node に指します:
 
 ```sh
 export NODE_EXTRA_CA_CERTS=/path/to/corporate-ca.pem
 ```
 
-Node reads that variable only at process start, so export it before running `dsh`.
+Node はプロセス開始時にのみその変数を読みます。`dsh` 実行前にエクスポートします。
 
-**Tools DSH runs for you follow the same proxy.** Commands in the bash tool, `git`, `gh`, and MCP servers started as child processes all inherit these variables. A child that is itself a Node program honors them only on Node 22.21 or later; an older Node connects directly. If one of your proxy variables holds a value DSH rejected — a SOCKS URL, say — Node-based tools also connect directly rather than fail to start, while `curl` and `git` still read that value.
+**DSH が代行実行するツールは同じプロキシーに従います。** bash ツールのコマンド、`git`、`gh`、子プロセス起動の MCP サーバーはすべてこれら変数を継承します。子が Node プログラム自体の場合、Node 22.21 以降でのみ尊重し、旧 Node は直接接続します。プロキシー変数の 1 つが DSH 拒否値 — たとえば SOCKS URL — を保持する場合、Node 系ツールも起動失敗ではなく直接接続します。一方 `curl` と `git` はなおその値を読みます。
 
-**A password in the proxy URL reaches those tools too.** `HTTPS_PROXY=http://alice:s3cret@proxy.example:8080` is a normal environment variable, so every command DSH runs — including the ones the model writes — can read it, and a command that prints its environment puts the password in output that is kept. This is how the variable already behaves for everything else in your shell. If that matters, give the proxy a credential-free entry point, or authenticate it some other way than in the URL.
+**プロキシー URL のパスワードはそれらツールにも届きます。** `HTTPS_PROXY=http://alice:s3cret@proxy.example:8080` は通常環境変数であるため、DSH が実行するすべてのコマンド — モデルが書くものも含め — は読めます。環境を出力するコマンドはそのパスワードを保持される出力に置きます。これはシェルの他のすべてに対する既存の変数動作です。問題になる場合、プロキシーに認証情報なし入口を与えるか、URL 以外の方法で認証します。
 
-## What stays direct
+## 直接のまま残るもの
 
-Not every request DSH makes goes through the proxy:
+DSH のすべての要求がプロキシー経由になるわけではありません:
 
-- **Anything on this machine.** Loopback is always direct: `localhost`, the whole `127.0.0.0/8` range, `::1`, and `0.0.0.0`. A proxy cannot usefully reach a service that only listens locally.
-- **Code the model writes.** Workflow workers and Node ptc-runtime processes receive no proxy settings, so model-authored scripts cannot read a proxy URL that may carry a password. Direct requests must configure any required proxy themselves and remain subject to the execution sandbox.
-- **Usage telemetry.** The OTLP exporter uses Node's own HTTP client rather than the one a proxy configures, so telemetry connects directly and simply fails where direct egress is blocked. Nothing you do in DSH depends on it. Set `DSH_TELEMETRY_MODE=DISABLED` to turn it off entirely.
-- **`web_fetch` to a literal private address.** A URL naming an address like `http://10.0.0.5/` is refused rather than handed to the proxy, the same refusal it gets with no proxy configured.
+- **このマシン上のもの。** ループバックは常に直接です。`localhost`、全体 `127.0.0.0/8`、`::1`、`0.0.0.0`。ローカル待受けのみのサービスにプロキシーは有用に到達できません。
+- **モデルが書くコード。** Workflow ワーカーと Node ptc-runtime プロセスはプロキシー設定を受け取らないため、モデル作成スクリプトはパスワードを含む可能性のあるプロキシー URL を読めません。直接要求は必要なプロキシーを自前設定しなければならず、実行サンドボックス対象のままです。
+- **利用テレメトリー。** OTLP エクスポーターはプロキシーが設定するものではなく Node 独自の HTTP クライアントを使うため、テレメトリーは直接接続し、直接送出が遮断される場所では単に失敗します。DSH の動作はそれに依存しません。完全に無効化には `DSH_TELEMETRY_MODE=DISABLED` を設定します。
+- **リテラル非公開宛先への `web_fetch`。** `http://10.0.0.5/` のようなアドレス指名 URL はプロキシーに渡さず拒否されます。プロキシー未設定と同じ拒否です。
 
-## Check that it worked
+## 動作確認
 
-Ask the agent to fetch a page and watch your proxy application's connection log:
+エージェントにページ取得を求め、プロキシーアプリの接続ログを見ます:
 
 ```sh
 dsh --profile headless "fetch https://example.com and tell me the page title"
 ```
 
-If the request does not appear there, confirm the variables survive into DSH's own environment:
+そこに要求が現れない場合、変数が DSH 自身の環境に届いているか確認します:
 
 ```sh
 env | grep -i proxy

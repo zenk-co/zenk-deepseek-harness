@@ -5,7 +5,7 @@ description: "新会话会创建新的 Agent，不再复用已有空 Session。"
 
 # 通过新会话创建新的 Agent
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

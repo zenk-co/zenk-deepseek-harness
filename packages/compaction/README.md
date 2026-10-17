@@ -3,53 +3,53 @@ description: "Package map for the conversation-condensing feature family: automa
 kind: "package-group"
 ---
 
-# compaction/ — compaction capability family
+# compaction/ — 圧縮ケイパビリティ群
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `compaction/` group keeps long agent conversations working near the model's context limit: older history is condensed into a summary automatically as token pressure builds, on demand with `/compact`, oversized tool outputs can be trimmed first so there is less to condense, and images an image-capable route can no longer send are replaced with placeholders. The shipped `dsh` base enables the feature by default — mount the packages explicitly to tune when and how condensation happens. The token measurement that decides when to condense lives in a separate LLM-family service.
+`compaction/` グループは、モデルのコンテキスト上限付近で長いエージェント会話を動作させ続ける。トークン圧力の高まりに応じて古い履歴は自動的に概要へ凝縮され、`/compact` でオンデマンドに凝縮でき、過大なツール出力は先に刈り込んで凝縮量を減らせ、画像対応ルートが送信できなくなった画像はプレースホルダーに置換される。出荷 `dsh` ベースではこの機能はデフォルトで有効である。凝縮の時期と方法を調整するにはパッケージを明示的にマウントする。凝縮時期を決めるトークン計測は、別の LLM 系サービスに存在する。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-Each package below provides one piece of the feature; open a package page for how to use it.
+以下の各パッケージが機能の 1 断片を提供する。使用方法は各パッケージページを開くこと。
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`compaction/`](compaction/README.md) | The shared condensation contract: the operations and summary format every backend and trigger use | `ctx.compaction` |
-| [`compaction-basic/`](compaction-basic/README.md) | Automatic condensation of older history into a summary as token pressure builds | registers `ctx.compaction` |
-| [`compaction-tool-result-pruner/`](compaction-tool-result-pruner/README.md) | Trims oversized tool outputs so less history needs condensing | `ctx.toolResultPruner` |
-| [`compaction-image-offload/`](compaction-image-offload/README.md) | Replaces over-budget request images with placeholders when an image-capable route rejects a request | listens to `agent/request-error` |
-| [`command-compact/`](command-compact/README.md) | The `/compact` command to condense history on demand | registers on `ctx.commands` |
+| [`compaction/`](compaction/README.md) | 共有凝縮契約。すべてのバックエンドとトリガーが使用する操作と概要形式 | `ctx.compaction` |
+| [`compaction-basic/`](compaction-basic/README.md) | トークン圧力の高まりに応じた古い履歴の自動凝縮 | `ctx.compaction` を登録 |
+| [`compaction-tool-result-pruner/`](compaction-tool-result-pruner/README.md) | 過大なツール出力を刈り込み、凝縮が必要な履歴を減らす | `ctx.toolResultPruner` |
+| [`compaction-image-offload/`](compaction-image-offload/README.md) | 画像対応ルートがリクエストを拒否した際、予算超過のリクエスト画像をプレースホルダーに置換する | `agent/request-error` を受信 |
+| [`command-compact/`](command-compact/README.md) | オンデマンドで履歴を凝縮する `/compact` コマンド | `ctx.commands` に登録 |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Start with the subsystem reference for the shared vocabulary, then read the two Agent Notes for the design rationale.
+共有語彙のサブシステムリファレンスから始め、設計根拠の 2 つの Agent Note を読む。
 
-- [Compaction subsystem reference](../../docs/subsystems/compaction.md) — the condensation vocabulary, results, and service behavior.
-- [historical Compaction capability-seam Agent Note](../../.agents/notes/archived/feature/2026-06-18-compaction-capability-seam.md) — how the family is split and why it depends on session and LLM vocabulary.
-- [Queued manual compaction reference](compaction/README.md) — how on-demand `/compact` serializes against running turns.
-- [Capability seams](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md) — the Service Definition / Service Provider / Consumer split this family follows.
+- [圧縮サブシステムリファレンス](../../docs/subsystems/compaction.md) — 凝縮語彙、結果、サービス動作。
+- [歴史的圧縮ケイパビリティシーム Agent Note](../../.agents/notes/archived/feature/2026-06-18-compaction-capability-seam.md) — 群の分割方法と、セッション・LLM 語彙に依存する理由。
+- [キュー手動圧縮リファレンス](compaction/README.md) — オンデマンド `/compact` が実行中ターンに対して直列化される仕組み。
+- [ケイパビリティシーム](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md) — この群が従う Service Definition / Service Provider / Consumer 分割。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

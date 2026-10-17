@@ -1,35 +1,35 @@
 ---
-description: "The event-sourced session log and in-memory store for users and maintainers building, inspecting, or extending the durable record behind every agent interaction."
+description: "すべてのエージェント操作の背後にある永続レコードを構築・検査・拡張するユーザーとメンテナー向けの、イベントソーシング方式のセッションログとインメモリストア。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-session` records every model-visible fact in an append-only session log and derives model history from that record. Consumers can inspect, replay, fork, and flush sessions while preserving historical events; compaction hides superseded entries from the active conversation without deleting them. Sessions remain in memory unless a persistence backend is added, and durability checkpoints wait for configured backends. Choose this package wherever an agent needs a reconstructable session record; it does not call models.
+`dsh-session` はモデル可視のあらゆる事実を追記専用のセッションログに記録し、その記録からモデル履歴を派生させる。コンシューマーは履歴イベントを保持したままセッションを検査、再生、フォーク、フラッシュできる。コンパクションは置き換えられたエントリーを削除せずにアクティブな会話から隠す。永続化バックエンドを追加しない限りセッションはメモリに留まり、永続性チェックポイントは設定されたバックエンドを待つ。エージェントが再構築可能なセッションレコードを必要とする場所ではこのパッケージを選ぶ。モデルを呼び出すことはない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount `dsh-session` wherever a session must exist. It creates and holds event-sourced `Session` instances in memory; durable storage is layered on by a persistence plugin that subscribes to the `session/event` feed.
+セッションが必要なすべての場所で `dsh-session` をマウントする。これはイベントソーシング方式の `Session` インスタンスをメモリ内に作成して保持する。永続ストレージは、`session/event` フィードを購読する永続化プラグインによって上に重ねられる。
 
-### Create and inspect sessions
+### セッションを作成して検査する
 
-`ctx.sessions.create()` builds a live session bound to the calling fiber; `get(id)` and `list()` find sessions, and `fork()` creates a child session from a stable prefix of a live one.
+`ctx.sessions.create()` は呼び出し元ファイバーに束縛されたライブセッションを構築する。`get(id)` と `list()` はセッションを見つけ、`fork()` はライブセッションの安定したプレフィックスから子セッションを作成する。
 
 ```text
 const session = ctx.sessions.create(sessionId, { meta: { cwd: '/workspace' } })
@@ -37,9 +37,9 @@ ctx.sessions.get(sessionId)      // the live session
 ctx.sessions.list()              // every live session, in creation order
 ```
 
-### Append and derive
+### 追記と派生
 
-`session.append(type, data, opts?)` commits one typed event — it snapshots and freezes the payload, validates it as lossless JSON, and notifies observers. `session.deriveMessages()` projects the log into the `Message[]` the model sees, incrementally and cached:
+`session.append(type, data, opts?)` は 1 つの型付きイベントをコミットする — ペイロードをスナップショットしてフリーズし、ロスレス JSON として検証し、オブザーバーに通知する。`session.deriveMessages()` はログをモデルが見る `Message[]` へ投影する。インクリメンタルかつキャッシュ付きで行う:
 
 ```text
 session.append('user/message', { role: 'user', content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' } },
@@ -47,169 +47,169 @@ session.append('user/message', { role: 'user', content: [{ type: 'text', text: '
 session.deriveMessages()         // the derived model history
 ```
 
-Surface events (`system/message`, `developer/message`, `user/message`, `assistant/message`, `tool/result`) require `surfaceOp` in both typed events and append input. A replacement uses exactly `{ op: 'replace', startSeq, endSeq }`, with inclusive `SessionSeq` endpoints in current surface order. An Assistant message embeds its exact compact provider stream and forbids `sourceEventSeqs`. Known log-only events forbid both metadata fields and never produce a message.
+サーフェスイベント（`system/message`、`developer/message`、`user/message`、`assistant/message`、`tool/result`）は、型付きイベントと append 入力の両方で `surfaceOp` を必要とする。置換は正確に `{ op: 'replace', startSeq, endSeq }` を使用し、現在のサーフェス順での両端を含む `SessionSeq` 端点を取る。アシスタントメッセージは自身の正確でコンパクトなプロバイダーストリームを埋め込み、`sourceEventSeqs` を禁止する。既知のログ専用イベントは両方のメタデータフィールドを禁止し、メッセージを生成しない。
 
-`developer/message` stores tool-addition names and a `headerSeq` reference to an earlier `request/header`. The reference is required exactly when additions are present, and each name must identify exactly one complete schema in that header. Removals name the tool without a header reference. Historical headers remain available across restart, fork, and surface replacement; the current registry and latest header do not select an earlier addition's definition. `sourceEventSeqs` continues to describe derivation and replaced nodes.
+`developer/message` はツール追加名と、以前の `request/header` への `headerSeq` 参照を格納する。参照は追加が存在するときに正確に必要であり、各名前はそのヘッダー内の正確に 1 つの完全なスキーマを識別しなければならない。削除はヘッダー参照なしでツールを名指す。履歴ヘッダーは再起動、フォーク、サーフェス置換をまたいで利用可能なままである。現在のレジストリと最新のヘッダーが、以前の追加の定義を選択することはない。`sourceEventSeqs` は派生と置換されたノードを引き続き記述する。
 
-Plugins declare content-changing events with `@messageProjection` and register a pure definition through `ctx.sessions.registerMessageProjection()`. Session calls the definition before accepting an event and caches its immutable message updates. Missing definitions reject append and restore; unloading a used definition also blocks cached reads. Detached constructors and `foldSurface(events, projections)` require explicit definitions. Reconstructors pass the fold's `projectedMessages` to `deriveEventMessage()`; live instance methods apply the same projections automatically. [Plugin-owned message projections](../../../.agents/notes/implemented/architecture/2026-09-11-plugin-owned-message-projections.md) defines ownership and offline assembly.
+プラグインは内容を変更するイベントを `@messageProjection` で宣言し、`ctx.sessions.registerMessageProjection()` を通じて純粋な定義を登録する。Session はイベントを受け入れる前に定義を呼び出し、その不変のメッセージ更新をキャッシュする。定義が欠けている場合、append と restore は拒否される。使用中の定義のアンロードもキャッシュされた読み取りをブロックする。デタッチされたコンストラクターと `foldSurface(events, projections)` は明示的な定義を必要とする。再構築器はフォールドの `projectedMessages` を `deriveEventMessage()` に渡す。ライブインスタンスメソッドは同じプロジェクションを自動的に適用する。[プラグイン所有のメッセージプロジェクション](../../../.agents/notes/implemented/architecture/2026-09-11-plugin-owned-message-projections.md)が所有権とオフライン組み立てを定義する。
 
-Append, seed/restore, and event adoption/snapshot reject any `header.system` and exactly empty optional request-header fields (`tools: []`, `adapterDefaults: {}`) instead of normalizing input. Tool-result `data.error` is allowed only when the first-class message has `isError === true`; failure identity remains optional. Rejected appends do not change the log, derived state, or event feed. Adoption validates event-local metadata but not referenced history or replacement membership.
+append、シード/リストア、およびイベントの採用/スナップショットは、入力を正規化する代わりに、あらゆる `header.system` と、正確に空の任意リクエストヘッダーフィールド（`tools: []`、`adapterDefaults: {}`）を拒否する。ツール結果の `data.error` は、ファーストクラスメッセージが `isError === true` を持つ場合にのみ許可される。失敗アイデンティティは任意のままである。拒否された append は、ログ、派生状態、イベントフィードを変更しない。採用はイベントローカルのメタデータを検証するが、参照された履歴や置換メンバーシップは検証しない。
 
-`system/message` holds the rendered system prompt: the first one is surface node 0, the prepared call capability governs admission, with a non-empty rendering consolidated at the first system node on an incapable route or appended after cached history inside a continuing `in-history` series; empty system nodes project to no message, so clearing the prompt requires logged empty replacements of all active system nodes, not just the latest; the surface fold rejects a replacement covering node 0 while it is a `system/message` unless the replacing event is itself a `system/message` over exactly that node, while later system nodes carry no protection and a compaction range may shadow them ([decision](../../../.agents/notes/implemented/architecture/2026-09-02-system-prompt-as-surface-node.md)).
+`system/message` はレンダリングされたシステムプロンプトを保持する。最初のものがサーフェスノード 0 であり、準備済み呼び出しケイパビリティが承認を統治する。空でないレンダリングは、能力のないルートでは最初のシステムノードで統合され、継続中の `in-history` 系列ではキャッシュされた履歴の後に追記される。空のシステムノードはメッセージに投影されないため、プロンプトのクリアには、最新のものだけでなく、アクティブなすべてのシステムノードのログ記録された空置換が必要である。サーフェスフォールドは、ノード 0 が `system/message` である間、それを覆う置換を拒否する（置換イベント自体が正確にそのノードに対する `system/message` である場合を除く）。一方、後発のシステムノードは保護を持たず、コンパクション範囲がそれらをシャドウしてもよい（[決定](../../../.agents/notes/implemented/architecture/2026-09-02-system-prompt-as-surface-node.md)）。
 
-### Read the log
+### ログを読む
 
-`session.seq` reads the current log length without materializing an array, and `session.eventAt(seq)` reads one accepted, deeply frozen event by sequence number. `session.snapshotEvents(fromSeq?, toSeqExclusive?)` materializes a frozen, stable snapshot of a half-open range; a complete current snapshot is cached until the next append. `eventAt()`, `snapshotEvents()`, and `ownEvents()` are deprecated: existing logic may remain unmigrated for now, but new production calls are prohibited. Repository test files may use these three readers under their scoped lint allowance ([policy](../../../.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md)). Callers that only need a length use `seq`.
+`session.seq` は配列を実体化せずに現在のログ長を読み取り、`session.eventAt(seq)` はシーケンス番号で 1 つの受け入れ済みでディープフリーズされたイベントを読む。`session.snapshotEvents(fromSeq?, toSeqExclusive?)` は半開区間のフリーズされた安定したスナップショットを実体化する。完全な現在のスナップショットは次の append までキャッシュされる。`eventAt()`、`snapshotEvents()`、`ownEvents()` は非推奨である。既存のロジックは今のところ移行されないままでもよいが、新しい本番呼び出しは禁止されている。リポジトリのテストファイルは、スコープ付き lint 許可の下でこれら 3 つのリーダーを使用してよい（[ポリシー](../../../.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md)）。長さだけを必要とする呼び出し元は `seq` を使う。
 
-Session log positions use two numeric types. `SessionSeq` identifies an existing event or inclusive event watermark; `SessionLogOffset` identifies a gap, prefix length, or read boundary and may equal the event count. `SessionSeqCursor` adds the `-1` “no event yet” value, while `OptionalSessionSeq` uses `null` when absence is data. The constructors validate non-negative safe integers, and the brands disappear at runtime, so durable JSON and wire values remain ordinary numbers.
+セッションログの位置には 2 つの数値型を使用する。`SessionSeq` は既存のイベントまたは両端を含むイベントウォーターマークを識別し、`SessionLogOffset` はギャップ、プレフィックス長、または読み取り境界を識別し、イベント数に等しくてもよい。`SessionSeqCursor` は `-1` の「まだイベントなし」値を追加し、`OptionalSessionSeq` は不在がデータである場合に `null` を使う。コンストラクターは非負の安全な整数を検証し、ブランドは実行時に消えるため、永続 JSON と wire の値は通常の数値のままである。
 
 <a id="write-experimental-plugin-records"></a>
 
-### Write experimental plugin records
+### 実験的プラグインレコードを書き込む
 
-`appendPluginRecord(session, type, data)` appends one plugin record for a package under `packages/experimental/`; the `verify-plugin-record-callers` check rejects any other production caller in this repository. Plugins outside this repository must not call it either, although no repository check can inspect them.
+`appendPluginRecord(session, type, data)` は `packages/experimental/` 配下のパッケージ用に 1 つのプラグインレコードを追記する。`verify-plugin-record-callers` チェックは、このリポジトリ内の他の本番呼び出し元を拒否する。このリポジトリ外のプラグインもこれを呼び出してはならないが、それを検査できるリポジトリチェックはない。
 
-Declare each record in `PluginRecordMap` through `@deepseek-ai/dsh-session/types`, with a description and an explicit payload type annotation in the owning experimental package's `src/`. Names use `plugin:<owner>/<record>`, where `owner` is the suffix of the package name `@deepseek-ai/dsh-experimental-<owner>`; for example, `plugin:pi-extensions/entry`. TypeScript checks each name and payload against its declaration; the writer's runtime JSON snapshot rejects values that cannot be preserved losslessly. Put extension-defined or other dynamic names inside the payload of a declared record.
+各レコードは `@deepseek-ai/dsh-session/types` を通じて `PluginRecordMap` に宣言し、所有する実験的パッケージの `src/` に説明と明示的なペイロード型注釈を置く。名前は `plugin:<owner>/<record>` を使用する。`owner` はパッケージ名 `@deepseek-ai/dsh-experimental-<owner>` のサフィックスである。たとえば `plugin:pi-extensions/entry` である。TypeScript は各名前とペイロードをその宣言に対して検査し、ライターの実行時 JSON スナップショットはロスレスに保存できない値を拒否する。拡張定義またはその他の動的名は、宣言されたレコードのペイロード内に置く。
 
-The [experimental persistence catalog](../../../docs/experimental-persistence-catalog.md) lists current plugin-record declarations with their owners, descriptions, payload type annotations, and source files. These declarations remain separate from `SessionEventMap`, expanded persistence schemas, released type history, and `KNOWN_SESSION_EVENT_TYPES`. Records carry `ignorable: true`: a build that does not recognize one retains and skips it on read. Records never enter the model-visible surface. Resume and fork carry them with the rest of the log; Session format migration keeps them on a best-effort basis.
+[実験的永続化カタログ](../../../docs/experimental-persistence-catalog.md)は、現在のプラグインレコード宣言を、そのオーナー、説明、ペイロード型注釈、ソースファイルとともに列挙する。これらの宣言は、`SessionEventMap`、展開された永続化スキーマ、リリース済みの型履歴、`KNOWN_SESSION_EVENT_TYPES` とは別のままである。レコードは `ignorable: true` を持ち、認識しないビルドはそれを保持し、読み取り時にスキップする。レコードがモデル可視のサーフェスに入ることはない。再開とフォークはログの残りとともにそれらを運び、Session フォーマットの移行はベストエフォートでそれらを保持する。
 
-`pluginRecordOf(event)` returns an event as a record, or `undefined` for any other event; a `ctx.sessionProjections` unit that passes each event to it rebuilds plugin state on resume. Its `data` remains `unknown` even when the current map declares the name. The owner validates it before use because earlier builds can write different payloads, and the V3-to-V4 format edge can rename an unknown ignorable V3 event into the same `plugin:` namespace. Removing or renaming a declaration does not discard stored records. The [ignorable events decision](../../../.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.md) owns the compatibility policy.
+`pluginRecordOf(event)` はイベントをレコードとして返すか、その他のイベントに対して `undefined` を返す。各イベントをこれに渡す `ctx.sessionProjections` ユニットは、再開時にプラグイン状態を再構築する。現在のマップが名前を宣言していても、その `data` は `unknown` のままである。以前のビルドが異なるペイロードを書き込みうることと、V3 から V4 へのフォーマット端が未知の ignorable な V3 イベントを同じ `plugin:` 名前空間に改名しうることから、オーナーは使用前にそれを検証する。宣言の削除または改名は、保存されたレコードを破棄しない。[ignorable イベントの決定](../../../.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.md)が互換性ポリシーを所有する。
 
-### Fork a session
+### セッションをフォークする
 
-`ctx.sessions.fork(source, boundary?, childSessionId?)` copies an exact inclusive event prefix (default: the last event) from a live source. `buildForkSeed` in `dsh-session/fork` places an inherited marker after the copied events, adds missing error tool results only for the open step, and closes that step and turn with a `forked` reason. Closed steps and turns remain unchanged, including historical missing results. The marker and closers belong to the child; `inheritedEventCount` counts only the copied prefix.
+`ctx.sessions.fork(source, boundary?, childSessionId?)` は、ライブソースから正確な両端を含むイベントプレフィックス（デフォルト: 最後のイベント）をコピーする。`dsh-session/fork` の `buildForkSeed` は、コピーされたイベントの後に継承マーカーを置き、オープンなステップにのみ欠落したエラーツール結果を追加し、そのステップとターンを `forked` 理由で閉じる。閉じられたステップとターンは、歴史的な欠落結果も含めて変更されない。マーカーとクローザーは子に属し、`inheritedEventCount` はコピーされたプレフィックスのみを数える。
 
-The logical `SessionHeader.isSeeded` field reports whether fork history exists without exposing a positional integer. `Session.inheritedEventCount` retains the exact checked `SessionLogOffset`; `ownEvents()` returns events at and after that cut, and `isOwnSeq(seq)` accepts only an existing child-owned position. A low-level seeded constructor must supply an explicit `seed` and `inheritedEventCount` because the constructor seed can contain child-owned setup events after the inherited prefix.
+論理フィールド `SessionHeader.isSeeded` は、位置を表す整数を露出することなく、フォーク履歴が存在するかどうかを報告する。`Session.inheritedEventCount` は正確に検証された `SessionLogOffset` を保持する。`ownEvents()` はそのカット以降のイベントを返し、`isOwnSeq(seq)` は既存の子所有の位置のみを受け入れる。低レベルのシード付きコンストラクターは明示的な `seed` と `inheritedEventCount` を供給しなければならない。コンストラクターシードは継承プレフィックスの後に子所有のセットアップイベントを含むことがあるためである。
 
-### Flush durable state
+### 永続状態をフラッシュする
 
-`ctx.sessions.flush(session)` dispatches the awaited durability checkpoint: every persistence listener flushes and the call settles after all of them. A producer that needs an immediate durability barrier awaits it instead of assuming the write-behind drained.
+`ctx.sessions.flush(session)` は待機可能な永続性チェックポイントをディスパッチする。すべての永続化リスナーがフラッシュし、呼び出しはそれらすべての後に決着する。即時の永続性バリアを必要とするプロデューサーは、ライトビハインドがドレインされたと仮定するのではなく、これを待機する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the package realizes the behavior above; the observable contract is covered in [Use this package](#use-this-package).
+このセクションでは、このパッケージが上記の動作をどのように実現するかを説明する。観察可能な契約は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design concept
+### 設計概念
 
-The package is built on event sourcing: a `Session` is an append-only log of typed `SessionEvent`s, and everything else — model history, transcripts, telemetry, titles, persistence — derives from that stream. The surface is a derived projection: an incremental manager validates append candidates, advances the ordered view from committed events, and tracks `replaceGeneration` for positional replacements and `contentGeneration` for replacements and plugin-owned message changes. Model-visible means logged: anything that reaches a model request must be reconstructable from the log. Each model attempt that reaches settlement commits one event: `assistant/message` carries the assembled model-visible message plus its compact timed stream, while `assistant/attempt` retains a failed, retried, cancelled, or stream-error attempt without adding model history. A hard process loss before settlement leaves no durable attempt stream.
+このパッケージはイベントソーシングに基づいて構築されている。`Session` は型付き `SessionEvent` の追記専用ログであり、それ以外のすべて — モデル履歴、トランスクリプト、テレメトリー、タイトル、永続化 — はそのストリームから派生する。サーフェスは派生プロジェクションである。インクリメンタルマネージャーが append 候補を検証し、コミットされたイベントから順序付きビューを前進させ、位置ベースの置換のために `replaceGeneration` を、置換とプラグイン所有のメッセージ変更のために `contentGeneration` を追跡する。モデル可視とはログ記録済みを意味する。モデルリクエストに到達するものは何でもログから再構築可能でなければならない。決着に到達した各モデル試行は 1 つのイベントをコミットする。`assistant/message` は組み立てられたモデル可視メッセージとそのコンパクトなタイム付きストリームを運び、`assistant/attempt` は失敗、再試行、キャンセル、ストリームエラーの試行をモデル履歴に追加することなく保持する。決着前のプロセスの強制終了は永続的な試行ストリームを残さない。
 
-### Request headers
+### リクエストヘッダー
 
-`request/header` stores a full canonical snapshot of the non-history request envelope with reason `initial`, `resume`, `change`, or `series`. An explicit message-series start, a surface replacement, or a plugin-owned message change writes a `series` snapshot when the envelope is unchanged; a simultaneous change uses `startsSeries: true`. Same-series steps, retries, and ordinary later turns inherit the latest snapshot. `adapterDefaults` distinguishes values resolved by the adapter from explicit settings, and `foldRequestHeader()` selects the latest snapshot. This self-contained record supports partial-window rendering and exact reconstruction at the cost of growth per message series; the [reconstructable-requests Agent Note](../../../.agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.md) owns the detail.
+`request/header` は、理由 `initial`、`resume`、`change`、`series` を伴う、非履歴リクエストエンベロープの完全な正規スナップショットを格納する。明示的なメッセージ系列の開始、サーフェス置換、またはプラグイン所有のメッセージ変更は、エンベロープが変更されていなければ `series` スナップショットを書き込み、同時に変更された場合は `startsSeries: true` を使用する。同一系列のステップ、リトライ、通常の後続ターンは最新のスナップショットを継承する。`adapterDefaults` はアダプターが解決した値と明示的な設定を区別し、`foldRequestHeader()` は最新のスナップショットを選択する。この自己完結型レコードは、メッセージ系列ごとの増加と引き換えに、部分ウィンドウのレンダリングと正確な再構築をサポートする。詳細は[再構築可能リクエストの Agent Note](../../../.agents/notes/implemented/architecture/2026-07-05-reconstructable-requests.md)が所有する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `SessionStore` service, store lifecycle, `fork`, `flush` |
-| [`src/types.ts`](src/types.ts) | `SessionEventMap`, `SessionEvent`, `UserMessage`, `SessionHeader`, `TurnEndReasonMap` |
-| [`src/surface.ts`](src/surface.ts) | Ordered surface projection, replacement validation, `deriveEventMessage` |
-| [`src/request-header.ts`](src/request-header.ts) | `request/header` folding and reconstruction |
-| [`dsh-util-values`](../../util/values/README.md) | Shared lossless JSON validation and detached snapshots |
-| [`src/repair.ts`](src/repair.ts) | Shared tool-result recovery for failed steps, interrupted logs, and fork seeds |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー。`SessionStore` サービス、ストアライフサイクル、`fork`、`flush` |
+| [`src/types.ts`](src/types.ts) | `SessionEventMap`、`SessionEvent`、`UserMessage`、`SessionHeader`、`TurnEndReasonMap` |
+| [`src/surface.ts`](src/surface.ts) | 順序付きサーフェスプロジェクション、置換検証、`deriveEventMessage` |
+| [`src/request-header.ts`](src/request-header.ts) | `request/header` の畳み込みと再構築 |
+| [`dsh-util-values`](../../util/values/README.md) | 共有のロスレス JSON 検証とデタッチされたスナップショット |
+| [`src/repair.ts`](src/repair.ts) | 失敗したステップ、中断されたログ、フォークシードのための共有ツール結果リカバリー |
 
-### Append validation
+### append の検証
 
-Every append uses the shared iterative `snapshotJsonValue()` pass, which reads, validates, and copies each nested value once, so a stateful getter cannot supply one value to validation and another to storage. Non-lossless-JSON payloads (BigInt, cycles, sparse arrays, `-0`, exotic prototypes) are rejected at the append site, before any backend flush. The append path constructs each `SessionSeq`; surface events additionally validate marker shape, cited source-event sequences, and complete shadowed-node coverage for replacements.
+すべての append は共有の反復的な `snapshotJsonValue()` パスを使用する。これは各ネスト値を 1 回だけ読み取り、検証し、コピーするため、ステートフルなゲッターが検証とストレージに別の値を供給することはできない。ロスレス JSON でないペイロード（BigInt、循環、疎配列、`-0`、異質なプロトタイプ）は、バックエンドのフラッシュ前に append サイトで拒否される。append パスは各 `SessionSeq` を構築する。サーフェスイベントはさらに、マーカー形状、引用されたソースイベントシーケンス、置換のための完全なシャドウノードカバレッジを検証する。
 
-### Shared recovery
+### 共有リカバリー
 
-`ToolCallRecovery` tracks unanswered requests from committed events without retaining event history. AgentLoop observes live steps; crash recovery and fork-seed construction replay their prefixes through `openTurnClosers`. Live failures and crash recovery use interrupted-result wording by default; fork construction passes the fork cause to select its distinct retry guidance. The caller appends recovery results before closing the step ([reference](../agent-loop/README.md)).
+`ToolCallRecovery` はイベント履歴を保持せずに、コミットされたイベントから未回答のリクエストを追跡する。AgentLoop はライブステップを観察する。クラッシュリカバリーとフォークシード構築は、`openTurnClosers` を通じてプレフィックスを再生する。ライブの失敗とクラッシュリカバリーはデフォルトで中断結果の文言を使用し、フォーク構築はフォーク原因を渡して独自の再試行ガイダンスを選択する。呼び出し元はステップを閉じる前にリカバリー結果を追記する（[参照](../agent-loop/README.md)）。
 
-### Derived history
+### 派生履歴
 
-`deriveMessages()` caches deep-frozen projections and returns a fresh array per call. The surface event types (`system/message`, `developer/message`, `user/message`, `assistant/message`, `tool/result`) supply their recorded message identities and content; empty-content system and developer nodes project to no message. Plugin-owned projections change derived content without mutating recorded messages. Replacements and projection decisions invalidate the cache. Embedded Assistant streams and `assistant/attempt` events remain replay and diagnostic data only. Ordinary prompts and injected context project without automatic type- or source-specific wrappers. Producers own any framing in their recorded content.
+`deriveMessages()` はディープフリーズされたプロジェクションをキャッシュし、呼び出しごとに新しい配列を返す。サーフェスイベント型（`system/message`、`developer/message`、`user/message`、`assistant/message`、`tool/result`）は、記録されたメッセージアイデンティティと内容を供給する。空の内容の system ノードと developer ノードはメッセージに投影されない。プラグイン所有のプロジェクションは、記録されたメッセージを変更せずに派生内容を変更する。置換とプロジェクション決定はキャッシュを無効化する。埋め込まれた Assistant ストリームと `assistant/attempt` イベントは、再生と診断のデータに留まる。通常のプロンプトと注入されたコンテキストは、型固有またはソース固有の自動ラッパーなしで投影される。記録された内容内のあらゆるフレーミングはプロデューサーが所有する。
 
-### The request header
+### リクエストヘッダー
 
-The loop logs a full canonical `request/header` snapshot (call config, adapter defaults, assembled tool schemas — the rendered system prompt is a `system/message` surface node, not header state) at each loop-instance boundary and on change; `foldRequestHeader(events)` reconstructs it by selecting the latest snapshot, making every conversation request a pure function of the log. Route metadata (`request/context`) is separate logged state appended only when the provider, model, capacity, or `systemPromptUpdate` mode differs; it records the actual prepared call's mode after prompt and user admission, rather than supplying that admission decision.
+ループは、各ループインスタンス境界と変更時に、完全な正規 `request/header` スナップショット（呼び出し設定、アダプターデフォルト、組み立てられたツールスキーマ — レンダリングされたシステムプロンプトは `system/message` サーフェスノードであり、ヘッダー状態ではない）をログに記録する。`foldRequestHeader(events)` は最新のスナップショットを選択してそれを再構築し、すべての会話リクエストをログの純粋関数にする。ルートメタデータ（`request/context`）は別個のログ状態であり、provider、model、容量、または `systemPromptUpdate` モードが異なる場合にのみ追記される。これはプロンプトとユーザー承認の後に実際の準備済み呼び出しのモードを記録するのであって、その承認決定を供給するのではない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-The package-level contract is enough for most consumers; read these when you need the surrounding domain.
+ほとんどのコンシューマーにはパッケージレベルの契約で十分である。周辺ドメインが必要なときにこれらを読む。
 
-- [Session subsystem](../../../docs/subsystems/session.md) — the full event vocabulary, surface types, and generated service API.
-- [Persistence subsystem](../../../docs/subsystems/persistence.md) — how backends make this log durable.
-- [Core subsystem](../../../docs/subsystems/core.md) — the loop that writes and derives from sessions.
-- [Generated persistence catalog](../../../docs/persistence-catalog.md) — every session event with its payload and declaration site.
-- [Core group map](../README.md) — how the core packages compose.
+- [Session subsystem](../../../docs/subsystems/session.md) — 完全なイベント語彙、サーフェス型、生成されたサービス API。
+- [Persistence subsystem](../../../docs/subsystems/persistence.md) — バックエンドがこのログをどのように永続化するか。
+- [Core subsystem](../../../docs/subsystems/core.md) — セッションに書き込み、そこから派生するループ。
+- [Generated persistence catalog](../../../docs/persistence-catalog.md) — すべてのセッションイベントと、そのペイロードおよび宣言サイト。
+- [Core group map](../README.md) — コアパッケージがどのように構成されるか。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Derived message history
+### 派生メッセージ履歴
 
-#### What the model sees
+#### モデルが見るもの
 
-The model receives the complete messages from `system/message`, `developer/message`, `user/message`, `assistant/message`, and `tool/result` surface entries with logged projections applied, the system prompt first. Identities, roles, sources, and unmodified blocks retain their original values; projections never mint identities. Direct prompts and injected context remain separate `user/message` events whose sources preserve their attribution. Embedded streams, `assistant/attempt`, boundaries, and other log-only facts add no message.
+モデルは、`system/message`、`developer/message`、`user/message`、`assistant/message`、`tool/result` サーフェスエントリーからの完全なメッセージを、ログ記録されたプロジェクションを適用した状態で受け取る（システムプロンプトが最初）。アイデンティティ、ロール、ソース、および変更されていないブロックは元の値を保つ。プロジェクションがアイデンティティを鋳造することはない。直接のプロンプトと注入されたコンテキストは別個の `user/message` イベントのままであり、そのソースが帰属を保つ。埋め込まれたストリーム、`assistant/attempt`、境界、その他のログ専用の事実はメッセージを追加しない。
 
-#### Token effect
+#### トークンへの影響
 
-Appended surface entries are resent on later steps. A `replace` surface operation removes the shadowed entries from future inputs without deleting their raw log records.
+追記されたサーフェスエントリーは後のステップで再送される。`replace` サーフェス操作は、生のログレコードを削除することなく、シャドウされたエントリーを将来の入力から取り除く。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Appended surface entries preserve reusable prefixes. A `replace` operation invalidates reuse from the first shadowed message even though the underlying event log stays append-only.
+追記されたサーフェスエントリーは再利用可能なプレフィックスを保つ。`replace` 操作は、基盤のイベントログが追記専用のままであっても、シャドウされた最初のメッセージから再利用を無効化する。
 
-### Tool-result recovery and fork results
+### ツール結果のリカバリーとフォーク結果
 
-#### What the model sees
+#### モデルが見るもの
 
-If recovery finds an assistant tool request with no durable `tool/call`, its synthetic `TOOL_NOT_STARTED` result says `The tool call was interrupted before the Harness recorded it as started. Retry it if it is still needed.` If a durable `tool/call` has no result, its `TOOL_OUTCOME_UNKNOWN` result says `The tool call was interrupted after it was recorded, but no result was durably recorded. Its outcome is unknown. Decide whether to retry from the tool semantics: retry only if the operation is read-only or idempotent; if it may have side effects, first verify external state or ask the user. Do not retry blindly.` Fork-generated results describe only the inherited records: the parent may have started or completed a call after the selected event. `TOOL_NOT_STARTED` means the prefix contains no start record; `TOOL_OUTCOME_UNKNOWN` means it contains a start but no result. Both tell the model to retry only read-only or idempotent operations without further checks; operations with side effects require external verification or user input. See the [fork reference](src/fork.ts).
+リカバリーが、永続的な `tool/call` を持たないアシスタントのツールリクエストを見つけた場合、その合成 `TOOL_NOT_STARTED` 結果は `The tool call was interrupted before the Harness recorded it as started. Retry it if it is still needed.` と述べる。永続的な `tool/call` に結果がない場合、その `TOOL_OUTCOME_UNKNOWN` 結果は `The tool call was interrupted after it was recorded, but no result was durably recorded. Its outcome is unknown. Decide whether to retry from the tool semantics: retry only if the operation is read-only or idempotent; if it may have side effects, first verify external state or ask the user. Do not retry blindly.` と述べる。フォーク生成の結果は継承されたレコードのみを記述する。親は選択されたイベントの後に呼び出しを開始または完了した可能性がある。`TOOL_NOT_STARTED` はプレフィックスに start レコードが含まれないことを意味し、`TOOL_OUTCOME_UNKNOWN` は start はあるが結果がないことを意味する。どちらもモデルに、読み取り専用または冪等な操作のみをそれ以上の確認なしで再試行するよう伝える。副作用のある操作には外部検証またはユーザー入力が必要である。[fork 参照](src/fork.ts)を参照。
 
-#### Token effect
+#### トークンへの影響
 
-Zero tokens in an intact session. Each repaired call adds its retained risk-specific error text to later requests.
+無傷のセッションではゼロトークンである。修復された各呼び出しは、保持されたリスク固有のエラーテキストを後のリクエストに追加する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ。新たに可視化された内容は再利用可能なリクエストプレフィックスに従い、既存の KV キャッシュエントリーを無効化しない。
 
-### Logged request header
+### ログ記録されたリクエストヘッダー
 
-#### What the model sees
+#### モデルが見るもの
 
-The session reconstructs active tool schemas and call config from request headers; provider-specific deferred and retained declarations are derived at dispatch. `toolHistory()` caches a stateful fold over committed headers and developer messages, consuming only unseen events on subsequent reads. It resolves additions through their historical `headerSeq`, returns immutable snapshots, and restarts declarations on an explicit request series or a changed retained definition. Restoring a retained name with an unchanged definition continues the series; the recorded addition re-offers it. Both loop requests and compaction calls use this state. Headers lacking matching update records use complete active declarations. Same-name schema changes are allowed and invalidate prefix reuse even on `in-history` routes; registration-time rejection against historical tools is deferred ([rationale](../../../.agents/notes/implemented/architecture/2026-09-20-dynamic-tool-updates.md)). The system prompt remains part of `deriveMessages()`; header events add no message or prompt copy.
+Session はリクエストヘッダーからアクティブなツールスキーマと呼び出し設定を再構築する。プロバイダー固有の遅延宣言と保持宣言はディスパッチ時に派生される。`toolHistory()` はコミットされたヘッダーと developer メッセージに対するステートフルな畳み込みをキャッシュし、後続の読み取りでは未見のイベントのみを消費する。追加を履歴の `headerSeq` を通じて解決し、不変のスナップショットを返し、明示的なリクエスト系列または保持定義の変更で宣言を再開する。変更されていない定義で保持名を復元すると系列が継続し、記録された追加がそれを再提示する。ループリクエストとコンパクション呼び出しの両方がこの状態を使用する。一致する更新レコードを欠くヘッダーは、完全なアクティブ宣言を使用する。同名スキーマの変更は許可され、`in-history` ルートでもプレフィックスの再利用を無効化する。履歴ツールに対する登録時の拒否は先送りされている（[根拠](../../../.agents/notes/implemented/architecture/2026-09-20-dynamic-tool-updates.md)）。システムプロンプトは `deriveMessages()` の一部のままである。ヘッダーイベントはメッセージやプロンプトのコピーを追加しない。
 
-#### Token effect
+#### トークンへの影響
 
-Zero duplicate tokens from logging. The system nodes and schemas still incur their normal per-request cost.
+ログ記録による重複トークンはゼロである。システムノードとスキーマは依然として通常のリクエストごとのコストを負う。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Logging causes no invalidation, and exact reconstruction preserves request-prefix identity. A later header with changed config or schemas may invalidate reuse from its first difference; a prompt change that replaces surface node 0 invalidates reuse from the first token, while an in-history append keeps the prefix through the cached history reusable.
+ログ記録は無効化を引き起こさず、正確な再構築がリクエストプレフィックスの同一性を保つ。設定やスキーマが変更された後発のヘッダーは、その最初の差分から再利用を無効化しうる。サーフェスノード 0 を置換するプロンプト変更は最初のトークンから再利用を無効化する一方、履歴内追記はキャッシュされた履歴までのプレフィックスを再利用可能に保つ。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the session store needs special care. They are current package constraints, not a task backlog.
+これらの制限は、セッションストアが特別な注意を必要とする状況を定義する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Live-source Store API** — persisted-but-unloaded sources use the Host observation path. Fork closes only the open tail and does not repair missing results in previously closed steps.
-- **`SESSION_FORMAT_VERSION` names the [current logical representation](../../../docs/session-format-status.md)** — the current reader rejects retired `header.system` and validates `system/message` payloads and protected-head rewrites. Historical headers and events belong to adjacent format packages; the [adjacent migration chain](../../session/session-format-catalog/README.md) converts supported history before constructing `Session`, and the write-open path publishes only the current-format successor. Equal-version unknown events require the envelope's explicit `ignorable` marker, which does not promise safe structural migration ([mechanism](../../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md)). [Reader compatibility](../../../.agents/notes/implemented/process/2026-10-08-session-reader-compatibility-review.md) determines whether a change needs a version increase.
-- **`TurnEndReasonMap` omits the ACP-named `refusal` / `max_turn_requests` variants** — producer-gated: they land when an adapter or the loop first emits them.
-- **No session tree beyond fork** — a pi-style entry tree over branched sessions is deferred unless a consumer needs more than boundary-based forking.
+- **ライブソースの Store API** — 永続化されているがアンロードされたソースは Host 観察パスを使用する。フォークはオープンなテールのみを閉じ、以前に閉じられたステップの欠落結果を修復しない。
+- **`SESSION_FORMAT_VERSION` は[現在の論理表現](../../../docs/session-format-status.md)を名指す** — 現在のリーダーは廃止された `header.system` を拒否し、`system/message` ペイロードと保護先頭の書き換えを検証する。履歴ヘッダーと履歴イベントは隣接フォーマットパッケージに属する。[隣接移行チェーン](../../session/session-format-catalog/README.md)は `Session` を構築する前にサポート対象の履歴を変換し、書き込みオープンパスは現在フォーマットの後継のみを公開する。同バージョンの未知イベントは、エンベロープの明示的な `ignorable` マーカーを必要とする。これは安全な構造移行を約束するものではない（[メカニズム](../../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md)）。変更がバージョン上げを必要とするかどうかは[リーダー互換性](../../../.agents/notes/implemented/process/2026-10-08-session-reader-compatibility-review.md)が決定する。
+- **`TurnEndReasonMap` は ACP 名の `refusal` / `max_turn_requests` バリアントを省略する** — プロデューサー制: アダプターまたはループがそれらを最初に発行したときに導入される。
+- **フォークを超えるセッションツリーはない** — 分岐したセッション上の pi 形式のエントリーツリーは、コンシューマーが境界ベースのフォーク以上のものを必要としない限り先送りである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

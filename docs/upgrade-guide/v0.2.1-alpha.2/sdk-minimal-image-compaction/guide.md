@@ -3,19 +3,19 @@ kind: upgrade-guide
 description: "The sdk-minimal default tool roster adds read_image and automatically summarizes older context."
 ---
 
-# SDK-minimal image reading and automatic compaction
+# SDK-minimal の画像読み取りと自動コンパクション
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更内容
 
-`sdk-minimal` advertises `read_image` alongside its persistent shell and `working_directory`. Automatic compaction sends an additional model request to summarize older history when context pressure reaches the configured threshold. The complete Session log remains stored as uncompressed JSONL. Images that exceed the route budget are permanently replaced by attachment/path placeholders so the request can retry. SDK prompt text does not execute `/compact`.
+`sdk-minimal` は永続シェルと `working_directory` に並んで `read_image` を広告する。自動コンパクションはコンテキスト圧迫が設定済みしきい値に達すると古い履歴を要約する追加モデルリクエストを送る。完全なセッションログは非圧縮 JSONL として保存されたままである。ルート予算を超える画像はリクエストが再試行できるよう添付/パスプレースホルダーに恒久的に置換される。SDK プロンプト文は `/compact` を実行しない。
 
-Clients that pin tool names, benchmark prompt size, or count model requests must account for these defaults. Image reading requires an adapter route that declares image input. See the [bundle reference](../../../../packages/bundle/sdk-minimal/README.md) for configuration and model effects.
+ツール名を固定するクライアント、プロンプトサイズを測るベンチマーク、モデルリクエストを数える処理はこれらの既定を織り込まなければならない。画像読み取りは画像入力を宣言するアダプタールートを要求する。設定とモデル影響は [バンドルリファレンス](../../../../packages/bundle/sdk-minimal/README.md) を参照。
 
-## Migration
+## 移行手順
 
-1. Accept the new defaults, or place this patch in `$DSH_HOME/profiles/sdk-minimal/cordis.patch.yml` to retain the previous default tools and disable automatic compaction:
+1. 新しい既定を受け入れるか、以前の既定ツールと自動コンパクション無効を維持するには `$DSH_HOME/profiles/sdk-minimal/cordis.patch.yml` にこのパッチを置く:
 
 ```yaml
 - id: tool-fs
@@ -29,4 +29,4 @@ Clients that pin tool names, benchmark prompt size, or count model requests must
     auto: false
 ```
 
-2. Launch a fresh SDK runtime. Without additional user plugins, its model requests contain the persistent `bash` or `pwsh` tool and `working_directory`; it sends no automatic summarization requests.
+2. 新鮮な SDK ランタイムを起動する。追加ユーザープラグインが無ければ、そのモデルリクエストは永続 `bash` または `pwsh` ツールと `working_directory` を含み、自動要約リクエストを送らない。

@@ -1,94 +1,94 @@
 ---
-description: "Browser-host wire layer for the web GUI: Remote RPC, event-stream delivery with reconnect, exact Fetch routes, the /api HTTP bridge, and the browser-trust fence."
+description: "web GUI のブラウザー-Host wire 層: Remote RPC、再接続付きイベントストリーム配信、正確な Fetch ルート、/api HTTP ブリッジ、ブラウザー信頼フェンス。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-connection
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The package carries browser-to-Host Remote calls, exact Fetch responses, and connection generations. The Client plugin mounts `ctx.connection` with current-page loopback state, generic RPC, the active generation and its Host facts, observable recovery state, an immediate reconnect command, and the registration point for one generation source. A generation becomes visible when its source reports ready; source completion, failure, withdrawal, or an explicit stop clears it before `ConnectionController` applies its retry policy.
+このパッケージは、ブラウザーから Host への Remote 呼び出し、正確な Fetch レスポンス、接続世代を運ぶ。Client プラグインは `ctx.connection` をマウントし、現在ページのループバック状態、汎用 RPC、アクティブな世代とその Host ファクト、観測可能なリカバリー状態、即時再接続コマンド、および 1 つの世代ソースの登録ポイントを提供する。世代はそのソースが ready を報告したときに可視になる。ソースの完了、失敗、撤回、または明示的な停止は、`ConnectionController` がリトライポリシーを適用する前にそれをクリアする。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Browser authentication and request trust](#browser-authentication-and-request-trust)
-- [Connection generation](#connection-generation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [ブラウザー認証とリクエスト信頼](#browser-authentication-and-request-trust)
+- [接続世代](#connection-generation)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The `./client` import selects the standalone `lib/client.node.js` ESM bundle in Node and the `lib/client.browser.js` loader factory in browsers. The Web Host still serves the browser export at the logical `/plugins/.../client.js` URL. Import the Client entry for a non-page Cordis tree; the separate package root is the Host entry.
+`./client` インポートは、Node ではスタンドアロンの `lib/client.node.js` ESM バンドルを、ブラウザーでは `lib/client.browser.js` ローダーファクトリーを選択する。Web Host は論理 URL `/plugins/.../client.js` でブラウザーエクスポートを提供し続ける。非ページの Cordis ツリーには Client エントリーをインポートする。別個のパッケージルートが Host エントリーである。
 
-A static desktop page can provide `__DSH_TRANSPORT__.streamBaseUrl` for the HTTP origin of its owned Host. The Gateway uses that origin for its WebSocket while HTTP transport remains independently selected. The desktop carrier owns authentication; setting the origin alone grants no access.
+静的なデスクトップページは、自身が所有する Host の HTTP オリジンとして `__DSH_TRANSPORT__.streamBaseUrl` を提供できる。Gateway はそのオリジンを WebSocket に使用し、HTTP トランスポートは独立に選択されたままである。デスクトップキャリアが認証を所有する。オリジンの設定だけではアクセス権は得られない。
 
-Unary RPC requests use JSON. A Host handler may return byte attachments that it has already separated from the JSON-compatible result value, with each attachment naming its result-relative path. Connection writes these values as multipart parts. The JSON `metadata` part contains the RPC response envelope with `null` placeholders and an attachment table recording each path, codec, and part identifier. Paths use string keys and numeric array indices; no business field name is reserved. The Client validates the envelope, `rpcId`, attachment table, and parts, then restores each byte value as an `ArrayBuffer`-backed view. Results without attachments, including base64 strings, and failures remain JSON. Logical RPC carriers return decoded native values directly. Connection does not discover binary fields or depend on Typert; the handler that owns a result protocol performs any type-directed or runtime projection before returning. Binary parameters, events, and streamed binary results are unsupported.
+単項 RPC リクエストは JSON を使う。Host ハンドラーは、JSON 互換の結果値からすでに分離したバイト添付を返してもよく、各添付は結果相対のパスを名指す。Connection はこれらの値を multipart パートとして書き込む。JSON の `metadata` パートは、`null` プレースホルダー付きの RPC レスポンスエンベロープと、各パス、コーデック、パート識別子を記録する添付テーブルを含む。パスは文字列キーと数値配列インデックスを使う。予約されたビジネスフィールド名はない。Client はエンベロープ、`rpcId`、添付テーブル、パートを検証し、各バイト値を `ArrayBuffer` ベースのビューとして復元する。添付のない結果 (base64 文字列を含む) と失敗は JSON のままである。論理 RPC キャリアはデコードされたネイティブ値を直接返す。Connection はバイナリフィールドを発見したり Typert に依存したりしない。結果プロトコルを所有するハンドラーが、返す前に型指向またはランタイムの投影を行う。バイナリパラメーター、イベント、ストリーミングされたバイナリ結果はサポートされない。
 
-The browser uses HTTP POST for Remote unary calls. API Gateway owns the `/api/remote.mux` WebSocket and its logical streams; shell-owned compositions provide equivalent Remote streams, including a stream's uplink, through `connection.rpc.open` without opening a WebSocket. The browser plugin reads the page transport, recovery settings, and location, then delegates to `installConnection(ctx, options)`. A composition that owns its carrier may call the same installer directly; the whole-client test tier does so. Non-page carriers supply `ClientTransportHooks.createWebSocket` with the same authenticated Cookie as HTTP and a `streamBaseUrl`; `ConnectionHandle.openWebSocket()` resolves the Mux path against that base and invokes the selected factory. Each invocation creates one Context-owned service, so several Client trees can use different carriers in one realm. The Host half always provides the carrier-neutral RPC and exact `GET`/`HEAD`/`POST` route registries. When a Web carrier is present it also owns the sole `/api` route, Fetch bridge, browser authentication, and Host/Origin checks; a shell-owned carrier dispatches the shared Fetch handler directly. Each exact route declares buffered or streaming request-body handling before the bridge reads any bytes. Typert Gateway claims generated Remote endpoints, feature packages register non-JSON responses such as Session-log downloads and raw file uploads, and unclaimed requests return 404. Loopback hostname classification remains package-internal to the browser-facing Client state. Browser raw-body transfer is provided by [`dsh-client-file-upload`](../file-upload/README.md).
+ブラウザーは Remote の単項呼び出しに HTTP POST を使う。API Gateway は `/api/remote.mux` WebSocket とその論理ストリームを所有する。シェル所有のコンポジションは、WebSocket を開かずに `connection.rpc.open` を通じて、ストリームのアップリンクを含む同等の Remote ストリームを提供する。ブラウザープラグインはページトランスポート、リカバリー設定、ロケーションを読み取り、`installConnection(ctx, options)` に委譲する。自身のキャリアを所有するコンポジションは同じインストーラーを直接呼んでもよい。whole-client テスト階層はそうしている。非ページキャリアは `ClientTransportHooks.createWebSocket` に、HTTP と同じ認証済み Cookie と `streamBaseUrl` を供給する。`ConnectionHandle.openWebSocket()` はそのベースに対して Mux パスを解決し、選択されたファクトリーを呼び出す。各呼び出しは 1 つの Context 所有サービスを作成するため、複数の Client ツリーが 1 つのレルム内で異なるキャリアを使える。Host 半分は常にキャリア中立の RPC と正確な `GET`/`HEAD`/`POST` ルートレジストリを提供する。Web キャリアが存在するときは、唯一の `/api` ルート、Fetch ブリッジ、ブラウザー認証、Host/Origin チェックも所有する。シェル所有のキャリアは共有 Fetch ハンドラーを直接ディスパッチする。各正確なルートは、ブリッジがバイトを読む前に、バッファリングまたはストリーミングのリクエストボディ処理を宣言する。Typert Gateway が生成された Remote エンドポイントを要求し、機能パッケージが Session ログのダウンロードや生ファイルアップロードなどの非 JSON レスポンスを登録し、未要求のリクエストは 404 を返す。ループバックホスト名の分類は、ブラウザーに面する Client 状態に対してパッケージ内部のままである。ブラウザーの raw body 転送は [`dsh-client-file-upload`](../file-upload/README.md) が提供する。
 
 -----
 
 <a id="browser-authentication-and-request-trust"></a>
-## Browser authentication and request trust
+## ブラウザー認証とリクエスト信頼
 
-Over the Web carrier, every Host RPC method and WebSocket stream requires an authenticated browser or API Peer; there is no method-specific loopback tier. Each process mints a random launch token. `dsh-web-app` prints and opens its application URL with `?token=...`, preserving the caller's authority and mount; `frontend-static` delegates root and index requests to `ctx.connection.authorizeIndex`, which accepts that token only on `GET /`, writes an authority-bound signed cookie, and redirects to clean `./`, which drops the token and keeps the request's directory. A missing, expired, malformed, or wrong-authority cookie returns 401 before RPC dispatch. Static assets remain public. The HTTP carrier accepts query tokens only at the root exchange and `/connect`, and accepts no Authorization-header token.
+Web キャリア上では、すべての Host RPC メソッドと WebSocket ストリームが、認証済みのブラウザーまたは API Peer を必要とする。メソッド固有のループバック階層は存在しない。各プロセスはランダムな起動トークンを生成する。`dsh-web-app` は `?token=...` 付きでアプリケーション URL を印刷して開き、呼び出し元の権限とマウントを保つ。`frontend-static` はルートと index のリクエストを `ctx.connection.authorizeIndex` に委譲し、これは `GET /` でのみそのトークンを受け入れ、権限に束縛された署名済み Cookie を書き込み、クリーンな `./` へリダイレクトする。これによりトークンは破棄され、リクエストのディレクトリは保たれる。欠落、期限切れ、不正形式、または誤った権限の Cookie は RPC ディスパッチの前に 401 を返す。静的アセットは公開のままである。HTTP キャリアはルート交換と `/connect` でのみクエリトークンを受け入れ、Authorization ヘッダーのトークンは受け入れない。
 
-The cookie signing secret is the owner-scoped `client-connection/browser-session` grant record in `ctx.credentials`. The local provider persists it in `$DSH_HOME/.credentials.yaml`; `BrowserAuth` loads or creates the record during Connection activation and retains the secret in memory, so request authentication is synchronous. Deleting or replacing the record takes effect on the next Connection activation. Cookies carry an absolute issue/expiry interval, defaulting to 30 days through `cookieMaxAgeDays`, and bind the normalized hostname plus port in both their deterministic name and signed payload. They are host-only, `Path=/`, `HttpOnly`, and `SameSite=Strict`, and carry `Secure` exactly when the listener that received the index request serves TLS; only that listener's own protocol decides, never a `publicUrl` announcement or a forwarded header.
+Cookie 署名の秘密は、`ctx.credentials` 内のオーナースコープの `client-connection/browser-session` グラントレコードである。ローカルプロバイダーはそれを `$DSH_HOME/.credentials.yaml` に永続化する。`BrowserAuth` は Connection のアクティベーション中にレコードをロードまたは作成し、秘密をメモリに保持するため、リクエスト認証は同期である。レコードの削除または置換は次の Connection アクティベーションで有効になる。Cookie は絶対の発行/失効インターバルを運び ( `cookieMaxAgeDays` によりデフォルト 30 日)、正規化されたホスト名とポートを、決定論的な名前と署名済みペイロードの両方に束縛する。それらは host-only、`Path=/`、`HttpOnly`、`SameSite=Strict` であり、index リクエストを受け取ったリスナーが TLS を提供する場合にのみ `Secure` を運ぶ。決めるのはそのリスナー自身のプロトコルだけで、`publicUrl` の告知や転送ヘッダーは決して使わない。
 
-HTTPS cookie names and signed audiences include the `https:` scheme, so HTTP cookies cannot authenticate to a TLS listener even on the same hostname and port. Default ports normalize under the listener's scheme. Existing HTTP cookie audiences remain unchanged.
+HTTPS の Cookie 名と署名対象 (audience) は `https:` スキームを含むため、HTTP Cookie は同じホスト名とポートであっても TLS リスナーを認証できない。デフォルトポートはリスナーのスキームの下で正規化される。既存の HTTP Cookie の audience は変わらない。
 
-Before authentication, every request passes `src/api-request-trust.ts`. Its `Host` must be loopback, equal the listener's bind IP literal on any port, or match a `trustedHosts` entry: exact on `host:port`, any port on port-less entries. Host and configured entries use the listener's scheme for WHATWG default-port normalization, not a forwarded header or `Origin`. An attached HTTP(S) `Origin` must name the same authority, with Host parsed under that Origin's scheme to support HTTPS proxies over HTTP upstreams; `sec-fetch-site: cross-site` is refused. Malformed configured authorities fail plugin load. `allowsRemoteAuthorities` reports whether `trustedHosts` permits a non-loopback authority; accepting the bind IP does not change that list. These checks defend DNS rebinding and cross-site browser requests; they never establish identity. A failed Host/Origin check returns 403, while a trusted but unauthenticated request returns 401. `dsh web --host 0.0.0.0` is unsupported. Decision records: [browser request trust](../../../.agents/notes/implemented/architecture/2026-07-28-api-browser-trust-boundary.md) and [browser token authentication](../../../.agents/notes/implemented/architecture/2026-08-24-browser-token-authentication.md).
+認証の前に、すべてのリクエストは `src/api-request-trust.ts` を通る。その `Host` はループバックであるか、任意のポートでリスナーのバインド IP リテラルと等しいか、`trustedHosts` エントリーに一致しなければならない: `host:port` では完全一致、ポートなしエントリーでは任意のポート。Host と設定されたエントリーは、WHATWG のデフォルトポート正規化のためにリスナーのスキームを使い、転送ヘッダーや `Origin` は使わない。付随する HTTP(S) の `Origin` は同じ権限を名指さなければならず、Host はその Origin のスキームの下で解析される (HTTP アップストリームの先の HTTPS プロキシをサポートするため)。`sec-fetch-site: cross-site` は拒否される。不正な形式の設定済み権限はプラグインロードを失敗させる。`allowsRemoteAuthorities` は `trustedHosts` が非ループバック権限を許可するかを報告する。バインド IP の受け入れはそのリストを変えない。これらのチェックは DNS リバインディングとクロスサイトブラウザーリクエストを防御する。それらはアイデンティティを確立することは決してない。Host/Origin チェックの失敗は 403 を返し、信頼されているが未認証のリクエストは 401 を返す。`dsh web --host 0.0.0.0` はサポートされない。決定記録: [browser request trust](../../../.agents/notes/implemented/architecture/2026-07-28-api-browser-trust-boundary.md) と [browser token authentication](../../../.agents/notes/implemented/architecture/2026-08-24-browser-token-authentication.md)。
 
-Every request speaks for one Peer, a `PeerScope` whose `principal` names the caller, whose `interactions` governs participation in forwarded events, and whose `signal` aborts when its scope ends. `ctx.connection.browserPeer` is shared by authenticated browser connections; it has owner principal and defaults to `interactions: 'answer'`. `ctx.connection.admit(request)` checks trust and browser or API authentication and returns the credential's live Peer or a rejection. The `/api` route and Gateway WebSocket upgrade use this admission; handlers receive the call's Peer. `ctx.connection.createPeer({ principal, interactions? })` creates an independent in-process Peer, disposed with the Context that read the service or earlier through its own `dispose()`; omitted interactions default to `answer`. The exported `Peer` class accepts the same options. `fetch(request, peer)` and the HTTP bridge take the Peer explicitly; an exact route answers 403 to a non-owner Peer. Method-level access for other principals belongs to [`dsh-api-remote-access`](../../api/remote-access/README.md).
+すべてのリクエストは 1 つの Peer を代弁する。`PeerScope` は、`principal` が呼び出し元を名指し、`interactions` が転送イベントへの参加を統治し、`signal` がそのスコープの終了時に abort する。`ctx.connection.browserPeer` は認証済みブラウザー接続で共有され、所有者 principal を持ち、デフォルトで `interactions: 'answer'` である。`ctx.connection.admit(request)` は信頼とブラウザーまたは API の認証をチェックし、クレデンシャルのライブ Peer または拒否を返す。`/api` ルートと Gateway WebSocket アップグレードはこのアドミッションを使う。ハンドラーは呼び出しの Peer を受け取る。`ctx.connection.createPeer({ principal, interactions? })` は独立したプロセス内 Peer を作成し、サービスを読んだ Context とともに、またはそれより早く自身の `dispose()` によって破棄される。省略された interactions は `answer` にデフォルトする。エクスポートされた `Peer` クラスは同じオプションを受け入れる。`fetch(request, peer)` と HTTP ブリッジは Peer を明示的に取る。正確なルートは非所有者 Peer に 403 を返す。他の principal のメソッドレベルアクセスは [`dsh-api-remote-access`](../../api/remote-access/README.md) に属する。
 
-Only API callers use `GET /connect?token=...&interactions=answer|none`: it immediately creates a Peer with owner principal and returns 302 with the Mux destination and a signed API Cookie. The API connection defaults to `none`; invalid or repeated declarations return 400. HTTP may precede WebSocket establishment. One API socket owns cleanup: duplicate attachment returns 409, closure removes its Peer, and later HTTP using that Cookie is refused. Already-admitted unary calls retain request-level cancellation, but `invocation.peer.ctx` cannot register effects after its Peer has been disposed. API callers keep their Cookie separate from browser storage; the authority-specific Cookie name is shared.
+`GET /connect?token=...&interactions=answer|none` を使うのは API 呼び出し元だけである: これは所有者 principal の Peer を即座に作成し、Mux の宛先と署名済み API Cookie を伴う 302 を返す。API 接続はデフォルトで `none` である。不正または繰り返された宣言は 400 を返す。HTTP が WebSocket 確立に先行してもよい。1 つの API ソケットがクリーンアップを所有する: 重複アタッチは 409 を返し、クローズはその Peer を除去し、その Cookie を使う以降の HTTP は拒否される。すでに許可された単項呼び出しはリクエストレベルのキャンセルを保持するが、`invocation.peer.ctx` は Peer が破棄された後にエフェクトを登録できない。API 呼び出し元は Cookie をブラウザーストレージとは別に保つ。権限固有の Cookie 名は共有される。
 
-Authenticated shared HTTP requests pass through the `connection/request` waterfall before body transfer. A listener may refuse new requests or await `next()` through response completion; removing its owning fiber removes admission behavior. Desktop uses this hook to lock new API work during an approved installation without canceling already-admitted work. Client disconnection aborts the handler signal; the bridge stops socket writes and drains any remaining response chunks. WebSocket stream ownership remains with API Gateway.
+認証済みの共有 HTTP リクエストは、ボディ転送の前に `connection/request` waterfall を通る。リスナーは新しいリクエストを拒否してもよく、レスポンス完了まで `next()` を await してもよい。所有ファイバーを除去するとアドミッション動作が除去される。デスクトップはこのフックを使い、承認されたインストール中に新しい API 作業をロックするが、すでに許可された作業はキャンセルしない。クライアントの切断はハンドラーシグナルを abort する。ブリッジはソケット書き込みを停止し、残っているレスポンスチャンクをドレインする。WebSocket ストリームの所有権は API Gateway に残る。
 
 <a id="connection-generation"></a>
-## Connection generation
+## 接続世代
 
-`installConnection` resolves `interactions` to `answer` for pages and `none` for non-page callers unless explicitly supplied. Only answering Clients register the internal `$events` logical stream as the sole generation source, independently of whether any `$on` listener exists. The Host attaches all incremental listeners in the API Remotes source factory, then sends one `{ type: 'ready', clientId, host: { home } }` item before events. `ConnectionController` publishes that generation and calls `onConnected` only after the ready item arrives, so baseline acquisition cannot race ahead of incremental observation.
+`installConnection` は、明示的に供給されない限り、`interactions` をページには `answer` に、非ページ呼び出し元には `none` に解決する。答える (answering) Client だけが、`$on` リスナーの存在にかかわらず、内部の `$events` 論理ストリームを唯一の世代ソースとして登録する。Host は API Remotes ソースファクトリーですべてのインクリメンタルリスナーをアタッチしてから、イベントの前に 1 つの `{ type: 'ready', clientId, host: { home } }` アイテムを送る。`ConnectionController` は ready アイテムが到着した後にのみその世代を公開して `onConnected` を呼ぶため、ベースライン取得がインクリメンタル観測より先に競走することはない。
 
-An ended `$events` stream, a Remote stream error, a non-ready opening item, or a malformed event item invalidates the current generation. A pending handshake logs a slow-Host warning after 3 seconds and logs the readiness timeout and aborts after 15 seconds by default, including time spent waiting for the physical socket. The source must stop delivery, release resources, and settle after cancellation before a replacement starts; late readiness from a cancelled source cannot publish a generation. While the browser reports network availability, the controller publishes `connecting` and retries with 50%–100% jitter under caps of 500ms, 1s, 2s, 4s, 8s, and 10s, continuing at the final cap until recovery. Every retry asks Gateway to replace the physical WebSocket once and reopens `$events`.
+終了した `$events` ストリーム、Remote ストリームエラー、ready でない冒頭アイテム、または不正形式のイベントアイテムは、現在の世代を無効にする。保留中のハンドシェイクは 3 秒後に遅い Host の警告をログし、デフォルトでは 15 秒後にレディネスタイムアウトをログして abort する (物理ソケットを待つ時間も含む)。ソースは、置換が始まる前に、配信を停止し、リソースを解放し、キャンセル後に決着しなければならない。キャンセルされたソースからの遅いレディネスは世代を公開できない。ブラウザーがネットワーク可用性を報告している間、コントローラーは `connecting` を公開し、500ms、1s、2s、4s、8s、10s の上限の下で 50%–100% のジッターを伴って再試行し、回復するまで最終上限で続ける。各再試行は Gateway に物理 WebSocket を 1 回置き換えるよう求め、`$events` を再び開く。
 
-`ctx.connection.reconnect()` interrupts active work, resets the sequence, and starts retry 1 immediately. Browser `offline` aborts active work, publishes `disconnected`, and suspends automatic attempts; the next `online` transition resets the sequence and starts at the 500ms tier. Only a ready item publishes `connected`. Gateway mux owns no independent retry schedule.
+`ctx.connection.reconnect()` はアクティブな作業を中断し、シーケンスをリセットし、再試行 1 を即座に開始する。ブラウザーの `offline` はアクティブな作業を abort し、`disconnected` を公開し、自動試行を停止する。次の `online` 遷移がシーケンスをリセットし、500ms の段から開始する。`connected` を公開するのは ready アイテムだけである。Gateway mux は独立した再試行スケジュールを持たない。
 
-Set the Host Connection row's `config.recovery` to override retry caps, the growth factor, or handshake warning and cancellation times; the [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-client-connection) lists accepted fields. The Host validates these values and injects them into each served page. The Client validates the bootstrap data before providing Connection and uses those defaults when Gateway starts its loop; explicit `start()` timing overrides take precedence. The growth factor must be finite and at least one. Readiness, failure, cancellation, or a hard deadline that occurs before the warning cancels that warning. Reload the page after changing Host recovery configuration.
+Host の Connection 行の `config.recovery` を設定して、再試行上限、成長係数、またはハンドシェイク警告とキャンセルの時間を上書きする。[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-client-connection)が受け入れられるフィールドを列挙する。Host はこれらの値を検証し、提供する各ページに注入する。Client は Connection を提供する前にブートストラップデータを検証し、Gateway がループを開始するときにそれらのデフォルトを使う。明示的な `start()` のタイミング上書きが優先される。成長係数は有限で 1 以上でなければならない。警告より前に起こるレディネス、失敗、キャンセル、またはハード期限はその警告をキャンセルする。Host のリカバリー設定変更後はページをリロードする。
 
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the wire consumer layer moves already-composed messages between browser and host; nothing here reaches a model request.
+なし。wire コンシューマー層はすでに構成済みのメッセージをブラウザーと Host の間で移動させるだけであり、ここにあるものはモデルリクエストに到達しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てることも送信することもない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Buffered `/api` routes retain each request body in memory** — `maxRequestBodyBytes` (default 300 MiB, sized for the default 200 MiB aggregate image limit after base64 expansion plus envelope headroom) bounds ordinary image and RPC envelopes. Opt-in streaming routes receive backpressured chunks and bypass the aggregate cap; route implementations own persistence, cancellation, and any storage quota.
-- **A plain-HTTP listener exposes the bearer cookie in transit** — such a deployment cannot mark the browser cookie `Secure`, so serving the same authority over a network can leak the session cookie; configure TLS on the Web carrier ([`dsh-host-webserver`](../../host/webserver/README.md)) to have the cookie marked `Secure` and confined to TLS.
-- **Unused API Peers may remain until Host shutdown** — no connect deadline or idle collection is imposed on lightweight records whose caller never establishes a WebSocket. Cookie expiry still rejects new requests. API callers must reconnect through `/connect` after their owning socket closes or the Host restarts.
-- **There is no logout operation** — clearing the browser cookie ends one browser session; deleting the owner credential record and restarting `dsh` revokes every session.
+- **バッファリングされる `/api` ルートは各リクエストボディをメモリに保持する** — `maxRequestBodyBytes` (デフォルト 300 MiB。デフォルトの 200 MiB 集約画像上限の base64 展開後とエンベロープのヘッドルームを見込んだサイズ) が通常の画像と RPC のエンベロープを制限する。オプトインのストリーミングルートは背圧のかかったチャンクを受け取り、集約上限を迂回する。ルート実装が永続化、キャンセル、ストレージクォータを所有する。
+- **プレーン HTTP リスナーはベアラー Cookie を転送中に露出する** — そのようなデプロイメントはブラウザー Cookie を `Secure` にできないため、同じ権限をネットワーク越しに提供するとセッション Cookie が漏れうる。Cookie を `Secure` とし TLS に限定するには、Web キャリア ([`dsh-host-webserver`](../../host/webserver/README.md)) に TLS を設定する。
+- **未使用の API Peer は Host シャットダウンまで残ることがある** — 呼び出し元が WebSocket を確立しない軽量レコードには、接続期限やアイドル回収が課されない。Cookie の失効は依然として新しいリクエストを拒否する。API 呼び出し元は、所有ソケットが閉じた後や Host 再起動後に `/connect` を通じて再接続しなければならない。
+- **ログアウト操作は存在しない** — ブラウザー Cookie をクリアすると 1 つのブラウザーセッションが終了する。オーナークレデンシャルレコードを削除して `dsh` を再起動すると、すべてのセッションが失効する。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

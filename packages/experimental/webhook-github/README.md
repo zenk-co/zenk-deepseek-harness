@@ -1,88 +1,88 @@
 ---
-description: "Signed GitHub webhook adapter for deployments routing authenticated JSON events into the webhook runtime."
+description: "認証済み JSON イベントを webhook ランタイムへ導くデプロイ向けの署名付き GitHub webhook アダプター。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-webhook-github
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-webhook-github` registers one exact HTTP route on the injected `ctx.webServer`. It bounds and verifies GitHub's raw JSON body, projects a provider-neutral delivery, calls `ctx.webhookRuntime.dispatch()`, and returns `202` without waiting for rules or Sessions. Use it when a deployment needs authenticated GitHub ingress for the generic webhook runtime.
+`dsh-webhook-github` は注入 `ctx.webServer` 上に 1 つの正確な HTTP 経路を登録する。GitHub の raw JSON 本体を区切って検証し、プロバイダー中立の配送に投影し、`ctx.webhookRuntime.dispatch()` を呼び、規則やセッションを待たずに `202` を返す。汎用 webhook ランタイム向けの認証済み GitHub 入口が要るデプロイで使うこと。
 
-## Table of Contents
+## 目次
 
-- [Configuration](#configuration)
-- [HTTP contract](#http-contract)
-- [Dedicated listener composition](#dedicated-listener-composition)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [設定](#configuration)
+- [HTTP 契約](#http-contract)
+- [専用リスナーコンポジション](#dedicated-listener-composition)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="configuration"></a>
-## Configuration
+## 設定
 
-| Key | Meaning |
+| キー | 意味 |
 |---|---|
-| `source` | Non-empty adapter instance carried to rules, such as `primary-github`. |
-| `path` | Exact non-root pathname without trailing slash, query, or fragment. |
-| `secretEnv` | Credential reference containing the GitHub webhook secret. |
-| `maxBodyBytes` | Positive safe-integer ceiling for the untouched request body. |
+| `source` | 規則へ運ばれる空でないアダプター実体（例 `primary-github`）。 |
+| `path` | 末尾斜線・クエリ・断片のない正確な非ルートパス名。 |
+| `secretEnv` | GitHub webhook シークレットを含む資格情報参照。 |
+| `maxBodyBytes` | 手付かず要求本体の正の安全整数上限。 |
 
-All fields are required. The secret reference is resolved for every request, so rotation affects the next delivery without reloading the plugin.
+すべての欄が必須である。秘密参照は要求ごとに解決されるため、交代はプラグイン再読み込みなしに次配送に影響する。
 
 <a id="http-contract"></a>
-## HTTP contract
+## HTTP 契約
 
-Only `POST application/json` is accepted. The adapter reads a bounded UTF-8 body, requires `X-Hub-Signature-256`, `X-GitHub-Delivery`, and `X-GitHub-Event`, resolves the secret, verifies HMAC before JSON parsing, and requires a top-level lossless-JSON object. It never logs the secret, signature, or payload.
+`POST application/json` のみ受け付ける。アダプターは上限付き UTF-8 本体を読み、`X-Hub-Signature-256`・`X-GitHub-Delivery`・`X-GitHub-Event` を要求し、秘密を解決し、JSON 構文解析の前に HMAC を検証し、最上位の無損失 JSON オブジェクトを要求する。秘密・署名・ペイロードを記録しない。
 
-| Status | Meaning |
+| 状態 | 意味 |
 |---|---|
-| `202` | Verified JSON was dispatched in memory. |
-| `400` | Required header, UTF-8, JSON, or top-level object was invalid. |
-| `401` | Signature was invalid. |
-| `405` | Method was not `POST`. |
-| `413` | Declared or streamed body exceeded `maxBodyBytes`. |
-| `415` | Media type was not `application/json`. |
-| `503` | Credential or webhook runtime was unavailable. |
+| `202` | 検証済み JSON をメモリ内で配送した。 |
+| `400` | 必須ヘッダー・UTF-8・JSON・最上位オブジェクトのいずれかが不正だった。 |
+| `401` | 署名が不正だった。 |
+| `405` | メソッドが `POST` でなかった。 |
+| `413` | 宣言または流し込み本体が `maxBodyBytes` を超えた。 |
+| `415` | 媒体型が `application/json` でなかった。 |
+| `503` | 資格情報または webhook ランタイムが利用不可だった。 |
 
-`202` does not state that any rule matched or that a Session was created. GitHub event-specific field validation belongs to each rule; the adapter guarantees only authenticated generic JSON.
+`202` は規則が一致したこともセッションが作成されたことも述べない。GitHub イベント固有の欄検証は各規則に属し、アダプターは認証済み汎用 JSON のみを保証する。
 
 <a id="dedicated-listener-composition"></a>
-## Dedicated listener composition
+## 専用リスナーコンポジション
 
-The normal Web profile already owns `ctx.webServer`. Mount another `dsh-host-webserver` and this adapter inside a group that isolates only `webServer`; the adapter still inherits credentials and `webhookRuntime`. The [GitHub review guide](../../../docs/user/guide/github-review.md) uses `127.0.0.1:3081/github` behind a TLS reverse proxy while the UI remains on port 3080.
+通常 Web プロファイルは既に `ctx.webServer` を所有する。`webServer` のみを分離するグループ内に別の `dsh-host-webserver` とこのアダプターをマウントする。アダプターは依然として資格情報と `webhookRuntime` を継承する。[GitHub レビューガイド](../../../docs/user/guide/github-review.md)は UI がポート 3080 のまま、TLS リバースプロキシ背後の `127.0.0.1:3081/github` を使う。
 
-The package distributes the example overlay and rule module under `examples/github-review/`. Install this package and its `dsh-webhook` peer into the profile before loading that installed overlay; the [guide](../../../docs/user/guide/github-review.md) gives the complete commands.
+パッケージは `examples/github-review/` 配下にサンプルオーバーレイと規則モジュールを配布する。設置済みオーバーレイを読み込む前にこのパッケージと `dsh-webhook` ピアをプロファイルにインストールすること。[ガイド](../../../docs/user/guide/github-review.md)が完全なコマンドを示す。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-webhook`: this adapter contributes no prompt or tool schema; a matching rule owns the Session request and model-visible text.
+間接的に `dsh-webhook` 越しに関わる。このアダプターはプロンプトもツールスキーマも寄与せず、一致する規則がセッション要求とモデル可視テキストを所有する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Independent. Authentication and HTTP dispatch do not touch a model request; any new Session prefix belongs to the consuming rule and runtime.
+独立である。認証と HTTP 配送はモデル要求に触れず、新規セッション接頭辞は利用規則とランタイムに属する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **No TLS** — the injected development WebServer is normally loopback-only behind a TLS reverse proxy or tunnel.
-- **Generic payload validation only** — rules own validation of the GitHub event fields they consume.
-- **No provider acknowledgement of downstream work** — `202` precedes arbitrary rule calls and Session creation.
-- **No form encoding** — GitHub must send `application/json`; `application/x-www-form-urlencoded` is rejected.
+- **TLS なし** — 注入開発 WebServer は通常 TLS リバースプロキシまたはトンネル背後のループバック限定である。
+- **汎用ペイロード検証のみ** — 利用する GitHub イベント欄の検証は規則が所有する。
+- **下流作業のプロバイダー承認なし** — `202` は任意の規則呼び出しとセッション作成に先行する。
+- **フォーム符号化なし** — GitHub は `application/json` で送らなければならず、`application/x-www-form-urlencoded` は拒否される。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

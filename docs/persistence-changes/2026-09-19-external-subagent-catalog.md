@@ -5,13 +5,13 @@ kind: persistence-change
 
 # 2026-09-19-external-subagent-catalog
 
-English | [中文](2026-09-19-external-subagent-catalog.zh.md)
+日本語 | [English](2026-09-19-external-subagent-catalog.en.md) | [中文](2026-09-19-external-subagent-catalog.zh.md)
 
-## Summary
+## 概要
 
-Add external mode to parent catalog entries for children without a local Session.
+ローカルセッションを持たない子のために親カタログエントリへ external モードを追加する。
 
-## Table of Contents
+## 目次
 
 - [Declaration](#declaration)
 - [Compatibility](#compatibility)
@@ -19,7 +19,7 @@ Add external mode to parent catalog entries for children without a local Session
 - [Dev Note](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -33,16 +33,16 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-Existing version-0 and version-1 one-shot and continuable facts remain valid; version 1 also retains unknown mode. New external executions write payload version 2 with mode external, without a separate marker. Creation writes one membership fact; execution and cleanup do not update it. Duplicate child ids remain invalid. This does not change released generations or the Session format version.
+既存のバージョン 0 とバージョン 1 のワンショットおよび継続可能ファクトは引き続き有効であり、バージョン 1 は unknown モードも保持する。新しい外部実行は分離マーカー無しにモード external でペイロードバージョン 2 を書く。作成は一つのメンバーシップファクトを書き、実行とクリーンアップはそれを更新しない。重複した子 id は引き続き無効である。これはリリース済み世代やセッションフォーマットバージョンを変更しない。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Focused catalog, external activation, native V4 restoration, client navigation, and control-tool tests passed. They cover external membership, historical local modes, invalid marker rejection, non-navigable external leaves, and duplicate-child rejection.
+対象を絞ったカタログ、外部起動、ネイティブ V4 復元、クライアントナビゲーション、制御ツールテストが合格した。外部メンバーシップ、履歴ローカルモード、無効マーカー拒否、ナビゲート不能な外部リーフ、重複子拒否をカバーする。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 None.

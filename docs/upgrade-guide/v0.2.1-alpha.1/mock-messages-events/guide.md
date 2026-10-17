@@ -1,17 +1,17 @@
 ---
 kind: upgrade-guide
-description: "Messages mock streams publish named SSE events for native SDK consumers."
+description: "Messages モックストリームはネイティブ SDK コンシューマー向けに名前付き SSE イベントを公開する。"
 ---
 
-# Read named events from the Messages mock server
+# Messages モックサーバーから名前付きイベントを読む
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-The next release makes `@deepseek-ai/dsh-llm-mock-server` emit the Messages event name beside each structured SSE payload. Native SDKs require these names to process message and content-block events. Consumers that accept only unnamed SSE messages must update their event handling. Scripted payloads, ordering, request capture, and chunk counts are unchanged; the deliberately malformed JSON behavior still sends its invalid data directly.
+次リリースで `@deepseek-ai/dsh-llm-mock-server` は構造化 SSE ペイロードごとに Messages イベント名を併せて送出する。ネイティブ SDK はメッセージ・コンテンツブロックイベントの処理にこれらの名前を必要とする。無名 SSE メッセージのみ受け付けるコンシューマーはイベント処理を更新しなければならない。スクリプト化ペイロード、順序、リクエストキャプチャー、チャンク数は変わらず、意図的に不正な JSON の動作は依然として無効データを直接送る。
 
-## Migration
+## 移行
 
-1. Consume the named Messages events and parse their `data` fields. Do not filter the stream to unnamed events.
-2. Verify a complete text response, tool-call response, and the fault behaviors your test uses. The [mock server reference](../../../../packages/test-support/llm-mock-server/README.md) describes the available scripts.
+1. 名前付き Messages イベントを消費し、その `data` フィールドをパースする。ストリームを無名イベントに絞らない。
+2. 完全なテキスト応答、ツール呼び出し応答、テストが使う障害動作を検証する。利用可能なスクリプトは [モックサーバーリファレンス](../../../../packages/test-support/llm-mock-server/README.md) に記載されている。

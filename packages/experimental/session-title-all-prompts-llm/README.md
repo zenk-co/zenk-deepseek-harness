@@ -1,120 +1,120 @@
 ---
-description: "All-messages LLM session-title provider for users and maintainers choosing a title strategy or debugging automatic title generation."
+description: "タイトル戦略を選ぶか自動タイトル生成をデバッグするユーザーとメンテナー向けの、全メッセージ LLM セッションタイトルプロバイダー。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-title-all-prompts-llm
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-session-title-all-prompts-llm` summarizes every eligible human message through `ctx.llm` as an optional `ctx.sessionTitle` provider. It registers the `all-prompts` cadence and starts a new revision after each new human prompt, using seeded history and child-session prompts. A newer revision aborts and supersedes older work, and even a provider that ignores cancellation cannot commit stale output. It owns both its initial-generation prompt and its revision prompt, and shares only the [execution module](../../session/session-title-llm/README.md) from `dsh-session-title-llm` with the first-prompt provider. Automatic behavior and configuration come first; the implementation is a small provider strategy over that executor.
+`dsh-session-title-all-prompts-llm` は `ctx.llm` 経由で対象のすべての人的メッセージを要約し、任意の `ctx.sessionTitle` プロバイダーとする。`all-prompts` ケイデンスを登録し、新しい人的プロンプトごとに新しいリビジョンを開始する。シード履歴と子セッションのプロンプトを使う。新しいリビジョンは古い作業を中断して置き換え、キャンセルを無視するプロバイダーでも古い出力をコミットできない。初期生成プロンプトとリビジョンプロンプトの両方を所有し、first-prompt プロバイダーとは `dsh-session-title-llm` の[実行モジュール](../../session/session-title-llm/README.md)だけを共有する。自動動作と構成が先にあり、実装はその executor 上の小さなプロバイダー戦略である。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin beside the title service when a session should be retitled as it grows, so the title keeps representing the whole conversation. It requires its own `targetWords` and `targetCjkCharacters` plus the shared [execution controls](../../session/session-title-llm/README.md#configuration), all with no defaults.
+セッションが育つにつれて再題名を付けるべきときにタイトルサービスの隣にこのプラグインをマウントし、タイトルが会話全体を表し続けるようにする。共有[実行制御](../../session/session-title-llm/README.md#configuration)に加えて独自の `targetWords` と `targetCjkCharacters` を要し、すべて既定値なしである。
 
-### When titles are generated
+### タイトルが生成されるとき
 
-A new revision starts after each new eligible human prompt, including prompts in child sessions; the generation folds all eligible messages through the current revision, seeded history included. A newer revision aborts and supersedes older work, so a stale completion can never commit. An automatic failure — including input over `maxInputBytes`, which fails instead of truncating history — warns and keeps the prior title; `ctx.sessionTitle.refresh()` is the explicit retry.
+新しい対象人的プロンプトごとに新しいリビジョンが始まる。子セッションのプロンプトを含む。生成はシード履歴を含めて現在のリビジョン経由で対象の全メッセージを折りたたむ。新しいリビジョンは古い作業を中断して置き換えるため、古い完了がコミットされることは決してない。`maxInputBytes` 超の入力を含む自動失敗は履歴を切り詰めずに失敗し、警告して以前のタイトルを保つ。`ctx.sessionTitle.refresh()` が明示的な再試行である。
 
-Once a provider-generated title exists, each request includes it and asks the model to preserve it exactly while it still describes the main topic or task. Follow-up questions, same-topic details, acknowledgements such as “thanks”, and requests to continue do not by themselves justify rewording. The model is instructed to update the title only when a material change or expansion of the main topic or task makes it inaccurate. A fallback title still receives ordinary initial generation; every eligible prompt still schedules a revision.
+プロバイダー生成タイトルが存在するようになると、各リクエストはそれを含み、主トピックまたはタスクを依然記述している間は正確に保つようモデルに求める。補足質問、同トピック詳細、「thanks」等の謝辞、継続要求だけでは言い換えを正当化しない。モデルは主トピックまたはタスクの実質的な変更や拡大がそれを不正確にするときにのみタイトルを更新するよう指示される。フォールバックタイトルも通常の初期生成を受ける。すべての対象プロンプトは依然リビジョンをスケジュールする。
 
-### Configuration
+### 構成
 
-The plugin requires `targetWords` and `targetCjkCharacters` plus the shared [execution controls](../../session/session-title-llm/README.md#configuration): `maxInputBytes`, `maxOutputTokens`, `timeoutMs`, and the optional paired `provider`/`model` route. Omit both to inherit the exact route from each current logged main request, or set both to route title generation independently. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-session-title-all-prompts-llm) is the exhaustive source for every accepted field.
+プラグインは共有[実行制御](../../session/session-title-llm/README.md#configuration) (`maxInputBytes`、`maxOutputTokens`、`timeoutMs`、任意の対 `provider`/`model` ルート) に加えて `targetWords` と `targetCjkCharacters` を要求する。両方省略で各現在の記録済み主リクエストから正確なルートを継承し、両方設定でタイトル生成を独立にルーティングする。生成済み[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-session-title-all-prompts-llm)が受け付ける全フィールドの網羅的な情報源である。
 
-### Failures and recovery
+### 失敗と回復
 
-If the final framed aggregate prompt exceeds `maxInputBytes`, the request fails instead of truncating history; automatic use warns and keeps the prior title, and only an explicit `refresh()` retries. Automatic work adds no tokens and no latency to the main agent request.
+最終枠付き集計プロンプトが `maxInputBytes` を超えると、履歴を切り詰めずにリクエストは失敗する。自動利用は警告して以前のタイトルを保ち、明示的 `refresh()` のみが再試行する。自動作業は主エージェントリクエストにトークンも遅延も加えない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains the plugin's shape; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節はプラグインの形状を説明する。観測可能な動作は[このパッケージを使う](#use-this-package)で完全にカバーされる。
 
-### Design concept
+### 設計コンセプト
 
-A small provider strategy: it owns both the initial-generation prompt and the revision prompt that anchors `currentTitle`, parses the assembled response into a title, and delegates only route, bounds, cancellation, logging, and assembly to the [shared execution module](../../session/session-title-llm/README.md).
+小さなプロバイダー戦略である。`currentTitle` を固定する初期生成プロンプトとリビジョンプロンプトの両方を所有し、組み立てた応答をタイトルに解析し、[共有実行モジュール](../../session/session-title-llm/README.md)にルート、境界、キャンセル、記録、組み立てだけを委譲する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config schema, initial and revision prompts, output parsing, and direct provider registration |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: 設定スキーマ、初期およびリビジョンプロンプト、出力解析、直接プロバイダー登録 |
 
-### Scheduling
+### スケジューリング
 
-The title service schedules automatic work: for the `all-prompts` cadence, every new eligible user message starts a revision, and a newer revision supersedes older work; the provider call begins after the exact main-request route is logged.
+タイトルサービスは自動作業をスケジュールする。`all-prompts` ケイデンスでは新しい対象ユーザーメッセージごとにリビジョンが始まり、新しいリビジョンは古い作業を置き換える。プロバイダー呼び出しは正確な主リクエストルートが記録された後に始まる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the provider contract is not enough. They move from the shared execution module to the alternative cadence and the service it plugs into.
+プロバイダー契約では足りないときにこれらを読むこと。共有実行モジュールから代替ケイデンスとそれが差さるサービスへ進む。
 
-- [Shared LLM execution module](../../session/session-title-llm/README.md) — the execution module this provider uses.
-- [First-message title provider](../../session/session-title-first-prompt-llm/README.md) — the cadence that titles a session once from its first prompt.
-- [Session title service](../../session/session-title/README.md) — fallback behavior, rename, refresh, and provider registration.
-- [Session package map](../../session/README.md) — adjacent persistence, projection, title, and telemetry packages.
+- [共有 LLM 実行モジュール](../../session/session-title-llm/README.md) — このプロバイダーが使う実行モジュール。
+- [初回メッセージタイトルプロバイダー](../../session/session-title-first-prompt-llm/README.md) — セッションに初回プロンプトから 1 回だけ題名を付けるケイデンス。
+- [セッションタイトルサービス](../../session/session-title/README.md) — フォールバック動作、改名、更新、プロバイダー登録。
+- [セッションパッケージマップ](../../session/README.md) — 隣接する永続化、投影、タイトル、テレメトリーパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### All-messages title request
+### 全メッセージタイトルリクエスト
 
-#### What the model sees
+#### モデルが見るもの
 
-The title model receives all eligible human messages through the current revision, in log order with exact seqs, including seeded history. When an accepted provider-generated title exists, this provider adds it as `currentTitle` with its own preservation instructions; fallback, user, and absent titles take its initial-generation path. Both the messages and the current title count toward `maxInputBytes`.
+タイトルモデルはシード履歴を含む対象のすべての人的メッセージを現在のリビジョン経由でログ順に正確な seq 付きで受け取る。受け入れ済みプロバイダー生成タイトルが存在するとき、このプロバイダーはそれを `currentTitle` として独自の保存指示付きで加える。フォールバック、ユーザー、欠落のタイトルは初期生成パスをたどる。メッセージと現在のタイトルは共に `maxInputBytes` に数える。
 
-#### Token effect
+#### トークンへの影響
 
-One auxiliary request may follow every new eligible prompt, bounded per request by `maxInputBytes` and `maxOutputTokens`; explicit refreshes may add calls. It selects the route's least supported reasoning effort, or leaves effort unspecified when the route exposes none. The main agent request gains zero tokens.
+新しい対象プロンプトごとに補助リクエストが最大 1 件続き、リクエストごとに `maxInputBytes` と `maxOutputTokens` で制限される。明示的な更新は呼び出しを加え得る。ルートの最も弱いサポート推論 effort を選ぶか、ルートが effort を公開しなければ未指定のままにする。主エージェントリクエストはゼロトークン増である。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No main-request invalidation. Auxiliary input grows or changes after each prompt, so provider-specific cache reuse ends at the first changed JSON token.
+主リクエスト無効化なし。補助入力は各プロンプト後に増減するため、プロバイダー固有キャッシュ再利用は最初の変更 JSON トークンで終わる。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define how the provider treats long and heterogeneous sessions. They are current package constraints.
+これらの制限はプロバイダーが長短混合セッションをどう扱うかを定める。現在のパッケージ制約である。
 
-- **No summarization-of-summaries** — input overflow retains the prior title; this provider has no summarization-of-summaries or retention policy for very long sessions.
-- **Messages are treated equally** — it includes every eligible human message without configurable weighting or filtering.
-- **Model-dependent stability** — title preservation is a model instruction, not a deterministic semantic check; the model may still change an adequate title.
+- **要約の要約なし** — 入力オーバーフローは以前のタイトルを保持する。このプロバイダーは超長期セッション向けの要約の要約も保持ポリシーも持たない。
+- **メッセージは平等に扱う** — 設定可能な重み付けやフィルタリングなしにすべての対象人的メッセージを含む。
+- **モデル依存の安定性** — タイトル保存は確定的意味チェックではなくモデル指示である。モデルは適切なタイトルを変え得る。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

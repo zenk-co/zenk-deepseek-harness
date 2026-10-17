@@ -1,14 +1,14 @@
-# Session Titles
+# セッションタイトル
 
-English | [中文](session-title.zh.md)
+日本語 | [English](session-title.en.md) | [中文](session-title.zh.md)
 
-Durable latest-wins title state and the optional asynchronous provider vocabulary owned by [`@deepseek-ai/dsh-session-title`](../../packages/session/session-title). The shared execution module owns the exact auxiliary request record. Package READMEs own timing, fallback, failure, and fork behavior; the generated [persistence catalog](../persistence-catalog.md) owns the complete event declarations.
+[`@deepseek-ai/dsh-session-title`](../../packages/session/session-title) が所有する、永続的な最新優先のタイトル状態と、任意の非同期プロバイダー語彙。共有実行モジュールが正確な補助リクエストレコードを所有します。タイミング、フォールバック、失敗、フォークの動作はパッケージ README が所有し、完全なイベント宣言は生成された[永続カタログ](../persistence-catalog.md)が所有します。
 
-Sources: [`packages/session/session-title/src/index.ts`](../../packages/session/session-title/src/index.ts), [`packages/session/session-title-llm/src/index.ts`](../../packages/session/session-title-llm/src/index.ts)
+ソース: [`packages/session/session-title/src/index.ts`](../../packages/session/session-title/src/index.ts), [`packages/session/session-title-llm/src/index.ts`](../../packages/session/session-title-llm/src/index.ts)
 
-## Durable title state
+## 永続的なタイトル状態
 
-`SessionTitleProviderId` is recorded for provider-produced revisions. `SessionTitleEventData` lists the exact human-message seqs used for the title, while `SessionTitleSnapshot` adds the durable event envelope facts returned by `ctx.sessionTitle.get()` and `foldSessionTitle()`. The `title` projection keeps its version-1 state and client view as only the title string or `null`, so existing persisted cache rows remain readable.
+`SessionTitleProviderId` は、プロバイダーが生成したリビジョンに対して記録されます。`SessionTitleEventData` はタイトルの導出に使われた正確な人間メッセージの seq を列挙し、`SessionTitleSnapshot` は `ctx.sessionTitle.get()` と `foldSessionTitle()` が返す永続イベントエンベロープの事実を追加します。`title` プロジェクションは、そのバージョン 1 の状態とクライアントビューをタイトル文字列または `null` のみとして保つため、既存の永続キャッシュ行は読み取り可能なままです。
 
 ```ts type-equiv
 /** Identifies one session-title provider registration. */
@@ -62,9 +62,9 @@ interface SessionTitleSnapshot extends SessionTitleEventData {
 }
 ```
 
-## Auxiliary request record
+## 補助リクエストレコード
 
-The shared execution module records each validated, dispatchable title request before calling the model. The payload reproduces the model-visible system and message input, routing, output limit, resolved reasoning effort, provider ownership, and source-message attribution even when generation later fails.
+共有実行モジュールは、モデルを呼び出す前に、検証済みでディスパッチ可能な各タイトルリクエストを記録します。ペイロードは、モデル可視のシステム入力とメッセージ入力、ルーティング、出力制限、解決済みの推論エフォート、プロバイダー所有権、ソースメッセージの帰属を、後で生成が失敗した場合でも再現します。
 
 ```ts type-equiv
 /** Exact model-visible request recorded before one auxiliary title dispatch. */
@@ -86,9 +86,9 @@ interface SessionTitleLlmRequestEventData {
 }
 ```
 
-## Provider input and output
+## プロバイダーの入力と出力
 
-The service snapshots eligible messages through one revision and, immediately before each provider call, the latest accepted title including the fallback it just ensured. A provider returns only seqs from that request; service-owned acceptance verifies ordering, normalizes the title, enforces the byte limit, and appends the title with its source-message seqs and source kind.
+サービスは、適格なメッセージを 1 つのリビジョンを通してスナップショットし、各プロバイダー呼び出しの直前に、それが確保したフォールバックを含む最新の受理済みタイトルをスナップショットします。プロバイダーはそのリクエストからの seq のみを返します。サービス所有の受理が順序を検証し、タイトルを正規化し、バイト制限を適用して、ソースメッセージの seq とソース種別と共にタイトルを追記します。
 
 ```ts type-equiv
 /** One eligible human text message exposed to title providers. */
@@ -159,13 +159,13 @@ interface SessionTitleProvider {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成 (doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。再生成は `pnpm run gen-cordis-catalog`) — 各言語側で異なるのはロケール固有の対訳ドキュメントパスだけです。署名ブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保ちます。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にあります。
 
 <a id="ctxsessiontitle--sessiontitleservice"></a>
 
 ### `ctx.sessionTitle` — `SessionTitleService`
 
-Log-backed title fold plus asynchronous fallback generation.
+ログに基づくタイトルフォールドと非同期フォールバック生成。
 
 ```ts cordis-catalog
 /**
@@ -207,7 +207,7 @@ async refresh(session: Session, signal?: AbortSignal): Promise<SessionTitleSnaps
 register(provider: SessionTitleProvider): () => Promise<void>
 ```
 
-Types: [Session](session.md)
+型: [Session](session.md)
 
-Source: [`packages/session/session-title/src/index.ts`](../../packages/session/session-title/src/index.ts)
+ソース: [`packages/session/session-title/src/index.ts`](../../packages/session/session-title/src/index.ts)
 <!-- END GENERATED cordis-surface -->

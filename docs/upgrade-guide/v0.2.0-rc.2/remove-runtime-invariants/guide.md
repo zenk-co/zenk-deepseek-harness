@@ -1,23 +1,23 @@
 ---
 kind: upgrade-guide
-description: "The runtime invariant registry package and every package's `./invariant` subpath export are removed."
+description: "ランタイム不変条件レジストリパッケージと各パッケージの `./invariant` サブパスエクスポートは削除される。"
 ---
 
-# Runtime invariant plugins are removed
+# ランタイム不変条件プラグインは削除される
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-In v0.2.0-rc.2, `@deepseek-ai/dsh-invariants` provided the `ctx.invariants` service, and workspace packages such as `@deepseek-ai/dsh-session`, `@deepseek-ai/dsh-agent`, `@deepseek-ai/dsh-scope`, and `@deepseek-ai/dsh-agent-loop` published `./invariant` companion plugins that registered checks with it. The `sdk-minimal` profile mounted five of these rows with ids `invariants`, `session-invariant`, `agent-invariant`, `scope-invariant`, and `agent-loop-invariant`.
+v0.2.0-rc.2 では、`@deepseek-ai/dsh-invariants` が `ctx.invariants` サービスを提供し、`@deepseek-ai/dsh-session`、`@deepseek-ai/dsh-agent`、`@deepseek-ai/dsh-scope`、`@deepseek-ai/dsh-agent-loop` などのワークスペースパッケージが、それにチェックを登録する `./invariant` コンパニオンプラグインを公開していた。`sdk-minimal` プロファイルは、`invariants`、`session-invariant`、`agent-invariant`、`scope-invariant`、`agent-loop-invariant` の ID を持つ 5 行をマウントしていた。
 
-The next release no longer publishes `@deepseek-ai/dsh-invariants`, `InvariantRegistry`, `InvariantInstaller`, `InvariantFailure`, `InvariantError`, or any `<package>/invariant` subpath. The `sdk-minimal` profile no longer contains the five rows. The `credentials/reference-updated`, `credentials/record-updated`, `authorization/settled`, and `llm/adapters-updated` emitters contain and log every listener failure, including errors with `code: 'INVARIANT'`, instead of rethrowing them.
+次のリリースでは、`@deepseek-ai/dsh-invariants`、`InvariantRegistry`、`InvariantInstaller`、`InvariantFailure`、`InvariantError`、およびあらゆる `<package>/invariant` サブパスを公開しなくなる。`sdk-minimal` プロファイルは 5 行を含まなくなる。`credentials/reference-updated`、`credentials/record-updated`、`authorization/settled`、`llm/adapters-updated` の各エミッターは、`code: 'INVARIANT'` を持つエラーを含め、あらゆるリスナー失敗を捕捉してログに記録し、再スローしなくなる。
 
-A `cordis.yml`, patch, or overlay that names a removed module fails to load it. A patch that targets one of the five `sdk-minimal` ids logs `patch: entry <id> not found`. TypeScript code that imports a removed module or symbol no longer compiles.
+削除されたモジュールを指名する `cordis.yml`、パッチ、またはオーバーレイでは、その読み込みに失敗する。5 つの `sdk-minimal` ID のいずれかを対象とするパッチは `patch: entry <id> not found` をログに記録する。削除されたモジュールやシンボルをインポートする TypeScript コードはコンパイルできなくなる。
 
-## Migration
+## 移行
 
-1. Delete rows whose `name` is `@deepseek-ai/dsh-invariants` or ends in `/invariant` from `cordis.yml`, `$DSH_HOME/profiles/<name>/cordis.patch.yml`, and `--patch` overlays.
-2. Delete patch entries that target the ids `invariants`, `session-invariant`, `agent-invariant`, `scope-invariant`, or `agent-loop-invariant`.
-3. Remove `@deepseek-ai/dsh-invariants` from `package.json` dependencies and delete imports of it and of `<package>/invariant` subpaths. A plugin that relied on a rethrown `INVARIANT` failure from one of the four emitters must report the failure through its own channel.
-4. Confirm: `dsh` starts the profile without a module-not-found error or `patch: entry ... not found` warning, and `tsc` reports no missing module or export.
+1. `cordis.yml`、`$DSH_HOME/profiles/<name>/cordis.patch.yml`、および `--patch` オーバーレイから、`name` が `@deepseek-ai/dsh-invariants` である行、または `/invariant` で終わる行を削除する。
+2. `invariants`、`session-invariant`、`agent-invariant`、`scope-invariant`、`agent-loop-invariant` の各 ID を対象とするパッチエントリを削除する。
+3. `package.json` の依存から `@deepseek-ai/dsh-invariants` を削除し、それおよび `<package>/invariant` サブパスへのインポートを削除する。4 つのエミッターのいずれかから再スローされる `INVARIANT` 失敗に依存していたプラグインは、自身のチャネルでその失敗を報告しなければならない。
+4. 確認する。プロファイルがモジュール未検出エラーや `patch: entry ... not found` 警告なしに `dsh` で開始すること、および `tsc` がモジュールやエクスポートの欠落を報告しないこと。

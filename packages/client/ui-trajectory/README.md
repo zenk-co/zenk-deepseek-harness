@@ -1,116 +1,116 @@
 ---
-description: "Trajectory view for the dsh web client: a turn-aware event ledger with an interactive timing overview, registered into the conversation view ring."
+description: "dsh web クライアント向けの Trajectory ビュー: ターンを意識したイベント台帳とインタラクティブなタイミング概要。会話ビューリングに登録される。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-trajectory
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The Trajectory tab lets you inspect agent activity as a turn-aware ledger and interactive timing overview. It groups User, Assistant, Tool, nested Subtool, and compaction records, marks turn and step boundaries, and opens a record inspector for token usage, duration, input, output, timing, images, and attachment summaries. Long histories open at the current tail, load older pages on demand, and render only visible rows. During streaming, the view follows the tail until you scroll upward, and in-flight records show a start marker without inventing elapsed time.
+Trajectory タブでは、エージェントの活動をターンを意識した台帳とインタラクティブなタイミング概要として検査できる。User、Assistant、Tool、ネストされた Subtool、compaction のレコードをグループ化し、ターンとステップの境界をマークし、トークン使用量、所要時間、入力、出力、タイミング、画像、添付の要約のためのレコードインスペクターを開く。長い履歴は現在のテールで開き、要求に応じて古いページを読み込み、可視の行だけをレンダリングする。ストリーミング中は、上へスクロールするまでビューがテールに追従し、進行中のレコードは経過時間を捏造せずに開始マーカーを表示する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Open the Trajectory tab in the conversation's view ring to inspect agent activity as an event ledger and timeline. The ledger covers records with an explicit loading row until the initial tail is positioned; while an older prefix remains unloaded, a first-row control loads one earlier page on click and shows the shared ongoing loader while that page is pending.
+会話のビューリングで Trajectory タブを開き、エージェントの活動をイベント台帳とタイムラインとして検査する。台帳は最初のテールが配置されるまで明示的な読み込み行でレコードを覆う。古いプレフィックスが未読み込みの間は、先頭行のコントロールがクリックで 1 つ前のページを読み込み、そのページが保留中の間は共有の進行中ローダーを表示する。
 
-### Inspecting records
+### レコードの検査
 
-Calls are identified by their recorded tool name. For `run_code`, the row shows the program description and the inspector opens numbered, highlighted source. The Code tab provides wrapping, a `{}` toggle for the original JSON arguments, and exact source copying, including trailing newlines. Copying the original arguments retains their recorded JSON whitespace. Each newly opened code view takes the last wrapping choice; changing it leaves other open views as they are. Output preserves the recorded text, using a tree for complete JSON objects or arrays. Highlighting uses only an unambiguous TypeScript or Python hint in the recorded tool schema; missing or conflicting hints leave plain source.
+呼び出しは記録されたツール名で識別される。`run_code` では、行がプログラムの説明を表示し、インスペクターが番号付きのハイライトされたソースを開く。Code タブは折り返し、元の JSON 引数のための `{}` トグル、末尾の改行を含む正確なソースのコピーを提供する。元の引数をコピーすると、記録された JSON の空白が保たれる。新しく開く各コードビューは最後の折り返しの選択を引き継ぎ、それを変更しても他の開いているビューはそのままである。出力は記録されたテキストを保ち、完全な JSON オブジェクトまたは配列にはツリーを使う。ハイライトは、記録されたツールスキーマ内の曖昧でない TypeScript または Python のヒントだけを使う。ヒントがないか競合する場合はプレーンなソースのままである。
 
-Selection, timeline navigation, folding, and search cover the React-visible window. Request numbers and cumulative usage cover the complete resident snapshot. Selecting a record opens a local inspector for token usage, duration, Input, Output, Timing, and durable images. Image URLs use the Conversation-owned per-session cache, so Chat and Trajectory share one authorized read per attachment. The Trajectory view declares `conversation.trajectory.images`; ledger children call this Slot through the framework `renderSlot` seat, passing image references, display options, and the authorized loader explicitly. Its official `MessageImages` entry calls the shared `conversation.images.content` Factory. A user record shows both nonzero image and ordinary-file counts beside its text, including attachment-only records. A standalone compaction request appears chronologically in its own `Between turns` section, while a numbered compaction remains inside its owning turn.
+選択、タイムラインナビゲーション、折りたたみ、検索は React 可視のウィンドウを対象とする。リクエスト番号と累積使用量は完全なレジデントスナップショットを対象とする。レコードを選択すると、トークン使用量、所要時間、Input、Output、Timing、永続画像のためのローカルインスペクターが開く。画像 URL は Conversation 所有のセッションごとのキャッシュを使うので、Chat と Trajectory は添付ごとに 1 回の認可された読み取りを共有する。Trajectory ビューは `conversation.trajectory.images` を宣言する。台帳の子はフレームワークの `renderSlot` シートを通じてこの Slot を呼び、画像参照、表示オプション、認可済みローダーを明示的に渡す。その公式の `MessageImages` エントリーは共有の `conversation.images.content` Factory を呼ぶ。ユーザーレコードは、添付のみのレコードも含め、テキストの横に非ゼロの画像数と通常ファイル数を表示する。単独の compaction リクエストは時系列順に独自の `Between turns` セクションに現れ、番号付きの compaction は所有するターン内に留まる。
 
-Summary and Preview share one ordered attachment list after the message text, preserving repeated references. Each row shows a contained image thumbnail or file-type icon, the recorded filename (a localized numbered label for unnamed images), and recorded size, type, and image dimensions where available. Zero-byte files retain their size, and truncated filenames expose the full name in a tooltip. Images open the existing lightbox. Raw keeps content-block order and unrendered text, with images and files in initially collapsed disclosures containing their complete recorded fields.
+Summary と Preview はメッセージテキストの後に 1 つの順序付き添付リストを共有し、繰り返しの参照を保つ。各行は、収められた画像サムネイルまたはファイル種別アイコン、記録されたファイル名（名前のない画像にはローカライズされた番号付きラベル）、および利用可能な場合は記録されたサイズ、種別、画像寸法を表示する。ゼロバイトのファイルはサイズを保ち、切り詰められたファイル名はツールチップで完全な名前を公開する。画像は既存のライトボックスを開く。Raw はコンテンツブロックの順序と未レンダリングのテキストを保ち、画像とファイルは完全な記録済みフィールドを含む初期折りたたみのディスクロージャーに入る。
 
-Requests remain pending while awaiting output, streaming, or retrying. A request without assistant output has no result link; interrupted output remains inspectable and both the request and assistant record show failure, including when the Step start is outside the loaded history. Retry counts and the last attempt error remain available after recovery; they do not change the current request status. A completed model response does not imply that its tools or turn have finished.
+リクエストは、出力待ち、ストリーミング、またはリトライの間は保留のままである。アシスタント出力のないリクエストには結果リンクがない。中断された出力は検査可能なままで、リクエストとアシスタントレコードの両方が失敗を示す。Step の開始が読み込み済み履歴の外にある場合も含む。リトライ回数と最後の試行のエラーは回復後も利用可能であり、現在のリクエストステータスを変えない。完了したモデル応答は、そのツールやターンが終了したことを意味しない。
 
-Thinking in the inspector uses compact Markdown at the inspector's fixed 13px size and 20px line height, independent of the content-size setting. Headings add bold weight without increasing size or line height. Assistant output keeps its regular Markdown typography.
+インスペクター内の Thinking は、インスペクター固定の 13px サイズと 20px 行高でコンパクトな Markdown を使い、コンテンツサイズ設定から独立している。見出しは太字のウェイトを加えるが、サイズや行高は増やさない。アシスタント出力は通常の Markdown タイポグラフィを保つ。
 
-### The timing overview
+### タイミングの概要
 
-Streaming replies retain their known start time and TTFT. After settlement, token timestamps provide generation duration; throughput also requires recorded usage. Historical replies retain the same recorded timing. TTFT measures from the Step start to its first token, including output from an earlier retry attempt; an unloaded Step start or a stream without tokens leaves the corresponding metric unavailable.
+ストリーミング中の返信は既知の開始時刻と TTFT を保つ。決着後は、トークンのタイムスタンプが生成所要時間を与える。スループットには記録された使用量も必要である。履歴の返信は同じ記録済みタイミングを保つ。TTFT は Step の開始から最初のトークンまでを測り、以前のリトライ試行からの出力も含む。読み込みされていない Step の開始、またはトークンのないストリームでは、対応するメトリクスが利用不可のままになる。
 
-A fixed Overview above the ledger projects real record start/duration timing from left to right; Assistant spans divide recorded TTFT from decoding, and a 500 ms hover reveals exact clock and duration details. Dragging an interval focuses the ledger on every record active at any point in that inclusive range; wheel gestures zoom the time domain; a right-button click clears the selected interval, and a right-button drag pans an already zoomed viewport. The initial view and streaming updates stay at the tail; scrolling upward suspends following so new records do not interrupt inspection of earlier rows.
+台帳の上の固定 Overview は、実際のレコードの開始/所要時間のタイミングを左から右へ射影する。Assistant スパンは記録された TTFT をデコードから分割し、500 ms のホバーが正確な時計と所要時間の詳細を明らかにする。インターバルをドラッグすると、台帳がその包含範囲内のどの時点かでアクティブなすべてのレコードにフォーカスする。ホイールジェスチャーは時間領域をズームする。右ボタンクリックは選択したインターバルをクリアし、右ボタンドラッグはすでにズーム済みのビューポートをパンする。初期ビューとストリーミング更新はテールに留まり、上へスクロールすると追従が一時停止するので、新しいレコードが以前の行の検査を妨げない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The view is a pure projection: Trajectory-owned Definitions assemble business records from the shared Session window — including durable cancellation-finalized prefixes, chunk-only interruption fallbacks, and interrupted Tool records — so Trajectory neither reads nor changes the Chat conversation snapshot. Its steering classifier retains only next-step Inbox IDs through persistent splice state and shares each current claimed batch across later Contexts.
+このビューは純粋なプロジェクションである。Trajectory 所有の Definition が共有 Session ウィンドウからビジネスレコードを組み立てる —— 永続化されたキャンセル確定済みプレフィックス、チャンクのみの中断フォールバック、中断された Tool レコードを含む —— ので、Trajectory は Chat 会話スナップショットを読むことも変更することもない。そのステアリング分類器は、永続的な splice 状態を通じて次ステップの Inbox ID だけを保持し、現在クレームされた各バッチを後続の Context 間で共有する。
 
-Native and nested PTC Tool results retain their raw structured error details and presentation metadata. Failed records show the error code in the ledger and the error name and code in the inspector.
+ネイティブおよびネストされた PTC の Tool 結果は、生の構造化エラー詳細とプレゼンテーションメタデータを保つ。失敗したレコードは、台帳にエラーコードを、インスペクターにエラー名とコードを表示する。
 
-Tool records begin at durable tool/call events and retain complete argument text with a lazy `args` view, reused by paired results. Chat's transient preparing stage does not create Trajectory tool rows or alter historical tool timing.
+Tool レコードは永続的な tool/call イベントから始まり、遅延 `args` ビュー付きの完全な引数テキストを保ち、対になる結果で再利用される。Chat の一時的な preparing ステージは Trajectory のツール行を作らず、履歴のツールタイミングも変えない。
 
-A complete appended prompt without a loaded request header appears as a standalone system row; only its known text is available, with no inferred request options or tool catalog. Prepending its request history replaces that standalone presentation without duplicating the prompt. In-history system prompt changes compare against the most recent request state, including earlier prompt updates without a new request header. Each request retains the prompt and change that applied at its own position. Surface replacements, including compaction, restore the last nonempty surviving system prompt even without a new system event; an unloaded prompt remains unavailable until its page arrives.
+読み込み済みのリクエストヘッダーなしで完全なプロンプトが追記された場合は、単独の system 行として現れる。既知のテキストだけが利用可能で、推論されたリクエストオプションもツールカタログもない。そのリクエスト履歴を先頭に追加すると、プロンプトを複製せずにその単独表示を置き換える。履歴内のシステムプロンプト変更は、新しいリクエストヘッダーなしの以前のプロンプト更新も含め、最新のリクエスト状態と比較される。各リクエストは、自身の位置で適用されたプロンプトと変更を保つ。compaction を含むサーフェス置換は、新しい system イベントがなくても最後の非空の生き残ったシステムプロンプトを復元する。読み込みされていないプロンプトは、そのページが届くまで利用不可のままである。
 
-### Virtual rows
+### 仮想行
 
-Long ledgers initially derive React data from 50 target Nodes ending at the mount-time tail. Later Nodes extend that anchored window without evicting its prefix, and the existing load control reveals earlier resident Nodes before requesting another Session page. Virtualization mounts only the visible row window plus a small overscan; request-only separators share the next measurable virtual item, while semantic row keys and ARIA indexes survive prepends. The virtualizer owns bottom following for structural appends; non-virtual ledgers use a direct tail-position write. Content-only stream frames preserve virtual row keys and heights, reuse measurements, and do not issue repeated tail-scroll writes. Completed replies retain assembled blocks, timing, and usage in Trajectory target State, while the shared Session window keeps the raw Events.
+長い台帳は当初、マウント時テールで終わる 50 個のターゲット Node から React データを導出する。後続の Node はそのアンカー済みウィンドウをプレフィックスを追い出さずに拡張し、既存の読み込みコントロールは別の Session ページを要求する前に、以前のレジデント Node を明らかにする。仮想化は可視の行ウィンドウ + 小さなオーバースキャンだけをマウントする。リクエストのみの区切りは次に測定可能な仮想アイテムを共有し、意味論的な行キーと ARIA インデックスは先頭への追加を生き延びる。仮想化機構は構造的な追記のボトムフォローを所有し、非仮想の台帳はテール位置への直接書き込みを使う。コンテンツのみのストリームフレームは仮想行のキーと高さを保ち、測定を再利用し、繰り返しのテールスクロール書き込みを発行しない。完了した返信は組み立て済みのブロック、タイミング、使用量を Trajectory ターゲット State に保ち、共有 Session ウィンドウは生の Events を保つ。
 
-### Layout
+### レイアウト
 
-Trajectory asks the conversation shell to float the composer over the full-height ledger, while its responsive vertical scrollers reserve the composer's live height so final rows remain reachable. Scrollable Summary regions keep their scrollbar thumbs transparent until hovered or focused, without changing the reserved scroll geometry. The package provides no service and declares no Context merge.
+Trajectory は会話シェルに、コンポーザーをフルハイトの台帳の上にフロートさせるよう要求し、そのレスポンシブな垂直スクローラーはコンポーザーのライブの高さを予約して最終行に到達できるようにする。スクロール可能な Summary 領域は、予約されたスクロールジオメトリを変えずに、ホバーまたはフォーカスまでスクロールバーのつまみを透明に保つ。このパッケージはサービスを提供せず、Context マージも宣言しない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the conversation host and the session data this view projects.
+これらのページは、会話ホストと、このビューが射影するセッションデータを扱う。
 
-- [ui-conversation](../ui-conversation/README.md) — the chat surface hosting the `conversation.view` ring.
-- [session-projection](../../session/session-projection/README.md) — the projection registry serving client-facing read models of session state.
-- [session](../../core/session/README.md) — the session seam whose window holds the raw events.
-- [compaction](../../compaction/compaction/README.md) — the compaction seam whose requests appear in the ledger.
+- [ui-conversation](../ui-conversation/README.md) — `conversation.view` リングをホストするチャットサーフェス。
+- [session-projection](../../session/session-projection/README.md) — セッション状態のクライアント向け読み取りモデルを提供するプロジェクションレジストリ。
+- [session](../../core/session/README.md) — 生のイベントをウィンドウに保持するセッションシーム。
+- [compaction](../../compaction/compaction/README.md) — そのリクエストが台帳に現れる compaction シーム。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+なし。このパッケージはブラウザー側の UI プラグイン層であり、モデルに面するものを何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Tool-change presentation** — Tool-only developer messages name a single added or removed tool inline without expansion. Multiple changes show added/removed counts and expand to comma-separated tool lists, one line per change kind. Mixed content uses the generic context presentation.
+- **ツール変更の表示** — ツールのみの開発者メッセージは、追加または削除された 1 つのツールを展開なしでインラインに名指す。複数の変更は追加/削除の件数を示し、変更種別ごとに 1 行のカンマ区切りツールリストに展開する。混在コンテンツは汎用のコンテキスト表示を使う。
 
 
-These limits define what the view can show while work is in flight; they are current package constraints.
+これらの制限は、作業が進行中の間にビューが表示できるものを定義する。現在のパッケージ制約である。
 
-- **In-flight Time stays blank** — `partial` and `runningCalls` rows show their running state without a fabricated duration, so the Overview renders a start marker rather than inventing a live span. Record and timeline selection are local to Trajectory, with no anchor deep links.
+- **進行中の Time は空のまま** — `partial` と `runningCalls` の行は、捏造された所要時間なしで実行中状態を示すので、Overview はライブスパンを捏造するのではなく開始マーカーをレンダリングする。レコードとタイムラインの選択は Trajectory にローカルで、アンカーディープリンクはない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

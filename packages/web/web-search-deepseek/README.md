@@ -1,39 +1,39 @@
 ---
-description: "The DeepSeek-backed search provider for ctx.web: how deployments mount native DeepSeek web search through the Anthropic-compatible Messages API, with per-search credential resolution."
+description: "ctx.web 向けの DeepSeek バックエンド検索プロバイダー: デプロイが Anthropic 互換 Messages API を通じてネイティブ DeepSeek Web 検索をどうマウントするか、検索ごとの認証情報解決とともに。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-web-search-deepseek
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-With `dsh-web-search-deepseek`, the harness searches the web through DeepSeek's native search using the DeepSeek account sign-in or an existing `DEEPSEEK_API_KEY`. Choose it when a deployment wants DeepSeek native search and accepts that one search costs a full model turn in latency and tokens, because DeepSeek exposes no dedicated search endpoint. Results come from the structured search blocks DeepSeek returns, never from scraping text out of a reply. A missing credential fails the call with a structured error; a response without a search-result block fails loudly rather than degrading. The model-facing `web_search` tool lives in `dsh-tool-web`.
+`dsh-web-search-deepseek` により、harness は DeepSeek アカウントのサインインまたは既存の `DEEPSEEK_API_KEY` を使用して DeepSeek のネイティブ検索で Web を検索します。デプロイが DeepSeek ネイティブ検索を望み、DeepSeek が専用の検索エンドポイントを公開していないため 1 回の検索が完全なモデルターン分のレイテンシとトークンを要することを受け入れる場合に選びます。結果は DeepSeek が返す構造化検索ブロックから来て、返信からテキストをスクレイプすることはありません。認証情報がない場合は構造化エラーで呼び出しが失敗し、検索結果ブロックのない応答は劣化せず大きな音で失敗します。モデル向けの `web_search` ツールは `dsh-tool-web` にあります。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送りされた作業](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the provider in a composition that already loads the web service; it registers as the `deepseek-official` search provider, so `ctx.web.search()` resolves it automatically when it is the only usable search backend — or pin it with `searchProvider: deepseek-official`.
+すでに web サービスをロードしている構成でこのプロバイダーをマウントします。`deepseek-official` 検索プロバイダーとして登録されるため、使用可能な唯一の検索バックエンドである場合、`ctx.web.search()` はそれを自動的に解決します — または `searchProvider: deepseek-official` で固定します。
 
-### When to choose it
+### いつ選択するか
 
-Choose this backend when a deployment wants DeepSeek's native server-side web search and its users either sign in to a DeepSeek account or hold a `DEEPSEEK_API_KEY` — the provider reuses those credentials as [Authentication](#authentication) describes. One search is heavier than a dedicated retrieval endpoint: DeepSeek runs the search inside a full model turn, so expect one Messages call's latency and generated tokens per search, with up to `maxUses` server-side searches per request. Avoid it when per-search cost or latency dominates.
+デプロイが DeepSeek のネイティブなサーバーサイド Web 検索を望み、そのユーザーが DeepSeek アカウントにサインインしているか `DEEPSEEK_API_KEY` を持っている場合はこのバックエンドを選びます — プロバイダーは [認証](#authentication) で説明するようにそれらの認証情報を再利用します。1 回の検索は専用の取得エンドポイントより重くなります。DeepSeek は完全なモデルターン内で検索を実行するため、検索あたり 1 回の Messages 呼び出しのレイテンシと生成トークンを見込み、リクエストあたり最大 `maxUses` 回のサーバーサイド検索が可能です。検索ごとのコストやレイテンシが支配的な場合は避けてください。
 
-### Minimal configuration
+### 最小構成
 
-Load the web service and the provider; the key resolves from `ctx.credentials` when that service is mounted, otherwise from the process environment. The auxiliary search call has its own endpoint setting and uses the Anthropic-compatible base `https://api.deepseek.com/anthropic/v1`, with `/messages` appended. It reads `$DEEPSEEK_SEARCH_BASE_URL`, independently of the conversation adapter’s `$DEEPSEEK_BASE_URL`.
+web サービスとプロバイダーをロードします。キーはそのサービスがマウントされている場合は `ctx.credentials` から、そうでなければプロセス環境から解決されます。補助検索呼び出しは独自のエンドポイント設定を持ち、Anthropic 互換のベース `https://api.deepseek.com/anthropic/v1` に `/messages` を付けて使用します。`$DEEPSEEK_SEARCH_BASE_URL` を読み取り、会話アダプターの `$DEEPSEEK_BASE_URL` とは独立しています。
 
 ```yaml
 - name: '@deepseek-ai/dsh-web'
@@ -43,135 +43,135 @@ Load the web service and the provider; the key resolves from `ctx.credentials` w
     baseURL: https://gateway.internal/anthropic/v1
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `apiKey` | omitted | Literal DeepSeek API key; prefer `apiKeyEnv` so no secret enters configuration. A non-empty literal wins over `apiKeyEnv`; an account token wins over both |
-| `apiKeyEnv` | `DEEPSEEK_API_KEY` | Credential reference resolved for each search through `ctx.credentials`, or from the process environment when that service is absent. A search that needs an API key and finds none fails as `WEB_PROVIDER_CREDENTIAL_MISSING` |
-| `baseURL` | `https://api.deepseek.com/anthropic/v1` | Anthropic-compatible endpoint base; `/messages` is appended. Falls back to `$DEEPSEEK_SEARCH_BASE_URL`; an unparseable value makes the provider unavailable |
-| `model` | `deepseek-v4-flash` | Anthropic-format model name |
-| `apiVersion` | `2023-06-01` | `anthropic-version` header value |
-| `maxTokens` | `4096` | Positive-integer upper bound on generated tokens for the Messages request |
-| `maxUses` | `5` | Positive-integer maximum `web_search` server-tool uses per request |
+| `apiKey` | 省略 | リテラルの DeepSeek API キー。設定にシークレットが入らないよう `apiKeyEnv` を推奨。空でないリテラルは `apiKeyEnv` より優先され、アカウントトークンはその両方より優先されます |
+| `apiKeyEnv` | `DEEPSEEK_API_KEY` | 各検索で `ctx.credentials` を通じて解決される認証情報参照。そのサービスがない場合はプロセス環境から。API キーを必要とする検索で見つからない場合は `WEB_PROVIDER_CREDENTIAL_MISSING` で失敗します |
+| `baseURL` | `https://api.deepseek.com/anthropic/v1` | Anthropic 互換エンドポイントベース。`/messages` が付加されます。`$DEEPSEEK_SEARCH_BASE_URL` にフォールバックし、解析不能な値はプロバイダーを使用不能にします |
+| `model` | `deepseek-v4-flash` | Anthropic 形式のモデル名 |
+| `apiVersion` | `2023-06-01` | `anthropic-version` ヘッダー値 |
+| `maxTokens` | `4096` | Messages リクエストの生成トークン数の正の整数上限 |
+| `maxUses` | `5` | リクエストあたりの `web_search` サーバーツール使用回数の正の整数上限 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web-search-deepseek) lists every accepted field. Each search captures options from the live Config references.
+生成される [設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-web-search-deepseek) は、受け付けられるすべてのフィールドを列挙します。各検索はライブの Config 参照からオプションを捕捉します。
 
 <a id="authentication"></a>
-### Authentication
+### 認証
 
-A search authenticates with the DeepSeek account when the latest `request/context` event of the initiating Session names the `deepseek-account` provider route and `ctx.deepseekAccount` resolves a token for the search endpoint. The account service resolves one only while signed in and only for its deployment-configured inference origin, `https://api.deepseek.com` by default. That search sends only `x-dsh-auth-token`, even when an API key is configured. Every other search, including a call without an initiating Session and a search whose endpoint has another origin, sends the API key as both `x-api-key` and `Authorization: Bearer`. An HTTP 401 response to an account-authenticated search fails as `WEB_PROVIDER_ERROR` with sign-in guidance instead of endpoint guidance, and leaves the account signed in.
+開始セッションの最新の `request/context` イベントが `deepseek-account` プロバイダールートを指定し、`ctx.deepseekAccount` が検索エンドポイント用のトークンを解決する場合、検索は DeepSeek アカウントで認証します。アカウントサービスがトークンを解決するのは、サインイン中の、かつデプロイ設定された推論オリジン（デフォルトでは `https://api.deepseek.com`）向けのみです。その検索は、API キーが設定されていても `x-dsh-auth-token` のみを送信します。開始セッションのない呼び出しや、エンドポイントが別のオリジンである検索を含む他のすべての検索は、API キーを `x-api-key` と `Authorization: Bearer` の両方として送信します。アカウント認証された検索への HTTP 401 応答は、エンドポイントのガイダンスではなくサインインのガイダンスとともに `WEB_PROVIDER_ERROR` として失敗し、アカウントはサインイン状態のままです。
 
-### What a search returns
+### 検索が返すもの
 
-`content` is always omitted: DeepSeek's provider prose is not trusted as an answer. `sources[]` comes from `web_search_result` items inside `web_search_tool_result` blocks — `url` and `title` directly, and `publishedAt` from `page_age` — with snippets joined from URL-keyed `cited_text` entries where an excerpt exists. Results are deduplicated by URL, and because DeepSeek exposes no result-count knob, the service enforces `maxResults` by truncating and flagging.
+`content` は常に省略されます。DeepSeek のプロバイダー散文は回答として信頼されません。`sources[]` は `web_search_tool_result` ブロック内の `web_search_result` 項目から来ます — `url` と `title` は直接、`publishedAt` は `page_age` から — 抜粋が存在する場合は URL をキーとする `cited_text` エントリーからスニペットが結合されます。結果は URL で重複排除され、DeepSeek が結果数ノブを公開していないため、サービスは切り詰めとフラグ付けによって `maxResults` を適用します。
 
-### Request logging
+### リクエストログ
 
-A search running under an initiating agent appends the log-only `web/deepseek-search-llm-request` session event immediately before dispatch. It carries the resolved endpoint, API version, and the exact secret-free JSON body sent to DeepSeek; headers and credentials are excluded. Credential failures and cancellations before dispatch create no event, while later HTTP or response failures leave the attempted request durable.
+開始エージェントの下で実行される検索は、ディスパッチの直前にログ専用の `web/deepseek-search-llm-request` セッションイベントを追記します。解決されたエンドポイント、API バージョン、DeepSeek に送信されるシークレットを含まない正確な JSON ボディを運びます。ヘッダーと認証情報は除外されます。ディスパッチ前の認証情報失敗とキャンセルはイベントを作成せず、以降の HTTP や応答の失敗は試行されたリクエストを永続化します。
 
-### Failures and recovery
+### 失敗と回復
 
-Failures throw `WebError` with a machine-routable code: a missing credential is `WEB_PROVIDER_CREDENTIAL_MISSING`, caller cancellation is `WEB_ABORTED`, and provider or transport failures — including a response with no `web_search_tool_result` block — are `WEB_PROVIDER_ERROR`. HTTP redirects are rejected before the `Location` target is contacted. Every failure after dispatch names the resolved search endpoint and explains that search endpoint configuration is separate from chat. If the endpoint is unintended, the message tells the conversation model to guide the user to the Endpoint field under Settings > Plugins > Plugin configuration > Web search and save the change. When that page is unavailable, it names `DEEPSEEK_SEARCH_BASE_URL` and `web-search-deepseek.baseURL` as deployment configuration alternatives. The model must not choose or change the endpoint. The model-facing `web_search` tool surfaces this text under its own error wrapper.
+失敗は `WebError` をスローし、機械ルーティング可能なコードを持ちます。認証情報の欠落は `WEB_PROVIDER_CREDENTIAL_MISSING`、呼び出し元のキャンセルは `WEB_ABORTED`、プロバイダーまたはトランスポートの失敗（`web_search_tool_result` ブロックのない応答を含む）は `WEB_PROVIDER_ERROR` です。HTTP リダイレクトは `Location` ターゲットに接触する前に拒否されます。ディスパッチ後のすべての失敗は、解決された検索エンドポイントを挙げ、検索エンドポイントの設定がチャットとは別であることを説明します。エンドポイントが意図しないものである場合、メッセージは会話モデルに、ユーザーを Settings > Plugins > Plugin configuration > Web search の Endpoint フィールドへ導き、変更を保存するよう伝えます。そのページが利用できない場合は、デプロイ設定の代替として `DEEPSEEK_SEARCH_BASE_URL` と `web-search-deepseek.baseURL` を挙げます。モデルはエンドポイントを選択または変更してはなりません。モデル向けの `web_search` ツールはこのテキストを自身のエラーラッパーの下に表示します。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the provider; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではプロバイダーの背後にある設計判断を説明します。観測可能な動作は [このパッケージを使う](#use-this-package) で完全に説明されています。
 
-### Design philosophy
+### 設計哲学
 
-The provider is built on two commitments:
+このプロバイダーは 2 つのコミットメントの上に成り立っています。
 
-- **Structured blocks only.** DeepSeek runs the search server-side and returns structured `web_search_tool_result` blocks; the provider parses those blocks and never scrapes URLs out of model prose. In strict mode, a response with no such block throws `WEB_PROVIDER_ERROR` instead of degrading.
-- **Conversation credentials, resolved per search.** The provider adds no secret: a search from a Session on the account route uses that account's token, and every other search reuses the `DEEPSEEK_API_KEY` reference. The auxiliary request endpoint stays independent through `$DEEPSEEK_SEARCH_BASE_URL`. A mounted credentials service is authoritative; without one the provider falls back to the launching process environment. Resolving per call means a key stored or rotated in the Web Models page, or an account sign-in, reaches the next search without a restart.
+- **構造化ブロックのみ。** DeepSeek はサーバーサイドで検索を実行し、構造化された `web_search_tool_result` ブロックを返します。プロバイダーはそれらのブロックを解析し、モデルの散文から URL をスクレイプすることはありません。厳密モードでは、そのようなブロックのない応答は劣化せず `WEB_PROVIDER_ERROR` をスローします。
+- **会話の認証情報を検索ごとに解決。** プロバイダーはシークレットを追加しません。アカウントルート上のセッションからの検索はそのアカウントのトークンを使用し、他のすべての検索は `DEEPSEEK_API_KEY` 参照を再利用します。補助リクエストエンドポイントは `$DEEPSEEK_SEARCH_BASE_URL` を通じて独立したままです。マウントされた credentials サービスが権威であり、なければプロバイダーは起動プロセス環境にフォールバックします。呼び出しごとに解決することで、Web Models ページで保存またはローテーションされたキー、あるいはアカウントのサインインが、再起動なしで次の検索に反映されます。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Config schema and per-search option capture |
-| [`src/provider.ts`](src/provider.ts) | The `DeepSeekSearchProvider`: Messages request dispatch, block parsing, citation joining, credential resolution |
-| [`src/types.ts`](src/types.ts) | Anthropic wire types for the search response |
+| [`src/index.ts`](src/index.ts) | 設定スキーマと検索ごとのオプション捕捉 |
+| [`src/provider.ts`](src/provider.ts) | `DeepSeekSearchProvider`: Messages リクエストのディスパッチ、ブロック解析、引用結合、認証情報解決 |
+| [`src/types.ts`](src/types.ts) | 検索応答の Anthropic wire 型 |
 
-### Request flow
+### リクエストフロー
 
-Each search captures the current Config values into provider options — endpoint, model, key reference, limits — then asks `ctx.deepseekAccount` for a token when the initiating Session uses the account route, otherwise resolves the credential reference through `ctx.credentials` (or the environment), appends the log-only session event, and dispatches the Messages request with the native `web_search` server tool. The response's `web_search_tool_result` blocks become `sources[]`; `cited_text` entries from text blocks are joined to their URLs as snippets; results are deduplicated by URL; and the service enforces the requested source bound on the way back.
+各検索は現在の Config 値をプロバイダーオプション — エンドポイント、モデル、キー参照、制限 — に捕捉し、開始セッションがアカウントルートを使用する場合は `ctx.deepseekAccount` にトークンを求め、そうでなければ `ctx.credentials`（または環境）を通じて認証情報参照を解決し、ログ専用セッションイベントを追記し、ネイティブ `web_search` サーバーツールとともに Messages リクエストをディスパッチします。応答の `web_search_tool_result` ブロックは `sources[]` になり、テキストブロックの `cited_text` エントリーは URL にスニペットとして結合され、結果は URL で重複排除され、サービスは戻り道で要求されたソース上限を適用します。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared vocabulary to the service, the model-facing tools, and the design rationale.
+パッケージレベルの契約では足りないときにこれらのページを読んでください。共有語彙からサービス、モデル向けツール、設計根拠へと進みます。
 
-- [Web subsystem](../../../docs/subsystems/web.md) — the exhaustive search request/result vocabulary and error codes.
-- [Web package map](../README.md) — the six-package family and each role.
-- [dsh-web](../web/README.md) — the web service this provider registers into.
-- [dsh-tool-web](../tool-web/README.md) — the model-facing `web_search` tool that renders this provider's sources.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web-search-deepseek) — every accepted config field and its source declaration.
-- [Web capability seam decision](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) — why search and fetch share one provider-selection service.
+- [Web サブシステム](../../../docs/subsystems/web.md) — 網羅的な検索リクエスト/結果の語彙とエラーコード。
+- [Web パッケージマップ](../README.md) — 6 パッケージファミリーと各ロール。
+- [dsh-web](../web/README.md) — このプロバイダーが登録する web サービス。
+- [dsh-tool-web](../tool-web/README.md) — このプロバイダーのソースをレンダリングするモデル向け `web_search` ツール。
+- [生成設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-web-search-deepseek) — 受け付けられるすべての設定フィールドとそのソース宣言。
+- [Web capability seam decision](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) — 検索とフェッチが 1 つのプロバイダー選択サービスを共有する理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Auxiliary DeepSeek search request
+### 補助 DeepSeek 検索リクエスト
 
-#### What the model sees
+#### モデルが見るもの
 
-A separate DeepSeek model receives exactly `Perform a web search for the query: <query>` as its user text and one native `web_search` server-tool definition. This request is not part of the conversation model's context.
+別個の DeepSeek モデルは、ユーザーテキストとして正確に `Perform a web search for the query: <query>` と、1 つのネイティブ `web_search` サーバーツール定義を受け取ります。このリクエストは会話モデルのコンテキストの一部ではありません。
 
-#### Token effect
+#### トークンへの影響
 
-Separate provider input and output tokens are incurred for each search; `maxTokens` caps generated output and `maxUses` caps native search uses.
+検索ごとに別個のプロバイダー入力トークンと出力トークンが発生します。`maxTokens` は生成出力を、`maxUses` はネイティブ検索の使用回数を制限します。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Independent of the conversation request cache. The auxiliary instruction and native tool definition can form a stable prefix, but each changed query or model route prevents reuse from its first difference.
+会話リクエストキャッシュから独立しています。補助命令とネイティブツール定義は安定したプレフィックスを形成できますが、クエリやモデルルートが変わるたびに最初の差分からの再利用が妨げられます。
 
-### Conversation tool result, indirectly
+### 間接的な会話ツール結果
 
-#### What the model sees
+#### モデルが見るもの
 
-Through `dsh-tool-web`, the conversation model sees deduplicated URLs, titles, dates, and citation snippets from structured search blocks; provider prose is not trusted as an answer. This provider's exact failures include the actionable missing-credential message, which also names DeepSeek Account sign-in, `DeepSeek search credential resolution failed: <error>`, and `DeepSeek search aborted`. An HTTP 401 to an account-authenticated search appends an instruction to guide the user to sign in to DeepSeek again. Other request, HTTP, native-search, and response-body failures append the resolved endpoint and the conditional configuration instruction described above. The consumer owns the error wrapper.
+`dsh-tool-web` を通じて、会話モデルは構造化検索ブロックからの重複排除された URL、タイトル、日付、引用スニペットを見ます。プロバイダーの散文は回答として信頼されません。このプロバイダーの正確な失敗には、実行可能な認証情報欠落メッセージ（DeepSeek Account のサインインも挙げます）、`DeepSeek search credential resolution failed: <error>`、`DeepSeek search aborted` が含まれます。アカウント認証された検索への HTTP 401 は、ユーザーを DeepSeek に再度サインインさせる指示を追記します。その他のリクエスト、HTTP、ネイティブ検索、応答ボディの失敗は、解決されたエンドポイントと上記の条件付き設定指示を追記します。エラーラッパーはコンシューマーが所有します。
 
-#### Token effect
+#### トークンへの影響
 
-Zero direct conversation tokens from registration. Result tokens scale with returned sources and snippets, then the service enforces the requested source bound.
+登録による直接の会話トークンはゼロです。結果トークンは返されたソースとスニペットに比例し、その後サービスが要求されたソース上限を適用します。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用です。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送りされた作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the provider is expensive or incomplete. They are current package constraints.
+これらの制限は、プロバイダーが高コストまたは不完全になる場合を定義します。これらは現在のパッケージ制約です。
 
-- **One search costs a full Messages model turn** — latency plus generated tokens, with up to `maxUses` server-side searches; DeepSeek exposes no dedicated retrieval endpoint.
-- **Dynamic credential availability resolves inside the operation** — the synchronous availability check can establish that a resolver exists but cannot query an asynchronous credential store, so a selected keyless provider fails the search with `WEB_PROVIDER_CREDENTIAL_MISSING`; the stable `web_search` schema stays registered.
-- **Over-returned sources still cost tokens** — with no result-count knob on the wire, `maxResults` is enforced only post-hoc by service truncation.
-- **Uncited results carry no `snippet`** — a source gains one only when a text-block citation (`cited_text`) matches its URL.
+- **1 回の検索は完全な Messages モデルターンのコスト** — レイテンシと生成トークン、加えて最大 `maxUses` 回のサーバーサイド検索。DeepSeek は専用の取得エンドポイントを公開していません。
+- **動的な認証情報の可用性は操作の内部で解決される** — 同期の可用性チェックはリゾルバーの存在を確認できますが、非同期の認証情報ストアを照会できません。そのため、選択されたキーのないプロバイダーは `WEB_PROVIDER_CREDENTIAL_MISSING` で検索に失敗します。安定した `web_search` スキーマは登録されたままです。
+- **過剰に返されたソースもトークンを消費する** — wire に結果数ノブがないため、`maxResults` はサービスによる事後的な切り詰めでのみ適用されます。
+- **引用されていない結果は `snippet` を持たない** — ソースがスニペットを得るのは、テキストブロックの引用（`cited_text`）がその URL に一致する場合のみです。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior, limits, and rationale live in the sections above and the linked Agent Notes.
+この開発ノートはメンテナー向けの作業コンテキストです。未解決の問いと未決定の方向性を扱います。明示的に非権威です — 出荷される動作、制限、根拠は、上のセクションとリンクされた Agent Note にあります。
 
-#### Future: dedicated retrieval endpoint
+#### 将来: 専用の取得エンドポイント
 
-A native DeepSeek search endpoint that avoids the full model turn would remove the dominant cost; until DeepSeek exposes one, this provider stays a Messages-call adapter.
+完全なモデルターンを避けるネイティブの DeepSeek 検索エンドポイントは支配的なコストを取り除きます。DeepSeek がそれを公開するまで、このプロバイダーは Messages 呼び出しアダプターにとどまります。
 
 </details>

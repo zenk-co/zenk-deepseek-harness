@@ -1,21 +1,21 @@
 ---
 kind: upgrade-guide
-description: "Tool presentation accepts native or ptc; the mixed both mode is rejected."
+description: "ツール提示は native または ptc を受け付け、混合の both モードは拒否される。"
 ---
 
-# Select native or PTC tool presentation
+# ネイティブまたは PTC のツール提示を選択する
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-The `mode` fields of `@deepseek-ai/dsh-tools` and `@deepseek-ai/dsh-agent-tool-presentation` accept only `native` or `ptc`. The `both` value is rejected. This also affects `DSH_TOOLS_MODE=both`, which supplies the tools configuration through the shipped profile patches.
+`@deepseek-ai/dsh-tools` と `@deepseek-ai/dsh-agent-tool-presentation` の `mode` フィールドは `native` または `ptc` のみを受け付ける。`both` 値は拒否される。これは出荷プロファイルパッチ経由でツール構成を提供する `DSH_TOOLS_MODE=both` にも影響する。
 
-`native` exposes visible tools as direct function calls. `ptc` exposes `run_code`; programs call the visible tools through the generated SDK. Different agent presets can continue using different modes in the same application.
+`native` は可視ツールを直接の関数呼び出しとして公開する。`ptc` は `run_code` を公開し、プログラムは生成された SDK 経由で可視ツールを呼び出す。異なるエージェントプリセットは同じアプリケーション内で引き続き異なるモードを使える。
 
-## Migration
+## 移行
 
-1. In `cordis.yml`, profile `cordis.patch.yml`, or a custom overlay, replace `mode: both` with `mode: native` for direct calls or `mode: ptc` for program-based calls.
-2. Replace `DSH_TOOLS_MODE=both` with `DSH_TOOLS_MODE=native` or `DSH_TOOLS_MODE=ptc`. For preset-specific selection, update the preset's `@deepseek-ai/dsh-agent-tool-presentation` row instead.
-3. Update code that calls `ctx.tools.presentAs('both')` to select `native` or `ptc`. In PTC programs, keep calls inside `run_code`; do not emit the SDK function names as direct model tool calls.
-4. Start the affected profile and confirm that configuration loads. Native requests expose the permitted direct tools; PTC requests expose `run_code` and its SDK instructions.
+1. `cordis.yml`、プロファイル `cordis.patch.yml`、またはカスタムオーバーレイで、直接呼び出しには `mode: both` を `mode: native` に、プログラムベースの呼び出しには `mode: ptc` に置き換える。
+2. `DSH_TOOLS_MODE=both` を `DSH_TOOLS_MODE=native` または `DSH_TOOLS_MODE=ptc` に置き換える。プリセット固有の選択には、代わりにプリセットの `@deepseek-ai/dsh-agent-tool-presentation` 行を更新する。
+3. `ctx.tools.presentAs('both')` を呼び出すコードを `native` または `ptc` の選択に更新する。PTC プログラムでは呼び出しを `run_code` 内に保ち、SDK 関数名を直接のモデルツール呼び出しとして送出しない。
+4. 影響を受けるプロファイルを起動し、設定が読み込まれることを確認する。ネイティブリクエストは許可された直接ツールを公開し、PTC リクエストは `run_code` とその SDK 手順を公開する。

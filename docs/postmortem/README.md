@@ -1,18 +1,18 @@
-# Post-mortems
+# ポストモーテム
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Incident write-ups: a bug reached a place it shouldn't have (a real user, a merged PR, a release), and the interesting part is *why our process let it through*, not just the one-line fix.
+インシデントの記録: バグが本来到達すべきでない場所に到達した (実在のユーザー、マージ済み PR、リリース) 場合の書き起こしであり、興味深い点は一行の修正そのものではなく、*なぜプロセスがそれを通してしまったのか* である。
 
-A post-mortem is NOT an [Agent Note](../../.agents/notes/README.md) (which records a deliberate design decision and its rejected alternatives, or proposes future work). It is a backward-looking record of a failure: what broke, the mechanism, why every safety net missed it, and the concrete guardrails added so the same class of bug fails loudly next time.
+ポストモーテムは [Agent Note](../../.agents/notes/README.md) (意図的な設計判断と棄却した代替案を記録するか、将来の作業を提案するもの) ではない。失敗の後ろ向きの記録である: 何が壊れたか、その仕組み、なぜすべての安全網が見逃したか、そして同じ種類のバグが次回は大きな音を立てて失敗するよう追加した具体的なガードレール。
 
-Write one when a bug is **subtle** (the mechanism is non-obvious and a careful engineer would re-derive it the hard way), **systemic** (the reason it escaped is a gap in tests/tooling/conventions, not a one-off typo), and **costly to rediscover** (it cost real debugging time, and would cost it again). Link the guardrails (tests, AGENTS.md rules, ADRs) the post-mortem motivated.
+バグが **subtle** (仕組みが自明でなく、注意深いエンジニアでも苦労して再導出することになる)、**systemic** (逃げた理由が単発の typo ではなくテスト/ツール/規約の隙間にある)、かつ **costly to rediscover** (実際にデバッグ時間を費やし、再び費やすことになる) 場合に書く。ポストモーテムが動機付けたガードレール (テスト、AGENTS.md のルール、ADR) へリンクする。
 
-Every post-mortem opens with an **Executive summary**: one short paragraph a busy reader can absorb in thirty seconds — what broke, the root cause in plain terms, why it escaped, and the durable lesson — before the detailed Summary / Timeline / Root cause / Guardrails sections that follow.
+すべてのポストモーテムは **Executive summary** で始める: 詳細な Summary / Timeline / Root cause / Guardrails セクションの前に、多忙な読者が 30 秒で吸収できる短い段落 — 何が壊れたか、平易な言葉での根本原因、なぜ逃げたか、耐久性のある教訓 — を置く。
 
-| # | Title |
+| # | タイトル |
 |---|---|
-| [0001](0001-acp-default-export-drops-inject.md) | ACP server crashed on connect: `export default` dropped the plugin's `inject` |
-| [0002](0002-js-expression-disabled-filesystem-tools.md) | Filesystem snapshot tools were permanently disabled by a literal `!!js` object |
-| [0003](0003-web-agent-gui-feedback-loop.md) | Web agent validated a replacement server instead of the GUI hosting its session |
-| [0004](0004-landlock-partial-notice-misclassified-child-failures.md) | Landlock partial-enforcement notice misclassified child failures |
+| [0001](0001-acp-default-export-drops-inject.md) | ACP サーバーが接続時にクラッシュ: `export default` がプラグインの `inject` を落とした |
+| [0002](0002-js-expression-disabled-filesystem-tools.md) | ファイルシステムのスナップショットツールがリテラルの `!!js` オブジェクトにより恒久的に無効化された |
+| [0003](0003-web-agent-gui-feedback-loop.md) | Web エージェントがセッションをホストする GUI ではなく置換サーバーを検証した |
+| [0004](0004-landlock-partial-notice-misclassified-child-failures.md) | Landlock 部分適用通知が子プロセスの失敗を誤分類した |

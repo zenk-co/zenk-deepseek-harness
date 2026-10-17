@@ -1,39 +1,39 @@
 ---
-description: "Client Tool presentation plugin for the dsh web client: whole-call tree composition, the keyed per-tool view slot, and the built-in atomic tool cards."
+description: "dsh Web クライアントのクライアントツール表示プラグイン。コール全体のツリー構成、ツールごとのキー付きビュースロット、および組み込みのアトミックツールカード。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-tool
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-client-ui-tool` is the client Tool presentation plugin of the dsh web client: it renders every tool call in the conversation. `ui-conversation` dispatches each ordered `tool-call` Conversation Node through the matching key of `conversation.chat.node`; this package renders its root and PTC dispatch children, then dispatches every atomic call through the keyed `tool.call.toolview` slot. Unregistered Tool names use the generic card. Business UI packages register only their wire Tool names and atomic views — they do not pair Session events, rebuild the transcript, or own root/subcall topology, because the Runtime remains authoritative for call/result pairing, lifecycle, and recursive `subCalls` projection.
+`dsh-client-ui-tool` は dsh Web クライアントのクライアントツール表示プラグインであり、会話内のすべてのツール呼び出しを描画する。`ui-conversation` は順序付けられた各 `tool-call` Conversation Node を `conversation.chat.node` の一致するキーを通じてディスパッチする。このパッケージはそのルートと PTC ディスパッチ子を描画し、その後、すべてのアトミックな呼び出しをキー付き `tool.call.toolview` スロットを通じてディスパッチする。未登録のツール名には汎用カードが使われる。ビジネス UI パッケージは自身の wire ツール名とアトミックビューだけを登録する。Session イベントを対にする、トランスクリプトを再構築する、ルート/サブコールのトポロジーを所有することはしない。呼び出し/結果の対、ライフサイクル、および再帰的な `subCalls` の射影については Runtime が権威のままであるためである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Tool calls appear in the conversation as cards: a root call tree with its nested subcalls, each atomic call rendered by its owning view. Every lifecycle state retains the tool's ordinary business glyph; failure and interruption remain explicit through the frozen call/result state, accessible status text, and failure summary. Users can open files or inspect calls through the Host callbacks. A collapsed `web_fetch` row links its http(s) URL, which opens in a new browser tab.
+ツール呼び出しは会話内にカードとして現れる。ネストされたサブコールを伴うルートコールツリーであり、各アトミックな呼び出しはそれを所有するビューによって描画される。すべてのライフサイクル状態はツール本来のビジネスグリフを保つ。失敗と中断は、凍結された呼び出し/結果状態、アクセシブルなステータステキスト、失敗サマリーによって明示的なままである。ユーザーは Host コールバックを通じてファイルを開いたり呼び出しを検査したりできる。折りたたまれた `web_fetch` 行はその http(s) URL をリンクし、新しいブラウザータブで開く。
 
-Settled foreground commands with a nonzero exit code, a terminating signal, or an explicit missing exit code keep their description in the ordinary gray text and show a neutral capsule with a red dot immediately after it. The capsule displays only the recorded code, signal, or localized missing-code status and stays on the same line; the description truncates with an ellipsis to reserve its space. Running, successful, and background calls omit it. Generic execution errors and stopped summaries retain their error and warning colors, including on hover.
+終了コードが非ゼロ、終了シグナルあり、または終了コードが明示的に欠落している確定済みフォアグラウンドコマンドは、説明を通常のグレーテキストのままにし、その直後に赤いドット付きの中立カプセルを表示する。カプセルは記録されたコード、シグナル、またはローカライズされた欠落コード状態のみを表示し、同じ行に留まる。説明はスペースを確保するために省略記号で切り詰められる。実行中、成功、およびバックグラウンドの呼び出しはこれを省略する。汎用の実行エラーと停止サマリーは、ホバー時も含めてエラーと警告の色を保つ。
 
-Before dispatch, a named model call appears as one non-expandable row with its tool-owned icon and title. A generic row shows `Tool call · <tool name>`. Read/write/edit show an openable path once `file_path` closes and decodes without errors; write/edit show `NKB` after that path once content arrives, retaining it during execution and after success, before any diff totals. N rounds the decoded input's UTF-16 length up in units of 1024, summing old and new text for edit; it is not file bytes. Error and stopped rows omit the size and diff totals. Command rows show the streamed description. `tool/call` enables the existing call presentation; completing an argument block alone does not start execution.
+ディスパッチ前、名前付きモデル呼び出しは、ツールが所有するアイコンとタイトルを伴う 1 つの展開不可能な行として現れる。汎用行は `Tool call · <tool name>` を表示する。read/write/edit は、`file_path` が閉じてエラーなくデコードされると、開くことのできるパスを表示する。write/edit は、内容が到着するとそのパスの後に `NKB` を表示し、実行中および成功後も diff 合計より前にそれを保持する。N はデコードされた入力の UTF-16 長を 1024 単位で切り上げた値であり、edit では新旧テキストを合計する。ファイルバイト数ではない。エラー行と停止行はサイズと diff 合計を省略する。コマンド行はストリーミングされる説明を表示する。`tool/call` が既存の呼び出し表示を有効にする。引数ブロックの完了だけでは実行は開始されない。
 
-### Registering a business tool view
+### ビジネスツールビューの登録
 
-An owning business package registers its wire Tool name into `tool.call.toolview`:
+所有するビジネスパッケージは自身の wire ツール名を `tool.call.toolview` に登録する:
 
 ```text
 ctx.slots.inject('tool.call.toolview', () =>
@@ -43,107 +43,107 @@ ctx.slots.inject('tool.call.toolview', () =>
   }, BusinessToolRow))
 ```
 
-The owner payload is `ToolCallOwnerProps`: `callId`, `toolName`, the `phase` discriminant and its stage-specific `block`, optional `cwd` and `home`, the session-authorized `loadImage` loader (for a view whose result carries durable images), and plain `openFile`/`inspect` callbacks. A PTC dispatch block retains its event's `parentCallId`; a root Session call has no such field, so descendants route through the same keyed dispatch — a registered view such as `read_image` renders its card there, and unregistered descendants keep the generic flattened form. Path summaries relativize to the Session cwd first, then replace a leftover POSIX Host home with `~`; `filePath` and Host open prefer the operation-time absolute result path while displayed labels keep the authored argument. Successful older root results retain their argument fallback; pending relative paths wait for a result. The registration receives the normal Session slot runtime share but no React node or Runtime service.
+オーナーペイロードは `ToolCallOwnerProps` である。すなわち `callId`、`toolName`、`phase` 判別子とそのステージ固有の `block`、オプションの `cwd` と `home`、セッション認可された `loadImage` ローダー (結果が永続イメージを運ぶビュー用)、およびプレーンな `openFile`/`inspect` コールバックである。PTC ディスパッチブロックは自身のイベントの `parentCallId` を保持する。ルート Session 呼び出しにはそのフィールドがないため、子孫は同じキー付きディスパッチを通る。`read_image` のような登録済みビューはそこで自身のカードを描画し、未登録の子孫は汎用のフラット化形式を保つ。パスサマリーはまず Session の cwd に対して相対化し、その後、残った POSIX Host ホームを `~` に置き換える。`filePath` と Host open は操作時の絶対結果パスを優先し、表示ラベルは記述された引数を保つ。成功した古いルート結果はその引数フォールバックを保持し、保留中の相対パスは結果を待つ。登録は通常の Session スロットランタイムシェアを受け取るが、React ノードや Runtime サービスは受け取らない。
 
-### Built-in views
+### 組み込みビュー
 
-Every registered view receives the explicit `preparing`, `start`, and `result` props declared in [the Tool slot types](src/client/contract/slots.ts). All blocks expose `name` and a lazy `args` reader; legacy `argsRaw` and result `call` fields remain available. The row model selects the title and combines any generic tool-name prefix with the available argument summary independently of lifecycle state. Tool-owned titles omit the English name. Write/edit and Bash share their component across stages. Custom renderers may retain separate preparation branches; argument-dependent components accept `StartedToolCallViewProps`.
+登録されたすべてのビューは、[Tool スロット型](src/client/contract/slots.ts)で宣言された明示的な `preparing`、`start`、`result` props を受け取る。すべてのブロックは `name` と遅延 `args` リーダーを公開する。レガシーの `argsRaw` と結果の `call` フィールドも引き続き利用できる。行モデルはタイトルを選択し、任意の汎用ツール名プレフィックスを利用可能な引数サマリーと組み合わせる。これはライフサイクル状態とは独立である。ツール所有のタイトルは英語名を省略する。write/edit と Bash はステージ間でコンポーネントを共有する。カスタムレンダラーは別個の準備ブランチを保持してよい。引数に依存するコンポーネントは `StartedToolCallViewProps` を受け入れる。
 
-File-tool rows prefer a complete `file_path`; other generic rows, including search and unregistered tools, prefer a non-empty `description` before their variant-specific argument fallback. Read `args` during rendering or view construction: a preparing reader grows in place, and only previously observed answer changes trigger subsequent block publication.
+ファイルツールの行は完全な `file_path` を優先する。検索や未登録ツールを含むその他の汎用行は、バリアント固有の引数フォールバックより前に空でない `description` を優先する。`args` は描画中またはビュー構築中に読む。preparing リーダーはその場で成長し、以前に観測された回答の変更のみが後続のブロック公開を引き起こす。
 
-This package owns the generic fallback and the built-in shell/pwsh, read, read_image, write/edit, running `str_replace_editor` `create`/`str_replace`, grep/glob, web, todo, question, and PTC dispatch presentations. Structured cards derive directly from first-party raw event fields; Host `presentCall` and `presentResult` values never enter the Client. Running atomic rows share one left-to-right highlight across their titles, separators, summaries, and suffixes, while settled rows stay static. Running and settled foreground standard `bash`/`pwsh` and `terminal_send` calls use terminal cards at the root and in PTC dispatch children, subject to the same argument, result, and error checks. Persistent `bash`/`pwsh` calls use terminal cards only while running. Shell output ending in a recognized spill-policy notice uses expandable generic output in shell rows and generic output in Details; a displaced or omitted exit marker cannot establish success. Settled persistent-shell results stay generic because reset and partial-output diagnostics do not always describe one process exit status; root persistent results are expandable. Valid explicit background `bash`/`pwsh` calls use the terminal Start presentation; a successful launch acknowledgement retains the command and cwd in a static command-only card without output or execution status. Launch failures retain generic arguments and errors, while background `terminal_send` stays generic. Inspect preserves the original arguments and acknowledgement; later job output is not attached to this card ([decision](../../../.agents/notes/implemented/bug-fix/2026-10-10-background-shell-command-display.md)). Expanded terminal commands and background inputs wrap to the available width while preserving authored line breaks and selectable text; terminal output keeps its column-preserving layout. Only horizontal overflow adds a named keyboard focus target. Inspect is available when provided. The acknowledgement does not report the job's exit status. A native or PTC dispatch failure carrying `AUTO_REVIEW_DENIED` shows the Auto review verdict in its collapsed row and one normalized not-executed reason when expanded; a missing or whitespace-only reason uses localized fallback text. `ui-skill` demonstrates a business-owned registration for `skill`.
+このパッケージは、汎用フォールバックと、組み込みの shell/pwsh、read、read_image、write/edit、実行中の `str_replace_editor` の `create`/`str_replace`、grep/glob、web、todo、question、および PTC ディスパッチの表示を所有する。構造化カードはファーストパーティの生イベントフィールドから直接導出される。Host の `presentCall` と `presentResult` の値が Client に入ることはない。実行中のアトミック行は、タイトル、区切り、サマリー、サフィックスにまたがる 1 つの左から右へのハイライトを共有し、確定済みの行は静的のままである。実行中および確定済みのフォアグラウンド標準 `bash`/`pwsh` および `terminal_send` 呼び出しは、ルートと PTC ディスパッチ子の両方でターミナルカードを使用する (同じ引数、結果、エラーチェックの対象となる)。永続 `bash`/`pwsh` 呼び出しは実行中のみターミナルカードを使用する。認識された spill ポリシー通知で終わるシェル出力は、シェル行では展開可能な汎用出力を、Details では汎用出力を使用する。位置がずれた、または省略された終了マーカーは成功を立証できない。確定済みの永続シェル結果は汎用のままである。リセットや部分出力の診断は常に 1 つのプロセス終了ステータスを記述するとは限らないためである。ルートの永続結果は展開可能である。有効な明示的バックグラウンド `bash`/`pwsh` 呼び出しはターミナル Start 表示を使用する。成功した起動確認応答は、出力や実行ステータスのない静的なコマンド専用カードにコマンドと cwd を保持する。起動の失敗は汎用の引数とエラーを保持し、バックグラウンド `terminal_send` は汎用のままである。Inspect は元の引数と確認応答を保つ。後のジョブ出力はこのカードに添付されない ([decision](../../../.agents/notes/implemented/bug-fix/2026-10-10-background-shell-command-display.md))。展開されたターミナルコマンドとバックグラウンド入力は、記述された改行と選択可能なテキストを保ちながら利用可能な幅に折り返す。ターミナル出力はその列保存レイアウトを保つ。水平方向のオーバーフローのみが名前付きキーボードフォーカスターゲットを追加する。Inspect は提供される場合に利用できる。確認応答はジョブの終了ステータスを報告しない。`AUTO_REVIEW_DENIED` を運ぶネイティブまたは PTC ディスパッチの失敗は、折りたたまれた行に自動レビューの評決を表示し、展開時に 1 つの正規化された未実行理由を表示する。理由が欠落しているか空白のみの場合はローカライズされたフォールバックテキストを使用する。`ui-skill` は `skill` に対するビジネス所有の登録の例を示す。
 
-Question rows pair answers with questions by id, using the tool result or the `userQuestions` projection for late replies. An answerable call has a button to reopen its panel. Once a late reply is in the agent Inbox, the row shows its submitted answers; “View answers” expands its read-only transcript while admission is pending. A settled call with answers opens the panel read-only. Closed calls without answers and invalid records offer no button. Cancelled and interrupted rows show their verdict without inventing answers. If no panel provider accepts the button action, it expands the row. Unsupported or ambiguous input falls back to flattened Tool text.
+Question 行は、id によって回答と質問を対にする。遅延返信にはツール結果または `userQuestions` 射影を使用する。回答可能な呼び出しには、パネルを再度開くボタンがある。遅延返信がエージェントのインボックスに入ると、行は提出された回答を表示する。受付が保留中の間、「View answers」は読み取り専用のトランスクリプトを展開する。回答のある確定済み呼び出しはパネルを読み取り専用で開く。回答のない閉じた呼び出しと無効なレコードにはボタンを提供しない。キャンセルおよび中断された行は、回答を捏造せずに評決を表示する。ボタンアクションを受け入れるパネルプロバイダーがない場合、行を展開する。サポートされない、または曖昧な入力はフラット化された Tool テキストにフォールバックする。
 
-Answer-panel buttons belong to the question renderer. It composes `DisclosureRow` with its own action and transcript; generic `ToolRow` does not select or dispatch question actions.
+回答パネルのボタンは question レンダラーに属する。これは `DisclosureRow` を独自のアクションとトランスクリプトと共に構成する。汎用 `ToolRow` は question アクションを選択もディスパッチもしない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The package realizes one dispatch rule: atomic Tool views are keyed by wire Tool name and registered by their owning business packages; this package only renders the tree and the fallback.
+このパッケージが実現するディスパッチルールは 1 つである。アトミックな Tool ビューは wire ツール名でキー付けされ、所有するビジネスパッケージによって登録される。このパッケージはツリーとフォールバックのみを描画する。
 
-### Rendering contract
+### 描画契約
 
-`ToolCallTree` receives one Tool node, Session `cwd`, and navigation callbacks. Each branch receives a stable block and memoizes its explicit phase props, so changing one subcall leaves unchanged sibling branches unrendered. It dispatches each tool by name through `tool.call.toolview`. Dispatched roots retain their recursive `subCalls`; preparation has no children. Each root and child wrapper preserves the `data-chat-anchor-key="call:<id>"` and `data-chat-call-id` DOM contract used for paging and selection. The Tool node keeps the same callId across all three stages.
+`ToolCallTree` は 1 つの Tool ノード、Session の `cwd`、およびナビゲーションコールバックを受け取る。各ブランチは安定したブロックを受け取り、その明示的なフェーズ props をメモ化するため、1 つのサブコールを変更しても未変更の兄弟ブランチは描画されない。各ツールは `tool.call.toolview` を通じて名前でディスパッチされる。ディスパッチされたルートは再帰的な `subCalls` を保持し、準備には子がない。各ルートおよび子ラッパーは、ページングと選択に使用される `data-chat-anchor-key="call:<id>"` と `data-chat-call-id` の DOM 契約を保つ。Tool ノードは 3 つの全ステージを通じて同じ callId を保つ。
 
-Tool owner props forward Chat's stable `useDisclosure` Hook through root and nested calls. Rows invoke it where they own their expanded bodies; intermediate renderers do not subscribe. Each invocation has independent open state that resets when the enclosing Turn collapses, without replacing React identity. Presentation-mode switches preserve it.
-
-
-Tool Definitions own the [lazy argument view](../../util/values/README.md). Rows choose their fields and update granularity through its readers, without a separate subscription or registration. Deltas append without scanning; frame-batched publication refreshes observed answers and replaces the block only when an answer changes. Card models that need dispatched arguments continue to read `argsRaw`.
-
-### Cards
+ツールオーナー props は、Chat の安定した `useDisclosure` Hook をルートとネストされた呼び出しに転送する。行は、展開された本体を所有する場所でそれを呼び出す。中間レンダラーは購読しない。各呼び出しは独立した開閉状態を持ち、それを囲む Turn が折りたたまれるとリセットされるが、React identity は置き換えない。表示モードの切り替えでもそれは保たれる。
 
 
-Every card is read in place in the call tree; there is no second, full-height presentation of a selected call. Row renderers share one pure card model for each terminal, read, diff, search, and web card, and the image card's gallery renders through the tool-owned `tool.call.images` slot, followed by the full recorded path and each attached image's pixel size (with the original size when downscaled) and byte count. These models validate raw call arguments, result content, failure state, persisted metadata, PTC dispatch `parentCallId`, and Session path facts. Unsupported or malformed inputs use flattened Tool result text. A file-path summary opens the file through the owner's `openFile`, which the chat view routes to the right Sidebar's text preview; `inspect` opens the trajectory view and is absent when that View is unavailable; cards then omit Inspect. Card-specific limits and fallback rules for the terminal, diff, read, search, and web cards remain in [the ui-primitives README](../ui-primitives/README.md); the image card's model in this package carries its own fallback rules.
+Tool Definition は[遅延引数ビュー](../../util/values/README.md)を所有する。行は、別個の購読や登録なしに、そのリーダーを通じてフィールドと更新の粒度を選択する。デルタはスキャンなしで追記される。フレームバッチの公開は観測された回答を更新し、回答が変わったときのみブロックを置き換える。ディスパッチされた引数を必要とするカードモデルは `argsRaw` を読み続ける。
 
-Chat diff cards keep nine rows before folding, enough for a file header, one removed/added pair, and three context lines on either side. The tool row shows the primitive's exact or coarse-replacement counts; the expanded card contains the diff body without a totals footer. Hovering the tool header colors its added count green and removed count red; both retain those colors while the card is expanded.
+### カード
 
-An Auto denial takes precedence over keyed specialized views. Its generic row preserves the call identity, omits raw arguments, and normalizes the stored reason only for display: trim surrounding whitespace and collapse line separators to spaces, with localized fallback for an empty result. Session and SDK error details keep the original reason.
 
-Recorded tool details cover goal and schedule tools, Cordis inspection, workflow and Ralph reports, Session event/search/trace queries, agent and teammate controls, background jobs, persistent terminals, and LSP navigation. These expanded bodies read successful logged results, preserve generic input/output for failures or unsupported data, and keep Inspect available. Dates include the viewer's time zone, and statuses reflect the call result rather than current session state. Session traces preserve descendant indentation. LSP results open filesystem paths through the Host callback and display other URIs as text. The browser adapter consumes recorded producer text and JSON; Host service objects and presenter callbacks do not cross into the Client.
+すべてのカードはコールツリー内でその場で読まれる。選択された呼び出しのための 2 つ目の全高表示はない。行レンダラーは、terminal、read、diff、search、web の各カード用に 1 つの純粋なカードモデルを共有し、image カードのギャラリーはツール所有の `tool.call.images` スロットを通じて描画され、その後に完全な記録済みパス、各添付イメージのピクセルサイズ (ダウンスケール時は元のサイズ) とバイト数が続く。これらのモデルは、生の呼び出し引数、結果内容、失敗状態、永続化メタデータ、PTC ディスパッチの `parentCallId`、および Session パスのファクトを検証する。サポートされない、または不正な入力はフラット化された Tool 結果テキストを使用する。ファイルパスのサマリーは、オーナーの `openFile` を通じてファイルを開き、チャットビューがそれを右側のサイドバーのテキストプレビューにルーティングする。`inspect` はトラジェクトリビューを開き、その View が利用できない場合は存在しない。その場合カードは Inspect を省略する。terminal、diff、read、search、web カードのカード固有の制限とフォールバックルールは [ui-primitives README](../ui-primitives/README.md) にある。このパッケージの image カードのモデルは独自のフォールバックルールを持つ。
 
-Expanded status dots and labels use static semantic colors. Receipt and job-output headers keep neutral text and omit the status while expanded. An interruption receipt confirms only that interruption was requested.
+チャットの diff カードは折りたたむ前に 9 行を保つ。ファイルヘッダー、1 組の削除/追加、両側 3 行ずつのコンテキスト行に十分である。ツール行はプリミティブの正確な、または粗い置換のカウントを表示する。展開されたカードは合計フッターなしの diff 本体を含む。ツールヘッダーにホバーすると、追加カウントが緑、削除カウントが赤に色付けされる。カードが展開されている間も両者はその色を保つ。
 
-Terminal prompt labels use recorded result `cwd`. Older successful root shell calls fall back to their original workspace and authored workdir; running calls show a directory only when their workdir is absolute. Terminal sends do not infer a process directory from the Session.
+自動レビューの拒否はキー付きの特化ビューより優先される。その汎用行は呼び出し identity を保ち、生の引数を省略し、保存された理由を表示用にのみ正規化する。すなわち、前後の空白を除去し、行区切りをスペースに畳み、結果が空の場合にはローカライズされたフォールバックを使用する。Session と SDK のエラー詳細は元の理由を保つ。
 
-The terminal model uses `hasSpillNotice` from the browser-safe `@deepseek-ai/dsh-spill-policy/notice` entry, not an independent UI pattern. The [spill-policy README](../../spill/spill-policy/README.md#shared-notice-ownership) owns notice formatting and recognition. This check conservatively selects generic output; matching text cannot authenticate its source, and replay leaves recorded result bytes untouched.
+記録されたツール詳細は、goal と schedule ツール、Cordis の検査、workflow と Ralph のレポート、Session のイベント/検索/トレースクエリ、エージェントとチームメイトの制御、バックグラウンドジョブ、永続ターミナル、および LSP ナビゲーションをカバーする。これらの展開された本体は、成功したログ済み結果を読み、失敗やサポートされないデータには汎用の入力/出力を保持し、Inspect を利用可能なままにする。日付にはビューアーのタイムゾーンが含まれ、ステータスは現在のセッション状態ではなく呼び出し結果を反映する。Session トレースは子孫のインデントを保つ。LSP 結果は Host コールバックを通じてファイルシステムパスを開き、その他の URI はテキストとして表示する。ブラウザーアダプターは記録されたプロデューサーのテキストと JSON を消費する。Host のサービスオブジェクトとプレゼンターコールバックが Client に入ることはない。
 
-### Declared optional capabilities
+展開されたステータスドットとラベルは静的なセマンティックカラーを使用する。レシートとジョブ出力のヘッダーは中立テキストを保ち、展開中はステータスを省略する。中断レシートは中断が要求されたことのみを確認する。
 
-This package declares the optional `UserQuestionPanels` capability; `ui-user-questions` provides it. `reveal(sessionId, callId)` opens an answerable panel, and `review(sessionId, callId, record)` opens recorded answers read-only. The row reads the capability through `ctx.get('userQuestionPanels')` and keeps its transcript when no question UI is composed.
+ターミナルプロンプトのラベルは記録された結果の `cwd` を使用する。古い成功したルートシェル呼び出しは、元の workspace と記述された workdir にフォールバックする。実行中の呼び出しは、workdir が絶対パスの場合にのみディレクトリを表示する。ターミナル send は Session からプロセスディレクトリを推測しない。
+
+ターミナルモデルは、独立した UI パターンではなく、ブラウザーセーフな `@deepseek-ai/dsh-spill-policy/notice` エントリの `hasSpillNotice` を使用する。通知の書式と認識は [spill-policy README](../../spill/spill-policy/README.md#shared-notice-ownership) が所有する。このチェックは保守的に汎用出力を選択する。一致するテキストはその出所を認証できず、リプレイは記録された結果バイトに触れない。
+
+### 宣言されたオプションケイパビリティ
+
+このパッケージはオプションの `UserQuestionPanels` ケイパビリティを宣言する。`ui-user-questions` がそれを提供する。`reveal(sessionId, callId)` は回答可能なパネルを開き、`review(sessionId, callId, record)` は記録された回答を読み取り専用で開く。行は `ctx.get('userQuestionPanels')` を通じてケイパビリティを読み、question UI が構成されていない場合はトランスクリプトを保つ。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the conversation host, the view slots, and the card models.
+これらのページは、会話ホスト、ビュースロット、およびカードモデルを扱う。
 
-- [ui-conversation](../ui-conversation/README.md) — the chat surface dispatching `tool-call` nodes to this package.
-- [ui-primitives](../ui-primitives/README.md) — the output card atoms the built-in views compose.
-- [ui-skill](../ui-skill/README.md) — a business-owned registration for the `skill` tool.
-- [ui-user-questions](../ui-user-questions/README.md) — the question panels the `ask_user_question` row reopens.
-- [Auto review](../../experimental/auto-review/README.md) — the structured denial identity and user-visible reason owner.
-- [Conversation subsystem](../../../docs/subsystems/conversation.md) — how a business-owned feature registers a Conversation node.
-- [Slot system standard](../../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) — the composition model behind the keyed slot.
+- [ui-conversation](../ui-conversation/README.md) — `tool-call` ノードをこのパッケージにディスパッチするチャットサーフェス。
+- [ui-primitives](../ui-primitives/README.md) — 組み込みビューが構成する出力カードのアトム。
+- [ui-skill](../ui-skill/README.md) — `skill` ツールに対するビジネス所有の登録。
+- [ui-user-questions](../ui-user-questions/README.md) — `ask_user_question` 行が再度開く question パネル。
+- [自動レビュー](../../experimental/auto-review/README.md) — 構造化された拒否 identity とユーザー可視の理由のオーナー。
+- [Conversation サブシステム](../../../docs/subsystems/conversation.md) — ビジネス所有の機能が Conversation ノードを登録する方法。
+- [スロットシステム標準](../../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) — キー付きスロットの背後にある構成モデル。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package renders streamed tool identities and logged calls without changing model context.
+なし。このパッケージは、モデルコンテキストを変えずに、ストリーミングされるツール identity とログ済み呼び出しを描画する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the dispatch depth and the view ownership; they are current package constraints.
+これらの制限は、ディスパッチ深度とビューの所有関係を定義する。これらは現在のパッケージの制約である。
 
-- **The Host excludes `run_code` from PTC mode program bindings** — production events produce one dispatch level; the recursive Runtime/UI contract supports nesting.
-- **Historical nested relative locations** — Older PTC dispatches without presentation metadata do not infer relative file targets or command directories; absolute call paths remain usable.
-- **First-party Tool views are colocated here** — they can move to their owning business packages independently through the keyed slot.
-- **Web tool links always open a new tab** — the collapsed `web_fetch` URL and the expanded web card links ignore the `ui-chat` link-opening setting because Tool views receive no external-link callback.
-- **Tool copy reuses the `ui-conversation` locale namespace** — tool titles, row chrome, and Cordis-free primitive labels use that dictionary; presenter models retain locale keys or data rather than rendered wording.
+- **Host は PTC モードのプログラムバインディングから `run_code` を除外する** — 本番イベントは 1 つのディスパッチレベルを生成する。再帰的な Runtime/UI 契約はネストをサポートする。
+- **歴史的なネスト相対位置** — 表示メタデータのない古い PTC ディスパッチは、相対ファイルターゲットやコマンドディレクトリを推測しない。絶対呼び出しパスは引き続き使用できる。
+- **ファーストパーティの Tool ビューはここに同居する** — キー付きスロットを通じて、所有するビジネスパッケージへ独立に移動できる。
+- **Web ツールのリンクは常に新しいタブで開く** — 折りたたまれた `web_fetch` URL と展開された web カードのリンクは `ui-chat` のリンクオープン設定を無視する。Tool ビューは外部リンクコールバックを受け取らないためである。
+- **ツールの文言は `ui-conversation` ロケール名前空間を再利用する** — ツールタイトル、行のクローム、および Cordis フリーのプリミティブラベルはその辞書を使用する。プレゼンターモデルは、レンダリング済みの文言ではなくロケールキーやデータを保持する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

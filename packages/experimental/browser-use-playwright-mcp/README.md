@@ -5,27 +5,27 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-browser-use-playwright-mcp
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use Playwright MCP to inspect pages and operate Chromium through its upstream tools. The provider initializes a Session's MCP connection before creation or resume completes and retains it across turns. Launch a separate browser or attach one Session to an existing browser with its current tabs and login state. This published experimental package activates only when explicitly mounted.
+Playwright MCP を使ってページを検査し、上流ツール経由で Chromium を操作します。プロバイダーは作成または再開の完了前にセッションの MCP 接続を初期化し、ターンまたぎで保持します。別ブラウザーを起動するか、現在のタブとログイン状態を持つ既存ブラウザーに 1 セッションをアタッチします。この公開 experimental パッケージは明示的にマウントした場合のみ有効化されます。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-Mount both entries before creating or resuming a Session, in a profile composition that supplies Agents, tools, system prompts, and the working-directory service. Loading or reloading this provider does not adopt Sessions that are already active. Browser installation follows the upstream runtime; select an existing Chromium installation with `executablePath`.
+セッションの作成または再開前に両エントリーをマウントします。エージェント、ツール、システムプロンプト、作業ディレクトリーサービスを提供するプロファイル構成で使います。このプロバイダーの読み込みや再読み込みは既に有効なセッションは取り込みません。ブラウザーインストールは上流ランタイムに従います。既存 Chromium インストールの選択には `executablePath` を使います。
 
 ```yaml
 - name: '@deepseek-ai/dsh-browser-use'
@@ -35,7 +35,7 @@ Mount both entries before creating or resuming a Session, in a profile compositi
     headless: true
 ```
 
-Use `mode: attach` and set `endpoint` to an HTTP(S) debugging URL or WS(S) browser endpoint to operate an existing browser. The new live Session claims the attachment during initialization and retains it until unloading. If the attachment is busy, that activation continues without this browser and does not retry on later turns. After release, a newly created or resumed activation can acquire it. Direct calls from another Session fail. Cleanup disconnects and leaves the external browser and its pages running.
+既存ブラウザーを操作するには `mode: attach` を使い、`endpoint` に HTTP(S) デバッグ URL または WS(S) ブラウザーエンドポイントを設定します。新規ライブセッションは初期化中にアタッチメントを確保し、アンロードまで保持します。アタッチメントが使用中の場合、その有効化はこのブラウザーなしで続行し、以降のターンで再試行しません。解放後、新規作成または再開した有効化が取得できます。別セッションからの直接呼び出しは失敗します。クリーンアップは切断し、外部ブラウザーとページは実行したまま残します。
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -45,21 +45,21 @@ Use `mode: attach` and set `endpoint` to an HTTP(S) debugging URL or WS(S) brows
 | `endpoint` | required for attach | Existing browser debugging endpoint |
 | `toolCallTimeoutMs` | MCP client default | Per-call timeout in milliseconds |
 
-The [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-browser-use-playwright-mcp) lists accepted fields. The profile or preset selects the browser mode. The child process clears inherited `PLAYWRIGHT_MCP_*` options so they cannot replace that configuration.
+[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-experimental-browser-use-playwright-mcp)は受け付けるフィールドを列挙します。ブラウザーモードの選択はプロファイルまたはプリセットです。子プロセスは継承 `PLAYWRIGHT_MCP_*` オプションをクリアするため、その設定を置換できません。
 
-When configuring the system prompt's `toolOrder` for the whole process, leave browser tools under `<unlisted-tools>`. Explicitly listing browser tool names can make prompt assembly fail for Sessions without a browser connection.
+プロセス全体のシステムプロンプト `toolOrder` を設定する場合、ブラウザーツールは `<unlisted-tools>` の下に残してください。ブラウザーツール名を明示的に列挙すると、ブラウザー接続のないセッションでプロンプト組立てが失敗することがあります。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The provider resolves its pinned npm entry and starts it under the current Node executable. A temporary protocol probe may precede the serving process. The [shared runtime](../browser-use-runtime/README.md) owns awaited Agent initialization, per-Session serialization, and cleanup; the [MCP client](../../mcp/mcp-client/README.md) owns transport, discovery, and result projection.
+プロバイダーはピン留め npm エントリーを解決し、現在の Node 実行ファイル配下で起動します。一時プロトコルプローブがサービングプロセスに先行することがあります。[共有ランタイム](../browser-use-runtime/README.md)は待機エージェント初期化、セッションごとの直列化、クリーンアップを所有し、[MCP クライアント](../../mcp/mcp-client/README.md)は転送、検出、結果投影を所有します。
 
-Browser state survives turns while its live Session remains attached. The MCP server starts in the Session's validated current working directory and retains that launch directory after later Session directory changes. Disposal waits for server shutdown before releasing resources. Resume after reload starts fresh browser runtime state; stored conversation history does not restore cookies or pages.
+ブラウザー状態はライブセッションがアタッチされている間ターンまたぎで存続します。MCP サーバーはセッションの検証済み現作業ディレクトリーで起動し、以降のセッションディレクトリー変更後も起動ディレクトリーを保持します。破棄はリソース解放前にサーバー終了を待ちます。再読み込み後の再開は新規ブラウザーランタイム状態で開始します。保存済み会話履歴は Cookie やページを復元しません。
 
 </details>
 
@@ -75,37 +75,37 @@ Browser state survives turns while its live Session remains attached. The MCP se
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Browser tools and screenshots
+### ブラウザーツールとスクリーンショット
 
-#### What the model sees
+#### モデルが見るもの
 
-Tools retain upstream descriptions and JSON schemas under `mcp__playwright-mcp__<tool>` names. Text and screenshots use the normal tool-result pipeline and Session log. Screenshots require an attachment store and an image-capable model route; other routes receive the MCP image diagnostic. The MCP client also exposes resource helpers and attributed server instructions. Browser instructions are shown only after this Session owns a connection; targeted resource requests enforce the same ownership.
+ツールは上流の説明と JSON スキーマを `mcp__playwright-mcp__<tool>` 名で保持します。テキストとスクリーンショットは通常のツール結果パイプラインとセッションログを使います。スクリーンショットにはアタッチメントストアと画像対応モデルルートが必要です。他ルートには MCP 画像診断が届きます。MCP クライアントはリソースヘルパーと帰属サーバー命令も公開します。ブラウザー命令はこのセッションが接続を所有した後にのみ表示されます。対象リソース要求も同じ所有権を強制します。
 
-#### Token effect
+#### トークン効果
 
-The catalog, resource helpers, and server instructions add tool definitions and prompt text. Calls add arguments, text, and admitted images to Session history. Inline image bytes stay outside model-visible history.
+カタログ、リソースヘルパー、サーバー命令がツール定義とプロンプトテキストを加えます。呼び出しは引数、テキスト、許容画像をセッション履歴に加えます。インライン画像バイトはモデル可視履歴外に留まります。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-An unchanged catalog preserves its tool-definition prefix. Results append to history; provider or catalog changes can reduce prefix reuse.
+不変のカタログはツール定義プレフィックスを保持します。結果は履歴に追記されます。プロバイダーまたはカタログ変更はプレフィックス再利用を減らすことがあります。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-The integration retains the pinned server's browser and tool restrictions.
+統合はピン留めサーバーのブラウザーおよびツール制限を保持します。
 
-- Chromium only; Firefox and WebKit are not selectable.
-- Startup failure or cancellation rejects Session creation or resume and triggers client cleanup. A disconnected client is not retried; after fixing the cause, create a new Session or unload and resume the existing one.
-- Attachment exclusivity is local to this provider instance. Other processes and browser users can still modify the same pages.
-- The shared resource-server inventory can show inherited server names; it does not grant access to another Session's browser.
-- Cancellation does not undo navigation, clicks, or other actions already delivered to the browser.
-- Tool schemas follow the pinned experimental dependency and carry no DSH stability promise.
+- Chromium のみです。Firefox と WebKit は選択できません。
+- 起動失敗やキャンセルはセッション作成または再開を拒否し、クライアントクリーンアップを起動します。切断クライアントは再試行されません。原因修正後は新規セッションを作成するか、既存セッションをアンロードして再開してください。
+- アタッチメント排他はこのプロバイダーインスタンスにローカルです。他プロセスやブラウザーユーザーは同じページを変更できます。
+- 共有リソースサーバー目録は継承サーバー名を表示することがあります。他セッションのブラウザーへのアクセスは付与しません。
+- キャンセルはブラウザーに到達済みのナビゲーション、クリック、その他アクションを取り消しません。
+- ツールスキーマはピン留め experimental 依存に従い、DSH 安定性約束はありません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

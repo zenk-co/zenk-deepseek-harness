@@ -1,14 +1,14 @@
-# Bilingual documentation
+# バイリンガルドキュメント
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-This repo's documentation is read by people and agents both inside and outside the company, so every document in scope is maintained in English and Simplified Chinese. This page defines the pairing contract, checks, scope, and exclusions; [translation-rules.md](translation-rules.md) defines how to translate; [terminology.md](terminology.md) is the terminology source of truth. Routine agent work follows the lightweight path in [docs/AGENTS.md](../AGENTS.md); the extended [.agents/skills/dsh-translate-docs](../../.agents/skills/dsh-translate-docs/SKILL.md) workflow is available only through explicit user invocation.
+このリポジトリのドキュメントは、社内外の人間とエージェントの両方に読まれるため、対象範囲のすべてのドキュメントは英語と簡体字中国語で維持される。このページはペアリング契約、チェック、対象範囲、除外を定義する。[translation-rules.md](translation-rules.md) は翻訳方法を定義し、[terminology.md](terminology.md) は用語の信頼できる唯一の情報源である。日常的なエージェント作業は [docs/AGENTS.md](../AGENTS.md) の軽量経路に従う。拡張された [.agents/skills/dsh-translate-docs](../../.agents/skills/dsh-translate-docs/SKILL.md) ワークフローは、明示的なユーザー呼び出しを通してのみ利用できる。
 
-## The pairing contract
+## ペアリング契約
 
-- **Both languages carry equal authority.** A document may be authored and reviewed in either language first — a Chinese-first Agent Note is as legitimate as an English-first one — and the counterpart is translated from it. Neither file outranks the other; what binds them is that they must say the same thing.
-- **A pair is three sibling files.** The English `foo.md`, the Chinese `foo.zh.md`, and a consistency record `foo.i18n.yaml`, all in the same directory. No locale directories, no separate translation repo, no interleaved bilingual files. Pairs merge whole: a PR never lands one language without the other two files.
-- **The consistency record.** `foo.i18n.yaml` holds one entry per heading section that still contains language-specific content. The key is the section's English heading-slug path (`/` for text before the first heading; a repeated path gets `~2`, `~3`, …), and the entry holds a hash of the English and of the Chinese blocks in that section that differ between the two sides:
+- **両言語は同等の権威を持つ。** ドキュメントはどちらの言語でも先に作成・レビューしてよい — 中国語ファーストの Agent Note は英語ファーストのものと同じく正統である — そしてカウンターパートはそこから翻訳される。どちらのファイルも他方より上位ではなく、両者を拘束するのは同じことを述べなければならないという点である。
+- **ペアは 3 つの兄弟ファイルである。** 英語の `foo.md`、中国語の `foo.zh.md`、および一貫性レコード `foo.i18n.yaml` が、すべて同じディレクトリにある。ロケールディレクトリも、別の翻訳リポジトリも、交互配置されたバイリンガルファイルもない。ペアは丸ごとマージされる: PR が一方の言語だけを他方の 2 ファイルなしでランディングすることはない。
+- **一貫性レコード。** `foo.i18n.yaml` は、言語固有の内容を依然として含む見出しセクションごとに 1 つのエントリーを保持する。キーはセクションの英語見出しスラッグパス (`/` は最初の見出しより前のテキスト用。繰り返しパスには `~2`、`~3`、… が付く) であり、エントリーはそのセクション内で両側が異なる英語ブロックと中国語ブロックのハッシュを保持する:
 
   ```yaml
   /foo:
@@ -19,51 +19,51 @@ This repo's documentation is read by people and agents both inside and outside t
     zh: de78429597783c7f
   ```
 
-  Section `i` of one side corresponds to section `i` of the other. Each side's hash covers every top-level block of the section except fenced code blocks and generated regions, the two kinds of content the gate already requires to be identical on both sides; content that merely happens to be identical is still hashed. A section with no remaining blocks has no entry. Regenerating a region or editing a code block on both sides leaves the record unchanged, and edits to different sections change separate record lines, so Git's default text merge, including GitHub's, composes them. A record conflicts only when both branches changed hashed content in the same section; resolve the Markdown and re-record the pair. An out-of-sync pair is updated by patching the counterpart minimally against the edited side's diff, never by re-translating whole files; the gate names each changed section. Routine work makes that patch directly; when the user explicitly invokes the extended workflow, `pnpm run gen-translation-brief <pair>` recovers the last-confirmed text from the newest commit whose contents produce the recorded entries, assembles the update at the narrowest safely aligned granularity, and `--apply` can splice a code-fence-only change after structural validation. After bringing the pair back in line, `pnpm run verify-translation-pairing --write <pair>` re-records the entries; that yaml diff is the reviewable act of confirming consistency, which is why `--write` requires naming the pairs you confirmed (`--write --all` is the explicit corpus-wide form).
+  一方のセクション `i` は他方のセクション `i` に対応する。各側のハッシュは、そのセクションのすべてのトップレベルブロックを対象とするが、フェンス付きコードブロックと生成リージョンは除外される。この 2 種類のコンテンツはゲートが両側で同一であることをすでに要求している。たまたま同一である内容も依然としてハッシュされる。残るブロックがないセクションにはエントリーがない。リージョンの再生成や両側でのコードブロックの編集はレコードを変更せず、異なるセクションへの編集は別々のレコード行を変更するので、Git の既定のテキストマージ (GitHub のものも含む) がそれらを合成する。レコードが競合するのは、両方のブランチが同じセクションのハッシュ対象内容を変更した場合のみである。Markdown を解決し、ペアを再記録する。同期が外れたペアは、全体を再翻訳するのではなく、編集された側の差分に対してカウンターパートに最小限のパッチを当てて更新する。ゲートは変更された各セクションを名指しする。日常作業ではそのパッチを直接行う。ユーザーが拡張ワークフローを明示的に呼び出した場合、`pnpm run gen-translation-brief <pair>` が、記録されたエントリーを生成する最新コミットから最後に確認されたテキストを復元し、安全に整列できる最も狭い粒度で更新を組み立てる。`--apply` は構造検証の後にコードフェンスのみの変更を接合できる。ペアを整合させた後、`pnpm run verify-translation-pairing --write <pair>` がエントリーを再記録する。その yaml diff が一貫性を確認するレビュー可能な行為であり、`--write` が確認したペアの指定を要求する理由でもある (`--write --all` は明示的なコーパス全体形式である)。
 
-  The Chinese file must retain its English backlink; an authored English source must retain its Chinese link, while a listed generated English source is exempt. The [archived section-keyed pairing records Agent Note](../../.agents/notes/archived/process/2026-09-23-section-keyed-translation-pairing-records.md) records the format choice and its alternatives.
-- **Language switcher.** The Chinese file always links back immediately after its H1 heading with `[English](foo.md) | 中文`. An authored English file reciprocates there with `English | [中文](foo.zh.md)`; a listed generated English source omits that line so it remains byte-identical to generator output. A README published outside GitHub, such as PyPI project metadata, may use the canonical `https://github.com/deepseek-ai/deepseek-harness/blob/master/<repository-path>` URL to the same counterpart so the switcher still resolves there.
-- **Structure mirrors the counterpart.** Heading depths and order, list kinds, ordered-list starts, list item counts, table row and column counts, semantic link targets with exact query/fragment suffixes, and verbatim code blocks match one to one across the pair. When a relative document link targets the active bilingual corpus, the English side uses its `.md` path and the Chinese side uses its `.zh.md` path. A missing counterpart in that corpus is a pair-completeness error rather than a fallback; targets outside the active corpus keep the authored path. See [translation-rules.md](translation-rules.md) for the full preservation rules. Existing Markdown gates apply to `.zh.md` files unchanged (`verify-md-wrap`, `verify-md-links`).
+  中国語ファイルは英語バックリンクを保持しなければならない。作成された英語ソースは中国語リンクを保持しなければならないが、リストされた生成英語ソースは免除される。[archived section-keyed pairing records Agent Note](../../.agents/notes/archived/process/2026-09-23-section-keyed-translation-pairing-records.md) がフォーマットの選択とその代替案を記録している。
+- **言語スイッチャー。** 中国語ファイルは常に H1 見出しの直後に `[English](foo.md) | 中文` でリンクバックする。作成された英語ファイルはそこで `English | [中文](foo.zh.md)` で応答する。リストされた生成英語ソースはこの行を省略し、ジェネレーター出力とバイト単位で同一のままである。GitHub 以外 (PyPI プロジェクトメタデータなど) で公開される README は、同じカウンターパートへの正規 `https://github.com/deepseek-ai/deepseek-harness/blob/master/<repository-path>` URL を使用してよく、スイッチャーはそこで依然として解決される。
+- **構造はカウンターパートを写す。** 見出しの深さと順序、リストの種類、順序付きリストの開始番号、リスト項目数、表の行数と列数、正確なクエリ/フラグメント接尾辞を持つセマンティックリンク先、および逐語的なコードブロックが、ペア間で 1 対 1 に対応する。相対ドキュメントリンクがアクティブなバイリンガルコーパスを対象とする場合、英語側は `.md` パスを使用し、中国語側は `.zh.md` パスを使用する。そのコーパスでのカウンターパートの欠落は、フォールバックではなくペア完全性エラーである。アクティブなコーパス外のターゲットは作成時のパスを保つ。完全な保存ルールについては [translation-rules.md](translation-rules.md) を参照。既存の Markdown ゲートは `.zh.md` ファイルにそのまま適用される (`verify-md-wrap`、`verify-md-links`)。
 
-## The gate: verify-translation-pairing
+## ゲート: verify-translation-pairing
 
-`pnpm run verify-translation-pairing` (part of `doc-sync`, which contributors run locally for documentation changes and CI runs exhaustively) enforces the contract mechanically:
+`pnpm run verify-translation-pairing` (ドキュメント変更のためにコントリビューターがローカルで実行し、CI が網羅的に実行する `doc-sync` の一部) は契約を機械的に強制する:
 
-1. Every document in scope has a complete pair. README discovery is case-insensitive on the basename, so `missions/readme.md` is in scope alongside the other documentation roots.
-2. Every pair artifact that exists at all is complete and consistent: all three files present, the record is canonical and its entries equal the entries computed from the current contents (changing language-specific content on either side without re-confirming the pair goes red), the Chinese side and every authored English source carry their language switchers (listed generated English sources are exempt), every ordinary relative document link uses its source side's target locale, and the structural signatures match in order — heading depths, verbatim code blocks (info string and content), table row and column counts, list kinds, ordered-list starts, item counts, and semantic link targets with exact query/fragment suffixes apart from the switcher.
-3. Files listed as `excluded` have no `.zh.md` and no `.i18n.yaml` at all. Frozen Agent Notes under `.agents/notes/archived/` are outside this evolving gate; their dedicated verifier requires and seals the complete existing triplet instead.
+1. 対象範囲のすべてのドキュメントが完全なペアを持つ。README の検出はベース名の大文字小文字を区別しないので、`missions/readme.md` も他のドキュメントルートと並んで対象範囲である。
+2. 存在するすべてのペアアーティファクトが完全かつ一貫している: 3 ファイルすべてが存在し、レコードが正規でそのエントリーが現在の内容から計算されたエントリーと等しく (ペアを再確認せずにどちらかの側の言語固有コンテンツを変更すると赤になる)、中国語側と作成されたすべての英語ソースが言語スイッチャーを運び (リストされた生成英語ソースは免除)、すべての通常の相対ドキュメントリンクがそのソース側のターゲットロケールを使用し、構造シグネチャが順序どおり一致する — 見出しの深さ、逐語的コードブロック (info 文字列と内容)、表の行数と列数、リストの種類、順序付きリストの開始、項目数、およびスイッチャーを除く正確なクエリ/フラグメント接尾辞を持つセマンティックリンク先。
+3. `excluded` としてリストされたファイルは `.zh.md` も `.i18n.yaml` も一切持たない。`.agents/notes/archived/` 配下の凍結された Agent Notes はこの進化するゲートの対象外である。その専用の検証器が代わりに既存の完全なトリプレットを要求して封印する。
 
-Source-oriented code gates consume an exact `.zh.md` fence sequence as a derivative of its unsuffixed sibling instead of compiling or manifesting the same code twice. The sequence must match in length, order, fence kind, and byte-exact body; otherwise both copies remain independently checked and the pairing gate reports the structural mismatch.
+ソース指向のコードゲートは、同じコードを 2 度コンパイルまたはマニフェスト化する代わりに、サフィックスなしの兄弟ファイルの派生物として正確な `.zh.md` フェンスシーケンスを消費する。シーケンスは長さ、順序、フェンスの種類、バイト単位で正確なボディが一致しなければならない。そうでなければ両方のコピーは独立にチェックされたままで、ペアリングゲートが構造の不一致を報告する。
 
-`pnpm run verify-translation-pairing --list` prints the current pairing state of every document in scope — missing, out-of-sync, or ok. It never fails; `missing` and `out-of-sync` rows identify violations that the normal check rejects.
+`pnpm run verify-translation-pairing --list` は対象範囲のすべてのドキュメントの現在のペアリング状態 — missing、out-of-sync、または ok — を出力する。これは決して失敗しない。`missing` と `out-of-sync` の行は、通常のチェックが拒否する違反を識別する。
 
-`pnpm run verify-translation-pairing <pair...>` checks just the named pairs — any of a pair's three files (or its bare stem) names it — so an update loop verifies its own pair in seconds instead of re-scanning the corpus. The no-argument corpus-wide form is what `doc-sync` and CI run; a scoped green never substitutes for it at PR level.
+`pnpm run verify-translation-pairing <pair...>` は指定されたペアのみをチェックする — ペアの 3 ファイルのいずれか (またはベアのステム) がそれを名指しする — ので、更新ループはコーパスを再スキャンせずに自身のペアを数秒で検証できる。引数なしのコーパス全体形式が `doc-sync` と CI の実行するものである。スコープ付きの green が PR レベルでそれに代わることは決してない。
 
-The practical rule this gate creates: **when a PR edits either side of a paired document, the same PR updates the counterpart directly in one terminology-guided pass and re-records the pair with `--write <pair>`**, exactly like the repo's existing doc-sync rule for code and READMEs. A PR that leaves a pair out of sync goes red in CI.
+このゲートが生む実務上のルール: **PR がペアドキュメントのどちらかの側を編集する場合、同じ PR が、用語ガイド付きの 1 パスでカウンターパートを直接更新し、`--write <pair>` でペアを再記録する。** リポジトリの既存のコードと README に対する doc-sync ルールとまったく同じである。ペアを同期外れのまま残す PR は CI で赤になる。
 
-The gate's limit, stated plainly: **a green gate means the pair was confirmed consistent at these exact contents, not that the confirmation was sound.** It checks hashes and Markdown structure; it cannot judge whether the two sides say the same thing, or whether the wording is accurate, well-termed, and natural — that is the reviewer's half of the contract, per [translation-rules.md](translation-rules.md). A re-recorded pair with a sloppy counterpart passes the gate; it must not pass review.
+ゲートの限界を率直に述べる: **green なゲートは、この正確な内容でペアが一貫していると確認されたことを意味し、確認が健全だったことを意味しない。** チェックするのはハッシュと Markdown 構造であり、両側が同じことを述べているか、文言が正確で用語が適切で自然かは判断できない — それは [translation-rules.md](translation-rules.md) に従い、契約のレビュアー側の半分である。ずさんなカウンターパートを持つ再記録済みペアはゲートを通るが、レビューを通してはならない。
 
-## Scope and exclusions
+## 対象範囲と除外
 
-**Scope**: the root `CONTRIBUTING.md`, `BRAND_GUIDELINES.md`, and `SAFETY.md` documents, every non-vendor README, and every active document under `.agents/notes/**`, `docs/**`, and `python/**`. README matching is case-insensitive on the basename and covers future directories without another manifest edit. Dependency and ignored build-output trees and the frozen `.agents/notes/archived/` tree are discovery exclusions, not evolving translation source.
+**対象範囲**: ルートの `CONTRIBUTING.md`、`BRAND_GUIDELINES.md`、`SAFETY.md`、すべての非 vendor README、および `.agents/notes/**`、`docs/**`、`python/**` 配下のすべてのアクティブドキュメント。README マッチングはベース名の大文字小文字を区別せず、別のマニフェスト編集なしで将来のディレクトリをカバーする。依存関係と無視されたビルド出力ツリー、および凍結された `.agents/notes/archived/` ツリーは検出の除外であり、進化する翻訳ソースではない。
 
-Generated English references and graphs participate in pairing when a reviewed Chinese counterpart is available. A generator puts its generated data in generated regions and writes each region into both pages, so regeneration never requires a manual Chinese update or a new record; only the prose outside the regions is translated and recorded. Freshness and pairing gates enforce their respective invariants independently.
+生成された英語リファレンスとグラフは、レビュー済みの中国語カウンターパートが利用可能な場合にペアリングに参加する。ジェネレーターは生成データを生成リージョンに置き、各リージョンを両方のページに書き込むので、再生成が手動の中国語更新や新しいレコードを必要とすることは決してない。翻訳され記録されるのはリージョン外の散文のみである。フレッシュネスゲートとペアリングゲートはそれぞれの不変条件を独立に強制する。
 
-Shared generated regions, such as the Cordis subsystem regions and the per-package regions of the [config catalog](../config-catalog.md), keep every generated byte identical across languages except localized paired-document paths; labels inside a region are code identifiers rather than translated words. A full-page generator can also render source-owned paired prose, such as [persistence-catalog-text.ts](../../scripts/persistence-catalog-text.ts), from the same structural data with matching Markdown structure and identical code blocks. It regenerates both pages and their consistency record together; review still verifies the paired prose's meaning and terminology.
+共有される生成リージョン — Cordis サブシステムリージョンや[設定カタログ](../config-catalog.md)のパッケージごとのリージョンなど — は、ローカライズされたペアドキュメントパスを除いて、すべての生成バイトを言語間で同一に保つ。リージョン内のラベルは翻訳された語ではなくコード識別子である。フルページジェネレーターは、[persistence-catalog-text.ts](../../scripts/persistence-catalog-text.ts) のようなソース所有のペア散文も、同じ構造データから一致する Markdown 構造と同一のコードブロックでレンダリングできる。両方のページとそれらの一貫性レコードを一緒に再生成する。レビューは引き続きペア散文の意味と用語を検証する。
 
-Generated English sources omit the language switcher that ordinary authored sources carry, because adding it would make the generator stale; their Chinese counterparts still link back to the English source. A manually maintained Chinese counterpart may rewrite only self-referential generation and maintenance statements that would otherwise be false for the reviewed translation; all technical content remains subject to the ordinary faithfulness rules.
+生成された英語ソースは、通常の作成ソースが運ぶ言語スイッチャーを省略する。追加するとジェネレーターが stale になるためである。その中国語カウンターパートは依然として英語ソースにリンクバックする。手動で維持される中国語カウンターパートは、レビューされた翻訳にとって偽となる自己言及的な生成・保守の記述のみを書き換えてよい。すべての技術的内容は通常の忠実性ルールの対象のままである。
 
-**Excluded** (never paired, and the gate rejects a `.zh.md` or `.i18n.yaml` for them):
+**除外** (決してペアにされず、ゲートはそれらの `.zh.md` や `.i18n.yaml` を拒否する):
 
-- [cordis-api/inherited.md](../cordis-api/inherited.md) — generated without a reviewed Chinese counterpart, so both website locales project the English source.
-- `docs/AGENTS.md`, `.agents/notes/**/AGENTS.md`, and their `CLAUDE.md` instruction symlinks — agent instructions, maintained in English only like the root `AGENTS.md`.
-- `docs/i18n/terminology.md` and [style-samples.md](style-samples.md) — both are bilingual by construction.
-- [translation-prompt.md](translation-prompt.md) — the automated pipeline's prompt template; its body is machine-consumed verbatim, so a paired translation would change pipeline behavior.
-- [review-ownership/README.md](../../.github/review-ownership/README.md) — repository-internal approval policy maintained in English only.
-- `.agents/notes/archived/` — frozen historical triplets. [`verify-archived-agent-notes`](../../scripts/verify-archived-agent-notes.ts) validates their completeness and content seals; translation maintenance must never rewrite them.
+- [cordis-api/inherited.md](../cordis-api/inherited.md) — レビュー済みの中国語カウンターパートなしで生成されるため、両方のウェブサイトロケールが英語ソースを投影する。
+- `docs/AGENTS.md`、`.agents/notes/**/AGENTS.md`、およびそれらの `CLAUDE.md` 指示シンボリックリンク — エージェント指示であり、ルート `AGENTS.md` と同様に英語のみで維持される。
+- `docs/i18n/terminology.md` と [style-samples.md](style-samples.md) — どちらも構造上バイリンガルである。
+- [translation-prompt.md](translation-prompt.md) — 自動パイプラインのプロンプトテンプレート。そのボディは機械によって逐語的に消費されるので、ペア翻訳はパイプラインの挙動を変えてしまう。
+- [review-ownership/README.md](../../.github/review-ownership/README.md) — 英語のみで維持されるリポジトリ内部の承認ポリシー。
+- `.agents/notes/archived/` — 凍結された歴史的トリプレット。[`verify-archived-agent-notes`](../../scripts/verify-archived-agent-notes.ts) がそれらの完全性と内容の封印を検証する。翻訳保守がそれらを書き換えることは決してあってはならない。
 
-**Universal requirement**: every current or future document in scope must merge as a complete bilingual pair. [scripts/translation-pairing.manifest.json](../../scripts/translation-pairing.manifest.json) contains only explicit exclusions; there is no per-file rollout list, date cutoff, or README-specific policy class.
+**普遍的な要件**: 対象範囲の現在または将来のすべてのドキュメントは、完全なバイリンガルペアとしてマージされなければならない。[scripts/translation-pairing.manifest.json](../../scripts/translation-pairing.manifest.json) は明示的な除外のみを含む。ファイルごとのロールアウトリスト、日付カットオフ、README 固有のポリシークラスは存在しない。
 
-## Division of labor
+## 役割分担
 
-Routine counterparts are updated directly by the working agent in one pass after it loads [terminology.md](terminology.md); it does not invoke a translation skill, generate a briefing, run a separate translation-review pass, or delegate to a subagent. The extended [dsh-translate-docs](../../.agents/skills/dsh-translate-docs/SKILL.md) workflow retains those heavier mechanisms for explicit user invocation. The gate checks pair completeness, recorded hashes, the Chinese backlink and authored-source switcher (with the documented generated-source exception), and its documented structural signature. Review still owns translation quality, terminology, and structural requirements that the signature does not encode. The prompt contract is executable: [scripts/translation-prompt.ts](../../scripts/translation-prompt.ts) renders the committed template (terminology injected; the template carries its own calibrated rules) into either direction and parses the three-section response, while `verify-translation-prompt` exercises both render directions and the checked-in example in `doc-sync`.
+日常的なカウンターパートは、作業エージェントが [terminology.md](terminology.md) をロードした後に 1 パスで直接更新する。翻訳スキルを呼び出したり、ブリーフィングを生成したり、別の翻訳レビューパスを実行したり、サブエージェントに委任したりしない。拡張された [dsh-translate-docs](../../.agents/skills/dsh-translate-docs/SKILL.md) ワークフローは、明示的なユーザー呼び出しのためにそれらの重い機構を保持する。ゲートはペアの完全性、記録されたハッシュ、中国語バックリンクと作成ソースのスイッチャー (文書化された生成ソースの例外付き)、および文書化された構造シグネチャをチェックする。翻訳品質、用語、シグネチャがエンコードしない構造要件は依然としてレビューが所有する。プロンプト契約は実行可能である: [scripts/translation-prompt.ts](../../scripts/translation-prompt.ts) がコミットされたテンプレート (用語が注入され、テンプレートは自身の較正されたルールを持つ) をどちらの方向にもレンダリングし、3 セクションの応答をパースする。`verify-translation-prompt` は両方のレンダリング方向とチェックインされた例を `doc-sync` で試す。

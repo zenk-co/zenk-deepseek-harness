@@ -1,41 +1,41 @@
 ---
-description: "The persisted session-projection cache for deployments and maintainers choosing, configuring, or debugging durable checkpoints, zero-I/O list reads, and accelerated cold projection folds."
+description: "耐久チェックポイント、ゼロ I/O のリスト読み取り、高速化されたコールドプロジェクションフォールドを選択・設定・デバッグするデプロイとメンテナー向けの、永続化されたセッションプロジェクションキャッシュ。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-projection-cache
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package keeps durable per-session projection checkpoints so history lists, statistics, and goal snapshots can read cached values without loading each session log. Cold projection folds can resume after the checkpointed prefix, reducing restart work. The session log remains authoritative: a crash can leave a checkpoint stale, but never ahead of committed events, and incompatible records are ignored or backed up. Choose it for restarted sessions with frequent projection reads; skip it when projections are live-only or extra storage writes and unbounded checkpoint retention outweigh the saved work.
+このパッケージはセッションごとの耐久プロジェクションチェックポイントを保持し、履歴リスト、統計、ゴールスナップショットが各セッションログをロードせずにキャッシュ値を読み取れるようにする。コールドプロジェクションフォールドはチェックポイント済みプレフィックスの後から再開でき、再起動時の作業を削減する。セッションログが引き続き権威であり、クラッシュによってチェックポイントが古くなることはあっても、コミット済みイベントより先に進むことはなく、互換性のないレコードは無視されるかバックアップされる。頻繁なプロジェクション読み取りを伴うセッションの再起動にはこれを選び、プロジェクションがライブのみの場合や、追加のストレージ書き込みと無制限のチェックポイント保持が節約できる作業を上回る場合は選ばない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this package beside the projection registry and the storage stack when clients should list projection values for cold sessions without loading their logs. Without it, consumers must obtain the log before they can reconstruct cold projection values.
+クライアントがコールドセッションのプロジェクション値をログをロードせずに一覧表示すべき場合は、プロジェクションレジストリとストレージスタックの隣にこのパッケージをマウントする。これがないと、コンシューマーはコールドプロジェクション値を再構築する前にログを取得しなければならない。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it when a deployment restarts sessions and needs durable projection values for history lists, statistics, or goal snapshots. Skip it when projections serve only live sessions, or when the extra storage writes cost more than the saved projection work.
+デプロイがセッションを再起動し、履歴リスト、統計、ゴールスナップショットのために耐久プロジェクション値を必要とする場合に選ぶ。プロジェクションがライブセッションのみにサービスする場合や、追加のストレージ書き込みが節約されるプロジェクション作業より高くつく場合は選ばない。
 
-### Minimal configuration
+### 最小構成
 
-Both throttle fields are required — flush cadence is a deployment choice with no universally correct value:
+両方のスロットルフィールドは必須である — フラッシュの頻度はデプロイの選択であり、普遍的に正しい値は存在しない:
 
-The cache opens its domain through the storage stack, so base mounts `storage`, `storage-json` (root `dshHomePath('storages')`), and `storage-domain` (`backend: json`) before it:
+キャッシュはストレージスタックを通じて自身のドメインを開くため、ベースはその前に `storage`、`storage-json`（ルート `dshHomePath('storages')`）、`storage-domain`（`backend: json`）をマウントする:
 
 ```yaml
 - id: session-projection-cache
@@ -45,96 +45,96 @@ The cache opens its domain through the storage stack, so base mounts `storage`, 
     writeIntervalMs: 5000
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `writeEveryEvents` | required | Committed events per session that force a durable checkpoint write between mandatory points |
-| `writeIntervalMs` | required | Longest time a dirty checkpoint may stay unwritten between mandatory points |
+| `writeEveryEvents` | 必須 | 必須ポイント間で耐久チェックポイントの書き込みを強制する、セッションあたりのコミット済みイベント数 |
+| `writeIntervalMs` | 必須 | 必須ポイント間でダーティなチェックポイントが未書き込みのままでいられる最長時間 |
 
-The plugin injects `storageDomain`, `sessionProjections`, and `sessions`. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-session-projection-cache) is the exhaustive source for every accepted field and its JSDoc.
+プラグインは `storageDomain`、`sessionProjections`、`sessions` を注入する。生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-session-projection-cache)は、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### How checkpoints are written
+### チェックポイントが書き込まれる方法
 
-Three mandatory points always write: session creation persists the seed-derived cut, `turn/end` persists the value that listing reads want, and session disposal persists the final live cut. Between them, the configured count and interval throttles write as events accumulate. Every write atomically replaces the session's complete record through the domain write chain; a failure logs a warning and keeps the cache stale, and the next write self-heals.
+3 つの必須ポイントは常に書き込む: セッション作成はシード由来のカットを永続化し、`turn/end` はリスト読み取りが求める値を永続化し、セッション破棄は最終ライブカットを永続化する。その間では、設定された件数と間隔のスロットルがイベントの蓄積に応じて書き込む。各書き込みはドメイン書き込みチェーンを通じてセッションの完全なレコードをアトミックに置き換える。失敗は警告をログに記録してキャッシュを古いままにし、次の書き込みが自己修復する。
 
-### Reading cached values
+### キャッシュ値の読み取り
 
-`cachedSnapshot(meta, keys?)` is the read-only face: it synchronously serves client values from the storage domain's in-memory tables with zero I/O. It accepts a record whose lifecycle identity (`formatVersion`, `createdAt`, `cwd`, `isSeeded`) matches the header and serves its version- and schema-matching keys as one block whose `asOfSeq` is the lowest watermark among the served rows. That watermark is the stored record's own: a header witnesses no inherited cut and cannot vouch that the row sequence is comparable with the log a consumer later opens, so the Session list labels the block `cached` and the client lets every value the connected Session later produces supersede it. Within one format generation the cut is fixed at fork time and distinguishes no lifecycle the other fields do not, and a viewed value never seeds a fold, so seeded (forked) sessions are served exactly like unseeded ones. `cachedPredecessorTitle(meta)` is the narrower listing-only exception across a Session-format edge: a structurally admitted predecessor record whose lifecycle matches may expose only a current-version-compatible `title` row, because title text is invariant across the adjacent edges. All other predecessor rows remain unavailable. `coldSnapshot(meta, inheritedEventCount, events)` is a fold face: it accepts the exact cut with a complete ordered log, skips the checkpointed prefix while folding, and refreshes the record without reading persistence itself.
+`cachedSnapshot(meta, keys?)` は読み取り専用の面である: ストレージドメインのインメモリテーブルからクライアント値をゼロ I/O で同期的に提供する。ライフサイクルアイデンティティ（`formatVersion`、`createdAt`、`cwd`、`isSeeded`）がヘッダーと一致するレコードを受け付け、そのバージョンとスキーマに一致するキーを、提供される行のうち最小のウォーターマークを `asOfSeq` とする 1 つのブロックとして提供する。そのウォーターマークは保存されたレコード自身のものである: ヘッダーは継承されたカットを証言せず、行シーケンスがコンシューマーが後に開くログと比較可能であることを保証できない。そのため Session リストはブロックに `cached` のラベルを付け、クライアントは接続された Session が後に生成するすべての値にそれを上書きさせる。1 つのフォーマット世代内ではカットはフォーク時に固定され、他のフィールドが区別しないライフサイクルを区別せず、閲覧された値がフォールドをシードすることはないため、シード済み（フォークされた）セッションはシードされていないセッションとまったく同様に提供される。`cachedPredecessorTitle(meta)` は Session フォーマットの境界をまたぐ、より狭いリスト専用の例外である: ライフサイクルが一致する、構造的に受け入れられた先行レコードは、現在のバージョン互換の `title` 行のみを公開してよい。タイトルテキストは隣接する境界をまたいで不変だからである。他のすべての先行レコード行は利用不可のままである。`coldSnapshot(meta, inheritedEventCount, events)` はフォールドの面である: 完全な順序付きログを伴う正確なカットを受け付け、フォールド中にチェックポイント済みプレフィックスをスキップし、永続化自体を読むことなくレコードを更新する。
 
-### What the cache guarantees
+### キャッシュが保証するもの
 
-The log leads and the cache follows: a live checkpoint flushes the session's buffered events durably before the cache row lands, so a crash can leave the cache behind the log but never ahead of it. Reads and writes share the storage domain's coherent in-memory state; the per-unit write chain mutates memory only after durability. Each version-stamped record must match the live unit schema and the lifecycle identity (`formatVersion`, `createdAt`, `cwd`, `isSeeded`); the fold faces (`hydratePrepared`, `coldSnapshot`, and checkpoint writes) also require the exact `inheritedEventCount`, so a row folded from another Session format generation or fork cut cannot seed the caller. The JSON backend stores each record at `<root>/session_projcache/sessions/<id>.json` in an owner-only directory tree. Domain read validation preserves every own JSON key in checkpoint values, including `__proto__` and `constructor` inside opaque metadata. It rejects values that cannot survive a lossless JSON round trip, using the same rules as checkpoint writes. Each projection then validates its hydration state with its own `stateSchema`; fields carrying opaque JSON need a validator that preserves their keys.
+ログが先導し、キャッシュが追随する: ライブチェックポイントはキャッシュ行が着地する前にセッションのバッファリングされたイベントを耐久フラッシュするため、クラッシュによってキャッシュがログより遅れることはあっても、ログより先に進むことはない。読み取りと書き込みはストレージドメインの一貫したインメモリ状態を共有し、ユニットごとの書き込みチェーンは耐久化の後にのみメモリを変更する。バージョンスタンプされた各レコードはライブユニットのスキーマとライフサイクルアイデンティティ（`formatVersion`、`createdAt`、`cwd`、`isSeeded`）に一致しなければならず、フォールドの面（`hydratePrepared`、`coldSnapshot`、チェックポイント書き込み）はさらに正確な `inheritedEventCount` を要求するため、別の Session フォーマット世代またはフォークカットから畳み込まれた行が呼び出し元をシードすることはできない。JSON バックエンドは各レコードをオーナー専用のディレクトリツリー内の `<root>/session_projcache/sessions/<id>.json` に保存する。ドメイン読み取り検証は、不透明なメタデータ内の `__proto__` や `constructor` を含め、チェックポイント値のすべての自身の JSON キーを保持する。ロスレス JSON ラウンドトリップを生き延びられない値は、チェックポイント書き込みと同じルールを使って拒否する。その後、各プロジェクションが自身の `stateSchema` でハイドレーション状態を検証する。不透明な JSON を運ぶフィールドには、そのキーを保持するバリデータが必要である。
 
-Upgrades never block startup or expose an unproven fold. Records stamped with a version in the spec's `compatibleVersions` remain structurally readable for a current checkpoint rewrite, but a missing or older `formatVersion` never matches a current Session and therefore cannot seed hydration. A lifecycle-matching predecessor title remains available only through the listing hint above because title text is invariant across the adjacent Session-format edges and its row still passes the current projection `stateVersion` and schema. Once the format matches, absent lineage fields decode as the unseeded lineage — exact for unseeded sessions, while a seeded caller fails the identity match and refolds cold. A stored record that still fails schema validation is moved aside as `<id>.json.bak.<stamp>` under the domain's `invalidRecords: 'backup-and-skip'` policy, logged with its cause, and rebuilt by the next checkpoint.
+アップグレードが起動をブロックしたり、証明されていないフォールドを露出したりすることは決してない。スペックの `compatibleVersions` 内のバージョンでスタンプされたレコードは、現在のチェックポイント書き換えのために構造的に読み取り可能なままであるが、欠落した、または古い `formatVersion` は現在の Session に一致しないため、ハイドレーションをシードできない。ライフサイクルが一致する先行タイトルは、上記のリストヒントを通じてのみ利用可能なままである。タイトルテキストは隣接する Session フォーマットの境界をまたいで不変であり、その行は現在のプロジェクション `stateVersion` とスキーマを依然として通過するからである。フォーマットが一致すれば、欠落したリネージフィールドはシードされていないリネージとしてデコードされる — シードされていないセッションには正確であり、シードされた呼び出し元はアイデンティティ一致に失敗してコールドで再フォールドする。スキーマ検証に依然として失敗する保存済みレコードは、ドメインの `invalidRecords: 'backup-and-skip'` ポリシーの下で `<id>.json.bak.<stamp>` として脇に移動され、原因とともにログに記録され、次のチェックポイントで再構築される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the cache's durability and storage ownership; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションではキャッシュの耐久性とストレージ所有権を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design concept
+### 設計概念
 
-The cache is a fold shortcut over the projection registry's checkpoint face, stored in a `per-record` domain data table. It commits to six consequences: reads never bypass the domain write chain; every background write is fail-soft; a `ver` mismatch discards rather than migrates a row; a record must pass the live unit's `stateSchema`; writes replace one complete session record through the lossless-JSON boundary; and the log leads, the cache follows.
+キャッシュはプロジェクションレジストリのチェックポイント面に対するフォールドショートカットであり、`per-record` ドメインデータテーブルに保存される。これは 6 つの帰結を約束する: 読み取りがドメイン書き込みチェーンを迂回しないこと、すべてのバックグラウンド書き込みがフェイルソフトであること、`ver` の不一致が行を移行するのではなく破棄すること、レコードがライブユニットの `stateSchema` を通過しなければならないこと、書き込みがロスレス JSON 境界を通じて 1 つの完全なセッションレコードを置き換えること、そしてログが先導しキャッシュが追随すること。
 
-### Read and write ownership
+### 読み取りと書き込みの所有権
 
-The cache stores one version-stamped document per session in the `session_projcache` domain. It does not depend on a session-persistence backend, call `locate`, or inspect per-session directories. A malformed or stale record reads as absent, and consumers that require a cold value own any log refold.
+キャッシュはバージョンスタンプされたドキュメントをセッションごとに 1 つ `session_projcache` ドメインに保存する。セッション永続化バックエンドに依存せず、`locate` を呼ばず、セッションごとのディレクトリを検査しない。不正な形式または古いレコードは不在として読み取られ、コールド値を必要とするコンシューマーがログの再フォールドを所有する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `SessionProjectionCache` service, write-behind listeners, cache reads |
-| [`src/spec.ts`](src/spec.ts) | The `session_projcache` domain spec and record identity types |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `SessionProjectionCache` サービス、ライトビハインドリスナー、キャッシュ読み取り |
+| [`src/spec.ts`](src/spec.ts) | `session_projcache` ドメインスペックとレコードアイデンティティ型 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the cache to the registry it checkpoints and the storage domain that holds its records.
+パッケージレベルの契約では不十分なときにこれらのページを読む。キャッシュから、それがチェックポイントするレジストリ、およびそのレコードを保持するストレージドメインへと進む。
 
-- [Session projections subsystem](../../../docs/subsystems/session-projection.md) — the projection unit contract and drive semantics this cache checkpoints.
-- [Session projection registry](../session-projection/README.md) — the `ctx.sessionProjections` service whose checkpoints this cache persists.
-- [Storage subsystem](../../../docs/subsystems/storage.md) — the domain routing and backend behavior that store cache records.
-- [Session package map](../README.md) — adjacent persistence, title, and telemetry packages.
-- [Session-projection RFC](../../../.agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.md) — the persisted projection cache design rationale.
+- [セッションプロジェクションサブシステム](../../../docs/subsystems/session-projection.md) — このキャッシュがチェックポイントするプロジェクションユニット契約と駆動セマンティクス。
+- [セッションプロジェクションレジストリ](../session-projection/README.md) — このキャッシュがチェックポイントを永続化する `ctx.sessionProjections` サービス。
+- [ストレージサブシステム](../../../docs/subsystems/storage.md) — キャッシュレコードを保存するドメインルーティングとバックエンドの動作。
+- [Session パッケージマップ](../README.md) — 隣接する永続化、タイトル、テレメトリのパッケージ。
+- [Session プロジェクション RFC](../../../.agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.md) — 永続化されたプロジェクションキャッシュの設計根拠。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the persisted cache accelerates host-side reads of projection state and registers nothing model-facing.
+なし。永続化されたキャッシュはプロジェクション状態のホスト側読み取りを高速化し、モデル向けのものを何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; the cache never assembles or sends provider requests.
+なし。キャッシュはプロバイダーリクエストを組み立てたり送信したりしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the cache needs operational care. They are current package constraints, not a task backlog.
+これらの制限は、キャッシュが運用上の注意を必要とする箇所を定義する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **No eviction or retention surface** — records accumulate per session; pruning stored checkpoints is out-of-band maintenance, same stance as session persistence itself.
-- **Interval throttle is per-session coarse** — the timer arms at the first dirty event after a clean write; a steady sub-threshold trickle writes once per interval, not a sliding window.
-- **No cache-side cold refold** — the cache serves and refreshes its rows but never reads the session log (it does not depend on the persistence layer); a consumer that needs a guaranteed cold snapshot refolds from the log itself.
-- **Every schema or domain-version change must prove its upgrade story** — a change to the stored record schema or the domain version lands in the same PR with an archived fixture of the previously shipped on-disk format under `tests/fixtures/` and test cases in `tests/fixtures.spec.ts` proving the chosen disposition: read-compat recovery (`compatibleVersions`), current-version rewrite, or backup-and-skip salvage. A bump whose old records are simply discarded still proves that the discard neither causes startup to fail nor poisons the tree.
+- **エビクションや保持の面がない** — レコードはセッションごとに蓄積する。保存済みチェックポイントの剪定は帯域外のメンテナンスであり、セッション永続化自体と同じ立場である。
+- **インターバルスロットルはセッション単位で粗い** — タイマーはクリーンな書き込みの後の最初のダーティイベントで起動する。しきい値未満の安定した細流はスライディングウィンドウではなく、間隔ごとに 1 回書き込む。
+- **キャッシュ側のコールド再フォールドがない** — キャッシュは行を提供して更新するが、セッションログを決して読まない（永続化層に依存しない）。保証されたコールドスナップショットを必要とするコンシューマーは、ログ自体から再フォールドする。
+- **すべてのスキーマまたはドメインバージョンの変更がアップグレードストーリーを証明しなければならない** — 保存されたレコードスキーマまたはドメインバージョンの変更は、以前に出荷されたオンディスクフォーマットのアーカイブ済みフィクスチャを `tests/fixtures/` に、選ばれた処置を証明するテストケースを `tests/fixtures.spec.ts` に伴って同じ PR で着地する。すなわち、読み取り互換の回復（`compatibleVersions`）、現在バージョンへの書き換え、またはバックアップアンドスキップによる救済である。古いレコードを単に破棄するバンプであっても、その破棄が起動を失敗させず、ツリーを汚染しないことを証明する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

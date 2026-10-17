@@ -1,37 +1,37 @@
 ---
-description: "The shipped JSONL session-persistence backend for deployments and maintainers choosing, configuring, or debugging per-session durable logs with optional Zstandard compression."
+description: "出荷済みの JSONL セッション永続化バックエンド。オプションの Zstandard 圧縮を伴うセッションごとの永続ログを選択・設定・デバッグするデプロイメントとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-persistence-jsonl
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-session-persistence-jsonl` stores each session in a current append-only JSONL log and retains immutable historical format generations — checksummed Zstandard frames by default, raw newline-delimited lines when compression is disabled. It serves the current logical `SessionEvent` stream through persistence handles, so format migration, compression, historical decoding, and crash recovery remain storage-internal details. Choose it when consumers need a per-session file on disk; the logs are readable as plain lines when `compression: 'none'` is selected. A root directory is the one required configuration; durability, lazy materialization, [supported historical-format migration](../session-format-catalog/README.md), and torn-tail crash recovery come with the backend.
+`dsh-session-persistence-jsonl` は各セッションを現在の追記専用 JSONL ログに保存し、不変の過去フォーマット世代 — デフォルトではチェックサム付き Zstandard フレーム、圧縮が無効な場合は生の改行区切り行 — を保持する。永続化ハンドルを通じて現在の論理 `SessionEvent` ストリームを提供するため、フォーマット移行、圧縮、過去フォーマットのデコード、クラッシュ復旧はストレージ内部の詳細に留まる。コンシューマーがディスク上のセッションごとのファイルを必要とする場合に選択する。`compression: 'none'` を選ぶと、ログはプレーンな行として読める。必須の設定はルートディレクトリ 1 つだけであり、耐久性、遅延マテリアライズ、[サポートされる過去フォーマットの移行](../session-format-catalog/README.md)、断ち切られた末尾のクラッシュ復旧はバックエンドに付属する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this backend when a composition needs durable sessions backed by per-session files. The common path is explicit: load the session service, mount the backend, and give it a root directory.
+コンポジションがセッションごとのファイルに支えられた永続セッションを必要とするときにこのバックエンドをマウントする。一般的な手順は明示的である。セッションサービスをロードし、バックエンドをマウントし、ルートディレクトリを与える。
 
-### When to choose it
+### 選ぶべきとき
 
-Choose this backend when consumers benefit from one artifact per session — navigation, external tooling, or a raw line-readable log. It is the sole first-party Session-persistence provider. The backend keeps sessions under a deployment-controlled root: project-local, shared, temporary, or centralized.
+セッションごとに 1 つの成果物が利点となる場合 — ナビゲーション、外部ツール、生の行として読めるログ — にこのバックエンドを選ぶ。唯一のファーストパーティのセッション永続化プロバイダーである。バックエンドはセッションを、デプロイメントが管理するルート (プロジェクトローカル、共有、一時、集中) の下に保持する。
 
-### Minimal configuration
+### 最小構成
 
 ```yaml
 - name: '@deepseek-ai/dsh-session'
@@ -40,21 +40,21 @@ Choose this backend when consumers benefit from one artifact per session — nav
     root: /absolute/path/to/session-logs
 ```
 
-`root` is required and has no default: a `process.cwd()` default would scatter session files as the process's cwd changes. An existing root must be a readable directory; an absent root is created on first materialization.
+`root` は必須でデフォルトはない。`process.cwd()` をデフォルトにすると、プロセスの cwd が変わるにつれてセッションファイルが散らばってしまうからである。既存のルートは読み取り可能なディレクトリでなければならず、存在しないルートは最初のマテリアライズ時に作成される。
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `root` | required | Root directory for all session files |
-| `compression` | `'zstd'` | Physical encoding: `'zstd'` checksummed frames, or `'none'` newline-delimited UTF-8 text |
-| `listConcurrency` | `3` | Maximum directory, header, and stat reads in flight, shared by every concurrent listing of this backend |
+| `root` | 必須 | すべてのセッションファイルのルートディレクトリ |
+| `compression` | `'zstd'` | 物理エンコーディング: `'zstd'` はチェックサム付きフレーム、`'none'` は改行区切りの UTF-8 テキスト |
+| `listConcurrency` | `3` | 同時実行中のディレクトリ・ヘッダー・stat 読み取りの最大数。このバックエンドのすべての同時リスティングで共有される |
 
-Live-event write batching is not configuration: the batching window is the seam's internal scheduling policy inside each write handle.
+ライブイベント書き込みのバッチ化は設定ではない。バッチ化ウィンドウは各書き込みハンドル内のシーム内部のスケジューリングポリシーである。
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-session-persistence-jsonl) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-session-persistence-jsonl)が、受け入れられるすべてのフィールドとその JSDoc の完全な情報源である。
 
-### On-disk layout
+### ディスク上のレイアウト
 
-Each session gets a session-owned directory under a readable project directory. Every canonical generation starts with a physical header whose version equals its filename. The current format stores one physical row per durable event; the frozen v0 and v1 readers also understand their historical packed Assistant-delta rows. The current format stores `isSeeded` in the header and derives the inherited cut from the last tagged `session/end-seed` marker, while historical codecs translate their numeric `seedLength`. The format catalog completes that translation before a handle exposes current logical values. Current storage records use the lossless source-event representation described below:
+各セッションは、読み取り可能なプロジェクトディレクトリの下にセッション所有のディレクトリを持つ。すべての正規世代は、バージョンがファイル名と一致する物理ヘッダーで始まる。現在のフォーマットは永続イベントごとに 1 つの物理行を保存し、凍結された v0 と v1 のリーダーはそれぞれの過去のパック済み Assistant デルタ行も理解する。現在のフォーマットは `isSeeded` をヘッダーに保存し、継承されたカットを最後にタグ付けされた `session/end-seed` マーカーから導出する。一方、過去のコーデックは数値の `seedLength` を変換する。フォーマットカタログは、ハンドルが現在の論理値を公開する前にその変換を完了する。現在のストレージレコードは、以下で説明するロスレスなソースイベント表現を使用する:
 
 ```text
 <root>/
@@ -70,112 +70,112 @@ Each session gets a session-owned directory under a readable project directory. 
       session.v3.jsonl           # released v3/current, raw root; later versions use vN
 ```
 
-Session ids are injectively escaped to one safe path segment before use (no traversal, no collision). The normalized cwd keeps the project directory readable for navigation; cwd strings that normalize alike share a project directory while session ids still select distinct session directories. Runtime operations select the numerically highest canonical generation, and format-refusal diagnostics name that absolute path so an operator can find the raw log a build refused to interpret.
+セッション id は使用前に単一の安全なパスセグメントへ単射的にエスケープされる (トラバーサルなし、衝突なし)。正規化された cwd はナビゲーションのためにプロジェクトディレクトリを読みやすく保つ。同じように正規化される cwd 文字列はプロジェクトディレクトリを共有するが、セッション id は依然として別々のセッションディレクトリを選ぶ。ランタイム操作は数値上最も高い正規世代を選択し、フォーマット拒否の診断はその絶対パスを名指すので、オペレーターはビルドが解釈を拒否した生のログを見つけられる。
 
-### Durability and crash semantics
+### 耐久性とクラッシュ時のセマンティクス
 
-A session is materialized lazily: `create(header)` writes nothing and returns the owned write handle, and the handle's first `append` writes and `fsync`s the encoded header and first batch through a no-overwrite publish — so a created-but-never-appended session leaves nothing on disk unless its owner calls `handle.flush()`, which publishes one header frame without an event. Each subsequent batch appends lines or one compressed frame and `fsync`s before the append resolves; a caught write or sync failure rolls the file back to its prior length. Committed events are never rewritten. After a crash, the stored log keeps its interrupted final turn — every record in the committed prefix survives, and the resuming reader appends synthetic closers through its write handle. An incomplete final raw line is discarded. A torn final Zstandard frame contributes only its complete decoded JSONL records; a write handle truncates the torn bytes and durably rewrites those recovered records before its first new batch. Checksum, decompression, or structural failure in a complete committed frame rejects as corruption.
+セッションは遅延してマテリアライズされる。`create(header)` は何も書かずに所有された書き込みハンドルを返し、ハンドルの最初の `append` が、上書きなしのパブリッシュを通じてエンコード済みヘッダーと最初のバッチを書き込んで `fsync` する — したがって、作成されたが一度も append されていないセッションは、オーナーが `handle.flush()` を呼ばない限りディスクに何も残さない。`handle.flush()` はイベントなしでヘッダーフレームを 1 つパブリッシュする。後続の各バッチは行または圧縮フレーム 1 つを追記し、append が解決する前に `fsync` する。捕捉された書き込みまたは sync の失敗は、ファイルを以前の長さにロールバックする。コミットされたイベントが書き換えられることはない。クラッシュ後、保存されたログは中断された最終ターンを保持する — コミット済みプレフィックスのすべてのレコードは生き残り、再開するリーダーは自身の書き込みハンドルを通じて合成のクローザーを追記する。不完全な最終生行は破棄される。断ち切られた最終 Zstandard フレームは、完全にデコードできた JSONL レコードのみを寄与する。書き込みハンドルは断ち切られたバイトを切り詰め、最初の新しいバッチの前にそれらの回復済みレコードを耐久書き込みで書き直す。完全にコミットされたフレームのチェックサム、展開、または構造の失敗は破損として拒否される。
 
-The current-generation scanner applies the current codec owner’s structural admission checks before recoverable-tail handling. Retired required PTC tags and `request/header.header.system` refuse the file even after an earlier malformed row; recovery never truncates them as ordinary damaged tail data.
+現世代のスキャナーは、回復可能な末尾の処理の前に、現在のコーデックオーナーの構造的受け入れチェックを適用する。廃止された必須 PTC タグと `request/header.header.system` は、以前に不正な行があってもファイルを拒否する。復旧がそれらを通常の破損した末尾データとして切り詰めることはない。
 
-Unloading the backend waits for the consumer unloads it triggers through `sessionPersistence` injection before removing live-event listeners and draining and closing remaining handles. Consumers must register cleanup in that injecting scope; unrelated scopes and explicit Session or handle closure have their own lifetimes. Programmatic mounting uses the plugin namespace (`import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'`) with `ctx.plugin`; access storage through `ctx.sessionPersistence`.
+バックエンドのアンロードは、ライブイベントリスナーを削除して残りのハンドルを排出・クローズする前に、`sessionPersistence` 注入を通じて自身が引き起こすコンシューマーのアンロードを待つ。コンシューマーはその注入側スコープでクリーンアップを登録しなければならない。無関係なスコープと、明示的なセッションまたはハンドルのクローズには、それぞれ独自のライフタイムがある。プログラムによるマウントはプラグイン名前空間 (`import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'`) を `ctx.plugin` とともに使う。ストレージへは `ctx.sessionPersistence` を通じてアクセスする。
 
-### Reading the logs
+### ログを読む
 
-Materialized `stat` and `list` snapshots include the format catalog's header classification as `formatStatus`, alongside the translated logical `header`. A read-only preparation leaves the selected historical version unchanged; the status becomes `current` after publication of the successor. Unmaterialized pending Sessions omit `formatStatus`.
+マテリアライズ済みの `stat` および `list` スナップショットは、変換された論理 `header` と並んで、フォーマットカタログのヘッダー分類を `formatStatus` として含む。読み取り専用の準備は選択された過去世代を変更しない。ステータスは後継のパブリッシュ後に `current` になる。未マテリアライズの保留中セッションは `formatStatus` を省略する。
 
-`open(id, 'read'|'write')` selects the highest canonical generation. Current input follows the ordinary fast path. For historical input, a read open decodes and migrates the source once, validates the current logical result, and returns it without publishing a successor. A write open reuses that revision-keyed preparation when available, or performs the same preparation, then encodes a same-directory temporary file in bounded chunks, verifies it in a Worker Thread, rechecks the source revision, and publishes the current successor without overwrite before returning. The source remains byte-identical. Source drift after preparation rejects that write open without replacing the logical history already returned to readers; a later write open prepares the new revision. The backend marks decoded event graphs `shared-frozen` when it freezes them before memoization; every nested object and array is frozen, and handle reads and slices preserve that state, including empty slices. Only an unmaterialized pending log reports `detached`. `stat(id)` and `list()` select and translate only the highest generation header without reading event rows or starting migration; snapshots carry the selected file’s `sizeBytes` and a best-effort revision. Current revisions identify that file; historical revisions also fingerprint the selected files across the persistence root, so child changes invalidate cached logical events. Fingerprinting reads filesystem metadata only; unrelated changes conservatively invalidate historical revisions. One `list()` call shares a corpus fingerprint across its historical entries. With `compression: 'none'`, the log is newline-delimited text an external reader can consume directly; the compressed default must be read through the backend.
+`open(id, 'read'|'write')` は最も高い正規世代を選択する。現在の入力は通常のファストパスに従う。過去の入力の場合、読み取りオープンはソースを一度デコード・移行し、現在の論理結果を検証し、後継をパブリッシュせずに返す。書き込みオープンは、利用可能ならそのリビジョンをキーとする準備を再利用し、そうでなければ同じ準備を行い、その後、同一ディレクトリの一時ファイルを有界のチャンクでエンコードし、Worker Thread で検証し、ソースリビジョンを再チェックし、戻る前に上書きなしで現在の後継をパブリッシュする。ソースはバイト単位で同一のままである。準備後のソースのドリフトは、リーダーに既に返された論理履歴を置き換えることなくその書き込みオープンを拒否する。後の書き込みオープンが新しいリビジョンを準備する。バックエンドは、メモ化の前にデコード済みイベントグラフを凍結するとき、それらを `shared-frozen` とマークする。ネストされたすべてのオブジェクトと配列が凍結され、ハンドルの読み取りとスライスは、空のスライスを含め、その状態を保つ。未マテリアライズの保留ログだけが `detached` を報告する。`stat(id)` と `list()` はイベント行を読まず、移行も開始せずに、最も高い世代のヘッダーのみを選択・変換する。スナップショットは選択されたファイルの `sizeBytes` とベストエフォートのリビジョンを運ぶ。現在のリビジョンはそのファイルを識別し、過去のリビジョンは永続化ルート全体にわたる選択済みファイルのフィンガープリントも取るため、子の変更がキャッシュされた論理イベントを無効化する。フィンガープリンティングはファイルシステムメタデータのみを読む。無関係な変更も保守的に過去リビジョンを無効化する。1 回の `list()` 呼び出しは、その過去エントリー間でコーパスフィンガープリントを共有する。`compression: 'none'` の場合、ログは外部リーダーが直接消費できる改行区切りテキストである。圧縮をデフォルトとする場合はバックエンドを通じて読まなければならない。
 
-Verification accepts a successful Worker response only after the Worker exits naturally with code 0. Its concurrency slot remains held through that exit; cancellation and Worker errors terminate and join the Worker before rejecting.
+検証は、Worker がコード 0 で自然に終了した後にのみ、成功した Worker 応答を受け入れる。その同時実行スロットはその終了まで保持され続ける。キャンセルと Worker エラーは、拒否する前に Worker を終了させて join する。
 
-Historical body preparation completes the parent catalog through [V3→V4](../session-format-v3-to-v4/README.md). It finds candidate direct children from headers, reads each child's own descriptor through historical codecs, and retains compact evidence plus source revisions. It neither prepares child catalogs nor publishes child successors. Unreadable or unsupported headers, including corrupt Zstandard header frames, are omitted from discovery and `list()`. Direct access to a corrupt compressed header still rejects; header I/O and cancellation errors propagate. Child decoding and descriptor-field failures produce warnings naming the child path and retain header identity through `subagent/catalog` when the parent has no complete entry; healthy children and existing parent catalog entries remain available. Opening a damaged child still reports that child's error. Missing, unsupported, or multiple descriptors likewise produce unknown-mode membership without inventing a label. Published unknown entries remain browsable; child history reads retry the actual log and resolve its mode from a valid descriptor. Preparation rechecks membership and inspected source revisions before returning, reuse, and publication, including failed child reads so a repaired child invalidates stale preparation. Source drift retries a read open once and refuses a write open. Cancellation still aborts the operation. Current V4 opens bypass discovery and validate catalog fields, uniqueness, and current delivery ownership before exposing events.
+過去の本体の準備は [V3→V4](../session-format-v3-to-v4/README.md) を通じて親カタログを完成させる。ヘッダーから候補の直接の子を見つけ、過去のコーデックを通じて各子自身の記述子を読み、コンパクトな証拠とソースリビジョンを保持する。子カタログの準備も、子の後継のパブリッシュも行わない。破損した Zstandard ヘッダーフレームを含め、読めないヘッダーやサポートされないヘッダーは、ディスカバリーと `list()` から除外される。破損した圧縮ヘッダーへの直接アクセスは依然として拒否される。ヘッダーの I/O エラーとキャンセルエラーは伝播する。子のデコードや記述子フィールドの失敗は、子のパスを名指す警告を生成し、親に完全なエントリーがない場合は `subagent/catalog` を通じてヘッダー同一性を保持する。健全な子と既存の親カタログエントリーは利用可能なままである。破損した子を開くと、依然としてその子のエラーが報告される。記述子が欠落、非サポート、または複数ある場合も同様に、ラベルをでっち上げることなく unknown モードのメンバーシップを生成する。パブリッシュされた unknown エントリーは引き続き閲覧可能であり、子履歴の読み取りは実際のログを再試行し、有効な記述子からそのモードを解決する。準備は、返す前・再利用前・パブリッシュ前に、メンバーシップと検査済みソースリビジョンを再チェックする。失敗した子読み取りも含まれるので、修復された子は古い準備を無効化する。ソースのドリフトは読み取りオープンを 1 回再試行し、書き込みオープンを拒否する。キャンセルは依然として操作を中断する。現在の V4 オープンはディスカバリーを迂回し、イベントを公開する前にカタログフィールド、一意性、現在のデリバリー所有権を検証する。
 
-Historical `stat` and `list` revisions require metadata work proportional to the root’s Session count. Fresh body preparation scans all selected headers and decodes direct-child bodies; memo reuse still scans membership and checks revisions. Read-only access never publishes an upgrade, so cold processes and evicted preparations repeat that work. Current V4 body reads and revisions avoid the historical corpus scan. See the [measured costs and diagnostic command](../../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md#catalog-scan-measurements).
+過去の `stat` と `list` のリビジョンは、ルートのセッション数に比例するメタデータ作業を必要とする。新規の本体準備はすべての選択済みヘッダーをスキャンし、直接の子の本体をデコードする。メモの再利用もメンバーシップをスキャンし、リビジョンをチェックする。読み取り専用アクセスはアップグレードを決してパブリッシュしないため、コールドなプロセスと追い出された準備はその作業を繰り返す。現在の V4 の本体読み取りとリビジョンは過去コーパスのスキャンを回避する。[計測されたコストと診断コマンド](../../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md#catalog-scan-measurements)を参照。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the physical encoding and write path; the observable contract is covered in [Use this package](#use-this-package).
+この節は物理エンコーディングと書き込み経路を説明する。観測可能な契約は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design concept
+### 設計概念
 
-The backend owns its complete storage runtime (`src/storage.ts`): `JsonlSessionHandle` carries the per-handle mutation chain, the routed live-event buffer with its fixed batching window and single-flight drain, monotonic reads, and idempotent close; a tracker holds the in-process single-writer claims, the open-handle set teardown sweeps, and the created-but-unmaterialized pending sessions the backend's own session listeners route into. Historical body reads share one per-session Decode/Migrate preparation, and a bounded revision-keyed memo lets an immediate observe-to-resume handoff reuse that parse; the backend deep-freezes each event graph once before memoization, so later handle reads reuse it without copying or freezing. Only a write open publishes the prepared successor. The package exposes plugin exports and configuration types — the concrete class is private, so consumers couple to `ctx.sessionPersistence`, and the shared seam suites (`runPersistenceContract`/`runLiveWritePathContract`) pin its observable behavior. Physical revisions combine device, inode, size, and nanosecond timestamps for the preparation memo, stable-read retries, and publication checks. Historical public revisions add a SHA-256 fingerprint of sorted selected paths and their physical revisions; lock files and retained unselected generations do not contribute.
+バックエンドは完全なストレージランタイム (`src/storage.ts`) を所有する。`JsonlSessionHandle` はハンドルごとのミューテーションチェーン、固定のバッチ化ウィンドウとシングルフライト排出を備えたルーティング済みライブイベントバッファー、単調読み取り、冪等クローズを担う。トラッカーは、プロセス内のシングルライター要求、ティアダウンが走査するオープンハンドル集合、バックエンド自身のセッションリスナーがルーティングする作成済み・未マテリアライズの保留セッションを保持する。過去の本体読み取りはセッションごとの単一の Decode/Migrate 準備を共有し、有界のリビジョンキー付きメモにより、observe から resume への即時ハンドオフがそのパースを再利用できる。バックエンドは各イベントグラフをメモ化の前に一度深く凍結するので、後のハンドル読み取りはコピーや凍結なしにそれを再利用する。準備済みの後継をパブリッシュするのは書き込みオープンだけである。このパッケージはプラグインエクスポートと設定型を公開する — 具象クラスは非公開なので、コンシューマーは `ctx.sessionPersistence` に結合し、共有シームスイート (`runPersistenceContract`/`runLiveWritePathContract`) がその観測可能な振る舞いを固定する。物理リビジョンはデバイス、inode、サイズ、ナノ秒タイムスタンプを組み合わせて、準備メモ、安定読み取りの再試行、パブリッシュチェックに用いる。過去の公開リビジョンは、ソートされた選択済みパスとその物理リビジョンの SHA-256 フィンガープリントを追加する。ロックファイルと保持された未選択の世代は寄与しない。
 
-### Physical encoding
+### 物理エンコーディング
 
-The default artifact is a standard concatenation of independent Zstandard frames: one checksummed frame containing only the header line, then one checksummed frame per durable append batch, using Node's built-in Zstandard API at its default compression level (no level knob). The current format writes one event per row; `sourceEventSeqs` uses a lossless storage representation in which consecutive runs of at least three sequence numbers become `[start, end]` pairs, any other list stays verbatim, and reading expands the exact in-memory array. Historical migration reuses one Zstandard decoder, passes parsed rows through stateful format stages, and streams current records through one compression context in about 1 MiB main-thread slices while retaining only final current events, bounded decoder state, and the required sequence-remap table. Listing reads and validates only the header frame. `compression: 'none'` keeps the same storage-form logical lines without frame compression. A root belongs to one encoding: startup discovery and targeted lookup reject generations with the other suffix; format migration preserves the configured encoding, while compression conversion, mixed-root fallback, and dual write remain unsupported. Frozen v0 and v1 codecs retain their packed-row decoders solely for historical generations.
+デフォルトの成果物は、独立した Zstandard フレームの標準的な連結である。ヘッダー行のみを含むチェックサム付きフレーム 1 つに続き、永続 append バッチごとにチェックサム付きフレーム 1 つで、Node 組み込みの Zstandard API をデフォルトの圧縮レベルで使う (レベル調整ノブはない)。現在のフォーマットは 1 行につき 1 イベントを書き、`sourceEventSeqs` はロスレスなストレージ表現を使う。そこでは 3 つ以上連続するシーケンス番号が `[start, end]` ペアになり、それ以外のリストはそのまま保たれ、読み取りは正確なインメモリ配列を展開する。過去の移行は 1 つの Zstandard デコーダーを再利用し、パース済みの行をステートフルなフォーマット段階に通し、現在のレコードを 1 つの圧縮コンテキストを通じて約 1 MiB のメインスレッドスライスでストリームし、最終的な現在のイベント、有界のデコーダー状態、必要なシーケンス再マップテーブルのみを保持する。リスティングはヘッダーフレームのみを読み取り検証する。`compression: 'none'` はフレーム圧縮なしで同じストレージ形式の論理行を保つ。ルートは 1 つのエンコーディングに属する。起動時のディスカバリーと対象を絞ったルックアップは、もう一方のサフィックスを持つ世代を拒否する。フォーマット移行は設定済みのエンコーディングを保つが、圧縮変換、混在ルートのフォールバック、デュアル書き込みはサポートされないままである。凍結された v0 と v1 のコーデックは、もっぱら過去世代のためにパック済み行デコーダーを保持する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, the backend service class, and file storage primitives |
-| [`src/storage.ts`](src/storage.ts) | The JSONL handle, routed live-event buffer, in-process writer bookkeeping, listeners, teardown |
-| [`src/format.ts`](src/format.ts) | Log path derivation, header encoding, and current record scanning |
-| [`src/generation.ts`](src/generation.ts) | Single-pass historical restore, bounded stage encoding, source revision check, and exclusive successor publication |
-| [`src/migration-verifier.ts`](src/migration-verifier.ts) | Worker lifecycle for staged and competing-generation verification |
-| [`src/zstd.ts`](src/zstd.ts) | Zstandard frame compression, decoding, and frame scanning |
-| [`src/win32.ts`](src/win32.ts) | Windows write-through publish and directory creation |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `Config` スキーマ、バックエンドサービスクラス、ファイルストレージプリミティブ |
+| [`src/storage.ts`](src/storage.ts) | JSONL ハンドル、ルーティング済みライブイベントバッファー、プロセス内ライターブックキーピング、リスナー、ティアダウン |
+| [`src/format.ts`](src/format.ts) | ログパスの導出、ヘッダーエンコーディング、現在レコードのスキャン |
+| [`src/generation.ts`](src/generation.ts) | 単一パスの過去復元、有界の段階エンコーディング、ソースリビジョンチェック、排他的な後継パブリッシュ |
+| [`src/migration-verifier.ts`](src/migration-verifier.ts) | 段階的および競合世代の検証のための Worker ライフサイクル |
+| [`src/zstd.ts`](src/zstd.ts) | Zstandard フレームの圧縮、デコード、フレームスキャン |
+| [`src/win32.ts`](src/win32.ts) | Windows のライトスルーパブリッシュとディレクトリ作成 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared persistence model to the sibling backend and the physical-format decisions.
+パッケージレベルの契約では足りないときにこれらのページを読む。共有の永続化モデルから、兄弟バックエンドと物理フォーマットの決定へ進む。
 
-- [Session persistence subsystem](../../../docs/subsystems/persistence.md) — backend-neutral service semantics and provider relationships.
-- [Session persistence seam](../session-persistence/README.md) — the service contract this backend implements.
-- [Released Session format migrations](../../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md) — immutable generations, adjacent migration edges, and publication rules.
+- [セッション永続化サブシステム](../../../docs/subsystems/persistence.md) — バックエンド中立のサービスセマンティクスとプロバイダー関係。
+- [セッション永続化シーム](../session-persistence/README.md) — このバックエンドが実装するサービス契約。
+- [リリース済みセッションフォーマットの移行](../../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md) — 不変の世代、隣接する移行エッジ、パブリッシュ規則。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Resumed conversation history
+### 再開された会話履歴
 
-#### What the model sees
+#### モデルが見るもの
 
-JSONL storage contributes no live prompt or schema. Loading restores stored surface history and preserves prior request headers for reconstruction; the new loop composes its current envelope. Recovery balances an assistant request without a durable call with `TOOL_NOT_STARTED`; a durable call without a result becomes `TOOL_OUTCOME_UNKNOWN`, which tells the model to retry only read-only or idempotent work and to verify possible side effects or ask the user. Embedded Assistant streams and log-only attempts do not duplicate messages.
+JSONL ストレージはライブのプロンプトやスキーマを寄与しない。ロードは保存されたサーフェス履歴を復元し、再構築のために以前のリクエストヘッダーを保持する。新しいループは現在のエンベロープを構成する。復旧は、永続呼び出しのない assistant リクエストを `TOOL_NOT_STARTED` でバランスさせ、結果のない永続呼び出しは `TOOL_OUTCOME_UNKNOWN` となり、モデルに読み取り専用または冪等な作業のみを再試行し、起こりうる副作用を検証するかユーザーに尋ねるよう指示する。埋め込み Assistant ストリームとログのみの試行はメッセージを重複させない。
 
-#### Token effect
+#### トークンへの影響
 
-Zero live-request tokens. A resumed agent pays for retained history and its current envelope, plus the quoted repair result for each interrupted call.
+ライブリクエストのトークンはゼロ。再開されたエージェントは、保持された履歴とその現在のエンベロープ、および中断された呼び出しごとの引用された修復結果の分を支払う。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-JSONL storage does not mutate live request prefixes. A resumed loop can reuse provider cache only when its reconstructed history, current envelope, and model route match; crash-repair results append.
+JSONL ストレージはライブリクエストのプレフィックスを変更しない。再開されたループがプロバイダーキャッシュを再利用できるのは、再構築された履歴、現在のエンベロープ、モデルルートが一致する場合のみである。クラッシュ修復の結果は追記される。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this backend is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+これらの制限は、このバックエンドが不向きになる場合や特別な運用上の注意が必要になる場合を定義する。それらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Format migration preserves the configured encoding and supports only the catalogued chain** — this build migrates supported historical generations to the current format; changing compression requires a separate root, and retained predecessors do not provide automatic fallback or downgrade support.
-- **The flat-file storage layout does not load** — use a separate root or move pre-release artifacts into the project/session directory layout before loading.
-- **Compressed files are not directly line-readable** — use the backend to load them, or select `compression: 'none'` before writing a fresh root when external line readers are required.
-- **Nothing deletes session files** — logs accumulate under `root` until removed externally; the seam has no deletion API.
-- **One live writer per session** — the write-handle claim excludes a second writer inside the owning backend instance, and a kernel lock (non-blocking `flock(2)` on `session.lock`; on Windows a named kernel semaphore derived from that path, with no filesystem footprint) excludes every other instance and process; the lock is taken at write-open of an existing artifact and, for a created session, only right before its first materializing write, so an unmaterialized session leaves no filesystem footprint. A crashed holder's lock dies with its process, so its session is writable again immediately, while a live-but-wedged holder blocks writers until its process exits (on POSIX, removing the lock file forfeits that exclusion; release itself never removes it). Advisory `flock` is unreliable on some network filesystems (NFSv3), and the Windows semaphore name is per login session.
-- **Concurrent root disposal is not ordered** — Cordis can remove already-disposing consumers from its registry before the provider can join their cleanup. Dependency ordering here covers consumer unloads triggered by removing this provider.
-- **POSIX materialization requires hard-link support** — first append uses `link()` so same-id races fail instead of overwriting a committed log; Windows uses write-through rename without replacement.
-- **POSIX writes require the matching prebuilt system addon** — [`node-addon-system`](../../../native/system/README.md) supplies asynchronous flock without consumer-side compilation. A missing addon rejects write ownership; Windows retains its semaphore implementation.
+- **フォーマット移行は設定済みのエンコーディングを保ち、カタログ化されたチェーンのみをサポートする** — このビルドはサポートされる過去世代を現在のフォーマットへ移行する。圧縮を変更するには別のルートが必要であり、保持された先行世代は自動フォールバックやダウングレードのサポートを提供しない。
+- **フラットファイルのストレージレイアウトはロードされない** — 別のルートを使うか、ロード前にプレリリースの成果物をプロジェクト/セッションディレクトリレイアウトへ移動する。
+- **圧縮ファイルは直接行として読めない** — バックエンドを使ってロードするか、外部の行リーダーが必要な場合は新しいルートへ書き込む前に `compression: 'none'` を選ぶ。
+- **セッションファイルを削除するものはない** — 外部で削除するまでログは `root` の下に蓄積される。シームに削除 API はない。
+- **セッションごとに 1 つのライブライター** — 書き込みハンドルの要求は、所有バックエンドインスタンス内の 2 番目のライターを排除し、カーネルロック (`session.lock` に対する非ブロッキング `flock(2)`。Windows ではそのパスから導出される名前付きカーネルセマフォで、ファイルシステム上の足跡はない) が他のすべてのインスタンスとプロセスを排除する。ロックは既存成果物の書き込みオープン時に、作成されたセッションについては最初のマテリアライズ書き込みの直前に取得されるので、未マテリアライズのセッションはファイルシステム上の足跡を残さない。クラッシュした保持者のロックはプロセスとともに消えるため、そのセッションは直ちに再び書き込み可能になる。一方、生きているがウェッジした保持者はプロセスが終了するまでライターをブロックする (POSIX では、ロックファイルを削除するとその排除を放棄することになる。release 自体は決して削除しない)。アドバイザリ `flock` は一部のネットワークファイルシステム (NFSv3) では信頼できない。また Windows のセマフォ名はログインセッションごとに異なる。
+- **ルートの同時破棄は順序付けられない** — Cordis は、プロバイダーがコンシューマーのクリーンアップに加わる前に、既に破棄中のコンシューマーをレジストリから削除することがある。ここでの依存関係の順序付けは、このプロバイダーの削除によって引き起こされるコンシューマーのアンロードを対象とする。
+- **POSIX のマテリアライズにはハードリンクのサポートが必要** — 最初の append は `link()` を使うため、同一 id の競合はコミット済みログを上書きせず失敗する。Windows は置換なしのライトスルー rename を使う。
+- **POSIX の書き込みには一致するプリビルド済みシステムアドオンが必要** — [`node-addon-system`](../../../native/system/README.md) が、コンシューマー側のコンパイルなしで非同期 flock を提供する。アドオンがない場合は書き込み所有権が拒否される。Windows はセマフォ実装を維持する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

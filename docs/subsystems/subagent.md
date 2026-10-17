@@ -1,14 +1,14 @@
-# Subagents
+# サブエージェント
 
-English | [中文](subagent.zh.md)
+日本語 | [English](subagent.en.md) | [中文](subagent.zh.md)
 
-The unified activation API manages local conversations and external executions.
+統合アクティベーション API はローカル会話と外部実行を管理する。
 
-## Capabilities and activation requests
+## ケイパビリティとアクティベーション要求
 
-Every backend uses startActivation. Capability flags validate request options; prepareContinuable selects local Agent creation, while start selects one external execution. The model-facing tool uses parent delivery. Workflow and code mode consumers can await caller results without injecting another parent message. Historical children with unavailable descriptors remain discoverable as `mode: 'unknown'` without granting continuation capabilities; the [package README](../../packages/subagent/subagent/README.md) defines catalog persistence.
+すべてのバックエンドは startActivation を使う。ケイパビリティフラグが要求オプションを検証する。prepareContinuable はローカル Agent の作成を選択し、start は 1 回の外部実行を選択する。モデル向けツールは parent 配送を使う。ワークフローとコードモードのコンシューマーは、親へのメッセージを新たに注入せずに caller 結果を待てる。記述子が利用できない履歴上の子は `mode: 'unknown'` として検出可能なまま残り、継続ケイパビリティは付与されない。[パッケージ README](../../packages/subagent/subagent/README.md) がカタログの永続化を定義する。
 
-Optional `request.cwd` selects the child's initial directory; relative paths resolve against the parent's current effective directory. Omitting it captures that directory at admission. Local child Sessions retain the parent's original project, and cold resume retains their logged directory state.
+任意の `request.cwd` は子の初期ディレクトリを選択する。相対パスは親の現在の有効ディレクトリを基準に解決される。省略した場合は受付時にそのディレクトリを取り込む。ローカルの子 Session は親の元のプロジェクトを保持し、コールドレジュームでは記録されたディレクトリ状態を保持する。
 
 ```ts type-equiv
 /**
@@ -125,11 +125,11 @@ interface ResolvedSubagentStartRequest extends SubagentStartRequest {
 }
 ```
 
-## Local children and activations
+## ローカル子とアクティベーション
 
-Spawn alone supports an independent `agentPreset`; omission and fork inherit the parent's active composition. The [child preset rules](../../packages/subagent/subagent/README.md#restoring-child-composition) define explicit selection, event ordering, and historical restoration.
+独立した `agentPreset` に対応するのは spawn のみである。省略と fork は親のアクティブなコンポジションを継承する。[子プリセットルール](../../packages/subagent/subagent/README.md#restoring-child-composition) が明示的な選択、イベント順序、履歴の復元を定義する。
 
-A local child has a durable Session and at most one live activation. The manager reserves identity and capacity, prepares the child through its backend, and owns input admission, cold resume, and child-first disposal. The activation result settles after resource release and completion notification. Disposal reports cleanup failure separately without replacing a captured result. Structured capture closes input for that activation; a later cold resume does not inherit the output schema.
+ローカルの子は durable な Session と最大 1 つのライブアクティベーションを持つ。マネージャーは識別子と容量を予約し、バックエンド経由で子を準備し、入力受付、コールドレジューム、子優先の破棄を所有する。アクティベーション結果はリソース解放と完了通知の後に確定する。破棄は取り込み済み結果を置き換えずにクリーンアップ失敗を別途報告する。構造化キャプチャはそのアクティベーションの入力を閉じる。後のコールドレジュームは出力スキーマを継承しない。
 
 ```ts type-equiv
 /**
@@ -171,9 +171,9 @@ interface ContinuableCreateSpec {
 }
 ```
 
-## Messages and interruption
+## メッセージと割り込み
 
-sendMessage authorizes the exact live sender and permits only adjacent local agents. Running children receive steering input; absent continuable children resume from persistence. External executions reject follow-ups. Both local and external executions automatically report their final text, structured result, diagnostic, and status in the parent settlement notice. Local children can also send messages through send_message. caller delivery suppresses settlement notices. drainDescendants and drainChildren await owned work teardown for local and external activations.
+sendMessage は厳密なライブ送信者を認可し、隣接するローカルエージェントのみを許可する。実行中の子は誘導入力を受け取り、不在の継続可能な子は永続化からレジュームする。外部実行は後続メッセージを拒否する。ローカル実行と外部実行はいずれも、親への確定通知の中で最終テキスト、構造化結果、診断、状態を自動的に報告する。ローカルの子は send_message 経由でもメッセージを送れる。caller 配送では確定通知を抑止する。drainDescendants と drainChildren はローカルおよび外部アクティベーションの所有作業の解体を待つ。
 
 ```ts type-equiv
 /** Durable attribution for one model-authored message between Agents. */
@@ -224,13 +224,13 @@ type SubagentInterruptAuthority =
   | { readonly kind: 'ancestor'; readonly agent: Agent }
 ```
 
-## Durable enumeration
+## durable な列挙
 
-`listChildren` reads the parent-owned catalog of all local children and parent-delivery external children. Caller-delivery external executions leave membership and result collection to their caller; local workflow children remain discoverable after completion. External entries carry `mode: 'external'` and cannot open a child Session or accept follow-ups. Catalog entries record membership at creation without execution status. `list_agents` exposes direct continuable children with `running` or `inactive` activity; see the [control tool](../../packages/subagent/tool-subagent-control/README.md#list_agents).
+`listChildren` は親が所有するカタログから、すべてのローカル子と parent 配送の外部子を読み取る。caller 配送の外部実行ではメンバーシップと結果収集を caller に委ねる。ローカルのワークフロー子は完了後も検出可能のまま残る。外部エントリは `mode: 'external'` を持ち、子 Session を開くことも後続メッセージを受け付けることもできない。カタログエントリは実行状態なしに作成時のメンバーシップを記録する。`list_agents` は直接の継続可能な子を `running` または `inactive` のアクティビティで公開する。[制御ツール](../../packages/subagent/tool-subagent-control/README.md#list_agents) を参照。
 
-## Results and backend handles
+## 結果とバックエンドハンドル
 
-SubagentResult is available to program consumers. The activation registry retains the external backend handle until disposal completes. A cleanup failure does not replace a captured execution result: the activation result and parent notice retain it, while dispose rejects and the live subagent/end event reports error. Backend-owned diagnostics must satisfy the safe-detail requirements below.
+SubagentResult はプログラムコンシューマーに利用可能である。アクティベーションレジストリは破棄が完了するまで外部バックエンドハンドルを保持する。クリーンアップ失敗は取り込み済み実行結果を置き換えない。アクティベーション結果と親への通知はその結果を保持し、dispose は拒否し、ライブの subagent/end イベントがエラーを報告する。バックエンド所有の診断は以下の安全詳細要件を満たさなければならない。
 
 ```ts type-equiv
 /**
@@ -313,9 +313,9 @@ interface SubagentRun {
 }
 ```
 
-## The provider contract: SubagentProvider
+## プロバイダー契約: SubagentProvider
 
-`SubagentManager` owns startup, message admission, and execution lifetimes. Spawn and Fork contribute detached creation inputs for local Agents. Codex, Claude Code, ACP, and DSH SDK contribute one execution handle; they do not gain multiple turns. Each activation is an execution record that directly retains its AgentHandle or SubagentRun. External completion follows the handle’s result promise; inbox and idle admission belong only to local execution. Both paths share admission, capacity, parent ownership, cancellation, and disposal. The [package reference](../../packages/subagent/subagent/README.md) describes composition and deployment requirements.
+`SubagentManager` は起動、メッセージ受付、実行ライフタイムを所有する。Spawn と Fork はローカル Agent 向けの分離された作成入力を提供する。Codex、Claude Code、ACP、DSH SDK は 1 つの実行ハンドルを提供し、複数ターンは得ない。各アクティベーションは AgentHandle または SubagentRun を直接保持する実行レコードである。外部完了はハンドルの結果プロミスに従う。インボックスとアイドル受付はローカル実行にのみ属する。両経路とも受付、容量、親所有、キャンセル、破棄を共有する。[パッケージリファレンス](../../packages/subagent/subagent/README.md) がコンポジションとデプロイ要件を説明する。
 
 ```ts type-equiv
 /**
@@ -372,13 +372,13 @@ interface SubagentProvider {
 }
 ```
 
-## Durable enumeration: `listChildren()`, `listDescendants()`, and their entries
+## durable な列挙: `listChildren()`、`listDescendants()` とそのエントリ
 
-The model-facing `list_agents` adapter reports current activity as `running` or `inactive`. These values do not describe task completion or guarantee that `send_message` will succeed.
+モデル向け `list_agents` アダプターは現在のアクティビティを `running` または `inactive` として報告する。これらの値はタスク完了を表さず、`send_message` が成功することも保証しない。
 
-`SubagentRuntime.listChildren(parentSessionId, signal?)` reads the parent's `subagentCatalog` view through a live-preferred Session observation and releases that observation on success or failure. It returns direct-child entries in parent event order without reading child logs or enumerating the Session corpus. Query failures propagate; a missing catalog projection fails explicitly. Browser rows derive membership from the shared projection store and add activity from Session status; the control stream pushes complete catalog updates. `listDescendants()` recursively reads those catalogs and derives `hasChildren` from each child catalog. [The parent-catalog Agent Note](../../.agents/notes/implemented/architecture/2026-09-01-parent-owned-subagent-catalog.md) owns creation, fork isolation, ordering, and persistence costs.
+`SubagentRuntime.listChildren(parentSessionId, signal?)` はライブ優先の Session 観測を通じて親の `subagentCatalog` ビューを読み取り、成功・失敗にかかわらずその観測を解放する。子ログの読み取りや Session コーパスの列挙なしに、親イベント順で直接の子エントリを返す。クエリ失敗は伝播し、カタログ投影の欠落は明示的に失敗する。ブラウザー行は共有投影ストアからメンバーシップを導出し、Session 状態からアクティビティを付加する。制御ストリームは完全なカタログ更新をプッシュする。`listDescendants()` はそれらのカタログを再帰的に読み取り、各子カタログから `hasChildren` を導出する。[親カタログ Agent Note](../../.agents/notes/implemented/architecture/2026-09-01-parent-owned-subagent-catalog.md) が作成、fork 分離、順序、永続化コストを所有する。
 
-`SubagentRuntime.listDescendants(rootSessionId)` recursively calls the same catalog reader in stable pre-order, preserving each parent's event order. External entries are leaves without local Sessions. One-shot and unknown-mode entries remain traversal nodes; unknown modes produce `unsupported` diagnostics. An unreadable child catalog produces `corrupt` or `unavailable` and stops only that branch. Root read failures, missing services or projections, and cancellation reject the listing. Each reachable catalog is observed once and released before the next read; repeated ids and cycles are skipped. Sessions absent from reachable catalogs are not discovered, including ordinary Session forks and any subagents below those forks. Each row carries its catalog parent and root-relative depth:
+`SubagentRuntime.listDescendants(rootSessionId)` は同じカタログリーダーを安定した前順で再帰的に呼び出し、各親のイベント順を保持する。外部エントリはローカル Session のない葉である。ワンショットと不明モードのエントリは走査ノードのまま残る。不明モードは `unsupported` 診断を生じる。読み取れない子カタログは `corrupt` または `unavailable` を生じ、その分岐のみを止める。ルート読み取り失敗、サービスまたは投影の欠落、キャンセルは一覧全体を拒否する。到達可能な各カタログは 1 回だけ観測され、次の読み取りの前に解放される。重複 ID と循環は飛ばされる。到達可能なカタログにない Session は検出されない。通常の Session フォークやそれらフォーク配下のサブエージェントも含む。各行はカタログ上の親とルート相対の深さを運ぶ。
 
 ```ts type-equiv
 /** One catalog descendant with its direct parent and edge distance from the requested root. */

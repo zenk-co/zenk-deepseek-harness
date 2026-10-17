@@ -3,19 +3,19 @@ kind: upgrade-guide
 description: "Plugin compatibility checks read engines.dsh before DSH peerDependencies, and refusals report requirements instead of peers."
 ---
 
-# Plugin compatibility reads `engines.dsh` first
+# プラグイン互換性は `engines.dsh` を先に読む
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更内容
 
-In v0.2.1-alpha.3, installation and profile startup judged a plugin or bundle only by its `peerDependencies` on `@deepseek-ai/dsh` and `@deepseek-ai/dsh-*`, and ignored `engines.dsh`. In the next release, an own `engines.dsh` range decides alone and those peers are ignored; the peer rule applies only when `engines.dsh` is absent. `workspace:` values are valid only in peers; in `engines.dsh` they are incompatible. A non-object `engines` or a non-string `engines.dsh` makes the manifest unreadable for compatibility, which refuses the package. Plugin authors whose package declares `engines.dsh`, or declares `engines` as something other than an object, are affected.
+v0.2.1-alpha.3 では、インストールとプロファイル起動はプラグインまたはバンドルを `@deepseek-ai/dsh` と `@deepseek-ai/dsh-*` への `peerDependencies` のみで判定し、`engines.dsh` を無視した。次回リリースでは、独自の `engines.dsh` 範囲が単独で決定し、それらのピアは無視される。ピアの規則は `engines.dsh` が無い場合にのみ適用される。`workspace:` 値はピア内でのみ有効であり、`engines.dsh` 内では互換性が無い。非オブジェクトの `engines` または非文字列の `engines.dsh` は互換性判定用にマニフェストを読み取り不能にし、パッケージを拒否する。`engines.dsh` を宣言するパッケージ、または `engines` をオブジェクト以外のものとして宣言するパッケージの作者が影響を受ける。
 
-The `incompatible-version` refusal record that the plugin manager returns to clients, `IncompatiblePlugin`, and the app-boot `PluginCompatibility` result rename `peers` to `requirements`. Keys are `engines.dsh` for the engines rule or the peer package name for the fallback. Code that reads these records is affected.
+プラグインマネージャーがクライアントに返す `incompatible-version` 拒否レコード、`IncompatiblePlugin`、およびアプリ起動時の `PluginCompatibility` 結果は、`peers` を `requirements` に改名する。キーは、engines 規則では `engines.dsh`、フォールバックではピアのパッケージ名である。これらのレコードを読むコードが影響を受ける。
 
-## Migration
+## 移行手順
 
-1. If your package declares `engines.dsh`, make that range cover every DSH release the package supports, because DSH peer ranges no longer widen or narrow it. Remove `engines.dsh` to keep peer-based checking.
-2. Replace `workspace:` values in `engines.dsh` with a semantic version range.
-3. Read `requirements` instead of `peers` from `IncompatiblePlugin` and `PluginCompatibility`.
-4. Confirm by installing the package with `dsh plugin --profile <profile> add <package@version>` or the plugin manager: a mismatch names `engines.dsh` or the peer package in the refusal.
+1. パッケージが `engines.dsh` を宣言している場合、DSH ピア範囲が広げたり狭めたりしなくなるため、その範囲がパッケージの対応するすべての DSH リリースをカバーするようする。ピア基準の検査を維持するには `engines.dsh` を削除する。
+2. `engines.dsh` 内の `workspace:` 値をセマンティックバージョン範囲に置き換える。
+3. `IncompatiblePlugin` と `PluginCompatibility` から `peers` ではなく `requirements` を読む。
+4. `dsh plugin --profile <profile> add <package@version>` またはプラグインマネージャーでパッケージをインストールして確認する: 不一致の場合、拒否理由に `engines.dsh` またはピアパッケージが名前で示される。

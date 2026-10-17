@@ -1,69 +1,69 @@
 ---
-description: "Host Remote owner for settings and credential configuration surfaces, including redacted reads, writes, credential references, and native document opening."
+description: "設定と資格設定面の Host Remote 所有者。編集済み読み、書込、資格参照、生文書開きを含む。"
 kind: "package-reference"
 ---
-# Settings Controller
+# 設定制御子
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`@deepseek-ai/dsh-api-settings-controller` exposes generated `ctx.remote.settings` and `ctx.remote.credentials` namespaces for browser configuration surfaces. It returns redacted settings and credential metadata, supports settings and credential writes without returning secret values, and opens provider-owned settings or Agent preset locations on the Host desktop. When a provider is absent, the namespace remains registered and returns an actionable configuration error.
+`@deepseek-ai/dsh-api-settings-controller` は browser 設定面向けに生成済み `ctx.remote.settings` と `ctx.remote.credentials` 名空を表す。編集済み設定と資格附属を返し、秘密値を返さずに設定と資格の書込を支え、Host 卓面で提供者所有の設定または Agent 既定位置を provider 所有文書として開く。提供者不在の場合も名空は登録のまま残り、行動可能な設定誤りを返す。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Configuration](#configuration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [設定](#configuration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しの作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this package as a Loader entry in a profile that serves browser configuration. The entry registers both namespaces independently of their providers so a missing provider produces a named configuration error at invocation. Its generated descriptors enter the strict Typert registry, while the settings and credential Definitions remain plain Cordis Services with no wire obligations of their own.
+browser 設定に給仕する profile でこの包を Loader 項目として載せる。項目は提供者と独立に両名空を登録するため、欠落提供者は呼出時に名付き設定誤りを生じる。生成記述子は厳格 Typert 登録に入り、設定と資格 Definition は独自配線義務のない素の Cordis サービスのままである。
 
-`describe(refs)` answers one map keyed by the requested names, so a settings page describing every reference its rows carry settles those rows together. It accepts at most 64 names per call, reports an invalid name or empty write value as `bad-request`, and copies each answer field by field — a provider returning more than `CredentialInfo` declares cannot widen what crosses. Valid `set(ref, value)` and `unset(ref)` calls report a provider refusal as `credential-rejected`, carrying the provider's message with only the reference in its details. Secret values cross in this direction only: no method here returns one.
+`describe(refs)` は要求名で鍵付けされた 1 図で答えるため、行が運ぶ全参照を述べる設定頁はそれら行をまとめて落ち着かせる。呼ごとに最大 64 名を受け付け、不正名や空書込値を `bad-request` として報告し、各回答項目ごとに写す — `CredentialInfo` が宣言するより多く返す提供者は渡るものを広げられない。有効な `set(ref, value)` と `unset(ref)` 呼出しは提供者拒否を `credential-rejected` として報告し、詳細には参照のみを伴って提供者文を運ぶ。秘密値はこの方向にのみ渡る。ここからはどの手法も 1 つを返さない。
 
-`settings.describe()` returns deployment facts and every namespace under `redactSecrets: true`. `settings.update`, `settings.replace`, and `settings.mutate` expose the settings service's three write operations and return the namespace's new redacted view; stale writes use `settings-conflict` and other provider refusals use `settings-rejected`.
+`settings.describe()` は配備事実と `redactSecrets: true` 下の全名空を返す。`settings.update`、`settings.replace`、`settings.mutate` は設定服務の 3 書込操作を表し、名空の新編集済み像を返す。古い書込は `settings-conflict` を使い、他の提供者拒否は `settings-rejected` を使う。
 
-`settings.openSettingsDocument()` prepares the provider-owned document and opens it with the native text editor; it accepts no browser-supplied filesystem target.
+`settings.openSettingsDocument()` は提供者所有の文書を整えて生文本編集子で開く。browser 供給の文件系標的を受け付けない。
 
 -----
 
 <a id="configuration"></a>
-## Configuration
+## 設定
 
-| Field | Default | Meaning |
+| 項目 | 既定 | 意味 |
 |---|---|---|
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-api-settings-controller) is the exhaustive source for accepted fields and their JSDoc.
+受付項目とその JSDoc の網羅源は生成済み[設定目録](../../../docs/config-catalog.md#deepseek-aidsh-api-settings-controller)である。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as settings and credential configuration are browser and Host state and register no prompt, tool, or session event.
+なし。設定と資格設定は browser と Host 状態であり、prompt、道具、セッションイベントを登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct effect; reading or writing these configuration values does not alter model requests already in flight.
+直接の影響なし。これら設定値の読み書きは既に飛行中の模型要求を変えない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しの作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- The batch bound is fixed at 64 references and is not a deployment-configurable field.
+- 一括上限は 64 参照に固定され、配備設定項目ではない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業背景 — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

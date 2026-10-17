@@ -1,47 +1,47 @@
 ---
-description: "Retrospective Session persistence types and adjacent-release changes for dsh-v0.0.1-rc.2."
+description: "dsh-v0.0.1-rc.2 の回顧的なセッション永続化型と隣接リリースの変更。"
 kind: persistence-release
 ---
 
-# Persistence release: dsh-v0.0.1-rc.2
+# 永続化リリース: dsh-v0.0.1-rc.2
 
-English | [中文](dsh-v0.0.1-rc.2.zh.md)
+日本語 | [English](dsh-v0.0.1-rc.2.en.md) | [中文](dsh-v0.0.1-rc.2.zh.md)
 
-## Summary
+## 概要
 
-The event envelope gains optional ignorable, and schedule/change plus four tool-workflow events are added. The writer format remains 0.
+イベントエンベロープは任意の ignorable を獲得し、schedule/change と 4 つの tool-workflow イベントが追加される。writer フォーマットは 0 のままである。
 
-## Table of Contents
+## 目次
 
-- [Release evidence](#evidence)
-- [Declaration](#declaration)
-- [Structural changes](#changes)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [リリース証跡](#evidence)
+- [宣言](#declaration)
+- [構造的変更](#changes)
+- [検証](#verification)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="evidence"></a>
-## Release evidence
+## リリース証跡
 
-This approximate backfill supports reading and format validation; it is not a contemporaneous compatibility acknowledgement. See the [archive reference](README.md) for extraction and coverage limits.
+この近似バックフィルは読み取りとフォーマット検証を支えるものであり、同時代の互換性承認ではない。抽出とカバレッジの限界は[アーカイブリファレンス](README.md)を参照。
 
-| Item | Recorded value |
+| 項目 | 記録値 |
 |---|---|
-| Source tag | `dsh-v0.0.1-rc.2` |
-| Source date | 2026-08-11T15:04:55.000Z |
-| Release record | Tag only; no release object. |
-| Previous release | [dsh-v0.0.1-rc.1](dsh-v0.0.1-rc.1.md) |
-| Session writer version | 0 |
-| Reconstructed inventory | <!-- persistence-release-inventory:start -->47 roots / 374 types<!-- persistence-release-inventory:end --> |
-| This snapshot | [dsh-v0.0.1-rc.2.schema.json](dsh-v0.0.1-rc.2.schema.json) |
+| ソースタグ | `dsh-v0.0.1-rc.2` |
+| ソース日付 | 2026-08-11T15:04:55.000Z |
+| リリース記録 | タグのみ。リリースオブジェクトはない。 |
+| 前回のリリース | [dsh-v0.0.1-rc.1](dsh-v0.0.1-rc.1.md) |
+| セッション writer バージョン | 0 |
+| 再構成インベントリー | <!-- persistence-release-inventory:start -->47 roots / 374 types<!-- persistence-release-inventory:end --> |
+| このスナップショット | [dsh-v0.0.1-rc.2.schema.json](dsh-v0.0.1-rc.2.schema.json) |
 
-Source evidence for the writer version constant at this tag:
+このタグにおける writer バージョン定数のソース証跡:
 
 - `packages/core/session/src/types.ts`: `export const SESSION_FORMAT_VERSION = 0`
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-release
 schemaVersion: 1
@@ -187,13 +187,13 @@ changes:
 ```
 
 <a id="changes"></a>
-## Structural changes
+## 構造的変更
 
 <!-- persistence-release-changes:start -->
 
-Detected 45 changed roots and 48 structural differences. The review requirement below is calculated using current rules for comparison only; it does not assert historical compliance, migration correctness, or runtime compatibility.
+45 個の変更ルートと 48 個の構造的差異を検出した。以下のレビュー要件は比較のみを目的として現在の規則で計算されたものであり、歴史的な準拠、マイグレーションの正しさ、ランタイム互換性を主張するものではない。
 
-| Path | Change | Review requirement |
+| パス | 変更 | レビュー要件 |
 |---|---|---|
 | `SessionEventEnvelope` | `union-variants-changed` | `review-required` |
 | `event:agent-preset/selected.ignorable` | `optional-property-added` | `review-required` |
@@ -247,15 +247,15 @@ Detected 45 changed roots and 48 structural differences. The review requirement 
 <!-- persistence-release-changes:end -->
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Extraction passed canonical-graph, root-digest, and reachable-type-digest validation, permitting the original optional `surfaceOp` only for historical surface events. The in-tree check reconstructs each tag from its predecessor and verifies before/after values, snapshot coverage, and bilingual machine declarations.
+抽出は正規グラフ、ルートダイジェスト、到達可能型ダイジェストの検証に合格し、元の任意の `surfaceOp` は歴史的サーフェスイベントに対してのみ許容された。ツリー内チェックは各タグをその前身から再構成し、before/after 値、スナップショットカバレッジ、バイリンガルの機械宣言を検証する。
 
 ```sh
 pnpm run verify-persistence-releases
 ```
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
-None.
+なし。

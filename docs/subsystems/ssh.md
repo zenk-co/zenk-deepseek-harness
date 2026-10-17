@@ -1,34 +1,34 @@
 # SSH
 
-English | [中文](ssh.zh.md)
+日本語 | [English](ssh.en.md) | [中文](ssh.zh.md)
 
-The [SSH provider family](../../packages/ssh/README.md) supplies one remote filesystem/process world through a deployment-owned OpenSSH connection. The Harness, model transport and Session storage remain on the host. The family implements the existing filesystem, subprocess and sandbox APIs; it introduces no SSH-specific model tools.
+[SSH プロバイダーファミリー](../../packages/ssh/README.md)は、デプロイが所有する OpenSSH 接続を介して 1 つのリモートファイルシステム/プロセスワールドを提供する。Harness、モデルトランスポート、およびセッションストレージはホスト上に残る。このファミリーは既存のファイルシステム、サブプロセス、サンドボックス API を実装し、SSH 固有のモデルツールは導入しない。
 
-## Execution coordinates
+## 実行座標
 
-Filesystem identities, executable lookup, process cwd, sandbox workspace roots and language-server file URLs refer to the SSH host. Providers canonicalize paths where the files exist, preserving filesystem interpretation of `symlink/..`. The policy resolver carries absolute execution-world spelling without trying to resolve remote paths on the Harness host.
+ファイルシステム識別子、実行可能ファイルの検索、プロセスの cwd、サンドボックスのワークスペースルート、言語サーバーのファイル URL は SSH ホストを参照する。プロバイダーはファイルが存在する場所でパスを正規化し、`symlink/..` のファイルシステム解釈を保つ。ポリシーリゾルバーは、Harness ホスト上でリモートパスを解決しようとせず、絶対的な実行ワールドの綴りを運ぶ。
 
-`processPath()` supplies a path usable by the paired subprocess provider. `processPathFromHostPath()` remains unavailable for SSH; installing a remote artifact does not make an arbitrary host path portable. [`NodePtcRuntime`](../../packages/ptc-runtime/ptc-runtime-node/README.md) therefore takes the verified remote launch configuration: an installed script bootstrap or the [helper executable’s embedded worker](../../packages/ssh/ssh-helper-runtime/README.md).
+`processPath()` は、対になるサブプロセスプロバイダーが使用できるパスを提供する。`processPathFromHostPath()` は SSH では利用できないままである。リモート成果物をインストールしても、任意のホストパスが移植可能になるわけではない。したがって [`NodePtcRuntime`](../../packages/ptc-runtime/ptc-runtime-node/README.md) は、検証済みのリモート起動構成を取る: インストール済みスクリプトブートストラップ、または[ヘルパー実行可能ファイルの埋め込みワーカー](../../packages/ssh/ssh-helper-runtime/README.md)である。
 
-## Transport and trust
+## トランスポートと信頼
 
-Administrative RPC uses the helper’s SSH exec streams. Ordinary stdin, stdout, stderr, terminal output and optional fd 7 control traffic use separately authenticated forwarded Unix sockets. Each forwarded stream has its own SSH channel window; paused program output does not share the control or administrative window. All channels still share connection bandwidth and transport failure.
+管理 RPC はヘルパーの SSH exec ストリームを使用する。通常の stdin、stdout、stderr、ターミナル出力、およびオプションの fd 7 制御トラフィックは、個別に認証された転送 Unix ソケットを使用する。転送される各ストリームは独自の SSH チャネルウィンドウを持ち、一時停止したプログラム出力が制御または管理のウィンドウを共有することはない。すべてのチャネルは依然として接続帯域幅とトランスポート障害を共有する。
 
-Deployment authentication, installed artifact verification and per-stream TLS authentication belong to [`dsh-ssh`](../../packages/ssh/ssh/README.md). The helper executes filesystem and process requests with trusted local providers on the remote machine. SSH is a transport; the selected remote sandbox provider enforces file effects.
+デプロイ認証、インストール済み成果物の検証、およびストリームごとの TLS 認証は [`dsh-ssh`](../../packages/ssh/ssh/README.md) に属する。ヘルパーは、リモートマシン上の信頼されたローカルプロバイダーでファイルシステムとプロセスのリクエストを実行する。SSH はトランスポートであり、ファイルへの影響を執行するのは選択されたリモートサンドボックスプロバイダーである。
 
-## Process lifetime and cancellation
+## プロセスの寿命とキャンセル
 
-A process is reserved before its streams are connected, and launch is accepted at most once. `done` reports the direct result; `waitForExit` observes the remote managed range. Terminal operations retain the asynchronous shared API. Preparation cancellation, launched-process termination and provider disposal release their owned resources through the helper.
+プロセスはストリームが接続される前に予約され、起動は最大 1 回だけ受け付けられる。`done` は直接の結果を報告し、`waitForExit` はリモートの管理対象範囲を観察する。ターミナル操作は非同期の共有 API を保つ。準備のキャンセル、起動済みプロセスの終了、およびプロバイダーの破棄は、ヘルパーを通じて所有リソースを解放する。
 
-Administrative deadlines bound individual RPC observations; they do not replace the execution deadline chosen by a Bash or ptc-runtime consumer. Remote waits can remain pending while other requests progress. SSH loss invalidates pending operations; helper EOF, signals and lease expiry start remote cleanup. The client reports unconfirmed outcomes honestly and never reconnects to replay a possibly executed action.
+管理デッドラインは個々の RPC 観察を制限するが、Bash または ptc-runtime コンシューマーが選んだ実行デッドラインを置き換えるものではない。リモートの待機は、他のリクエストが進む間 pending のままでいられる。SSH の喪失は pending 操作を無効にする。ヘルパーの EOF、シグナル、リース期限切れはリモートクリーンアップを開始する。クライアントは未確認の結果を正直に報告し、実行された可能性のあるアクションをリプレイするために再接続することは決してない。
 
-## Composition scope
+## 構成スコープ
 
-Headless records and checks Session cwd through the mounted filesystem provider. Remote FS, Bash, terminal, LSP and PTC consumers can therefore share those coordinates. Web workspace views that assume host filesystem access need separate integration; replacing providers alone does not make those views remote-aware.
+Headless はマウントされたファイルシステムプロバイダーを通じてセッション cwd を記録・検査する。したがって、リモートの FS、Bash、ターミナル、LSP、PTC コンシューマーはそれらの座標を共有できる。ホストファイルシステムアクセスを前提とする Web ワークスペースビューは別途の統合を必要とする。プロバイダーを置き換えるだけでは、それらのビューがリモート対応になるわけではない。
 
-See the [decision record](../../.agents/notes/implemented/architecture/2026-09-11-posix-ssh-runtime.md) for the alternatives and verification obligations.
+代替案と検証義務については[決定記録](../../.agents/notes/implemented/architecture/2026-09-11-posix-ssh-runtime.md)を参照。
 
-## Connection API
+## 接続 API
 
 ```ts type-equiv
 /** Installed helper invocation; script deployments may also install a PTC bootstrap. */
@@ -110,13 +110,13 @@ declare class SshConnection extends Service {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` によって最新性が検証され、再生成は `pnpm run gen-cordis-catalog` で行う）— 言語側はロケール固有のペアドキュメントパスのみが異なる。シグネチャブロックは `ts cordis-catalog` フェンスを使用し、元のソース JSDoc を保つ。ディスパッチモードは[primer](../cordis-primer.md#dispatch-modes)で定義され、フレームワークから継承した `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxssh--sshconnection"></a>
 
 ### `ctx.ssh` — `SshConnection`
 
-One non-reconnecting SSH session; loss invalidates all active operations.
+1 つの非再接続 SSH セッション。喪失はすべてのアクティブ操作を無効にする。
 
 ```ts cordis-catalog
 /**
@@ -142,5 +142,5 @@ async connectStream(endpoint: SshStreamEndpoint, signal?: AbortSignal): Promise<
 dispose(): Promise<void>
 ```
 
-Source: [`packages/ssh/ssh/src/index.ts`](../../packages/ssh/ssh/src/index.ts)
+ソース: [`packages/ssh/ssh/src/index.ts`](../../packages/ssh/ssh/src/index.ts)
 <!-- END GENERATED cordis-surface -->

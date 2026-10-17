@@ -5,7 +5,7 @@ description: "子路径插件不再从导出的 <子路径>/package.json 读取�
 
 # 子路径插件改读 `<子路径>/icon`，不再读 `<子路径>/package.json`
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

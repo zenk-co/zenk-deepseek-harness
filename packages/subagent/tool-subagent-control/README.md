@@ -1,35 +1,35 @@
 ---
-description: "Global send_message, interrupt_agent, and list_agents tools for users and maintainers composing or debugging continuable-child control."
+description: "継続可能な子の制御を構成またはデバッグするユーザーとメンテナー向けの、グローバルな send_message、interrupt_agent、list_agents ツール。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-subagent-control
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-tool-subagent-control` adds the global control tools for continuable children: `send_message` steers between a direct parent and child, `interrupt_agent` stops a child's current turn while keeping its inbox and descendants intact, and `list_agents` (from the separately loadable `list-agents` plugin) lists continuable children by durable id and label. Parents and continuable children inherit the same `send_message` definition and ordering, so model communication adds no child-only tool schema. No tool's presence decides whether a delegation tool starts continuable work.
+`dsh-tool-subagent-control` は継続可能な子のためのグローバル制御ツールを追加する。`send_message` は直接の親と子の間をステアし、`interrupt_agent` は子の現在のターンを停止しつつその inbox と子孫を無傷で保ち、`list_agents`（別途ロード可能な `list-agents` プラグイン由来）は継続可能な子を永続 id とラベルで一覧する。親と継続可能な子は同じ `send_message` 定義と順序を継承するので、モデルのコミュニケーションが子専用のツールスキーマを追加することはない。あるツールの存在が、委譲ツールの継続可能な作業の開始を決めることはない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this package in any composition with continuable children the model should message, interrupt, or list. The root plugin needs only the subagent service; the list tool is a separate plugin a deployment can omit.
+モデルがメッセージ送信、中断、一覧を行うべき継続可能な子を持つ任意の構成で、このパッケージをマウントする。ルートプラグインは subagent サービスだけを必要とし、list ツールはデプロイが省略できる別のプラグインである。
 
-### Minimal configuration
+### 最小構成
 
-Load the subagent service, a backend, the delegation tool, and this package. Adding the separate list plugin exposes all three tools:
+subagent サービス、バックエンド、委譲ツール、このパッケージをロードする。別の list プラグインを追加すると 3 つのツールすべてが公開される:
 
 ```yaml
 - name: '@deepseek-ai/dsh-subagent'
@@ -41,141 +41,141 @@ Load the subagent service, a backend, the delegation tool, and this package. Add
 - name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
 ```
 
-This package takes no configuration: the root plugin provides `send_message` and `interrupt_agent`, and the list plugin provides `list_agents`.
+このパッケージは設定を取らない。ルートプラグインが `send_message` と `interrupt_agent` を提供し、list プラグインが `list_agents` を提供する。
 
 ### send_message
 
-Sends a message to an Agent named by `agent_id`: any exact live Agent may target its direct continuable child, while a resident continuable child may also target its direct parent. A working target receives the message at its nearest step boundary through Steer; an inactive target starts or resumes a turn through the continuation lifecycle. The call returns only acceptance (the accepted message's stable `messageId`), never a reply. A failure — an unsupported target, unavailable parent, unknown child, descriptor-less child that cannot be resumed, or rejected admission — states the message was not delivered.
+`agent_id` で名指された Agent にメッセージを送る。任意の正確な生きた Agent はその直接の継続可能な子を対象にでき、居住中の継続可能な子はその直接の親も対象にできる。稼働中のターゲットは Steer を通じて最も近いステップ境界でメッセージを受け取る。非アクティブなターゲットは継続ライフサイクルを通じてターンを開始または再開する。呼び出しは受理（受理されたメッセージの安定した `messageId`）だけを返し、返信は決して返さない。失敗 —— サポートされないターゲット、利用不能な親、未知の子、再開できない記述子なしの子、拒否されたアドミッション —— は、メッセージが配信されなかったことを述べる。
 
 ### interrupt_agent
 
-External executions stop permanently and cannot receive follow-ups. Local targets stop only their current turn: queued messages stay parked until a later `send_message`, descendants keep running, and the child stays available for follow-ups. The call returns when the stop request is accepted, not when the target is quiet; interrupting an already-finished agent is an accepted no-op, and self, sibling, stale, and non-ancestor callers get errored results.
+外部実行は永久に停止し、フォローアップを受け取れない。ローカルのターゲットは現在のターンだけを停止する。キュー済みのメッセージは後の `send_message` まで駐機され、子孫は動き続け、子はフォローアップに利用可能なままである。呼び出しは停止リクエストが受理されたときに戻り、ターゲットが静かになったときではない。すでに終了したエージェントの中断は受理された no-op であり、自己、兄弟、古い、非祖先の呼び出し元はエラー結果を得る。
 
 ### list_agents
 
-Lists the continuable children below the calling agent: `children` (default) reads direct children from the parent catalog without opening child logs; `descendants` recursively reads child catalogs in stable pre-order, annotating each entry with its durable direct-parent session id and depth. Status comes from the live Agent registry — `running` or `inactive`. External entries are omitted without reading a child Session. Readable one-shot children are omitted from output but their catalogs remain traversal nodes. Unknown modes and unreadable child catalogs, including one-shot children, appear as diagnostics only in `descendants` scope. Ordinary Session forks are not catalog entries, so neither those forks nor their descendants are listed from the source Session.
+呼び出し元エージェントの下にある継続可能な子を一覧する。`children`（デフォルト）は子ログを開かずに親カタログから直接の子を読む。`descendants` は子カタログを安定した先行順で再帰的に読み、各エントリーにその永続的な直接親セッション id と深さを注記する。ステータスは生きた Agent レジストリから来る —— `running` または `inactive`。外部エントリーは子 Session を読まずに省略される。読み取り可能な単発の子は出力から省略されるが、そのカタログは走査ノードとして残る。未知のモードと読み取り不能な子カタログ（単発の子を含む）は、`descendants` スコープでのみ診断として現れる。通常の Session fork はカタログエントリーではないので、それらの fork もその子孫もソース Session から一覧されることはない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains what the tools delegate to the subagent service; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションでは、ツールが subagent サービスへ何を委譲するかを説明する。観察可能な挙動は[このパッケージを使う](#use-this-package)でカバーされている。
 
-### Design concept
+### 設計概念
 
-Thin adapters over `ctx.subagents.sendMessage()`, `interrupt()`, and the list projections; the tools perform no lifecycle routing. Residency, cold resume, and authorization belong to the service, and the tools pass the exact live calling agent (`exec.agent`) as both sender and authority.
+`ctx.subagents.sendMessage()`、`interrupt()`、および list プロジェクションの上の薄いアダプターであり、ツールはライフサイクルのルーティングを行わない。レジデンシー、コールド再開、認可はサービスに属し、ツールは正確な生きた呼び出し元エージェント（`exec.agent`）を送信者と権限の両方として渡す。
 
-### Delivery and signal ownership
+### 配信とシグナルの所有権
 
-The tool forwards its execution signal, which owns admission only until inbox acceptance. Once the target accepts a message, it cannot be cancelled through this tool. Every message is framed as `Agent <sender-id> sent a message:` and recorded with `{ kind: 'agent-message', form: 'relay', senderSessionId: sender.id }`; the service derives that attribution and never treats it as authority.
+ツールは自身の実行シグナルを転送し、それは inbox 受理までの間だけアドミッションを所有する。ターゲットがメッセージを受理した後は、このツールを通じてキャンセルできない。すべてのメッセージは `Agent <sender-id> sent a message:` として枠付けられ、`{ kind: 'agent-message', form: 'relay', senderSessionId: sender.id }` と記録される。サービスがその帰属を導出し、それを権限として扱うことは決してない。
 
-### Listing projection
+### 一覧プロジェクション
 
-`list_agents` derives the root id from the calling agent, reads the service catalog without a cursor, refines each candidate's status through the live Agent registry, and omits one-shot children because they cannot accept `send_message`. Descendant traversal preserves each parent catalog's event order. Unknown modes produce diagnostics while their catalogs remain traversable; unreadable catalogs produce diagnostics and stop that branch. Descendants absent from reachable catalogs cannot be discovered.
+`list_agents` は呼び出し元エージェントからルート id を導出し、カーソルなしでサービスカタログを読み、生きた Agent レジストリを通じて各候補のステータスを精査し、`send_message` を受け取れない単発の子を省略する。子孫の走査は各親カタログのイベント順を保つ。未知のモードは診断を生みつつ、そのカタログは走査可能なままである。読み取り不能なカタログは診断を生み、その枝を停止する。到達可能なカタログに存在しない子孫は発見できない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `send_message` and `interrupt_agent` registration |
-| [`src/list-agents.ts`](src/list-agents.ts) | `list_agents` registration: direct-child discovery and status refinement |
+| [`src/index.ts`](src/index.ts) | `send_message` と `interrupt_agent` の登録 |
+| [`src/list-agents.ts`](src/list-agents.ts) | `list_agents` の登録: 直接の子の発見とステータスの精査 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough; they move from the tool schemas to the continuation service behind them.
+パッケージレベルの契約では足りないときにこれらのページを読む。ツールスキーマからその背後の継続サービスへと進む。
 
-- [Subagent subsystem](../../../docs/subsystems/subagent.md) — continuable children, activations, inbox, interrupt, and follow-up authority.
-- [dsh-tool-subagent](../tool-subagent/README.md) — the delegation tool that starts continuable children.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-subagent-control) — the three tool schemas.
+- [サブエージェントサブシステム](../../../docs/subsystems/subagent.md) — 継続可能な子、アクティベーション、inbox、中断、フォローアップ権限。
+- [dsh-tool-subagent](../tool-subagent/README.md) — 継続可能な子を開始する委譲ツール。
+- [生成されたツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-subagent-control) — 3 つのツールスキーマ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Tool schema
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The generated [schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-subagent-control): `send_message` takes `agent_id` and `message`; `interrupt_agent` takes `agent_id`; `list_agents` takes no parameters.
+生成された[スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-subagent-control): `send_message` は `agent_id` と `message` を取り、`interrupt_agent` は `agent_id` を取り、`list_agents` はパラメーターを取らない。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost per parent request.
+親リクエストごとの固定スキーマコスト。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable; the schema does not change at runtime.
+プレフィックス安定。スキーマは実行時に変わらない。
 
-### Interrupt result
+### 中断結果
 
-#### What the model sees
+#### モデルが見るもの
 
-`interrupt requested for agent <agent_id>` on acceptance. An unauthorized caller — self, sibling, stale, or non-ancestor — is an errored result naming the rejection; an absent or settled target still renders the acceptance line.
+受理時に `interrupt requested for agent <agent_id>`。認可されていない呼び出し元 —— 自己、兄弟、古い、非祖先 —— は拒否を名指すエラー結果になる。不在または決着済みのターゲットでも受理行はレンダリングされる。
 
-#### Token effect
+#### トークンへの影響
 
-One short acknowledgement per call; the interrupted turn's abort is visible only in the child's own transcript.
+呼び出しごとに短い確認が 1 つ。中断されたターンの abort は子自身のトランスクリプトにだけ現れる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; each result follows the reusable request prefix.
+追記専用。各結果は再利用可能なリクエストプレフィックスに続く。
 
-### Delivery result
+### 配信結果
 
-#### What the model sees
+#### モデルが見るもの
 
-`message delivered to agent <agent_id>` on acceptance; the canonical output carries the accepted `messageId`. A failure — a non-adjacent target, unavailable parent, unknown child, descriptor-less child that cannot be resumed, or admission rejected — is an errored result whose message states the message was not delivered.
+受理時に `message delivered to agent <agent_id>`。正規出力は受理された `messageId` を運ぶ。失敗 —— 隣接しないターゲット、利用不能な親、未知の子、再開できない記述子なしの子、拒否されたアドミッション —— は、メッセージが配信されなかったことを述べるエラー結果である。
 
-#### Token effect
+#### トークンへの影響
 
-One short acknowledgement per call; the target's response never returns through this call. A child uses the same tool with its initial task's parent id to append selected content to parent history.
+呼び出しごとに短い確認が 1 つ。ターゲットの応答がこの呼び出しを通じて返ることはない。子は初期タスクの親 id を伴う同じツールを使い、選択した内容を親の履歴に追記する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-### Listing result
+### 一覧結果
 
-#### What the model sees
+#### モデルが見るもの
 
-One line per continuable child in stable catalog order: `<id> [<status>] — <label>` (`running` = executing a turn; `inactive` = no turn executing, whether loaded or stored; neither status describes task completion or outcome). Only `descendants` scope adds `<id> [diagnostic: <reason>]` for an unknown mode or unreadable child catalog, including an unreadable one-shot child. The `descendants` scope inserts ` parent=<id> depth=<n>` before the label dash on every line, in pre-order. Readable one-shot children are omitted; `(no subagents)` means no continuable child or diagnostic survived the projection.
+安定したカタログ順で継続可能な子ごとに 1 行: `<id> [<status>] — <label>`（`running` = ターンを実行中。`inactive` = ロード済みか保存済みかにかかわらず実行中のターンなし。どちらのステータスもタスクの完了や結果を表さない）。`descendants` スコープだけが、未知のモードや読み取り不能な子カタログ（読み取り不能な単発の子を含む）に対して `<id> [diagnostic: <reason>]` を追加する。`descendants` スコープは、ラベルのダッシュの前に ` parent=<id> depth=<n>` をすべての行に先行順で挿入する。読み取り可能な単発の子は省略される。`(no subagents)` は、プロジェクションを生き延びた継続可能な子も診断もないことを意味する。
 
-#### Token effect
+#### トークンへの影響
 
-Grows linearly with the listed continuable children and diagnostics — reachable catalog descendants under the `descendants` scope; there is no cursor or cap, so long-lived parents with many persisted children pay the full list each call.
+一覧された継続可能な子と診断に線形に増える —— `descendants` スコープでは到達可能なカタログ子孫。カーソルも上限もないので、永続化された子が多い長命の親は呼び出しごとに完全なリストを支払う。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; each result follows the reusable request prefix.
+追記専用。各結果は再利用可能なリクエストプレフィックスに続く。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the control tools cannot observe or steer; they are current package constraints.
+これらの制限は、制御ツールが観察またはステアできないものを定義する。現在のパッケージ制約である。
 
-- **A delivered message has no independent result** — acceptance returns only its inbox `messageId`; later target work lands in that target's durable Session and is never collected through this tool. A reply is another explicitly addressed `send_message`, not this call's result.
-- **Only supported adjacent Agents can communicate** — every sender may target a direct continuable child, only a sender with a resident continuable Activation may target its direct parent, and that parent must remain live; siblings and deeper descendants are not message targets, and only direct-child delivery supports cold activation.
-- **Listing is a snapshot, not a delivery promise** — it may race publication, disposal, or a later message, and another process may activate a child this process reports as `inactive`; cross-process accuracy requires a shared lease. `interrupt_agent` performs the authoritative live-lineage check itself, so discovery staleness cannot grant authority.
-- **No pagination or deletion** — the complete stably ordered set is returned, and persisted children remain listed for as long as their sessions remain in persistence; a service-level bound or delete operation is a later product decision.
+- **配信されたメッセージに独立した結果はない** — 受理はその inbox の `messageId` だけを返し、その後のターゲットの作業はそのターゲットの永続 Session に着地し、このツールを通じて回収されることはない。返信は別の明示的にアドレス指定された `send_message` であり、この呼び出しの結果ではない。
+- **通信できるのはサポートされた隣接 Agent だけ** — すべての送信者は直接の継続可能な子を対象にでき、居住中の継続可能な Activation を持つ送信者だけがその直接の親を対象にでき、その親は生きたままでなければならない。兄弟とより深い子孫はメッセージのターゲットではなく、コールドアクティベーションをサポートするのは直接の子への配信だけである。
+- **一覧はスナップショットであり、配信の約束ではない** — 公開、破棄、または後続のメッセージと競合する可能性があり、別のプロセスがこのプロセスで `inactive` と報告された子をアクティブ化することもある。プロセス間の正確性には共有リースが必要である。`interrupt_agent` は権威ある生きた系統チェックを自身で行うので、発見の古さが権限を与えることはない。
+- **ページネーションも削除もない** — 完全な安定順序のセットが返され、永続化された子はそのセッションが永続化に残る限り一覧され続ける。サービスレベルの上限または削除操作は後の製品判断である。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

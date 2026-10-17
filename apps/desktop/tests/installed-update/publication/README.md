@@ -1,72 +1,72 @@
 ---
-description: "Separate test binary uploads from operator-authorized fixed-feed publication for installed Windows update qualification."
+description: "インストール済み Windows 更新の適格性確認のための、テストバイナリアップロードとオペレーター承認の固定フィード公開の分離。"
 ---
 
-# Test update upload and publication
+# テスト更新のアップロードと公開
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Upload both verified versions without advertising version 2, then publish its fixed feed after the operator starts installed version 1. Default commands check local materials without credentials or network access. Actual COS writes require separate operator authorization and verification.
+バージョン 2 を告知せずに検証済みの両バージョンをアップロードし、オペレーターがインストール済みバージョン 1 を起動した後にその固定フィードを公開する。デフォルトのコマンドは、資格情報やネットワークアクセスなしでローカル材料を確認する。実際の COS 書き込みには、別途のオペレーター承認と検証が必要である。
 
-## Table of Contents
+## 目次
 
-- [Prerequisites](#prerequisites)
-- [Operator sequence](#sequence)
-- [Evidence and recovery](#evidence)
-- [Dev Note](#dev-note)
+- [前提条件](#prerequisites)
+- [オペレーター手順](#sequence)
+- [エビデンスと復旧](#evidence)
+- [開発メモ](#dev-note)
 
 <a id="prerequisites"></a>
 
-## Prerequisites
+## 前提条件
 
-Complete both package verifications in the [walkthrough](../README.md). Retain successful `verification/check-*/result.json` receipts and unchanged materials. The publisher revalidates each receipt against current installer, blockmap, feed, and manifest bytes. It never signs or installs anything.
+[ウォークスルー](../README.md)の両方のパッケージ検証を完了する。成功した `verification/check-*/result.json` レシートと未変更の材料を保持する。パブリッシャーは各レシートを、現在のインストーラー、blockmap、フィード、マニフェストのバイトに対して再検証する。署名やインストールは決して行わない。
 
-The existing `.env.windows` loader supplies `DSH_DESKTOP_AUTO_UPDATE_ENV=test`, `DOWNLOAD_TEST_ORIGIN=https://download-test.deepseek.com`, `DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602`, and `DOWNLOAD_TEST_COS_SECRET_ID` / `DOWNLOAD_TEST_COS_SECRET_KEY`. Only those two upload secrets enter the COS client; never put them in commands or records. The transport restricts requests to the test bucket and private Windows qualification paths.
+既存の `.env.windows` ローダーが `DSH_DESKTOP_AUTO_UPDATE_ENV=test`、`DOWNLOAD_TEST_ORIGIN=https://download-test.deepseek.com`、`DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602`、および `DOWNLOAD_TEST_COS_SECRET_ID` / `DOWNLOAD_TEST_COS_SECRET_KEY` を供給する。COS クライアントに入るのはこの 2 つのアップロードシークレットだけである。コマンドや記録に決して入れないこと。トランスポートはリクエストをテストバケットとプライベートな Windows 適格性確認パスに制限する。
 
-The binary-upload operation adds a bucket-versioning query and refuses writes unless the query succeeds with neither enabled nor suspended status. Feed publication reuses a successful binary-upload receipt instead of repeating that query or downloading binaries. COS documents that [`x-cos-forbid-overwrite`](https://cloud.tencent.cn/document/product/436/7749) does not protect objects in versioned buckets. A denied query leaves that configuration unknown; it does not establish that uploads are denied.
+バイナリアップロード操作はバケットバージョニングのクエリを追加し、クエリが有効でも一時停止でもないステータスで成功しない限り書き込みを拒否する。フィード公開は、そのクエリを繰り返したりバイナリをダウンロードしたりする代わりに、成功したバイナリアップロードレシートを再利用する。COS は [`x-cos-forbid-overwrite`](https://cloud.tencent.cn/document/product/436/7749) がバージョニングされたバケット内のオブジェクトを保護しないことを文書化している。クエリが拒否されてもその構成は不明のままである。アップロードが拒否されたことを証明するものではない。
 
-Use one publisher across all machines. A local `publication.lock` excludes overlapping operations sharing the material directory, not other machines. Version 2 publication checks the existing version 1 feed before replacement; this read and write are not an atomic compare-and-swap. No other publisher may write the same feed concurrently.
+すべてのマシンで 1 つのパブリッシャーを使う。ローカルの `publication.lock` は材料ディレクトリを共有する重複操作を排除するが、他のマシンは排除しない。バージョン 2 の公開は置き換え前に既存のバージョン 1 フィードを確認する。この読み取りと書き込みはアトミックな compare-and-swap ではない。他のパブリッシャーが同じフィードへ同時に書き込んではならない。
 
 <a id="sequence"></a>
 
-## Operator sequence
+## オペレーター手順
 
-These are pending manual steps, not completed remote qualification. Run from the repository root with the retained manifest, exact version, and matching verification receipt. Without `--execute`, both commands print a local plan and send no request:
+これらは保留中の手動ステップであり、完了したリモート適格性確認ではない。保持されたマニフェスト、正確なバージョン、一致する検証レシートを持ってリポジトリルートから実行する。`--execute` なしでは、両方のコマンドはローカルプランを表示し、リクエストを送信しない:
 
 ```powershell
 node --import tsx apps/desktop/scripts/publish-installed-update.ts upload-binaries "<run.json>" "<version>" "<verification/result.json>"
 node --import tsx apps/desktop/scripts/publish-installed-update.ts publish-feed "<run.json>" "<version>" "<verification/result.json>"
 ```
 
-1. Check both versions locally. For each separately authorized upload, append `--execute` to `upload-binaries` and type `UPLOAD <version> <run-id>` in an interactive terminal. Installer and blockmap uploads never publish a feed. Matching existing binaries are read back, not overwritten; different bytes stop the operation.
-2. Leave the fixed feed absent. Install and start version 1 through its installed shortcut; confirm its displayed version and journal `workspace-ready`. Complete the walkthrough's 404 case before authorizing any feed write. Keep version 1 running.
-3. Authorize version 1 `publish-feed` with `--execute` and `PUBLISH <version> <run-id>`. Its binaries must already exist and pass public readback. The initial feed must be absent or contain the exact version 1 bytes. After full feed readback, complete the same-version case in the running version 1 application; retain evidence and obtain separate authorization before publishing version 2.
-4. Authorize version 2 publication with the command below and its exact confirmation. Supply the original installed application's `dsh-update-qualification/<run-id>/journals` directory. Startup evidence and the expected previous feed are required. The operator independently verifies the installed path and that version 1 is still running.
+1. 両バージョンをローカルで確認する。個別に承認されたアップロードごとに、`upload-binaries` に `--execute` を付けて、対話的ターミナルで `UPLOAD <version> <run-id>` と入力する。インストーラーと blockmap のアップロードがフィードを公開することは決してない。一致する既存バイナリは読み戻され、上書きされない。異なるバイトは操作を停止させる。
+2. 固定フィードを存在しないままにしておく。インストール済みショートカットからバージョン 1 をインストールして起動し、表示バージョンと、ジャーナルの `workspace-ready` を確認する。フィード書き込みを承認する前に、ウォークスルーの 404 ケースを完了する。バージョン 1 を実行したままにする。
+3. `--execute` と `PUBLISH <version> <run-id>` でバージョン 1 の `publish-feed` を承認する。そのバイナリはすでに存在し、公開読み戻しに合格していなければならない。初期フィードは存在しないか、正確なバージョン 1 のバイトを含んでいなければならない。完全なフィード読み戻しの後、実行中のバージョン 1 アプリケーションで同一バージョンケースを完了する。エビデンスを保持し、バージョン 2 を公開する前に別途の承認を得る。
+4. 以下のコマンドとその正確な確認でバージョン 2 の公開を承認する。元のインストール済みアプリケーションの `dsh-update-qualification/<run-id>/journals` ディレクトリを指定する。起動エビデンスと期待される以前のフィードが必要である。オペレーターはインストール済みパスと、バージョン 1 がまだ実行中であることを独立に検証する。
 
 ```powershell
 node --import tsx apps/desktop/scripts/publish-installed-update.ts publish-feed "<run.json>" "<version-2>" "<version-2-verification/result.json>" --journals "<journal-directory>" --execute
 ```
 
-Continue the walkthrough only after successful publication and public readback. The tool uses fixed public URLs without cache-busting parameters, uploads with `Cache-Control: no-store`, and verifies returned bytes and hashes. Binary uploads retain complete public readback. Feed publication reads only the feed remotely and requires a successful `upload-binaries` result with an exactly matching local plan under this run's `publication-records/operation-*`; missing, failed, or mismatched receipts stop publication. The publication result records the reused receipt path and receipt/plan hashes. This proves prior delivery, not continued availability of immutable objects; do not delete or replace those objects. SDK writes have no automatic retries.
+公開と公開読み戻しが成功した後にのみウォークスルーを続行する。ツールはキャッシュバスティングパラメーターのない固定公開 URL を使い、`Cache-Control: no-store` でアップロードし、返されたバイトとハッシュを検証する。バイナリアップロードは完全な公開読み戻しを保持する。フィード公開はフィードをリモートで読むだけで、この実行の `publication-records/operation-*` の下で正確に一致するローカルプランを持つ成功した `upload-binaries` 結果を必要とする。欠落、失敗、または不一致のレシートは公開を停止させる。公開結果は再利用されたレシートパスとレシート/プランハッシュを記録する。これは以前の配信を証明するもので、不変オブジェクトの継続的な可用性を証明するものではない。それらのオブジェクトを削除または置き換えないこと。SDK 書き込みには自動リトライがない。
 
 <a id="evidence"></a>
 
-## Evidence and recovery
+## エビデンスと復旧
 
-Each operation retains `publication-records/operation-*`: plan, timestamped stages, final result, and feed body when applicable. Records include safe request IDs and available HTTP status, not raw SDK errors or authorization headers. Failure stops later writes; a timeout does not prove that the server rejected an earlier write. Preserve records and remote objects, inspect the last stage and actual remote state, and obtain separate confirmation before another operation.
+各操作は `publication-records/operation-*` を保持する: プラン、タイムスタンプ付きのステージ、最終結果、および該当する場合はフィードボディ。記録には安全なリクエスト ID と利用可能な HTTP ステータスが含まれ、生の SDK エラーや認可ヘッダーは含まれない。失敗は以降の書き込みを停止させる。タイムアウトは、以前の書き込みをサーバーが拒否したことを証明しない。記録とリモートオブジェクトを保全し、最後のステージと実際のリモート状態を検査し、別の操作の前に別途の確認を得る。
 
-Diagnose `403 AccessDenied` by the exact API: `GetBucketVersioning`, `GetObject`, and `PutObject` require distinct permissions. Before requesting broader access or changing CDN settings, compare retained successful runs and check the failing operation with the current credentials. An added configuration query must not be reported as an upload failure when no upload was attempted. Successful reads alone do not prove current write permission; prefer reviewing an unnecessary new preflight over expanding a least-privilege upload identity.
+`403 AccessDenied` は正確な API で診断する: `GetBucketVersioning`、`GetObject`、`PutObject` はそれぞれ異なる権限を必要とする。より広いアクセスを要求したり CDN 設定を変更したりする前に、保持された成功実行を比較し、失敗した操作を現在の資格情報で確認する。追加された構成クエリは、アップロードが試みられていないのにアップロード失敗として報告されてはならない。読み取りの成功だけでは現在の書き込み権限を証明しない。最小権限のアップロード ID を拡張するより、不要な新しいプリフライトを見直す方を選ぶ。
 
-A manually requested later operation verifies matching objects without rewriting them. `alreadyPublished: true` means reconciliation of an existing desired feed, not a new publication; use the original operation's evidence for publication timing. Unexpected feed bytes stop the operation, including attempted replacement of version 2 with version 1. A crash can leave `publication.lock`; confirm no publisher remains and preserve failed records before an operator removes that exact empty directory. Never delete a lock to bypass an active publisher.
+手動で要求された後続の操作は、一致するオブジェクトを書き換えずに検証する。`alreadyPublished: true` は、既存の望ましいフィードの調整を意味し、新しい公開ではない。公開タイミングには元の操作のエビデンスを使う。予期しないフィードバイトは操作を停止させる。バージョン 2 をバージョン 1 で置き換える試みも含む。クラッシュは `publication.lock` を残すことがある。オペレーターがその正確な空ディレクトリを削除する前に、パブリッシャーが残っていないことを確認し、失敗した記録を保全する。アクティブなパブリッシャーを迂回するためにロックを削除することは決してしない。
 
-Qualification COS version queries have a 30-second total deadline, and object reads and PUTs have a 15-minute total deadline. Expiration aborts the underlying HTTP requests and waits for closure before releasing the operation lock; ongoing transfer activity does not extend the budget.
+適格性確認の COS バージョンクエリには 30 秒の合計デッドラインがあり、オブジェクトの読み取りと PUT には 15 分の合計デッドラインがある。期限切れは基盤の HTTP リクエストをアボートし、操作ロックを解放する前にクローズを待つ。進行中の転送アクティビティは予算を延長しない。
 
 <a id="dev-note"></a>
 
-## Dev Note
+## 開発メモ
 
-Sequencing tests use an in-memory store; transport tests exercise real SDK serialization with a substituted HTTP handler. Neither certifies COS writes. On 2026-09-14, the current credentials read the retained test probe with HTTP 200 and matching SHA-512, while `GetBucketVersioning` returned 403; no PUT was attempted. A separate 2026-09-11 probe verified test uploads, fixed-feed refresh, and updater download. TODO: review the extra bucket-configuration prerequisite without weakening namespace isolation, integrity checks, or fail-stop behavior; its removal is not implemented by this documentation correction.
+シーケンステストはインメモリストアを使い、トランスポートテストは置き換えられた HTTP ハンドラーで実際の SDK シリアライズを演習する。どちらも COS 書き込みを認定しない。2026-09-14 に、現在の資格情報は保持されたテストプローブを HTTP 200 と一致する SHA-512 で読めたが、`GetBucketVersioning` は 403 を返した。PUT は試みられなかった。別の 2026-09-11 のプローブは、テストアップロード、固定フィードのリフレッシュ、アップデーターのダウンロードを検証した。TODO: 名前空間分離、整合性チェック、フェイルストップ動作を弱めずに、追加のバケット構成前提を見直す。その削除はこのドキュメント修正では実装されていない。
 
-The later operator-authorized run `installed-update-r5dYNH` retains `object-overwrite-probe/result.json` and `binary-upload/result.json` under `.desktop-build/qualification/`. Creating a new 49-byte test object succeeds; a second PUT of identical bytes with overwrite forbidden returns `409 FileAlreadyExists`, and origin/public hashes remain unchanged. A fixed-run binary-only driver then uploads both signed installers and their blockmaps with the same header, revalidates package receipts, and verifies all four complete public responses. It records four successful new-object PUTs, no retries, no feed or configuration writes, and keeps the probe. A HEAD observation of the private feed URL returns 404. This operator run uses observed object-level protection instead of querying bucket configuration; the general CLI prerequisite above remains unchanged. These receipts establish test-object delivery, not feed publication, installed startup, or an installed upgrade.
+後でオペレーターが承認した実行 `installed-update-r5dYNH` は、`.desktop-build/qualification/` の下に `object-overwrite-probe/result.json` と `binary-upload/result.json` を保持する。新しい 49 バイトのテストオブジェクトの作成は成功する。上書き禁止で同一バイトを 2 回目に PUT すると `409 FileAlreadyExists` を返し、オリジン/公開ハッシュは変更されないままである。固定実行のバイナリ専用ドライバーは、その後、両方の署名済みインストーラーとその blockmap を同じヘッダーでアップロードし、パッケージレシートを再検証し、4 つの完全な公開応答すべてを検証する。4 つの成功した新規オブジェクト PUT、リトライなし、フィードまたは構成の書き込みなしを記録し、プローブを保持する。プライベートフィード URL の HEAD 観察は 404 を返す。このオペレーター実行は、バケット構成をクエリする代わりに観察されたオブジェクトレベルの保護を使う。上記の一般的な CLI 前提は変更されない。これらのレシートはテストオブジェクトの配信を確立するもので、フィード公開、インストール済み起動、またはインストール済みアップグレードではない。

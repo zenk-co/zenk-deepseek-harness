@@ -1,45 +1,45 @@
-# Cordis Primer
+# Cordis 入門
 
-English | [中文](cordis-primer.zh.md)
+日本語 | [English](cordis-primer.en.md) | [中文](cordis-primer.zh.md)
 
-Cordis is the vendored plugin framework underneath DeepSeek Harness. This primer teaches the Cordis ideas a harness plugin author needs before reading the generated service/event reference on the [subsystem pages](subsystems/core.md); the [Cordis tutorial](cordis-tutorial/index.md) walks the same ideas hands-on. The vendored source and sync procedure live in [vendor/README.md](../vendor/README.md).
+Cordis は DeepSeek Harness の土台にあるベンダー同梱のプラグインフレームワークである。この入門は harness プラグイン作者が[サブシステムページ](subsystems/core.md)の生成済みサービス/イベントリファレンスを読む前に必要な Cordis 概念を教える。[Cordis チュートリアル](cordis-tutorial/index.md)は同じ概念を実践で歩く。ベンダー同梱のソースと同期手順は [vendor/README.md](../vendor/README.md) にある。
 
-## Cordis In Five Ideas
+## 5 つの考えで掴む Cordis
 
-- **A plugin is a object that implements Service.** It can be a function with optional `inject` and `apply(ctx)` fields, or a `Service` subclass whose lifecycle Cordis mounts into the current context.
-- **A context is a repository of services.** A service claims a stable `ctx.<key>` such as `ctx.tools`, `ctx.llm`, or `ctx.sessions` from a context; other plugins find services via key instead of importing a concrete implementation.
-- **Declare service dependency via `inject`.** A plugin that names required services waits until those services exist, so load order is expressed through service requirements rather than manual boot sequencing.
-- **Typed Events for communication.** Services declare event names through TypeScript declaration merging, then dispatch them as `emit`, `waterfall`, `parallel`, `serial`, or `bail` depending on whether listeners observe, wrap, fan out, run in order, or stop at the first bail value.
-- **Registrations are reversible effects.** Prompt sections, tool schemas, adapters, providers, and listeners are installed through `ctx.effect()` or `ctx.on()` so reload and teardown unwind them predictably.
+- **プラグインは Service を実装するオブジェクトである。** 任意の `inject` と `apply(ctx)` フィールドを持つ関数にも、`Service` サブクラスにもなれ、Cordis はそのライフサイクルを現在のコンテキストにマウントする。
+- **コンテキストはサービスの貯蔵所である。** サービスはコンテキストから `ctx.tools`、`ctx.llm`、`ctx.sessions` のような安定した `ctx.<key>` を主張し、他のプラグインは具体的な実装の取り込みではなくキーでサービスを見つける。
+- **`inject` でサービス依存を宣言する。** 必須サービスを名指ししたプラグインはそれらが存在するまで待つため、読み込み順は手動の起動順序付けではなくサービス要件で表される。
+- **通信には型付きイベントを使う。** サービスは TypeScript の宣言マージでイベント名を宣言し、リスナーが観測するか、包むか、扇状に広げるか、順に走るか、最初の bail 値で止まるかに応じて `emit`、`waterfall`、`parallel`、`serial`、`bail` として送出する。
+- **登録は可逆なエフェクトである。** プロンプト断片、ツールスキーマ、アダプター、プロバイダー、リスナーは `ctx.effect()` または `ctx.on()` 経由で導入されるため、再読み込みと解体が予測可能に巻き戻る。
 
-## Dispatch Modes
+## 送出様式
 
-Every event can have one of the following dispatch mode and can only be dispatched by these methods accordingly.
+各イベントは次のいずれかの送出様式を持ち、その様式に対応する手法でのみ送出できる。
 
-| Mode | Awaited? | Dispatch Order | Has Return Value? |
+| 様式 | 待機するか | 送出順序 | 戻り値はあるか |
 |---|---|---|---|
-| `emit` | No | listeners observe in registration order | No |
-| `waterfall` | No | listeners observe in registration order | Yes |
-| `parallel` | Yes | all listeners observe the event in parallel | No |
-| `serial` | Yes | listeners observe in registration order | Yes |
-| `bail` | No | listeners observe in registration order until one bails | Yes |
+| `emit` | いいえ | リスナーは登録順に観測する | いいえ |
+| `waterfall` | いいえ | リスナーは登録順に観測する | はい |
+| `parallel` | はい | すべてのリスナーがイベントを並行に観測する | いいえ |
+| `serial` | はい | リスナーは登録順に観測する | はい |
+| `bail` | いいえ | 1 つが bail するまでリスナーは登録順に観測する | はい |
 
-The dispatch mode is part of the event's public contract. New harness events document it with an `@mode` tag so the generated catalog can check declarations against dispatch sites.
+送出様式はイベントの公開契約の一部である。新規 harness イベントは `@mode` タグでそれを文書化し、生成カタログが宣言と送出箇所を照合できるようにする。
 
-## Cordis Waterfall Semantics
+## Cordis ウォーターフォール意味論
 
-`ctx.waterfall` is around-middleware. A listener receives `(...args, next)`. Call `next()` to delegate the possibly wrapped result to the next service; return without `next()` to short-circuit. Values propagate through `next()`'s return value.
+`ctx.waterfall` は包囲ミドルウェアである。リスナーは `(...args, next)` を受け取る。包んだ可能性のある結果を次のサービスへ委ねるには `next()` を呼び、呼び出さずに返すと短絡する。値は `next()` の戻り値を通じて伝わる。
 
-Cooperative listeners usually mutate a shared request or decision object and then delegate. A listener can also choose to replace the result entirely and downstream listeners will only see the result after replacement. Use `prepend: true` only when the listener must run before ordinary registrations.
+協調的リスナーは通常、共有リクエストまたは決定オブジェクトを変異させてから委ねる。リスナーは結果全体を置換することも選べ、下流リスナーは置換後の結果のみを見る。リスナーが通常登録より先に走らねばならない場合にのみ `prepend: true` を使う。
 
-For single-decision events, short-circuiting is the design. A policy listener can return without `next()` when it owns the decision, while a listener that only annotates or observes must delegate.
+単一決定イベントでは短絡が設計である。決定を所有する方針リスナーは `next()` なしで返してよく、注釈や観測のみのリスナーは委ねなければならない。
 
-## Loader Configuration
+## ローダー設定
 
-`@deepseek-ai/cordis-plugin-include` parses `!!js` into expression nodes. Loader interpolates an entry's `config` (after declared injections activate, against that plugin context — `ctx.serviceName`) and its `disabled` field (at every mount decision, against the loader context); Include preserves nested row expressions until target activation. Other entry metadata stays literal. Use overlays when the environment selects plugins.
+`@deepseek-ai/cordis-plugin-include` は `!!js` を式ノードに構文解析する。ローダーは項目の `config` (宣言済み注入の有効化後、そのプラグインコンテキスト — `ctx.serviceName` — に対して) と `disabled` フィールド (各マウント判定で、ローダーコンテキストに対して) を補間し、Include は対象有効化まで入れ子行の式を保持する。その他の項目メタデータは文字通り残る。環境がプラグインを選択する場合はオーバーレイを使う。
 
-## Practical Rules
+## 実務規則
 
-Encapsulate behavior into plugins: a tool pipeline event belongs to `ctx.tools`, model streaming belongs to `ctx.llm`, and live agent coordination belongs to `ctx.agents`. Prefer events for interception and policy; prefer service methods for direct capability calls.
+振る舞いをプラグインに封じ込める。ツールパイプラインイベントは `ctx.tools` に属し、モデルストリーミングは `ctx.llm` に属し、生きているエージェント協調は `ctx.agents` に属する。横取りと方針にはイベントを、直接のケイパビリティ呼び出しにはサービスメソッドを選ぶ。
 
-Every registration should have a disposer, either by returning one from `ctx.effect()` or using a Cordis helper that does it for you. If teardown order matters, keep the related work in one effect so disposal unwinds in the intended sequence.
+各登録は破棄子を持つべきであり、`ctx.effect()` から返すか、代行する Cordis ヘルパーを使う。解体順が重要な場合は関連作業を 1 つのエフェクトにまとめ、意図した順序で巻き戻るようにする。

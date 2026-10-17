@@ -1,35 +1,35 @@
 ---
-description: "The read-before-edit filesystem policy plugin for deployments and maintainers choosing or debugging guarded write and edit behavior."
+description: "編集前読み取りを求めるファイルシステムポリシープラグイン。ガード付きの書き込み・編集動作を選択・デバッグするデプロイとメンテナ向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-fs-observation-policy
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-fs-observation-policy` makes filesystem tools require an agent to read a file before overwriting or editing it. It also rejects a mutation when the file has changed since that read, and returns a clear instruction to re-read and retry. Reading a missing path authorizes guarded creation, while concurrent creation remains protected. Choose it for deployments that want read-before-write safety; resumed sessions must read targets again because observations are not persisted.
+`dsh-fs-observation-policy` は、ファイルシステムツールがファイルを上書き・編集する前にエージェントがそのファイルを読み取ることを必須にする。その読み取り以降にファイルが変更されていた場合、その変更を拒否し、再読み取りして再試行するよう明確な指示を返す。存在しないパスへの読み取りはガード付き作成を許可し、同時作成は引き続き保護される。書き込み前読み取りの安全性を求めるデプロイ向けに選ぶ。再開されたセッションでは観測結果が永続化されないため、対象を再び読み取る必要がある。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Load this plugin alongside a `ctx.fs` backend and the `dsh-tool-fs` tools when a deployment wants the model to read a file before it can overwrite or edit it. The plugin needs no configuration and injects no service; it only listens for the `fs/*` events the tools dispatch.
+デプロイでモデルにファイルを上書き・編集する前に読ませたい場合、`ctx.fs` バックエンドと `dsh-tool-fs` ツールに並べてこのプラグインをロードする。このプラグインに設定は不要で、サービスも注入しない。ツールがディスパッチする `fs/*` イベントを待つだけである。
 
-### Minimal composition
+### 最小構成
 
-Load a backend, then this plugin, then the tools. The policy listener should be the first decider registered for the `fs/*`-intent slots.
+バックエンド、次にこのプラグイン、次にツールの順にロードする。ポリシーリスナーは `fs/*` 意図スロットの最初の決定者として登録すべきである。
 
 ```yaml
 - name: '@deepseek-ai/dsh-fs-local'
@@ -37,103 +37,103 @@ Load a backend, then this plugin, then the tools. The policy listener should be 
 - name: '@deepseek-ai/dsh-tool-fs'
 ```
 
-### What changes for the model
+### モデルにとっての変更点
 
-With the policy mounted, `write` creates new files but refuses to overwrite an existing file that the session has not read, `edit` requires a prior read of the target, and a file that changed since it was read fails with `FS_STALE_VERSION`. Absence is recorded too: reading a missing file marks it confirmed absent, so a later `write` may recreate it through the guarded-create flow. A session resumes with no observed state, so it must re-read files before guarded mutations succeed again.
+ポリシーをマウントすると、`write` は新規ファイルを作成するが、セッションが読んでいない既存ファイルへの上書きを拒否し、`edit` は対象の事前読み取りを必須とし、読み取り後に変更されたファイルは `FS_STALE_VERSION` で失敗する。不在も記録される。存在しないファイルへの読み取りは確認済み不在として印付けされるため、後の `write` はガード付き作成フローで再作成できる。セッション再開時は観測済み状態を持たないため、ガード付き変更を再び成功させるにはファイルを再読み取りする必要がある。
 
-### Failures and recovery
+### 失敗と回復
 
-An edit without a prior observation fails with code `FS_NOT_OBSERVED` and policy reason `edit requires reading "<path>" first`; editing a target observed absent fails with `FS_NOT_FOUND`. The tools normalize unread policy and provider failures to `cannot modify "<path>": file has not been read — read the file, then retry` while preserving the code and original cause. Following the remedy on an externally deleted file records absence, so the next guarded write can recreate it without clobbering a concurrent creator.
+事前観測なしの編集はコード `FS_NOT_OBSERVED`、ポリシー理由 `edit requires reading "<path>" first` で失敗し、不在として観測された対象への編集は `FS_NOT_FOUND` で失敗する。ツールは、未読のポリシー失敗とプロバイダー失敗を `cannot modify "<path>": file has not been read — read the file, then retry` に正規化し、コードと元の原因を保持する。外部で削除されたファイルでこの対処に従うと不在が記録されるため、次のガード付き書き込みは同時作成者をつぶさずに再作成できる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the policy plugin and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではポリシープラグインの背後にある設計上の決定と、それを実現するコード箇所を説明する。観測可能な動作はすべて[このパッケージの使い方](#use-this-package)で扱っている。
 
-### Design concept
+### 設計構想
 
-The plugin is built on two ideas:
+このプラグインは 2 つの考えに基づく:
 
-- **Event gate, not method service.** The plugin influences the world only through the `fs/*` events, so it registers no `ctx.fsPolicy` service and has no public methods. Removing it cannot break `dsh-tool-fs` at a service-injection boundary — the tool falls through to the bare provider.
-- **Observed state is a prior-observation record.** A weak owner-to-target map holds three logical states — unseen, confirmed absent, or present at a version. The plugin performs no filesystem I/O of its own; it converts recorded state into the provider's optional guard, and the provider performs the atomic freshness check.
+- **メソッドサービスではなくイベントゲート。**プラグインは `fs/*` イベントを通じてのみ世界に影響し、`ctx.fsPolicy` サービスを登録せず公開メソッドも持たない。これを外してもサービス注入境界で `dsh-tool-fs` を壊すことはない — ツールは素のプロバイダーにフォールスルーする。
+- **観測済み状態は事前観測の記録。**弱い所有者から対象へのマップが 3 つの論理状態 — 未確認、確認済み不在、あるバージョンでの存在 — を保持する。プラグイン自体はファイルシステム I/O を一切行わず、記録済み状態をプロバイダーの任意ガードに変換し、プロバイダーがアトミックな鮮度チェックを行う。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | The three `fs/*` listeners and the observed-state gate |
-| [`src/types.ts`](src/types.ts) | The opaque event actor shape from which the owner session is derived |
+| [`src/index.ts`](src/index.ts) | 3 つの `fs/*` リスナーと観測済み状態ゲート |
+| [`src/types.ts`](src/types.ts) | 所有者セッションを導出する不透明なイベントアクター形状 |
 
-### Decision flow
+### 決定フロー
 
-`fs/write-intent` resolves unseen or confirmed absent to `{ kind: 'createIfAbsent' }` and observed present to `{ kind: 'replaceIfVersion', version: vObserved }`. `fs/edit-intent` rejects an unseen target with `FS_NOT_OBSERVED`, a confirmed-absent target with `FS_NOT_FOUND`, and otherwise supplies the observed version as the compare-and-swap basis. `fs/observed` records `{ kind: 'present', version }` or `{ kind: 'absent' }` for the owner and target — a synchronous, side-effect-only `WeakMap.set`, because successful mutations have already committed.
+`fs/write-intent` は、未確認または確認済み不在を `{ kind: 'createIfAbsent' }` に、観測済み存在を `{ kind: 'replaceIfVersion', version: vObserved }` に解決する。`fs/edit-intent` は、未確認の対象を `FS_NOT_OBSERVED` で、確認済み不在の対象を `FS_NOT_FOUND` で拒否し、それ以外は観測済みバージョンを compare-and-swap の基準として渡す。`fs/observed` は所有者と対象について `{ kind: 'present', version }` または `{ kind: 'absent' }` を記録する — 成功した変更は既にコミット済みのため、同期的な副作用のみの `WeakMap.set` である。
 
-### Single-slot, first-wins
+### 単一スロット、先勝ち
 
-Each intent slot holds exactly one decider: this plugin fully decides and never calls `next()`. The slot is first-wins by registration order — this plugin owning it is the default-deployment convention, not an event-enforced invariant. Layered permission, audit, or sandbox interception belongs on the `tools/execute` waterfall instead.
+各意図スロットは決定者をちょうど 1 つ保持する。このプラグインは完全に決定し、`next()` を決して呼ばない。スロットは登録順による先勝ちであり、このプラグインがそれを所有するのは既定デプロイの慣例であって、イベントが強制する不変条件ではない。層化された権限、監査、サンドボックス介入は代わりに `tools/execute` ウォーターフォールに属する。
 
-### Lifecycle
+### ライフサイクル
 
-Observed state is dropped on plugin disposal (HMR safety) and is never persisted across sessions — a resumed session starts with no observations.
+観測済み状態はプラグイン破棄時に捨てられ (HMR 安全性)、セッションをまたいで永続化されることはない — 再開されたセッションは観測なしで始まる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the policy to the contract, tools, and backends it composes with.
+パッケージレベルの契約では足りない場合にこれらのページを読むとよい。ポリシーから、それが組み合わせる契約、ツール、バックエンドへと進む。
 
-- [Filesystem subsystem](../../../docs/subsystems/filesystem.md) — exhaustive provider contract, policy events, and error taxonomy.
-- [dsh-fs](../fs/README.md) — the `ctx.fs` contract and the `fs/*` event vocabulary.
-- [tool-fs](../tool-fs/README.md) — the model-facing tools that dispatch the `fs/*` events.
-- [fs-local](../fs-local/README.md) — the host-filesystem backend this policy guards.
-- [fs-sandbox](../fs-sandbox/README.md) — the sandbox-enforcing backend this policy composes with.
-- [Fsspec-style seam-split reference](../fs/README.md) — why the policy is an event plugin rather than a provider method.
+- [Filesystem サブシステム](../../../docs/subsystems/filesystem.md) — 網羅的なプロバイダー契約、ポリシーイベント、エラー分類。
+- [dsh-fs](../fs/README.md) — `ctx.fs` 契約と `fs/*` イベント語彙。
+- [tool-fs](../tool-fs/README.md) — `fs/*` イベントをディスパッチする、モデルに面したツール。
+- [fs-local](../fs-local/README.md) — このポリシーがガードするホストファイルシステムバックエンド。
+- [fs-sandbox](../fs-sandbox/README.md) — このポリシーと組み合わせるサンドボックス強制バックエンド。
+- [Fsspec 流のシーム分割リファレンス](../fs/README.md) — ポリシーがプロバイダーメソッドではなくイベントプラグインである理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Filesystem tool outcome
+### Filesystem ツール結果
 
-#### What the model sees
+#### モデルが見るもの
 
-This plugin adds no prompt or schema. It rejects an edit without a prior observation with code `FS_NOT_OBSERVED` and policy reason `edit requires reading "<path>" first`; editing a target observed absent returns `FS_NOT_FOUND`. Guarded mutations whose positive observation is stale propagate the provider-owned `FS_STALE_VERSION` error. [`dsh-tool-fs`](../tool-fs/README.md) owns the model-facing error wrapper: it normalizes every `FS_NOT_OBSERVED` source to `cannot modify "<path>": file has not been read — read the file, then retry`, while `FS_STALE_VERSION` retains the provider reason and adds `— re-read the file, then retry`; both preserve the code and original cause. Following the stale remedy on an externally deleted target records absence: the next guarded write may recreate it with `createIfAbsent`, while the provider atomically preserves any concurrent creator.
+このプラグインはプロンプトもスキーマも追加しない。事前観測なしの編集をコード `FS_NOT_OBSERVED`、ポリシー理由 `edit requires reading "<path>" first` で拒否し、不在として観測された対象への編集は `FS_NOT_FOUND` を返す。正の観測が古いガード付き変更はプロバイダー由来の `FS_STALE_VERSION` エラーを伝搬する。[`dsh-tool-fs`](../tool-fs/README.md) がモデルに面したエラーラッパーを所有する。すべての `FS_NOT_OBSERVED` 起因を `cannot modify "<path>": file has not been read — read the file, then retry` に正規化し、`FS_STALE_VERSION` はプロバイダー理由を保持して `— re-read the file, then retry` を付け加える。どちらもコードと元の原因を保持する。外部で削除された対象で古さの対処に従うと不在が記録される。次のガード付き書き込みは `createIfAbsent` で再作成でき、プロバイダーは同時作成者をアトミックに保護する。
 
-#### Token effect
+#### トークンへの影響
 
-Zero tokens on allowed operations beyond the ordinary tool result. A denial adds the small retained error result and avoids any success payload.
+許可された操作では通常のツール結果を超えるトークンはゼロである。拒否は小さく保持されるエラー結果を追加し、成功ペイロードを避ける。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
+追記のみ。新規可視内容は再利用可能なリクエスト接頭辞の後に続き、既存の KV キャッシュエントリを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the policy is a poor fit or needs special operational care. They are current package constraints, not a general filesystem comparison or a task backlog.
+これらの制限は、ポリシーが不向きな場合や特別な運用上の注意を要する場合を定義する。これらは現在のパッケージ制約であり、一般的なファイルシステム比較やタスクバックログではない。
 
-- **Observed state does not survive a session resume** — persistence of the record is deferred, so a resumed session must re-read files before guarded writes and edits.
-- **Actors without an agent session can never satisfy the policy** — their edits throw `FS_NOT_OBSERVED` and their writes always resolve `createIfAbsent`, so a non-agent caller cannot overwrite an existing file through the gate.
-- **Direct `ctx.fs` reads emit no `fs/observed`** — a file read outside the `read` tool stays unobserved, and a later guarded edit rejects with `FS_NOT_OBSERVED` until the tool reads it.
-- **Authorization is version freshness, not view completeness** — any windowed read authorizes a full-file overwrite of an unchanged file, deliberately weaker than a full-view rule ([seam-split reference](../fs/README.md)).
+- **観測済み状態はセッション再開を超えて残らない** — 記録の永続化は先送りのため、再開されたセッションはガード付き書き込みと編集の前にファイルを再読み取りする必要がある。
+- **エージェントセッションを持たないアクターはポリシーを満たせない** — その編集は `FS_NOT_OBSERVED` を投げ、書き込みは常に `createIfAbsent` に解決するため、非エージェント呼び出し元はゲート経由で既存ファイルを上書きできない。
+- **直接の `ctx.fs` 読み取りは `fs/observed` を発しない** — `read` ツール外でのファイル読み取りは未観測のままであり、ツールで読むまで後のガード付き編集は `FS_NOT_OBSERVED` で拒否される。
+- **認可はビューの完全性ではなくバージョン鮮度である** — ウィンドウ化読み取りは、変更のないファイルへの全ファイル上書きを許可し、意図的に全ビュー規則より弱い ([シーム分割リファレンス](../fs/README.md))。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

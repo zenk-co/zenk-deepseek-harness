@@ -1,29 +1,29 @@
-# Cookbook: Add a built-in plugin feature preview
+# クックブック: 組み込みプラグイン機能プレビューを追加する
 
-English | [中文](adding-a-plugin-preview.zh.md)
+日本語 | [English](adding-a-plugin-preview.en.md) | [中文](adding-a-plugin-preview.zh.md)
 
-Plugin Manager owns optional feature illustrations for built-in bundles. Follow this guide when editing its internal `BUNDLE_PREVIEWS` map. Packages cannot declare illustrations through their manifest or exports; third-party plugins have no preview interface.
+Plugin Manager は組み込みバンドル用の任意機能イラストを所有する。内部 `BUNDLE_PREVIEWS` マップを編集する場合にこのガイドに従う。パッケージはマニフェストやエクスポートを通じてイラストを宣言できない。サードパーティプラグインにプレビューインターフェースはない。
 
-## 1. Decide whether an image helps
+## 1. 画像が役立つかを決める
 
-Show one concrete result or recognizable capability. Omit the map entry when the description is enough: no image is required, and omission reserves no space. Essential instructions stay in localized text or configuration outside the illustration.
+1 つの具体的な結果または認識可能なケイパビリティを示す。説明で十分な場合はマップエントリーを省略する。画像は必須ではなく、省略は領域を確保しない。必須の指示はイラスト外のローカライズされたテキストまたは設定に残す。
 
-## 2. Draw one fixed-size SVG
+## 2. 固定寸法 SVG を 1 つ描く
 
-| Item | Requirement |
+| 項目 | 要件 |
 |---|---|
-| Count | Zero or one logical feature image per bundle. English and Chinese files are alternatives for that image, not a gallery or carousel. |
-| Format | SVG only: `width="640" height="300" viewBox="0 0 640 300"` (32:15). Raster preview files and other dimensions are unsupported. |
-| Languages | Supply both `en` and `zh`. Translate headings, annotations, and example content; preserve official brand assets and names. No single strings, arrays, or extra languages. |
-| Composition | One main example, optionally with one close-up. Keep important content about 32 canvas units from the edges. Review text at the page's actual size. |
-| Typography | Outline lettering into paths using a suitable font. Match the feature and neighboring UI; do not rely on browser font substitution. |
-| Theme | Compare light and dark themes. One illustration serves both; avoid transparent dark text that disappears on dark backgrounds. |
+| 数量 | バンドルごとに論理的な機能画像ゼロまたは 1 つ。英語と中国語のファイルはその画像の代替であり、ギャラリーやカルーセルではない。 |
+| 形式 | SVG のみ。`width="640" height="300" viewBox="0 0 640 300"`（32:15）。ラスタープレビューファイルと他の寸法は未対応である。 |
+| 言語 | `en` と `zh` の両方を提供する。見出し、注釈、例内容を翻訳する。公式ブランドアセットと名前は保全する。単一文字列、配列、追加言語はなし。 |
+| 構成 | 1 つの主例。任意で 1 つの拡大図。重要な内容は辺から約 32 キャンバス単位離す。ページ実寸でテキストをレビューする。 |
+| 書体 | 適切なフォントでレタリングをパスにアウトライン化する。機能と隣接 UI に合わせる。ブラウザーフォント代替に頼らない。 |
+| テーマ | ライトとダークのテーマを比較する。1 つのイラストが両方に仕える。ダーク背景で消える透明なダークテキストを避ける。 |
 
-The SVG is self-contained: no fonts, remote resources, scripts, handlers, animation, stylesheets, `text`, or `foreignObject`. An `image` element may embed an unchanged official PNG/JPEG/WebP brand asset as a base64 data URL. Small plugin icons remain geometry-only. This exception preserves brand artwork and does not permit raster preview files. Validation checks the data-URL envelope, not decoded pixels; the page renders the SVG through `<img>`. Both raw language files together must stay within 1 MiB. They are embedded as base64 data URLs in the Plugin Manager client bundle, so keep them small.
+SVG は自己完結である。フォント、リモートリソース、スクリプト、ハンドラー、アニメーション、スタイルシート、`text`、`foreignObject` はなし。`image` 要素は変更のない公式 PNG・JPEG・WebP ブランドアセットを base64 データ URL として埋め込んでよい。小さなプラグインアイコンは形状のみのままである。この例外はブランド artwork を保全するものであり、ラスタープレビューファイルを許可しない。検証はデコード画素ではなくデータ URL 外形を検査する。ページは SVG を `<img>` 経由で描画する。両言語の raw ファイル合計は 1 MiB 以内に収めなければならない。Plugin Manager クライアントバンドルに base64 データ URL として埋め込まれるため、小さく保つ。
 
-## 3. Register the internal pair
+## 3. 内部ペアを登録する
 
-Put `<feature>-preview.svg` and `<feature>-preview.zh.svg` under [Plugin Manager assets](../../packages/client/ui-plugin-manager/src/client/assets/). Import both into [PluginManagerPage.tsx](../../packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx), then add one exact built-in package name to `BUNDLE_PREVIEWS`:
+`<feature>-preview.svg` と `<feature>-preview.zh.svg` を [Plugin Manager アセット](../../packages/client/ui-plugin-manager/src/client/assets/)の下に置く。両方を [PluginManagerPage.tsx](../../packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx) にインポートし、次に正確な組み込みパッケージ名 1 つを `BUNDLE_PREVIEWS` に追加する。
 
 ```ts ignore-check
 import examplePreview from './assets/example-preview.svg'
@@ -33,20 +33,20 @@ import examplePreviewZh from './assets/example-preview.zh.svg'
 ['@deepseek-ai/dsh-example-bundle', { en: examplePreview, zh: examplePreviewZh }]
 ```
 
-Keep the map's required `en` and `zh` type. Do not add package metadata, a Host read method, exported preview resources, or a third-party declaration path. Use the [badge skill](../../packages/client/ui-plugin-manager/src/client/assets/badge-skill-preview.svg) and [voice input](../../packages/client/ui-plugin-manager/src/client/assets/voice-input-preview.svg) illustrations as examples. The voice transcript is explanatory sample content, not a recording result.
+マップに必須の `en` と `zh` 型を保持する。パッケージメタデータ、ホスト読み取りメソッド、エクスポートされたプレビューリソース、サードパーティ宣言パスを追加しない。[badge skill](../../packages/client/ui-plugin-manager/src/client/assets/badge-skill-preview.svg) と [voice input](../../packages/client/ui-plugin-manager/src/client/assets/voice-input-preview.svg) イラストを例として使う。voice transcript は説明用のサンプル内容であり、録音結果ではない。
 
-## 4. Keep the page contract
+## 4. ページ契約を保つ
 
-| Item | Current behavior |
+| 項目 | 現在の動作 |
 |---|---|
-| Position | Below the description and status notices, above components and source information; aligned with the description. |
-| Spacing | 24 px above the image; 32 px before the following details section. |
-| Display | One `<img>`, natural 640×300 canvas, at most the available width and 320 px high; proportional scaling. The page supplies border and 16 px corners. |
-| Language | The current UI language selects one of the required files. Alternative text uses the localized plugin name. |
-| Availability | Visible before activation. Decode failure shows a localized notice without blocking controls. Lists and component rows retain their small icons. |
+| 位置 | 説明と状態通知の下、コンポーネントとソース情報の上。説明に揃える。 |
+| 間隔 | 画像上に 24 px。後の details 区分前に 32 px。 |
+| 表示 | 1 つの `<img>`、自然 640×300 キャンバス、最大で利用可能幅と高さ 320 px。比例拡縮。ページが境界と 16 px 角を提供する。 |
+| 言語 | 現在の UI 言語が必須ファイルの一方を選択する。代替テキストはローカライズされたプラグイン名を使う。 |
+| 可用性 | 有効化前に可視である。デコード失敗はコントロールを妨げずにローカライズされた通知を表示する。リストとコンポーネント行は小さなアイコンを保持する。 |
 
-## 5. Validate and review
+## 5. 検証とレビュー
 
-Run `pnpm exec vitest run scripts/builtin-plugin-preview.spec.ts packages/client/ui-plugin-manager/tests/components.client.spec.tsx scripts/client-bundle-css.spec.ts`, then `pnpm run build`. The asset test checks every registered pair, fixed SVG dimensions, self-contained content, and combined size. Type checking requires both languages. These checks enforce format; visual quality and equivalent meaning in both languages still require review.
+`pnpm exec vitest run scripts/builtin-plugin-preview.spec.ts packages/client/ui-plugin-manager/tests/components.client.spec.tsx scripts/client-bundle-css.spec.ts` を実行し、次に `pnpm run build` を実行する。アセットテストは登録ペアすべて、固定 SVG 寸法、自己完結内容、合計寸法を検査する。型検査は両言語を必須とする。これらの検査は形式を強制する。視覚品質と両言語での等価な意味は依然としてレビューが必要である。
 
-Open the real plugin details in English and Chinese before activation. Decode the image and confirm 640×300 natural dimensions, placement, light/dark readability, and no horizontal overflow at 390 px. Also check a built-in without artwork and a third-party plugin. Follow [record-browser-gif](../../.agents/skills/record-browser-gif/SKILL.md) for PR evidence; record from the final clean commit and label the demonstrated flow accurately.
+実際のプラグイン詳細を有効化前に英語と中国語で開く。画像をデコードし、自然 640×300 寸法、配置、ライト・ダーク可読性、390 px での横はみ出しなしを確認する。artwork なし組み込みとサードパーティプラグインも検査する。PR 証跡は [record-browser-gif](../../.agents/skills/record-browser-gif/SKILL.md) に従う。最終 clean コミットから記録し、実演フローを正確にラベル付けする。

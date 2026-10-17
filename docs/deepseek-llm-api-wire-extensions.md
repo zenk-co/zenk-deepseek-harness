@@ -1,46 +1,46 @@
-# Official DeepSeek LLM API wire extensions
+# 公式 DeepSeek LLM API ワイヤー拡張
 
-English | [中文](deepseek-llm-api-wire-extensions.zh.md)
+日本語 | [English](deepseek-llm-api-wire-extensions.en.md) | [中文](deepseek-llm-api-wire-extensions.zh.md)
 
-This reference defines every DeepSeek Harness-specific HTTP header and additive JSON field sent by [`@deepseek-ai/dsh-llm-deepseek`](../packages/llm/llm-deepseek/README.md) on `deepseek-official` Messages requests. It does not redefine fields owned by the upstream DeepSeek API. The provider-neutral LLM interface and `llm-pi-ai` do not implement these additions.
+このリファレンスは、[`@deepseek-ai/dsh-llm-deepseek`](../packages/llm/llm-deepseek/README.md) が `deepseek-official` Messages リクエストで送信する、DeepSeek Harness 固有のすべての HTTP ヘッダーと追加 JSON フィールドを定義する。上流の DeepSeek API が所有するフィールドを再定義するものではない。プロバイダー中立の LLM インターフェースと `llm-pi-ai` は、これらの追加を実装しない。
 
-The adapter sends the additions to its resolved `baseURL`, including a configured gateway. They remain outside `messages`, system prompts, and tool schemas, so they do not add model-input tokens or alter the model-visible prefix.
+アダプターは追加内容を、解決された `baseURL`（設定されたゲートウェイを含む）に送信する。追加内容は `messages`、システムプロンプト、ツールスキーマの外側にとどまるため、モデル入力トークンを増やさず、モデル可視のプレフィックスも変えない。
 
-## Wire namespaces and versioning
+## ワイヤー名前空間とバージョニング
 
-| Location | Naming | Examples |
+| 位置 | 命名 | 例 |
 |---|---|---|
-| HTTP field names | Lowercase kebab-case; HTTP matching remains case-insensitive | `user-agent`, `x-deepseek-harness-session-id` |
-| DeepSeek request-body extension fields | Snake case with the reserved `dsh_` prefix | `dsh_plugin_packages`, `dsh_session_log` |
-| DSH-owned nested JSON members | Camel case | `afterSeq`, `throughSeq`, `sessionId` |
-| Tagged values | Kebab-case strings; durable events use `domain/action` | `session-log-deepseek/delivery-accepted` |
+| HTTP フィールド名 | 小文字の kebab-case。HTTP のマッチングは引き続き大文字小文字を区別しない | `user-agent`, `x-deepseek-harness-session-id` |
+| DeepSeek リクエストボディの拡張フィールド | 予約された `dsh_` プレフィックスを持つ snake case | `dsh_plugin_packages`, `dsh_session_log` |
+| DSH 所有のネストされた JSON メンバー | Camel case | `afterSeq`, `throughSeq`, `sessionId` |
+| タグ付きの値 | kebab-case 文字列。永続イベントは `domain/action` を使う | `session-log-deepseek/delivery-accepted` |
 
-Each body extension owns its `version` independently. A version applies only to the object that contains it; no compatibility or ordering relationship exists between versions of different fields. JSON member order is not part of the protocol.
+各ボディ拡張は自身の `version` を独立に所有する。バージョンはそれを含むオブジェクトにのみ適用され、異なるフィールドのバージョン間に互換性や順序の関係は存在しない。JSON メンバーの順序はプロトコルの一部ではない。
 
-The [`DeepSeekLlmApiExtensionRegistry`](../packages/llm/deepseek-llm-api-extensions/README.md) reserves one provider per top-level extension name. Empty or whitespace-padded names, duplicate registrations, and collisions with the base DeepSeek request fail before HTTP dispatch.
+[`DeepSeekLlmApiExtensionRegistry`](../packages/llm/deepseek-llm-api-extensions/README.md) は、トップレベル拡張名ごとに 1 つのプロバイダーを予約する。空の名前、前後に空白が付いた名前、重複登録、および DeepSeek のベースリクエストとの衝突は、HTTP ディスパッチの前に失敗する。
 
-## Request headers
+## リクエストヘッダー
 
-| Header | Presence | Value |
+| ヘッダー | 出現条件 | 値 |
 |---|---|---|
-| `user-agent` | Every provider HTTP request, including Files API operations | Application identity in `product/version (+url)` form; the default product is `deepseek-harness` |
-| `x-deepseek-harness-user-id` | Every authorized model request | The stable anonymous UUID for the resolved Harness home |
-| `x-deepseek-harness-session-id` | Model requests carrying a Session id | The exact request `sessionId` string |
-| `x-deepseek-harness-compact` | Model requests whose purpose is `compaction` | The literal string `1` |
+| `user-agent` | すべてのプロバイダー HTTP リクエスト（Files API 操作を含む） | `product/version (+url)` 形式のアプリケーション同一性。デフォルトの product は `deepseek-harness` |
+| `x-deepseek-harness-user-id` | すべての認可されたモデルリクエスト | 解決された Harness home の安定した匿名 UUID |
+| `x-deepseek-harness-session-id` | セッション id を運ぶモデルリクエスト | 正確なリクエスト `sessionId` 文字列 |
+| `x-deepseek-harness-compact` | purpose が `compaction` であるモデルリクエスト | リテラル文字列 `1` |
 
-Credential failure happens before anonymous-user-id resolution, so an unauthorized request neither sends these headers nor creates the identity file. A direct request without a Session omits `x-deepseek-harness-session-id`. Session-title requests have no additional purpose header; the ordinary Session-id rule still applies when one carries a `sessionId`.
+資格情報の失敗は匿名ユーザー id の解決より前に起きるため、認可されていないリクエストはこれらのヘッダーを送信せず、識別ファイルも作成しない。セッションを持たない直接リクエストは `x-deepseek-harness-session-id` を省略する。セッションタイトルのリクエストに追加の purpose ヘッダーはなく、`sessionId` を運ぶ場合は通常のセッション id ルールが引き続き適用される。
 
-## Body-extension transaction
+## ボディ拡張トランザクション
 
-The adapter serializes the complete base body, including the exact `messages`, before it asks registered providers to prepare fields. A provider receives that immutable body, the request cancellation signal, and optional `sessionId` and auxiliary-call `purpose`. Returning `undefined` omits that provider's field for the request.
+アダプターは、登録されたプロバイダーにフィールドの準備を求める前に、正確な `messages` を含む完全なベースボディをシリアライズする。プロバイダーはその不変ボディ、リクエストのキャンセルシグナル、およびオプションの `sessionId` と補助呼び出しの `purpose` を受け取る。`undefined` を返すと、そのプロバイダーのフィールドはそのリクエストで省略される。
 
-Prepared JSON values are detached from provider-owned state, merged as top-level siblings of the base fields, and serialized in the same HTTP body. A contributor whose preparation fails is omitted from that request, with only its first failure logged, while the other fields are still sent; a field that collides with a base field prevents the request. If the merged body fails to serialize, the adapter sends the base body without any extension field, skips the acceptance transaction so contributors resend their state on a later request, and logs the omitted field names. A composition without the registry sends the unextended base body.
+準備された JSON 値はプロバイダー所有の状態から切り離され、ベースフィールドのトップレベルの兄弟としてマージされ、同じ HTTP ボディにシリアライズされる。準備に失敗したコントリビューターはそのリクエストから省略され、最初の失敗のみがログに記録されるが、他のフィールドは引き続き送信される。ベースフィールドと衝突するフィールドはリクエストを妨げる。マージされたボディのシリアライズが失敗した場合、アダプターは拡張フィールドのないベースボディを送信し、コントリビューターが後のリクエストで自身の状態を再送できるよう受け入れトランザクションをスキップし、省略されたフィールド名をログに記録する。レジストリのない構成は、拡張されていないベースボディを送信する。
 
-After the configured endpoint returns HTTP 2xx, the adapter runs the prepared `accept()` transaction before reading the SSE response body. Transport failures and non-2xx responses do not accept any contribution. An acceptance failure is logged and does not fail the model request; the contributor resends its unaccepted state on a later request. Acceptance records endpoint-level HTTP success; it does not assert that an SSE stream completed or that the endpoint persisted an extension.
+設定されたエンドポイントが HTTP 2xx を返した後、アダプターは SSE レスポンスボディを読む前に、準備された `accept()` トランザクションを実行する。転送の失敗と非 2xx レスポンスは、どのコントリビューションも受け入れない。受け入れの失敗はログに記録され、モデルリクエストを失敗させない。コントリビューターは受け入れられなかった状態を後のリクエストで再送する。受け入れはエンドポイントレベルの HTTP 成功を記録するものであり、SSE ストリームが完了したことも、エンドポイントが拡張を永続化したことも主張しない。
 
 ## `dsh_plugin_packages`
 
-[`@deepseek-ai/dsh-plugin-package-inventory-deepseek`](../packages/llm/plugin-package-inventory-deepseek/README.md) contributes the complete active Loader-backed plugin package inventory. The field is enabled by default.
+[`@deepseek-ai/dsh-plugin-package-inventory-deepseek`](../packages/llm/plugin-package-inventory-deepseek/README.md) は、アクティブな Loader 由来のプラグインパッケージインベントリの全体をコントリビュートする。このフィールドはデフォルトで有効である。
 
 ```json
 {
@@ -56,24 +56,24 @@ After the configured endpoint returns HTTP 2xx, the adapter runs the prepared `a
 }
 ```
 
-| Member | Type | Meaning |
+| メンバー | 型 | 意味 |
 |---|---|---|
-| `version` | `1` | Schema version for `dsh_plugin_packages` |
-| `packages` | array | Complete active set for this request |
-| `packages[].name` | string | Exact non-empty npm package name from the owning manifest |
-| `packages[].version` | optional string | Exact non-blank package version from the same manifest; absent when unavailable |
+| `version` | `1` | `dsh_plugin_packages` のスキーマバージョン |
+| `packages` | 配列 | このリクエストの完全なアクティブ集合 |
+| `packages[].name` | 文字列 | 所有マニフェストからの正確な非空 npm パッケージ名 |
+| `packages[].version` | オプションの文字列 | 同じマニフェストからの正確な非空白パッケージバージョン。利用できない場合は省略される |
 
-Every request re-reads active non-group Loader entries from the host tree and, when available for the request Session, its standing agent-preset tree. Relative and absolute modules use their nearest owning manifest; bare package entries follow the Loader resolution base that activated them. A named manifest without a non-blank string version contributes `{ name }`, regardless of `private`. Missing names and unreadable manifests omit only the affected entries; package metadata does not block requests.
+すべてのリクエストは、ホストツリーからアクティブな非グループ Loader エントリを読み直し、リクエストのセッションに対して利用可能な場合は、その常設のエージェントプリセットツリーも読み直す。相対モジュールと絶対モジュールは最も近い所有マニフェストを使い、ベアパッケージエントリは自身をアクティブ化した Loader 解決ベースに従う。非空白文字列のバージョンを持たない名前付きマニフェストは、`private` に関係なく `{ name }` をコントリビュートする。名前の欠落と読めないマニフェストは、影響を受けるエントリのみを省略する。パッケージメタデータはリクエストを妨げない。
 
-The sender deduplicates exact `(name, optional version)` pairs and sorts first by `name`, then by `version`, with a locale-independent text comparison and absent versions first. Simultaneously active versions of one package remain separate entries, including a name-only entry. Receivers must accept absent versions, must not collapse the array by package name, and must not infer package activation from array order.
+送信者は正確な `(name, オプションの version)` ペアを重複排除し、まず `name` で、次に `version` で並べ替える。比較はロケール非依存のテキスト比較を使い、バージョンがないものが先になる。1 つのパッケージの同時にアクティブな複数バージョンは、名前のみのエントリを含め、別々のエントリとして残る。受信者はバージョンの欠落を受け入れなければならず、配列をパッケージ名で折り畳んではならず、配列順からパッケージのアクティブ化を推測してはならない。
 
-Disabled, pending, failed, unloading, disposed, and structural Loader entries are absent. Ordinary dependencies, loose modules without a named owning package, programmatically mounted child fibers, and in-memory dynamic plugins are also absent because they have no authoritative Loader-backed package identity.
+無効化された、pending、failed、unloading、disposed、および構造的な Loader エントリは存在しない。通常の依存関係、名前付きの所有パッケージを持たないルーズなモジュール、プログラムからマウントされた子ファイバー、およびメモリ内の動的プラグインも、権威ある Loader 由来のパッケージ同一性を持たないため存在しない。
 
-An enabled inventory with no qualifying entries sends `packages: []`; disabling the contributor omits the entire `dsh_plugin_packages` field. Package identities are provider metadata and never enter model input.
+条件を満たすエントリのない有効なインベントリは `packages: []` を送信し、コントリビューターを無効化すると `dsh_plugin_packages` フィールド全体が省略される。パッケージ同一性はプロバイダーのメタデータであり、モデル入力に決して入らない。
 
 ## `dsh_session_log`
 
-[`@deepseek-ai/dsh-session-log-deepseek`](../packages/session/session-log-deepseek/README.md) contributes one contiguous suffix of the canonical Session log. The field is enabled by default. It applies to a request with a live Session and at least one event; a direct request, a stale Session id, or an empty log omits the field, as does a request whose first pending event alone exceeds `maxBytes` or cannot be serialized; a composition disables it with `enabled: false`. The examples below use logical Session format 2 only to illustrate the wire fields; they do not identify the [current writer format](session-format-status.md).
+[`@deepseek-ai/dsh-session-log-deepseek`](../packages/session/session-log-deepseek/README.md) は、正準セッションログの 1 つの連続するサフィックスをコントリビュートする。このフィールドはデフォルトで有効である。ライブセッションを持ち、少なくとも 1 つのイベントがあるリクエストに適用される。直接リクエスト、古いセッション id、または空のログはこのフィールドを省略し、最初の保留イベントだけで `maxBytes` を超える、またはシリアライズできないリクエストも同様である。構成は `enabled: false` で無効化できる。以下の例はワイヤーフィールドを説明するためだけに論理セッション形式 2 を使っており、[現在のライター形式](session-format-status.md)を識別するものではない。
 
 ```json
 {
@@ -101,40 +101,40 @@ An enabled inventory with no qualifying entries sends `packages: []`; disabling 
 }
 ```
 
-| Member | Type | Meaning |
+| メンバー | 型 | 意味 |
 |---|---|---|
-| `version` | `1` | Schema version for `dsh_session_log` |
-| `sessionFormatVersion` | non-negative integer | Session format generation represented by this suffix |
-| `session` | object | Immutable wire projection of the current Session header |
-| `afterSeq` | integer | Greatest sequence recorded as accepted before this request, or `-1` |
-| `throughSeq` | non-negative integer | Greatest sequence represented by this request |
-| `events` | array | Contiguous events from `afterSeq + 1` through `throughSeq` |
+| `version` | `1` | `dsh_session_log` のスキーマバージョン |
+| `sessionFormatVersion` | 非負整数 | このサフィックスが表すセッション形式の世代 |
+| `session` | オブジェクト | 現在の Session ヘッダーの不変のワイヤープロジェクション |
+| `afterSeq` | 整数 | このリクエストの前に受け入れ済みとして記録された最大シーケンス、または `-1` |
+| `throughSeq` | 非負整数 | このリクエストが表す最大シーケンス |
+| `events` | 配列 | `afterSeq + 1` から `throughSeq` までの連続イベント |
 
-The first upload uses `afterSeq: -1`, and each later upload starts after the greatest accepted watermark for the same Session id. Each upload carries the longest contiguous run from that point whose serialized field fits `maxBytes`, 8 MiB by default and counted in UTF-8 bytes including the header and numeric fields, so a backlog above the limit spans several accepted requests. The sender snapshots the event array once per request; appends after that snapshot belong to a later request.
+最初のアップロードは `afterSeq: -1` を使い、以降のアップロードは同じセッション id の受け入れ済みウォーターマークの最大値の後から始まる。各アップロードは、その位置からの最長の連続区間のうち、シリアライズしたフィールドが `maxBytes` に収まるものを運ぶ。`maxBytes` はデフォルト 8 MiB で、ヘッダーと数値フィールドを含む UTF-8 バイト数で数えられるため、上限を超えるバックログは複数の受け入れ済みリクエストにまたがる。送信者はイベント配列をリクエストごとに 1 回スナップショットする。そのスナップショットの後の追加は後のリクエストに属する。
 
-### Wire Session header
+### ワイヤーの Session ヘッダー
 
-The `session` member projects logical Session metadata to raw JSON primitives. A seeded Session sends its exact `Session.inheritedEventCount` as `seedLength`; an unseeded Session omits that field. The logical `isSeeded` flag does not appear on this wire. The outer `dsh_session_log.version` selects this extension schema, while `session.version` selects the logical Session format. Changing the Session header projection requires an extension-schema bump even when the embedded logical format also changes.
+`session` メンバーは論理セッションメタデータを生の JSON プリミティブに投影する。シードされたセッションは正確な `Session.inheritedEventCount` を `seedLength` として送信し、シードされていないセッションはそのフィールドを省略する。論理 `isSeeded` フラグはこのワイヤーには現れない。外側の `dsh_session_log.version` がこの拡張スキーマを選択し、`session.version` が論理セッション形式を選択する。Session ヘッダーのプロジェクションを変更するには、埋め込まれた論理形式も同時に変わる場合でも拡張スキーマの版上げが必要である。
 
-| Member | Presence | Meaning |
+| メンバー | 出現条件 | 意味 |
 |---|---|---|
-| `version` | required | Logical Session format version from `Session.header`; see [format status](session-format-status.md) |
-| `id` | required | Exact Session id |
-| `createdAt` | required | Non-negative safe-integer Unix epoch milliseconds |
-| `cwd` | optional | Absolute working directory recorded at Session creation |
-| `parentSession` | optional | Parent Session id for a fork |
-| `seedLength` | seeded Sessions only | Exact inherited event count, including zero for an empty inherited prefix |
-| `origin` | optional | Literal `subagent` for a subagent child |
-| `delegationDepth` | optional | Non-negative persisted subagent delegation depth |
-| `agentPreset` | optional | Agent preset id used to compose this Session |
+| `version` | 必須 | `Session.header` からの論理セッション形式バージョン。[形式ステータス](session-format-status.md) を参照 |
+| `id` | 必須 | 正確なセッション id |
+| `createdAt` | 必須 | 非負の安全整数の Unix epoch ミリ秒 |
+| `cwd` | オプション | セッション作成時に記録された絶対作業ディレクトリ |
+| `parentSession` | オプション | フォークの親セッション id |
+| `seedLength` | シードされたセッションのみ | 正確な継承イベント数。空の継承プレフィックスでは 0 |
+| `origin` | オプション | サブエージェントの子に対するリテラル `subagent` |
+| `delegationDepth` | オプション | 永続化された非負のサブエージェント委譲深度 |
+| `agentPreset` | オプション | このセッションの構成に使われたエージェントプリセット id |
 
-### Canonical event envelopes
+### 正準イベントエンベロープ
 
-Each `events` item carries a canonical event as raw JSON primitives, independently of every other request field. Every event includes `type`, numeric `seq`, `time`, and `data`, with `ignorable: true` preserved when present. Surface events require `surfaceOp`; replacement ranges use numeric `startSeq` and `endSeq`, and system, user, and tool events may also carry numeric `sourceEventSeqs`. Assistant provider metadata remains in its embedded stream. Known log-only events omit surface metadata; restored unknown ignorable records preserve opaque metadata without treating it as a surface operation.
+各 `events` 項目は、他のすべてのリクエストフィールドとは独立に、正準イベントを生の JSON プリミティブとして運ぶ。すべてのイベントは `type`、数値の `seq`、`time`、`data` を含み、`ignorable: true` が存在する場合はそれが保持される。サーフェスイベントには `surfaceOp` が必要である。置換レンジは数値の `startSeq` と `endSeq` を使い、system、user、tool イベントは数値の `sourceEventSeqs` も運ぶことがある。Assistant のプロバイダーメタデータはその埋め込みストリームに残る。既知のログ専用イベントはサーフェスメタデータを省略し、復元された未知の無視可能レコードは、それをサーフェス操作として扱わずに不透明メタデータを保持する。
 
-### Acceptance watermark and at-least-once delivery
+### 受け入れウォーターマークと少なくとも 1 回の配信
 
-After the endpoint returns HTTP 2xx, the contribution appends this canonical event to the same Session:
+エンドポイントが HTTP 2xx を返した後、コントリビューションはこの正準イベントを同じセッションに追加する：
 
 ```json
 {
@@ -149,14 +149,14 @@ After the endpoint returns HTTP 2xx, the contribution appends this canonical eve
 }
 ```
 
-`delivery-accepted` means that the configured endpoint returned HTTP 2xx for the containing LLM request. It does not assert SSE completion or remote persistence. The event's `throughSeq` must identify an earlier event, its `sessionId` identifies the Session whose suffix was sent, and `sessionFormatVersion` binds the watermark to that exact logical generation. Absence means historical format v0.
+`delivery-accepted` は、設定されたエンドポイントが、それを含む LLM リクエストに対して HTTP 2xx を返したことを意味する。SSE の完了やリモートでの永続化を主張するものではない。イベントの `throughSeq` はより早いイベントを識別しなければならず、`sessionId` はサフィックスを送信したセッションを識別し、`sessionFormatVersion` はウォーターマークをその正確な論理世代に結び付ける。存在しない場合は履歴形式 v0 を意味する。
 
-The sender folds the greatest matching `throughSeq` for the current Session id and format generation, so concurrent accepted requests cannot move the cursor backward and a watermark from another generation cannot authorize the current suffix. A resumed process rebuilds the cursor from the durable log. A fork ignores inherited watermarks that name another Session, and therefore uploads its own inherited prefix from sequence zero, in requests bounded by `maxBytes`, before advancing under the child id. The watermark event itself belongs to the next unsent suffix.
+送信者は、現在のセッション id と形式世代に一致する最大の `throughSeq` を畳み込む。そのため、並行して受け入れられたリクエストがカーソルを後退させることはなく、別の世代のウォーターマークが現在のサフィックスを認可することもない。再開されたプロセスは永続ログからカーソルを再構築する。フォークは別のセッションを名指す継承ウォーターマークを無視するため、子 id で進める前に、`maxBytes` で区切られたリクエストで自身の継承プレフィックスをシーケンス 0 からアップロードする。ウォーターマークイベント自体は次に未送信のサフィックスに属する。
 
-Transport failures, non-2xx responses, and requests sent without extension fields after a serialization failure append no watermark. A crash after endpoint acceptance but before local persistence may resend an already accepted range; uncertainty produces duplicates, never a sequence gap. There is no independent upload store or truncation path; `maxBytes` bounds each request's field instead.
+転送の失敗、非 2xx レスポンス、およびシリアライズ失敗後に拡張フィールドなしで送られたリクエストは、ウォーターマークを追加しない。エンドポイントの受け入れ後、ローカルへの永続化前にクラッシュすると、すでに受け入れられた範囲を再送することがある。不確実性は重複を生むが、シーケンスの欠落は決して生まない。独立したアップロードストアや切り詰めパスは存在せず、代わりに `maxBytes` が各リクエストのフィールドを制限する。
 
-## Exposure and receiver requirements
+## 露出内容と受信者要件
 
-The request headers expose the Harness application version, one anonymous Harness-home identity, and an optional Session identity. `dsh_plugin_packages` exposes active npm package names and versions. Unless a composition disables it, `dsh_session_log` may expose the Session working directory, system-prompt snapshots, user and Assistant content, embedded Assistant streams, failed-attempt output, tool arguments and results, compaction summaries, feedback, and plugin-owned events. Adapter API keys are not Session events and therefore do not enter the field. A gateway selected through `baseURL` receives the same values as the official endpoint.
+リクエストヘッダーは、Harness アプリケーションバージョン、1 つの匿名 Harness-home 同一性、およびオプションのセッション同一性を露出する。`dsh_plugin_packages` はアクティブな npm パッケージ名とバージョンを露出する。構成が無効化しない限り、`dsh_session_log` はセッションの作業ディレクトリ、システムプロンプトのスナップショット、ユーザーと Assistant のコンテンツ、埋め込み Assistant ストリーム、失敗した試行の出力、ツール引数と結果、コンパクション要約、フィードバック、およびプラグイン所有のイベントを露出しうる。アダプターの API キーはセッションイベントではないため、このフィールドに入らない。`baseURL` を通じて選択されたゲートウェイは、公式エンドポイントと同じ値を受け取る。
 
-Receivers address extension fields by name, dispatch each field by its own `version`, preserve distinct package versions, and ignore JSON member ordering. A session-log receiver validates the contiguous sequence range before interpreting event types. An unrecognized canonical event without `ignorable: true` prevents lossless reconstruction. The base request remains usable without either the registry or a particular contribution; field absence means that contribution did not apply to that request. While a session-log backlog drains, `throughSeq` trails the Session's latest event, so a 2xx does not show that the receiver holds the current log.
+受信者は拡張フィールドを名前でアドレス指定し、各フィールドを自身の `version` でディスパッチし、異なるパッケージバージョンを保持し、JSON メンバーの順序を無視する。セッションログの受信者は、イベント種別を解釈する前に連続シーケンス範囲を検証する。`ignorable: true` のない認識されない正準イベントは、無損失の再構築を妨げる。ベースリクエストは、レジストリまたは特定のコントリビューションがなくても使用可能なままである。フィールドの欠落は、そのコントリビューションがそのリクエストに適用されなかったことを意味する。セッションログのバックログが排出されている間、`throughSeq` はセッションの最新イベントに後れを取るため、2xx は受信者が現在のログを保持していることを示さない。

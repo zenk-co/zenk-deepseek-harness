@@ -5,7 +5,7 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-plugin-package-inventory-deepseek
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

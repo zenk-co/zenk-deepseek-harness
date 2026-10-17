@@ -1,51 +1,51 @@
 ---
-description: "The storage group map: durable non-session data through named backends and the typed domain data form, for users and maintainers navigating the group."
+description: "ストレージグループマップ: ワークスペースレコードやセッションサイドカーなど durable な非セッションデータを、名前付きバックエンドと型付きドメインデータ形式で保持する。"
 kind: "package-group"
 ---
 
 # packages/storage
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The storage group keeps non-session application data across restarts, including workspace records and session sidecars. Choose `storage-json` for human-readable files or `storage-sqlite` for point updates in one database; `storage-domain` adds schema-validated typed records and change notifications, while `storage` selects the configured backend. These packages are optional and host-side: they do not expose tools, prompt content, or session events to the model. Use the group when application state must outlive a process, and omit it when the composition has no such data.
+ストレージグループは、ワークスペースレコードやセッションサイドカーを含む非セッションアプリケーションデータを再起動をまたいで保持する。`storage-json` は人間可読ファイル向け、`storage-sqlite` は単一データベース内でのポイント更新向け、`storage-domain` はスキーマ検証済み型付きレコードと変更通知を追加し、`storage` は設定済みバックエンドを選択する。これらのパッケージはオプショナルで Host 側のものであり、モデルにツール、プロンプト内容、セッションイベントを公開しない。アプリ状態がプロセスを超えて存続しなければならない場合にこのグループを使い、そのようなデータがない構成では省略すること。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`storage`](storage/README.md) | Connects registered backends with mounted data-form facilities | `ctx.storage` |
-| [`storage-json`](storage-json/README.md) | Stores each unit as one human-readable JSON file | registers backend `json` |
-| [`storage-sqlite`](storage-sqlite/README.md) | Stores units as JSON documents in one SQLite database | registers backend `sqlite` |
-| [`storage-domain`](storage-domain/README.md) | Provides schema-validated, change-emitting KV domains over routed backends | `ctx.storageDomain` |
+| [`storage`](storage/README.md) | 登録済みバックエンドとマウント済みデータ形式ファシリティを接続する | `ctx.storage` |
+| [`storage-json`](storage-json/README.md) | 1単位を1つの人間可読 JSON ファイルとして格納する | バックエンド `json` を登録する |
+| [`storage-sqlite`](storage-sqlite/README.md) | 単位を単一 SQLite データベース内の JSON ドキュメントとして格納する | バックエンド `sqlite` を登録する |
+| [`storage-domain`](storage-domain/README.md) | ルーティング済みバックエンド上にスキーマ検証済みで変更通知付きの型付き KV ドメインを提供する | `ctx.storageDomain` |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Storage subsystem](../../docs/subsystems/storage.md) — the authoritative contract: the backend contract, domain declaration, change events, and generated API.
-- [domain KV storage Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — the design behind the family, the workspace consumer, and the deferred session-backend migration.
-- [Workspace subsystem](../../docs/subsystems/workspace.md) — the first consumer of the domain data form.
+- [Storage サブシステム](../../docs/subsystems/storage.md) — 正式な契約: バックエンド契約、ドメイン宣言、変更イベント、生成 API。
+- [ドメイン KV ストレージ Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — ファミリー、ワークスペース消費者、延期されたセッションバックエンド移行の背後にある設計。
+- [Workspace サブシステム](../../docs/subsystems/workspace.md) — データ形式の最初の消費者。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-The design Agent Note is still marked proposed while the family ships; its out-of-scope table is the deferred-work list for the migration phase (the `log` facet, session-backend reuse, cross-process change push). Promote decisions into implemented notes as they land.
+設計 Agent Note は提案中のままファミリーが出荷されている。その対象外テーブルは移行フェーズの将来作業リストである（`log` ファセット、セッションバックエンドの再利用、クロスプロセス変更プッシュ）。着地したら決定を implemented ノートに昇格させること。
 
 </details>

@@ -1,39 +1,39 @@
 ---
-description: "The credential seam for users and maintainers resolving, describing, or storing credentials — reference values and durable records — without putting secret values in configuration."
+description: "秘密の値を設定に置かずに、クレデンシャル — 参照値と永続レコード — を解決、記述、保存するユーザーとメンテナー向けのクレデンシャルシーム。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-credentials
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-credentials` keeps secret values out of configuration by letting settings and `cordis.yml` refer to key names such as `DEEPSEEK_API_KEY`. It also stores durable per-plugin credential records, including authorization grants and provider environment values. A rotated stored key applies to the next request without a restart or configuration edit. Configuration UIs can report whether a key or record is set, its source, and whether it is writable without exposing values. Empty key values count as absent, while an empty record remains a deliberate stored credential.
+`dsh-credentials` は、設定と `cordis.yml` が `DEEPSEEK_API_KEY` のようなキー名を参照できるようにすることで、秘密の値を設定から排除する。また、承認グラントやプロバイダー環境値を含む、プラグインごとの永続クレデンシャルレコードを保存する。ローテーションされた保存済みキーは、再起動や設定編集なしで次のリクエストから適用される。構成 UI は、値を公開することなく、キーやレコードが設定されているか、そのソース、書き込み可能かどうかを報告できる。空のキー値は存在しないものとして扱われる一方、空のレコードは意図的に保存されたクレデンシャルのままである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-This package is the part of the product that stores and looks up secret values: store a key once, reference it by name everywhere, and read, check, or remove it at any time. It also keeps durable credential records, so a plugin can store, update, and remove the credentials it holds for its own ids. The product's default composition already includes a credential store; a custom composition loads the local store package with a file path.
+このパッケージは、秘密の値を保存・検索する製品部分である: キーを一度保存し、どこからでも名前で参照し、いつでも読み取り、確認、削除できる。また永続クレデンシャルレコードを保持するので、プラグインは自身の ID に対して保持するクレデンシャルを保存、更新、削除できる。製品の既定構成にはすでにクレデンシャルストアが含まれている。カスタム構成では、ローカルストアパッケージをファイルパスとともにロードする。
 
-### When to use it
+### いつ使うか
 
-Use a credential store whenever configuration must stay free of secret values: settings files that are synced, shared, or rendered in a configuration UI, or teams that rotate keys without editing configuration. Use records when a plugin must keep credentials with no single environment variable — an authorization grant from a sign-in flow, or provider environment values — and when a configuration UI should list what a user is authorized for. A configuration UI can show whether a key or record is set, where it comes from, and whether you can change it — never the value itself. If you only need one fixed environment variable, read that variable directly and skip the store.
+設定を秘密の値から自由に保つ必要がある場合は常にクレデンシャルストアを使用する: 同期、共有、または構成 UI で表示される設定ファイル、あるいは設定を編集せずにキーをローテーションするチームなどである。単一の環境変数を持てないクレデンシャル — サインインフローからの承認グラントやプロバイダー環境値 — をプラグインが保持する必要がある場合、および構成 UI がユーザーが認可されているものを一覧表示すべき場合にレコードを使用する。構成 UI は、キーやレコードが設定されているか、どこから来るか、変更できるかを表示でき、値自体を表示することは決してない。固定された環境変数が 1 つだけ必要な場合は、その変数を直接読み取り、ストアを省略する。
 
-### Adding it to your composition
+### 構成に追加する
 
-Load the local store package with a document path:
+ローカルストアパッケージをドキュメントパスとともにロードする:
 
 ```yaml
 - name: '@deepseek-ai/dsh-credentials-local'
@@ -41,9 +41,9 @@ Load the local store package with a document path:
     path: /absolute/path/to/.credentials.yaml
 ```
 
-The local store README owns the full configuration surface; the generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-credentials-local) is the exhaustive field list.
+完全な構成サーフェスはローカルストアの README が所有する。生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-credentials-local)が網羅的なフィールドリストである。
 
-### Storing, checking, and removing keys
+### キーの保存、確認、削除
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -58,11 +58,11 @@ await ctx.credentials.set(ref, 'sk-…')                 // the stored value out
 await ctx.credentials.unset(ref)                       // no-op when absent; an environment fallback then applies again
 ```
 
-Store a key with `set`, remove it with `unset`, check its status with `describe`, and read the current value with `resolve` when an operation needs it. `describe` reports whether the key is set, where it comes from, and whether you can write to it — it never returns the value.
+キーは `set` で保存し、`unset` で削除し、`describe` で状態を確認し、操作が必要とする場合は `resolve` で現在の値を読む。`describe` はキーが設定されているか、どこから来るか、書き込み可能かを報告し、値を返すことは決してない。
 
-### Storing, updating, and removing records
+### レコードの保存、更新、削除
 
-A plugin addresses each record by `<scope>/<id>` — its own registered name plus an id it chooses, such as a provider route key — and reads, modifies, or removes what it holds:
+プラグインは各レコードを `<scope>/<id>` — 自身の登録名と、自身が選ぶ ID (プロバイダールートキーなど) — でアドレス指定し、保持するものを読み取り、変更、削除する:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -78,113 +78,113 @@ await ctx.credentials.modifyRecord(key, async () => ({ kind: 'grant', payload: {
 await ctx.credentials.deleteRecord(key)                  // no-op when absent
 ```
 
-`modifyRecord` is the only write path: it hands your mutation the record as it stands at the moment the write is exclusive, and returning `undefined` leaves the entry untouched. Records have no empty-value rule — a record carrying neither a key nor environment values states that its owner confirmed ambient authentication — and a configuration UI can enumerate every record to show what you are authorized for and find records a removed plugin left behind.
+`modifyRecord` が唯一の書き込み経路である: 書き込みが排他的な時点で成立しているレコードをミューテーションに渡し、`undefined` を返すとエントリーは変更されないまま残る。レコードには空値ルールがない — キーも環境値も持たないレコードは、そのオーナーがアンビエント認証を確認したことを表明する — また構成 UI はすべてのレコードを列挙して、あなたが認可されているものを表示し、削除されたプラグインが残したレコードを見つけられる。
 
-### Using a key in configuration
+### 設定でキーを使用する
 
-A settings section or `cordis.yml` entry names a key instead of containing it — an LLM adapter, for example, takes `apiKeyEnv`:
+設定セクションや `cordis.yml` エントリーは、キーを含めるのではなく名前で参照する — たとえば LLM アダプターは `apiKeyEnv` を取る:
 
 ```yaml
 apiKeyEnv: DEEPSEEK_API_KEY
 ```
 
-Requests that need the key use its current stored value, so rotating the key takes effect on the very next request — no restart and no configuration edit.
+キーを必要とするリクエストは現在の保存値を使用するので、キーのローテーションは次のリクエストで直ちに有効になる — 再起動も設定編集も不要である。
 
-### What can go wrong
+### 何がうまくいかないことがあるか
 
-- **A stored key outranks the launching environment** — while a value is stored, `DEEPSEEK_API_KEY=… dsh` (or a CI secret, a container `-e`) does not apply; `unset` the stored key to use the exported one.
-- **An empty value cannot be stored** — storing an empty string is refused; remove the key instead.
-- **Key values never appear in configuration UIs or diagnostics** — the UI shows whether a key is set, where it comes from, and whether you can change it; the value itself stays in the store.
+- **保存済みキーは起動環境より優先される** — 値が保存されている間は、`DEEPSEEK_API_KEY=… dsh` (または CI シークレットやコンテナの `-e`) は適用されない。エクスポートされたものを使うには保存済みキーを `unset` する。
+- **空の値は保存できない** — 空文字列の保存は拒否される。代わりにキーを削除する。
+- **キーの値が構成 UI や診断に現れることはない** — UI はキーが設定されているか、どこから来るか、変更できるかを表示する。値自体はストアに留まる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the package and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、パッケージ背後の設計決定を説明し、それを実現するコードを示す。観察可能な挙動は[このパッケージを使う](#use-this-package)で完全に説明されている。
 
-### Design philosophy
+### 設計哲学
 
-One doctrine and four consequences:
+1 つのドクトリンと 4 つの帰結:
 
-- **Configuration carries references, never secrets.** A settings section or `cordis.yml` entry names a credential; the value behind the reference lives with a provider. The settings document stays safe to sync and to render, `describe()` answers without holding a value, and rotating a secret touches no configuration file.
-- **Consumers resolve per operation.** Resolution is a per-call read with no cross-operation cache; that read is the hot-update mechanism.
-- **An empty stored value is absent.** `resolve` skips it, `describe` reports it unconfigured — a blank can never masquerade as a configured secret.
-- **Records are durable, and presence is the fact.** A record is stored per `<scope>/<id>` and survives restarts; the empty-value rule does not apply, so an `api-key` record carrying neither a key nor environment values is a deliberate statement, not a blank.
-- **Listener failures are contained.** `notifyUpdated` fans `credentials/reference-updated` out so every listener runs; a sync throw or async rejection is logged without changing the committed operation's outcome.
+- **設定は参照を運び、秘密を運ばない。** 設定セクションや `cordis.yml` エントリーはクレデンシャルを名前で参照する。参照の背後の値はプロバイダーとともに存在する。設定ドキュメントは同期や表示を安全に行え、`describe()` は値を保持せずに回答し、秘密のローテーションが設定ファイルに触れることはない。
+- **コンシューマーは操作ごとに解決する。** 解決は操作をまたぐキャッシュのない呼び出しごとの読み取りであり、その読み取り自体がホットアップデート機構である。
+- **空の保存値は存在しないものとして扱う。** `resolve` はそれをスキップし、`describe` は未構成として報告する — 空白が構成済みの秘密を装うことは決してできない。
+- **レコードは永続的であり、存在自体が事実である。** レコードは `<scope>/<id>` ごとに保存され、再起動を超えて存続する。空値ルールは適用されないので、キーも環境値も持たない `api-key` レコードは、空白ではなく意図的な表明である。
+- **リスナーの失敗は封じ込められる。** `notifyUpdated` は `credentials/reference-updated` をファンアウトしてすべてのリスナーを実行させる。同期 throw や非同期 rejection は、コミットされた操作の結果を変えずにログに記録される。
 
-### The credentials/reference-updated event
+### credentials/reference-updated イベント
 
-`credentials/reference-updated (ref)` fires after a committed change to a provider-managed source — a `set`, an `unset`, or an external edit observed in storage. Ambient process-environment changes are not observable and never emit. Consumers do not need the event (they re-resolve per operation); it exists for configuration UIs refreshing a "configured" badge.
+`credentials/reference-updated (ref)` は、プロバイダー管理ソースへのコミットされた変更 — `set`、`unset`、またはストレージで観測された外部編集 — の後に発火する。アンビエントなプロセス環境の変更は観測できず、決して emit されない。コンシューマーはこのイベントを必要としない (操作ごとに再解決するため)。これは「構成済み」バッジを更新する構成 UI のために存在する。
 
-`credentials/record-updated (key)` fires after a committed change to a stored record — a `modifyRecord` that wrote, a `deleteRecord` that removed, or an external edit observed in storage. It stays a separate event because the two key grammars are disjoint: a listener receiving both spaces on one event could not tell which one a subject belongs to.
+`credentials/record-updated (key)` は、保存されたレコードへのコミットされた変更 — 書き込みを行った `modifyRecord`、削除を行った `deleteRecord`、またはストレージで観測された外部編集 — の後に発火する。2 つのキー文法が互いに素であるため、別個のイベントのままである: 1 つのイベントで両方の空間を受け取るリスナーは、対象がどちらに属するか判別できない。
 
-### Record write and read paths
+### レコードの書き込みと読み取りの経路
 
-`modifyRecord` is the only record write path because a correct write depends on the current value: a token refresh is read-decide-replace, and the mutation sees the record as it stands at the moment the write is exclusive — returning `undefined` leaves the entry untouched. Exclusion holds across processes where the backing store supports it, which is what stops two processes rotating one refresh token from losing whichever wrote first. Reads mirror the reference half but never layer: nothing can shadow a record, and a `grant` payload is returned exactly as its owner wrote it, because only the owning plugin can interpret it.
+`modifyRecord` が唯一のレコード書き込み経路である。正しい書き込みは現在の値に依存するからである: トークンリフレッシュは読み取り-判断-置換であり、ミューテーションは書き込みが排他的な時点で成立しているレコードを見る — `undefined` を返すとエントリーは変更されないまま残る。排他はバッキングストアが対応する範囲でプロセスをまたいで成立し、これが 1 つのリフレッシュトークンをローテーションする 2 つのプロセスのうち先に書いた方が失われるのを防ぐ。読み取りは参照側を反映するが、レイヤー化は決してしない: レコードをシャドウできるものはなく、`grant` ペイロードはオーナーが書いたまま正確に返される。解釈できるのは所有プラグインのみであるためである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service Definition: the `credentialRef`/`credentialKey` brands, `ResolvedCredential`/`CredentialRecordInfo`, the abstract provider over both key spaces, contained fan-out |
-| [`src/types.ts`](src/types.ts) | Client-safe type surface: the `CredentialRef` and `CredentialKey` brands, the stored-record union, the `CredentialInfo` reference view, the `credentials/reference-updated` and `credentials/record-updated` declarations |
+| [`src/index.ts`](src/index.ts) | サービス定義: `credentialRef`/`credentialKey` ブランド、`ResolvedCredential`/`CredentialRecordInfo`、両方のキー空間にわたる抽象プロバイダー、封じ込められたファンアウト |
+| [`src/types.ts`](src/types.ts) | Client 安全な型サーフェス: `CredentialRef` と `CredentialKey` ブランド、保存レコードユニオン、`CredentialInfo` 参照ビュー、`credentials/reference-updated` と `credentials/record-updated` の宣言 |
 
-### Client-safe types
+### Client 安全な型
 
-The `./types` subpath export holds the event declarations together with the `CredentialRef` and `CredentialKey` brands, the stored-record union they name, and the `CredentialInfo` reference view a configuration surface reads, and the package root re-exports them. A consumer outside the Host compilation face therefore reads the very signature the Host emits instead of restating it.
+`./types` サブパスエクスポートは、イベント宣言とともに `CredentialRef` および `CredentialKey` ブランド、それらが指名する保存レコードユニオン、構成サーフェスが読む `CredentialInfo` 参照ビューを保持し、パッケージルートがそれらを再エクスポートする。したがって Host コンパイルフェース外のコンシューマーは、シグネチャを再記述するのではなく、Host が emit するものと同じものを読む。
 
-### Lifecycle
+### ライフサイクル
 
-The service is a Cordis `Service` registered by the provider: disposing the mounting fiber removes `ctx.credentials`.
+サービスはプロバイダーによって登録された Cordis `Service` である: マウントしているファイバーをディスポーズすると `ctx.credentials` が除去される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared subsystem vocabulary to the shipped store and the capability architecture.
+パッケージレベルの契約では足りないときにこれらのページを読む。共有サブシステム語彙から同梱のストアとケイパビリティアーキテクチャへと進む。
 
-- [Credentials subsystem reference](../../../docs/subsystems/credentials.md) — `CredentialRef`/`CredentialKey`, per-operation resolution, UI-safe info, provider layers, and the generated Cordis surface.
-- [Local credentials store](../credentials-local/README.md) — the default on-machine store: where keys and records live and how the environment layers rank.
-- [Capability seams](../../../docs/capability-seams.md) — the Service Definition / Service Provider / Consumer split this package follows.
+- [Credentials subsystem reference](../../../docs/subsystems/credentials.md) — `CredentialRef`/`CredentialKey`、操作ごとの解決、UI 安全な情報、プロバイダーレイヤー、生成される Cordis サーフェス。
+- [Local credentials store](../credentials-local/README.md) — 既定のオンマシンストア: キーとレコードの在処と環境レイヤーの順位。
+- [Capability seams](../../../docs/capability-seams.md) — このパッケージが従う Service Definition / Service Provider / Consumer の分割。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the consuming adapter, which resolves each credential reference and owns every model-facing use a value authorizes.
+間接的。消費するアダプターを通じてであり、アダプターが各クレデンシャル参照を解決し、値が認可するすべてのモデル向けの使用を所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; resolved values never enter a request prefix.
+直接的な無効化はない。解決された値がリクエストプレフィックスに入ることは決してない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this package is a poor fit or needs special care. They are current package constraints, not a task backlog.
+これらの制限は、このパッケージが不適切な選択となる、または特別な注意を要する条件を定義する。これらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **References have no enumeration** — the seam answers questions about references it is given; configuration surfaces learn them from settings schemas, so a `list()` over that half has no current consumer. Records do enumerate, because they have no schema to be discovered from.
-- **References are environment-variable-shaped** — one flat POSIX-identifier namespace, because a reference doubles as the environment name it resolves through. Records carry the richer `<owner>/<id>` addressing.
-- **Process-environment changes are invisible** — no notification can fire for a variable changed in the launching shell; a UI only re-reads `describe()` on its own navigation.
-- **A record's owner is its scope, and nothing verifies the scope is mounted** — the seam stores what it is given and reports what it stores; recognizing an orphan is the caller's join between `listRecords()` and whatever registry owns that scope, and the seam has no registry of its own to check against.
+- **参照に列挙はない** — シームは与えられた参照についての問いに答える。構成サーフェスは設定スキーマからそれらを知るので、その半分に対する `list()` には現在のコンシューマーがない。レコードは列挙できる。発見元となるスキーマを持たないためである。
+- **参照は環境変数の形をしている** — 1 つのフラットな POSIX 識別子名前空間である。参照は解決に使う環境名を兼ねるためである。レコードはより豊かな `<owner>/<id>` アドレス指定を運ぶ。
+- **プロセス環境の変更は不可視** — 起動シェルで変更された変数に対して通知を発火させることはできない。UI は自身のナビゲーション時にのみ `describe()` を再読する。
+- **レコードのオーナーはそのスコープであり、スコープがマウントされていることを検証するものはない** — シームは与えられたものを保存し、保存したものを報告する。孤児の認識は `listRecords()` とそのスコープを所有するレジストリとの間の呼び出し元の結合であり、シーム自身には照合すべきレジストリがない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
+この開発者ノートはメンテナー向けの作業コンテキストである: 未解決の問いと未決定の方向性。明示的に非権威である — 出荷済みの挙動と制限は上記のセクションとパッケージコードにある。
 
-The seam shape leaves room for keyring-, helper-command-, and KMS-backed providers; a remote settings provider never needs to carry secrets. None is shipped, and no current consumer requires one.
+シームの形体は keyring、ヘルパーコマンド、KMS ベースのプロバイダーの余地を残している。リモート設定プロバイダーが秘密を運ぶ必要は決してない。いずれも同梱されておらず、現在それを必要とするコンシューマーも存在しない。
 
 </details>

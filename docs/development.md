@@ -1,80 +1,80 @@
-# Development guide
+# 開発ガイド
 
-English | [中文](development.zh.md)
+日本語 | [English](development.en.md) | [中文](development.zh.md)
 
-The setup tutorial takes a new contributor from prerequisites to a checked checkout. The contributor reference that follows covers repository layout, daily workflow, and CI organization. Design rationale and implementation details belong to the linked Agent Notes and scripts.
+セットアップチュートリアルは、新しいコントリビューターを前提条件から検証済みのチェックアウトまで導く。続くコントリビューターリファレンスは、リポジトリレイアウト、日常のワークフロー、CI の編成を扱う。設計根拠と実装の詳細は、リンクされた Agent Notes とスクリプトに属する。
 
-## Setup tutorial
+## セットアップチュートリアル
 
-### Prerequisites
+### 前提条件
 
-- Node.js supports 22.19+ and 24+. CI covers 22.19, 24, and 26; see the [Node engine floor Agent Note](../.agents/notes/implemented/process/2026-07-06-node-engine-floor.md).
-- Node.js TypeScript type stripping enabled. The repository build scripts load `tsdown.config.ts` with tsdown's native config loader, so they fail when `--no-experimental-strip-types` is in `NODE_OPTIONS` or the Node.js build lacks TypeScript support; `pnpm run build` checks this first and names the cause.
-- Corepack-enabled pnpm. The repo pins `pnpm@11.28.5` in `package.json`; run `corepack enable` if `pnpm --version` does not resolve through Corepack.
-- Git 2.26 or newer; hook setup enables Git's worktree-specific configuration extension.
-- Optional: a DeepSeek API key for the Web, headless, and ACP automation demos and real-API e2e tests.
+- Node.js は 22.19+ と 24+ をサポートする。CI は 22.19、24、26 をカバーする。[Node engine floor Agent Note](../.agents/notes/implemented/process/2026-07-06-node-engine-floor.md) を参照。
+- Node.js の TypeScript 型ストリッピングが有効であること。リポジトリのビルドスクリプトは tsdown のネイティブ設定ローダーで `tsdown.config.ts` をロードするため、`NODE_OPTIONS` に `--no-experimental-strip-types` がある場合や Node.js ビルドが TypeScript サポートを欠く場合は失敗する。`pnpm run build` はこれを最初にチェックし、原因を名指す。
+- Corepack が有効な pnpm。リポジトリは `package.json` で `pnpm@11.28.5` を固定する。`pnpm --version` が Corepack を通じて解決されない場合は `corepack enable` を実行する。
+- Git 2.26 以降。フックのセットアップは Git の worktree 固有設定拡張を有効にする。
+- 省略可能: Web、ヘッドレス、ACP 自動化のデモと実 API e2e テスト用の DeepSeek API キー。
 
-### Windows and WSL 2
+### Windows と WSL 2
 
-On Windows, you can develop with native tools or use WSL 2 for a Linux environment. WSL 2 is useful for verifying Linux behavior and for using Linux toolchains when native dependency compilation or filesystem permissions obstruct Windows development. Each environment needs its own runtime, build tools, and permissions; WSL is optional.
+Windows では、ネイティブツールで開発するか、Linux 環境のために WSL 2 を使うことができる。WSL 2 は、Linux の挙動の検証や、ネイティブ依存のコンパイルまたはファイルシステム権限が Windows での開発を妨げる場合に Linux ツールチェーンを使うのに役立つ。各環境は独自のランタイム、ビルドツール、権限を必要とする。WSL は省略可能である。
 
-Keep the checkout, installed dependencies, and toolchain in the same operating system environment. For WSL 2, store the checkout in the Linux filesystem; for native Windows tools, use the Windows filesystem. Accessing files across the two filesystems adds overhead to I/O-intensive operations such as Git, dependency installation, and builds. See Microsoft's [file storage and performance guidance](https://learn.microsoft.com/en-us/windows/wsl/filesystems#file-storage-and-performance-across-file-systems).
+チェックアウト、インストール済み依存、ツールチェーンは同じオペレーティングシステム環境に保つ。WSL 2 ではチェックアウトを Linux ファイルシステムに置き、ネイティブ Windows ツールでは Windows ファイルシステムを使う。2 つのファイルシステムをまたぐファイルアクセスは、Git、依存のインストール、ビルドなど I/O 集約的な操作にオーバーヘッドを加える。Microsoft の [file storage and performance guidance](https://learn.microsoft.com/en-us/windows/wsl/filesystems#file-storage-and-performance-across-file-systems) を参照。
 
-Install dependencies separately in each environment because native binaries and links can differ between operating systems. Test results apply to the environment where the tests ran; Windows-specific behavior still needs native Windows validation.
+ネイティブバイナリとリンクはオペレーティングシステム間で異なり得るため、各環境で依存を別々にインストールする。テスト結果はテストを実行した環境に適用される。Windows 固有の挙動には依然としてネイティブ Windows での検証が必要である。
 
-### First-time setup
+### 初回セットアップ
 
-pnpm uses its strict symlinked linker so undeclared dependencies fail instead of relying on hoisting. Keep dependency build scripts explicitly allowlisted in `pnpm-workspace.yaml`.
+pnpm は厳格なシンボリックリンクロードを使うため、宣言されていない依存はホイスティングに頼るのではなく失敗する。依存のビルドスクリプトは `pnpm-workspace.yaml` で明示的に許可リストに載せておく。
 
-Install dependencies from the repo root:
+リポジトリルートから依存をインストールする:
 
 ```sh
 pnpm install
 ```
 
-The install also configures worktree-local Lefthook hooks through `scripts/install-lefthook.mjs`. The [worktree-local hooks Agent Note](../.agents/notes/implemented/process/2026-07-27-worktree-local-lefthook.md) owns the hook-path safety contract.
+インストールは `scripts/install-lefthook.mjs` を通じて worktree ローカルの Lefthook フックも構成する。フックパスの安全 contract は [worktree-local hooks Agent Note](../.agents/notes/implemented/process/2026-07-27-worktree-local-lefthook.md) が所有する。
 
-The [DevTools frontend](../packages/experimental/inspector/README.md#use-this-package) is compiled locally from a pinned npm source package and Vite. After dependencies are installed, its build needs no network access or browser installation. Workspace and published-package installation run no DevTools resource-download hook; published Inspector packages contain the built frontend.
+[DevTools フロントエンド](../packages/experimental/inspector/README.md#use-this-package)は、固定された npm ソースパッケージと Vite からローカルでコンパイルされる。依存のインストール後、そのビルドはネットワークアクセスもブラウザーのインストールも必要としない。ワークスペースと公開パッケージのインストールは DevTools リソースダウンロードフックを実行しない。公開された Inspector パッケージはビルド済みフロントエンドを含む。
 
-If the hooks are missing because dependencies were restored from cache or `postinstall` was skipped, install them manually:
+依存がキャッシュから復元されたか `postinstall` がスキップされたためにフックが欠けている場合は、手動でインストールする:
 
 ```sh
 node scripts/install-lefthook.mjs
 ```
 
-If the wrapper rejects existing Git configuration or reports a stale lock, follow its diagnostic and the linked Agent Note rather than editing worktree metadata speculatively. After moving a checkout, rerun the wrapper to regenerate the owned path.
+ラッパーが既存の Git 設定を拒否した場合や古いロックを報告した場合は、worktree メタデータを当て推量で編集するのではなく、その診断とリンクされた Agent Note に従う。チェックアウトを移動した後は、ラッパーを再実行して所有パスを再生成する。
 
-Run typecheck once after a fresh clone:
+新しくクローンした後は一度 typecheck を実行する:
 
 ```sh
 pnpm run typecheck
 ```
 
-Setup is complete when `pnpm run typecheck` exits successfully.
+`pnpm run typecheck` が正常終了すればセットアップは完了である。
 
-## Contributor reference
+## コントリビューターリファレンス
 
-### TypeScript project layout
+### TypeScript プロジェクトレイアウト
 
-The repository uses isolated Host and Client aggregates. An ordinary package is registered in exactly one aggregate: Host packages in `tsconfig.host.json` and Client packages in `tsconfig.client.json`; three packages (`host/webserver`, `compaction/compaction`, `typert/registry`) are referenced by both aggregates as shared leaves so each side type-checks the same source.
+リポジトリは分離された Host と Client の集約を使う。通常のパッケージはちょうど 1 つの集約に登録される: Host パッケージは `tsconfig.host.json` に、Client パッケージは `tsconfig.client.json` に登録される。3 つのパッケージ (`host/webserver`、`compaction/compaction`、`typert/registry`) は共有リーフとして両方の集約から参照され、各側が同じソースを型チェックする。
 
-| File | Role | Forms a program? |
+| ファイル | 役割 | プログラムを構成するか? |
 |---|---|---|
-| `tsconfig.json` | Solution root: `extends` base, `files: []`, and references to the two aggregates. It is the tsserver discovery entry and the entry for explicitly running the complete Project Reference graph; through the inherited `paths`, it is also the resolution config for tsx running `scripts/`. | No |
-| `tsconfig.host.json` | Host aggregate: Host packages, examples, tests, scripts, website, and the exceptional Host project of `api/remotes`. | Yes |
-| `tsconfig.client.json` | Client aggregate: `packages/client/*` packages and their tests, `apps/web`, and the exceptional Client project of `api/remotes`. | Yes |
-| `tsconfig.base.json` | Shared compilerOptions and the source `paths` map. Also the resolution facade the vitest configs point vite-tsconfig-paths at: it has no `include`, so its `paths` apply to every importer. | No |
-| `tsconfig.base.client.json` | Browser compiler settings (`jsx`, DOM libs, `types: []`) extended by the Client aggregate and every `packages/client/*` package. | No |
+| `tsconfig.json` | ソリューションルート: base を `extends` し、`files: []` と 2 つの集約への参照を持つ。tsserver の検出エントリーであり、完全な Project Reference グラフを明示的に実行するためのエントリーである。継承された `paths` を通じて、`scripts/` を実行する tsx の解決設定でもある。 | いいえ |
+| `tsconfig.host.json` | Host 集約: Host パッケージ、examples、tests、scripts、website、および `api/remotes` の例外的な Host プロジェクト。 | はい |
+| `tsconfig.client.json` | Client 集約: `packages/client/*` パッケージとそのテスト、`apps/web`、および `api/remotes` の例外的な Client プロジェクト。 | はい |
+| `tsconfig.base.json` | 共有の compilerOptions とソース `paths` マップ。vitest 設定が vite-tsconfig-paths を向ける解決ファサードでもある: `include` を持たないため、その `paths` はすべてのインポーターに適用される。 | いいえ |
+| `tsconfig.base.client.json` | Client 集約とすべての `packages/client/*` パッケージが拡張するブラウザーコンパイラー設定 (`jsx`、DOM ライブラリー、`types: []`)。 | いいえ |
 
-Host and Client stay two aggregate programs because both sides declaration-merge the cordis `Context` interface under the same keys with different services; one program seeing both merges reports a collision. The collision exists only inside a `ts.Program` — module resolution never triggers it — which is why the solution may reference both aggregates and one paths facade may span both sides. Three disciplines follow:
+Host と Client は 2 つの集約プログラムのままでいる。両側が cordis `Context` インターフェースを同じキーで異なるサービスとして宣言マージし、両方のマージを見る 1 つのプログラムは衝突を報告するからである。衝突は `ts.Program` の内側にのみ存在し — モジュール解決がそれを引き起こすことは決してない — そのためソリューションは両方の集約を参照でき、1 つの paths ファサードが両側にまたがり得る。3 つの規律が続く:
 
-- `tsconfig.base.json` never gains `include` or `files`: they would leak into every extending package project and narrow the facade's match-all scope.
-- A script that builds a repo-wide `ts.Program` seeds `tsconfig.host.json` or `tsconfig.client.json` explicitly — never the root solution, because flattening both aggregates into one program collides the `Context` merges.
-- A new package is registered in exactly one aggregate; only the split packages above carry both leaf configs, and the shared leaves are registered in both aggregates because each side must type-check the same source. Having both a Node loader entry and a browser entry is not a reason to split a package; an ordinary Client plugin produces both runtime artifacts during the Client build phase.
+- `tsconfig.base.json` は `include` や `files` を決して得ない: それらは拡張するすべてのパッケージプロジェクトに漏れ出し、ファサードの全マッチスコープを狭める。
+- リポジトリ全体の `ts.Program` を構築するスクリプトは `tsconfig.host.json` または `tsconfig.client.json` を明示的にシードする — ルートソリューションは決して使わない。両方の集約を 1 つのプログラムに平坦化すると `Context` のマージが衝突するからである。
+- 新しいパッケージはちょうど 1 つの集約に登録される。両方のリーフ設定を持つのは上記の分割パッケージだけであり、共有リーフは両方の集約に登録される。各側が同じソースを型チェックしなければならないからである。Node ローダーエントリーとブラウザーエントリーの両方を持つことは、パッケージを分割する理由にはならない。通常の Client プラグインは Client ビルドフェーズ中に両方のランタイム成果物を生成する。
 
-Six packages split Host and Client tsconfigs: `api/remotes`, `api/gateway`, `api/session-controller`, `api/workspace-controller`, `client/connection`, and `session-query/session-log-export`. `api/remotes`' Host entry participates in the Host Typert graph while its Client entry imports generated `/remote` declarations; `session-log-export` keeps Node archive production out of its browser controller. Each split package-root `tsconfig.json` is therefore only a solution, and the two aggregates and direct consumers reference `tsconfig.host.json` or `tsconfig.client.json` respectively. The workspace `constraints` gate walks the reachable Project Reference graph and checks each referencing project's own compiler face: a single-config target remains valid from either face, while a split target must name the matching leaf rather than its solution root or opposite leaf; it discovers split packages from the presence of both leaf configs, so a new split joins the gate automatically. The [`api-remotes` README](../packages/api/remotes/README.md) and [`session-log-export` README](../packages/session-query/session-log-export/README.md) explain their splits.
+6 つのパッケージが Host と Client の tsconfig を分割する: `api/remotes`、`api/gateway`、`api/session-controller`、`api/workspace-controller`、`client/connection`、`session-query/session-log-export`。`api/remotes` の Host エントリーは Host Typert グラフに参加し、その Client エントリーは生成された `/remote` 宣言をインポートする。`session-log-export` は Node アーカイブ生成をブラウザーコントローラーの外に保つ。したがって各分割パッケージルートの `tsconfig.json` はソリューションにすぎず、2 つの集約と直接のコンシューマーはそれぞれ `tsconfig.host.json` または `tsconfig.client.json` を参照する。ワークスペースの `constraints` ゲートは到達可能な Project Reference グラフをたどり、各参照側プロジェクト自身のコンパイラーフェイスをチェックする: 単一設定のターゲットはどちらのフェイスからも有効のままであり、分割ターゲットはソリューションルートや反対側のリーフではなく一致するリーフを名指さなければならない。ゲートは両方のリーフ設定の存在から分割パッケージを検出するため、新しい分割は自動的にゲートに参加する。[`api-remotes` README](../packages/api/remotes/README.md) と [`session-log-export` README](../packages/session-query/session-log-export/README.md) がそれぞれの分割を説明する。
 
-`pnpm run build:artifacts` emits every artifact in the generated dependency order, checking and compiling only the package references of each compiler face:
+`pnpm run build:artifacts` は生成された依存順ですべての成果物を出力し、各コンパイラーフェイスのパッケージ参照のみをチェックしてコンパイルする:
 
 ```sh
 pnpm run build:native-system
@@ -86,103 +86,103 @@ tsdown --env.DSH_BUILD_FACE client
 pnpm run build:web
 ```
 
-`pnpm run build:check` runs only `tsc -p tsconfig.host.json` and `tsc -p tsconfig.client.json` concurrently. Project mode checks each aggregate's repository-wide test and script program against the package declarations already on disk and never compiles a reference, so `build:check` neither detects nor rebuilds missing or stale `build:artifacts` output; missing output surfaces as compiler errors. `pnpm run build` runs both step sets as one [scheduled](../scripts/run-gates.ts) dependency graph: each aggregate check starts once its own face's package compilation finishes and overlaps the remaining artifact steps. In all three commands `DSH_GATE_CONCURRENCY` bounds concurrent steps (`1` runs them in dependency order) and `DSH_GATE_FAIL_FAST=1` stops the remaining steps at the first failure; otherwise a failure skips only its dependents, so independent errors are all reported. A failed step prints its own output, and any failure exits non-zero without writing the client build record.
+`pnpm run build:check` は `tsc -p tsconfig.host.json` と `tsc -p tsconfig.client.json` のみを並行して実行する。プロジェクトモードは各集約のリポジトリ全体のテストとスクリプトプログラムを、すでにディスク上にあるパッケージ宣言に対してチェックし、参照をコンパイルすることは決してないため、`build:check` は欠落または古い `build:artifacts` 出力を検出も再ビルドもしない。欠落した出力はコンパイラーエラーとして表面化する。`pnpm run build` は両方のステップセットを 1 つの[スケジュールされた](../scripts/run-gates.ts)依存グラフとして実行する: 各集約チェックは自身のフェイスのパッケージコンパイルが終わると開始し、残りの成果物ステップと重なる。3 つのコマンドすべてで、`DSH_GATE_CONCURRENCY` が並行ステップを制限し (`1` は依存順に実行する)、`DSH_GATE_FAIL_FAST=1` は最初の失敗で残りのステップを止める。そうでなければ失敗はその依存先のみをスキップするため、独立したエラーはすべて報告される。失敗したステップは自身の出力を表示し、いかなる失敗も client build record を書かずに非ゼロで終了する。
 
-Choose the command by what the change needs:
+変更が必要とするものによってコマンドを選ぶ:
 
-| Situation | Command |
+| 状況 | コマンド |
 |---|---|
-| Iterating on package sources and needing runnable artifacts | `pnpm run build:artifacts`; `dev:web` and `dev:desktop` run it before launching |
-| Type-checking tests, scripts, benchmarks, or website code | `pnpm run build:check` after the latest `build:artifacts`; rerun `build:artifacts` first when package sources changed |
-| Before declaring TypeScript work complete | `pnpm run build:check` after the latest `build:artifacts`, or `pnpm run build` |
-| Complete verification, as the required CI build lanes run it | `pnpm run build` |
-| Type checks without the Web and Desktop artifacts | `pnpm run typecheck` |
-| Lint or documentation code-block checks | `pnpm run lint` or `pnpm run doc-typecheck`; each prepares `host-contracts` itself |
+| パッケージソースを反復し、実行可能な成果物が必要 | `pnpm run build:artifacts`; `dev:web` と `dev:desktop` は起動前にこれを実行する |
+| テスト、スクリプト、ベンチマーク、または website のコードを型チェックする | 最新の `build:artifacts` の後に `pnpm run build:check`; パッケージソースが変わった場合は先に `build:artifacts` を再実行する |
+| TypeScript 作業の完了を宣言する前 | 最新の `build:artifacts` の後に `pnpm run build:check`、または `pnpm run build` |
+| 必須の CI ビルドレーンが実行する完全な検証 | `pnpm run build` |
+| Web と Desktop の成果物なしの型チェック | `pnpm run typecheck` |
+| Lint またはドキュメントのコードブロックチェック | `pnpm run lint` または `pnpm run doc-typecheck`; それぞれが `host-contracts` を自身で準備する |
 
-PR artifact builders run `build:artifacts`; required Linux and Windows normal builds and public `typecheck` also check the repository-wide test and script programs. CI benchmark preparation additionally uses `--noCheck` for its disposable library outputs, relying on those required builds for diagnostics; other artifact builders keep package checking ([rationale](../.agents/notes/implemented/process/2026-10-05-pr-artifact-typechecks.md)).
+PR 成果物ビルダーは `build:artifacts` を実行する。必須の Linux と Windows の通常ビルドおよび公開 `typecheck` は、リポジトリ全体のテストとスクリプトプログラムもチェックする。CI ベンチマークの準備はさらに、使い捨てのライブラリー出力に `--noCheck` を使い、診断はそれらの必須ビルドに頼る。他の成果物ビルダーはパッケージチェックを保つ ([根拠](../.agents/notes/implemented/process/2026-10-05-pr-artifact-typechecks.md))。
 
-Both tsdown passes match `vendor/*`, `packages/*/*`, and `apps/cli`; the Host pass also matches `apps/desktop-host`. They neither scan build artifacts to discover Client packages nor maintain a Host/Client package filter list. Package-local tsdown configs select entries for the current phase through `DSH_BUILD_FACE`: an ordinary Client plugin produces both its Node loader and browser bundle during the Client phase; `api-remotes` uses `hostPhase: true` to produce its Host entry early and only its browser bundle during the Client phase. Tsdown consumes only the JavaScript emitted to `lib/types` by the preceding tsc phase. Tsdown builds the matched workspace members concurrently, so `apps/desktop`, whose main bundle inlines workspace devDependencies from their `lib/` output, bundles in its own step after the Host pass ([Desktop README](../apps/desktop/README.md#bundled-workspace-dependencies)).
+両方の tsdown パスは `vendor/*`、`packages/*/*`、`apps/cli` にマッチする。Host パスは `apps/desktop-host` にもマッチする。ビルド成果物をスキャンして Client パッケージを発見することも、Host/Client パッケージのフィルターリストを保守することもない。パッケージローカルの tsdown 設定は `DSH_BUILD_FACE` を通じて現在のフェーズのエントリーを選ぶ: 通常の Client プラグインは Client フェーズ中に Node ローダーとブラウザーバンドルの両方を生成し、`api-remotes` は `hostPhase: true` を使って Host エントリーを早く生成し、Client フェーズではブラウザーバンドルのみを生成する。Tsdown は先行する tsc フェーズが `lib/types` に出力した JavaScript のみを消費する。Tsdown はマッチしたワークスペースメンバーを並行してビルドするため、メインバンドルがワークスペースの devDependencies をその `lib/` 出力からインライン化する `apps/desktop` は、Host パスの後に自身のステップでバンドルする ([Desktop README](../apps/desktop/README.md#bundled-workspace-dependencies))。
 
-Typert analyzes Host types, seeded by `tsconfig.host.json`, and generates both Host reflection artifacts and the Host-for-Client Remote projection; Client tsdown does not start Typert. Host tsdown runs it as a plugin, and [`generate-typert.ts`](../scripts/generate-typert.ts) runs the same generation without bundling and writes byte-identical files. The bundle-free pass reads workspace packages only from source and fails when the Host program would load a package's `lib/` output, naming the import and the `paths` alias to add, so it can run beside Host package compilation. Client package compilation always follows one of the two passes because Client sources import the generated Remote declarations. `pnpm run typecheck` runs the `build.ts --scope typecheck` graph: Host package compilation beside the bundle-free Typert pass, then Client package compilation, with each aggregate checked in build mode (`tsc -b`) once its own face's packages compile; it skips the native addon, every bundle, Web, and the client build record. `lint`, `lint:fix`, and `doc-typecheck` read the generated declarations but not the Host aggregate check, so they prepare only Host package compilation and the bundle-free Typert pass (`compile-referenced-projects.ts host-contracts`). None of these commands writes bundles: the runnable `lib/` output stays as the last `build:artifacts` left it, so run `build:artifacts` before launching or testing built output.
+Typert は `tsconfig.host.json` をシードとして Host 型を分析し、Host リフレクション成果物と Host-for-Client Remote プロジェクションの両方を生成する。Client tsdown は Typert を起動しない。Host tsdown はそれをプラグインとして実行し、[`generate-typert.ts`](../scripts/generate-typert.ts) はバンドルなしで同じ生成を実行し、バイト単位で同一のファイルを書く。バンドルなしパスはワークスペースパッケージをソースからのみ読み、Host プログラムがパッケージの `lib/` 出力をロードしようとする場合はインポートと追加すべき `paths` エイリアスを名指して失敗するため、Host パッケージコンパイルの隣で実行できる。Client ソースは生成された Remote 宣言をインポートするため、Client パッケージのコンパイルは常に 2 つのパスのいずれかに続く。`pnpm run typecheck` は `build.ts --scope typecheck` グラフを実行する: バンドルなし Typert パスの隣で Host パッケージコンパイル、その後 Client パッケージコンパイル、各集約は自身のフェイスのパッケージがコンパイルされるとビルドモード (`tsc -b`) でチェックされる。ネイティブアドオン、すべてのバンドル、Web、client build record はスキップする。`lint`、`lint:fix`、`doc-typecheck` は生成された宣言を読むが Host 集約チェックは読まないため、Host パッケージコンパイルとバンドルなし Typert パスのみを準備する (`compile-referenced-projects.ts host-contracts`)。これらのコマンドはいずれもバンドルを書かない: 実行可能な `lib/` 出力は最後の `build:artifacts` が残したままの状態にとどまるため、ビルド済み出力を起動またはテストする前に `build:artifacts` を実行する。
 
-`pnpm run build` and `build:artifacts` embed the root package version, the seven-character source commit, and a dirty marker when Git reports local changes; they also inherit other caller-supplied `DSH_CLIENT_*` values. `pnpm run build:official` is the cross-platform local equivalent of the CI and release artifact build and omits the local dirty marker. Each successful `build` or `build:artifacts` writes a gitignored record that binds the exact public values to the Vite output and dynamic client bundles; release packing and built Web tests reject a missing record or artifacts changed by a later partial build. `pnpm run dev:web` runs `build:artifacts` first (`--skip-build` reuses an existing artifact tree instead), then samples the current version and Git state once and shares that environment across every watcher stage for the session; it does not validate the complete-build record because the watcher stages rewrite its recorded artifacts.
+`pnpm run build` と `build:artifacts` は、ルートパッケージのバージョン、7 文字のソースコミット、および Git がローカル変更を報告した場合の dirty マーカーを埋め込む。呼び出し元が供給した他の `DSH_CLIENT_*` 値も継承する。`pnpm run build:official` は CI とリリースの成果物ビルドのクロスプラットフォームなローカル同等物であり、ローカルの dirty マーカーを省略する。成功した各 `build` または `build:artifacts` は、正確な公開値を Vite 出力と動的クライアントバンドルに結び付ける gitignore されたレコードを書く。リリースパッキングとビルド済み Web テストは、レコードの欠落または後続の部分ビルドで変わった成果物を拒否する。`pnpm run dev:web` は最初に `build:artifacts` を実行し (`--skip-build` は代わりに既存の成果物ツリーを再利用する)、次に現在のバージョンと Git 状態を一度サンプリングし、その環境をセッション中のすべての watcher ステージで共有する。watcher ステージが記録された成果物を書き換えるため、完全ビルドレコードを検証しない。
 
-Static analysis and tests resolve workspace imports through the base `paths` map to `src` and must pass on a clean tree; gates that consume built `lib/` output declare that dependency explicitly. Generated Host-for-Client Remote declarations are the deliberate exception: the public `typecheck`, `lint`, and `doc-typecheck` commands generate them first, while internal `*:contracts-ready` scripts assume that an invoking public command or scheduler gate already depends on the Typert contract-generation pass or the complete build. See the [Typert Remote note](../.agents/notes/implemented/architecture/2026-08-02-typert-remote-method-calls.md) for the gate-preparation contract.
+静的解析とテストは、ワークスペースインポートを base `paths` マップを通じて `src` に解決し、クリーンなツリーでパスしなければならない。ビルド済み `lib/` 出力を消費するゲートはその依存を明示的に宣言する。生成された Host-for-Client Remote 宣言は意図的な例外である: 公開 `typecheck`、`lint`、`doc-typecheck` コマンドはそれらを最初に生成し、内部の `*:contracts-ready` スクリプトは、呼び出した公開コマンドまたはスケジューラーゲートが Typert contract 生成パスまたは完全ビルドにすでに依存していると仮定する。ゲート準備の contract については [Typert Remote note](../.agents/notes/implemented/architecture/2026-08-02-typert-remote-method-calls.md) を参照。
 
-Business services declare callable methods on the Host with `@Remote` or `@RemoteScope`; the Host build generates Host-for-Client types and runtime contributions, and the Client's `api-remotes` composition loads those contributions under `ctx.remote` and scoped `agentCtx.remote` namespaces. See [API Gateway](api-gateway.md) for the generated artifacts on both sides, their assembly relationships, the SRC development fallback, and the Web build order.
+ビジネスサービスは Host 上で呼び出し可能なメソッドを `@Remote` または `@RemoteScope` で宣言する。Host ビルドは Host-for-Client 型とランタイムコントリビューションを生成し、Client の `api-remotes` コンポジションはそれらのコントリビューションを `ctx.remote` およびスコープ付き `agentCtx.remote` 名前空間の下にロードする。両側の生成成果物、それらの組み立て関係、SRC 開発フォールバック、Web ビルド順については [API Gateway](api-gateway.md) を参照。
 
-If a relevant local check consumes built package output, build once first:
+関連するローカルチェックがビルド済みパッケージ出力を消費する場合は、先に一度ビルドする:
 
 ```sh
 pnpm run build
 ```
 
-`pnpm run hygiene` includes `publint`, which validates package entrypoints against the built `lib/*.js` files, and `verify-node-next-types`, which validates built declarations against a temporary NodeNext consumer. A fresh worktree has no bundled JS or declarations until `pnpm run build` runs; ordinary commits and pushes do not require that build unless their selected checks consume it.
+`pnpm run hygiene` は `publint` (パッケージエントリーポイントをビルド済み `lib/*.js` ファイルに対して検証する) と `verify-node-next-types` (ビルド済み宣言を一時的な NodeNext コンシューマーに対して検証する) を含む。新しい worktree は `pnpm run build` が走るまでバンドルされた JS や宣言を持たない。通常のコミットとプッシュは、選択されたチェックがそれを消費しない限り、そのビルドを必要としない。
 
-### Environment variables
+### 環境変数
 
-The real DeepSeek adapter and key-backed agent demos read credentials from the environment or from a gitignored `.env` at the repo root:
+実際の DeepSeek アダプターとキーを使う agent デモは、環境またはリポジトリルートの gitignore された `.env` から資格情報を読む:
 
 ```sh
 DEEPSEEK_API_KEY=sk-...
 DEEPSEEK_BASE_URL=https://... # optional
 ```
 
-`DEEPSEEK_BASE_URL` is optional and defaults to the public API. Never commit real credentials. The real-API e2e suites self-skip when `DEEPSEEK_API_KEY` is not set.
+`DEEPSEEK_BASE_URL` は省略可能で、デフォルトは公開 API である。実際の資格情報をコミットしてはならない。実 API e2e スイートは `DEEPSEEK_API_KEY` が設定されていない場合は自己スキップする。
 
-### Git integrations
+### Git 統合
 
-`.i18n.yaml` records use Git's default text merge. A record conflicts only when both branches changed language-specific content in the same heading section; resolve the Markdown, then rerun `pnpm run verify-translation-pairing --write <pair>`. If `pre-merge-commit` rejects an otherwise clean merge, Git leaves the complete result staged without a commit; repair the failure and run `git commit`, or run `git merge --abort`.
+`.i18n.yaml` レコードは Git のデフォルトテキストマージを使う。レコードが競合するのは、両方のブランチが同じ見出しセクション内の言語固有コンテンツを変更した場合だけである。Markdown を解決し、`pnpm run verify-translation-pairing --write <pair>` を再実行する。`pre-merge-commit` がそれ以外はクリーンなマージを拒否した場合、Git は完全な結果をコミットなしでステージしたままにする。失敗を修復して `git commit` を実行するか、`git merge --abort` を実行する。
 
-lefthook is configured in `lefthook.yml` as a fast local checkpoint:
+lefthook は高速なローカルチェックポイントとして `lefthook.yml` で構成される:
 
-- `pre-commit` verifies staged pairing records against the staged owner blobs, validates staged files with the project-free `.oxlintrc.staged.json` profile and applies Oxlint fixes with one bounded retry, checks the staged diff for whitespace errors, checks pi-ai provider metadata when its inputs or generated file are staged, and runs the vendor manifest guard.
-- `pre-merge-commit` performs the same index-backed pairing check before Git creates an automatic merge commit.
-- `pre-push` runs `pnpm run typecheck`, which generates Typert contracts without bundling before the Client TypeScript check and checks both aggregates.
+- `pre-commit` はステージされたペアリングレコードをステージされたオーナーブロブに対して検証し、プロジェクト非依存の `.oxlintrc.staged.json` プロファイルでステージされたファイルを検証して 1 回の制限付き再試行で Oxlint 修正を適用し、ステージされた差分の空白エラーをチェックし、pi-ai プロバイダーメタデータの入力または生成ファイルがステージされている場合にそれをチェックし、vendor マニフェストガードを実行する。
+- `pre-merge-commit` は Git が自動マージコミットを作成する前に、同じインデックス裏付けのペアリングチェックを実行する。
+- `pre-push` は `pnpm run typecheck` を実行する。これは Client TypeScript チェックの前にバンドルなしで Typert contract を生成し、両方の集約をチェックする。
 
-The vendor manifest guard checks that changes under `vendor/*/src` are staged with the matching `vendor/README.md` manifest update. See `vendor/README.md` before editing vendored code.
+vendor マニフェストガードは、`vendor/*/src` 配下の変更が一致する `vendor/README.md` マニフェスト更新とともにステージされていることをチェックする。ベンダーコードを編集する前に `vendor/README.md` を参照。
 
-The pi-ai check regenerates expected metadata in memory. It rejects stale data without rewriting or staging files. After a pi-ai dependency or generator change, follow the package's [provider metadata update steps](../packages/llm/llm-pi-ai/README.md#generated-provider-metadata).
+pi-ai チェックは期待メタデータをメモリー内で再生成する。ファイルを書き換えたりステージしたりせずに古いデータを拒否する。pi-ai 依存またはジェネレーターの変更後は、パッケージの [provider metadata update steps](../packages/llm/llm-pi-ai/README.md#generated-provider-metadata) に従う。
 
-Apart from the scoped pairing and provider metadata checks, the hooks intentionally do not run tests, snapshots, documentation checks, builds, or hygiene. Contributors run the [checks relevant to the changed behavior](../AGENTS.md#run-relevant-checks-locally) once; CI owns exhaustive coverage, built-artifact smokes, and the Node 22.19, 24, and 26 compatibility matrix.
+スコープ付きのペアリングとプロバイダーメタデータのチェックを除き、フックは意図的にテスト、スナップショット、ドキュメントチェック、ビルド、hygiene を実行しない。コントリビューターは[変更された挙動に関連するチェック](../AGENTS.md#run-relevant-checks-locally)を一度実行する。網羅的なカバレッジ、ビルド済み成果物のスモーク、Node 22.19、24、26 の互換性マトリックスは CI が所有する。
 
-Contributors can opt into the comprehensive local gate set with `pnpm run check:all`. The command is independent of the Git hooks and is not an agent instruction.
+コントリビューターは `pnpm run check:all` で包括的なローカルゲートセットにオプトインできる。このコマンドは Git フックから独立しており、agent 指示ではない。
 
-Outside CI (`CI` other than `true`), default worker counts follow the [local worker budget](../scripts/parallelism.ts): 12 for gate schedulers, `build`, `typecheck`, Oxlint, and publint, and 48 for Vitest forks and local coverage. `doc-sync`, `test:docs`, `hygiene`, and `check:all` run at most 8 gates at once, in CI as well. `os.availableParallelism()` reports host CPUs rather than a container's CPU quota, so uncapped defaults oversubscribe shared hosts. CI keeps the runner's CPU count. `DSH_GATE_CONCURRENCY`, `DSH_OXLINT_THREADS`, `DSH_COVERAGE_MAX_WORKERS`, and Vitest `--maxWorkers` override the defaults.
+CI の外 (`CI` が `true` 以外) では、デフォルトのワーカー数は[ローカルワーカー予算](../scripts/parallelism.ts)に従う: ゲートスケジューラー、`build`、`typecheck`、Oxlint、publint には 12、Vitest フォークとローカルカバレッジには 48。`doc-sync`、`test:docs`、`hygiene`、`check:all` は CI でも同様に最大 8 ゲートを同時に実行する。`os.availableParallelism()` はコンテナーの CPU クォータではなくホスト CPU を報告するため、上限なしのデフォルトは共有ホストをオーバーサブスクライブする。CI はランナーの CPU 数を保つ。`DSH_GATE_CONCURRENCY`、`DSH_OXLINT_THREADS`、`DSH_COVERAGE_MAX_WORKERS`、Vitest の `--maxWorkers` がデフォルトを上書きする。
 
-### CI gates
+### CI ゲート
 
-The keyless [CI workflow](../.github/workflows/ci.yml) groups independent gates into broad lanes and runs a smaller compatibility signal across supported Node versions. Artifact consumers wait for one build within their lane. Coverage partitions reuse file timings scoped to their platform and runner pool to balance work within the configured worker limit. Required benchmarks run separately on standard GitHub-hosted Linux; the [benchmark runner reference](../benchmarks/AGENTS.md) owns routing and the job timeout. The separate real-API workflow runs `pnpm run test:e2e` with its configured worker bound. See [scripts/run-gates.ts](../scripts/run-gates.ts) and the workflow files for the current gate and job inventory.
+キー不要の [CI ワークフロー](../.github/workflows/ci.yml) は独立したゲートを広いレーンにグループ化し、サポートされる Node バージョンにまたがるより小さな互換性シグナルを実行する。成果物コンシューマーは自身のレーン内の 1 回のビルドを待つ。カバレッジパーティションは、設定されたワーカー上限内で作業をバランスさせるために、プラットフォームとランナープールにスコープされたファイルタイミングを再利用する。必須ベンチマークは標準の GitHub ホストの Linux で別途実行される。ルーティングとジョブタイムアウトは[ベンチマークランナーリファレンス](../benchmarks/AGENTS.md)が所有する。別個の実 API ワークフローは、設定されたワーカー上限で `pnpm run test:e2e` を実行する。現在のゲートとジョブのインベントリーについては [scripts/run-gates.ts](../scripts/run-gates.ts) とワークフローファイルを参照。
 
-The credential-free dsh dependency-layout and dsh/vendor pack rehearsals use the existing Linux self-hosted pool only when `DSH_CI_FAILOVER_LINUX=selfhosted` and the event is a trusted master push or same-repository, non-fork, non-Dependabot pull request. All other cases, including manual dispatch, use `ubuntu-24.04`; manual publication stays hosted. See the [release rehearsal runner reference](../.agents/notes/implemented/process/2026-07-26-ci-failover-runbook.md) for persistent-store isolation and fallback limits.
+資格情報不要の dsh 依存レイアウトと dsh/vendor パックのリハーサルは、`DSH_CI_FAILOVER_LINUX=selfhosted` でイベントが信頼された master プッシュまたは同一リポジトリの非フォーク、非 Dependabot プルリクエストである場合にのみ、既存の Linux セルフホストプールを使う。手動ディスパッチを含む他のすべてのケースは `ubuntu-24.04` を使う。手動パブリケーションはホストのままである。永続ストアの分離とフォールバックの制限については[リリースリハーサルランナーリファレンス](../.agents/notes/implemented/process/2026-07-26-ci-failover-runbook.md)を参照。
 
-### Daily commands
+### 日常のコマンド
 
-The root [contributor instructions](../AGENTS.md#commands) summarize common commands, while [`package.json`](../package.json) and [scripts/run-gates.ts](../scripts/run-gates.ts) own the current script and gate inventories. Select the smallest checks that cover the changed surface. Documentation changes use `pnpm run doc-sync`; package-public behavior changes also update the owning README or JSDoc, and built-artifact checks require `pnpm run build` first.
+ルートの[コントリビューター指示](../AGENTS.md#commands)が一般的なコマンドを要約し、現在のスクリプトとゲートのインベントリーは [`package.json`](../package.json) と [scripts/run-gates.ts](../scripts/run-gates.ts) が所有する。変更されたサーフェスをカバーする最小のチェックを選ぶ。ドキュメント変更は `pnpm run doc-sync` を使う。パッケージ公開の挙動変更は所有する README または JSDoc も更新し、ビルド済み成果物のチェックは先に `pnpm run build` を必要とする。
 
-### Profile runs
+### プロファイル実行
 
-Run the repository build separately before using these source-checkout demos:
+これらのソースチェックアウトデモを使う前に、リポジトリのビルドを別途実行する:
 
 ```sh
 pnpm run build
 ```
 
-The one-shot Headless coding agent needs `DEEPSEEK_API_KEY` in the environment or repo-root `.env`:
+単発の Headless コーディングエージェントは環境またはリポジトリルートの `.env` に `DEEPSEEK_API_KEY` を必要とする:
 
 ```sh
 pnpm dsh --profile headless "summarize this workspace"
 ```
 
-The PTC mode demo runs the same headless profile with code presentation enabled:
+PTC モードのデモは、コードプレゼンテーションを有効にした同じヘッドレスプロファイルを実行する:
 
 ```sh
 pnpm run demo:ptc -- "summarize this workspace"
 ```
 
-### Application commands
+### アプリケーションコマンド
 
-Web and Desktop share one command pair. `start:*` launches the artifacts of a prior `pnpm run build` or `build:artifacts`; `dev:*` runs `build:artifacts` first and then launches. Web additionally keeps client bundles rebuilt on source edits, because its Host runs from source while the browser loads built bundles:
+Web と Desktop は 1 組のコマンドを共有する。`start:*` は先行する `pnpm run build` または `build:artifacts` の成果物を起動し、`dev:*` は最初に `build:artifacts` を実行してから起動する。Web はさらに、ソース編集時にクライアントバンドルを再ビルドし続ける。Host はソースから実行され、ブラウザーはビルド済みバンドルをロードするからである:
 
 ```sh
 pnpm run start:web       # serve built Web artifacts through the source launcher (the same launch as pnpm dsh web)
@@ -191,24 +191,24 @@ pnpm run start:desktop   # launch built Desktop artifacts
 pnpm run dev:desktop     # build, then launch Desktop
 ```
 
-Arguments after a Web command reach `dsh web`, for example `pnpm run dev:web --no-open --port 3081`; `dev:web` also accepts `--skip-build` to reuse the existing artifact tree and `--no-serve` to run only the rebuild watchers beside a server started elsewhere. Both Web commands use the normal Harness home, while the Desktop commands use the isolated development home described in the [Desktop README](../apps/desktop/README.md). The root `Makefile` names the same commands as `make web`, `make dev-web`, `make desktop`, `make dev-desktop`, and `make build`; `ARGS='--no-open'` forwards options.
+Web コマンドの後に続く引数は `dsh web` に届く。たとえば `pnpm run dev:web --no-open --port 3081` である。`dev:web` はさらに `--skip-build` を受け入れて既存の成果物ツリーを再利用し、`--no-serve` で別の場所で起動されたサーバーの隣で再ビルド watcher のみを実行する。両方の Web コマンドは通常の Harness home を使い、Desktop コマンドは [Desktop README](../apps/desktop/README.md) に記載された分離された開発 home を使う。ルートの `Makefile` は同じコマンドを `make web`、`make dev-web`、`make desktop`、`make dev-desktop`、`make build` として名付ける。`ARGS='--no-open'` がオプションを転送する。
 
-### TODO markers
+### TODO マーカー
 
-Use one of three comment tags to flag known issues in the code, ordered by urgency:
+コード内の既知の問題に印を付けるには、緊急度順に並んだ 3 つのコメントタグのいずれかを使う:
 
-- `FIXME` — an issue that should block a new release. A release should not ship with an open `FIXME` unless reviewers explicitly agree the change can be merged anyway.
-- `TODO` — an issue that should be fixed soon, once we have the resources.
-- `XXX` — an issue that we may fix someday; lowest priority, no commitment.
+- `FIXME` — 新リリースをブロックすべき問題。レビュアーがその変更をそれでもマージしてよいと明示的に同意しない限り、リリースは未解決の `FIXME` を抱えて出荷すべきでない。
+- `TODO` — リソースが得られ次第、早く修正すべき問題。
+- `XXX` — いつか修正するかもしれない問題。最低優先度で、コミットメントはない。
 
-Pick the tag that matches the urgency so anyone scanning the code can tell a release blocker from a someday-maybe.
+コードを走査する誰もがリリースブロッカーと「いつかやるかも」を区別できるよう、緊急度に一致するタグを選ぶ。
 
-### Documenting types verbatim (`ts type-equiv`)
+### 型の逐語的文書化 (`ts type-equiv`)
 
-The [subsystems](subsystems/README.md) pages paste source-equivalent declarations together with their original JSDoc so a reader sees the exact type definition and source contract. To keep a paste from drifting when source changes, fence it as ` ```ts type-equiv ` (instead of ` ```ts `) and register it in `scripts/type-equiv.manifest.json` with the source file and symbol it mirrors:
+[subsystems](subsystems/README.md) ページは、ソース等価の宣言を元の JSDoc とともに貼り付け、読者が正確な型定義とソース contract を見られるようにする。ソース変更時に貼り付けがドリフトしないように、` ```ts type-equiv ` (` ```ts ` の代わり) としてフェンスし、`scripts/type-equiv.manifest.json` にミラーするソースファイルとシンボルを登録する:
 
 ```json
 { "doc": "docs/subsystems/session.md", "symbol": "SessionEvent", "source": "packages/core/session/src/types.ts" }
 ```
 
-`pnpm run verify-type-equiv` (part of `doc-sync`) then extracts that symbol's declaration and attached JSDoc from source via the TypeScript parser and asserts the block matches both. For a class whose implementation bodies do not belong in the catalog, use ` ```ts public-api ` and set `"projection": "public-api"`; the checked projection retains the public fields, constructor, accessors, methods, and original class/member JSDoc while omitting bodies and private or protected members. Comparison ignores whitespace and non-JSDoc comments but requires every original JSDoc comment, including member documentation, so readers see the source contract beside the exact type definition. The gate enforces a 1:1 correspondence by document, symbol, and projection between primary blocks and manifest entries; a paired `.zh.md` block reuses its unsuffixed sibling's entry only when the whole tracked fence sequence is byte-identical and ordered identically. `doc-typecheck` applies the same derivative rule to compilable fences, while skipping both source-equivalence fence kinds from compilation and its opt-out ratio. When you change a documented declaration or its JSDoc, the gate fails until you update the paste; when you add or remove a primary block, update the manifest in the same change.
+`pnpm run verify-type-equiv` (`doc-sync` の一部) は、TypeScript パーサーを通じてソースからそのシンボルの宣言と付随する JSDoc を抽出し、ブロックが両方にマッチすることを表明する。実装本体がカタログに属さないクラスには、` ```ts public-api ` を使い、`"projection": "public-api"` を設定する。チェックされるプロジェクションは公開フィールド、コンストラクター、アクセサー、メソッド、元のクラス/メンバー JSDoc を保ち、本体と private または protected メンバーを省略する。比較は空白と JSDoc 以外のコメントを無視するが、メンバー文書を含むすべての元の JSDoc コメントを要求するため、読者は正確な型定義の隣でソース contract を見る。ゲートは、プライマリブロックとマニフェストエントリーの間に、文書、シンボル、プロジェクションによる 1:1 の対応を強制する。ペアの `.zh.md` ブロックは、追跡されたフェンス列全体がバイト単位で同一で同順である場合にのみ、サフィックスのない兄弟のエントリーを再利用する。`doc-typecheck` は同じ派生ルールをコンパイル可能なフェンスに適用しつつ、両方のソース等価フェンス種別をコンパイルとそのオプトアウト比率からスキップする。文書化された宣言またはその JSDoc を変更した場合、貼り付けを更新するまでゲートは失敗する。プライマリブロックを追加または削除した場合は、同じ変更でマニフェストを更新する。

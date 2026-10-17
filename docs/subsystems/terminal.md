@@ -1,14 +1,14 @@
-# Persistent PTY Sessions
+# 永続 PTY セッション
 
-English | [中文](terminal.zh.md)
+日本語 | [English](terminal.en.md) | [中文](terminal.zh.md)
 
-Types shared by PTY backends, `ctx.terminals`, and the model-facing consumer. The [persistent PTY Agent Note](../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) owns the rationale; this page records the cross-package vocabulary from [`packages/terminal/terminal/src/types.ts`](../../packages/terminal/terminal/src/types.ts).
+PTY バックエンド、`ctx.terminals`、モデルに面したコンシューマーが共有する型。[永続 PTY Agent Note](../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) が根拠を所有し、このページは [`packages/terminal/terminal/src/types.ts`](../../packages/terminal/terminal/src/types.ts) 由来の横断パッケージ語彙を記録する。
 
-## Identity and readiness
+## アイデンティティと準備状態
 
-`TerminalSessionId` is a service-minted branded id. Optional names are owner-local display metadata; authorization compares the exact owning `Agent`, not a name or guessed id.
+`TerminalSessionId` はサービスが発行するブランド付き id である。任意の名前は所有者ローカルな表示メタデータであり、認可は名前や推測 id ではなく厳密な所有 `Agent` を比較する。
 
-`TerminalWaitReason` says why one send returned. It is independent from `TerminalSessionStatus`: silence or timeout may return while the top-level shell remains alive, while `session_exit` means that shell exited rather than an arbitrary foreground child.
+`TerminalWaitReason` は 1 回の送信が戻った理由を示す。`TerminalSessionStatus` とは独立である。無音やタイムアウトで戻ってもトップレベルのシェルは生き残りうる一方、`session_exit` は任意のフォアグラウンドの子ではなくそのシェルが終了したことを意味する。
 
 ```ts type-equiv
 /** Why one interactive send returned control to its caller. */
@@ -22,9 +22,9 @@ type TerminalSessionStatus =
   | { kind: 'exited'; exitCode: number | null; signal: NodeJS.Signals | null }
 ```
 
-## Backend and live session
+## バックエンドとライブセッション
 
-A backend owns how one registered type starts and detects readiness. `TerminalSessionService` publishes the returned session only after setup succeeds, then owns id authorization and cleanup. A backend that cannot clean partial startup resources rejects with `TerminalBackendCleanupError`, allowing disposal to retain the cleanup failure without replacing the caller's cancellation reason. A backend session owns terminal state and captured-resource quiescence.
+バックエンドは、登録された 1 つの型がどう開始し準備完了を検出するかを所有する。`TerminalSessionService` はセットアップ成功後に返されたセッションを公開し、id 認可とクリーンアップを所有する。部分的な開始リソースを片付けられないバックエンドは `TerminalBackendCleanupError` で拒否し、呼び出し元のキャンセル理由を置き換えずにクリーンアップ失敗を保持したまま破棄できる。バックエンドセッションは端末状態と捕捉リソースの静止を所有する。
 
 ```ts type-equiv
 /** Replaceable provider for one PTY session type. */
@@ -56,9 +56,9 @@ interface TerminalBackendSession {
 }
 ```
 
-## Send and retained output
+## 送信と保持出力
 
-One live session accepts one active send. Its operation exposes a consuming output cursor for generic background jobs and one terminal result for a foreground caller. `TerminalReadResult` separately pages the bounded session scrollback.
+1 つのライブセッションはアクティブな送信を 1 つだけ受け付ける。その操作は、汎用バックグラウンドジョブ向けの消費型出力カーソルと、フォアグラウンド呼び出し元向けの 1 つの端末結果を公開する。`TerminalReadResult` は別に、境界付きセッションスクロールバックをページングする。
 
 ```ts type-equiv
 /** Live backend-owned send; exactly one may be active per PTY session. */
@@ -86,9 +86,9 @@ interface TerminalSendResult {
 }
 ```
 
-## Ownership and durability
+## 所有権と耐久性
 
-`TerminalSessionService` attaches one awaited cleanup to the exact owner scope, rejects foreign operations, and keeps sessions alive across backend or tool-plugin reload. PTY state and raw bytes remain process-local. Model input and bounded returned output are durable through the existing `tool/call`, `tool/result`, and task-result paths rather than duplicate PTY session events.
+`TerminalSessionService` は厳密な所有者スコープに 1 つの待機クリーンアップを結び付け、外部の操作を拒否し、バックエンドやツールプラグインのリロードをまたいでセッションを生かし続ける。PTY 状態と生バイトはプロセスローカルのままである。モデル入力と境界付き返却出力は、PTY セッションイベントを重複させるのではなく既存の `tool/call`、`tool/result`、タスク結果パスを通じて耐久化される。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -96,13 +96,13 @@ interface TerminalSendResult {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によるソースからの生成物 (`pnpm run verify-cordis-catalog` が doc-sync で鮮度を検証。再生成は `pnpm run gen-cordis-catalog`) — 言語面の差異はロケール固有のペア文書パスのみである。シグネチャブロックは `ts cordis-catalog` フェンスを使い元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義し、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxterminals--terminalsessionservice"></a>
 
 ### `ctx.terminals` — `TerminalSessionService`
 
-In-process registry for replaceable PTY backends and exact-Agent sessions.
+置換可能な PTY バックエンドと厳密 Agent セッションのインプロセスレジストリ。
 
 ```ts cordis-catalog
 /**

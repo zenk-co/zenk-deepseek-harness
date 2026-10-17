@@ -1,37 +1,37 @@
 ---
-description: "The subagent delegation seam for users and maintainers choosing a provider backend, composing delegation tools, or debugging child-agent runs."
+description: "プロバイダーバックエンドを選び、委譲ツールを構成し、または子エージェントの実行をデバッグするユーザーとメンテナー向けの、サブエージェント委譲シーム。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-subagent
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-subagent` to delegate work through named providers and collect managed activation results. Local spawn and fork children retain durable sessions for later messages; ACP, DSH SDK, Codex, and Claude Code execute once. Every child shares admission, cancellation, ownership, and discovery. Compose the service with a provider and a delegation tool.
+`dsh-subagent` を使うと、名前付きプロバイダーを通じて作業を委譲し、管理されたアクティベーション結果を収集できる。ローカルの spawn と fork の子は、後のメッセージのために耐久性のあるセッションを保持する。ACP、DSH SDK、Codex、Claude Code は 1 回だけ実行する。すべての子はアドミッション、キャンセル、所有権、および検出を共有する。サービスをプロバイダーと委譲ツールとともに構成する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Each start accepts an optional `cwd`; relative paths resolve against the parent's current working directory, and omission captures that current directory. The child keeps its parent's origin metadata and permission roots. A child-owned directory value follows any inherited history, survives continuation and restart, and is independent of later parent changes.
+各開始は任意の `cwd` を受け入れる。相対パスは親の現在の作業ディレクトリを基準に解決され、省略するとその現在のディレクトリが捕捉される。子は親のオリジンメタデータとパーミッションルートを保つ。子が所有するディレクトリ値は、継承された履歴に追従し、継続と再起動を生き延び、その後の親の変更から独立している。
 
-This package is the contract every delegation setup shares. You enable it by mounting the service together with one or more provider backends and the model-facing delegation tool; from then on, an agent can delegate work and the service routes each request to the named provider.
+このパッケージは、あらゆる委譲構成が共有する契約である。サービスを 1 つ以上のプロバイダーバックエンドおよびモデル向けの委譲ツールとともにマウントすると有効になり、それ以降エージェントは作業を委譲でき、サービスは各リクエストを名前付きプロバイダーへルーティングする。
 
-### Enabling delegation
+### 委譲を有効にする
 
-Mount the service with a provider and the delegation tool. The provider registers under its configured name; each tool row selects one provider. A minimal setup:
+サービスをプロバイダーと委譲ツールとともにマウントする。プロバイダーは設定された名前で登録され、各ツール行が 1 つのプロバイダーを選択する。最小構成:
 
 ```yaml
 - name: '@deepseek-ai/dsh-subagent'
@@ -42,186 +42,186 @@ Mount the service with a provider and the delegation tool. The provider register
     toolName: subagent
 ```
 
-The tool returns a child session id immediately. The parent receives a completion notice when the background activation settles. Mounting the service alone enables no delegation.
+ツールは子セッション id を即座に返す。親は、バックグラウンドのアクティベーションが確定したときに完了通知を受け取る。サービスを単独でマウントしても委譲は有効にならない。
 
-### Delegation settings
+### 委譲設定
 
-The limits section on the **Plugins → Subagent** page edits the Host’s `subagent` settings section. User values override this plugin's composition; reset removes the user override. `maxDepth` defaults to `1` and supplies the delegation tools' depth when their own configuration omits it. An explicit tool depth, including `provider-managed`, takes precedence. Depth `0` disables delegation through tools inheriting this setting; depth `1` permits direct children only. Changes apply on the next delegation attempt. Direct service callers continue to supply their own optional request depth.
+**Plugins → Subagent** ページの limits セクションは、Host の `subagent` 設定セクションを編集する。ユーザーの値はこのプラグインの構成を上書きし、リセットはユーザーの上書きを除去する。`maxDepth` は既定で `1` で、委譲ツール自身の構成が省略する場合にその深度を供給する。`provider-managed` を含む明示的なツール深度が優先される。深度 `0` はこの設定を継承するツールを通じた委譲を無効にし、深度 `1` は直接の子のみを許可する。変更は次の委譲の試行時に適用される。直接のサービス呼び出し元は引き続き自身の任意のリクエスト深度を供給する。
 
-### Activation capacity
+### アクティベーション容量
 
-Set `maxActiveSubagents` on the host plugin to limit live and materializing children in each activation tree. It defaults to `8` and accepts positive safe integers. A top-level parent starts a pool shared by its local and external descendants; the root parent consumes no slot. Creation and cold resume reserve before yielding, and disposal returns the slot only after cleanup. Waiting parents, pending inbox work, and stopping activations remain counted. Sending to a resident child reuses its slot. Delegation depth is a separate policy.
+ホストプラグインの `maxActiveSubagents` を設定して、各アクティベーションツリー内のライブおよび生成中の子を制限する。既定値は `8` で、正の安全な整数を受け入れる。最上位の親は、そのローカルおよび外部の子孫が共有するプールを開始する。ルート親はスロットを消費しない。作成とコールドレジュームは yield する前にスロットを予約し、破棄はクリーンアップの後にのみスロットを返す。待機中の親、保留中のインボックス作業、および停止中のアクティベーションは引き続き計数される。居住中の子への送信はそのスロットを再利用する。委譲深度は別個のポリシーである。
 
-The current `maxActiveSubagents` value is sampled before every new or cold-resumed Activation. Raising it admits more children in existing trees; lowering it leaves resident children running and refuses further admissions until usage is below the limit.
+現在の `maxActiveSubagents` 値は、新しい、またはコールドレジュームされたすべてのアクティベーションの前にサンプリングされる。値を上げると既存のツリーでより多くの子が許可され、下げると居住中の子は実行させたまま、使用量が制限を下回るまでそれ以上の許可を拒否する。
 
-At capacity, creation or cold resume rejects with `ACTIVATION_LIMIT_REACHED` (browser prompts receive `subagent/delivery-unavailable`): wait for a child to finish or continue using the existing agents. Admission does not queue, because a parent waiting for descendants must not wait for its own occupied slot. Slots are process-local and do not constrain cumulative Session history or token usage.
+容量に達すると、作成またはコールドレジュームは `ACTIVATION_LIMIT_REACHED` で拒否する（ブラウザープロンプトは `subagent/delivery-unavailable` を受け取る）。子が終了するのを待つか、既存のエージェントを使い続ける。許可はキューに入らない。子孫を待つ親が自身の占有スロットを待ってはならないためである。スロットはプロセスローカルで、累積のセッション履歴やトークン使用量を制約しない。
 
-### Local and external children
+### ローカルと外部の子
 
-`startActivation({ provider, label, request, signal, delivery })` returns `{ childId, messageId?, result, dispose }`. Supplying `childId` selects a local backend and guarantees `messageId`. Local children accept later messages and can cold-resume; external children expose one execution and reject continuation. `request.agentOptions` overrides supported child model settings. `delivery: 'parent'` supplies the model-facing completion notice; `delivery: 'caller'` lets workflows await the result without a parent notice or initial return guidance. Local parent delivery requires persistence; caller delivery can use an ephemeral local session. Cold resume requires persistence and Session query.
+`startActivation({ provider, label, request, signal, delivery })` は `{ childId, messageId?, result, dispose }` を返す。`childId` を供給するとローカルバックエンドが選択され、`messageId` が保証される。ローカルの子は後のメッセージを受け入れ、コールドレジュームできる。外部の子は 1 つの実行を公開し、継続を拒否する。`request.agentOptions` は対応する子のモデル設定を上書きする。`delivery: 'parent'` はモデル向けの完了通知を供給し、`delivery: 'caller'` はワークフローが親通知や最初の戻りガイダンスなしで結果を待てるようにする。ローカルの親配信には永続化が必要で、呼び出し元配信はエフェメラルなローカルセッションを使用できる。コールドレジュームには永続化と Session クエリが必要である。
 
-### Child presets
+### 子プリセット
 
-In-process spawn accepts an independent `agentPreset`; fork and external backends reject this option. Without a selection, a local child joins the parent's current preset revision. An explicit id mounts the currently available revision, even when that id matches the parent's. Configure model choices through [`dsh-tool-subagent`](../tool-subagent/README.md#selecting-a-child-preset) and persona and tools in the [preset composition](../../preset/agent-preset-registry/README.md). Cold resume preserves persona and tool restrictions recorded in historical child descriptors.
+インプロセスの spawn は独立した `agentPreset` を受け入れる。fork と外部バックエンドはこのオプションを拒否する。選択しない場合、ローカルの子は親の現在のプリセットリビジョンに加わる。明示的な id は、その id が親のものと一致する場合でも、現在利用可能なリビジョンをマウントする。モデルの選択は [`dsh-tool-subagent`](../tool-subagent/README.md#selecting-a-child-preset) で、ペルソナとツールは[プリセット構成](../../preset/agent-preset-registry/README.md)で構成する。コールドレジュームは、歴史的な子記述子に記録されたペルソナとツールの制限を保つ。
 
-### Messaging, interrupting, and discovering
+### メッセージング、中断、検出
 
-Every exact live Agent can use `sendMessage()` with a direct continuable child; a resident continuable child can also use it with its direct parent. A working target receives the Agent message through Steer at its nearest step; an idle target starts a turn, and only a direct child can be cold-resumed. The parent can also interrupt a running descendant or list its children at any time. A browser continuation prompt independently selects Queue or Steer and may carry image parts: the Host admits and persists each image batch through the attachment store before the child inbox accepts the message, and refuses delivery when the child's declared model does not accept image input. Direct-child discovery reads the parent-owned `subagentCatalog` projection. `listChildren(parentSessionId, signal?)` owns a live-preferred Session observation and returns the catalog asynchronously without reading child logs. It forwards cancellation and releases the observation after materialization. Materialization preserves parent event order in O(D) time for D facts. External entries are leaves and require no child Session observation. Descendant discovery recursively reads local child catalogs in parent event order, observing each reachable Session once. It skips branches whose catalogs cannot be read and returns diagnostics for them; neither path loads or resumes a child Agent.
+すべての正確なライブ Agent は、直接の継続可能な子との間で `sendMessage()` を使用できる。居住中の継続可能な子は、その直接の親との間でも同様に使用できる。作業中のターゲットは、最も近いステップで Steer を通じて Agent メッセージを受け取る。アイドルのターゲットはターンを開始し、コールドレジュームできるのは直接の子だけである。親は、実行中の子孫を中断したり、いつでもその子を列挙したりできる。ブラウザーの継続プロンプトは、Queue または Steer を独立に選択し、画像パーツを運ぶことができる。Host は、子のインボックスがメッセージを受け入れる前に、添付ストアを通じて各画像バッチを許可して永続化し、子の宣言済みモデルが画像入力を受け入れない場合は配信を拒否する。直接の子の検出は、親が所有する `subagentCatalog` プロジェクションを読み取る。`listChildren(parentSessionId, signal?)` はライブ優先のセッション観測を所有し、子ログを読まずにカタログを非同期で返す。キャンセルを転送し、マテリアライズの後に観測を解放する。マテリアライズは、D 個のファクトに対して O(D) 時間で親のイベント順を保つ。外部エントリーは葉であり、子セッション観測を必要としない。子孫の検出は、親のイベント順でローカル子カタログを再帰的に読み取り、到達可能な各セッションを一度だけ観測する。カタログを読めないブランチはスキップし、それらに対する診断を返す。どちらの経路も子 Agent をロードまたは再開しない。
 
-### Failure and recovery
+### 失敗と回復
 
-Starting without the `agents` service rejects with `CONTINUATION_UNAVAILABLE`; an available runtime rejects a missing or replaced parent with `UNAUTHORIZED`. Providers implementing neither execution method are rejected at registration with `UNSUPPORTED_CAPABILITY`; unsupported requested capabilities reject creation with the same code. The caller signal cancels only unpublished work; after publication, `dispose()` cancels the exact activation and waits for its descendants, including pending startups, and their resource cleanup. `result` settles after teardown and notifications, carrying output, optional structured data, and a stop reason; capture failures reject it after teardown. Cleanup failures reject `dispose()` and mark the lifecycle end as failed; the result promise and parent notification retain the captured execution result.
+`agents` サービスなしで開始すると `CONTINUATION_UNAVAILABLE` で拒否され、利用可能なランタイムは欠如した、または置き換えられた親を `UNAUTHORIZED` で拒否する。どちらの実行メソッドも実装しないプロバイダーは登録時に `UNSUPPORTED_CAPABILITY` で拒否され、サポートされない要求ケイパビリティは同じコードで作成を拒否する。呼び出し元のシグナルは未公開の作業のみをキャンセルする。公開後は、`dispose()` が正確なアクティベーションをキャンセルし、保留中の起動を含むその子孫とそのリソースクリーンアップを待つ。`result` はテアダウンと通知の後に確定し、出力、任意の構造化データ、停止理由を運ぶ。キャプチャの失敗はテアダウンの後にそれを拒否する。クリーンアップの失敗は `dispose()` を拒否し、ライフサイクルの終了を失敗としてマークする。結果プロミスと親通知はキャプチャされた実行結果を保持する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains how the service is built and where the observable behavior comes from; the full contract lives in [Use this package](#use-this-package).
+このセクションは、サービスがどのように構築され、観測可能な振る舞いがどこから来るのかを説明する。完全な契約は[このパッケージを使う](#use-this-package)にある。
 
-### Design concept
+### 設計概念
 
-- **One service, many providers.** The service is a named-provider registry; each backend registers under a unique name and a request picks one by name.
-- **One managed lifetime.** `SubagentManager` owns startup, message admission, capacity, parent relationships, and disposal. Each activation retains a local AgentHandle or external SubagentRun directly; local inbox and idle state belong only to the local variant.
-- **Fulfillment is publication.** `startActivation()` returns only after the child is accepted and its handle can cancel that exact execution.
-- **Trusted same-process values.** Requests, descriptors, and results are borrowed immutable; serialization and hostile-input validation belong at process and wire boundaries.
+- **1 つのサービス、多数のプロバイダー。** サービスは名前付きプロバイダーのレジストリである。各バックエンドは一意の名前で登録し、リクエストは名前で 1 つを選ぶ。
+- **1 つの管理されたライフタイム。** `SubagentManager` が起動、メッセージ許可、容量、親関係、および破棄を所有する。各アクティベーションはローカルの AgentHandle または外部の SubagentRun を直接保持し、ローカルのインボックスとアイドル状態はローカル変種だけに属する。
+- **充足は公開である。** `startActivation()` は、子が受理され、そのハンドルがその正確な実行をキャンセルできるようになってから初めて返る。
+- **信頼された同一プロセスの値。** リクエスト、記述子、および結果は不変の借用である。シリアライズと敵対的入力の検証はプロセスとワイヤの境界に属する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service entry: provider registry, start and continuation API, lifecycle events |
-| [`src/manager.ts`](src/manager.ts) | Unified startup, message admission, cold resume, parent ownership, settlement, and disposal |
-| [`src/activation.ts`](src/activation.ts) | Execution records, capacity slots, child locks, and local output capture |
-| [`src/continuation-messages.ts`](src/continuation-messages.ts) | Adjacent-Agent messages, return guidance, and settlement notices |
-| [`src/internal.ts`](src/internal.ts) | Host-only Queue and Steer adapters plus standard adjacent-Agent messaging markers |
-| [`src/structured.ts`](src/structured.ts) | Activation-scoped structured capture and guards |
-| [`src/types.ts`](src/types.ts) | Public request, result, and provider contracts |
-| [`src/descriptor.ts`](src/descriptor.ts) | Versioned `subagent/descriptor` session-event vocabulary |
-| [`src/catalog.ts`](src/catalog.ts) | Parent-owned `subagent/catalog` event and chunked host projection |
-| [`src/child-agent.ts`](src/child-agent.ts) | Child composition, delegated policy, depth helpers |
-| [`src/list-children.ts`](src/list-children.ts) | Direct and recursive parent-catalog reads |
-| [`src/control.ts`](src/control.ts) | Browser control request validation and stable failure codes |
-| [`src/control-types.ts`](src/control-types.ts) | Client-safe catalog row, control requests, receipts, and failures |
-| [`src/archive-admission.ts`](src/archive-admission.ts) | The `subagent` family of the Workspace registry's archive admission: running descendants and their parent-cause cancel |
+| [`src/index.ts`](src/index.ts) | サービスエントリー: プロバイダーレジストリ、開始と継続の API、ライフサイクルイベント |
+| [`src/manager.ts`](src/manager.ts) | 統合された起動、メッセージ許可、コールドレジューム、親の所有権、確定、および破棄 |
+| [`src/activation.ts`](src/activation.ts) | 実行レコード、容量スロット、子ロック、およびローカル出力キャプチャ |
+| [`src/continuation-messages.ts`](src/continuation-messages.ts) | 隣接 Agent メッセージ、戻りガイダンス、および確定通知 |
+| [`src/internal.ts`](src/internal.ts) | Host 専用の Queue および Steer アダプターと、標準の隣接 Agent メッセージングマーカー |
+| [`src/structured.ts`](src/structured.ts) | アクティベーションスコープの構造化キャプチャとガード |
+| [`src/types.ts`](src/types.ts) | 公開のリクエスト、結果、およびプロバイダー契約 |
+| [`src/descriptor.ts`](src/descriptor.ts) | バージョン付き `subagent/descriptor` セッションイベント語彙 |
+| [`src/catalog.ts`](src/catalog.ts) | 親が所有する `subagent/catalog` イベントとチャンク化されたホストプロジェクション |
+| [`src/child-agent.ts`](src/child-agent.ts) | 子の構成、委譲ポリシー、深度ヘルパー |
+| [`src/list-children.ts`](src/list-children.ts) | 直接および再帰的な親カタログ読み取り |
+| [`src/control.ts`](src/control.ts) | ブラウザー制御リクエストの検証と安定した失敗コード |
+| [`src/control-types.ts`](src/control-types.ts) | クライアントセーフなカタログ行、制御リクエスト、レシート、および失敗 |
+| [`src/archive-admission.ts`](src/archive-admission.ts) | Workspace レジストリのアーカイブアドミッションの `subagent` ファミリー: 実行中の子孫とその親原因によるキャンセル |
 
-### Provider preparation and structured output
+### プロバイダーの準備と構造化出力
 
-The service validates requested capabilities before creation. Local providers supply only `prepareContinuable()`: spawn returns fresh state and fork returns a completed-turn seed. The manager captures the parent model settings, delegated permissions, and composition before creating the child. External providers retain `start()` as a transport adapter and retain their own permission systems. The common manager owns their published execution. Structured tools, instructions, validation, and terminal guards belong to one local activation; they are not persisted as resume configuration. The child can submit its structured result after consuming accepted input and releasing owned descendants. Staging a result closes further input through tool-result policy and any enclosing PTC execution; a rejected result reopens input, while a committed result keeps it closed. Later cold resume has no structured schema.
+サービスは作成前に要求されたケイパビリティを検証する。ローカルプロバイダーは `prepareContinuable()` のみを供給する。spawn は新鮮な状態を返し、fork は完了したターンのシードを返す。マネージャーは子を作成する前に、親のモデル設定、委譲されたパーミッション、および構成をキャプチャする。外部プロバイダーは `start()` をトランスポートアダプターとして保持し、独自のパーミッションシステムを保つ。共通のマネージャーがそれらの公開された実行を所有する。構造化ツール、指示、検証、およびターミナルガードは 1 つのローカルアクティベーションに属し、レジューム構成として永続化されない。子は、受理された入力を使い切り、所有する子孫を解放した後に、構造化結果を提出できる。結果をステージングすると、ツール結果ポリシーと、それを囲む PTC 実行があればそれを通じて、以降の入力を閉じる。拒否された結果は入力を再開し、コミットされた結果はそれを閉じたままにする。後のコールドレジュームには構造化スキーマがない。
 
-External providers mint a fresh `SubagentRun.id` for each execution in the runtime's shared Session id namespace, across all parents and providers. A collision with a resident Agent, Session, or activation rejects startup with `DUPLICATE_CHILD` and disposes the new external handle without replacing the existing execution.
+外部プロバイダーは、すべての親とプロバイダーにわたるランタイム共有の Session id 名前空間で、各実行に新鮮な `SubagentRun.id` を発行する。居住中の Agent、Session、またはアクティベーションとの衝突は `DUPLICATE_CHILD` で起動を拒否し、既存の実行を置き換えることなく新しい外部ハンドルを破棄する。
 
-### Activation settlement
+### アクティベーションの確定
 
-The manager reserves child identity and capacity, materializes a local Agent or external execution, and accepts the initial task. Local admission closes after Agent activity, pending input, and owned descendants finish, with activity revalidated after the final Session flush. Both local and external activations deliver their result after handle cleanup, capacity release, and settlement notifications. Host waits join progressing descendants and their cleanup, including failed executions; idle parked subtrees remain resident without delaying host completion. Closing admission and disposing the handle prevent late work from entering a released Agent. Parent delivery emits its notice after settlement; caller delivery leaves collection to the awaiting workflow. Headless hosts repeat `agent.whenIdle()` and `waitForChildren(agent)` until no child work remains and the parent stays idle with an unchanged Session sequence across the child check, so completion notices can produce the final parent answer.
+マネージャーは子の identity と容量を予約し、ローカル Agent または外部実行をマテリアライズし、初期タスクを受理する。ローカルの許可は、Agent アクティビティ、保留中の入力、および所有する子孫が終了した後に閉じられ、アクティビティは最終のセッションフラッシュ後に再検証される。ローカルと外部の両方のアクティベーションは、ハンドルのクリーンアップ、容量の解放、および確定通知の後に結果を届ける。Host の待機は進行中の子孫とそのクリーンアップ（失敗した実行を含む）に合流し、アイドルのパークされたサブツリーは居住したままホストの完了を遅延させない。許可を閉じ、ハンドルを破棄すると、遅延した作業が解放済み Agent に入ることを防ぐ。親配信は確定後に通知を発行し、呼び出し元配信は収集を待機中のワークフローに委ねる。ヘッドレスホストは `agent.whenIdle()` と `waitForChildren(agent)` を、子の作業が残らず、子チェックを挟んで親がアイドルかつセッションシーケンスが不変になるまで繰り返すため、完了通知が最終的な親の回答を生み出せる。
 
-A local Agent failure without a subsequently committed `turn/end` settles as `error` after its owned descendants finish. Unclaimed input cannot keep that failed activation resident. A later committed turn ending supersedes the live failure and supplies the recovered outcome.
+その後コミットされた `turn/end` を持たないローカル Agent の失敗は、所有する子孫が終了した後に `error` として確定する。未クレームの入力がその失敗したアクティベーションを居住させ続けることはない。後でコミットされたターンの終了がライブの失敗を置き換え、回復後の結果を供給する。
 
-Successful local creation appends a `subagent/catalog` fact to the parent Session regardless of result delivery. External creation appends a catalog fact only with `delivery: 'parent'`; caller-owned external executions retain their caller's membership records. External entries use `mode: 'external'` to identify children without a local Session. Catalog entries record membership once at creation and carry no execution status. Complete results go to the caller or the parent completion notice. Projections exclude inherited facts. Direct lists read one parent projection, so completed local workflow children remain discoverable and can be opened or continued. Catalog payload v0 records local modes; v1 also accepts unknown mode; v2 records external executions. Readers support all three versions. Historical migration appends a v1 `subagent/catalog` from a readable child header when its descriptor is unavailable; local creation retains v0. Its `mode: 'unknown'` projection keeps the child visible without claiming continuation support; an existing complete entry remains authoritative.
+ローカル作成に成功すると、結果の配信方法にかかわらず、親セッションに `subagent/catalog` ファクトが追加される。外部作成は `delivery: 'parent'` の場合にのみカタログファクトを追加し、呼び出し元が所有する外部実行は呼び出し元のメンバーシップレコードを保つ。外部エントリーは `mode: 'external'` を使用して、ローカルセッションを持たない子を識別する。カタログエントリーは作成時に一度だけメンバーシップを記録し、実行ステータスを運ばない。完全な結果は呼び出し元または親の完了通知に届く。プロジェクションは継承されたファクトを除外する。直接リストは 1 つの親プロジェクションを読み取るため、完了したローカルワークフローの子も引き続き検出可能で、開いたり継続したりできる。カタログペイロード v0 はローカルモードを記録し、v1 は unknown モードも受け入れ、v2 は外部実行を記録する。リーダーは 3 つのバージョンすべてをサポートする。歴史的マイグレーションは、記述子が利用できない場合に、読み取り可能な子ヘッダーから v1 の `subagent/catalog` を追加する。ローカル作成は v0 を保つ。その `mode: 'unknown'` プロジェクションは、継続サポートを主張せずに子を表示されたままにする。既存の完全なエントリーが権威のままである。
 
 <a id="restoring-child-composition"></a>
-### Restoring child composition
+### 子の構成の復元
 
-An independently selected spawn records `agent-preset/selected` before its first own `subagent/descriptor`. Cold resume excludes the inherited event prefix and checks that ordering, then reads the preset id from the existing `agentPreset` projection. It mounts that id without requiring the original subagent provider to remain registered. A missing or broken selected preset rejects restoration; it does not fall back to the parent or deployment default.
+独立に選択された spawn は、最初の自身の `subagent/descriptor` より前に `agent-preset/selected` を記録する。コールドレジュームは継承されたイベントプレフィックスを除外してその順序を確認し、次に既存の `agentPreset` プロジェクションからプリセット id を読み取る。元のサブエージェントプロバイダーが登録されたままであることを要求せずに、その id をマウントする。選択されたプリセットが欠如しているか壊れている場合、復元は拒否される。親やデプロイメントのデフォルトへのフォールバックはない。
 
-Logs without that selection before the first own descriptor, including historical spawn and fork logs, retain `composeFrom` of the parent's current composition. A header preset id, an inherited selection, or a selection after the descriptor does not opt a child into independent restoration, including a fork with no inherited events. Session and descriptor formats are unchanged. Independent cold resume uses the currently registered preset definition, without preserving an earlier revision across restarts.
+最初の自身の記述子より前にその選択がないログは、歴史的な spawn と fork のログを含め、親の現在の構成の `composeFrom` を保つ。ヘッダーのプリセット id、継承された選択、または記述子の後の選択は、継承されたイベントのない fork を含め、子を独立復元の対象にしない。Session 形式と記述子形式は変わらない。独立したコールドレジュームは現在登録されているプリセット定義を使用し、再起動をまたいで以前のリビジョンを保つことはない。
 
-### Ownership and invariants
+### 所有権と不変条件
 
-- **The manager owns accepted work** — unpublished failures roll back; published handles cancel their exact activation and await child-first disposal.
-- **Registration is effect-scoped** — removing a provider blocks new starts but never revokes accepted runs.
-- **Agent-message authority is exact adjacency** — `sendMessage()` requires the exact live sender; every sender may target a direct continuable child, while only a sender with a resident continuable Activation may target its direct parent.
-- **The descriptor is log-only** — a session event absent from model history and retained across compaction; the writer records the resolved child provider, model, and reasoning effort for cold resume. Historical one-shot descriptors remain readable.
-- **This runtime answers archive admission for children** ([seam](../../workspace/workspace/README.md)) — `workspace/session-activity` reports the live subagent descendants inside a turn as the `subagent` family, found by the durable lineage this package records (`parentSession` with the subagent origin, any depth, never a fork) and labelled from each child's descriptor through a live Session observation when the Session query service is composed, otherwise by id; `workspace/session-stop` cancels each of them with the parent cause, one at a time, so one child refusing its cancel is logged while its siblings still stop. The parent's own turn, its jobs, and the archived-lineage step gate belong to the API Session Controller.
+- **マネージャーが受理された作業を所有する** — 未公開の失敗はロールバックし、公開されたハンドルはその正確なアクティベーションをキャンセルし、子優先の破棄を待つ。
+- **登録はエフェクトスコープである** — プロバイダーを削除すると新しい開始はブロックされるが、受理済みの実行が取り消されることはない。
+- **Agent メッセージの権限は正確な隣接性である** — `sendMessage()` は正確なライブ送信者を要求する。すべての送信者は直接の継続可能な子を対象にできるが、居住中の継続可能な Activation を持つ送信者だけがその直接の親を対象にできる。
+- **記述子はログ専用である** — モデル履歴に存在せず、コンパクションをまたいで保持されるセッションイベントである。ライターはコールドレジュームのために解決された子プロバイダー、モデル、および推論エフォートを記録する。歴史的な単発記述子は読み取り可能なままである。
+- **このランタイムは子のアーカイブアドミッションに応答する**（[シーム](../../workspace/workspace/README.md)） — `workspace/session-activity` はターン内のライブサブエージェント子孫を `subagent` ファミリーとして報告する。これはこのパッケージが記録する耐久性のあるリネージ（サブエージェントオリジンを持つ `parentSession`、任意の深度、fork は決して含まない）によって見つけられ、Session クエリサービスが構成されている場合はライブのセッション観測を通じて各子の記述子からラベル付けされ、そうでなければ id によってラベル付けされる。`workspace/session-stop` はそれらを親原因で 1 つずつキャンセルするため、1 つの子がキャンセルを拒否してもログに記録されつつ、その兄弟は停止する。親自身のターン、そのジョブ、およびアーカイブされたリネージのステップゲートは API の Session Controller に属する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared seam to the backends, the model-facing tools, and the design decisions.
+パッケージレベルの契約で足りない場合は、これらのページを読む。共有シームからバックエンド、モデル向けツール、および設計上の決定へと進む。
 
-- [Subagent subsystem](../../../docs/subsystems/subagent.md) — the service contract, provider contract, and terminal result semantics.
-- [historical Subagent capability seam](../../../.agents/notes/archived/feature/2026-06-21-subagent-capability-seam.md) — the design record for the delegation capability family.
-- [Continuable subagents](../../../.agents/notes/implemented/feature/2026-07-28-continuable-subagent-conversations.md) — durable children that accept follow-up turns.
-- [In-process spawn backend](../subagent-spawn-in-process/README.md) — the simplest provider to compose.
-- [Auto review](../../experimental/auto-review/README.md) — the current-session authorization mode inherited only by in-process DSH children.
-- [Out-of-process ACP backend](../subagent-acp/README.md) — children with their own runtime over the Agent Client Protocol.
-- [DeepSeek input conversion](../../llm/llm-deepseek/README.md#model-experience) — provider replay rules for saved settlement notices.
-- [tool-subagent-control README](../tool-subagent-control/README.md) — the follow-up, interrupt, and listing surface.
+- [Subagent サブシステム](../../../docs/subsystems/subagent.md) — サービス契約、プロバイダー契約、および終端結果のセマンティクス。
+- [歴史的な Subagent ケイパビリティシーム](../../../.agents/notes/archived/feature/2026-06-21-subagent-capability-seam.md) — 委譲ケイパビリティファミリーの設計記録。
+- [継続可能なサブエージェント](../../../.agents/notes/implemented/feature/2026-07-28-continuable-subagent-conversations.md) — フォローアップのターンを受け入れる耐久性のある子。
+- [インプロセス spawn バックエンド](../subagent-spawn-in-process/README.md) — 最も単純な構成対象のプロバイダー。
+- [自動レビュー](../../experimental/auto-review/README.md) — インプロセスの DSH 子だけが継承する現在セッションの認可モード。
+- [アウトオブプロセス ACP バックエンド](../subagent-acp/README.md) — Agent Client Protocol 上で独自のランタイムを持つ子。
+- [DeepSeek 入力変換](../../llm/llm-deepseek/README.md#model-experience) — 保存された確定通知のプロバイダー再生ルール。
+- [tool-subagent-control README](../tool-subagent-control/README.md) — フォローアップ、中断、および列挙のサーフェス。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Settlement notice
+### 確定通知
 
-#### What the model sees
+#### モデルが見るもの
 
-Parent delivery emits a user-role status notice containing the child’s nonempty final text blocks, regardless of `send_message` availability or use. External notices also state that further messages are unsupported. Reasoning and other nontext blocks are excluded. Every parent notice includes available structured output as `Structured result: <JSON>` and the provider’s safe diagnostic as a separate text block. Empty closing text is reported as `It left no closing message.` Caller delivery emits no notice; SDK lifecycle notifications retain complete child output when cleanup succeeds.
+親配信は、`send_message` の可用性や使用にかかわらず、子の空でない最終テキストブロックを含む user ロールのステータス通知を発行する。外部の通知はさらに、以降のメッセージがサポートされないことを述べる。推論およびその他の非テキストブロックは除外される。すべての親通知は、利用可能な構造化出力を `Structured result: <JSON>` として、プロバイダーの安全な診断を別個のテキストブロックとして含む。空の締めのテキストは `It left no closing message.` として報告される。呼び出し元配信は通知を発行しない。SDK ライフサイクル通知は、クリーンアップが成功した場合に完全な子出力を保持する。
 
-#### Token effect
+#### トークンへの影響
 
-One notice per settled activation using parent delivery. Caller delivery adds no completion message; its consumer owns result presentation.
+親配信を使用する確定済みアクティベーションごとに 1 つの通知。呼び出し元配信は完了メッセージを追加しない。その消費者が結果の提示を所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only in the parent: the notice follows its reusable request prefix. Reaching an idle parent starts one independent model request; reaching a busy one does not.
+親では追記のみである。通知は再利用可能なリクエストプレフィックスに続く。アイドルの親に到達すると 1 つの独立したモデルリクエストが開始され、ビジーな親への到達では開始されない。
 
-### Child delegation-scope statement
+### 子の委譲スコープ文
 
-#### What the model sees
+#### モデルが見るもの
 
-Every in-process child's runtime-context snapshot carries the `subagent:delegation` statement below, after the sandbox-policy and approval-policy sentences.
+すべてのインプロセスの子のランタイムコンテキストスナップショットは、サンドボックスポリシーと承認ポリシーの文の後に、以下の `subagent:delegation` 文を運ぶ。
 
-##### The delegation-scope statement
+##### 委譲スコープ文
 
 ```markdown
 You are a delegated subagent: your permission scope was fixed when you were started and cannot be widened from inside this session — operations that require approval are rejected automatically. When the job needs access beyond that scope, do not retry the denied operation; state the limitation in your reply so the delegating agent can handle it.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-One fixed statement in each child's runtime-context snapshot; none in the parent's requests.
+各子のランタイムコンテキストスナップショットに 1 つの固定文。親のリクエストにはない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable within a child: the statement never changes during the child's lifetime, so it is written once into the first runtime-context snapshot. Parent-side, no direct invalidation; the named tool consumers own any request-prefix changes.
+子の中ではプレフィックスが安定している。文は子のライフタイム中に変わらないため、最初のランタイムコンテキストスナップショットに一度だけ書き込まれる。親側では直接の無効化はない。リクエストプレフィックスの変更は、名前が挙げられたツールの消費者が所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the seam is a poor fit or needs special operational care. They are current package constraints, not a general delegation comparison or a task backlog.
+これらの制限は、シームが適さない、または特別な運用上の注意が必要な場合を定義する。これらは現在のパッケージの制約であり、一般的な委譲の比較やタスクバックログではない。
 
-- **Descendant reads are sequential** — each reachable catalog, including one-shot children, takes one observation. A cold Session without a valid prepared observation requires a full-log read; large cold trees can accumulate storage latency.
-- **External children execute once** — ACP, DSH SDK, Codex, and Claude Code have no local child Session and accept no follow-up input. Their parent-owned records remain discoverable after disposal.
-- **Adjacent model messaging only** — `sendMessage()` requires an exact live sender; every sender may target a direct continuable child, while only a sender with a resident continuable Activation may target its direct parent. Browser prompts use a separate human Queue-or-Steer control path.
-- **A direct parent must remain live for child-to-parent delivery** — the service has no durable parent mailbox; a missing parent rejects the message instead of accepting work it cannot wake.
-- **Wake gap during cancellation convergence** — a follow-up accepted after an interrupt signal but before the Agent becomes idle stays queued until another waking send.
-- **Pending injected context retains an Activation** — settlement conservatively treats every Inbox occurrence as unfinished. Context parked after the Agent becomes idle keeps the child and its live ancestors resident until a waking delivery claims it, a queue mutation removes it, or manager teardown discards it. Host completion joins active work, pending child creation, and resource cleanup, but does not wait for a subtree containing only idle parked inboxes; it neither completes those activation results nor discards their messages.
-- **Process-local residency** — the Activation inbox and ownership graph do not coordinate two harness processes; concurrent access to one persistence store needs a durable mailbox and cross-process lease protocol.
-- **No replay of accepted-but-unlogged messages** — a crash can lose an accepted prompt that never reached the child's session log; the lost message is not replayed automatically.
-- **No durable parent mailbox** — child-to-parent messages require a resident continuable child and live direct parent, and provide acceptance identity rather than exactly-once delivery.
-- **Lifecycle events are observe-only** — a run-affecting `subagent/end` continuation or decision API waits for a concrete consumer.
+- **子孫の読み取りは逐次である** — 到達可能な各カタログ（単発の子を含む）が 1 つの観測を要する。有効な準備済み観測を持たないコールドセッションは全ログ読み取りを要する。大きなコールドツリーはストレージ遅延を蓄積し得る。
+- **外部の子は 1 回だけ実行する** — ACP、DSH SDK、Codex、Claude Code はローカルの子 Session を持たず、フォローアップ入力を受け入れない。親が所有するそれらのレコードは破棄後も検出可能なままである。
+- **隣接モデルメッセージングのみ** — `sendMessage()` は正確なライブ送信者を要求する。すべての送信者は直接の継続可能な子を対象にできるが、居住中の継続可能な Activation を持つ送信者だけがその直接の親を対象にできる。ブラウザーのプロンプトは別個の人間向け Queue または Steer 制御経路を使用する。
+- **子から親への配信には直接の親がライブである必要がある** — サービスに耐久性のある親メールボックスはない。親が欠如している場合、起こせない作業を受け入れるのではなく、メッセージを拒否する。
+- **キャンセル収束中のウェイクギャップ** — 中断シグナルの後、Agent がアイドルになる前に受理されたフォローアップは、別のウェイク送信があるまでキューに留まる。
+- **保留中の注入コンテキストは Activation を保持する** — 確定はすべてのインボックス出現を保守的に未完了として扱う。Agent がアイドルになった後にパークされたコンテキストは、ウェイク配信がそれをクレームするか、キューの変更がそれを除去するか、マネージャーのテアダウンがそれを破棄するまで、子とそのライブの祖先を居住させ続ける。Host の完了はアクティブな作業、保留中の子の作成、およびリソースのクリーンアップに合流するが、アイドルのパークされたインボックスだけを含むサブツリーは待たない。それらのアクティベーション結果を完了させることも、そのメッセージを破棄することもない。
+- **プロセスローカルの居住性** — Activation のインボックスと所有権グラフは 2 つのハーネスプロセスを調整しない。1 つの永続化ストアへの同時アクセスには、耐久性のあるメールボックスとクロスプロセスのリースプロトコルが必要である。
+- **受理されたが未ログのメッセージの再生はない** — クラッシュは、子のセッションログに到達しなかった受理済みプロンプトを失い得る。失われたメッセージは自動的に再生されない。
+- **耐久性のある親メールボックスはない** — 子から親へのメッセージには、居住中の継続可能な子とライブの直接の親が必要で、exactly-once 配信ではなく受理 identity を提供する。
+- **ライフサイクルイベントは観測専用である** — 実行に影響する `subagent/end` の継続または決定 API は、具体的な消費者を待つ。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
+この開発者ノートはメンテナー向けの作業コンテキストである。すなわち未解決の問いと未決定の方向性である。これは明示的に非権威である。出荷済みの振る舞いと制限は、上記のセクションとパッケージコードにある。
 
-- **Cross-process continuation** — a durable mailbox and lease protocol would let two harness processes share one persistence store.
-- **Continuable ACP children** — requires persisting the remote session id and a per-child continuation advertisement.
-- **Host-user delivery** — a future host adapter needs a concrete authenticated interaction before the seam gains a user delivery capability.
+- **クロスプロセスの継続** — 耐久性のあるメールボックスとリースプロトコルにより、2 つのハーネスプロセスが 1 つの永続化ストアを共有できるようになる。
+- **継続可能な ACP 子** — リモートセッション id の永続化と、子ごとの継続アドバタイズメントが必要である。
+- **Host ユーザー配信** — 将来のホストアダプターは、シームがユーザー配信ケイパビリティを得る前に、具体的な認証済みインタラクションを必要とする。
 
 </details>

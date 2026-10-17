@@ -1,18 +1,18 @@
 # deepseek-harness-runtime-bin
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Platform runtime wheel for the DeepSeek Harness Python SDK. It packages the normal `dsh` CLI and its closed Node dependency tree into a native executable, so SDK use requires no system Node.js. This package publishes wheels only.
+DeepSeek Harness Python SDK 用のプラットフォームランタイム wheel。通常の `dsh` CLI とその閉じた Node 依存ツリーをネイティブ実行ファイルにパッケージングするため、SDK の利用にシステムの Node.js は不要である。このパッケージは wheel のみを公開する。
 
-## Installed commands and artifacts
+## インストールされるコマンドと成果物
 
-The wheel installs a `dsh` console command and the `deepseek_harness_runtime` Python module. `dsh` forwards its arguments to the bundled executable and requires a non-empty `DSH_HOME`; it never falls back to `~/.dsh`.
+wheel は `dsh` コンソールコマンドと `deepseek_harness_runtime` Python モジュールをインストールする。`dsh` は引数を同梱の実行ファイルに転送し、空でない `DSH_HOME` を要求する。`~/.dsh` にはフォールバックしない。
 
-Production executables are named `deepseek-harness-sdk-runtime-<platform>-<arch>` under the module's `runtime/` directory; Windows uses the `.exe` suffix. Linux and macOS wheels include a target-native `-rg` sidecar, Windows includes `-rg.exe`, and macOS also includes `-spawn-helper` for `node-pty`. Published targets are Linux x64, Linux arm64, macOS arm64, macOS x64, and Windows x64. The wheel tag and payload must match exactly; no Windows arm64 wheel is published.
+本番実行ファイルは、モジュールの `runtime/` ディレクトリ配下で `deepseek-harness-sdk-runtime-<platform>-<arch>` と命名される。Windows では `.exe` サフィックスを使用する。Linux と macOS の wheel にはターゲットネイティブの `-rg` サイドカーが含まれ、Windows には `-rg.exe`、macOS にはさらに `node-pty` 用の `-spawn-helper` が含まれる。公開ターゲットは Linux x64、Linux arm64、macOS arm64、macOS x64、Windows x64 である。wheel タグとペイロードは正確に一致しなければならない。Windows arm64 の wheel は公開されない。
 
-The wheel carries only the executable, native execution helpers, and `<platform>-<arch>/` with `downloads.json` and the lightweight `office-skills/` tree. CPython, authoring libraries, standalone Node, pnpm, and the complete Office sidecar are optional downloads. Importing Python modules, starting SDK profiles, and processing Office files never download resources.
+wheel が含むのは、実行ファイル、ネイティブ実行ヘルパー、および `downloads.json` と軽量な `office-skills/` ツリーを含む `<platform>-<arch>/` のみである。CPython、authoring ライブラリ、スタンドアロン Node、pnpm、完全な Office サイドカーはオプションのダウンロードである。Python モジュールのインポート、SDK プロファイルの起動、Office ファイルの処理がリソースをダウンロードすることは決してない。
 
-Download either resource explicitly before using it:
+いずれのリソースも、使用前に明示的にダウンロードする:
 
 ```py
 from deepseek_harness_runtime import download_office, download_primary_runtime
@@ -21,49 +21,49 @@ office = download_office()
 primary_runtime = download_primary_runtime()
 ```
 
-`download_office()` downloads the locked npm Kit, target engine, and complete dependency tree, plus standalone Node for the Kit CLI. `download_primary_runtime()` independently downloads CPython, locked Python libraries, Node, pnpm, and Office skills. Both return absolute resource directories and reuse completed caches. The authoring download validates its target, interpreters, library directory and skills before returning. The existing local `installPrimaryRuntime()` operation still copies an already available payload; it does not download. The shared builder applies the [NumPy/pandas test-file exclusions](../../apps/desktop/README.md#bundled-workspace-dependencies).
+`download_office()` は、ロックされた npm Kit、ターゲットエンジン、完全な依存ツリー、および Kit CLI 用のスタンドアロン Node をダウンロードする。`download_primary_runtime()` は、CPython、ロックされた Python ライブラリ、Node、pnpm、Office スキルを独立してダウンロードする。どちらも絶対リソースディレクトリを返し、完了済みキャッシュを再利用する。authoring のダウンロードは、戻る前にターゲット、インタープリター、ライブラリディレクトリ、スキルを検証する。既存のローカル `installPrimaryRuntime()` 操作は、利用可能なペイロードをコピーするだけで、ダウンロードは行わない。共有ビルダーは [NumPy/pandas テストファイルの除外](../../apps/desktop/README.md#bundled-workspace-dependencies)を適用する。
 
-`DSH_RESOURCE_CACHE` selects an absolute cache root, defaulting to `~/.cache/deepseek-harness/resources`. Resource identities include the release's locked inputs. Downloads verify archive hashes and package identities, preserve executable permissions, and publish completed directories atomically. Failed downloads can be retried. `DSH_RESOURCE_DOWNLOAD_TIMEOUT_MS` bounds each archive download, including its body; the default is `300000`, and accepted values are integers from `1` to `2147483647`. Downloads follow the Harness proxy environment policy. Installed wheel files are never modified. Release versions have separate cache directories; unused versions require manual removal. Downloads use the locked upstream URLs without a registry or mirror override.
+`DSH_RESOURCE_CACHE` は絶対キャッシュルートを選択し、デフォルトは `~/.cache/deepseek-harness/resources` である。リソース ID にはリリースのロックされた入力が含まれる。ダウンロードはアーカイブのハッシュとパッケージ ID を検証し、実行権限を保持し、完了したディレクトリをアトミックに公開する。失敗したダウンロードは再試行できる。`DSH_RESOURCE_DOWNLOAD_TIMEOUT_MS` は各アーカイブのダウンロード(ボディを含む)を制限する。デフォルトは `300000` で、受け付けられる値は `1` から `2147483647` の整数である。ダウンロードは Harness のプロキシ環境ポリシーに従う。インストール済みの wheel ファイルが変更されることはない。リリースバージョンごとに別々のキャッシュディレクトリを持ち、未使用バージョンの削除は手動で行う必要がある。ダウンロードはロックされた上流 URL を使用し、レジストリやミラーのオーバーライドはない。
 
-On subsequent launches the packaged bootstrap exposes downloaded resources to the SDK profile. `DSH_PRIMARY_RUNTIME` overrides the cached authoring environment; an empty value disables its query. `DSH_OFFICE_SIDECAR` can select an absolute sidecar directory with its standalone Node. Users may provide their own Python environment and document libraries without downloading the authoring environment. Office skills are available when either resource is selected; authoring-only deployments expose the skills with the Kit CLI disabled. External authoring payloads retain the `primary-runtime/` plus sibling `office-skills/` layout. The SDK reads resources in place without copying them into `DSH_HOME`. The `sdk-minimal` profile does not mount these providers.
+以降の起動時、同梱のブートストラップはダウンロード済みリソースを SDK プロファイルに公開する。`DSH_PRIMARY_RUNTIME` はキャッシュされた authoring 環境をオーバーライドし、空の値はそのクエリを無効にする。`DSH_OFFICE_SIDECAR` は、スタンドアロン Node を含む絶対サイドカーディレクトリを選択できる。ユーザーは authoring 環境をダウンロードせずに独自の Python 環境とドキュメントライブラリを提供できる。Office スキルは、どちらかのリソースが選択されている場合に利用可能になる。authoring 専用のデプロイでは、Kit CLI を無効にしてスキルが公開される。外部の authoring ペイロードは `primary-runtime/` と隣接する `office-skills/` のレイアウトを維持する。SDK はリソースを `DSH_HOME` にコピーせず、その場で読み取る。`sdk-minimal` プロファイルはこれらのプロバイダーをマウントしない。
 
-Skill selection is independent of delivery: project, custom-directory, and user filesystem skills override same-name bundled skills. An SDK patch can disable only the Office provider while retaining the Python query:
+スキルの選択はデリバリーから独立している。プロジェクト、カスタムディレクトリ、ユーザーファイルシステムのスキルは、同名の同梱スキルをオーバーライドする。SDK パッチは、Python クエリを維持したまま Office プロバイダーのみを無効にできる:
 
 ```yaml
 - id: skill-office
   disabled: true
 ```
 
-Office operation skills invoke the configured Node and Kit CLI through the profile's shell commands. See the [Office provider](../../packages/skill/skill-office/README.md#use-this-package) for command selection and replacing the skill collection. Configuration patches apply at process startup; changing skills does not require rebuilding the runtime wheel or Python environment.
+Office 操作スキルは、プロファイルのシェルコマンドを通じて設定された Node と Kit CLI を呼び出す。コマンドの選択とスキルコレクションの置き換えについては [Office プロバイダー](../../packages/skill/skill-office/README.md#use-this-package)を参照。設定パッチはプロセス起動時に適用される。スキルの変更にランタイム wheel や Python 環境の再ビルドは不要である。
 
-Repository builds also materialize a dev-only `runtime/node/` carrier. It runs `node runtime/node/runtime-bootstrap.mjs` on system Node 22.19 or newer. It is never selected automatically and is excluded from wheels and sdists.
+リポジトリのビルドでは、開発専用の `runtime/node/` キャリアも生成される。これはシステムの Node 22.19 以降で `node runtime/node/runtime-bootstrap.mjs` を実行する。自動的に選択されることはなく、wheel と sdist からは除外される。
 
-Both carriers execute the same `dsh` grammar and shipped profiles, including the standalone `sdk-minimal` tree and the full `web` profile with its frontend assets. The private `dsh-python-runtime-closure` manifest defines the packaged dependency closure; there is no Python-specific Node application or checked-in default `cordis.yml`.
+両方のキャリアは同じ `dsh` 文法と出荷されるプロファイル(スタンドアロンの `sdk-minimal` ツリーや、フロントエンドアセットを含む完全な `web` プロファイルを含む)を実行する。プライベートな `dsh-python-runtime-closure` マニフェストがパッケージ化される依存クロージャを定義する。Python 固有の Node アプリケーションやチェックインされたデフォルトの `cordis.yml` は存在しない。
 
-## Python module API
+## Python モジュール API
 
-- `bundled_package_dir() -> Path` returns the installed module-data root and verifies its release metadata.
-- `bundled_runtime_path() -> Path` returns the current platform executable and verifies required sidecars.
-- `resolve_bundled_launch_args(mode=None) -> tuple[str, ...]` returns the executable argv by default. Explicit `mode="node"` or `DSH_RUNTIME_MODE=node` selects the repo-only Node carrier.
-- `download_office() -> Path` explicitly downloads or reuses the Office sidecar and its standalone Node.
-- `download_primary_runtime() -> Path` explicitly downloads or reuses the authoring environment.
-- `resolve_office_launch_args() -> tuple[str, str]` locates the installed Node and Kit CLI without downloading; missing resources raise `FileNotFoundError` with the download instruction.
-- `main()` implements the installed `dsh` console command and rejects an absent or blank `DSH_HOME`. On Windows it waits for the bundled process with inherited standard streams and forwards its exit status; on POSIX it replaces the Python process.
+- `bundled_package_dir() -> Path` はインストール済みモジュールデータのルートを返し、そのリリースメタデータを検証する。
+- `bundled_runtime_path() -> Path` は現在のプラットフォームの実行ファイルを返し、必要なサイドカーを検証する。
+- `resolve_bundled_launch_args(mode=None) -> tuple[str, ...]` はデフォルトで実行ファイルの argv を返す。明示的な `mode="node"` または `DSH_RUNTIME_MODE=node` はリポジトリ専用の Node キャリアを選択する。
+- `download_office() -> Path` は Office サイドカーとそのスタンドアロン Node を明示的にダウンロードまたは再利用する。
+- `download_primary_runtime() -> Path` は authoring 環境を明示的にダウンロードまたは再利用する。
+- `resolve_office_launch_args() -> tuple[str, str]` はダウンロードせずにインストール済みの Node と Kit CLI を探す。リソースがない場合はダウンロード手順を含む `FileNotFoundError` を送出する。
+- `main()` はインストール済みの `dsh` コンソールコマンドを実装し、`DSH_HOME` が存在しない場合または空白の場合は拒否する。Windows では標準ストリームを継承して同梱プロセスを待機し、その終了ステータスを転送する。POSIX では Python プロセスを置き換える。
 
-Unsupported platforms and missing executables or sidecars raise `FileNotFoundError` with the build and installation routes. Unknown runtime modes raise `ValueError`.
+サポートされないプラットフォーム、および実行ファイルやサイドカーがない場合は、ビルドとインストールの手順を含む `FileNotFoundError` を送出する。不明なランタイムモードは `ValueError` を送出する。
 
-## Packaged profile resolution
+## パッケージ化されたプロファイルの解決
 
-`dsh` initializes shipped profiles under the explicit home, composes their bundle patches, and loads bundled plugins from the executable's virtual filesystem. Runtime resolution uses an in-memory generation instead of disk symlinks or proxy packages. Fallback imports use recorded declaring-package paths, including paths inside the executable's virtual filesystem, so built-in rows and external plugin peers share the bundled Cordis/module instance. Native shared libraries and Windows ConPTY addons are packaged with native addons, while ripgrep and the macOS PTY helper remain executable sidecars.
+`dsh` は明示された home の下で出荷プロファイルを初期化し、そのバンドルパッチを構成し、実行ファイルの仮想ファイルシステムから同梱プラグインをロードする。ランタイム解決は、ディスク上のシンボリックリンクやプロキシパッケージの代わりに、インメモリの世代を使用する。フォールバックインポートは、実行ファイルの仮想ファイルシステム内のパスを含む、記録された宣言元パッケージのパスを使用するため、組み込みの行と外部プラグインのピアが同梱の Cordis/モジュールインスタンスを共有する。ネイティブ共有ライブラリと Windows ConPTY アドオンはネイティブアドオンとしてパッケージ化され、ripgrep と macOS の PTY ヘルパーは実行可能サイドカーのままである。
 
-Python and the packaged bootstrap share the resource layout: `<cache>/<identity>/office/`, `node/bin/node[.exe]`, and `node_modules/@deepseek-ai/libreoffice-kit/lib/cli.js`. Automatic Office cache discovery requires the `complete` marker to match the manifest identity; an explicit `DSH_OFFICE_SIDECAR` requires the Node and CLI files. The Python bootstrap resolves the Office kit from its explicitly downloaded or selected sidecar so native helpers and URL Workers use real filesystem paths. The same resource preparation implementation serves repository builds and explicit Python downloads. The kit owns document operations; the Office smoke retrieves CLI paths from the loaded skill and executes capabilities and DOCX conversion with an empty PATH.
+Python と同梱のブートストラップはリソースレイアウトを共有する: `<cache>/<identity>/office/`、`node/bin/node[.exe]`、`node_modules/@deepseek-ai/libreoffice-kit/lib/cli.js`。Office キャッシュの自動検出には、`complete` マーカーがマニフェスト ID と一致することが必要である。明示的な `DSH_OFFICE_SIDECAR` には Node と CLI のファイルが必要である。Python ブートストラップは、明示的にダウンロードまたは選択されたサイドカーから Office kit を解決するため、ネイティブヘルパーと URL Worker は実際のファイルシステムパスを使用する。同じリソース準備の実装が、リポジトリのビルドと明示的な Python ダウンロードの両方に使用される。kit はドキュメント操作を所有する。Office スモークテストは、ロードされたスキルから CLI パスを取得し、空の PATH でケイパビリティと DOCX 変換を実行する。
 
-External profile management uses `dsh plugin --profile <name> ...`. That command requires `pnpm` on `PATH`; ordinary SDK/profile execution does not.
+外部プロファイルの管理には `dsh plugin --profile <name> ...` を使用する。このコマンドは `PATH` 上の `pnpm` を必要とするが、通常の SDK/プロファイル実行には必要ない。
 
-## Build and distribution
+## ビルドと配布
 
-Production deployment permits unused workspace patches for packages outside the runtime closure; patches for included packages must still apply successfully. This exception is confined to the deploy command; repository installation still rejects unused patches.
+本番デプロイでは、ランタイムクロージャ外のパッケージに対する未使用のワークスペースパッチが許可される。含まれるパッケージのパッチは引き続き正常に適用されなければならない。この例外は deploy コマンドに限定され、リポジトリのインストールは未使用のパッチを依然として拒否する。
 
-From the repository root, `pnpm exec tsx scripts/build-exe-for-python-sdk.ts` verifies the closure, builds packages, deploys a symlink-free tree, packages the selected target, and syncs the executable and sidecars into this module. Only the target platform’s PTY prebuilds are packaged. Package README, CHANGELOG, HISTORY Markdown, source maps, and TypeScript declarations outside runtime assets are omitted. Deployment disables workspace hoisting, and packaging excludes checkout dependencies and workspace source trees outside the deployment so dependency scans cannot add development packages to the payload. Staging shares root workspace packages with nested consumers of the same pnpm dependency identity, preserving singleton services while retaining different peer resolutions. `scripts/build-python-release.py` stages release-shaped wheels at the root repository version and pins `deepseek-harness-sdk` to the exact runtime version.
+リポジトリルートから `pnpm exec tsx scripts/build-exe-for-python-sdk.ts` を実行すると、クロージャの検証、パッケージのビルド、シンボリックリンクなしツリーのデプロイ、選択されたターゲットのパッケージング、実行ファイルとサイドカーのこのモジュールへの同期を行う。パッケージ化されるのはターゲットプラットフォームの PTY プリビルドのみである。パッケージ README、CHANGELOG、HISTORY の Markdown、ソースマップ、ランタイムアセット外の TypeScript 宣言は省略される。デプロイはワークスペースのホイスティングを無効にし、パッケージングはチェックアウトの依存関係とデプロイ外のワークスペースソースツリーを除外するため、依存関係スキャンが開発パッケージをペイロードに追加することはない。ステージングは、同じ pnpm 依存 ID を持つネストされたコンシューマーとルートワークスペースパッケージを共有し、異なるピア解決を維持しつつシングルトンサービスを保つ。`scripts/build-python-release.py` は、リポジトリルートのバージョンでリリース形式の wheel をステージングし、`deepseek-harness-sdk` を正確なランタイムバージョンに固定する。
 
-The installed-wheel smoke creates a clean virtual environment outside the checkout, proves the installed distribution and executable identities, then exercises default and customized SDK profiles, external plugins, MCP, native tools, direct JSON-RPC, committed snapshots, and the real provider on trusted runs. Its Office scenario relocates the lightweight target payload, explicitly downloads the sidecar, and converts DOCX with the required platform engine: the target’s declared native engine, or WASM when no native engine is declared. See the [Python contributor workflow](../development.md) and [installed-wheel testing decision](../../.agents/notes/implemented/testing/2026-08-23-installed-python-wheel-black-box-ci.md).
+インストール済み wheel のスモークテストは、チェックアウト外にクリーンな仮想環境を作成し、インストール済みディストリビューションと実行ファイルの同一性を証明したうえで、デフォルトおよびカスタマイズされた SDK プロファイル、外部プラグイン、MCP、ネイティブツール、直接の JSON-RPC、コミット済みスナップショット、信頼された実行での実際のプロバイダーを試す。その Office シナリオは、軽量なターゲットペイロードを移動し、サイドカーを明示的にダウンロードし、必要なプラットフォームエンジン(ターゲットが宣言したネイティブエンジン、ネイティブエンジンが宣言されていない場合は WASM)で DOCX を変換する。[Python コントリビューターワークフロー](../development.md)と[インストール済み wheel テストの決定](../../.agents/notes/implemented/testing/2026-08-23-installed-python-wheel-black-box-ci.md)を参照。

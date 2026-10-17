@@ -1,52 +1,52 @@
 ---
-description: "The goal group map: one durable completion objective per session, with model tools, a human command, and automatic continuation, for users and maintainers navigating the group."
+description: "目標グループマップ: セッションごとに1つの durable 完了目標。モデルツール、人向けコマンド、自動継続を備える。グループ内を移動するユーザーとメンテナー向け。"
 kind: "package-group"
 ---
 
 # packages/goal
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The goal group lets one agent session pursue a durable completion objective across restarts, resumes, and forks. Agents can create and update the objective, while people can inspect or control it directly with `/goal` without spending a model turn. An optional continuation package can keep active work moving through sequential Rounds. Each session has only one current goal, and that goal records completion state rather than scheduling work; automatic continuation must therefore be enabled separately.
+目標グループにより、1つのエージェントセッションは再起動、再開、フォークをまたいで durable な完了目標を追跡できる。エージェントは目標を作成・更新でき、人はモデルターンを消費せず `/goal` で直接確認または操作できる。オプショナルな継続パッケージは進行中の作業を連続ラウンドで動かし続けられる。各セッションが持つ現在の目標は1つのみであり、その目標は作業のスケジューリングではなく完了状態を記録する。そのため自動継続は別途有効化しなければならない。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`goal`](goal/README.md) | One durable goal per session: create, edit, pause, resume, complete, block, and clear | `ctx.goals` |
-| [`tool-goal`](tool-goal/README.md) | Model tools `get_goal`, `create_goal`, `update_goal` | registers on `ctx.tools` |
-| [`command-goal`](command-goal/README.md) | Human `/goal` command in UI command planes | registers on `ctx.commands` |
-| [`goal-round-driver`](goal-round-driver/README.md) | Automatic continuation: turns an active goal into sequential Rounds | no service key |
+| [`goal`](goal/README.md) | セッションごとに1つの durable 目標: 作成、編集、一時停止、再開、完了、ブロック、クリア | `ctx.goals` |
+| [`tool-goal`](tool-goal/README.md) | モデルツール `get_goal`、`create_goal`、`update_goal` | `ctx.tools` に登録する |
+| [`command-goal`](command-goal/README.md) | UI コマンド面の人向け `/goal` コマンド | `ctx.commands` に登録する |
+| [`goal-round-driver`](goal-round-driver/README.md) | 自動継続: 有効な目標を連続ラウンドに変える | サービスキーなし |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Goal subsystem](../../docs/subsystems/goal.md) — goal types, durable `goal/change` events, and the generated service API.
-- [Generated tool catalog](../../docs/tool-catalog.md#deepseek-aidsh-tool-goal) — the three goal-tool schemas the model receives.
-- [Generated configuration catalog](../../docs/config-catalog.md#deepseek-aidsh-goal) — every accepted config field of the goal service.
-- [historical Goal domain Agent Note](../../.agents/notes/archived/feature/2026-07-19-persisted-same-session-goal-domain.md) — the domain design and its decisions.
+- [Goal サブシステム](../../docs/subsystems/goal.md) — 目標型、durable な `goal/change` イベント、生成サービス API。
+- [生成ツールカタログ](../../docs/tool-catalog.md#deepseek-aidsh-tool-goal) — モデルが受け取る3つの目標ツールスキーマ。
+- [生成設定カタログ](../../docs/config-catalog.md#deepseek-aidsh-goal) — 目標サービスの受け入れ設定フィールドのすべて。
+- [歴史的な Goal ドメイン Agent Note](../../.agents/notes/archived/feature/2026-07-19-persisted-same-session-goal-domain.md) — ドメイン設計とその決定。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

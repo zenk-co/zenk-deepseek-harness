@@ -1,24 +1,24 @@
-# Web Client Slots
+# Web Client スロット
 
-English | [中文](slots.zh.md)
+日本語 | [English](slots.en.md) | [中文](slots.zh.md)
 
-Slots are the Web Client's typed React composition system. [`dsh-client-ui-slots`](../../packages/client/ui-slots/README.md) defines the React-free registry and type algebra; [`dsh-client-ui-renderer`](../../packages/client/ui-renderer/README.md) binds observable sources to hooks, renders the tree, and owns React contexts internally. A feature plugin contributes UI through `ctx.slots.register()` and never imports another feature plugin's component.
+スロットは Web Client の型付き React 構成システムである。[`dsh-client-ui-slots`](../../packages/client/ui-slots/README.md) が React 非依存のレジストリと型代数を定義し、[`dsh-client-ui-renderer`](../../packages/client/ui-renderer/README.md) が監視可能なソースをフックに束縛し、ツリーをレンダリングし、React コンテキストを内部で所有する。機能プラグインは `ctx.slots.register()` を通じて UI を貢献し、他の機能プラグインのコンポーネントを決してインポートしない。
 
-This page documents slot ownership, component inputs, extension APIs, and the shipped hierarchy. The surrounding boot, Remote, Client model, and Conversation paths are in [Web Client architecture](web-client.md).
+このページはスロットの所有権、コンポーネント入力、拡張 API、同梱の階層を文書化する。周辺の boot、Remote、Client モデル、Conversation の経路は [Web Client アーキテクチャ](web-client.md)にある。
 
-`plugins.bundle.config` supplies bundle detail configuration, keyed by npm package name. `plugins.bundle.activation` renders optional guidance after user-requested enablement, with owner callbacks to dismiss or open that bundle’s details. `conversation.input.activity` supplies one action between the model selector and Send, with toolbar expansion released on unmount.
+`plugins.bundle.config` は npm パッケージ名でキー付けされたバンドル詳細設定を供給する。`plugins.bundle.activation` はユーザー要求の有効化の後にオプションのガイダンスをレンダリングし、そのバンドルの詳細を閉じるまたは開くオーナーコールバックを持つ。`conversation.input.activity` はモデルセレクターと Send の間の 1 つのアクションを供給し、ツールバーの展開はアンマウント時に解放される。
 
-The plugin catalog declares `plugins.add.actions`, a root-scoped list for `MenuItemButton` rows after installation in the Add plugin menu. Its owner supplies `onDismiss()` to close the menu before starting an action. The slot follows the owning Plugins page declaration lifetime.
+プラグインカタログは `plugins.add.actions` を宣言する。これは Add plugin メニューでのインストール後の `MenuItemButton` 行のためのルートスコープのリストである。そのオーナーは、アクションを開始する前にメニューを閉じる `onDismiss()` を供給する。スロットは所有する Plugins ページの宣言ライフタイムに従う。
 
-## Declaration and lifecycle
+## 宣言とライフサイクル
 
-`SlotMap` is the compile-time registry. A package declaration-merges the key, cardinality, scope, owner props, keyed props, and optional slot-level inject face. The runtime declaration is the matching `children` entry on the component that owns the render location.
+`SlotMap` はコンパイル時のレジストリである。パッケージがキー、カーディナリティ、スコープ、オーナー props、keyed props、およびオプションのスロットレベル inject フェイスを宣言マージする。実行時宣言は、レンダリング位置を所有するコンポーネント上の対応する `children` エントリーである。
 
-Declaring a child has three effects: it makes the child key live, authorizes that parent entry's `renderSlot` or `renderSlotChain` call, and records the runtime dispatch specification. One live entry owns each declaration. Registering into an undeclared slot or declaring a child already owned elsewhere fails during plugin activation.
+子を宣言することには 3 つの効果がある: 子キーを有効にし、その親エントリーの `renderSlot` または `renderSlotChain` 呼び出しを認可し、実行時ディスパッチ仕様を記録する。1 つのライブエントリーが各宣言を所有する。宣言されていないスロットへの登録、またはすでに他所で所有されている子の宣言は、プラグインのアクティベーション中に失敗する。
 
-`root` is the only built-in declaration and the only key rendered through the Cordis service itself. `ui-renderer` calls `ctx.slots.renderSlot('root', {})`; every descendant is rendered through the `renderSlot` or `renderSlotChain` prop of the entry that declared it.
+`root` は唯一の組み込み宣言であり、Cordis サービス自体を通じてレンダリングされる唯一のキーである。`ui-renderer` は `ctx.slots.renderSlot('root', {})` を呼ぶ。すべての子孫は、それを宣言したエントリーの `renderSlot` または `renderSlotChain` prop を通じてレンダリングされる。
 
-Registrations and declarations follow Cordis effect lifetimes. Disposing an entry removes its contribution and recursively collapses the child slots it declared. A feature that contributes into another package's slot therefore uses `ctx.slots.inject(key, callback)`: the callback runs for each declaration lifetime, its effects are removed when the owner collapses, and it runs again if the owner is mounted again.
+登録と宣言は Cordis のエフェクトライフタイムに従う。エントリーを破棄するとその貢献が除去され、それが宣言した子スロットが再帰的に折り畳まれる。したがって、別のパッケージのスロットへ貢献する機能は `ctx.slots.inject(key, callback)` を使う: コールバックは宣言ライフタイムごとに実行され、そのエフェクトはオーナーが折り畳まれると除去され、オーナーが再びマウントされると再び実行される。
 
 ```tsx ignore-check
 import type { Context } from '@deepseek-ai/cordis'
@@ -45,75 +45,75 @@ export function apply(ctx: Context): void {
 }
 ```
 
-## Cardinality and scope
+## カーディナリティとスコープ
 
-The slot declaration fixes two independent axes.
+スロット宣言は 2 つの独立した軸を固定する。
 
-| Axis | Value | Meaning |
+| 軸 | 値 | 意味 |
 |---|---|---|
-| cardinality | `single` | One cell. The active priority winner renders. Use a child slot instead of treating this as an additive list. |
-| cardinality | `list` | Cells are addressed by required `id` and ordered by `order`, then registration order. |
-| cardinality | `keyed` | The owner dispatches an `entryKey`; the matching cell renders with any key-specific props. |
-| cardinality | `chain` | Each entry supplies a pure `select(owner)` function. The first non-null result in priority order renders and receives that result as `matched`; otherwise the owner fallback renders. |
-| scope | `root` | One root-scoped component and store instance. |
-| scope | `session-maybe` | Inherits the surrounding Provider binding but stays renderable without one; Session values are optional. |
-| scope | `session` | Requires a resolved surrounding Provider binding and receives definite Session values. |
+| カーディナリティ | `single` | 1 つのセル。アクティブな優先度の勝者がレンダリングする。これを追加リストとして扱うのではなく、子スロットを使う。 |
+| カーディナリティ | `list` | セルは必須の `id` でアドレス指定され、`order`、次に登録順で並べられる。 |
+| カーディナリティ | `keyed` | オーナーが `entryKey` をディスパッチし、一致するセルがキー固有の props とともにレンダリングされる。 |
+| カーディナリティ | `chain` | 各エントリーが純粋な `select(owner)` 関数を供給する。優先度順で最初の非 null の結果がレンダリングされ、その結果を `matched` として受け取る。そうでなければオーナーのフォールバックがレンダリングする。 |
+| スコープ | `root` | 1 つのルートスコープのコンポーネントとストアインスタンス。 |
+| スコープ | `session-maybe` | 周囲の Provider バインディングを継承するが、それがなくてもレンダリング可能なままである。Session 値はオプションである。 |
+| スコープ | `session` | 解決された周囲の Provider バインディングを必要とし、確定した Session 値を受け取る。 |
 
-`priority` is a shadowing rank for `single`, `list`, and `keyed` cells and an election order for `chain`. Lower values run or render first. Ordinary additive contributions should choose a fresh list `id` or keyed `key`; intentionally reusing a shipped cell replaces its presentation.
+`priority` は `single`、`list`、`keyed` セルのシャドーイングランクであり、`chain` の選出順である。低い値が先に実行またはレンダリングされる。通常の追加的な貢献は新しい list の `id` または keyed の `key` を選ぶべきである。同梱のセルを意図的に再利用するとそのプレゼンテーションが置き換わる。
 
-## Component inputs
+## コンポーネント入力
 
-A registered component receives inputs assembled at its binding site. Components derive these types rather than copying their members.
+登録されたコンポーネントは、そのバインディングサイトで組み立てられた入力を受け取る。コンポーネントはメンバーをコピーするのではなく、これらの型を導出する。
 
-| Input | Declared by | Component type |
+| 入力 | 宣言元 | コンポーネント型 |
 |---|---|---|
-| owner values and standard scope values | the `SlotMap` row and installed scope adapters | `PropsRuntime<K>` |
-| authorized child renderers | the registration's `children` keys | `PropsRenderSlots<S>` |
-| selector hook and mutation callbacks for shared view state | the registration's `store` | `PropsStore<H>` |
-| private data, callbacks, and observable hooks | the registration's `inject` factory | `InjectFace<I>` |
-| localized `t` function | the registration's `locale` namespace | `PropsLocale<N>` |
-| selected chain value | the registration's `select` result | `matched` through `ComposedProps` |
+| オーナー値と標準スコープ値 | `SlotMap` の行とインストールされたスコープアダプター | `PropsRuntime<K>` |
+| 認可された子レンダラー | 登録の `children` キー | `PropsRenderSlots<S>` |
+| 共有ビュー状態のためのセレクターフックと変更コールバック | 登録の `store` | `PropsStore<H>` |
+| プライベートデータ、コールバック、監視可能なフック | 登録の `inject` ファクトリー | `InjectFace<I>` |
+| ローカライズされた `t` 関数 | 登録の `locale` 名前空間 | `PropsLocale<N>` |
+| 選択された chain の値 | 登録の `select` 結果 | `ComposedProps` を通じた `matched` |
 
-`SessionProvider` is also present in `PropsRenderSlots` when an entry declares a `session` or `session-maybe` child. With no `session` prop it inherits the surrounding binding; an explicit `SessionReference` or `undefined` overrides only that subtree. The Provider does not key its whole body. A strict `session` entry remounts when its binding generation changes. A blank `session-maybe` entry adopts its first binding without remounting, then remounts for a later generation or a return to absence.
+エントリーが `session` または `session-maybe` の子を宣言する場合、`SessionProvider` も `PropsRenderSlots` に存在する。`session` prop がない場合は周囲のバインディングを継承し、明示的な `SessionReference` または `undefined` はそのサブツリーのみを上書きする。Provider は本体全体をキー付けしない。厳密な `session` エントリーはバインディング世代が変わると再マウントする。空の `session-maybe` エントリーは再マウントせずに最初のバインディングを採用し、後の世代または不在への復帰で再マウントする。
 
-Components never receive `ctx`. Parent-owned point-in-time values enter through the owner argument to `renderSlot`; shared view state uses a declared store; services and model objects stay in the `apply` closure and are projected into callbacks or observable sources.
+コンポーネントは `ctx` を決して受け取らない。親が所有する時点値は `renderSlot` のオーナー引数を通じて入る。共有ビュー状態は宣言されたストアを使う。サービスとモデルオブジェクトは `apply` クロージャにとどまり、コールバックまたは監視可能なソースに射影される。
 
-## Framework-provided hooks
+## フレームワーク提供のフック
 
-The shipped adapters add these standard props. They are available according to the target slot's scope, independent of which package registered the component.
+同梱のアダプターがこれらの標準 props を追加する。それらはコンポーネントを登録したパッケージに関係なく、ターゲットスロットのスコープに応じて利用できる。
 
-| Availability | Props | Owner |
+| 可用性 | Props | オーナー |
 |---|---|---|
-| every scope | `useSessions`, `useSessionStatus`, `useSessionRetainInfo`, `useSessionAccess` | `ui-session` |
-| every scope | `useWorkspaces`, `useWorkspaceAccess` | `ui-workspace` |
-| every scope | `useRemoteAccess` (the `global` resource) | `api-remote-access` |
-| every scope | `usePanelInfo` | `ui-layout` |
-| `session` | `sessionId`, `useSession`, `useProjection`, `useAccess` (the bound Session's answer) | `ui-session` |
-| `session-maybe` | optional `sessionId`, `useSession`, `useProjection`, `useAccess` results | `ui-session` |
-| `session` | `useConversation`, `useInput`, `inputActions` | `ui-conversation` |
-| `session-maybe` | optional `useConversation`, `useInput`, `inputActions` results | `ui-conversation` |
+| すべてのスコープ | `useSessions`、`useSessionStatus`、`useSessionRetainInfo`、`useSessionAccess` | `ui-session` |
+| すべてのスコープ | `useWorkspaces`、`useWorkspaceAccess` | `ui-workspace` |
+| すべてのスコープ | `useRemoteAccess` (the `global` resource) | `api-remote-access` |
+| すべてのスコープ | `usePanelInfo` | `ui-layout` |
+| `session` | `sessionId`、`useSession`、`useProjection`、`useAccess` (バインドされた Session の答え) | `ui-session` |
+| `session-maybe` | オプションの `sessionId`、`useSession`、`useProjection`、`useAccess` の結果 | `ui-session` |
+| `session` | `useConversation`、`useInput`、`inputActions` | `ui-conversation` |
+| `session-maybe` | オプションの `useConversation`、`useInput`、`inputActions` の結果 | `ui-conversation` |
 | `session` | `useChat` | `ui-chat` |
 | `session` | `useTrajectory` | `ui-trajectory` |
 
-The renderer also creates `useStore` from a declared store and `t` from a declared locale namespace. These are registration-derived props rather than global standard props.
+レンダラーはまた、宣言されたストアから `useStore` を、宣言された locale 名前空間から `t` を作成する。これらはグローバル標準 props ではなく登録由来の props である。
 
-Framework and domain-adapter owners may extend the standard set through `ctx.slots.provideRoot()` or `ctx.uiSession.provide()` together with the corresponding `GlobalStandardProps`, `SessionStandardProps`, or `SessionMaybeStandardProps` declaration merge. A feature component should not create a React hook prop itself or add a global standard prop for entry-private data.
+フレームワークとドメインアダプターのオーナーは、対応する `GlobalStandardProps`、`SessionStandardProps`、または `SessionMaybeStandardProps` の宣言マージとともに、`ctx.slots.provideRoot()` または `ctx.uiSession.provide()` を通じて標準セットを拡張してよい。機能コンポーネントは、React フック prop を自ら作成したり、エントリープライベートのデータのためにグローバル標準 prop を追加したりすべきではない。
 
-## Developer-provided injection
+## 開発者提供の注入
 
-The `inject` option on a registration is the ordinary feature-owned injection point. Its factory runs in the plugin's `apply` world, may close over injected Cordis services, and returns only the data and callbacks that the component needs. For a `session` slot it receives `sessionId`; for `session-maybe` it receives `sessionId | undefined`; when a store is declared it also receives the store's bound actions.
+登録の `inject` オプションは、通常の機能所有の注入ポイントである。そのファクトリーはプラグインの `apply` ワールドで実行され、注入された Cordis サービスを閉じ込めてよく、コンポーネントが必要とするデータとコールバックのみを返す。`session` スロットでは `sessionId` を受け取り、`session-maybe` では `sessionId | undefined` を受け取り、ストアが宣言されている場合はストアのバインドされたアクションも受け取る。
 
-A reserved `hooks` object in that return value accepts bare `getSnapshot`/`subscribe` sources. The renderer converts `hooks: { status }` into a `useStatus(selector)` component prop and caches the binding by source identity. Components do not receive the source itself and do not call `useSyncExternalStore` directly.
+その戻り値内の予約された `hooks` オブジェクトは、素の `getSnapshot`/`subscribe` ソースを受け入れる。レンダラーは `hooks: { status }` を `useStatus(selector)` コンポーネント prop に変換し、ソースの同一性でバインディングをキャッシュする。コンポーネントはソース自体を受け取らず、`useSyncExternalStore` を直接呼ばない。
 
-The owner of a slot may put an `inject` face in the child declaration when every occupant needs the same capability. Plain members reach all occupants unchanged. Function-valued members inside its `hooks` object are hook factories; they receive the slot's standard props and optional per-render `hookContext`, then return the constrained hook exposed to the occupant. `conversation.chat.node` uses this mechanism to provide `useTurnData(key)` for the node currently being rendered.
+スロットのオーナーは、すべての占有者が必要とする同じケイパビリティがある場合、子宣言に `inject` フェイスを置いてよい。プレーンなメンバーはすべての占有者に変更なしで届く。その `hooks` オブジェクト内の関数値メンバーはフックファクトリーである。それらはスロットの標準 props とオプションのレンダリングごとの `hookContext` を受け取り、占有者に公開される制約付きフックを返す。`conversation.chat.node` はこの機構を使って、現在レンダリングされているノードのための `useTurnData(key)` を提供する。
 
-Use owner props for values already known at one render occurrence, registration `inject` for one entry's callbacks and private observables, slot-level `inject` for a capability controlled by the slot owner, and a declared store for mutable view state shared across entries or preserved across remounts. React nodes compose through child slots, not through injected values.
+1 つのレンダリング時点ですでに知られている値にはオーナー props を、1 つのエントリーのコールバックとプライベートな監視可能値には登録 `inject` を、スロットオーナーが制御するケイパビリティにはスロットレベル `inject` を、エントリー間で共有されるまたは再マウントをまたいで保持される可変ビュー状態には宣言されたストアを使う。React ノードは注入された値ではなく、子スロットを通じて構成される。
 
 <a id="current-hierarchy"></a>
 
-## Conversation hierarchy
+## Conversation 階層
 
-The following Conversation paths distinguish declaration owners from reusable Factory roots; unrelated shell positions are omitted. An entry owns its declared children, while a Factory owns its child declarations for the lifetime of its registered definition. Bracketed names identify the default React components; a plain React descendant can render its owner's Slot. Factory calls are references to independent reusable definitions, not new Slot declarations.
+以下の Conversation 経路は、宣言のオーナーと再利用可能な Factory ルートを区別する。無関係なシェルの位置は省略する。エントリーは自身が宣言した子を所有し、Factory は登録された定義の寿命の間その子宣言を所有する。角括弧の名前はデフォルトの React コンポーネントを識別し、素の React 子孫がオーナーの Slot をレンダリングできる。Factory 呼び出しは独立した再利用可能な定義への参照であり、新しい Slot 宣言ではない。
 
 ```text
 root [AppFrame]
@@ -186,15 +186,15 @@ Factory: conversation.images.content [MessageImagesContent / ImageGallery]
 Factory: conversation.chat.reasoning.content [ReasoningContent / MarkdownText]
 ```
 
-All four image Slots default to `MessageImages`, which calls `conversation.images.content` with the caller's image references and authorized loader. User and output image replacements are independent. The `conversation.user.text` Factory is shared by user content, Queue, and Goal; its `inline: true` keyed Slot renders span anchors and inline error placeholders rather than block wrappers.
+4 つの画像 Slot はすべてデフォルトで `MessageImages` になり、呼び出し元の画像参照と認可されたローダーを伴って `conversation.images.content` を呼ぶ。ユーザー画像と出力画像の置き換えは独立している。`conversation.user.text` Factory はユーザーコンテンツ、Queue、Goal が共有する。その `inline: true` の keyed Slot は、ブロックラッパーではなく span アンカーとインラインエラープレースホルダーをレンダリングする。
 
-The generated [Client inspect catalog](../../packages/extensions/cordis-client-runner/src/client/slot-catalog.ts) covers all shell branches and is the exhaustive contract for each key: cardinality, scope, owner props, standard props, current occupants, declaration owner, and replacement risk. A running dynamic package can query the live tree and an exact key with `cordis_inspect what:"client"`; the source catalog is generated from `SlotMap` declarations and `slots.register()` call sites by `pnpm run gen-client-catalog`.
+生成された [Client inspect カタログ](../../packages/extensions/cordis-client-runner/src/client/slot-catalog.ts)はすべてのシェル分岐をカバーし、各キーの網羅的な契約である: カーディナリティ、スコープ、オーナー props、標準 props、現在の占有者、宣言オーナー、置き換えリスク。実行中の dynamic パッケージは `cordis_inspect what:"client"` でライブツリーと正確なキーを照会できる。ソースカタログは `SlotMap` 宣言と `slots.register()` 呼び出しサイトから `pnpm run gen-client-catalog` によって生成される。
 
-## Extension rules
+## 拡張ルール
 
-- Import another feature package only for declarations with `import type`; never import or re-export its runtime values.
-- Declare a new child slot only in the component that owns and renders that location. Other packages wait with `ctx.slots.inject()` and contribute through `ctx.slots.register()`.
-- Keep business and transport state in their owning Cordis services or Client models. Slot stores hold shared viewing and interaction state only.
-- Keep observable source and snapshot identities stable between changes. Republish through the same source whenever its value changes.
-- Pass JSON-compatible data and callbacks between UI domains. The `hooks` compartment is the sole exception for bare observables; React content travels through slots.
-- Treat `single` and an occupied keyed cell as replacement points. Use list ids or an unoccupied key for additive extensions.
+- 別の機能パッケージをインポートするのは `import type` での宣言のみにする。そのランタイム値を決してインポートまたは再エクスポートしない。
+- 新しい子スロットは、その位置を所有してレンダリングするコンポーネントでのみ宣言する。他のパッケージは `ctx.slots.inject()` で待機し、`ctx.slots.register()` を通じて貢献する。
+- ビジネス状態とトランスポート状態は、それを所有する Cordis サービスまたは Client モデルに置く。Slot ストアは共有の閲覧とインタラクションの状態のみを保持する。
+- 監視可能なソースとスナップショットの同一性を変更間で安定に保つ。値が変わるたびに同じソースを通じて再公開する。
+- UI ドメイン間では JSON 互換のデータとコールバックを渡す。`hooks` 区画は素の監視可能値のための唯一の例外である。React コンテンツはスロットを通じて移動する。
+- `single` と占有された keyed セルは置き換えポイントとして扱う。追加的な拡張には list の id または未占有のキーを使う。

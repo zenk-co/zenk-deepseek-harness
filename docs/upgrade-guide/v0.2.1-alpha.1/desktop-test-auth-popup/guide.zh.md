@@ -5,7 +5,7 @@ description: "桌面测试包需要在本地显式开启后，才能显示飞书
 
 # 在本地开启测试更新策略鉴权弹窗
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

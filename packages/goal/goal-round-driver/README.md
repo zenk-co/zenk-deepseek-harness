@@ -1,35 +1,35 @@
 ---
-description: "The same-session continuation driver for users and maintainers choosing, composing, or debugging automatic goal rounds."
+description: "自動ゴールラウンドを選択、構成、またはデバッグするユーザーとメンテナー向けの、同一セッション継続ドライバー。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-goal-round-driver
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-goal-round-driver` automatically continues an active goal in the same session while the agent is idle, continuation is armed, and the configured round allowance remains. Each round gives the model another turn toward the objective; only goal rounds that reach model history consume the allowance, and exhaustion records a blocker. The driver has no configuration: the goal defines the round limit, and `dsh-tool-goal` defines when repeated blocking stops continuation. Mount it with `dsh-goal` and `dsh-tool-goal` for unattended multi-round progress; omit it when each step requires human steering.
+`dsh-goal-round-driver` は、エージェントがアイドルで、継続がアームされ、設定されたラウンド許容量が残っている間、同一セッションでアクティブなゴールを自動的に継続する。各ラウンドはモデルに目標へ向かうもう 1 ターンを与える。モデル履歴に到達したゴールラウンドだけが許容量を消費し、枯渇するとブロッカーが記録される。ドライバーに設定はない: ラウンド制限はゴールが定義し、繰り返しのブロッキングがいつ継続を止めるかは `dsh-tool-goal` が定義する。無人での複数ラウンド進行には `dsh-goal` と `dsh-tool-goal` とともにマウントし、各ステップに人間の操舵が必要な場合は省略する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount `dsh-goal-round-driver` when an active goal should keep making progress without human intervention. It composes with the goal service and the goal tools: the service owns the state, the tools give the model control over it, and this package schedules the rounds.
+アクティブなゴールが人間の介入なしに進み続けるべき場合に `dsh-goal-round-driver` をマウントする。これはゴールサービスとゴールツールと構成される: サービスが状態を所有し、ツールがモデルにその制御を与え、このパッケージがラウンドをスケジュールする。
 
-### Compose it
+### 構成する
 
-Mount the driver beside the goal service and the goal tools; the driver itself takes no configuration.
+ドライバーをゴールサービスとゴールツールの隣にマウントする。ドライバー自体は設定を取らない。
 
 ```yaml
 - id: goal
@@ -42,98 +42,98 @@ Mount the driver beside the goal service and the goal tools; the driver itself t
   name: '@deepseek-ai/dsh-goal-round-driver'
 ```
 
-`maxGoalRounds` belongs to the goal definition, while the model-facing blocked threshold belongs to `dsh-tool-goal`; duplicating either value in the driver could produce divergent policy.
+`maxGoalRounds` はゴール定義に属し、モデル向けのブロックしきい値は `dsh-tool-goal` に属する。どちらの値をドライバーで重複させても、方針の不一致を生みかねない。
 
-### What each round does
+### 各ラウンドが行うこと
 
-With an exact live agent idle, an active armed goal, and remaining capacity, the driver queues one goal-round prompt. It names the JSON-quoted objective, round number, and cap, and tells the model to use current workspace, tool results, and durable state as authority. An accepted round starts a distinct request series, so Chat renders its self-contained request header before the goal message. The round enters history as a goal-sourced user message; only an entered goal message consumes the cap, while human messages and stale reservations do not. Goal lifecycle mutations still require the independent authority checks in `dsh-tool-goal`.
+正確な生きたエージェントがアイドルで、アクティブでアームされたゴールがあり、容量が残っている場合、ドライバーは 1 つのゴールラウンドプロンプトをキューに入れる。それは JSON 引用された目標、ラウンド番号、上限を名指しし、現在のワークスペース、ツール結果、永続状態を権威として使うようモデルに伝える。受け入れられたラウンドは別個のリクエストシリーズを開始するため、Chat はゴールメッセージの前に自己完結したリクエストヘッダーを描画する。ラウンドはゴール由来のユーザーメッセージとして履歴に入る。入ったゴールメッセージだけが上限を消費し、人間のメッセージと古い予約は消費しない。ゴールライフサイクルの変更には、`dsh-tool-goal` の独立した権限チェックが依然として必要である。
 
-### When continuation stops
+### 継続が停止するとき
 
-A round starts only at whole-agent idle and, when the subagent service is loaded, only after the agent's progressing descendants settle; completion, pause, and blocking suppress continuation; a host-initiated pause also aborts the turn already running, while a model-initiated pause inside its own turn finishes normally. An edit only invalidates an in-flight round through the revision fence, and the driver continues the new revision. The driver also stops on its own when a turn ends on max tokens, a durability write fails, the agent is cancelled, the plugin unloads, or the round cap is exhausted — at the cap it records a blocker with the stable code `round-limit`. Cancellation never auto-restarts a round: a goal whose round was under way is paused at the next idle point, and a cancellation unrelated to a goal attempt only disarms continuation. A round prompt still queued when the agent reaches idle is removed from the inbox, so later human input does not wait behind it; when the cancelled turn belonged to other work, continuation is disarmed rather than paused.
+ラウンドはエージェント全体がアイドルのときにのみ開始し、subagent サービスがロードされている場合は、エージェントの進行中の子孫が確定した後にのみ開始する。完了、一時停止、ブロッキングは継続を抑制する。ホスト起点の一時停止はすでに実行中のターンもアボートするが、モデル起点の一時停止は自身のターン内で正常に終了する。編集はリビジョンフェンスを通じて実行中のラウンドを無効にするだけで、ドライバーは新しいリビジョンを継続する。ドライバーは、ターンが max tokens で終了した、耐久性書き込みが失敗した、エージェントがキャンセルされた、プラグインがアンロードされた、またはラウンド上限が枯渇した場合にも自ら停止する — 上限では安定コード `round-limit` でブロッカーを記録する。キャンセルがラウンドを自動再開することは決してない: ラウンドが進行中だったゴールは次のアイドルポイントで一時停止され、ゴール試行と無関係なキャンセルは継続をディスアームするだけである。エージェントがアイドルに達したときにまだキューにあるラウンドプロンプトは受信箱から削除されるため、後からの人間の入力がその後ろで待つことはない。キャンセルされたターンが他の作業に属していた場合、継続は一時停止ではなくディスアームされる。
 
-### After resume, fork, or unload
+### 再開、fork、またはアンロードの後
 
-Mounting the driver over an existing agent never arms a goal, and after session resume or fork an active goal stays disarmed until an explicit human-authorized resume — the driver never revives work on its own. Unloading the plugin cancels any in-flight round and ensures no later round starts.
+既存のエージェントの上にドライバーをマウントしてもゴールがアームされることはなく、セッションの再開または fork の後、アクティブなゴールは明示的な人間承認の再開までディスアームされたままである — ドライバーが自ら作業を復活させることは決してない。プラグインをアンロードすると実行中のラウンドがキャンセルされ、以降のラウンドが開始されないことが保証される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the driver schedules rounds without races; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションでは、ドライバーが競合なしにラウンドをスケジュールする方法を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design
+### 設計
 
-- **Reservation, then admission.** At idle the driver reserves `roundsStarted + 1` for the current `{ goalId, revision }`, queues one `<goal_round>` prompt with a goal message source, and only an entered `user/message` increments `roundsStarted`. A reservation rejected as stale does not consume the round number.
-- **Race fences.** The `agent/pre-step` listener verifies the complete claimed record against the current goal both before and after downstream listeners, so a stale, cancelled, or competing prompt is rejected before its step enters. Human work that arrives before a reservation makes automatic work yield until the agent is idle again.
-- **Durability checkpoint.** `goal/changed` creates a durability obligation: before queuing work the driver awaits `ctx.sessions.flush()` and rechecks the goal revision and competing input after the await. A flush failure arriving through `agent/error` disarms continuation before another round can start.
-- **Fail-closed teardown.** Teardown closes admission, disarms every live goal, cancels active work with the `parent` cause, and awaits the driver plus agent quiescence while its event fence remains installed.
+- **予約、その後に許可。** アイドル時にドライバーは現在の `{ goalId, revision }` に対して `roundsStarted + 1` を予約し、ゴールメッセージソースを持つ 1 つの `<goal_round>` プロンプトをキューに入れ、入った `user/message` だけが `roundsStarted` をインクリメントする。古いものとして拒否された予約はラウンド番号を消費しない。
+- **競合フェンス。** `agent/pre-step` リスナーは、下流リスナーの前と後の両方で、主張された完全なレコードを現在のゴールと照合する。そのため、古い、キャンセルされた、または競合するプロンプトはそのステップが入る前に拒否される。予約の前に到着した人間の作業は、エージェントが再びアイドルになるまで自動作業を譲らせる。
+- **耐久性チェックポイント。** `goal/changed` は耐久性義務を生む: 作業をキューに入れる前に、ドライバーは `ctx.sessions.flush()` を待ち、await の後にゴールリビジョンと競合入力を再確認する。`agent/error` を通じて届くフラッシュ失敗は、別のラウンドが開始する前に継続をディスアームする。
+- **フェイルクローズドのティアダウン。** ティアダウンは許可を閉じ、すべてのライブゴールをディスアームし、アクティブな作業を `parent` 原因でキャンセルし、イベントフェンスを設置したままドライバーとエージェントの静止を待つ。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: driver state machine, race fences, teardown |
-| [`src/prompt.ts`](src/prompt.ts) | The retained `<goal_round>` continuation prompt |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: ドライバー状態機械、競合フェンス、ティアダウン |
+| [`src/prompt.ts`](src/prompt.ts) | 保持される `<goal_round>` 継続プロンプト |
 
-### The round prompt
+### ラウンドプロンプト
 
-The retained prompt is one text block: the JSON-quoted objective and `round/maxGoalRounds` on the first lines, then the working instructions.
+保持されるプロンプトは 1 つのテキストブロックである: 最初の行に JSON 引用された目標と `round/maxGoalRounds`、続いて作業指示。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-The driver consumes the goal state and defers policy to the goal tools; read these pages for the surrounding contract and the design rationale.
+ドライバーはゴール状態を消費し、方針をゴールツールに委ねる。周囲の契約と設計根拠についてはこれらのページを読む。
 
-- [Goal service](../goal/README.md) — the goal state and lifecycle this driver continues.
-- [Goal tools](../tool-goal/README.md) — the model-facing tools and their execution-time authority checks.
+- [ゴールサービス](../goal/README.md) — このドライバーが継続するゴール状態とライフサイクル。
+- [ゴールツール](../tool-goal/README.md) — モデル向けツールとその実行時権限チェック。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Goal-round prompt
+### ゴールラウンドプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-Each admitted round is one retained user-role `<goal_round>` block naming the full objective and positive round number. Earlier human messages, goal-state snapshots, assistant output, and tool records remain in the same session history.
+許可された各ラウンドは、完全な目標と正のラウンド番号を名指しする 1 つの保持された user ロールの `<goal_round>` ブロックである。以前の人間のメッセージ、ゴール状態スナップショット、アシスタント出力、ツールレコードは同じセッション履歴に残る。
 
-#### Token effect
+#### トークンへの影響
 
-One fixed instruction block plus the objective is added per admitted round. Later requests resend retained rounds until compaction shadows them; no fresh agent or copied conversation prefix is created.
+許可されたラウンドごとに、1 つの固定の命令ブロックと目標が追加される。以降のリクエストは、compaction がそれらを覆い隠すまで保持されたラウンドを再送信する。新しいエージェントやコピーされた会話プレフィックスは作成されない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only within an epoch: each admitted round extends the existing conversation after its reusable prefix. Compaction may replace the derived-history suffix and move the reusable boundary.
+エポック内では追記のみ: 許可された各ラウンドは再利用可能なプレフィックスの後に既存の会話を延長する。Compaction は派生履歴のサフィックスを置き換え、再利用境界を移動することがある。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the driver is a poor fit or needs special care. They are current package constraints, not a task backlog.
+これらの制限は、ドライバーが不向きな場合や特別な注意が必要な場合を定義する。これらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **No independent evaluator** — the model-facing goal policy decides when evidence is sufficient for completion and whether a blocker is semantically unchanged; evaluator-backed certification remains deferred.
-- **Same-session execution only** — this package deliberately does not spawn a fresh agent, fork a session prefix, or implement Ralph-style independent attempts; that workflow belongs to its own plugin layer.
-- **Accepted-queue unload race** — Cordis plugin unload is asynchronous. A goal prompt already accepted by the agent inbox can begin and consume its round before unload starts; teardown then cancels the request, disarms the goal, and awaits quiescence. No later round starts.
-- **Round cap, not resource budget** — token, currency, time, and provider quota policies remain independent. Their session events are not attributed to the goal message or mapped into goal blocker codes.
-- **No abnormal auto-retry** — transient provider and persistence failures require a later human-authorized resume rather than an implicit retry policy.
+- **独立した評価器はない** — 証拠が完了に十分かどうか、およびブロッカーが意味的に変わっていないかどうかは、モデル向けのゴールポリシーが決める。評価器に裏付けられた認定は延期されたままである。
+- **同一セッション実行のみ** — このパッケージは、新しいエージェントの起動、セッションプレフィックスの fork、Ralph スタイルの独立試行を意図的に行わない。そのワークフローは独自のプラグインレイヤーに属する。
+- **許可済みキューのアンロード競合** — Cordis のプラグインアンロードは非同期である。エージェントの受信箱にすでに受け入れられたゴールプロンプトは、アンロードが始まる前に開始してラウンドを消費しうる。ティアダウンはその後リクエストをキャンセルし、ゴールをディスアームし、静止を待つ。以降のラウンドは開始されない。
+- **ラウンド上限であり、リソース予算ではない** — トークン、通貨、時間、プロバイダークォータのポリシーは独立したままである。それらのセッションイベントはゴールメッセージに帰属されたり、ゴールブロッカーコードにマッピングされたりしない。
+- **異常時の自動リトライはない** — 一時的なプロバイダー障害と永続化障害には、暗黙のリトライポリシーではなく、後からの人間承認の再開が必要である。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers; it is explicitly non-authoritative. Open, undecided directions: an abnormal-failure retry policy and evaluator-backed round certification; both stay outside this package by design.
+この開発メモはメンテナー向けの作業コンテキストであり、明示的に非権威である。未解決で未決定の方向性: 異常失敗のリトライポリシーと、評価器に裏付けられたラウンド認定。どちらも設計上このパッケージの外に留まる。
 
 </details>

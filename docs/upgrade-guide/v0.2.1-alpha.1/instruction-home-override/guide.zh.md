@@ -5,7 +5,7 @@ description: "`agent-instructions` 行不再接受 `dshHome`；指令加载始�
 
 # 指令加载只解析一个 harness home
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

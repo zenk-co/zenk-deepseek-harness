@@ -1,169 +1,169 @@
 ---
-description: "Run workflow orchestration through the shared sandboxed PTC Node process runtime, with workflow hooks, subagent routing and caller-owned cancellation."
+description: "ワークフローフック、subagent ルーティング、呼び出し元所有のキャンセルを伴う、共有のサンドボックス化された PTC Node プロセスランタイムによるワークフローオーケストレーションの実行。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-workflow-ptc
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Run JavaScript workflows in fresh Node processes under the calling Session's file sandbox policy. Scripts keep the `agent()`, `parallel()`, `pipeline()`, `phase()` and `log()` hooks while subagents perform delegated work. The same execution provider serves PTC and workflows, including the opt-in Ralph loop. Runs have no overall elapsed deadline; cancellation stops the managed process and disposes child agents. The selected sandbox and subprocess providers determine enforcement and cleanup limits.
+呼び出し元 Session のファイルサンドボックスポリシーの下で、新しい Node プロセスで JavaScript ワークフローを実行する。スクリプトは `agent()`、`parallel()`、`pipeline()`、`phase()`、`log()` フックを保ち、subagent が委譲された作業を実行する。同じ実行プロバイダーが PTC とワークフローをサービスし、オプトインの Ralph ループも含む。実行には全体的な経過時間のデッドラインがない。キャンセルは管理対象プロセスを停止し、子エージェントを破棄する。エンフォースメントとクリーンアップの限界は、選択されたサンドボックスとサブプロセスプロバイダーが決める。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this engine in a composition that provides subagents, sandbox policy and the [Node PTC runtime](../../ptc-runtime/ptc-runtime-node/README.md). It supplies workflow execution for `dsh-tool-workflow` and for `dsh-tool-ralph` when explicitly enabled. Ralph remains disabled in shipped defaults. The engine rejects non-TypeScript PTC providers when it loads. Python PTC compositions must disable the `workflow-ptc`, `tool-workflow` and any enabled `tool-ralph` rows.
+subagent、サンドボックスポリシー、[Node PTC ランタイム](../../ptc-runtime/ptc-runtime-node/README.md)を提供するコンポジションで、このエンジンをマウントする。これは `dsh-tool-workflow` と、明示的に有効化された場合の `dsh-tool-ralph` にワークフロー実行を提供する。Ralph は出荷されるデフォルトでは無効のままである。このエンジンはロード時に非 TypeScript の PTC プロバイダーを拒否する。Python PTC のコンポジションは `workflow-ptc`、`tool-workflow`、および有効化されている場合は `tool-ralph` の行を無効化しなければならない。
 
-### Minimal configuration
+### 最小構成
 
-With those dependencies available, mount the engine and its model-facing consumer:
+これらの依存関係が利用可能な状態で、このエンジンとそのモデル向けコンシューマーをマウントする:
 
 ```yaml
 - name: '@deepseek-ai/dsh-workflow-ptc'
 - name: '@deepseek-ai/dsh-tool-workflow'
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `provider` | `spawn` | Host-side subagent provider used by `agent()` calls. |
-| `maxConcurrentAgents` | `0` | Concurrent `agent()` ceiling; `0` resolves from available CPU parallelism. |
-| `maxTotalAgents` | `1000` | Total `agent()` calls one run may start. |
-| `maxItemsPerCall` | `4096` | Items accepted by one `parallel()` or `pipeline()` call. |
-| `syncTimeoutMs` | `5000` | VM timeout for the script's initial synchronous slice, in milliseconds. |
+| `provider` | `spawn` | `agent()` 呼び出しが使う Host 側の subagent プロバイダー。 |
+| `maxConcurrentAgents` | `0` | 同時 `agent()` の上限。`0` は利用可能な CPU 並列度から解決する。 |
+| `maxTotalAgents` | `1000` | 1 回の実行が開始できる `agent()` 呼び出しの総数。 |
+| `maxItemsPerCall` | `4096` | 1 回の `parallel()` または `pipeline()` 呼び出しが受け付けるアイテム数。 |
+| `syncTimeoutMs` | `5000` | スクリプトの最初の同期スライスに対する VM タイムアウト（ミリ秒）。 |
 
-An owning consumer may set `WorkflowStartRequest.subagentProvider` and lower `WorkflowStartRequest.maxTotalAgents` for one run. Script hooks cannot change either choice. Process heap, output, control and termination limits belong to the Node PTC provider; the engine adds no overall elapsed timer. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-workflow-ptc) defines accepted engine fields.
+所有するコンシューマーは 1 回の実行のために `WorkflowStartRequest.subagentProvider` を設定し、`WorkflowStartRequest.maxTotalAgents` を引き下げてよい。スクリプトのフックはどちらの選択も変更できない。プロセスのヒープ、出力、制御、終了の制限は Node PTC プロバイダーに属し、エンジンは全体的な経過時間タイマーを追加しない。生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-workflow-ptc)が、受け付けられるエンジンフィールドを定義する。
 
-The Node PTC provider's `maxPendingCalls` also limits workflow concurrency: child startup, result waits and disposal use those slots. Progress batches use at most one additional slot. Leave headroom when setting `maxConcurrentAgents`.
+Node PTC プロバイダーの `maxPendingCalls` もワークフローの同時実行を制限する: 子の起動、結果の待機、破棄はそれらのスロットを使う。進捗バッチは最大で追加の 1 スロットを使う。`maxConcurrentAgents` を設定するときは余裕を残すこと。
 
-### Results and failures
+### 結果と失敗
 
-The script runs with top-level `await`; `meta` and `args` arrive as JSON data. Every `agent()` call starts a managed subagent Activation under the run's fixed parent and waits for its text or structured result. The workflow records its own members and collects their results without adding them to the parent's subagent catalog or sending child settlement notices to the parent model. The final lossless-JSON return value becomes the run result; an ordinary child failure resolves `agent()` to `null`.
+スクリプトはトップレベルの `await` を伴って実行される。`meta` と `args` は JSON データとして到着する。すべての `agent()` 呼び出しは、実行の固定された親の下で管理対象 subagent の Activation を開始し、そのテキストまたは構造化結果を待つ。ワークフローは自身のメンバーを記録し、親の subagent カタログに追加したり親モデルへ子の決着通知を送ったりすることなく、それらの結果を収集する。最終的なロスレス JSON 戻り値が実行結果になる。通常の子の失敗は `agent()` を `null` に解決する。
 
-Invalid metadata, an unparseable body, an unavailable provider route or a per-run cap above the ceiling is rejected before a run is published. During execution, hook misuse and tripped cooperative caps fail the workflow. Process failures, unavailable required confinement and PTC output or control limits also fail the run.
+無効なメタデータ、解析不能な本体、利用できないプロバイダールート、上限を超える実行単位のキャップは、実行が公開される前に拒否される。実行中は、フックの誤用と作動した協調的キャップがワークフローを失敗させる。プロセスの失敗、利用できない必須の隔離、PTC の出力または制御の制限も実行を失敗させる。
 
-### File policy and cancellation
+### ファイルポリシーとキャンセル
 
-The engine captures the calling Session's effective working directory and standing file policy separately. The PTC process and every child started by that workflow retain the captured directory when the parent later moves. A runtime without confinement is accepted only for `danger-full-access`; `read-only` and `workspace-write` fail before execution. Node in-memory mode executes an async wrapper in a temporary environment, so workflow-local variables never join the Agent's retained REPL. The VM retains the documented helper API, but it is not a security boundary: code that reaches Node follows the selected runtime's file policy. The program-visible environment is empty. Network access is not restricted by the file policy.
+エンジンは呼び出し元 Session の有効な作業ディレクトリと常設ファイルポリシーを別々に取得する。PTC プロセスとそのワークフローが開始したすべての子は、親が後で移動しても取得済みのディレクトリを保持する。隔離のないランタイムは `danger-full-access` に対してのみ受け付けられる。`read-only` と `workspace-write` は実行前に失敗する。Node のインメモリモードは非同期ラッパーを一時的な環境で実行するため、ワークフローローカルの変数が Agent の保持する REPL に参加することはない。VM は文書化されたヘルパー API を保持するが、セキュリティ境界ではない: Node に到達するコードは選択されたランタイムのファイルポリシーに従う。プログラム可視の環境は空である。ネットワークアクセスはファイルポリシーによって制限されない。
 
-The workflow requests `timeoutMs: null` from PTC. Its initial VM slice still has `syncTimeoutMs`, and a caller's abort signal still applies, including an enclosing tool deadline. Cancellation immediately aborts the PTC process and pending or active subagents. The caller must dispose every run and await child cleanup; there is no separate workflow cleanup timer.
+ワークフローは PTC に `timeoutMs: null` を要求する。その最初の VM スライスには依然として `syncTimeoutMs` があり、呼び出し元の abort シグナルも依然として適用される（それを囲むツールのデッドラインを含む）。キャンセルは PTC プロセスと保留中またはアクティブな subagent を直ちに中止する。呼び出し元はすべての実行を破棄し、子のクリーンアップを待たなければならない。別個のワークフロークリーンアップタイマーは存在しない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The workflow engine owns orchestration; the PTC provider owns process launch, OS confinement, framed transport and managed process cleanup. Local children remain in the parent subagent catalog after completion, independently of caller-owned result collection; workflow runs add no parent completion notice. Local workflow children use the continuable catalog mode and accept messages while resident; cold continuation requires Session persistence and query, so an ephemeral child returns `NOT_RESUMABLE` after disposal.
+ワークフローエンジンがオーケストレーションを所有し、PTC プロバイダーがプロセスの起動、OS の隔離、フレーム付きトランスポート、管理対象プロセスのクリーンアップを所有する。ローカルの子は完了後も親の subagent カタログに残り、呼び出し元所有の結果収集からは独立している。ワークフロー実行は親への完了通知を追加しない。ローカルのワークフロー子は継続可能カタログモードを使い、在席中はメッセージを受け付ける。コールド継続には Session の永続化とクエリが必要なため、エフェメラルな子は破棄後に `NOT_RESUMABLE` を返す。
 
-### Design concept
+### 設計概念
 
-One self-contained guest program runs the existing VM and workflow helpers inside a PTC Node process. Host bindings connect that program to `ctx.subagents` and workflow observers. The engine captures the runtime and subagent services when a run starts, so an accepted run retains its dependencies through engine unload.
+1 つの自己完結したゲストプログラムが、PTC Node プロセス内で既存の VM とワークフローヘルパーを実行する。Host バインディングがそのプログラムを `ctx.subagents` とワークフローオブザーバーに接続する。エンジンは実行開始時にランタイムと subagent サービスを取得するため、受け付けられた実行はエンジンのアンロードを通じて依存関係を保持する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Engine configuration, request validation and run creation |
-| [`src/host.ts`](src/host.ts) | PTC execution, child ownership, settlement and disposal |
-| [`src/guest.ts`](src/guest.ts) | Guest adapter over PTC host bindings |
-| [`src/guest-source.ts`](src/guest-source.ts) | Self-contained guest program source |
-| [`src/runtime.ts`](src/runtime.ts) | VM evaluation, helper contracts and combinators |
-| [`src/realm.ts`](src/realm.ts) | Lossless-JSON materialization across VM realms |
-| [`src/meta.ts`](src/meta.ts) | Metadata validation and normalization |
+| [`src/index.ts`](src/index.ts) | エンジン設定、リクエスト検証、実行作成 |
+| [`src/host.ts`](src/host.ts) | PTC 実行、子の所有権、決着、破棄 |
+| [`src/guest.ts`](src/guest.ts) | PTC Host バインディング上のゲストアダプター |
+| [`src/guest-source.ts`](src/guest-source.ts) | 自己完結したゲストプログラムのソース |
+| [`src/runtime.ts`](src/runtime.ts) | VM 評価、ヘルパー契約、コンビネーター |
+| [`src/realm.ts`](src/realm.ts) | VM レルムをまたぐロスレス JSON のマテリアライズ |
+| [`src/meta.ts`](src/meta.ts) | メタデータの検証と正規化 |
 
-### Values and child ownership
+### 値と子の所有権
 
-The guest materializes outbound values as lossless JSON before PTC transport. Exotic prototypes, functions, symbols, cycles, sparse arrays, non-finite numbers and nested `undefined` are rejected. Child results cross back as JSON; same-process observer events retain their own cloning and callback-containment rules.
+ゲストは PTC トランスポートの前に、外向きの値をロスレス JSON としてマテリアライズする。エキゾチックなプロトタイプ、関数、シンボル、循環、疎な配列、非有限数、ネストした `undefined` は拒否される。子の結果は JSON として戻り、同一プロセスのオブザーバーイベントは自身のクローニングとコールバック封じ込めのルールを保持する。
 
-The host tracks pending starts separately from accepted Activations. Cancellation aborts pending starts and disposes accepted Activations; a child that becomes ready after cancellation is also disposed. Each Activation's disposal addresses that execution and is shared by all cleanup paths. In-flight host bindings remain the workflow adapter's responsibility after PTC stops the program.
+Host は保留中の開始を、受け付けられた Activation とは別に追跡する。キャンセルは保留中の開始を中止し、受け付けられた Activation を破棄する。キャンセル後に準備完了になった子も破棄される。各 Activation の破棄はその実行を対象とし、すべてのクリーンアップ経路で共有される。進行中の Host バインディングは、PTC がプログラムを停止した後もワークフローアダプターの責任のままである。
 
-### Cancellation and outcomes
+### キャンセルと結果
 
-The first accepted terminal outcome owns the run result. Cancellation stops the process immediately rather than waiting for a guest acknowledgement. Process settlement and child cleanup remain separate obligations; public disposal waits for both. Existing workflow start/end pairing and child lifecycle projection remain intact.
+最初に受け付けられた終端結果が実行結果を所有する。キャンセルはゲストの確認応答を待たずにプロセスを直ちに停止する。プロセスの決着と子のクリーンアップは別々の義務のままであり、公開の破棄は両方を待つ。既存のワークフロー開始/終了のペアリングと子ライフサイクルのプロジェクションはそのまま維持される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Use these references for the shared execution guarantees and workflow contracts.
+共有の実行保証とワークフロー契約についてはこれらのリファレンスを使う。
 
-- [Workflow subsystem](../../../docs/subsystems/workflow.md) — request, result and event definitions.
-- [Workflow service](../workflow/README.md) — caller-owned runs and cleanup.
-- [Node PTC runtime](../../ptc-runtime/ptc-runtime-node/README.md) — file policy, process limits and deployment choices.
-- [workflow tool](../tool-workflow/README.md) — model-facing scripted orchestration.
-- [Ralph tool](../../experimental/tool-ralph/README.md) — opt-in fixed fresh-agent iteration.
-- [Workflow sandbox reuse](../../../.agents/notes/implemented/architecture/2026-09-13-workflow-ptc-sandbox-reuse.md) — execution ownership and tradeoffs.
+- [ワークフローサブシステム](../../../docs/subsystems/workflow.md) — リクエスト、結果、イベントの定義。
+- [ワークフローサービス](../workflow/README.md) — 呼び出し元所有の実行とクリーンアップ。
+- [Node PTC ランタイム](../../ptc-runtime/ptc-runtime-node/README.md) — ファイルポリシー、プロセス制限、デプロイの選択。
+- [workflow ツール](../tool-workflow/README.md) — モデル向けのスクリプト化されたオーケストレーション。
+- [Ralph ツール](../../experimental/tool-ralph/README.md) — オプトインの固定された新しいエージェントによる反復。
+- [ワークフローのサンドボックス再利用](../../../.agents/notes/implemented/architecture/2026-09-13-workflow-ptc-sandbox-reuse.md) — 実行の所有権とトレードオフ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Child-agent requests
+### 子エージェントのリクエスト
 
-#### What the model sees
+#### モデルが見るもの
 
-Every script `agent()` call sends its prompt verbatim and optional model or structured-output schema to a subagent provider. Each child sees that provider's own context; phase and log narration stays on observer events.
+すべてのスクリプトの `agent()` 呼び出しは、そのプロンプトと任意のモデルまたは構造化出力スキーマを subagent プロバイダーへそのまま送信する。各子はそのプロバイダー自身のコンテキストを見る。フェーズとログのナレーションはオブザーバーイベントに留まる。
 
-#### Token effect
+#### トークンへの影響
 
-Each child consumes its own model context. Cooperative concurrency, total-agent and item caps limit ordinary script fan-out; child histories do not join the parent history directly.
+各子は自身のモデルコンテキストを消費する。協調的な同時実行、総エージェント数、アイテム数のキャップが通常のスクリプトのファンアウトを制限する。子の履歴が親の履歴に直接加わることはない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Independent of the parent request cache and of sibling children. Each child can reuse only a byte-identical prefix under its own provider, model, prompt and schema.
+親のリクエストキャッシュからも、兄弟の子からも独立している。各子は自身のプロバイダー、モデル、プロンプト、スキーマの下で、バイト単位で同一のプレフィックスのみを再利用できる。
 
-### Parent tool result, indirectly
+### 親のツール結果、間接的に
 
-#### What the model sees
+#### モデルが見るもの
 
-The tool consumer presents the final JSON value and child count, or a workflow failure. Intermediate child outputs remain available to the script. Script parsing, helper misuse, child infrastructure failures and PTC execution failures produce errors; ordinary child failure produces `null` for the script to handle.
+ツールコンシューマーは最終的な JSON 値と子の数、またはワークフローの失敗を提示する。中間の子の出力はスクリプトから利用可能なままである。スクリプトの解析、ヘルパーの誤用、子のインフラ障害、PTC 実行の失敗はエラーを生成する。通常の子の失敗はスクリプトが処理すべき `null` を生成する。
 
-#### Token effect
+#### トークンへの影響
 
-The engine adds no direct parent tokens. PTC bounds the outer program result, and the tool consumer owns its model-facing rendering and retention.
+エンジンは親のトークンを直接追加しない。PTC が外側のプログラム結果を制限し、ツールコンシューマーがそのモデル向けレンダリングと保持を所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix.
+追記のみ。新たに可視になった内容は再利用可能なリクエストプレフィックスに従う。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits qualify workflow execution and cleanup.
+これらの制限はワークフロー実行とクリーンアップを限定する。
 
-- **File confinement and cleanup inherit provider limits** — the Node PTC and subprocess providers define enforcement completeness and the managed process range.
-- **Workflow caps are cooperative** — helper counters limit ordinary scripts; they are not host-enforced security quotas or descendant token budgets.
-- **No overall elapsed deadline** — a run can remain active until it completes, fails or is cancelled. Caller deadlines still apply.
-- **Child cleanup follows provider contracts** — the adapter awaits disposal and pending starts without a separate abandonment timer.
-- **The VM is not a security boundary** — withheld globals guide script authors; OS policy governs code that reaches Node.
-- **Cross-realm errors fail `instanceof Error` inside scripts** — branch on stable fields such as `name` and `code`.
+- **ファイル隔離とクリーンアップはプロバイダーの制限を継承する** — Node PTC とサブプロセスプロバイダーがエンフォースメントの完全性と管理対象プロセスの範囲を定義する。
+- **ワークフローのキャップは協調的である** — ヘルパーのカウンターは通常のスクリプトを制限する。それらは Host が強制するセキュリティクォータや子孫のトークン予算ではない。
+- **全体的な経過時間デッドラインがない** — 実行は完了、失敗、またはキャンセルされるまでアクティブのままでいられる。呼び出し元のデッドラインは依然として適用される。
+- **子のクリーンアップはプロバイダーの契約に従う** — アダプターは別個の放棄タイマーなしに破棄と保留中の開始を待つ。
+- **VM はセキュリティ境界ではない** — 伏せられたグローバルはスクリプト作者を導く。OS ポリシーが Node に到達するコードを統治する。
+- **クロスレルムのエラーはスクリプト内の `instanceof Error` を失敗させる** — `name` や `code` のような安定したフィールドで分岐する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

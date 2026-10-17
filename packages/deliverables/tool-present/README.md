@@ -1,35 +1,35 @@
 ---
-description: "Declare accessible files as deliverables with present; configuration, Session ownership, and source-file opening."
+description: "present でアクセス可能なファイルを成果物として宣言する。設定、セッション所有、ソースファイルを開くこと。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-present
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `present` to declare final files accessible through the Session filesystem, including files created through shell commands. Users open the current source files in their default application. The tool records paths and optional descriptions without copying file contents.
+`present` を使い、シェルコマンドで作成されたファイルを含む、セッションファイルシステムを通じてアクセス可能な最終ファイルを宣言する。ユーザーは現在のソースファイルを既定アプリケーションで開く。ツールはファイル内容をコピーせずにパスと任意の説明を記録する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-`present` validates paths against the Session's current working directory and records absolute paths, so later directory changes do not redirect delivered files.
+`present` はセッションの現在作業ディレクトリに対してパスを検証し、絶対パスを記録するため、後のディレクトリ変更で配信ファイルがすり替わることはない。
 
-The `standard`, `ptc`, and `cordis` agent presets mount this plugin. Call `present` with `files: [{ path, description? }]` after creating the files. Files must be regular files accessible through the Session filesystem. Relative paths resolve against the Session working directory; absolute paths may name files outside it, including `/tmp` or Downloads. Missing files, directories, final symbolic links, and provider-denied paths fail the call. Files in a shell sandbox’s private `/tmp` must first be written somewhere the Session filesystem can access.
+`standard`、`ptc`、`cordis` エージェントプリセットはこのプラグインをマウントする。ファイル作成後に `files: [{ path, description? }]` で `present` を呼ぶ。ファイルはセッションファイルシステムを通じてアクセス可能な通常ファイルでなければならない。相対パスはセッション作業ディレクトリに対して解決される。絶対パスはその外のファイル（`/tmp` やダウンロードを含む）を指名できる。欠落ファイル、ディレクトリ、最終シンボリックリンク、プロバイダー拒否パスは呼び出しを失敗させる。シェルサンドボックスの私的 `/tmp` 内のファイルは、まずセッションファイルシステムがアクセスできる場所に書き出さなければならない。
 
-Mount it in an agent's Cordis composition with `tools`, `fs`, and the `turnBoundary` Session projection available:
+エージェントの Cordis 構成に `tools`、`fs`、利用可能な `turnBoundary` セッション射影と共にマウントする。
 
 ```yaml
 - name: '@deepseek-ai/dsh-tool-present'
@@ -37,66 +37,66 @@ Mount it in an agent's Cordis composition with `tools`, `fs`, and the `turnBound
     maxFiles: 8
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `maxFiles` | `8` | Positive maximum file count per call |
+| `maxFiles` | `8` | 呼び出しごとの正の最大ファイル数 |
 
-The file-count limit is validated at mount. The tool requires an agent Session with a workspace and an open turn. Delivery belongs to the calling Session; a parent must call `present` itself to declare files created by a subagent.
+ファイル数上限はマウント時に検証される。ツールはワークスペースを持つエージェントセッションと開いているターンを必須とする。配信は呼び出しセッションに属する。親はサブエージェントが作成したファイルを宣言するために自ら `present` を呼ばなければならない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The tool resolves paths through the configured filesystem provider and checks regular-file metadata without reading contents. Successful final `tools/result` notifications append `deliverables/presented`, including nested calls. A later enclosing program failure does not revoke an already completed declaration. Blocked results publish none. Each plugin instance records only calls it executed; scoped tools with the same name cannot publish through another instance.
+ツールは設定されたファイルシステムプロバイダーを通じてパスを解決し、内容を読まずに通常ファイルメタデータを検査する。成功した最終 `tools/result` 通知は入れ子呼び出しを含めて `deliverables/presented` を追加する。後の外側プログラム失敗は完了済み宣言を取り消さない。ブロック結果は何も公開しない。各プラグインインスタンスは自身が実行した呼び出しのみを記録する。同名のスコープ付きツールは別インスタンスを通じて公開できない。
 
-The pure `./types` entry declares `PresentedFile` and the Session event without importing Host runtime code. The Web consumer validates persisted declarations before displaying or opening them. New declarations store absolute paths. Legacy relative declarations retain the viewed Session's original workspace as their base.
+純粋な `./types` エントリーはホストランタイムコードをインポートせずに `PresentedFile` とセッションイベントを宣言する。Web コンシューマーは永続化された宣言を表示・開放前に検証する。新しい宣言は絶対パスを格納する。旧式の相対宣言は閲覧セッションの元ワークスペースを基準として保持する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Filesystem subsystem](../../../docs/subsystems/filesystem.md) — provider paths and errors.
-- [Web deliverables](../../client/ui-deliverables/README.md) — source-file opening and cards.
-- [Delivery decision](../../../.agents/notes/implemented/feature/2026-09-08-present-workspace-source-files.md) — Session ownership and required-on-read events.
+- [ファイルシステムサブシステム](../../../docs/subsystems/filesystem.md) — プロバイダーパスとエラー。
+- [Web 成果物](../../client/ui-deliverables/README.md) — ソースファイルを開くこととカード。
+- [配信決定](../../../.agents/notes/implemented/feature/2026-09-08-present-workspace-source-files.md) — セッション所有と読み取り必須イベント。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
 ### present
 
-#### What the model sees
+#### モデルが見るもの
 
-The [present schema](../../../docs/tool-catalog.md#present) asks for existing accessible files: “Declare existing files as final deliverables for the user. Use it when the user needs a separate file, especially Office documents, spreadsheets, and slide decks; prefer your final response when that suffices. The user opens the current files; their contents are not copied.” The `files` parameter asks for the 1-2 most important deliverables and at most 4 per call. Results report `Presented <path>` for each file; the program result and durable event contain paths and optional descriptions.
+[present スキーマ](../../../docs/tool-catalog.md#present)は既存のアクセス可能なファイルを求める。「既存ファイルをユーザーへの最終成果物として宣言する。ユーザーが別ファイル（特に Office 文書、表計算、スライド deck）を必要とする場合に使う。それで足りる場合は最終応答を優先する。ユーザーは現在のファイルを開く。内容はコピーされない」。`files` 引数は最も重要な成果物 1〜2 件を求め、呼び出しごとに最大 4 件までである。結果はファイルごとに `Presented <path>` を報告する。プログラム結果と永続イベントはパスと任意の説明を含む。
 
-#### Token effect
+#### トークンへの影響
 
-One tool schema per mounted agent and one result line per delivered file. File bytes do not enter model messages.
+マウントされたエージェントごとに 1 つのツールスキーマと、配信ファイルごとに 1 つの結果行である。ファイルバイトはモデルメッセージに入らない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The tool schema is static for the mount lifetime. Delivery result text extends the conversation without rewriting its prompt prefix.
+ツールスキーマはマウント寿命中静的である。配信結果テキストはプロンプトプレフィックスを書き換えずに会話を拡張する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Metadata and Host-path checks cannot atomically prevent replacement before a desktop application opens a file.
-- Edits change what opens. Deleted or moved source files cannot be opened from their declarations.
-- Session ZIP exports contain declarations, not file contents. Persistent delivery versions and copy-on-write storage are deferred.
+- メタデータとホストパス検査では、デスクトップアプリケーションがファイルを開く前の置換を原子的に防げない。
+- 編集は開く内容を変える。削除または移動されたソースファイルはその宣言から開けない。
+- セッション ZIP エクスポートはファイル内容ではなく宣言を含む。永続的な配信バージョンとコピーオンライト格納は先送りである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

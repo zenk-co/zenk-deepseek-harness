@@ -1,15 +1,15 @@
-# Configure persistent plugins from a prompt
+# プロンプトから永続プラグインを設定する
 
-English | [中文](dynamic-cordis.zh.md)
+日本語 | [English](dynamic-cordis.en.md) | [中文](dynamic-cordis.zh.md)
 
-Creator mode provides [Plugin Manager](../../../../packages/boot/plugin-manager/README.md) and read-only [runtime inspection](../../../../packages/extensions/tool-cordis/README.md). Plugin configuration belongs to the current profile, affects its sessions, and survives process restarts.
+Creator モードは [Plugin Manager](../../../../packages/boot/plugin-manager/README.md) と読み取り専用の [ランタイム検査](../../../../packages/extensions/tool-cordis/README.md) を提供する。プラグイン設定は現在のプロファイルに属し、そのセッションに影響し、プロセス再起動後も残る。
 
-## Connect an MCP server
+## MCP サーバーに接続する
 
-Start the Web profile and select Creator mode. With a reachable Streamable HTTP MCP server that exposes `ping`, send this prompt using its actual endpoint:
+Web プロファイルを起動して Creator モードを選択する。`ping` を公開する到達可能な Streamable HTTP MCP サーバーを用意し、実際のエンドポイントを使って次のプロンプトを送る:
 
-> Configure the MCP server at `<endpoint>` in this profile as `demo`. Make its tools available now, then call its ping tool and tell me the result.
+> このプロファイルの `<endpoint>` にある MCP サーバーを `demo` として設定して。そのツールを今すぐ利用可能にし、ping ツールを呼び出して結果を教えて。
 
-The agent writes a configuration-only bundle whose patch inserts `@deepseek-ai/dsh-mcp-client`, then installs it with `plugin_manager install_bundle`. With HMR enabled, the tools appear in the same running session. Verify both the management result (`application: applied`) and a successful `mcp__demo__ping` call. A saved entry with `restart-required` has not activated yet; a failed entry needs configuration repair.
+エージェントは設定専用バンドルを書き、そのパッチが `@deepseek-ai/dsh-mcp-client` を挿入し、`plugin_manager install_bundle` でインストールする。HMR が有効なら、同じ実行中セッションにツールが現れる。管理結果（`application: applied`）と `mcp__demo__ping` 呼び出しの成功の両方を確認する。`restart-required` の保存済みエントリーはまだ有効化されておらず、失敗したエントリーは設定の修復が必要である。
 
-Read the bundle patch before editing its configuration. Use Plugin Manager to disable entries or remove the bundle. See the [MCP client reference](../../../../packages/mcp/mcp-client/README.md) for accepted configuration and connection failure behavior.
+設定を編集する前にバンドルパッチを読む。エントリーの無効化やバンドルの削除には Plugin Manager を使う。受け付ける設定と接続失敗時の動作は [MCP クライアントリファレンス](../../../../packages/mcp/mcp-client/README.md) を参照。

@@ -5,7 +5,7 @@ kind: "package-group"
 
 # lsp/：语言服务器代码导航
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

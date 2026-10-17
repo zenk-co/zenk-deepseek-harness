@@ -1,18 +1,18 @@
 ---
 kind: upgrade-guide
-description: "Desktop font-size shortcuts reserve key combinations previously available to custom shortcuts."
+description: "Desktop フォントサイズショートカットは、以前カスタムショートカットに利用可能だったキー組み合わせを予約する。"
 ---
 
-# Desktop font-size shortcuts reserve custom key combinations
+# Desktop フォントサイズショートカットはカスタムキー組み合わせを予約する
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-Desktop reserves `Cmd`/`Ctrl` + `=` (including `Shift` + `=` for `+`) and `Cmd`/`Ctrl` + `-` to adjust text, code, and terminal font sizes together. Use `Cmd` on macOS and `Ctrl` on Windows and Linux. Custom bindings using these combinations, including overlapping two-key chords, remain saved but no longer execute. Web shortcut behavior is unchanged.
+Desktop はテキスト、コード、ターミナルのフォントサイズを一緒に調整するため `Cmd`/`Ctrl` + `=`（`+` のための `Shift` + `=` を含む）と `Cmd`/`Ctrl` + `-` を予約する。macOS では `Cmd`、Windows と Linux では `Ctrl` を使う。これらの組み合わせを使うカスタムバインド（重なる 2 キーコードを含む）は保存されたまま残るが実行されなくなる。Web のショートカット動作は変わらない。
 
-## Migration
+## 移行
 
-1. Open Settings → General → Keyboard shortcuts in Desktop and find any custom binding marked as conflicting with a font-size shortcut.
-2. Record a nonconflicting combination for that action, or choose **Remove** to disable its keyboard shortcut. **Restore default** is available when the action's default does not conflict.
-3. Try the reassigned action, then press `Cmd`/`Ctrl` + `=` and `Cmd`/`Ctrl` + `-`. Confirm that all three font sizes change in Settings and remain saved after reopening Desktop.
+1. Desktop で Settings → General → Keyboard shortcuts を開き、フォントサイズショートカットと競合するとマークされたカスタムバインドを探す。
+2. そのアクションに競合しない組み合わせを記録するか、**Remove** を選んでキーボードショートカットを無効にする。そのアクションのデフォルトが競合しない場合は **Restore default** が利用できる。
+3. 再割り当てしたアクションを試し、次に `Cmd`/`Ctrl` + `=` と `Cmd`/`Ctrl` + `-` を押す。3 つのフォントサイズすべてが Settings で変わり、Desktop を開き直しても保存されたままであることを確認する。

@@ -5,27 +5,27 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-lazy-require
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-lazy-require` keeps a CommonJS-compatible Host dependency unloaded until its first real operation. Resolution remains relative to the consuming package, and one successful module value is reused for the rest of the process realm.
+`dsh-lazy-require` は、アプリケーション起動時に初期化が不要な CommonJS 互換 Host 依存を、最初の実際の操作まで未読み込みに保つ。解決は利用パッケージ相対のままであり、1 回成功したモジュール値はプロセスレルムの残りで再利用される。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Pass the dependency's literal specifier and the caller's `import.meta.url`:
+依存のリテラル指定子と呼び出し元の `import.meta.url` を渡す:
 
 ```ts
 import { createLazyRequire } from '@deepseek-ai/dsh-lazy-require'
@@ -34,53 +34,53 @@ interface NativeModule { open(): void }
 const requireNative = createLazyRequire<NativeModule>('native-package', import.meta.url)
 ```
 
-Calling `requireNative()` loads the dependency once. A failed load is not cached.
+`requireNative()` の呼び出しで依存を 1 回読み込む。失敗した読み込みはキャッシュされない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The utility creates Node's `require` from the supplied caller URL and caches only a successful return value. The explicit caller URL preserves package-local dependency resolution after publication.
+このユーティリティは提供された呼び出し元 URL から Node の `require` を作成し、成功した戻り値のみをキャッシュする。明示的な呼び出し元 URL により、公開後もパッケージローカルな依存解決が保持される。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Caller-relative loader and successful-result cache |
+| [`src/index.ts`](src/index.ts) | 呼び出し元相対ローダーと成功結果キャッシュ |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Utility package map](../README.md) — adjacent shared primitives.
-- [NPM release sequences](../../../.agents/notes/implemented/process/2026-08-10-npm-release-sequences.md) — published dependency classification and first-use loading policy.
+- [ユーティリティパッケージマップ](../README.md) — 隣接する共有プリミティブ。
+- [NPM リリース手順](../../../.agents/notes/implemented/process/2026-08-10-npm-release-sequences.md) — 公開依存分類と初回使用時読み込みポリシー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this Host utility registers no model-facing behavior.
+なし。この Host ユーティリティはモデル向け動作を登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None.
+なし。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **CommonJS-compatible dependencies only** — ESM-only packages require an asynchronous factory owned by their caller.
-- **WebWorker packaging needs an explicit request** — the static packer does not discover dependencies named only in `createLazyRequire()` calls. A package used in a Preview image must keep the dependency reachable through a supported literal request until the packer recognizes this helper.
+- **CommonJS 互換依存のみ** — ESM 専用パッケージは呼び出し元所有の非同期ファクトリーを必要とする。
+- **WebWorker パッケージ化には明示的リクエストが必要** — 静的パッカーは `createLazyRequire()` 呼び出し内でのみ命名された依存を検出しない。Preview イメージで使用されるパッケージは、パッカーがこのヘルパーを認識するまで、対応するリテラルリクエスト経由で依存に到達可能に保たなければならない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
-None.
+なし。

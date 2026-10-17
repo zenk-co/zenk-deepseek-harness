@@ -1,16 +1,16 @@
-# Durable Attachments
+# 永続アタッチメント
 
-English | [中文](attachment.zh.md)
+日本語 | [English](attachment.en.md) | [中文](attachment.zh.md)
 
-The attachment seam separates binary image and generic-file ownership from the session log. A producer gives bytes to [`ctx.attachments`](#ctxattachments--attachmentstore-abstract-seam); the service publishes an immutable content-addressed reference only after the object is durable. Session events and model-visible attachment blocks contain that reference and metadata, never a browser object URL, host temporary path, provider URL, or base64 payload. The independent [`ctx.fileUploads`](#ctxfileuploads--fileuploads) service binds browser file transfers and staged receipts to the receiving Agent.
+アタッチメントシームは、バイナリ画像と汎用ファイルの所有権をセッションログから分離する。プロデューサーはバイトを [`ctx.attachments`](#ctxattachments--attachmentstore-abstract-seam) へ渡し、サービスはオブジェクトが永続化された後にのみ不変のコンテンツアドレス参照を公開する。セッションイベントとモデル可視のアタッチメントブロックはその参照とメタデータを含み、ブラウザーのオブジェクト URL、ホストの一時パス、プロバイダー URL、base64 ペイロードを含むことはない。独立した [`ctx.fileUploads`](#ctxfileuploads--fileuploads) サービスは、ブラウザーのファイル転送とステージング済みレシートを受け取り側の Agent にバインドする。
 
-Unsent browser drafts may stay in memory and native clients may stage them in operating-system temporary storage. Browser generic files become durable before they receive a staged prompt receipt. Once the host accepts a user message, its images move below `<DSH_HOME>/attachments/v1` before the user event is appended. Structured model image output follows the same persist-before-event rule.
+未送信のブラウザードラフトはメモリに留まってよく、ネイティブクライアントはそれらをオペレーティングシステムの一時ストレージにステージングしてよい。ブラウザーの汎用ファイルは、ステージング済みプロンプトレシートを受け取る前に永続化される。ホストがユーザーメッセージを受け入れると、その画像はユーザーイベントが追加される前に `<DSH_HOME>/attachments/v1` の下へ移動する。構造化されたモデル画像出力も同じ「イベント前永続化」規則に従う。
 
-Source: [`packages/attachment/attachment/src/types.ts`](../../packages/attachment/attachment/src/types.ts)
+ソース: [`packages/attachment/attachment/src/types.ts`](../../packages/attachment/attachment/src/types.ts)
 
-## Identity and verified metadata
+## ID と検証済みメタデータ
 
-`AttachmentId` is a branded opaque string. The local backend currently emits `sha256:<digest>`, but consumers must neither parse that representation nor derive a filesystem path from it. A consumer may ask the attachment provider for its object location through `imageHostPath()`, then must use the current execution filesystem to decide whether model tools can read that host path.
+`AttachmentId` はブランド付きの不透明文字列である。ローカルバックエンドは現在 `sha256:<digest>` を出力するが、消費者はその表現をパースしてはならず、そこからファイルシステムパスを導出してもならない。消費者は `imageHostPath()` を通じてアタッチメントプロバイダーにオブジェクトの場所を尋ねてよく、その後、モデルツールがそのホストパスを読めるかを判断するために現在の実行ファイルシステムを使わなければならない。
 
 ```ts type-equiv
 /** Raster image formats accepted by the version-one attachment path. */
@@ -56,11 +56,11 @@ interface ImageAttachmentLimits {
 }
 ```
 
-The local backend admits at most 20 images and 200 MiB of encoded source data per message. One source may use up to 20 MiB, 64,000,000 pixels, and 8192 pixels on either side. These source limits precede the independent normalization stage, which limits the long edge to 2048 pixels and encoded data to 4 MiB by default.
+ローカルバックエンドは、メッセージあたり最大 20 画像、エンコード済みソースデータ 200 MiB まで受け入れる。1 つのソースは最大 20 MiB、64,000,000 ピクセル、各辺 8192 ピクセルまで使える。これらのソース制限は独立した正規化段階よりも前であり、正規化は既定で長辺を 2048 ピクセル、エンコード済みデータを 4 MiB に制限する。
 
-The reference records intrinsic dimensions and encoded length so clients can lay out history without decoding first, while every authoritative read still re-checks digest, media signature, dimensions, and metadata against the object.
+参照は固有の寸法とエンコード済み長を記録するので、クライアントは最初にデコードせずに履歴をレイアウトできる。一方、すべての権威ある読み取りは、ダイジェスト、メディアシグネチャ、寸法、メタデータをオブジェクトに対して再検査する。
 
-## Commit and verified-read payloads
+## コミットと検証済み読み取りのペイロード
 
 ```ts type-equiv
 /**
@@ -167,7 +167,7 @@ interface RequestImageAttachment {
 }
 ```
 
-`saveImage()` prepares and atomically commits a provider-independent normalized attachment before returning its `ImageAttachmentRef`. `saveImages()` prepares every validated attachment once before publishing the batch, so validation rejection leaves no partial objects and publication does not repeat decoding or quality selection. `admitPromptContent()` accepts the complete ordered Host prompt after file receipt resolution, replaces base64 image uploads with durable references, and passes durable file references unchanged. `admitEncodedImages()` supports other wire entries and delegates count, aggregate-byte, and ordered batch admission to `saveImages()`. `admitEncodedFile()` gives encoded protocol adapters the same service-owned canonical-base64 admission, and `isAttachmentError()` lets those adapters recognize stable attachment failures without importing implementation helpers. `readImage()` verifies a normalized attachment from an authorized session path. `imageHostPath()` exposes only the provider-owned host object location; it does not decide whether the current tool execution world can read it. `readImageRequest()` derives and caches one deterministic request version at an exact route-chosen target size and encoded-byte target. That version contains encoded bytes and metadata but no execution-world path. New entries are fully decoded before publication, while cache hits use a bounded metadata probe. Callers use `Promise.all` over the singular method when they need an ordered batch. The local implementation lazily encodes preferred candidates, singleflights equal request identities, lets each waiter cancel independently, stops shared work when no waiter remains, and bounds all transforms with its instance-level limiter, which defaults to two simultaneous transformations. The service is retention-neutral: resumed and forked sessions may share objects, so reference-aware garbage collection is deferred rather than tied to one session's deletion.
+`saveImage()` は、プロバイダー非依存の正規化されたアタッチメントを準備しアトミックにコミットしてから、その `ImageAttachmentRef` を返す。`saveImages()` はバッチを公開する前に検証済みのすべてのアタッチメントを 1 回ずつ準備するので、検証の拒否が部分的なオブジェクトを残すことはなく、公開がデコードや品質選択を繰り返すこともない。`admitPromptContent()` は、ファイルレシート解決後の完全な順序付き Host プロンプトを受け取り、base64 画像アップロードを永続参照に置き換え、永続的なファイル参照はそのまま通す。`admitEncodedImages()` は他の wire エントリーをサポートし、件数、合計バイト、順序付きバッチの受け入れを `saveImages()` に委譲する。`admitEncodedFile()` はエンコードされたプロトコルアダプターに同じサービス所有の正規 base64 受け入れを与え、`isAttachmentError()` はそれらのアダプターが実装ヘルパーをインポートせずに安定したアタッチメント失敗を認識できるようにする。`readImage()` は認可されたセッションパスから正規化アタッチメントを検証する。`imageHostPath()` はプロバイダーが所有するホストオブジェクトの場所のみを公開し、現在のツール実行ワールドがそれを読めるかは決定しない。`readImageRequest()` は、正確なルート選択のターゲットサイズとエンコード済みバイトターゲットで、1 つの決定論的なリクエストバージョンを導出しキャッシュする。そのバージョンはエンコード済みバイトとメタデータを含むが、実行ワールドのパスは含まない。新しいエントリーは公開前に完全にデコードされ、キャッシュヒットは有限のメタデータプローブを使う。呼び出し元は順序付きバッチが必要なとき、単数形メソッドに対して `Promise.all` を使う。ローカル実装は、優先候補を遅延エンコードし、等しいリクエスト ID を singleflight し、各待機者が独立にキャンセルできるようにし、待機者がいなくなると共有作業を停止し、すべての変換をインスタンスレベルのリミッターで制限する。そのリミッターは既定で同時変換 2 である。このサービスは保持について中立である。再開およびフォークされたセッションはオブジェクトを共有しうるので、参照を考慮したガベージコレクションは、1 つのセッションの削除に結び付けるのではなく先送りされている。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -175,13 +175,13 @@ interface RequestImageAttachment {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxattachments--attachmentstore-abstract-seam"></a>
 
-### `ctx.attachments` — `AttachmentStore` (abstract seam)
+### `ctx.attachments` — `AttachmentStore`（抽象シーム）
 
-Immutable binary attachment service. Implementations validate bytes before publishing a reference.
+不変バイナリアタッチメントサービス。実装は参照を公開する前にバイトを検証する。
 
 ```ts cordis-catalog
 /**
@@ -297,13 +297,13 @@ fileHostPath(ref: FileAttachmentRef): string | undefined
 readImageRequest( ref: ImageAttachmentRef, target: ImageRequestTarget, signal?: AbortSignal, ): Promise<RequestImageAttachment>
 ```
 
-Source: [`packages/attachment/attachment/src/index.ts`](../../packages/attachment/attachment/src/index.ts)
+ソース: [`packages/attachment/attachment/src/index.ts`](../../packages/attachment/attachment/src/index.ts)
 
 <a id="ctxfileuploads--fileuploads"></a>
 
 ### `ctx.fileUploads` — `FileUploads`
 
-Host service owning upload storage and receipts keyed by each receiving Agent's exact Session.
+各受信 Agent の正確なセッションをキーとするアップロードストレージとレシートを所有する Host サービス。
 
 ```ts cordis-catalog
 /**
@@ -355,7 +355,7 @@ bindPrompt( agent: Agent, receiptIds: readonly FileUploadReceiptId[], requestId:
 retirePrompt(agent: Agent, requestId: string): void
 ```
 
-Types: [Agent](core.md) · [SessionId](core.md)
+型: [Agent](core.md) · [SessionId](core.md)
 
-Source: [`packages/client/file-upload/src/index.ts`](../../packages/client/file-upload/src/index.ts)
+ソース: [`packages/client/file-upload/src/index.ts`](../../packages/client/file-upload/src/index.ts)
 <!-- END GENERATED cordis-surface -->

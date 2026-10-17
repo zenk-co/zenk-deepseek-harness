@@ -1,35 +1,35 @@
 ---
-description: "Shared telemetry transport plugins for business consumers."
+description: "ビジネスコンシューマー向けの共有テレメトリートランスポートプラグイン。"
 kind: "package-group"
 ---
 
 # telemetry/ — shared reporting
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This group provides reporting infrastructure shared by product analytics and feedback-authorized Session uploads. Business plugins select events, identities, authorization, and redaction; transport plugins own encoding and delivery.
+このグループは製品分析とフィードバック認可のセッションアップロードで共有される報告インフラを提供する。ビジネスプラグインがイベント、アイデンティティー、認可、編集を選択し、トランスポートプラグインがエンコードと配送を所有する。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
 | Package | Role |
 |---|---|
 | [`otel`](otel/README.md) | Cordis service creating independent ordinary-event and byte-bounded Session-log channels |
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [OTel subsystem](../../docs/subsystems/otel.md) — shared service and consumer ownership.
+- [OTel サブシステム](../../docs/subsystems/otel.md) — shared service and consumer ownership.
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 None.

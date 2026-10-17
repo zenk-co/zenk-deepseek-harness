@@ -1,134 +1,134 @@
 ---
-description: "Settings shell, ownerless copy, and durable product-onboarding namespace for the dsh web client: the General section, trigger chrome, and onboarding ledger projection."
+description: "dsh web クライアント向けの、設定シェル、所有者なしコピー、永続的なプロダクトオンボーディング名前空間: General セクション、トリガークローム、オンボーディング台帳の投影。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-settings-general
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to give the dsh web client a Settings panel, connection-recovery control, feature-contributed navigation, and sequential first-run onboarding. Users can open it from the sidebar, retry a failed connection immediately, and access a local configuration file when the Host makes one available on a loopback browser. Feature packages supply their own settings rows, sections, and onboarding steps; this package supplies their shared presentation and the Coding Tools switch without adding onboarding copy.
+このパッケージを使うと、dsh web クライアントに設定パネル、接続回復コントロール、機能が提供するナビゲーション、順次の初回オンボーディングを与えられる。ユーザーはサイドバーからこれを開き、失敗した接続を直ちに再試行し、Host がループバックブラウザーで利用可能にしたときにローカル設定ファイルへアクセスできる。機能パッケージは自身の設定行、セクション、オンボーディングステップを供給する。このパッケージはそれらの共有プレゼンテーションと Coding Tools スイッチを、オンボーディングコピーを追加せずに供給する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
-The Settings panel uses a shared 800 × 800 layout, bounded by the viewport. Longer sections scroll inside the content column; the Account entry uses the account icon. The panel portals beside `#root` rather than inside it, so a macOS window drag region a chrome row declares later in document order cannot swallow its controls.
+設定パネルはビューポートで制限された共有の 800 × 800 レイアウトを使う。長いセクションはコンテンツ列の内側でスクロールする。Account エントリーはアカウントアイコンを使う。パネルは `#root` の内側ではなく隣にポータルされるため、ドキュメント順で後にクローム行が宣言する macOS のウィンドウドラッグ領域がそのコントロールを飲み込むことはない。
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Users reach the shell through the sidebar's bottom Settings control; feature plugins contribute their pages and onboarding steps through the slot ledgers this shell projects. In both the expanded sidebar and collapsed rail, the control exposes the localized Settings label as its accessible name. A pale-yellow **Disconnected** action beside Settings indicates browser offline suspension; its permanent retry glyph marks the retry action, which the Chinese outage copy also names (连接异常，刷新重试). Every recovery attempt shows the shared ongoing loader beside **Reconnecting** with one to three dots advancing every 500ms, and an attempt stays visible for at least 800ms so brief retries do not flicker. Selecting either yellow state starts an immediate retry; press feedback stays within the warning palette. Recovery changes the region to pale-green **Connected** for two seconds from the moment the green pill becomes visible. The pill fades in on appearance, fades out over 150ms on removal, and sizes to its current label. Initial startup and uninterrupted healthy operation remain silent. The shell renders the modal panel, the navigation built from `settings.section` entries, and exactly one mounted onboarding step at a time.
+ユーザーはサイドバー下部の設定コントロールからシェルに到達する。機能プラグインは、このシェルが投影するスロット台帳を通じて自身のページとオンボーディングステップを提供する。展開したサイドバーと折りたたんだレールのどちらでも、コントロールはローカライズされた設定ラベルをそのアクセシブル名として公開する。設定の隣の淡黄色の **Disconnected** アクションはブラウザーのオフライン中断を示す。その常設の再試行グリフが再試行アクションを示し、中国語の障害コピーもそれを名指す（连接异常，刷新重试）。すべての回復試行は **Reconnecting** の隣に共有の進行中ローダーを表示し、1〜3 個のドットが 500ms ごとに進む。試行は少なくとも 800ms 可視のままで、短い再試行がちらつかないようにする。どちらの黄色状態を選んでも直ちに再試行が始まり、押下フィードバックは警告パレット内にとどまる。回復は、緑のピルが可視になってから 2 秒間、その領域を淡緑の **Connected** に変える。ピルは出現時にフェードインし、除去時に 150ms かけてフェードアウトし、現在のラベルにサイズが合う。初期起動と中断のない正常動作は沈黙のままである。シェルはモーダルパネル、`settings.section` エントリーから構築されるナビゲーション、および同時にちょうど 1 つのマウントされたオンボーディングステップをレンダリングする。
 
-Settings uses the [frame’s shared overlay inset](../ui-layout/README.md#window-chrome-seat) and keeps at least 24px of viewport margin. Its mask leaves the Windows caption unpainted; the full-viewport layer still blocks background clicks.
+Settings は[フレームの共有オーバーレイインセット](../ui-layout/README.md#window-chrome-seat)を使い、少なくとも 24px のビューポートマージンを保つ。そのマスクは Windows キャプションを塗らないままにし、全ビューポートレイヤーは依然として背景クリックをブロックする。
 
-When the page reconnects to a Host running another release, a **Service version changed** dialog draws two lines: **Service** from the Host's previous release (gray) to its current release, joined by a thin solid green arrow because the Host already switched, and **Page** from the release this page booted from to the Host's release (gray), joined by an equally thin dashed gray arrow because only a reload completes it. A line shows versions when its two versions differ and commits otherwise. The page applies no plugin update from that release. **Reload to load the new version** loads it; **Not now**, the close control, a mask click, and Escape keep the page at its own release and stop asking about that Host release. When the Host returns to the page's release, the dialog closes and live updates resume.
+ページが別のリリースを実行する Host へ再接続すると、**Service version changed** ダイアログが 2 本の線を描く。**Service** は Host の前回リリース（灰色）から現在のリリースまでで、Host がすでに切り替わっているため細い実線の緑矢印でつながれる。**Page** はこのページが起動したリリースから Host のリリース（灰色）までで、リロードのみがそれを完了するため同じく細い破線の灰色矢印でつながれる。線は 2 つのバージョンが異なるときにバージョンを表示し、それ以外はコミットする。ページはそのリリースからプラグイン更新を適用しない。**Reload to load the new version** はそれをロードし、**Not now**、クローズコントロール、マスククリック、Escape はページを自身のリリースに留め、その Host リリースについて尋ねるのをやめる。Host がページのリリースに戻ると、ダイアログは閉じ、ライブ更新が再開する。
 
-When the section navigation exceeds the panel's available height, the list scrolls independently of the settings content and keeps the Settings title fixed.
+セクションナビゲーションがパネルの利用可能な高さを超えると、リストは設定コンテンツとは独立にスクロールし、Settings タイトルは固定されたままになる。
 
-In Desktop, the account-row update control shows availability, progress, verification, readiness, and persistent retry feedback. It shares the connection indicator’s 28px height, 8px corners, 14px icon slot, 4px icon gap, and 12px medium text with an 18px line height; update-state border, fill, and text colors remain independently defined. Retry text and its dot use the same brand blue as other update labels; numeric download progress has no ellipsis. The preload carries semantic phase, version, progress, and classified failures; the component resolves every visible and accessible string from the active `settings` locale, including after an in-application language change. Selecting an available update starts downloading; installation requires a separate shell-owned confirmation. A collapsed sidebar shows the same status as a brand-blue dot on its top expand button, including failures. Connection feedback takes priority except during shell-reported installation, when the expected backend disconnect must not hide update status. Failure restores connection feedback. Both controls share one carrier subscription; browser code cannot choose packages or authorize installation. [Desktop updates](../../../apps/desktop/README.md) owns the release workflow. Checking, verifying, and preparing-to-restart tooltips show only the supplied version; without a version, they retain the state label. Desktop update tooltips preserve the complete version and prerelease suffix without adding v or V; their error summaries match the shell update dialogs.
+Desktop では、アカウント行の更新コントロールが可用性、進行状況、検証、準備完了、永続的な再試行フィードバックを表示する。接続インジケーターの 28px 高さ、8px 角、14px アイコンスロット、4px アイコン間隔、18px 行高の 12px 中字を共有する。更新状態のボーダー、塗り、テキスト色は独立に定義されたままである。再試行テキストとそのドットは他の更新ラベルと同じブランドブルーを使い、数値のダウンロード進行状況に省略記号はない。プリロードは意味論的なフェーズ、バージョン、進行状況、分類済みの失敗を運ぶ。コンポーネントは、アプリケーション内の言語変更後を含め、すべての可視およびアクセシブルな文字列をアクティブな `settings` ロケールから解決する。利用可能な更新を選ぶとダウンロードが始まる。インストールにはシェル所有の別の確認が必要である。折りたたまれたサイドバーは同じ状態を上部の展開ボタン上のブランドブルーのドットとして示す（失敗も含む）。接続フィードバックが優先されるが、シェルが報告するインストール中は例外で、そのとき予期されるバックエンド切断が更新状態を隠してはならない。失敗は接続フィードバックを復元する。両方のコントロールは 1 つのキャリア購読を共有し、ブラウザーコードはパッケージを選べず、インストールを認可できない。[Desktop の更新](../../../apps/desktop/README.md)がリリースワークフローを所有する。Checking、verifying、preparing-to-restart のツールチップは供給されたバージョンのみを表示し、バージョンがなければ状態ラベルを保つ。Desktop 更新のツールチップは、v や V を付けずに完全なバージョンとプレリリースサフィックスを保持する。そのエラー要約はシェルの更新ダイアログと一致する。
 
-Settings visibility and section selection live in the shell owner store. The shell supplies the effective Settings binding to the contributed launcher for menu keycaps and `aria-keyshortcuts`; the fallback button uses the same binding for hover and keyboard-focus hints and `aria-keyshortcuts`. The Settings command (Desktop: `Mod+,`; Windows/macOS Web: `Mod+Alt+,`) toggles the dialog when Settings is in front or no modal is open; the sidebar control opens the same dialog. The command cannot open or close Settings while the shortcut reference or another modal is in front. Held-key repeats do nothing. Initial focus lands on the selected section in the navigation, or on the title when no sections are available, without drawing a focus outline. Tab and directional navigation retain their visible focus indicators. `Mod+/` can open the shortcut reference above Settings; `Escape` closes the top dialog and restores focus to its invoking control. Return focus omits outlines after shortcut, Escape, or pointer dismissal.
+設定の可視性とセクション選択はシェル所有者ストアにある。シェルはメニューのキーキャップと `aria-keyshortcuts` のために、実効の Settings バインディングを提供されたランチャーへ供給する。フォールバックボタンはホバーとキーボードフォーカスのヒントおよび `aria-keyshortcuts` に同じバインディングを使う。Settings コマンド（Desktop: `Mod+,`、Windows/macOS Web: `Mod+Alt+,`）は、Settings が前面かモーダルが開いていないときにダイアログを切り替える。サイドバーのコントロールは同じダイアログを開く。ショートカットリファレンスや別のモーダルが前面にある間、コマンドは Settings を開閉できない。押しっぱなしの繰り返しは何もしない。初期フォーカスはナビゲーションの選択済みセクション、セクションがなければタイトルに、フォーカスアウトラインを描かずに着地する。Tab と方向ナビゲーションは可視のフォーカスインジケーターを保つ。`Mod+/` は Settings の上にショートカットリファレンスを開ける。`Escape` は最上位のダイアログを閉じ、その呼び出し元コントロールへフォーカスを復元する。ショートカット、Escape、ポインターによる解除の後の復帰フォーカスはアウトラインを省略する。
 
-### The General section
+### General セクション
 
-The current release version appears at the bottom of General Settings in Web and Desktop, using the build’s `DSH_CLIENT_VERSION` metadata and the active language. Partial builds without version metadata omit the row.
+現在のリリースバージョンは Web と Desktop の General Settings の下部に、ビルドの `DSH_CLIENT_VERSION` メタデータとアクティブな言語を使って表示される。バージョンメタデータのない部分ビルドはこの行を省略する。
 
-The Coding Tools switch controls the shared `ui-settings.enabled` preference described by [ui-settings](../ui-settings/README.md#use-this-package). It is available in both Web and desktop, follows accepted changes immediately, and disables duplicate input while a write settles. A failed write displays localized retry guidance.
+Coding Tools スイッチは [ui-settings](../ui-settings/README.md#use-this-package) が記述する共有 `ui-settings.enabled` 設定を制御する。Web とデスクトップの両方で利用可能で、受け入れられた変更に直ちに従い、書き込みが落ち着くまで重複入力を無効にする。失敗した書き込みはローカライズされた再試行ガイダンスを表示する。
 
-The General section holds the built-in Coding Tools and Current version rows alongside rows registered into `settings.general.item` by feature packages. Each registrant owns its row copy and behavior. The Appearance row, for example, lives in ui-theme.
+General セクションは、組み込みの Coding Tools と Current version の行を、機能パッケージが `settings.general.item` に登録する行と並べて保持する。各登録者が自身の行のコピーと動作を所有する。たとえば Appearance 行は ui-theme にある。
 
-### Opening the configuration file
+### 設定ファイルを開く
 
-On a loopback browser, the shell renders **Open configuration file** only when the Host confirms that a provider-owned local document can be prepared. The action opens that document in the native text editor (bypassing the browser file association on macOS). Remote browsers never register this native-open action, including on configured public deployments; their preferences persist through the Host settings service.
+ループバックブラウザーでは、シェルは Host がプロバイダー所有のローカルドキュメントを準備できると確認したときにのみ **Open configuration file** をレンダリングする。アクションはそのドキュメントをネイティブテキストエディターで開く（macOS ではブラウザーのファイル関連付けを回避する）。リモートブラウザーは、構成済みの公開デプロイ上でも含め、このネイティブオープンアクションを決して登録しない。それらの設定は Host 設定サービスを通じて永続化される。
 
-### Onboarding steps
+### オンボーディングステップ
 
-The onboarding ledger projects in ascending order and mounts exactly one step at a time. Registrants own durable completion, capability readiness, copy, mutations, and their visible wrapper, so independently registered flows cannot stack and the shell does not become a second configuration fact source. Visible steps own their dialog chrome and app-root `inert` lifecycle.
+オンボーディング台帳は昇順に投影され、同時にちょうど 1 つのステップをマウントする。登録者が永続的な完了、ケイパビリティの準備完了、コピー、変更、およびその可視ラッパーを所有するため、独立に登録されたフローが積み重なることはなく、シェルが 2 つ目の設定ファクトソースになることもない。可視のステップは自身のダイアログクロームとアプリルート `inert` ライフサイクルを所有する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-The shell declares settings.launcher for an account-owned sidebar menu and retains the Settings button as its fallback. The launcher receives settingsOpen, whose false-to-true edge marks one Settings entry, so a registrant acts once per entry instead of on every re-render inside one open. Closing the dialog returns focus to the active launcher.
+シェルはアカウント所有のサイドバーメニューのために settings.launcher を宣言し、Settings ボタンをフォールバックとして保持する。ランチャーは settingsOpen を受け取り、その false から true へのエッジが 1 回の Settings 入場を印付けるため、登録者は 1 回のオープン内の再レンダリングごとではなく入場ごとに 1 度だけ行動する。ダイアログを閉じるとフォーカスがアクティブなランチャーへ戻る。
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-The shell owns the chrome and the projections; it contributes the Coding Tools and Current version rows, while feature registrants own their additional content and copy.
+シェルがクロームと投影を所有する。Coding Tools と Current version の行を提供し、機能の登録者がその追加コンテンツとコピーを所有する。
 
-### Ledger projections
+### 台帳の投影
 
-The navigation is a projection of the `settings.section` ledger; nav labels may be locale-following thunks, resolved through `resolveSlotLabel` and re-rendered on the section ledger bump or the locale revision (an optional `ctx.get('locale')` read; no hard locale dependency). The onboarding ledger projects in ascending order; the active registrant receives its id, `complete()`, and an `openSection(id)` callback, and completing or skipping transfers ownership to the next entry.
+ナビゲーションは `settings.section` 台帳の投影である。ナビラベルはロケール追従のサンクでよく、`resolveSlotLabel` を通じて解決され、セクション台帳のバンプまたはロケールリビジョン（オプションの `ctx.get('locale')` 読み取り。ハードなロケール依存なし）で再レンダリングされる。オンボーディング台帳は昇順に投影される。アクティブな登録者はその id、`complete()`、`openSection(id)` コールバックを受け取り、完了またはスキップが所有権を次のエントリーへ移す。
 
-### Connection recovery
+### 接続の回復
 
-The shell is an explicit recovery consumer, so it injects Connection directly rather than adding lifecycle controls to `ctx.remote`. Its private hooks compartment binds `ctx.connection.state`, while the component receives only the selected state and an injected callback for `ctx.connection.reconnect()`. `ConnectionIndicator` owns the inline presentation and receives all visible and accessible copy from the `settings` locale namespace; the shell owns the 800ms minimum-visible hold for the connecting state and the two-second recovered-state timer, which starts when the recovered pill becomes visible after the hold.
+シェルは明示的な回復コンシューマーであるため、`ctx.remote` にライフサイクル制御を加えるのではなく Connection を直接注入する。そのプライベート hooks コンパートメントが `ctx.connection.state` を束縛し、コンポーネントは選択された状態と `ctx.connection.reconnect()` 用の注入されたコールバックのみを受け取る。`ConnectionIndicator` がインライン表示を所有し、`settings` ロケール名前空間からすべての可視およびアクセシブルなコピーを受け取る。シェルは connecting 状態の 800ms 最小可視ホールドと、回復状態の 2 秒タイマー（ホールド後に回復ピルが可視になったときに始まる）を所有する。
 
-### Host release changes
+### Host リリース変更
 
-The `shell.overlay` entry `host-release-change` binds `ctx.modules.entries.releaseChange` in its hooks compartment and receives two callbacks: one calls `ctx.modules.entries.dismissRelease()`, the other reloads the page. Release identities are Host data and render verbatim; [Client Modules](../modules/README.md#host-release-changes) owns which release counts as current.
+`shell.overlay` エントリー `host-release-change` は、その hooks コンパートメントで `ctx.modules.entries.releaseChange` を束縛し、2 つのコールバックを受け取る。1 つは `ctx.modules.entries.dismissRelease()` を呼び、もう 1 つはページをリロードする。リリース識別子は Host データであり逐語的にレンダリングされる。[Client Modules](../modules/README.md#host-release-changes)がどのリリースを現在と数えるかを所有する。
 
-### Document availability
+### ドキュメントの可用性
 
-On a loopback page, the Client loads the provider's `hasDocument` capability through `settings/describe` and renders **Open configuration file** only when the Host confirms that a provider-owned local document can be prepared. The action calls the pathless, browser-authenticated `settings/openSettingsDocument` Remote; the Host resolves the provider path again, materializes an absent document, and hands it to a native text editor (`open -t` on macOS, bypassing a browser file association; the desktop file association on Linux and Windows; Windows association after `wslpath -w` translation on WSL). Open failures keep the action available and render a localized error. Reopening the dialog or reconnecting refreshes availability after a transient read failure or Host topology change. Non-loopback pages withhold this native action through the Client policy.
+ループバックページでは、Client は `settings/describe` を通じてプロバイダーの `hasDocument` ケイパビリティをロードし、Host がプロバイダー所有のローカルドキュメントを準備できると確認したときにのみ **Open configuration file** をレンダリングする。アクションはパスレスでブラウザー認証された `settings/openSettingsDocument` Remote を呼ぶ。Host はプロバイダーパスを再度解決し、存在しないドキュメントを実体化し、ネイティブテキストエディター（macOS では `open -t`、ブラウザーのファイル関連付けを回避する。Linux と Windows ではデスクトップのファイル関連付け。WSL では `wslpath -w` 変換後の Windows 関連付け）へ渡す。オープンの失敗はアクションを利用可能なままにし、ローカライズされたエラーをレンダリングする。ダイアログの再オープンや再接続は、一時的な読み取り失敗や Host トポロジー変更の後に可用性を更新する。非ループバックページは Client ポリシーを通じてこのネイティブアクションを差し控える。
 
-### Host half
+### Host 側
 
-The Host half declares `welcomeNoticeVersion` as a volatile field of the `ui-settings-general` entry Config. The welcome step contributed by ui-settings-models reads and writes its `welcomeNoticeVersion` through the existing public settings boundary; the shell itself remains policy-free.
+Host 側は `welcomeNoticeVersion` を `ui-settings-general` エントリー Config の揮発性フィールドとして宣言する。ui-settings-models が提供するウェルカムステップは、既存の公開設定境界を通じてその `welcomeNoticeVersion` を読み書きする。シェル自体はポリシーフリーのままである。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the settings surface family and the composition model.
+これらのページは設定サーフェスファミリーと構成モデルを扱う。
 
-- [ui-settings](../ui-settings/README.md) — the domain base whose slot types and scope service this shell builds on.
-- [ui-sidebar](../ui-sidebar/README.md) — the sidebar shell hosting the `sidebar.settings` seat.
-- [ui-settings-models](../ui-settings-models/README.md) — the feature package contributing the DeepSeek onboarding step.
-- [settings](../../settings/README.md) — the durable user-settings seam and its file provider.
-- [Slot system standard](../../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) — the composition model behind the ledgers.
+- [ui-settings](../ui-settings/README.md) — このシェルが基盤とするスロット型とスコープサービスを持つドメイン基底。
+- [ui-sidebar](../ui-sidebar/README.md) — `sidebar.settings` シートをホストするサイドバーシェル。
+- [ui-settings-models](../ui-settings-models/README.md) — DeepSeek オンボーディングステップを提供する機能パッケージ。
+- [settings](../../settings/README.md) — 永続的なユーザー設定シームとそのファイルプロバイダー。
+- [スロットシステム標準](../../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) — 台帳の背後にある構成モデル。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+なし。このパッケージはモデル向けに何も登録しないブラウザー側 UI プラグインレイヤーである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the shell itself provides versus what features must supply; they are current package constraints.
+これらの制限は、シェル自体が提供するものと機能が供給しなければならないものを定義する。これらは現在のパッケージ制約である。
 
-- **Additional General rows require their feature plugins** — the shell supplies Coding Tools and Current version; feature plugins supply the remaining preferences.
-- **The Windows caption badge keeps a side-opening bubble** — `DesktopUpdateBadge` occupies `sidebar.toggle.badge` in the caption and requests `side="right"`, so the Desktop-owned menu text can cover its bubble while the sidebar is collapsed on Windows; the sidebar toggle and New Session bubbles open below the caption instead (#4688).
+- **追加の General 行にはそれぞれの機能プラグインが必要** — シェルは Coding Tools と Current version を供給し、残りの設定は機能プラグインが供給する。
+- **Windows キャプションバッジは横開きバブルを保つ** — `DesktopUpdateBadge` はキャプション内の `sidebar.toggle.badge` を占め `side="right"` を要求するため、Windows でサイドバーが折りたたまれている間、Desktop 所有のメニューテキストがそのバブルを覆いうる。サイドバートグルと New Session のバブルは代わりにキャプションの下に開く（#4688）。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

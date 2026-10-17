@@ -5,26 +5,26 @@ kind: "package-group"
 
 # session/ — durable session data plane
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The session group keeps conversations durable, restores released log formats, and makes committed history available after restart. Its storage and checkpoint packages protect requests, tool side effects, and completed steps; projection packages derive client-ready values; title packages name sessions; telemetry packages report activity. Start with the shipped JSONL storage, then add checkpointing and only the projections, title policy, or telemetry your deployment needs. Each package README owns its guarantees and configuration, while a sibling query group provides independent read and tool access.
+session グループは会話を durable に保ち、解放済みログ形式を復元し、コミット済み履歴を再起動後も利用可能にします。その保存とチェックポイントパッケージはリクエスト、ツール副作用、完了ステップを保護します。プロジェクションパッケージはクライアント対応値を導出します。タイトルパッケージはセッションに名前を付けます。テレメトリーパッケージは活動を報告します。出荷 JSONL 保存から始め、チェックポイント化と、配置に必要なプロジェクション、タイトルポリシー、テレメトリーのみを追加します。各パッケージ README が保証と設定を所有し、兄弟クエリーグループが独立した読取とツールアクセスを提供します。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-The group splits into four families: durable storage (persistence seam, backends, checkpoint policy), projections, titles, and telemetry. Each package README owns its contract and configuration.
+グループは 4 ファミリーに分かれます。durable 保存 (永続化シーム、バックエンド、チェックポイントポリシー)、プロジェクション、タイトル、テレメトリーです。各パッケージ README が契約と設定を所有します。
 
-### Persistence
+### 永続化
 
 | Package | Role | ctx key |
 |---|---|---|
@@ -39,7 +39,7 @@ The group splits into four families: durable storage (persistence seam, backends
 | [`session-checkpoint-policy/`](session-checkpoint-policy/README.md) | Makes model requests, top-level tool side effects, and completed steps durable before the next action | wraps `ctx.llm` and `ctx.tools` |
 | [`session-log-deepseek/`](session-log-deepseek/README.md) | Uploads the incremental canonical log as optional official DeepSeek request metadata | contributes `dsh_session_log` |
 
-### Projection
+### プロジェクション
 
 | Package | Role | ctx key |
 |---|---|---|
@@ -50,7 +50,7 @@ The group splits into four families: durable storage (persistence seam, backends
 | [`session-stats/`](session-stats/README.md) | Serves whole-log conversation counts and wall times through the `sessionStats` unit | registers on `ctx.sessionProjections` |
 | [`session-turn-outline/`](session-turn-outline/README.md) | Serves the whole-log turn outline (turn, `turn/start` seq, prompt preview) through the `turnOutline` unit | registers on `ctx.sessionProjections` |
 
-### Titles
+### タイトル
 
 | Package | Role | ctx key |
 |---|---|---|
@@ -58,19 +58,19 @@ The group splits into four families: durable storage (persistence seam, backends
 | [`session-title-llm/`](session-title-llm/README.md) | Shared bounded execution for provider-owned title strategies | library — no ctx key |
 | [`session-title-first-prompt-llm/`](session-title-first-prompt-llm/README.md) | Titles a session from its first eligible human message | registers on `ctx.sessionTitle` |
 
-### Telemetry
+### テレメトリー
 
 | Package | Role | ctx key |
 |---|---|---|
 | [`session-telemetry/`](session-telemetry/README.md) | Captures session activity and hands records to a configured reporting backend | `ctx.sessionTelemetry` |
 | [`session-telemetry-otel/`](session-telemetry-otel/README.md) | Delivers telemetry through OpenTelemetry logs in `FEEDBACK_ONLY` or `DISABLED` mode | registers on `ctx.sessionTelemetry` |
 
-Only one title provider may register at a time; without one, the title service keeps its deterministic fallback. The subsystem pages below are the backend-neutral references for each family.
+一度に登録できるタイトルプロバイダーは 1 つのみです。プロバイダーがない場合、タイトルサービスは決定論的フォールバックを保持します。以下のサブシステムページは各ファミリーのバックエンド中立リファレンスです。
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
 - [Session persistence subsystem](../../docs/subsystems/persistence.md) — backend-neutral service semantics, the flush checkpoint, and crash recovery.
 - [Working directory subsystem](../../docs/subsystems/working-directory.md) — effective directory and recovery.
@@ -79,9 +79,9 @@ Only one title provider may register at a time; without one, the title service k
 - [Session telemetry subsystem](../../docs/subsystems/session-telemetry.md) — capture, redaction, and delivery modes.
 - [Session subsystem](../../docs/subsystems/session.md) — the live event log every package in this group persists or derives from.
 
-See [`session-title-all-prompts-llm`](../experimental/session-title-all-prompts-llm/README.md) for the experimental optional capability.
+実験的 optional ケイパビリティは [`session-title-all-prompts-llm`](../experimental/session-title-all-prompts-llm/README.md) を見てください。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 None.

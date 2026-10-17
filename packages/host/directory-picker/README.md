@@ -5,65 +5,65 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-host-directory-picker
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The web GUI lets an operator choose a workspace directory with either an OS chooser or an in-app browser. Use the native option when the operator can reach the host display; use the browser option for remote clients or when directory listing and creation must stay in the app. Consumers receive the interaction kind and can present the matching workflow. Directory picking is limited to the GUI host and never affects the agent loop. The browser workflow exposes one directory tree at a time; multiple roots are unsupported.
+Web GUI では OS チューザーまたはアプリ内ブラウザーでワークスペースディレクトリーを選べます。操作者がホスト画面に到達できる場合はネイティブ方式を使い、リモートクライアントの場合やディレクトリー一覧と作成をアプリ内に留めるべき場合はブラウザー方式を使います。コンシューマーは対話種別を受け取り、対応ワークフローを提示できます。ディレクトリー選択は GUI ホストに限定され、エージェントループには影響しません。ブラウザーワークフローは一度に 1 つのディレクトリーツリーを公開します。複数ルートは未対応です。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-Mount exactly one directory-picker backend and let the workspace flow drive it: the seam itself is only the service contract, so a composition without a backend has no way to pick a directory.
+directory-picker バックエンドをちょうど 1 つマウントし、ワークスペースフローに駆動させます。シーム自体はサービス契約のみであり、バックエンドのない構成ではディレクトリーを選択する方法がありません。
 
-### Choosing a backend
+### バックエンドの選択
 
-The [native backend](../directory-picker-native/README.md) is the right choice when the operator sits at the host's display: `directoryPicker/pick` opens one OS chooser and returns the chosen absolute path, or `null` on cancel. The [browse backend](../directory-picker-browse/README.md) works everywhere — it lists one directory level and creates child directories from the browser, so remote clients that cannot reach an OS dialog still pick a workspace. When the host situation varies between boots, compose the [adaptive chooser](../directory-picker-auto/README.md), which resolves the situation once at boot and mounts the matching backend.
+操作者がホスト画面の前にいる場合、[ネイティブバックエンド](../directory-picker-native/README.md)が適切です。`directoryPicker/pick` が OS チューザーを 1 つ開き、選択絶対パスを返し、キャンセル時は `null` を返します。[ブラウズバックエンド](../directory-picker-browse/README.md)はどこでも動作します。ブラウザーから 1 階層の一覧と子ディレクトリー作成を行うため、OS ダイアログに到達できないリモートクライアントでもワークスペースを選べます。起動ごとにホスト状況が変わる場合は[適応チューザー](../directory-picker-auto/README.md)を構成し、起動時に状況を一度解決して対応バックエンドをマウントします。
 
-### The capability contract
+### ケイパビリティ契約
 
-`capability()` returns a discriminated union describing how an operator selects a directory: `{ kind: 'native', pick(signal) }` for the OS chooser, or `{ kind: 'browse', list(path?), createDirectory(path, name) }` for the in-app browser. Consumers switch on `kind`; a capability kind no composition implements means the UI hides the picking affordance rather than failing. Browse failures throw the typed `DirectoryPickerError` with a closed code set — `directory-unreadable`, `directory-exists`, or `directory-create-failed` — each carrying the subject path, which the picking Remote controller maps 1:1 onto wire failure codes.
+`capability()` は操作者のディレクトリー選択方法を記述する判別共用体を返します。OS チューザー用の `{ kind: 'native', pick(signal) }`、またはアプリ内ブラウザー用の `{ kind: 'browse', list(path?), createDirectory(path, name) }` です。コンシューマーは `kind` で分岐します。どの構成も実装しないケイパビリティ種別では、失敗ではなく UI が選択アフォーダンスを隠します。ブラウズ失敗は型付き `DirectoryPickerError` をスローし、閉じたコード集合 — `directory-unreadable`、`directory-exists`、`directory-create-failed` — のいずれかで対象パスを運び、選択 Remote コントローラーがワイヤー失敗コードに 1:1 でマッピングします。
 
-### What rows carry
+### 行が運ぶもの
 
-`DirectoryEntry` rows expose the absolute `path` and a host-owned `hidden` flag (dot-prefixed on POSIX) so display policy stays client-side; clients never join path segments themselves. `DirectoryListing.crumbs` is the ancestor chain from the filesystem root to the listed directory — every crumb is a jump target, and the root crumb is labeled by its full path.
+`DirectoryEntry` 行は絶対 `path` とホスト所有の `hidden` フラグ (POSIX ではドット接頭辞) を公開し、表示ポリシーをクライアント側に留めます。クライアントがパス片を自前で結合することはありません。`DirectoryListing.crumbs` はファイルシステムルートから一覧ディレクトリーまでの祖先チェーンです。すべての crumb はジャンプ先であり、ルート crumb は完全パスでラベル付けされます。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-### Design concept
+### 設計概念
 
-The seam is built on one separation: the interaction shape a backend provides is a contract, not an implementation detail. `DirectoryPicker` is an abstract Cordis service with a single `capability()` method; a backend subclass registers as `ctx.directoryPicker`, and loading a second implementation throws the standard duplicate-service error. The capability object must be stable for the service lifetime because consumers may capture it across calls.
+シームは 1 つの分離の上に構築されます。バックエンドが提供する対話形状は実装詳細ではなく契約です。`DirectoryPicker` は単一 `capability()` メソッドを持つ抽象 Cordis サービスです。バックエンドサブクラスは `ctx.directoryPicker` として登録し、2 つ目の実装の読み込みは標準の重複サービスエラーをスローします。コンシューマーが呼び出しをまたいでキャプチャーすることがあるため、ケイパビリティオブジェクトはサービス存続期間 stable でなければなりません。
 
-### The merge-extensible vocabulary
+### マージ拡張可能な語彙
 
-`DirectoryPickerCapabilities` is a merge-extensible map keyed by capability kind, and `DirectoryPickerCapability` derives the union from it. A new backend declaration-merges its shape here (the entry's `kind` literal must equal its key) instead of editing this package. Each backend package also ships a browser entrypoint that registers the matching interaction in ui-workspace's directory-flow slots, so one composition row selects both the host capability and the client flow.
+`DirectoryPickerCapabilities` はケイパビリティ種別をキーとするマージ拡張可能なマップであり、`DirectoryPickerCapability` はそこから共用体を導出します。新バックエンドはこのパッケージを編集せず、ここに形状を宣言マージします (エントリーの `kind` リテラルはキーと等しくなければなりません)。各バックエンドパッケージは ui-workspace の directory-flow スロットに対応対話を登録するブラウザーエントリーポイントも出荷するため、1 つの構成行でホストケイパビリティとクライアントフローの両方を選択します。
 
-### Source map
+### ソースマップ
 
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Service Definition: abstract `DirectoryPicker`, capability vocabulary, typed error, Context merge |
 
-### Failure vocabulary
+### 失敗語彙
 
-`DirectoryPickerError` carries a closed `DirectoryPickerErrorCode` plus the absolute subject path, so consumers map business codes without string matching. The seam Agent Note records the design rationale, the separation from `ctx.fs`, and the policy decisions.
+`DirectoryPickerError` は閉じた `DirectoryPickerErrorCode` と絶対対象パスを運ぶため、コンシューマーは文字列照合なしに業務コードをマッピングします。シーム Agent Note は設計根拠、`ctx.fs` からの分離、ポリシー決定を記録します。
 
 </details>
 
@@ -72,36 +72,36 @@ The seam is built on one separation: the interaction shape a backend provides is
 <a id="further-exploration"></a>
 ## Further Exploration
 
-Read these when the seam contract is not enough: the decision record first, then the two backends and the adaptive chooser that compose it.
+シーム契約だけでは足りない場合に読みます。決定記録を先に、次にそれを構成する 2 つのバックエンドと適応チューザーです。
 
 - [Directory-picker capability seam decision](../../../.agents/notes/archived/architecture/2026-07-28-directory-picker-capability-seam.md) — design rationale, the `ctx.fs` separation, and the policy decisions.
-- [Native backend](../directory-picker-native/README.md) — the OS-chooser interaction and its platform tooling.
-- [Browse backend](../directory-picker-browse/README.md) — the in-app listing and creation interaction for remote clients.
-- [Adaptive chooser](../directory-picker-auto/README.md) — boot-time resolution between the two backends.
-- [Workspace subsystem](../../../docs/subsystems/workspace.md) — the workspace records the picked directory feeds.
+- [Native backend](../directory-picker-native/README.md) — OS チューザー対話とプラットフォーム工具。
+- [Browse backend](../directory-picker-browse/README.md) — リモートクライアント向けアプリ内一覧・作成対話。
+- [Adaptive chooser](../directory-picker-auto/README.md) — 2 バックエンド間の起動時解決。
+- [Workspace subsystem](../../../docs/subsystems/workspace.md) — 選択ディレクトリーを記録するワークスペース。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
 None, as the GUI-host picking seam registers nothing model-facing.
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てず送信もしません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the seam contract leaves a decision to a future consumer. They are current package constraints, not a task backlog.
+これらの制限は、シーム契約が将来のコンシューマーに決定を委ねる条件を定めます。これらは現行パッケージの制約であり、タスクバックログではありません。
 
-- **No multi-root support** — the browse contract exposes one ancestry chain per listing; per-deployment root scoping (and Windows drive-root enumeration above a drive) waits for a consumer that needs it, per the DirectoryPicker Agent Note.
+- **No multi-root support** — ブラウズ契約は一覧ごとに 1 つの祖先チェーンを公開します。配置ごとのルートスコープ (およびドライブより上の Windows ドライブルート列挙) は、それを必要とするコンシューマーを待ちます。DirectoryPicker Agent Note によります。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

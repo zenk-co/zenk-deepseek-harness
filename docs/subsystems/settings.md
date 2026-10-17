@@ -1,18 +1,17 @@
-# Plugin Configuration Forms
+# プラグイン構成フォーム
 
-English | [中文](settings.zh.md)
+日本語 | [English](settings.en.md) | [中文](settings.zh.md)
 
-The [settings service](../../packages/settings/settings/README.md) projects volatile Config fields from active profile entries. The [configuration editor](../../packages/boot/config-editor/README.md) persists edits through Cordis patches. Business consumers read `.get()` on their own Config references.
+[settings サービス](../../packages/settings/settings/README.md)は有効なプロファイルエントリから揮発性 Config フィールドを射影する。[構成エディター](../../packages/boot/config-editor/README.md)は編集を Cordis パッチ経由で永続化する。業務コンシューマーは自身の Config 参照上で `.get()` を読む。
 
-## Identity and values
+## Identity と値
 
-A form namespace is the local id of a uniquely addressed entry in the active profile. Multiple plugin instances have separate forms when their entry ids differ. Ordinary fields are excluded. Descriptors carry resolved values, inherited values, explicit profile overrides, and an optimistic revision.
+フォーム名前空間は、有効なプロファイル内で一意にアドレス指定されたエントリのローカル id である。エントリ id が異なる複数のプラグインインスタンスは別々のフォームを持つ。通常フィールドは除外される。記述子は解決済み値、継承値、明示的なプロファイル上書き、楽観的リビジョンを運ぶ。
 
-## Edits
+## 編集
 
-`update` merges submitted fields. `replace` resets live fields to inherited configuration before applying submitted fields. `mutate` addresses individual paths, preserving secrets absent from a client response. Every write validates the complete Config and refuses stale revisions before persistence.
-
-`settings/document-updated` invalidates form descriptors after Loader configuration changes. It is a UI notification; consumers use `loader/volatile-update` only when they need to refresh registration facts.
+`update` は投入されたフィールドをマージする。`replace` は投入されたフィールドを適用する前にライブフィールドを継承構成へリセットする。`mutate` は個別パスにアドレス指定し、クライアント応答にないシークレットを保持する。すべての書き込みは完全な Config を検証し、古いリビジョンを永続化前に拒む。
+`settings/document-updated` は Loader 構成変更の後にフォーム記述子を無効化する。これは UI 通知であり、登録事実の更新が必要な場合にのみコンシューマーは `loader/volatile-update` を使う。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -20,13 +19,13 @@ A form namespace is the local id of a uniquely addressed entry in the active pro
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によりソースから生成（doc-sync の `pnpm run verify-cordis-catalog` で鮮度を検証、`pnpm run gen-cordis-catalog` で再生成）。言語面が異なるのはロケール固有の対訳文書パスのみである。シグネチャブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md)にある。
 
 <a id="ctxsettings--settingsforms"></a>
 
 ### `ctx.settings` — `SettingsForms`
 
-Project Config schemas into forms and own optional instance-level UI policy.
+Config スキーマをフォームへ射影し、任意のインスタンスレベル UI ポリシーを所有する。
 
 ```ts cordis-catalog
 /** Register the calling plugin instance's page policy without changing its Config.
@@ -76,7 +75,7 @@ Source: [`packages/settings/settings/src/index.ts`](../../packages/settings/sett
 
 ### `ctx.settingsController` — `SettingsController`
 
-Host service backing the generated `ctx.remote.settings` namespace. Every remote read uses `redactSecrets: true`, so a `role('secret')` field cannot ride a response. Writes expose the settings service's merge, replacement, and path-addressed operations, and classify every provider refusal as `settings/conflict` or `settings/rejected` with the service's message.
+生成された `ctx.remote.settings` 名前空間の裏付けとなる Host サービス。すべてのリモート読み取りは `redactSecrets: true` を使うため、`role('secret')` フィールドが応答に乗ることはない。書き込みは settings サービスのマージ・置換・パス指定操作を公開し、すべてのプロバイダー拒否をサービスメッセージ付きで `settings/conflict` または `settings/rejected` に分類する。
 
 ```ts cordis-catalog
 /**
@@ -132,13 +131,13 @@ Source: [`packages/api/settings-controller/src/index.ts`](../../packages/api/set
 
 <a id="settings-events"></a>
 
-### `settings/*` events
+### `settings/*` イベント
 
 <a id="settingsdocument-updated--emit"></a>
 
 #### `settings/document-updated` — emit
 
-One profile entry's form values, availability, or page policy changed. Form clients re-read its schema, resolved values, and revision.
+1 つのプロファイルエントリのフォーム値、利用可否、ページポリシーが変わった。フォームクライアントはそのスキーマ、解決済み値、リビジョンを読み直す。
 
 ```ts cordis-catalog
 /**

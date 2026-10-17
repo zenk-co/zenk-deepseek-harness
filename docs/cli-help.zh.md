@@ -3,7 +3,7 @@
 
 # dsh 命令行帮助
 
-[English](cli-help.md) | 中文
+[日本語](cli-help.md) | [English](cli-help.en.md) | 中文
 
 此参考收录启动器、子命令和随附 profile 的完整帮助。同一份帮助只展示一次，并列出所有调用方式。帮助输出保留原文。
 

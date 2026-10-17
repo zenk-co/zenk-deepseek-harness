@@ -1,92 +1,92 @@
 ---
-description: "Application Remote assembly: selects typed Host capabilities and forwarded events for Client consumers."
+description: "アプリケーション Remote アセンブリ: Client コンシューマー向けに型付き Host ケイパビリティと転送イベントを選択する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-api-remotes
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Desktop analytics follows the [product collection policy](../../client/product-analytics/README.md), including its live application setting. Web usage is excluded.
+Desktop の分析は[製品収集ポリシー](../../client/product-analytics/README.md)に従う。そのライブアプリケーション設定も含む。Web の利用は除外される。
 
-## Summary
+## 概要
 
-Two-sided BFF for Host Remote capabilities selected by this application. The Host entry owns the forwarded-event selection and registers its application event source with API Gateway; the Client entry imports generated `/remote` artifacts as runtime values, mounts each contribution through `ctx.remote.$mount()`, and re-exports their declaration merges. Client business packages depend on this facade rather than the Gateway implementation or individual Remote runtime entries.
+このアプリケーションが選択する Host Remote ケイパビリティのための両面 BFF。Host エントリーは転送イベントの選択を所有し、アプリケーションイベントソースを API Gateway に登録する。Client エントリーは生成された `/remote` 成果物をランタイム値としてインポートし、各コントリビューションを `ctx.remote.$mount()` を通じてマウントし、それらの宣言マージを再エクスポートする。Client のビジネスパッケージは、Gateway 実装や個々の Remote ランタイムエントリーではなく、このファサードに依存する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Forwarded Host events](#forwarded-host-events)
-- [Build boundary](#build-boundary)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [転送される Host イベント](#forwarded-host-events)
+- [ビルド境界](#build-boundary)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-[`@deepseek-ai/dsh-api-session-controller`](../session-controller/README.md) owns Agent and Session identity policy, including the Typert lookup resolvers used by other namespaces. This package selects and mounts that generated Session contribution without a direct runtime dependency on `@deepseek-ai/dsh-session`; activation policy stays with Session Controller.
+[`@deepseek-ai/dsh-api-session-controller`](../session-controller/README.md) は、他の名前空間が使う Typert ルックアップリゾルバーを含め、Agent と Session の識別ポリシーを所有する。このパッケージは `@deepseek-ai/dsh-session` への直接のランタイム依存なしに、その生成された Session コントリビューションを選択してマウントする。アクティベーションポリシーは Session Controller に留まる。
 
-The Client assembly mounts Office conversion, Commands, credentials, settings, Goal, Schedule, dynamic Cordis, file and Session references, read-only Host plugin inventory, plugin-installation registry response comparison, message feedback, permission presets, Session Controller, subagents, and Workspace Controller contributions. The `permissionPresets` namespace returns the complete process-level catalog used by current-session controls. Cordis effect ownership withdraws every contribution when this assembly unloads, while `@deepseek-ai/dsh-api-gateway/client` owns descriptor validation, traced namespace Services, direct and scoped methods, invocation, streams, and cancellation. The Client entry consumes the shared `TypertClientRemote` interface through Cordis and does not import the concrete Gateway. It re-exports the Gateway Client face's declaration merges type-only, so a consumer reaching the forwarded-event vocabulary through this facade gains no runtime edge to the Gateway implementation.
+Client アセンブリは Office 変換、Commands、資格情報、設定、Goal、Schedule、動的 Cordis、ファイルと Session の参照、読み取り専用の Host プラグインインベントリ、プラグインインストールレジストリ応答の比較、メッセージフィードバック、パーミッションプリセット、Session Controller、サブエージェント、Workspace Controller のコントリビューションをマウントする。`permissionPresets` 名前空間は、現在のセッションのコントロールが使うプロセスレベルの完全なカタログを返す。Cordis の効果所有権により、このアセンブリがアンロードされるとすべてのコントリビューションが撤回される。一方、`@deepseek-ai/dsh-api-gateway/client` は記述子検証、トレースされた名前空間サービス、直接メソッドとスコープ付きメソッド、呼び出し、ストリーム、キャンセルを所有する。Client エントリーは共有 `TypertClientRemote` インターフェースを Cordis 経由で消費し、具象 Gateway をインポートしない。Gateway Client フェイスの宣言マージを型のみで再エクスポートするので、このファサードを通じて転送イベント語彙に到達するコンシューマーは、Gateway 実装へのランタイムエッジを得ない。
 
-This facade is also the front door for the wire type vocabulary a Client package names. It re-exports, type-only, the Remote failure vocabulary (`RemoteResult`, `RemoteFailure`, `RemoteErrorCode`, `RemoteErrorDetailsMap`), the Host facts (`RemoteHostFacts`), and each selected domain's client-safe payload types, so a Client feature package imports one specifier instead of reaching into `dsh-typert-protocol`, the Gateway, or an owner's Host entry. Two kinds of package deliberately skip this door: the API-layer packages this assembly itself selects — importing it back would close a dependency cycle — and their tests, which take the failure vocabulary from `dsh-typert-protocol` directly. A UI package's tests instead take the `RemoteError` constructor from [`dsh-client-test-runtime`](../../test-support/client-runtime/README.md).
+このファサードは、Client パッケージが名指すワイヤ型語彙の玄関でもある。Remote 失敗語彙（`RemoteResult`、`RemoteFailure`、`RemoteErrorCode`、`RemoteErrorDetailsMap`）、Host の事実（`RemoteHostFacts`）、および選択された各ドメインのクライアント安全なペイロード型を型のみで再エクスポートするので、Client の機能パッケージは `dsh-typert-protocol`、Gateway、またはオーナーの Host エントリーに手を伸ばす代わりに 1 つの指定子をインポートする。この玄関を意図的に迂回する 2 種類のパッケージがある: このアセンブリ自身が選択する API 層パッケージ（逆にインポートすると依存サイクルが閉じてしまう）と、`dsh-typert-protocol` から直接失敗語彙を取るそれらのテストである。UI パッケージのテストは代わりに [`dsh-client-test-runtime`](../../test-support/client-runtime/README.md) から `RemoteError` コンストラクターを取る。
 
-This package owns no physical transport or Host service discovery. It projects the application selection into generated Remote contributions and an independent Host event source per Client; API Gateway owns endpoints, carriers, cancellation, and reconnection. Its Client face can be reused by Web or a future TUI that provides the same React-free `ctx.remote` contract.
+このパッケージは物理トランスポートや Host サービスディスカバリーを所有しない。アプリケーションの選択を、生成された Remote コントリビューションと Client ごとの独立した Host イベントソースに投影する。API Gateway はエンドポイント、キャリア、キャンセル、再接続を所有する。その Client フェイスは、同じ React 非依存の `ctx.remote` 契約を提供する Web または将来の TUI によって再利用できる。
 
 -----
 
 <a id="forwarded-host-events"></a>
-## Forwarded Host events
+## 転送される Host イベント
 
-`src/remote-events.ts` holds `API_REMOTE_FORWARDED_EVENTS`, the allowlist of Host Cordis events this application forwards without renaming, and therefore the legal key set of `ctx.remote.$on`; each entry also selects ordinary emission or Agent-scoped waterfall delivery. The type-only `src/types.ts` derives its selection face. Forwarding one more event requires one entry in that array: the type projection, consumer key face, and Host forwarding loop all derive from it.
+`src/remote-events.ts` は `API_REMOTE_FORWARDED_EVENTS` を保持する。これはこのアプリケーションが名前を変えずに転送する Host Cordis イベントの許可リストであり、したがって `ctx.remote.$on` の正当なキーセットである。各エントリーは通常の emit か Agent スコープのウォーターフォール配送かも選択する。型のみの `src/types.ts` がその選択フェイスを導出する。イベントを 1 つ多く転送するには、その配列に 1 つのエントリーが必要である: 型投影、コンシューマーキーフェイス、Host 転送ループはすべてそこから導出される。
 
-The listener signature is not restated here. Each allowlisted event's Cordis `Events` declaration lives in its owner package's client-safe `./types` export, and both faces of this package pull those declarations in. The Host face additionally asserts every entry against `TypertForwardableEventEntry`: an `emit` entry must be a declared one-way event, while a `waterfall` entry must be a declared Agent-scoped waterfall whose final parameter is its same-result `next()` callback.
+リスナーシグネチャはここでは再掲しない。許可リストにある各イベントの Cordis `Events` 宣言は、そのオーナーパッケージのクライアント安全な `./types` エクスポートにあり、このパッケージの両方のフェイスがそれらの宣言を取り込む。Host フェイスはさらに各エントリーを `TypertForwardableEventEntry` に対してアサートする: `emit` エントリーは宣言された一方向イベントでなければならず、`waterfall` エントリーは最終パラメーターが同結果の `next()` コールバックである宣言された Agent スコープのウォーターフォールでなければならない。
 
-An `emit` entry may declare `resources`, readers keyed by `TypertResourceMap` kind and typed by the event's own parameters, such as `resources: { session: summary => summary.sessionId }` on `api-session/added`. The Host entry attaches them to each forwarded frame unchanged, and the Gateway forwards a notification to a non-owner Peer only when access control allows the event on the resources they name; a notification without `resources` touches the built-in `global` resource. `api-session/activity`, `api-session/added`, `api-session/error`, `api-session/removed`, and `api-session/status` declare their Session. A notification names one resource identity or none; collection changes travel on follow streams instead.
+`emit` エントリーは `resources` を宣言できる。これは `TypertResourceMap` の種別でキー付けされ、イベント自身のパラメーターで型付けられたリーダーであり、例えば `api-session/added` の `resources: { session: summary => summary.sessionId }` である。Host エントリーはそれらを各転送フレームに変更せずに添付し、Gateway は、アクセス制御が名指されたリソース上でそのイベントを許可する場合にのみ、通知を非オーナー Peer へ転送する。`resources` のない通知はビルトインの `global` リソースに触れる。`api-session/activity`、`api-session/added`、`api-session/error`、`api-session/removed`、`api-session/status` はそれぞれの Session を宣言する。通知は 1 つのリソース識別子またはなしを名指す。コレクションの変更は代わりにフォローストリームで伝わる。
 
-The Host entry registers an independent allowlist listener set and queue for each Client stream. It rejects non-JSON ordinary-event arguments before enqueueing. For a waterfall, it projects only the top-level Agent identity and JSON request fields; a Client result must also be lossless JSON, while `next()` delegates to the following Host listener. Each scoped waterfall request must carry its routed Agent directly as `request.agent`; the Host rejects a missing or mismatched identity before forwarding. The source attaches all listeners synchronously before `ctx.typertGateway.registerRemoteEvents()` exposes Gateway's internal `$events` logical stream, so its first `ready` item proves that incremental delivery is active and carries the Host home for Client path display. Withdrawing the registration aborts active streams.
+Host エントリーは、Client ストリームごとに独立した許可リストリスナーセットとキューを登録する。エンキュー前に非 JSON の通常イベント引数を拒否する。ウォーターフォールについては、トップレベルの Agent 識別子と JSON リクエストフィールドのみを投影する。Client の結果もロスレス JSON でなければならず、`next()` は後続の Host リスナーに委任する。スコープ付きウォーターフォールリクエストはそれぞれ、ルーティングされた Agent を `request.agent` として直接運ばなければならない。Host は転送前に欠落または不一致の識別子を拒否する。ソースは `ctx.typertGateway.registerRemoteEvents()` が Gateway の内部 `$events` 論理ストリームを公開する前に、すべてのリスナーを同期的にアタッチするので、その最初の `ready` アイテムは増分配送がアクティブであることを証明し、Client のパス表示用の Host ホームを運ぶ。登録の撤回はアクティブなストリームを中止する。
 
-The payload-free `schedule/changed` event invalidates Schedule task queries; Clients re-read after a notification and reconnect. The payload-free `permission-presets/catalog-changed` event invalidates the process catalog. A Client subscribes before its first `permissionPresets.catalog()` read and re-reads the complete snapshot after a notification; the event carries no catalog state and changes no Session sequence.
+ペイロードのない `schedule/changed` イベントは Schedule タスククエリを無効化する。Client は通知後に再読み取りし、再接続する。ペイロードのない `permission-presets/catalog-changed` イベントはプロセスカタログを無効化する。Client は最初の `permissionPresets.catalog()` 読み取りの前に購読し、通知後に完全なスナップショットを再読み取りする。イベントはカタログ状態を運ばず、Session シーケンスを変えない。
 
 <a id="build-boundary"></a>
-## Build boundary
+## ビルド境界
 
-Most repository packages belong to one TypeScript face: Host packages are registered in the root `tsconfig.host.json`, and Client packages in the root `tsconfig.client.json`. This package splits because its Host entry must participate in the Host Typert graph, while `src/client/index.ts` cannot compile until Host tsdown has generated the business packages' `/remote` declarations.
+リポジトリのほとんどのパッケージは 1 つの TypeScript フェイスに属する: Host パッケージはルート `tsconfig.host.json` に登録され、Client パッケージはルート `tsconfig.client.json` に登録される。このパッケージは分割される。その Host エントリーが Host Typert グラフに参加しなければならない一方、`src/client/index.ts` は Host tsdown がビジネスパッケージの `/remote` 宣言を生成するまでコンパイルできないためである。
 
-This package's root `tsconfig.json` is only a solution that references `tsconfig.host.json` and `tsconfig.client.json`. The Host aggregate and direct Host consumers reference the former, while the Client aggregate and direct Client consumers reference the latter; the package-root solution must not enter either aggregate's dependency graph. The two projects own disjoint source files and `.tsbuildinfo` files but share the `lib/types` output directory, with one deliberate exception: `src/remote-events.ts` and `src/types.ts` are listed in BOTH faces' `files`, because the forwarded-event allowlist is the single control point over what a consumer can receive, and the Host forwarding loop and the Client `ctx.remote.$on` key face must read one declaration rather than two that could drift.
+このパッケージのルート `tsconfig.json` は `tsconfig.host.json` と `tsconfig.client.json` を参照するソリューションにすぎない。Host 集約と直接の Host コンシューマーは前者を参照し、Client 集約と直接の Client コンシューマーは後者を参照する。パッケージルートのソリューションはどちらの集約の依存グラフにも入ってはならない。2 つのプロジェクトは素集合のソースファイルと `.tsbuildinfo` ファイルを所有するが、`lib/types` 出力ディレクトリを共有する。1 つの意図的な例外がある: `src/remote-events.ts` と `src/types.ts` は両方のフェイスの `files` に列挙される。転送イベント許可リストはコンシューマーが受け取れるものに対する単一の制御点であり、Host 転送ループと Client の `ctx.remote.$on` キーフェイスは、乖離しうる 2 つではなく 1 つの宣言を読まなければならないためである。
 
-That exception is not just a `files` entry. The root `tsconfig.base.json` maps `@deepseek-ai/dsh-api-remotes/types` to `src/types.ts` — the source plane, like every other workspace subpath and unlike the generated `/remote` artifacts, which have no `paths` entry and resolve through `exports` to built output. Both faces therefore admit the same allowlist and type projection into their own programs and emit byte-identical `remote-events` and `types` outputs into `lib/types`; the `.tsbuildinfo` files stay independent. No gate enforces the faces' source-file disjointness — `scripts/project-reference-faces.ts` only checks that a reference into a split project names the matching face — so this paragraph records why the double listing is intentional.
+この例外は単なる `files` エントリーではない。ルート `tsconfig.base.json` は `@deepseek-ai/dsh-api-remotes/types` を `src/types.ts` —— ソースプレーン —— にマップする。これは他のすべてのワークスペースサブパスと同様であり、`paths` エントリーを持たず `exports` を通じてビルド済み出力に解決される生成 `/remote` 成果物とは異なる。したがって両方のフェイスは同じ許可リストと型投影を自身のプログラムに取り込み、バイト単位で同一の `remote-events` と `types` 出力を `lib/types` に emit する。`.tsbuildinfo` ファイルは独立したままである。フェイスのソースファイル素集合性を強制するゲートはない —— `scripts/project-reference-faces.ts` は分割プロジェクトへの参照が一致するフェイスを名指すことだけをチェックする —— ので、この段落は二重列挙が意図的である理由を記録する。
 
-The package-local `clientBundle(..., { hostPhase: true })` makes Host tsdown bundle the Host entry and the later Client tsdown bundle only the browser entry. Ordinary Client plugins remain single Client projects and produce both their Node loader entry and browser bundle during Client tsdown; split only when the two source sets require different compiler faces.
+パッケージローカルの `clientBundle(..., { hostPhase: true })` は、Host tsdown に Host エントリーをバンドルさせ、後の Client tsdown にブラウザエントリーだけをバンドルさせる。通常の Client プラグインは単一の Client プロジェクトのままで、Client tsdown 中に Node ローダーエントリーとブラウザバンドルの両方を生成する。2 つのソースセットが異なるコンパイラフェイスを必要とする場合にのみ分割する。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this BFF selects Remote application methods and forwarded events but registers nothing model-facing.
+なし。この BFF は Remote アプリケーションメソッドと転送イベントを選択するが、モデルに面するものは何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct effect; mounted Host capabilities own any model-visible behavior they trigger.
+直接の効果はない。マウントされた Host ケイパビリティが、それらが引き起こすモデル可視の挙動を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- The capability set is fixed by explicit build-time value imports; the Client does not discover the Host's active Services or Remote definitions at runtime.
-- Additional capabilities require an explicit `/remote` value import and mount in this assembly.
-- Only scoped waterfalls that are still pending are replayed after reconnection; ordinary one-way notifications remain isolated best-effort deliveries and are not replayed. State that requires reliable recovery needs an owner-provided query, cursor, or opening baseline.
+- ケイパビリティセットは明示的なビルド時の値インポートによって固定される。Client は実行時に Host のアクティブなサービスや Remote 定義を発見しない。
+- 追加のケイパビリティには、このアセンブリにおける明示的な `/remote` 値インポートとマウントが必要である。
+- 再接続後に再生されるのは、まだ保留中のスコープ付きウォーターフォールのみである。通常の一方向通知は分離されたベストエフォート配送のままで、再生されない。信頼できる回復を必要とする状態には、オーナー提供のクエリ、カーソル、または開始ベースラインが必要である。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>
 
-The Client assembly includes the account namespace for login commands and reconnectable account snapshots.
+Client アセンブリには、ログインコマンドと再接続可能なアカウントスナップショットのための account 名前空間が含まれる。

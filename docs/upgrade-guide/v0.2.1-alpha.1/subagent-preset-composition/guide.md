@@ -3,19 +3,19 @@ kind: upgrade-guide
 description: "Subagent persona and toolFilter configuration is replaced by Agent Preset composition."
 ---
 
-# Configure subagent composition through presets
+# プリセットでサブエージェント構成を設定する
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更内容
 
-`dsh-tool-subagent` rejects `persona` and `toolFilter` configuration. New `SubagentStartRequest` values and provider capabilities no longer expose either field. In-process spawn selects a preset through `agentPreset`; its persona and tools come from that preset's plugins. Fork inherits the parent's preset and cannot independently change persona or restrict tools. Model and reasoning-effort options are unchanged.
+`dsh-tool-subagent` は `persona` と `toolFilter` 設定を拒否する。新しい `SubagentStartRequest` 値とプロバイダーケイパビリティはどちらのフィールドも公開しなくなった。インプロセスの spawn は `agentPreset` 経由でプリセットを選択し、そのペルソナとツールはそのプリセットのプラグインから得る。fork は親のプリセットを継承し、ペルソナを独立に変更したりツールを制限したりできない。モデルとリーズニングエフォートのオプションは不変である。
 
-The shipped `standard`, `ptc`, and `cordis` delegation tools no longer hide `schedule_*` tools. Delegated callers still receive the existing execution refusal. Historical child Session descriptors retain their persona and tool restrictions when resumed.
+同梱の `standard`、`ptc`、`cordis` 委譲ツールは `schedule_*` ツールを隠さなくなった。委譲された呼び出し元は引き続き既存の実行拒否を受け取る。履歴上の子セッション記述子は、再開時にペルソナとツール制限を保持する。
 
-## Migration
+## 移行手順
 
-1. Remove `persona` and `toolFilter` from `dsh-tool-subagent` rows in your profile patches and custom presets. Update programmatic callers and provider capability declarations to remove the same fields.
-2. For spawn, define an Agent Preset containing `dsh-persona` and the required tool plugins, then set the delegation tool's `agentPreset` to its id. Use `allowedAgentPresets` to offer several declared presets to the parent model. Presets select plugin compositions; there is no replacement per-child tool-name filter.
-3. For fork, remove the overrides and accept the inherited composition. If the task needs a different composition, use spawn with a preset; it does not inherit the parent's conversation.
-4. Start a new Session and delegate a task. Confirm that the child uses the selected preset's persona and tools. Existing persisted child Sessions need no manual edits.
+1. プロファイルパッチとカスタムプリセット内の `dsh-tool-subagent` 行から `persona` と `toolFilter` を削除する。プログラムによる呼び出し元とプロバイダーケイパビリティ宣言を更新し、同じフィールドを削除する。
+2. spawn には、`dsh-persona` と必要なツールプラグインを含むエージェントプリセットを定義し、委譲ツールの `agentPreset` をその id に設定する。親モデルに複数の宣言済みプリセットを提供するには `allowedAgentPresets` を使う。プリセットはプラグイン構成を選択するものであり、子ごとのツール名フィルターの置換は存在しない。
+3. fork ではオーバーライドを削除し、継承された構成を受け入れる。異なる構成が必要なタスクにはプリセット付き spawn を使う。親の会話は継承しない。
+4. 新しいセッションを開始してタスクを委譲する。子が選択したプリセットのペルソナとツールを使うことを確認する。既存の永続化済み子セッションに手動編集は不要である。

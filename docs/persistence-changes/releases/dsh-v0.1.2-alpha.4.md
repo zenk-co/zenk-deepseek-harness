@@ -1,47 +1,47 @@
 ---
-description: "Retrospective Session persistence types and adjacent-release changes for dsh-v0.1.2-alpha.4."
+description: "dsh-v0.1.2-alpha.4 向け遡及セッション永続型と隣接版変更。"
 kind: persistence-release
 ---
 
-# Persistence release: dsh-v0.1.2-alpha.4
+# 永続版: dsh-v0.1.2-alpha.4
 
-English | [中文](dsh-v0.1.2-alpha.4.zh.md)
+日本語 | [English](dsh-v0.1.2-alpha.4.en.md) | [中文](dsh-v0.1.2-alpha.4.zh.md)
 
-## Summary
+## 概要
 
-The logical SessionHeader replaces optional seedLength with required isSeeded, while the physical JSONL header still declares seedLength. The subagent-report and coordinator user-message source variants become agent-message. The writer format remains 0.
+論理 SessionHeader は任意 seedLength を必須 isSeeded に置換する一方、物理 JSONL 頭は依然 seedLength を宣言する。subagent-report と coordinator 利用者文出所変種は agent-message になる。書記形式は 0 のままである。
 
-## Table of Contents
+## 目次
 
-- [Release evidence](#evidence)
-- [Declaration](#declaration)
-- [Structural changes](#changes)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [版証拠](#evidence)
+- [宣言](#declaration)
+- [構造変更](#changes)
+- [検証](#verification)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="evidence"></a>
-## Release evidence
+## 版証拠
 
-This approximate backfill supports reading and format validation; it is not a contemporaneous compatibility acknowledgement. See the [archive reference](README.md) for extraction and coverage limits.
+この概算後埋めは読み取りと形式検証を支え、同時代の互換承認ではない。抽出と適用範囲の限りは[書庫参照](README.md)を見ること。
 
-| Item | Recorded value |
+| 項目 | 記録値 |
 |---|---|
-| Source tag | `dsh-v0.1.2-alpha.4` |
-| Source date | 2026-09-01T15:37:26.000Z |
-| Release record | Release object present. |
-| Previous release | [dsh-v0.1.2-alpha.3](dsh-v0.1.2-alpha.3.md) |
-| Session writer version | 0 |
-| Reconstructed inventory | <!-- persistence-release-inventory:start -->54 roots / 415 types<!-- persistence-release-inventory:end --> |
-| This snapshot | [dsh-v0.1.2-alpha.4.schema.json](dsh-v0.1.2-alpha.4.schema.json) |
+| 源札 | `dsh-v0.1.2-alpha.4` |
+| 源日時 | 2026-09-01T15:37:26.000Z |
+| 版記録 | Release 対象あり。 |
+| 前版 | [dsh-v0.1.2-alpha.3](dsh-v0.1.2-alpha.3.md) |
+| セッション書記版 | 0 |
+| 再構成目録 | <!-- persistence-release-inventory:start -->54 roots / 415 types<!-- persistence-release-inventory:end --> |
+| この snapshot | [dsh-v0.1.2-alpha.4.schema.json](dsh-v0.1.2-alpha.4.schema.json) |
 
-Source evidence for the writer version constant at this tag:
+この札での書記版定数の源証拠。
 
 - `packages/core/session/src/types.ts`: `export const SESSION_FORMAT_VERSION = 0`
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-release
 schemaVersion: 1
@@ -64,13 +64,13 @@ changes:
 ```
 
 <a id="changes"></a>
-## Structural changes
+## 構造変更
 
 <!-- persistence-release-changes:start -->
 
-Detected 4 changed roots and 5 structural differences. The review requirement below is calculated using current rules for comparison only; it does not assert historical compliance, migration correctness, or runtime compatibility.
+検出された変更根 4 件と構造差 5 件。下の査読要件は比較用現行規則で算出され、歴史的適合、移行正当、実行時互換を主張しない。
 
-| Path | Change | Review requirement |
+| 経路 | 変更 | 査読要件 |
 |---|---|---|
 | `SessionHeader.seedLength` | `property-removed` | `review-required` |
 | `SessionHeader.isSeeded` | `required-property-added` | `review-required` |
@@ -81,15 +81,15 @@ Detected 4 changed roots and 5 structural differences. The review requirement be
 <!-- persistence-release-changes:end -->
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Extraction passed canonical-graph, root-digest, and reachable-type-digest validation, permitting the original optional `surfaceOp` only for historical surface events. The in-tree check reconstructs each tag from its predecessor and verifies before/after values, snapshot coverage, and bilingual machine declarations.
+抽出は正準図、根 digest、到達型 digest 検証を通り、歴史面イベント向け元の任意 `surfaceOp` のみを許した。木内検査は各札を前任から再構成し、前後値、snapshot 適用範囲、二言語機械宣言を検証する。
 
 ```sh
 pnpm run verify-persistence-releases
 ```
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
-None.
+なし。

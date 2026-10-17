@@ -5,7 +5,7 @@ kind: "package-group"
 
 # ptc-runtime/——PTC 执行能力族
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

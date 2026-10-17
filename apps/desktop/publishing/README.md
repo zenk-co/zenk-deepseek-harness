@@ -1,88 +1,88 @@
 ---
-description: "Publish completed Desktop installers and update feeds to the selected download service. This reference covers deployment identity, upload credentials, fixed downloads and audit records. Build configuration and signing operations have separate owners."
+description: "完成した Desktop インストーラーと更新フィードを選択されたダウンロードサービスへ公開する。このリファレンスはデプロイの識別、アップロード資格情報、固定ダウンロード、監査レコードを扱う。ビルド構成と署名操作には別のオーナーがいる。"
 ---
 
-# Desktop publication
+# Desktop の公開
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Publish completed Desktop installers and update feeds to the selected download service. This reference covers deployment identity, upload credentials, fixed downloads and audit records. Build configuration and signing operations have separate owners.
+完成した Desktop インストーラーと更新フィードを選択されたダウンロードサービスへ公開する。このリファレンスはデプロイの識別、アップロード資格情報、固定ダウンロード、監査レコードを扱う。ビルド構成と署名操作には別のオーナーがいる。
 
-## Table of Contents
+## 目次
 
-- [Publication prerequisites](#prerequisites)
-- [Deployment and test release identity](#upload-updates)
-- [Publish installers and update feeds](#publish-feeds)
-- [Fixed installer downloads](#fixed-downloads)
-- [Upload credentials](#credentials)
-- [Upload audit and recovery](#audit-and-recovery)
+- [公開の前提条件](#prerequisites)
+- [デプロイとテストリリースの識別](#upload-updates)
+- [インストーラーと更新フィードの公開](#publish-feeds)
+- [固定インストーラーダウンロード](#fixed-downloads)
+- [アップロード資格情報](#credentials)
+- [アップロードの監査とリカバリー](#audit-and-recovery)
 
-For retained self-hosted builds, use the [CI publication workflow](ci/README.md), which keeps installers on their original machine and supports resumable publication. The commands below remain the existing manually authorized local uploader: they retain checkout-local audit records and use the operator's Git identity. They do not share the CI publisher's locks, approval or tag-only recovery. Do not run both writers against one channel concurrently. Both use the same upload-plan validation; separate orchestration preserves existing manual commands while adding immutable-attempt recovery for CI. Consolidating or retiring the manual commands is separate work.
+保持されるセルフホストビルドには [CI 公開ワークフロー](ci/README.md)を使う。これはインストーラーを元のマシンに保持し、再開可能な公開をサポートする。以下のコマンドは既存の手動認可ローカルアップローダーのままである。チェックアウトローカルの監査レコードを保持し、オペレーターの Git アイデンティティを使う。CI パブリッシャーのロック、承認、タグのみのリカバリーは共有しない。1 つのチャネルに対して両方のライターを同時に実行しないこと。両者は同じアップロードプラン検証を使う。オーケストレーションを分けることで、既存の手動コマンドを保ちつつ CI 向けの不変試行リカバリーを追加している。手動コマンドの統合または廃止は別の作業である。
 
 <a id="prerequisites"></a>
 
-## Publication prerequisites
+## 公開の前提条件
 
-Publication requires completed release artifacts and explicit operator authorization. Building an installer or downloading an Actions artifact does not publish it. Read the [release version rules](../packaging/README.md#release-versions) and retain the packaging evidence. Machine presets are for packaging, not upload/COS commands: unset `DSH_PACKAGING_PRESET` and provide the existing target dotenv upload configuration. The configuration and actual COS/CDN acceptance must be verified by the release operator.
+公開には完成したリリース成果物と、オペレーターによる明示的な認可が必要である。インストーラーをビルドしたり Actions 成果物をダウンロードしたりしても公開にはならない。[リリースバージョンのルール](../packaging/README.md#release-versions)を読み、パッケージングの証拠を保持する。マシンプリセットはパッケージング用であり、アップロード/COS コマンド用ではない: `DSH_PACKAGING_PRESET` を unset し、既存のターゲット dotenv アップロード構成を提供する。構成と実際の COS/CDN 受理はリリースオペレーターが検証しなければならない。
 
 <a id="upload-updates"></a>
 
-## Deployment and test release identity
+## デプロイとテストリリースの識別
 
-`DSH_DESKTOP_AUTO_UPDATE_ENV` selects `test` or `production` for both the URL embedded during packaging and the later COS upload; an absent value selects `test`. Test packaging requires its HTTPS origin in `DOWNLOAD_TEST_ORIGIN`; production uses `https://download.deepseek.com`. Upload requires the selected bucket in `DOWNLOAD_TEST_COS_BUCKET` or `DOWNLOAD_PROD_COS_BUCKET`. Production feeds use `dsh-desk/feeds/<target>/` and binaries use `dsh-desk/bin/<target>/`. Test releases require `DOWNLOAD_TEST_RELEASE_ID`: 32 lowercase hexadecimal characters inserted as `dsh-desk/<release-id>/feeds/<target>/` and `dsh-desk/<release-id>/bin/<target>/`. YAML references, stable-channel aliases, and blockmaps stay inside that release directory. Targets are `mac-arm64`, `mac-x64`, and `win-x64`.
+`DSH_DESKTOP_AUTO_UPDATE_ENV` は、パッケージング中に埋め込まれる URL と後続の COS アップロードの両方に対して `test` または `production` を選択する。値がない場合は `test` を選択する。テストパッケージングは `DOWNLOAD_TEST_ORIGIN` にその HTTPS オリジンを必要とし、production は `https://download.deepseek.com` を使う。アップロードは `DOWNLOAD_TEST_COS_BUCKET` または `DOWNLOAD_PROD_COS_BUCKET` に選択されたバケットを必要とする。Production のフィードは `dsh-desk/feeds/<target>/` を使い、バイナリは `dsh-desk/bin/<target>/` を使う。テストリリースは `DOWNLOAD_TEST_RELEASE_ID` を必要とする: 32 文字の小文字 16 進数で、`dsh-desk/<release-id>/feeds/<target>/` と `dsh-desk/<release-id>/bin/<target>/` として挿入される。YAML 参照、stable チャネルのエイリアス、blockmap はそのリリースディレクトリ内に留まる。ターゲットは `mac-arm64`、`mac-x64`、`win-x64` である。
 
-The update destination and upload credentials follow the selected deployment:
+更新先とアップロード資格情報は選択されたデプロイに従う:
 
-| Environment | Public origin | COS bucket | COS credentials |
+| 環境 | 公開オリジン | COS バケット | COS 資格情報 |
 |---|---|---|---|
-| `test` or unset | `DOWNLOAD_TEST_ORIGIN` | `DOWNLOAD_TEST_COS_BUCKET` | `DOWNLOAD_TEST_COS_SECRET_ID`, `DOWNLOAD_TEST_COS_SECRET_KEY` |
+| `test` または未設定 | `DOWNLOAD_TEST_ORIGIN` | `DOWNLOAD_TEST_COS_BUCKET` | `DOWNLOAD_TEST_COS_SECRET_ID`, `DOWNLOAD_TEST_COS_SECRET_KEY` |
 | `production` | `https://download.deepseek.com` | `DOWNLOAD_PROD_COS_BUCKET` | `DOWNLOAD_PROD_COS_SECRET_ID`, `DOWNLOAD_PROD_COS_SECRET_KEY` |
 
-Generate a fresh ID for each test release batch with the command below and copy its output into `DOWNLOAD_TEST_RELEASE_ID` in `.env.macos` or `.env.windows`. These Git-ignored platform files own the value; shell variables do not override it, and dotenv values are not shell-expanded. Keep the ID through packaging, upload, and retries; upload rejects a completion record with a different update URL. To test an upgrade between versions, reuse the installed client’s ID for the later version. Production does not use this field.
+以下のコマンドでテストリリースバッチごとに新しい ID を生成し、その出力を `.env.macos` または `.env.windows` の `DOWNLOAD_TEST_RELEASE_ID` にコピーする。値を所有するのはこれらの Git 管理外のプラットフォームファイルである。シェル変数はそれを上書きせず、dotenv の値はシェル展開されない。パッケージング、アップロード、リトライを通じて ID を保つ。アップロードは更新 URL が異なる完了レコードを拒否する。バージョン間のアップグレードをテストするには、後のバージョンにインストール済みクライアントの ID を再利用する。Production はこのフィールドを使わない。
 
 ```sh
 node --input-type=module -e "import { randomBytes } from 'node:crypto'; console.log(randomBytes(16).toString('hex'))"
 ```
 
-Distribute each test batch through its complete download links. Installed test clients retain their batch feed and do not discover a new ID automatically. Format validation cannot establish randomness; use the generator output. Random paths reduce guessing, not access by link holders; withdrawing a batch requires deleting its COS objects and purging its CDN directory.
+各テストバッチはその完全なダウンロードリンクで配布する。インストール済みのテストクライアントはそのバッチのフィードを保ち、新しい ID を自動的に発見しない。形式検証は乱数性を確立できない。ジェネレーターの出力を使う。ランダムなパスは推測を減らすが、リンク保持者によるアクセスは減らさない。バッチを撤回するには、その COS オブジェクトを削除し、CDN ディレクトリをパージする必要がある。
 
 <a id="publish-feeds"></a>
 
-## Publish installers and update feeds
+## インストーラーと更新フィードの公開
 
-Configure the update origin and selected COS bucket, SecretId, and SecretKey in the target dotenv file, then package and upload the same target:
+ターゲット dotenv ファイルで更新オリジンと選択した COS バケット、SecretId、SecretKey を構成し、同じターゲットをパッケージしてアップロードする:
 
 ```sh
 pnpm run package:desktop:mac:arm64
 pnpm run upload:mac:arm64
 ```
 
-The target dotenv file for internal-test packaging explicitly sets `DSH_DESKTOP_AUTO_UPDATE_ENV=test` and `DOWNLOAD_TEST_ORIGIN=https://download-test.deepseek.com`; uploads use `DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602` and separate test credentials. Both test and production use the fixed Nightly channel; deployment selection does not enable channel switching.
+内部テストパッケージング用のターゲット dotenv ファイルは `DSH_DESKTOP_AUTO_UPDATE_ENV=test` と `DOWNLOAD_TEST_ORIGIN=https://download-test.deepseek.com` を明示的に設定する。アップロードは `DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602` と別のテスト資格情報を使う。テストと production の両方が固定の Nightly チャネルを使う。デプロイの選択がチャネル切り替えを有効にすることはない。
 
-Early internal-test packages use the `test` deployment. Select `production` explicitly only for a production release; changing upload credentials does not retarget an existing package. Packaging requires no COS credentials, disables electron-builder publishing, strips COS credentials from child processes, and records completion only after signing and notarization succeed. Upload validates this record, deployment, target, shared version, filenames, sizes, and SHA-512 before reading credentials. Packages and blockmaps upload before YAML; historical objects are retained. Every release publishes `nightly.yml` or `nightly-mac.yml`; stable releases also publish `latest.yml` or `latest-mac.yml` pointing at the same artifacts. Published YAML uses absolute binary URLs. The uploader leaves Cache-Control unset, including the empty header the COS SDK would otherwise add: deployment infrastructure owns cache policy, with uncached feeds and separately configurable binary caching. Serialize publication per target and verify public artifacts and feed contents before release qualification.
+初期の内部テストパッケージは `test` デプロイを使う。`production` を明示的に選択するのは production リリースのときだけである。アップロード資格情報を変えても既存パッケージのターゲットは変わらない。パッケージングは COS 資格情報を必要とせず、electron-builder の公開を無効にし、子プロセスから COS 資格情報を除去し、署名と公証が成功した後にのみ完了を記録する。アップロードは資格情報を読む前に、このレコード、デプロイ、ターゲット、共有バージョン、ファイル名、サイズ、SHA-512 を検証する。パッケージと blockmap は YAML より先にアップロードされ、履歴オブジェクトは保持される。すべてのリリースは `nightly.yml` または `nightly-mac.yml` を公開する。stable リリースは同じ成果物を指す `latest.yml` または `latest-mac.yml` も公開する。公開される YAML は絶対バイナリ URL を使う。アップローダーは Cache-Control を未設定のままにする。COS SDK がそうしなければ追加する空ヘッダーも含めてである。キャッシュポリシーはデプロイインフラストラクチャが所有し、フィードは非キャッシュ、バイナリのキャッシュは別途構成可能である。ターゲットごとに公開を直列化し、リリース適格性の確認前に公開成果物とフィード内容を検証する。
 
-Windows NSIS uploads require the generated, nonempty `.exe.blockmap` beside the installer. The blockmap is uploaded before channel YAML; NSIS installer metadata does not require the embedded `blockMapSize` used by the separate web-installer format. File-plan tests use the pinned builder's blockmap generator, not a hand-authored embedded-map field.
+Windows NSIS アップロードは、インストーラーの隣に生成された非空の `.exe.blockmap` を必要とする。blockmap はチャネル YAML より先にアップロードされる。NSIS インストーラーのメタデータは、別の web-installer 形式が使う埋め込み `blockMapSize` を必要としない。ファイルプランのテストは、手書きの埋め込みマップフィールドではなく、固定されたビルダーの blockmap ジェネレーターを使う。
 
 <a id="fixed-downloads"></a>
 
-## Fixed installer downloads
+## 固定インストーラーダウンロード
 
-Fixed installer downloads use `pnpm run upload:latest:mac:arm64`, `pnpm run upload:latest:mac:x64`, or `pnpm run upload:latest:win:x64` from the repository root. They upload the completed target's DMG or EXE to `desktop/dsh-latest-macos-arm64.dmg`, `desktop/dsh-latest-macos-x64.dmg`, or `desktop/dsh-latest-windows-x64.exe`. Production URLs start with `https://download.deepseek.com/`; test URLs use `DOWNLOAD_TEST_ORIGIN`. Both deployments reuse the target dotenv's deployment, bucket, and credentials, all normal release validation, and the upload audit below. Each command replaces one fixed object without publishing feeds, blockmaps, or release tags. Test fixed downloads are shared across release IDs in the test bucket; the packaged update URL still requires its original release ID. Publication is explicit, including prerelease versions. Deployment infrastructure must configure revalidation or purge cached fixed downloads after replacement. Local loopback tests cover the upload; release operators own real COS and CDN acceptance.
+固定インストーラーダウンロードは、リポジトリルートから `pnpm run upload:latest:mac:arm64`、`pnpm run upload:latest:mac:x64`、または `pnpm run upload:latest:win:x64` を使う。完成したターゲットの DMG または EXE を `desktop/dsh-latest-macos-arm64.dmg`、`desktop/dsh-latest-macos-x64.dmg`、または `desktop/dsh-latest-windows-x64.exe` にアップロードする。Production の URL は `https://download.deepseek.com/` で始まり、テストの URL は `DOWNLOAD_TEST_ORIGIN` を使う。どちらのデプロイもターゲット dotenv のデプロイ、バケット、資格情報、通常のリリース検証、以下のアップロード監査を再利用する。各コマンドはフィード、blockmap、リリースタグを公開せずに 1 つの固定オブジェクトを置き換える。テストの固定ダウンロードはテストバケット内のリリース ID 間で共有されるが、パッケージされた更新 URL は依然として元のリリース ID を必要とする。公開はプレリリースバージョンも含めて明示的である。デプロイインフラストラクチャは、置き換え後にキャッシュされた固定ダウンロードの再検証を構成するかパージしなければならない。ローカルループバックテストがアップロードをカバーする。実際の COS と CDN の受理はリリースオペレーターが所有する。
 
 <a id="credentials"></a>
 
-## Upload credentials
+## アップロード資格情報
 
-Windows operators can keep a CLIXML object with DPAPI-encrypted `SecretId` and `SecretKey` SecureString fields outside the repository. The [credential launcher](../scripts/upload-with-credentials.ps1) requires an explicit `-CredentialFile` and `-Environment production` or `test`; without `-Upload`, it only verifies decryption and injection into a local Node child, with no network request. It requires Node on `PATH` and the Windows user and machine that encrypted the file. Plaintext, empty, and whitespace-only fields fail. The parent environment is unchanged; the child receives only the selected COS pair after unrelated secrets and Node preload options are removed. Raw child stderr is suppressed and credential values in stdout are redacted. This check does not prove COS authorization. An explicit upload additionally requires `-Upload -Target <target> -Bucket <bucket>` and the normal completed-release prerequisites below; actual cloud upload remains release-operator qualification. Add `-Latest` to that upload invocation to replace the fixed installer without publishing update feeds or a release tag. This launcher supports permanent keys, not STS credentials. An explicit upload requires the selected deployment and bucket to match the target dotenv and completed package record before network writes; it uses the DPAPI credential pair even if the dotenv contains other COS keys.
+Windows のオペレーターは、DPAPI で暗号化された `SecretId` と `SecretKey` の SecureString フィールドを持つ CLIXML オブジェクトをリポジトリ外に保持できる。[資格情報ランチャー](../scripts/upload-with-credentials.ps1)は明示的な `-CredentialFile` と `-Environment production` または `test` を要求する。`-Upload` なしでは、復号とローカル Node 子プロセスへの注入だけを検証し、ネットワークリクエストは行わない。`PATH` 上の Node、およびファイルを暗号化した Windows ユーザーとマシンを必要とする。プレーンテキスト、空、空白のみのフィールドは失敗する。親環境は変更されず、子は無関係なシークレットと Node のプリロードオプションが除去された後、選択された COS ペアだけを受け取る。子の生の stderr は抑制され、stdout 内の資格情報値は秘匿される。このチェックは COS 認可を証明するものではない。明示的なアップロードはさらに `-Upload -Target <target> -Bucket <bucket>` と、以下の通常の完成リリース前提条件を必要とする。実際のクラウドアップロードはリリースオペレーターの適格性確認のままである。そのアップロード呼び出しに `-Latest` を加えると、更新フィードやリリースタグを公開せずに固定インストーラーを置き換えられる。このランチャーは恒久キーをサポートし、STS 資格情報はサポートしない。明示的なアップロードは、ネットワーク書き込みの前に、選択されたデプロイとバケットがターゲット dotenv と完成パッケージレコードに一致することを必要とする。dotenv が他の COS キーを含んでいても、DPAPI 資格情報ペアを使う。
 
 <a id="audit-and-recovery"></a>
 
-## Upload audit and recovery
+## アップロードの監査とリカバリー
 
-Test and production uploads through `upload:*` retain a fresh `.desktop-build/upload-records/<environment>-<target>-*` directory after release preflight. `plan.json` records destination, version, every file's size/SHA-512, and published YAML bytes; flushed `events.jsonl` records PUT intent and available response status/request ID; `result.json` records completion or the last failed stage. A missing final result means interruption or unavailable storage, not success. No credential values, authorization headers, or raw SDK errors are recorded. Audit-write failures stop later PUTs. Every object is one streamed Tencent COS PUT with an explicit length and Content-MD5; the COS SDK repeats a request only when its body is not a stream, and this uploader does not retry either. Retain partial records and inspect remote state before another operation: a timeout or failed receipt write does not prove that the object was not stored. These records are local, not tamper-proof or automatically backed up; archive each release's records with its build evidence in controlled storage. Public CDN readback remains separate release qualification, explicitly marked `not-performed` in the upload result.
+`upload:*` を通じたテストと production のアップロードは、リリースプリフライト後に新しい `.desktop-build/upload-records/<environment>-<target>-*` ディレクトリを保持する。`plan.json` は宛先、バージョン、すべてのファイルのサイズ/SHA-512、公開された YAML バイトを記録する。フラッシュされた `events.jsonl` は PUT の意図と、利用可能な場合は応答ステータス/リクエスト ID を記録する。`result.json` は完了または最後に失敗したステージを記録する。最終結果の欠如は、成功ではなく中断またはストレージ利用不可を意味する。資格情報値、認可ヘッダー、生の SDK エラーは記録されない。監査書き込みの失敗は以降の PUT を停止する。すべてのオブジェクトは、明示的な長さと Content-MD5 を持つ 1 回のストリーミング Tencent COS PUT である。COS SDK はボディがストリームでない場合にのみリクエストを繰り返し、このアップローダーもどちらもリトライしない。部分レコードを保持し、次の操作の前にリモート状態を検査する: タイムアウトやレシート書き込みの失敗は、オブジェクトが保存されなかったことを証明しない。これらのレコードはローカルであり、改ざん防止でも自動バックアップでもない。各リリースのレコードはビルド証拠とともに管理されたストレージへアーカイブする。公開 CDN の読み戻しは別のリリース適格性確認であり、アップロード結果に明示的に `not-performed` とマークされる。
 
-## Dev Note
+## 開発者ノート
 
-None.
+なし。

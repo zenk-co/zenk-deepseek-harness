@@ -1,104 +1,100 @@
 ---
-description: "Plan-mode status chip for the Web GUI: the composer control that shows plan mode is on and turns it off; for users and maintainers of plan mode."
+description: "Web GUI 向けプランモード状態チップ。プランモードが on であることを示し off にするコンポーザーコントロール。プランモードのユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-plan
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Plan mode lets you review a plan before implementation. Enter with `/plan` and leave with the composer chip. Submitted plans open automatically in the right sidebar for review and remain available from cards in the completed Turn’s final artifact area after approval, rejection, or dismissal. Reopening a plan focuses its existing tab, and browser reload restores the document from Session history.
+プランモードでは実装前にプランをレビューできる。`/plan` で入り、コンポーザーチップで抜ける。投入されたプランはレビュー向けに右サイドバーへ自動的に開き、承認・却下・閉鎖後の完了ターン最終成果物領域のカードから利用可能なままである。プランを再び開くと既存タブに焦点が当たり、ブラウザーリロードはセッション履歴から文書を復元する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin alongside `ui-conversation` and `dsh-plan-mode`; the chip then occupies the composer's plan seat to the right of the access-mode control whenever plan mode is active. Enter plan mode through the `/plan` command path — choose Plan from the composer's `+` Command menu or type `/plan` — and turn it off with the chip.
+`ui-conversation` と `dsh-plan-mode` と並べてこのプラグインをマウントすると、プランモード有効中はチップがアクセスモード制御の右にあるコンポーザーの plan 席を占める。`/plan` コマンドパス経由でプランモードに入る。すなわちコンポーザー `+` コマンドメニューから Plan を選ぶか `/plan` を打ち、チップで off にする。
 
-### What the chip shows
+### チップの表示
 
-While the effective target is plan mode, the seat renders the blue "Plan" status button — the plan glyph ahead of the label, swapped for a circled cross while the enabled button is hovered or keyboard-focused — which executes `/plan off`. Otherwise the seat stays empty: a host without plan mode, or a Draft with no session, shows nothing. While plan mode is the effective target, the composer textarea's placeholder switches to the plan-task hint — "describe your task to generate plan" — unless the owning surface supplies its own placeholder.
+実効対象がプランモードの間、席は青い「Plan」状態ボタンを描画する。すなわちラベルの前にある plan glyph であり、有効ボタン hover またはキーボード焦点中は丸囲み cross に替わり、`/plan off` を実行する。それ以外の場合、席は空のままである。プランモードなし host やセッションなし Draft は何も示さない。プランモードが実効対象の間、コンポーザーテキスト領域の placeholder は所有面が自身の placeholder を供給しない限り計画タスクヒント（「describe your task to generate plan」）に替わる。
 
-### Reading submitted plans
+### 投入済みプランの読み方
 
-When a Turn ends, each submitted plan appears in its final artifact area, using the file-delivery card treatment with a Markdown icon, title, and Open action. A pending plan opens automatically once per submission in the current browser session. Closing it stays effective across review remounts; a new submission opens its own plan. Historical cards open only when clicked. Use the card or review strip’s View full plan link to read the complete Markdown. Plan tabs show a plain text file icon. Different submissions retain separate tabs; the review buttons alone decide whether implementation may begin.
+ターン終了時、各投入プランはその最終成果物領域に現れ、Markdown アイコン・タイトル・Open アクション付きのファイル配送カード扱いを使う。保留プランは現ブラウザーセッションで投入ごとに 1 回自動的に開く。閉じることはレビュー再マウントをまたいで有効であり、新規投入は自身のプランを開く。歴史カードはクリックされたときにのみ開く。カードやレビューストリップの View full plan リンクで完全な Markdown を読む。プランタブは素のテキストファイルアイコンを示す。異なる投入は別タブを保持し、実装開始可否を決めるのはレビューボタンだけである。
+記録済み呼出しのないレビューも自動的に開く。その完全テキストはタブの移動記憶にのみ存在し、保留レビューカードはそれを再び開ける。ページ再読み込みはそのテキストを失い、期限切れプレビューはユーザーを保留レビューへ戻す。埋込み子会話から開かれたプランは文書読み取り向けに子のアドレスを保持したまま可視サイドバーを使う。
 
-A review without a logged invocation also opens automatically. Its complete text lives only in the tab’s navigation memory, and the pending review card can reopen it. Reloading the page loses that text; an expired preview directs the user back to a pending review. Plans opened from an embedded child conversation use the visible sidebar while retaining the child’s address for document reads.
+### 失敗
 
-### Failures
-
-Admission failures (`matched: false`, business errors, transport faults) surface as an inline error and the chip stays until the projection confirms the exit.
+受付失敗（`matched: false`、業務エラー、輸送障害）はインラインエラーとして現れ、チップは射影が終了を確認するまで残る。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The chip occupies the conversation-declared `conversation.input.plan` single seat; the node half is an empty apply (the roster row). Reads ride the generic projection pair through the standard-kit `useProjection`: the effective target is `pending ? !active : active` — a folded host value, not client optimism, so an arriving frame corrects the chip either way. The seat's injected face carries one verb, `exitPlanMode`, which executes `/plan off` through `ctx.remote.commands.execute` and maps admission failures to an inline error line. The placeholder and hint text live in ui-conversation's `conversation` locale namespace and are shared verbatim with the claimed `/plan` command hint.
-
-Plan cards derive from native `tool/call` or PTC dispatch arguments through a Conversation Definition, with each invocation’s resolved Turn location. They contribute to the additive `conversation.chat.turnTail` list alongside file deliveries. The plan resource address identifies the invocation and its complete ordinary or direct-parent subagent Session address; its provider reads existing Session history, including older pages, without storing document text in sidebar layout. The question plugin owns the review action slot and supplies its request key, complete text, and optional invocation identity. The automatic open reads `ctx.sidebarRight.mounted` through a bound hook and runs once a Session is on screen: the Sidebar names the returning Session before the commit that mounts the review renders, so a review that arrived while a global panel or another Session was on screen opens from that commit's effect. The [historical decision](../../../.agents/notes/archived/feature/2026-09-17-persistent-plan-cards.md) explains why review lifetime and document lifetime remain separate. Subagent plan addresses also preserve unknown mode so history reads can resolve the child descriptor.
-
-The framework-bound `usePlans(turn)` exposes only submitted-plan data for that Turn. Chat indexes membership on Node updates and orders this collection when read; card rendering neither scans the transcript nor subscribes to other Turns or Node kinds.
-
-Submitted-plan cards follow the [file-card family](../../../docs/ui-radius.md#radius-scale) for their radius and icon-tile material.
+チップは会話宣言の `conversation.input.plan` 単一席を占める。ノード半分は空 apply である（名簿行）。読み取りは標準キット `useProjection` 経由の汎用射影対に乗る。実効対象は `pending ? !active : active` であり、折畳み済み host 値であってクライアント楽観ではないため、到着フレームはいずれにもチップを正す。席の注入面は 1 動詞 `exitPlanMode` を運び、`ctx.remote.commands.execute` 経由で `/plan off` を実行し、受付失敗をインラインエラー行へ写像する。placeholder とヒント文は ui-conversation の `conversation` ロケール名前空間にあり、請求済み `/plan` コマンドヒントと逐語共有される。
+プランカードはネイティブ `tool/call` または PTC 振分引数から会話定義経由で導出され、各呼出しの解決済みターン位置付きである。ファイル配送と並んで加算 `conversation.chat.turnTail` 一覧に寄与する。プランリソースアドレスは呼出しとその完全な通常または直接親サブエージェントセッションアドレスを識別する。そのプロバイダーはサイドバーレイアウトに文書テキストを格納せず、古いページを含む既存セッション履歴を読む。質問プラグインはレビュー動作スロットを所有し、そのリクエストキー・完全テキスト・任意呼出し identity を供給する。自動 open は束縛フック経由で `ctx.sidebarRight.mounted` を読み、セッションが画面上にある場合に 1 回実行する。サイドバーはレビューをマウントするコミットより前に戻りセッションを名指すため、グローバルパネルや他セッションが画面上にあった間に到着したレビューはそのコミットのエフェクトから開く。[歴史的決定](../../../.agents/notes/archived/feature/2026-09-17-persistent-plan-cards.md)はレビュー寿命と文書寿命が分離したままである理由を説明する。サブエージェントプランアドレスも未知モードを保持するため、履歴読み取りは子記述子を解決できる。
+フレームワーク束縛 `usePlans(turn)` はそのターンの投入済みプランデータのみ公開する。Chat はノード更新時に所属を索引付け、読み取り時にこの収集を順序付ける。カード描画は transcript を走査も他ターンやノード種を購読もしない。
+投入済みプランカードは[ファイルカードファミリー](../../../docs/ui-radius.md#radius-scale)に従い、その radius とアイコンタイル素材を使う。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the plan surface is not enough. They move from the chip to the plan-mode domain and the composer shell.
+プラン面では足りないときに、これらのページを読む。チップからプランモード領域とコンポーザーシェルへと進む。
 
-- [dsh-plan-mode](../../plan/plan-mode/README.md) — owns plan mode, the `/plan` command, the projection, and the policy section.
-- [ui-conversation](../ui-conversation/README.md) — declares the composer's `conversation.input.plan` seat and the placeholder locale keys.
-- [Tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-plan-mode) — the `exit_plan_mode` tool schema the model uses to leave plan mode.
-- [Client package map](../README.md) — adjacent browser UI packages.
+- [dsh-plan-mode](../../plan/plan-mode/README.md) — プランモード、`/plan` コマンド、射影、ポリシー節を所有する。
+- [ui-conversation](../ui-conversation/README.md) — コンポーザーの `conversation.input.plan` 席と placeholder ロケールキーを宣言する。
+- [ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-plan-mode) — モデルがプランモードを抜けるために使う `exit_plan_mode` ツールスキーマ。
+- [クライアントパッケージマップ](../README.md) — 隣接ブラウザー UI パッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the `/plan off` command line the chip dispatches: `dsh-plan-mode` owns the model-visible policy section, the exit-tool schema, and the logged state that line drives.
+間接的に、チップが発送する `/plan off` コマンド行を通じてである。`dsh-plan-mode` がモデル可視ポリシー節、終了ツールスキーマ、その行が駆動する記録済み状態を所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Entering or leaving plan mode changes the active `plan:policy` system-prompt section and therefore the request prefix; the chip itself adds no prompt content.
+プランモードへの出入りは有効な `plan:policy` システムプロンプト節を変えるためリクエストプレフィックスが変わる。チップ自体はプロンプト内容を追加しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the current plan chip. They are current package constraints, not a plan-mode comparison or a task backlog.
+現在のプランチップを定める。これらは現在のパッケージ制約であり、プランモード比較やタスク backlog ではない。
 
-- **Plan mode is guidance, not an execution sandbox** — deployments that require enforced read-only planning must compose the independent sandbox and approval policies.
-- **The chip belongs to the default composer** — a pending whole-composer interaction such as plan review temporarily replaces the InputBar and its chip.
-- **No inactive plan control** — entry uses the shared Command source; a session with the capability but inactive mode shows no plan affordance in the tool row.
+- **プランモードはガイダンスであり、実行サンドボックスではない** — 強制読取専用計画を要するデプロイは独立したサンドボックスと承認ポリシーを構成しなければならない。
+- **チップは既定コンポーザーに属する** — 計画レビューのような保留中全体コンポーザー対話は InputBar とそのチップを一時的に置換する。
+- **無効時プラン制御なし** — 入口は共有コマンドソースを使う。ケイパビリティを持つがモード無効のセッションはツール行にプラン affordance を示さない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

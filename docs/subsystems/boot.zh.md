@@ -1,6 +1,6 @@
 # Profile 管理
 
-[English](boot.md) | 中文
+[日本語](boot.md) | [English](boot.en.md) | 中文
 
 [boot 包组](../../packages/boot/README.zh.md)负责 launcher 提供的 profile 访问与插件管理器。[插件管理器](../../packages/boot/plugin-manager/README.zh.md)文档说明持久化、重载与包操作行为。
 

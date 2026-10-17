@@ -1,45 +1,45 @@
 ---
-description: "Workspace-instruction context for users and maintainers enabling, sizing, or debugging AGENTS.md/CLAUDE.md loading and refresh."
+description: "AGENTS.md/CLAUDE.md の読み込みとリフレッシュを有効化、サイズ調整、デバッグするユーザーとメンテナー向けのワークスペース指示コンテキスト。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-agent-instructions
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-agent-instructions` gives agents workspace guidance from user-global and project-level `AGENTS.md`-compatible files. It loads the applicable chain for the first request. It does not watch external edits continuously: successful filesystem operations discover newly relevant nested files and make later changes or removals visible, while session resume reconciles the baseline. `dsh-base` enables this behavior by default, while profiles can disable it. A byte budget bounds the injected context: broader files are omitted before the most specific file is truncated, and an empty chain adds nothing.
+`dsh-agent-instructions` は、ユーザーグローバルおよびプロジェクトレベルの `AGENTS.md` 互換ファイルから、エージェントにワークスペースのガイダンスを与える。最初のリクエストのために適用可能なチェーンをロードする。外部編集を継続的に監視はしない: 成功したファイルシステム操作が新たに関連するネストファイルを発見し、以降の変更や削除を可視にする。一方、Session の再開がベースラインを調整する。`dsh-base` はこの動作をデフォルトで有効化し、プロファイルは無効化できる。バイト予算が注入されるコンテキストを制限する: 最も具体的なファイルが切り詰められる前に、より広いファイルが省略され、空のチェーンは何も追加しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Changing the Session's working directory reloads the applicable project instruction chain before the next request.
+Session の作業ディレクトリを変更すると、次のリクエストの前に適用可能なプロジェクト指示チェーンが再ロードされる。
 
-Mount this plugin when agents should work from the workspace's own instruction files. `dsh-base` already includes it with a 65,536-byte budget, so base-backed profiles only need to replace the row when they want another `maxBytes`; providerless trees load nothing until a filesystem provider is present.
+エージェントがワークスペース自身の指示ファイルから作業すべき場合にこのプラグインをマウントする。`dsh-base` はすでに 65,536 バイトの予算でこれを含んでいるので、base ベースのプロファイルが別の `maxBytes` を望む場合は行を置き換えるだけでよい。プロバイダーのないツリーは、ファイルシステムプロバイダーが存在するまで何もロードしない。
 
-### What the agent gets
+### エージェントが得るもの
 
-The first request includes one durable baseline message with the user-global chain — `$DSH_HOME/AGENTS.md`, then `<agentsHome>/AGENTS.md` — followed by the project chain: every existing candidate file from the project root down to the session working directory, in broad-to-specific order. Within one candidate group, files whose content matches after trimming render once: a `CLAUDE.md` that duplicates its `AGENTS.md` is not repeated, and a shared-root `AGENTS.md` that duplicates the harness-home file collapses behind it. After a successful `read`, `write`, or `edit` call reaches a deeper directory, the next request includes the newly applicable instruction file; a changed file replaces its content, and a file that disappears or duplicates an earlier candidate produces a removal notice.
+最初のリクエストは、ユーザーグローバルチェーン — `$DSH_HOME/AGENTS.md`、次に `<agentsHome>/AGENTS.md` — を持つ 1 つの耐久ベースラインメッセージを含み、続いてプロジェクトチェーン: プロジェクトルートから Session の作業ディレクトリまでの既存のすべての候補ファイルを、広い順から具体的な順で含む。1 つの候補グループ内では、トリム後に内容が一致するファイルは一度だけレンダリングされる: `AGENTS.md` を重複する `CLAUDE.md` は繰り返されず、ハーネスホームのファイルを重複する共有ルートの `AGENTS.md` はその後ろに折り畳まれる。成功した `read`、`write`、または `edit` 呼び出しがより深いディレクトリに達した後、次のリクエストは新たに適用可能な指示ファイルを含む。変更されたファイルはその内容を置き換え、消えたファイルまたは以前の候補を重複するファイルは削除通知を生成する。
 
-### Configuration
+### 設定
 
-The defaults suit a typical checkout: `.git` marks the project root, `AGENTS.md` and `CLAUDE.md` are the base candidates, and `AGENTS.local.md` and `CLAUDE.local.md` are additive local overlays. Only `maxBytes` is required — it caps the complete rendered baseline so each deployment chooses its prompt budget explicitly.
+デフォルトは典型的なチェックアウトに適する: `.git` がプロジェクトルートを示し、`AGENTS.md` と `CLAUDE.md` がベース候補であり、`AGENTS.local.md` と `CLAUDE.local.md` が追加的なローカルオーバーレイである。必須なのは `maxBytes` のみである — これが完全にレンダリングされるベースラインの上限であり、各デプロイメントがプロンプト予算を明示的に選ぶ。
 
-The harness home holding the user-global `AGENTS.md` is process policy rather than row configuration: the plugin resolves `$DSH_HOME`, or `~/.dsh`, through `@deepseek-ai/dsh-home-paths`, so instruction loading always reads the process home. The shared agents root resolves the same way, from `$DSH_AGENTS_HOME` or `~/.agents`. Stray `dshHome` and `agentsHome` row keys are ignored.
+ユーザーグローバルの `AGENTS.md` を保持するハーネスホームは、行の設定ではなくプロセスポリシーである: プラグインは `@deepseek-ai/dsh-home-paths` を通じて `$DSH_HOME`、または `~/.dsh` を解決するので、指示の読み込みは常にプロセスのホームを読む。共有 agents ルートも同じ方法で `$DSH_AGENTS_HOME` または `~/.agents` から解決する。迷入した `dshHome` と `agentsHome` の行キーは無視される。
 
-Root discovery climbs only when a marker probe confirms that the marker is absent. A permission or I/O failure stops discovery and surfaces the host or filesystem-provider error instead of selecting an ancestor project. The [historical root-marker metadata decision](../../../.agents/notes/archived/bug-fix/2026-09-03-root-marker-metadata-failures.md) records why discovery fails instead of substituting another root.
+ルート発見は、マーカープローブがマーカーの不在を確認したときにのみ上方へ登る。権限または I/O の失敗は発見を停止し、祖先プロジェクトを選択する代わりにホストまたはファイルシステムプロバイダーのエラーを表面化する。[歴史的なルートマーカーメタデータの決定](../../../.agents/notes/archived/bug-fix/2026-09-03-root-marker-metadata-failures.md)が、別のルートを代替するのではなく発見が失敗する理由を記録している。
 
 ```yaml
 - name: '@deepseek-ai/dsh-agent-instructions'
@@ -47,7 +47,7 @@ Root discovery climbs only when a marker probe confirms that the marker is absen
     maxBytes: 65536
 ```
 
-The accepted fields, at a glance:
+受け付けられるフィールドの概観:
 
 ```ts
 export interface Config {
@@ -59,79 +59,79 @@ export interface Config {
 }
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `maxBytes` | required | Cap on the complete rendered baseline message, in bytes |
-| `maxSourceBytes` | `1048576` | Cap on one source instruction file before rendering |
-| `projectRootMarkers` | `['.git']` | Directory names that mark the project root |
-| `instructionFileCandidates` | `['AGENTS.md', 'CLAUDE.md']` | Base file names loaded in each project directory |
-| `localInstructionFileCandidates` | `['AGENTS.local.md', 'CLAUDE.local.md']` | Local overlay file names loaded after the base files |
+| `maxBytes` | 必須 | 完全にレンダリングされたベースラインメッセージのバイト上限 |
+| `maxSourceBytes` | `1048576` | レンダリング前の 1 つのソース指示ファイルの上限 |
+| `projectRootMarkers` | `['.git']` | プロジェクトルートを示すディレクトリ名 |
+| `instructionFileCandidates` | `['AGENTS.md', 'CLAUDE.md']` | 各プロジェクトディレクトリでロードされるベースファイル名 |
+| `localInstructionFileCandidates` | `['AGENTS.local.md', 'CLAUDE.local.md']` | ベースファイルの後にロードされるローカルオーバーレイファイル名 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-agent-instructions) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-agent-instructions)が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### Observing the budget
+### 予算の観察
 
-Rendering keeps the most specific files first: it drops whole broader files before truncating the most-specific file, and emits a visible `Workspace instruction budget ...` notice naming the omitted and truncated paths. The rendered bytes never exceed `maxBytes`. An over-budget broad file is ignored; during refresh it is treated as temporarily unavailable rather than removed.
+レンダリングは最も具体的なファイルを先に保つ: 最も具体的なファイルを切り詰める前に、より広いファイルを丸ごと落とし、省略および切り詰められたパスを名指す可視の `Workspace instruction budget ...` 通知を出力する。レンダリングされたバイトは `maxBytes` を決して超えない。予算超過の広いファイルは無視され、リフレッシュ中は削除ではなく一時的に利用不能として扱われる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the plugin; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションではプラグインの背後にある設計判断を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design concept
+### 設計概念
 
-The plugin is built on one principle: workspace instructions are durable conversation content, owned per agent and per session. Baseline and refresh messages are ordinary sourced `user/message` events, so they replay, compact, and resume exactly like other history, and model-visible state is always reconstructable from the session log. The plugin owns the complete `<system-reminder>` framing and every injected message reaches the model verbatim.
+このプラグインは 1 つの原則の上に成り立つ: ワークスペース指示は耐久な会話コンテンツであり、エージェントごと、Session ごとに所有される。ベースラインとリフレッシュのメッセージは通常のソース付き `user/message` イベントであるため、他の履歴とまったく同様に再生、コンパクション、再開され、モデルに可視の状態は常にセッションログから再構築できる。プラグインは完全な `<system-reminder>` フレーミングを所有し、注入されるすべてのメッセージは逐語的にモデルに届く。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: pre-step listener, `tools/result` touch tracking, inbox composition |
-| [`src/config.ts`](src/config.ts) | `Config` schema, budget resolution, baseline identity |
-| [`src/files.ts`](src/files.ts) | Candidate discovery, project-root search, bounded streaming reads |
-| [`src/render.ts`](src/render.ts) | Instruction rendering, budget truncation, change records |
-| [`src/state.ts`](src/state.ts) | Durable message sources, version/digest cache, reconciliation |
-| [`src/digest.ts`](src/digest.ts) | SHA-1 content identity and per-candidate-group duplicate keys |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: pre-step リスナー、`tools/result` タッチ追跡、受信箱の組み立て |
+| [`src/config.ts`](src/config.ts) | `Config` スキーマ、予算解決、ベースラインアイデンティティ |
+| [`src/files.ts`](src/files.ts) | 候補の発見、プロジェクトルート検索、上限付きストリーミング読み取り |
+| [`src/render.ts`](src/render.ts) | 指示のレンダリング、予算の切り詰め、変更レコード |
+| [`src/state.ts`](src/state.ts) | 耐久メッセージソース、バージョン/ダイジェストキャッシュ、調整 |
+| [`src/digest.ts`](src/digest.ts) | SHA-1 コンテンツアイデンティティと候補グループごとの重複キー |
 
-### Main flow
+### 主要フロー
 
-At the first eligible `agent/pre-step` of a session, the plugin composes the baseline and folds it into the entering batch right after the claimed messages. Successful first-party `read`, `write`, and `edit` calls contribute touches that bubble up through parent execution tokens; once the enclosing step is durable, a projection reconciles the visible session state against the inbox and queues additions, replacements, or removals. An unchanged path with an unchanged digest is never injected again. Discovery follows structured filesystem activity rather than shell navigation, because each local shell call starts a fresh process and parsing arbitrary shell syntax is not a reliable filesystem seam.
+セッションの最初の適格な `agent/pre-step` で、プラグインはベースラインを組み立て、クレームされたメッセージの直後の entering バッチにそれを折り込む。成功したファーストパーティの `read`、`write`、`edit` 呼び出しはタッチを寄与し、それが親の実行トークンを通じてバブルアップする。囲むステップが耐久になると、射影が可視のセッション状態を受信箱と調整し、追加、置き換え、または削除をキューに入れる。ダイジェストが変わらない経路は再び注入されることがない。発見はシェルナビゲーションではなく構造化されたファイルシステムアクティビティをたどる。各ローカルシェル呼び出しは新しいプロセスを開始し、任意のシェル構文のパースは信頼できるファイルシステムシームではないからである。
 
-### Invariants
+### 不変条件
 
-Every injected message carries a typed source with its change list; a complete baseline also carries an identity derived from normalized discovery, precedence, project-root, and budget configuration, and a matching durable message confirms a queued baseline. Model-visible text contains no hidden state markers, and literal `</system-reminder>` text anywhere in instruction content or model-visible metadata is escaped so repository-controlled text cannot close the plugin-owned frame.
+注入されるすべてのメッセージは、変更リストを持つ型付きソースを運ぶ。完全なベースラインは、正規化された発見、優先順位、プロジェクトルート、予算設定から導出されたアイデンティティも運び、一致する耐久メッセージがキューに入ったベースラインを確認する。モデルに可視のテキストには隠れた状態マーカーが含まれず、指示コンテンツまたはモデル可視メタデータのどこかにあるリテラルの `</system-reminder>` テキストはエスケープされるので、リポジトリが制御するテキストがプラグイン所有のフレームを閉じることはできない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the package-level contract is not enough. They move from the instruction-file format to the design decision and the exhaustive configuration.
+パッケージレベルの契約では足りないときにこれらのページを読む。指示ファイルの形式から、設計上の決定と網羅的な設定へ進む。
 
-- [Documentation standard](../../../docs/AGENTS.md) — what `AGENTS.md` instruction files contain and how they are maintained.
-- [Workspace-context decision record](../../../.agents/notes/archived/feature/2026-06-24-workspace-context.md) — per-agent/session isolation and lifecycle rationale.
-- [Context group map](../README.md) — sibling request-context packages.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-agent-instructions) — every accepted config field and its source declaration.
+- [ドキュメント標準](../../../docs/AGENTS.md) — `AGENTS.md` 指示ファイルが何を含み、どのように維持されるか。
+- [ワークスペースコンテキストの決定記録](../../../.agents/notes/archived/feature/2026-06-24-workspace-context.md) — エージェント/Session ごとの分離とライフサイクルの根拠。
+- [Context グループマップ](../README.md) — 兄弟のリクエストコンテキストパッケージ。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-agent-instructions) — 受け付けられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a> <a id="prompt-shape"></a>
-## Model Experience
+## モデル体験
 
-### Baseline context
+### ベースラインコンテキスト
 
-#### What the model sees
+#### モデルが見るもの
 
-At the first request, derived history contains one durable user-role message with the bounded user-global and project instruction chain in broad-to-specific order. Resume reuses that message when its visible baseline is compatible.
+最初のリクエストで、導出履歴は、広い順から具体的な順の上限付きユーザーグローバルおよびプロジェクト指示チェーンを持つ 1 つの耐久ユーザーロールメッセージを含む。再開は、可視ベースラインが互換である場合にそのメッセージを再利用する。
 
-##### Baseline instruction template
+##### ベースライン指示テンプレート
 
 ```markdown
 <system-reminder>
@@ -151,21 +151,21 @@ Instructions from: AGENTS.md
 </system-reminder>
 ```
 
-#### Token effect
+#### トークン効果
 
-The rendered baseline is appended once and remains in derived history until compaction. `maxBytes` bounds the complete message, broader files are omitted before the most-specific file is truncated, and an empty chain contributes zero tokens.
+レンダリングされたベースラインは一度追記され、コンパクションまで導出履歴に残る。`maxBytes` が完全なメッセージを制限し、最も具体的なファイルが切り詰められる前に広いファイルが省略され、空のチェーンはゼロトークンを寄与する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Append-only after the existing reusable prefix. Resume preserves reuse when the visible baseline identity is compatible; an incompatible identity appends a complete replacement, so discovery, precedence, project-root, or budget changes affect reuse only from that history position.
+既存の再利用可能なプレフィックスの後への追記専用。再開は、可視ベースラインのアイデンティティが互換である場合に再利用を保つ。非互換のアイデンティティは完全な置き換えを追記するので、発見、優先順位、プロジェクトルート、または予算の変更はその履歴位置からだけ再利用に影響する。
 
-### Newly discovered scope context
+### 新たに発見されたスコープコンテキスト
 
-#### What the model sees
+#### モデルが見るもの
 
-After a successful first-party filesystem call reaches a deeper directory, the next request includes one retained sourced `user/message` with the newly applicable instruction file. A user-global file discovered after the baseline renders the same section with `These user-global instructions apply to all work.` in place of the scope sentence below, because a user-global scope directory is an internal reconciliation key rather than a project directory.
+成功したファーストパーティのファイルシステム呼び出しがより深いディレクトリに達した後、次のリクエストは、新たに適用可能な指示ファイルを持つ 1 つの保持されたソース付き `user/message` を含む。ベースラインの後に発見されたユーザーグローバルファイルは、以下のスコープ文の代わりに `These user-global instructions apply to all work.` を持つ同じセクションをレンダリングする。ユーザーグローバルスコープディレクトリはプロジェクトディレクトリではなく内部の調整キーだからである。
 
-##### Additional instruction template
+##### 追加指示テンプレート
 
 ```markdown
 <system-reminder>
@@ -177,21 +177,21 @@ These instructions apply to work under `packages/app`. Use them as guidance when
 </system-reminder>
 ```
 
-#### Token effect
+#### トークン効果
 
-Each discovered scope adds bounded history tokens until compaction. Unchanged content is suppressed by visible session state plus version/digest comparison, and PTC mode defers the same message until after the outer `run_code` result and its enclosing durable step.
+発見された各スコープはコンパクションまで上限付きの履歴トークンを追加する。変更されていないコンテンツは、可視のセッション状態とバージョン/ダイジェスト比較によって抑制され、PTC モードは同じメッセージを外側の `run_code` 結果とそれを囲む耐久ステップの後まで先送りする。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
+追記専用。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-### Changed or removed instruction context
+### 変更または削除された指示コンテキスト
 
-#### What the model sees
+#### モデルが見るもの
 
-A changed file produces `Updated instructions from: <path>` plus its replacement content. A candidate that disappears or becomes a per-directory duplicate of an earlier candidate produces the removal notice below.
+変更されたファイルは `Updated instructions from: <path>` とその置き換え内容を生成する。消えた候補、または以前の候補のディレクトリごとの重複になった候補は、以下の削除通知を生成する。
 
-##### Removal notice
+##### 削除通知
 
 ```markdown
 <system-reminder>
@@ -201,36 +201,36 @@ The previously loaded instructions from this file no longer apply.
 </system-reminder>
 ```
 
-#### Token effect
+#### トークン効果
 
-Each confirmed change or removal is one retained history message bounded by `maxBytes`. Provider failures add no message, and an update omitted by the budget remains eligible for a later filesystem touch.
+確認された各変更または削除は、`maxBytes` で制限された 1 つの保持履歴メッセージである。プロバイダーの失敗はメッセージを追加せず、予算によって省略された更新は後のファイルシステムタッチに対して適格なままである。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
+追記専用。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when instruction loading is a poor fit or needs operational awareness. They are current package constraints, not a task backlog.
+これらの制限は、指示の読み込みが不適切になる、または運用上の注意を要する条件を定める。それらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Discovery follows structured fs tools, not shell navigation** — a `bash` command that changes directories does not trigger nested instruction discovery because shell syntax and per-call shell state are not a reliable filesystem seam.
-- **Refresh is touch-driven** — there is no watcher; external edits become visible on the next successful first-party `read`, `write`, or `edit`, when resume reconciles a visible baseline, or when an entering pre-step restores a shadowed baseline.
-- **Candidate semantics stay intentionally small** — lowercase names, `.claude/rules/`, and `@path` imports are not interpreted; project scopes load `AGENTS.local.md`/`CLAUDE.local.md` overlays by default, but neither user-global root has a local overlay and other custom names require explicit candidate configuration. A project directory named like a user-global scope directory renders as `./<name>/...`, so it keeps its own scope instead of resolving to the global root.
-- **Deduplication is content-based within one candidate group** — candidates collapse only when byte-identical after trimming leading and trailing whitespace. The two user-global roots share one group, so the shared-root file collapses behind a matching harness-home file; sibling project candidates collapse the same way, while a distinct real copy that has drifted from `AGENTS.md` loads in full alongside it. A duplicate of budget-retained content stays reconciled: when the retained candidate changes or disappears, the duplicate becomes visible again. Unchanged hidden duplicates, including files removed from visible state as duplicates, use cached metadata instead of content reads.
-- **One candidate group shares failure fate** — when metadata or content cannot be read for any candidate, including a hidden duplicate, the group keeps its last-good state for that pass. An unreadable shared agents root therefore also postpones a harness-home change notice until a later pass observes both roots.
-- **A byte-budget omission does not re-enter reconciliation** — a candidate the baseline dropped for budget reasons, including any content duplicate of that candidate, is not probed again while that visible baseline holds; it becomes visible only after the baseline is rebuilt.
-- **Symlinked instruction files are followed across the trust boundary** — a candidate whose final component is a symlink is resolved and its target loaded, so a cloned repository can surface off-tree file content as lower-authority workspace guidance (it never overrides system, developer, or direct user instructions). Confine `ctx.fs` with the filesystem policy gate or an OS sandbox when loading untrusted repositories.
-- **Instruction content is bounded, not summarized** — over-budget broad files are omitted and the most-specific file may be truncated; the plugin never asks a model to compress instruction prose.
+- **発見は構造化された fs ツールをたどり、シェルナビゲーションはたどらない** — ディレクトリを変更する `bash` コマンドはネストした指示の発見を引き起こさない。シェル構文と呼び出しごとのシェル状態は信頼できるファイルシステムシームではないからである。
+- **リフレッシュはタッチ駆動である** — ウォッチャーは存在しない。外部編集は、次の成功したファーストパーティの `read`、`write`、または `edit` のとき、再開が可視ベースラインを調整するとき、または entering pre-step がシャドーされたベースラインを復元するときに可視になる。
+- **候補のセマンティクスは意図的に小さいままである** — 小文字名、`.claude/rules/`、`@path` インポートは解釈されない。プロジェクトスコープはデフォルトで `AGENTS.local.md`/`CLAUDE.local.md` オーバーレイをロードするが、どちらのユーザーグローバルルートもローカルオーバーレイを持たず、他のカスタム名は明示的な候補設定を必要とする。ユーザーグローバルスコープディレクトリと同じ名前のプロジェクトディレクトリは `./<name>/...` としてレンダリングされるので、グローバルルートに解決されるのではなく自身のスコープを保つ。
+- **重複排除は 1 つの候補グループ内での内容ベースである** — 候補が折り畳まれるのは、先頭と末尾の空白をトリムした後にバイト単位で同一である場合のみである。2 つのユーザーグローバルルートは 1 つのグループを共有するので、共有ルートのファイルは一致するハーネスホームのファイルの後ろに折り畳まれる。兄弟のプロジェクト候補も同じように折り畳まれ、`AGENTS.md` から乖離した別個の実コピーはそれと並んで完全にロードされる。予算保持コンテンツの重複は調整されたままである: 保持された候補が変更または消滅すると、重複が再び可視になる。変更されていない隠れた重複 — 重複として可視状態から除去されたファイルを含む — は、内容の読み取りではなくキャッシュされたメタデータを使う。
+- **1 つの候補グループは失敗の運命を共有する** — 隠れた重複を含むいずれかの候補についてメタデータまたはコンテンツを読めない場合、そのグループはそのパスの間 last-good 状態を保つ。したがって読み取り不能な共有 agents ルートは、後のパスが両方のルートを観察するまでハーネスホームの変更通知も先送りする。
+- **バイト予算による省略は調整に再参加しない** — 予算の理由でベースラインが落とした候補 — その候補の内容上の重複も含む — は、その可視ベースラインが保持されている間は再びプローブされない。それはベースラインが再構築された後にのみ可視になる。
+- **シンボリックリンクされた指示ファイルは信頼境界を越えてたどられる** — 最終コンポーネントがシンボリックリンクである候補は解決され、そのターゲットがロードされるので、クローンしたリポジトリがツリー外のファイル内容をより低い権限のワークスペースガイダンスとして表面化させうる (system、developer、または直接のユーザー指示を決して上書きしない)。信頼できないリポジトリをロードする場合は、ファイルシステムポリシーゲートまたは OS サンドボックスで `ctx.fs` を閉じ込める。
+- **指示コンテンツは要約ではなく上限付けされる** — 予算超過の広いファイルは省略され、最も具体的なファイルは切り詰められうる。プラグインは指示の散文を圧縮するようモデルに求めることは決してない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

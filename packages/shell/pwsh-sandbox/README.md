@@ -1,47 +1,47 @@
 ---
-description: "The sandbox-consuming PowerShell executor for deployments and maintainers choosing, configuring, or debugging confined PowerShell command execution with denial facts."
+description: "拒否の事実を伴う制限付き PowerShell コマンド実行を選択・設定・デバッグするデプロイメントとメンテナー向けの、サンドボックス消費型 PowerShell エグゼキューター。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-pwsh-sandbox
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-pwsh-sandbox` is the sandbox-consuming PowerShell executor: every command runs as a fresh `pwsh -Command` process confined through the `ctx.sandbox` capability, with the selected mode, enforcement, and denial facts stamped on each settled result. On Windows the sandbox seam resolves to the ACL restricted-token runner chain; on Linux and macOS it uses bwrap, Landlock, or Seatbelt. When no runner can enforce a confined mode, the call fails closed with a structured `SANDBOX_UNAVAILABLE` error rather than running unconfined. It is the pwsh twin of `dsh-bash-sandbox`, mirroring it call-for-call.
+`dsh-pwsh-sandbox` はサンドボックス消費型の PowerShell エグゼキューターです: すべてのコマンドは新しい `pwsh -Command` プロセスとして実行され、`ctx.sandbox` ケイパビリティを通じて制限されます。選択されたモード、適用状況、拒否の事実は、確定した各結果に刻印されます。Windows ではサンドボックスシームは ACL 制限トークンのランナーチェーンに解決され、Linux と macOS では bwrap、Landlock、または Seatbelt を使います。制限付きモードを適用できるランナーがない場合、呼び出しは制限なしで実行されるのではなく、構造化された `SANDBOX_UNAVAILABLE` エラーでフェイルクローズします。これは `dsh-bash-sandbox` の pwsh 版の双子で、呼び出しごとに対応しています。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と保留作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this executor instead of `dsh-pwsh-local` when PowerShell commands must not run with the harness process's full file authority. It registers as `ctx.shell`, inherits `dsh-pwsh-local`'s process mechanics, and requires a `ctx.sandbox` provider plus `ctx.sandboxPolicy`.
+PowerShell コマンドをハーネスプロセスの完全なファイル権限で実行してはならない場合は、`dsh-pwsh-local` の代わりにこのエグゼキューターをマウントします。これは `ctx.shell` として登録され、`dsh-pwsh-local` のプロセスメカニクスを継承し、`ctx.sandbox` プロバイダーと `ctx.sandboxPolicy` を必要とします。
 
-### When to choose it
+### 選ぶべきとき
 
-Choose it when a deployment needs file-level confinement for PowerShell commands, typically on Windows. The confinement substance is platform-neutral: the sandbox seam picks the platform's runner — the ACL restricted-token chain on Windows, bwrap/Landlock/Seatbelt elsewhere — while this executor owns the pwsh side. The sandbox policy (mode plus workspace root) is not this package's config: it rides each call from `ctx.sandboxPolicy`, with tool calls passing the calling session's resolved policy and direct calls falling back to deployment policy.
+デプロイメントが PowerShell コマンドにファイルレベルの制限を必要とする場合、通常は Windows でこれを選びます。制限の実体はプラットフォーム中立です: サンドボックスシームがプラットフォームのランナー — Windows では ACL 制限トークンチェーン、それ以外では bwrap/Landlock/Seatbelt — を選び、このエグゼキューターは pwsh 側を所有します。サンドボックスポリシー (モードとワークスペースルート) はこのパッケージの設定ではありません: 各呼び出しに `ctx.sandboxPolicy` から同乗し、ツール呼び出しは呼び出し元セッションの解決済みポリシーを渡し、直接呼び出しはデプロイメントポリシーにフォールバックします。
 
-### Modes and file effects
+### モードとファイルへの影響
 
-| Mode | File effects |
+| モード | ファイルへの影響 |
 |---|---|
-| `read-only` (default) | Writes are denied; the boundary stays partial for the shared hard-link, unconfined-read, and AppContainer-ACL limits |
-| `workspace-write` | Writes under the policy's workspace root plus a private temp directory; `TMP`/`TEMP` are rewritten to it before spawning |
-| `danger-full-access` | No confinement; the provider is never consulted, and results carry `sandbox: { mode, denied: false }` |
+| `read-only` (デフォルト) | 書き込みは拒否される。共有ハードリンク、非制限リード、AppContainer ACL の制限により境界は部分的のまま |
+| `workspace-write` | ポリシーのワークスペースルート配下とプライベート一時ディレクトリへの書き込み。スポーン前に `TMP`/`TEMP` がそこへ書き換えられる |
+| `danger-full-access` | 制限なし。プロバイダーは決して照会されず、結果は `sandbox: { mode, denied: false }` を運ぶ |
 
-### Minimal configuration
+### 最小構成
 
-On Windows, mount the ACL restricted-token provider; on Linux and macOS, mount the local runner provider instead. The executor's own config is the local pwsh executor's knobs verbatim; the generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-pwsh-sandbox) is the exhaustive source.
+Windows では ACL 制限トークンプロバイダーをマウントし、Linux と macOS では代わりにローカルランナープロバイダーをマウントします。エグゼキューター自身の設定はローカル pwsh エグゼキューターのノブそのままで、生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-pwsh-sandbox)が網羅的な情報源です。
 
 ```yaml
 - id: sandbox
@@ -55,98 +55,98 @@ On Windows, mount the ACL restricted-token provider; on Linux and macOS, mount t
   name: '@deepseek-ai/dsh-pwsh-sandbox'
 ```
 
-### Denials and escalation
+### 拒否とエスカレーション
 
-A denied command is reported as a fact: the result carries `sandbox: { mode, denied: true }`, and the tool layer converts it into the standard permission-denied surface — the same one the bash tool uses. When escalation is available, the model may retry the exact command once with the narrowest wider mode and a one-sentence justification; the approval prompt asks the user, and nothing executes before approval. This executor never negotiates permissions itself.
+拒否されたコマンドは事実として報告されます: 結果は `sandbox: { mode, denied: true }` を運び、ツール層がそれを標準の permission-denied サーフェスへ変換します — bash ツールが使うものと同じです。エスカレーションが利用可能な場合、モデルは正確なコマンドを、最も狭いより広いモードと 1 文の正当化を伴って 1 回だけリトライできます。承認プロンプトがユーザーに尋ね、承認前に何も実行されません。このエグゼキューター自体が権限を交渉することは決してありません。
 
-### Failures and recovery
+### 失敗と回復
 
-If no runner can enforce a confined mode, the foreground call fails with `SANDBOX_UNAVAILABLE` and a background process records a runner-failure fact — never a silent unconfined run. A provider rejection is attributed to the confinement runner only when its `ENOENT`/`EACCES` path or syscall independently names `argv[0]`; otherwise it keeps the local executor's stage-neutral provider-failure semantics.
+制限付きモードを適用できるランナーがない場合、フォアグラウンド呼び出しは `SANDBOX_UNAVAILABLE` で失敗し、バックグラウンドプロセスはランナー失敗の事実を記録します — 暗黙の非制限実行になることは決してありません。プロバイダーの拒否が制限ランナーに帰属されるのは、その `ENOENT`/`EACCES` パスまたはシステムコールが独立に `argv[0]` を名指す場合だけです。それ以外はローカルエグゼキューターのステージ中立なプロバイダー失敗セマンティクスを保ちます。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains the design of the executor and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではエグゼキューターの設計を説明し、それを実現するコードを示します。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱います。
 
-### Design concept
+### 設計概念
 
-The executor is the pwsh twin of `dsh-bash-sandbox`: it inherits `dsh-pwsh-local`'s process mechanics, consumes its argv-level seam (`argv()`/`executeArgv()`/`onProcessDone()`), and wraps the exact pwsh invocation through `ctx.sandbox.confine()` before spawning. The confinement substance is platform-neutral — the sandbox seam resolves to the platform's runner — while this package owns the pwsh side only: the selected mode, enforcement completeness, and denial classification on results.
+このエグゼキューターは `dsh-bash-sandbox` の pwsh 版の双子です: `dsh-pwsh-local` のプロセスメカニクスを継承し、その argv レベルのシーム (`argv()`/`executeArgv()`/`onProcessDone()`) を消費し、スポーン前に正確な pwsh 呼び出しを `ctx.sandbox.confine()` を通じてラップします。制限の実体はプラットフォーム中立で、サンドボックスシームがプラットフォームのランナーに解決されます。このパッケージが所有するのは pwsh 側のみです: 結果上の選択されたモード、適用の完全性、拒否の分類です。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `SandboxPwshExecutor`, per-process fact retention, execution preparation |
-| [`src/helpers.ts`](src/helpers.ts) | Denial, runner-failure, and runner-spawn-failure classification |
-| `tests/` | Exercised behavior across the ACL and platform runners |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `SandboxPwshExecutor`、プロセスごとの事実保持、実行の準備 |
+| [`src/helpers.ts`](src/helpers.ts) | 拒否、ランナー失敗、ランナースポーン失敗の分類 |
+| `tests/` | ACL ランナーとプラットフォームランナーをまたいで試験される動作 |
 
-### Main flow
+### メインフロー
 
-For a confined mode, `resolve()` stamps the per-call policy; `execute` awaits preparation of the pwsh argv through the provider and hands the confined argv to the inherited subprocess path. At settlement the executor classifies the outcome: a runner failure outranks a denial because the command never ran, a failed run whose stderr carries the runner's denial dialect is reported `denied: true`, and every confined run carries its mode and enforcement facts. `danger-full-access` bypasses the provider entirely and stamps `denied: false`.
+制限付きモードでは、`resolve()` が呼び出しごとのポリシーを刻印し、`execute` がプロバイダーを通じた pwsh argv の準備を待ち、制限済みの argv を継承したサブプロセスパスへ渡します。確定時にエグゼキューターが結果を分類します: コマンドが実行されなかったためランナー失敗は拒否より優先され、stderr がランナーの拒否方言を運ぶ失敗実行は `denied: true` として報告され、すべての制限付き実行はそのモードと適用の事実を運びます。`danger-full-access` はプロバイダーを完全に迂回し、`denied: false` を刻印します。
 
-### Invariants
+### 不変条件
 
-- **Fail closed** — a confined mode with no usable runner rejects with `SANDBOX_UNAVAILABLE`; unconfined passthrough never happens for a confined policy.
-- **Deny-only at the seam** — this executor never grants permission; the approval flow lives in the tool layer.
-- **Per-process facts** — confinement facts are retained per handle until settlement, because a provider may vary enforcement between overlapping calls.
+- **フェイルクローズ** — 使用可能なランナーのない制限付きモードは `SANDBOX_UNAVAILABLE` で拒否されます。制限付きポリシーに対して非制限のパススルーが起こることは決してありません。
+- **シームでは拒否のみ** — このエグゼキューターが権限を許可することは決してありません。承認フローはツール層にあります。
+- **プロセスごとの事実** — 制限の事実は確定までハンドルごとに保持されます。プロバイダーが重複する呼び出し間で適用内容を変えることがあるからです。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the executor contract is not enough. They move from the seam to the confinement backends and the pwsh tool.
+エグゼキューター契約では足りないときに、これらのページを読んでください。シームから制限バックエンドと pwsh ツールへと進みます。
 
-- [shell seam](../shell/README.md) — the executor contract this provider implements, including the request/spec split.
-- [bash-sandbox](../bash-sandbox/README.md) — the bash twin of this executor, with the shared denial and escalation surface.
-- [pwsh-local](../pwsh-local/README.md) — the process mechanics this executor inherits.
-- [sandbox-windows-acl](../../sandbox/sandbox-windows-acl/README.md) — the Windows restricted-token runner chain.
-- [Bash executor subsystem](../../../docs/subsystems/shell.md) — request/spec vocabulary, results, and the service contract in full.
-- [pwsh executor and tool note](../../../.agents/notes/archived/feature/2026-08-01-pwsh-tool-and-executor.md) — the decision behind the pwsh executor and tool pair.
+- [shell シーム](../shell/README.md) — このプロバイダーが実装するエグゼキューター契約 (request/spec 分割を含む)。
+- [bash-sandbox](../bash-sandbox/README.md) — このエグゼキューターの bash 版の双子。共有の拒否・エスカレーションサーフェスを持つ。
+- [pwsh-local](../pwsh-local/README.md) — このエグゼキューターが継承するプロセスメカニクス。
+- [sandbox-windows-acl](../../sandbox/sandbox-windows-acl/README.md) — Windows の制限トークンランナーチェーン。
+- [Bash エグゼキューターサブシステム](../../../docs/subsystems/shell.md) — request/spec 語彙、結果、サービス契約の全体。
+- [pwsh エグゼキューターとツールのノート](../../../.agents/notes/archived/feature/2026-08-01-pwsh-tool-and-executor.md) — pwsh エグゼキューターとツールのペア背後の決定。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Confinement works, denial surfaces as command failure
+### 制限は機能し、拒否はコマンド失敗として現れる
 
-#### What the model sees
+#### モデルが見るもの
 
-The confined command's own stderr — for example `Access to the path '...' is denied.` under the Windows ACL runner; the tool layer converts classified denials into the standard permission-denied surface exactly as it does for the bash tool.
+制限付きコマンド自身の stderr — たとえば Windows ACL ランナーでの `Access to the path '...' is denied.`。ツール層は分類された拒否を、bash ツールとまったく同様に標準の permission-denied サーフェスへ変換します。
 
-#### Token effect
+#### トークン効果
 
-No model-visible text beyond the command's stderr and the tool layer's standard denial surface.
+コマンドの stderr とツール層の標準拒否サーフェス以外に、モデル可視のテキストはありません。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None directly; the denial surface belongs to the tool layer.
+直接にはなし。拒否サーフェスはツール層に属します。
 
-## Known Limitations and Deferred Work
+## 既知の制限と保留作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this executor is only a partial boundary on Windows. They are current package constraints, not a roadmap.
+これらの制限は、このエグゼキューターが Windows で部分的な境界に留まる場合を定義します。これらは現在のパッケージ制約であり、ロードマップではありません。
 
-- **Reads are unrestricted on Windows** — the ACL runner restricts writes only; the read boundary is documented in `@deepseek-ai/dsh-sandbox-windows-acl`.
-- **Windows workspace-write temp authority is private** — per live session/workspace pair; agentless calls receive a fresh private directory per invocation; the ambient temp root is never granted, and the runner rewrites `TMP`/`TEMP` to the private directory before spawning.
-- **Windows read-only grants no explicit writable root but remains partial** — NTFS hard links alias one file object across paths, reads stay unconfined, and a tree another AppContainer tool has ACL'd with a package SID is unreadable to the Low-integrity child. NUL stays writable in both modes because the device DACL grants Everyone write and carries no higher label; PowerShell's `> $null` redirection still works without opening it.
+- **Windows では読み取りは制限されない** — ACL ランナーは書き込みのみを制限します。読み取り境界は `@deepseek-ai/dsh-sandbox-windows-acl` に文書化されています。
+- **Windows の workspace-write の一時権限はプライベート** — ライブのセッション/ワークスペースのペアごとです。エージェントレス呼び出しは呼び出しごとに新しいプライベートディレクトリを受け取ります。環境の一時ルートが付与されることは決してなく、ランナーはスポーン前に `TMP`/`TEMP` をプライベートディレクトリへ書き換えます。
+- **Windows の read-only は明示的な書き込み可能ルートを付与しないが部分的なまま** — NTFS ハードリンクは 1 つのファイルオブジェクトを複数のパスに別名付けし、読み取りは制限されないままで、別の AppContainer ツールがパッケージ SID で ACL を付けたツリーは低整合性の子プロセスから読み取り不能です。NUL は両モードで書き込み可能のままです。デバイス DACL が Everyone に書き込みを付与し、より高いラベルを持たないためです。PowerShell の `> $null` リダイレクトは、それを開かずに引き続き機能します。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

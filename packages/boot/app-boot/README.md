@@ -1,218 +1,218 @@
 ---
-description: "Shared Loader boot support for dsh profiles and the temporary Python SDK runtime: environment layers, patches, diagnostics, and configuration preview."
+description: "dsh プロファイルと一時的な Python SDK ランタイム向けの共有 Loader ブート支援:環境層、パッチ、診断、設定プレビュー。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-app-boot
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-app-boot` is the shared Loader boot library behind `dsh` profiles, including the CLI packaged by the Python runtime wheel. It loads environment layers, composes profile bundles and patches, boots every plugin, and returns the running app or identifies the failed plugin and cause. Product applications use the `dsh` launcher instead of publishing separate bins; direct-config helpers remain only for lower-level embedders and tests. You can preview the effective configuration before booting, configure HMR through profile YAML, and let a terminal-owning app restore its terminal before a fatal exit.
+`dsh-app-boot` は `dsh` プロファイルの背後にある共有 Loader ブートライブラリであり、Python ランタイムホイールに同梱される CLI を含む。環境層を読み込み、プロファイルバンドルとパッチを合成し、すべてのプラグインをブートして、実行中のアプリを返すか、失敗したプラグインと原因を特定する。製品アプリケーションは個別の bin を公開する代わりに `dsh` ランチャーを使用し、直接設定ヘルパーは下位レベルの埋め込み側とテスト専用に残る。ブート前に実効設定をプレビューしたり、プロファイル YAML 経由で HMR を構成したり、端末を所有するアプリに致命的終了の前に端末を復元させたりできる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [本パッケージの使用方法](#use-this-package)
+- [実装の理解](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 本パッケージの使用方法
 
-Starting an app with this package is a small, explicit entry point: you give it a config file and it runs the whole boot. This section covers what you can do and what you get; the helper calls behind each outcome are documented in the folded implementation section.
+このパッケージでアプリを起動するのは、小さく明示的なエントリーポイントである:設定ファイルを渡すとブート全体が実行される。この節では可能なことと得られるものを扱い、各結果の背後にあるヘルパー呼び出しは折りたたまれた実装節に文書化されている。
 
-### When to use it
+### 使う場面
 
-Use it when implementing the shared `dsh` launcher or embedding its lower-level boot helpers. Product features belong in profile bundles instead of new application bins; code that only adds plugins to an already-running app mounts those plugins directly.
+共有 `dsh` ランチャーを実装するとき、またはその下位レベルブートヘルパーを埋め込むときに使う。製品機能は新しいアプリケーション bin ではなくプロファイルバンドルに属し、既に実行中のアプリにプラグインを追加するだけのコードはそれらのプラグインを直接マウントする。
 
-### Starting the app
+### アプリの起動
 
-You give your entry point a config file, and the process starts the whole app: it loads your environment layers, applies patches and profiles, boots every plugin, and returns once the app is running. In replay mode it boots the sibling `cordis.snapshot.yml` instead, so a recorded session reproduces identically. The smallest entry point is two calls:
+エントリーポイントに設定ファイルを渡すと、プロセスがアプリ全体を起動する:環境層を読み込み、パッチとプロファイルを適用し、すべてのプラグインをブートして、アプリの実行開始後に返る。リプレイモードでは代わりに兄弟 `cordis.snapshot.yml` をブートするため、記録済みセッションが同一に再現される。最小のエントリーポイントは 2 呼び出しである:
 
 ```text
 installFailLoud('dsh')
 const ctx = await boot('dsh', resolveConfigPath(argv[2], process.env.DSH_SNAPSHOT))
 ```
 
-`installFailLoud` writes one labelled `util.inspect` diagnostic to stderr for an unhandled rejection or an uncaught exception, awaits the surface's release hook under a fixed timeout, and exits 1; control never returns to the failed operation, because only the throw site knows which state is intact, and the event loop runs only until the release settles or times out. With that entry point, startup keeps every plugin that can activate. An enabled failed plugin produces a labelled warning. A failed required entry makes startup dispose the whole app and exit nonzero; required ids absent from a profile and disabled required entries do not affect startup. The global required list covers shared Agent execution, application endpoints, and Web bootstrap/transport: `agent-loop`, `webserver`, `web-runtime`, `modules`, `connection`, `headless-runner`, `acp`, and `sdk-jsonrpc-server`.
+`installFailLoud` は未処理の reject または未捕捉の例外に対してラベル付き `util.inspect` 診断を 1 件 stderr に書き出し、固定タイムアウト下でサーフェスの release フックを待機して、終了コード 1 で終了する;どの状態が無事かを知るのは throw 部位だけなので、制御が失敗した操作に戻ることは決してなく、イベントループは release の解決またはタイムアウトまでしか回らない。そのエントリーポイントでは、起動は活性化できるすべてのプラグインを保持する。有効な失敗プラグインはラベル付き警告を生じる。失敗した必須エントリがあると起動はアプリ全体を破棄して非ゼロ終了する;プロファイルに存在しない必須 id と無効化された必須エントリは起動に影響しない。グローバル必須リストは共有 Agent 実行、アプリケーションエンドポイント、Web ブートストラップ/トランスポートを対象とする:`agent-loop`、`webserver`、`web-runtime`、`modules`、`connection`、`headless-runner`、`acp`、`sdk-jsonrpc-server`。
 
 <a id="profiles"></a>
-### Profiles
+### プロファイル
 
-Import profile and bundle declaration types from [`@deepseek-ai/dsh-package-manifest`](../../util/package-manifest/README.md). App-boot adapts `DshPackageManifest` to `ProfileManifest` with optional package identity because local profiles need no published version. App-boot owns profile loading, JSON validation, and resolved runtime data.
+プロファイルとバンドルの宣言型は [`@deepseek-ai/dsh-package-manifest`](../../util/package-manifest/README.md) からインポートする。ローカルプロファイルには公開バージョンが不要なため、app-boot は `DshPackageManifest` を任意パッケージ識別子付き `ProfileManifest` に適合させる。app-boot はプロファイル読み込み、JSON 検証、解決済みランタイムデータを所有する。
 
-A profile is how one dsh installation ships different app surfaces: `web`, `headless`, `acp`, `sdk`, and `sdk-minimal` start distinct compositions from the same launcher. A profile lives at `$DSH_HOME/profiles/<name>` and combines installable bundles with its own `cordis.patch.yml`. A bundle's `dsh.bundle.patch` names one patch file or an ordered list of files; `bundlePatchFiles` validates the declaration and `bundlePatchPaths` resolves it to absolute paths; the layer concatenates their patch lists in that order. The YAML composition enables or disables HMR. The shipped `web` template uses live reload, while the other shipped templates apply patches only at startup. `sdk-minimal` names only its standalone bundle; the other templates retain base-plus-mode stacks. `dsh --profile <name> --from-default-profile <template>` creates or replaces a custom profile at a non-shipped name from one shipped template, while `dsh plugin` initializes a base-backed profile and manages its installed bundles. Bundle resolution, manifest, and patch-loading failures skip that bundle without changing its selection; the loaded profile lists each skip in `skippedBundles`, and the launcher prints them once per start with `reportSkippedBundles`. Remaining bundles keep their order; profile and user-patch errors still fail startup. Skipping a bundle does not guarantee that the remaining composition can provide the required services. Application-owned npm projects, such as Electron's reserved Desktop profile, use `loadProfileDirectory` to load an already initialized directory without exposing it through CLI profile lookup.
+プロファイルとは、1 つの dsh インストールが異なるアプリサーフェスを提供する仕組みである:`web`、`headless`、`acp`、`sdk`、`sdk-minimal` が同じランチャーから異なる合成を起動する。プロファイルは `$DSH_HOME/profiles/<name>` に存在し、インストール可能バンドルと独自の `cordis.patch.yml` を組み合わせる。バンドルの `dsh.bundle.patch` は 1 つのパッチファイルまたは順序付きファイルリストを名指しし、`bundlePatchFiles` が宣言を検証して `bundlePatchPaths` が絶対パスに解決し、層はその順序でパッチリストを連結する。YAML 合成は HMR の有効無効を決める。出荷 `web` テンプレートはライブリロードを使い、他の出荷テンプレートは起動時にのみパッチを適用する。`sdk-minimal` は単独バンドルのみを名指しし、他のテンプレートは base-plus-mode スタックを保つ。`dsh --profile <name> --from-default-profile <template>` は出荷テンプレートから非出荷名でカスタムプロファイルを作成または置換し、`dsh plugin` は base 引き継ぎプロファイルを初期化してインストール済みバンドルを管理する。バンドル解決、manifest、パッチ読み込みの失敗はその選択を変更せずに当該バンドルをスキップし、読み込まれたプロファイルは各スキップを `skippedBundles` に列挙して、ランチャーが起動ごとに 1 回 `reportSkippedBundles` で出力する。残りのバンドルは順序を保ち、プロファイルとユーザーパッチのエラーは依然として起動を失敗させる。バンドルをスキップしても残りの合成が必須サービスを提供できる保証はない。Electron の予約済み Desktop プロファイルのようなアプリケーション所有 npm プロジェクトは、CLI プロファイル検索に公開せずに初期化済みディレクトリを読み込むため `loadProfileDirectory` を使う。
 
-Before a profile imports a plugin, DSH checks its declared DSH requirement against the single runtime version returned by `getDshRuntimeVersion()`. When the manifest declares `engines.dsh`, that range alone decides and `peerDependencies` are ignored. Otherwise every `peerDependencies` range on `@deepseek-ai/dsh` and `@deepseek-ai/dsh-*` must match, and source-workspace `workspace:^`, `workspace:~`, and `workspace:*` peers refer to that same runtime. Prereleases participate in range matching. A manifest with neither declaration imposes no constraint; empty or invalid ranges, including a `workspace:` value in `engines.dsh`, are incompatible. A non-object `engines` or a non-string `engines.dsh` is a malformed manifest. A refusal names the unmet requirements, keyed `engines.dsh` or by peer package name. These checks are not a sandbox against malicious package code.
+プロファイルがプラグインをインポートする前に、DSH は宣言された DSH 要件を `getDshRuntimeVersion()` が返す単一ランタイムバージョンと照合する。manifest が `engines.dsh` を宣言する場合、その範囲だけが決定打となり `peerDependencies` は無視される。そうでない場合、`@deepseek-ai/dsh` と `@deepseek-ai/dsh-*` へのすべての `peerDependencies` 範囲が一致しなければならず、ソースワークスペースの `workspace:^`、`workspace:~`、`workspace:*` ピアは同じランタイムを指す。プレリリースは範囲照合に参加する。どちらの宣言もない manifest は制約を課さない;`engines.dsh` 内の `workspace:` 値を含む空または無効な範囲は非互換である。非オブジェクト `engines` または非文字列 `engines.dsh` は不正 manifest である。拒否は未充足要件を `engines.dsh` またはピアパッケージ名をキーに名指しする。これらの検査は悪意あるパッケージコードに対するサンドボックスではない。
 
-Admission happens only at composition boundaries DSH owns, and a denied row is denied in the launcher's own copy of the composition: no profile patch layer, dependency manifest, or bundle list changes. `prepareProfilePatches` composes over the launcher's empty profile root and runs while the root Include is mounted and on every profile recomposition, so a denied plugin never imports its module. `prepareProfileEntries` does the same for a preset's rows. A denied ordinary row becomes a detached `disabled: true` row; a native group stays mounted and its denied children do not load; a native Include that reaches a denied plugin is omitted whole, because its file is never rewritten. A row denied by policy keeps its configured `disabled` value in the profile, and every refusal is reported with the package, versions, and risk. A bundle is not a row, so `loadProfileDirectory` checks each bundle's own DSH requirement when it loads the profile's bundle layers, at startup and on every recomposition; an incompatible bundle without an exemption is skipped like an unreadable one and listed in `skippedBundles`. These boundaries do not cover plugins another embedder mounts through its own `ctx.plugin` call. Two edits made directly to files during a session are judged only at the next recomposition or startup: a running plugin's own `package.json` DSH requirement, and an entry-list file the Loader reads itself, such as the launcher's root config or a nested `cordis:include` file. `--dump-config` reports the configured composition, so a denied plugin row still appears there while a denied bundle contributes no rows, and `--dump-config-schema` imports each composed module to read its schema; run it only against a profile whose plugins you already trust.
+受け入れは DSH が所有する合成境界でのみ起こり、拒否された行はランチャー自身の合成コピー内で拒否される:プロファイルパッチ層、依存 manifest、バンドルリストは変わらない。`prepareProfilePatches` はランチャーの空プロファイルルート上で合成し、ルート Include のマウント中およびプロファイル再合成ごとに実行されるため、拒否されたプラグインのモジュールがインポートされることは決してない。`prepareProfileEntries` もプリセットの行に同じことを行う。拒否された通常行は切り離された `disabled: true` 行となり、ネイティブグループはマウントを保って拒否された子は読み込まれず、拒否プラグインに到達するネイティブ Include はファイルが書き換えられないため全体が省略される。ポリシーで拒否された行はプロファイル内の設定済み `disabled` 値を保ち、すべての拒否はパッケージ、バージョン、リスクとともに報告される。バンドルは行ではないため、`loadProfileDirectory` はプロファイルのバンドル層読み込み時に各バンドル独自の DSH 要件を検査する(起動時と再合成ごと);適用除外のない非互換バンドルは読み取り不能バンドルと同様にスキップされ `skippedBundles` に列挙される。これらの境界は、別の埋め込み側が独自の `ctx.plugin` 呼び出しでマウントするプラグインを対象としない。セッション中にファイルへ直接行われた 2 つの編集は次回再合成または起動時にのみ判定される:実行中プラグイン自身の `package.json` DSH 要件と、ランチャーのルート設定や入れ子 `cordis:include` ファイルのような Loader 自身が読むエントリーリストファイルである。`--dump-config` は設定済み合成を報告するため、拒否プラグイン行は依然としてそこに現れる一方で拒否バンドルは行を寄与せず、`--dump-config-schema` はスキーマ読み取りのため合成済み各モジュールをインポートする;既に信頼するプラグインだけのプロファイルに対して実行すること。
 
-Exact-version exemptions live in the profile's own `compatibility.json`, not in its `package.json`, so an exemption write never touches the dependency manifest, the bundle list, or Cordis patch files. It maps exact `package-name@version` keys to lists of exact DSH runtime versions; neither a plugin upgrade nor a DSH upgrade inherits permission. A missing file means no exemptions. A malformed one never stops the profile from starting: records the reader accepts still apply, each rejected record is reported on stderr beside the plugin denials, and the file is then treated as read-only, so a grant or revocation refuses and asks the user to repair it by hand instead of overwriting their content. [Plugin Manager](../plugin-manager/README.md#version-compatibility-and-exemptions) owns the grant, revocation, and risk confirmation each change requires.
+完全バージョン適用除外はプロファイル独自の `compatibility.json` に存在し、その `package.json` には存在しないため、適用除外の書き込みが依存 manifest、バンドルリスト、Cordis パッチファイルに触れることは決してない。完全な `package-name@version` キーを完全 DSH ランタイムバージョンのリストに対応付ける;プラグイン更新も DSH 更新も許可を継承しない。ファイルが無ければ適用除外なしである。不正なファイルでもプロファイルの起動を止めることは決してない:読み手が受け入れたレコードは依然適用され、拒否された各レコードはプラグイン拒否の脇に stderr へ報告され、その後ファイルは読み取り専用として扱われるため、付与や取り消しは拒否されて内容を手で修復するよう求める。[Plugin Manager](../plugin-manager/README.md#version-compatibility-and-exemptions) が各変更に必要な付与、取り消し、リスク確認を所有する。
 
-Your machine-local preferences also live in the Harness home:
+マシンローカルな好みも Harness ホームに存在する:
 
-- **`.env`** — your ordinary environment layers: the invoking directory's file outranks the Harness-home file, and both sit below the inherited environment. Variables that decide how the process starts (`PATH`, `DSH_*`, `XDG_*` and similar) are rejected from files: export them instead. The four proxy names (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`) are accepted from the Harness-home file only, never from the invoking directory's, which arrives with a clone. For a non-product bin that just wants one directory's `.env`, a missing file is fine and an unloadable one prints one labelled warning line.
-- **`cordis.patch.yml`** — your tweak layer, applied after every bundle layer (per-profile first, then the home-level file, which therefore outranks it): replace one entry's whole config (restating the fields you keep), insert new entries, or interpolate `!!js` expressions at boot. A patch naming an entry that does not exist prints a stderr warning; an empty or comments-only file fails boot — disable the layer with `[]` instead.
+- **`.env`** — 通常の環境層:呼び出し側ディレクトリのファイルが Harness ホームのファイルより優先され、どちらも継承環境より下位にある。プロセスの起動方法を決める変数(`PATH`、`DSH_*`、`XDG_*` など)はファイルから拒否される:代わりに export すること。4 つのプロキシ名(`HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY`、`NO_PROXY`)は Harness ホームのファイルからのみ受け入れ、クローンとともに届く呼び出し側ディレクトリのファイルからは決して受け入れない。1 ディレクトリの `.env` だけが欲しい非製品 bin では、ファイルが無くてもよく、読み込み不能ファイルはラベル付き警告を 1 行出力する。
+- **`cordis.patch.yml`** — 微調整層であり、すべてのバンドル層の後に適用される(プロファイル別が先、次にホームレベルファイルなので後者が優先される):1 エントリの config 全体を置換する(保持するフィールドは再記述する)、新規エントリを挿入する、またはブート時に `!!js` 式を補間する。存在しないエントリを名指すパッチは stderr 警告を出力し、空またはコメントのみのファイルはブートを失敗させる — 代わりに `[]` で層を無効化すること。
 
-The enabled `dsh-hmr` plugin watches the profile manifest and both user patch files, re-reads the ordered bundle layers, and applies the [reload failure policy](#startup-and-reload-failures). [DSH HMR](../hmr/README.md) serializes these reloads with [Plugin Manager](../plugin-manager/README.md) configuration writes; package operations run outside its queue. The launcher does not install HMR or watchers; disabled or absent HMR means changes require restart.
+有効な `dsh-hmr` プラグインはプロファイル manifest と両ユーザーパッチファイルを監視し、順序付きバンドル層を再読み込みして [再読み込み失敗ポリシー](#startup-and-reload-failures) を適用する。[DSH HMR](../hmr/README.md) はこれらの再読み込みを [Plugin Manager](../plugin-manager/README.md) の設定書き込みと直列化し、パッケージ操作はそのキューの外で実行される。ランチャーは HMR もウォッチャーも導入しない;HMR が無効または不在なら変更に再起動が必要である。
 
-Inserted plugin names may be absolute filesystem paths, file URLs, or package specifiers. Patch loading converts absolute paths and patch-relative `./` or `../` paths to file URLs within `insert` rows and their nested groups; existing-entry name assertions and replacement `config` values remain literal.
+挿入プラグイン名は絶対ファイルシステムパス、ファイル URL、パッケージ指定子のいずれでもよい。パッチ読み込みは `insert` 行とその入れ子グループ内の絶対パスおよびパッチ相対 `./`・`../` パスをファイル URL に変換し、既存エントリの名前表明と置換 `config` 値はリテラルのままである。
 
-Before mounting profile rows, the `dsh` launcher computes one immutable runtime resolution from the installation and ordered bundle dependency graphs. Every profile launcher uses runtime resolution, including plain Node, packaged executables, and the Electron Host. It installs the runtime resolution through Node's ESM and CommonJS resolvers without creating fallback links.
+プロファイル行のマウント前に、`dsh` ランチャーはインストールと順序付きバンドル依存グラフから 1 つの不変ランタイム解決を算出する。素の Node、パッケージ化実行ファイル、Electron Host を含め、すべてのプロファイルランチャーがランタイム解決を使う。フォールバックリンクを作らずに Node の ESM および CommonJS リゾルバー経由でランタイム解決を導入する。
 
-`sanitizeProfile(binName, profileDir, bundles)` provides filesystem recovery without loading plugins or parsing patches. Desktop uses it for native fatal recovery. Call it only after stopping the profile and excluding concurrent profile writes. It renames the profile’s `cordis.patch.yml` to a unique `.bak-<timestamp>` sibling and restores the supplied bundle list, preserving installed packages and other manifest fields. The timestamp is Unix time in milliseconds; collisions append an ordinal (`-1`, `-2`, …) without changing it. It returns the backup path, or `undefined` when no patch exists; missing profiles remain absent. Profile initialization recreates an empty patch on the next launch. The home-level patch is unchanged. Invalid profile JSON fails before mutation; later errors propagate and retain completed changes for retry.
+`sanitizeProfile(binName, profileDir, bundles)` はプラグイン読み込みもパッチ解析もせずにファイルシステム回復を提供する。Desktop はネイティブ致命的回復に使う。プロファイル停止後かつ並行プロファイル書き込みを排除してからのみ呼び出すこと。プロファイルの `cordis.patch.yml` を一意な `.bak-<timestamp>` 兄弟に改名し、供給バンドルリストを復元して、インストール済みパッケージと他の manifest フィールドを保持する。タイムスタンプはミリ秒単位 Unix 時刻であり、衝突時はそれを変えずに序数(`-1`、`-2`、…)を付加する。パッチが無ければバックアップパス、無ければ `undefined` を返し、存在しないプロファイルは不在のままである。プロファイル初期化は次回起動時に空パッチを再作成する。ホームレベルパッチは不変である。無効なプロファイル JSON は変更前に失敗し、後のエラーは伝播して完了済み変更を再試行向けに保持する。
 
-### Previewing the effective configuration
+### 実効設定のプレビュー
 
-Before you boot, you can print the exact configuration the app will mount: the dump shows the composed entry list with `!!js` expressions verbatim, grouped under comments naming each source file and the patch layers that changed it, as one loadable YAML document. Patches that match no row are reported with their layer label; a missing, unparsable, or invalid config fails the dump.
+ブート前に、アプリがマウントする正確な設定を出力できる:ダンプは合成済みエントリーリストを `!!js` 式つき逐語で、各ソースファイルとそれを変更したパッチ層を名指すコメントの下にグループ化して、1 つの読み込み可能 YAML 文書として示す。行に一致しないパッチは層ラベル付きで報告され、欠落・解析不能・無効な設定はダンプを失敗させる。
 
-### Inspecting plugin configuration schemas
+### プラグイン設定スキーマの検査
 
-`generateConfigSchema` takes a diagnostic bin name, a prepared on-disk profile, ordered patch lists, and an installation anchor, and returns `ConfigSchemaDump`. App-boot owns composition, runtime resolution, and collection diagnostics. The caller owns profile preparation, home/argv layer selection, process streams, and exit policy. `createConfigProjector`, `isNativeConfigSchema`, and `LOADER_EXPRESSION_SCHEMA` are exported for callers that project one live plugin Config without profile collection; projected value positions reference `#/$defs/loaderExpression`, so the enclosing document must define it.
+`generateConfigSchema` は診断 bin 名、準備済みオンディスクプロファイル、順序付きパッチリスト、インストールアンカーを受け取り、`ConfigSchemaDump` を返す。app-boot は合成、ランタイム解決、収集診断を所有する。呼び出し側はプロファイル準備、ホーム/argv 層選択、プロセスストリーム、終了ポリシーを所有する。`createConfigProjector`、`isNativeConfigSchema`、`LOADER_EXPRESSION_SCHEMA` はプロファイル収集なしに 1 つのライブプラグイン Config を投影する呼び出し側向けにエクスポートされ、投影値位置は `#/$defs/loaderExpression` を参照するため、外側文書がそれを定義しなければならない。
 
-The generated JSON Schema 2020-12 describes the composed entry list, with `$defs.patchList` for root-tree overlays and shared definitions projected from plugin Config graphs. It includes disabled entries, native groups, and literal YAML/JSON includes; builtin and canonical native package exports are matched using each tree's module-resolution base, including profile-local copies. Custom carriers are not inferred from their config fields. A missing include with literal `initial` entries is expanded in memory without writes. Discovery and projection diagnostics remain in `x-cordis`, including unknown Configs and partial constraints. The [CLI schema-dump reference](../../../apps/cli/reference/README.md#config-schema-dump) owns the output fields and editing semantics.
+生成された JSON Schema 2020-12 は合成済みエントリーリストを記述し、ルートツリーオーバーレイ用の `$defs.patchList` とプラグイン Config グラフから投影された共有定義を含む。無効エントリ、ネイティブグループ、リテラル YAML/JSON インクルードを含み、組み込みおよび正準ネイティブパッケージエクスポートはプロファイルローカル複製を含む各ツリーのモジュール解決基盤で照合される。カスタムキャリアは config フィールドから推測されない。リテラル `initial` エントリ付きの欠落インクルードは書き込みなしにメモリ内で展開される。未知 Config や部分制約を含む検出・投影診断は `x-cordis` に残る。[CLI schema-dump リファレンス](../../../apps/cli/reference/README.md#config-schema-dump) が出力フィールドと編集意味論を所有する。
 
-The projector preserves native omission behavior by checking literal defaults against generated schemas with Ajv, without executing native validators or transform callbacks. Regex compatibility checks and unsupported or recursive-default cases produce explicit limitations. Opaque input adaptations and lazy metadata effects widen validation rather than replaying native mutation. Non-JSON default/presentation annotations are omitted with limitations without losing the structural schema; an unrepresentable default leaves omission acceptance unknown unless the field is required. These dependencies load only when collection runs. Imports, Config getters, and lazy builders still execute trusted code; collection is not a sandbox. Do not overlap profile-resolution interceptions. The collector releases its interception before returning, while Node retains imported modules; runtime-created plugins and Agent preset instances remain outside discovery.
+投影器は、ネイティブ検証器や変換コールバックを実行せず、Ajv でリテラル既定値を生成スキーマと照合することでネイティブ省略動作を保持する。正規表現互換検査や未対応・再帰既定値ケースは明示的制限を生じる。不透明入力適応と遅延メタデータ効果はネイティブ変更を再現するのではなく検証を広げる。非 JSON 既定値/提示注釈は構造スキーマを失わずに制限付きで省略され、表現不能な既定値はフィールドが必須でない限り省略受容を不明のままにする。これらの依存は収集実行時にのみ読み込まれる。インポート、Config ゲッター、遅延ビルダーは依然として信頼済みコードを実行し、収集はサンドボックスではない。プロファイル解決介入を重ねないこと。収集器は復帰前に介入を解除するが、Node はインポート済みモジュールを保持し、ランタイム作成プラグインと Agent プリセットインスタンスは検出外のままである。
 
-### Reading plugin display metadata
+### プラグイン表示メタデータの読み取り
 
-`resolvePluginResource(specifier, parentURL)` resolves a plugin module or exported resource to its local filesystem path through the active Node ESM resolver without evaluating it. It throws when the resolver is unavailable or the resource cannot resolve to a local file.
+`resolvePluginResource(specifier, parentURL)` はプラグインモジュールまたはエクスポート済みリソースを、評価せずに有効 Node ESM リゾルバー経由でローカルファイルシステムパスに解決する。リゾルバーが利用不能な場合やリソースがローカルファイルに解決できない場合に throw する。
 
-Use `readPluginMeta(specifier, parentURL)` or `ctx.pluginPackages.metaOf(specifier, parentURL)` to read installed package display text without importing or activating the plugin. Lookup uses the complete package specifier and the caller's resolution base, respecting Node exports. File paths and file URLs return no metadata without resolving resources. For a package-root specifier, missing locale fields fall back to the accessible `package.json`; a subpath specifier never reads a `package.json`. Malformed metadata returns an `error` diagnostic. Results retain translations for Client-side language selection. The reader also loads an image data URL, even when locale text is complete: a package root uses its manifest `icon`, or `<package>/icon` when that field is omitted; a subpath uses `<specifier>/icon`. An icon error preserves valid text alongside the diagnostic. See [Plugin display metadata](../../../docs/cookbook/adding-a-package.md#plugin-display-metadata) for the author format.
+プラグインのインポートも活性化もせずにインストール済みパッケージ表示文を読むには `readPluginMeta(specifier, parentURL)` または `ctx.pluginPackages.metaOf(specifier, parentURL)` を使う。検索は完全パッケージ指定子と呼び出し側解決基盤を使い、Node exports を尊重する。ファイルパスとファイル URL はリソース解決なしにメタデータを返さない。パッケージルート指定子では、欠落ロケールフィールドは到達可能 `package.json` にフォールバックし、サブパス指定子は `package.json` を決して読まない。不正メタデータは `error` 診断を返す。結果は Client 側言語選択向けに翻訳を保持する。読み手はロケール文が完全でも画像データ URL を読み込む:パッケージルートは manifest の `icon`、当該フィールド省略時は `<package>/icon` を使い、サブパスは `<specifier>/icon` を使う。アイコンエラーは診断とともに有効文を保持する。著者形式は [プラグイン表示メタデータ](../../../docs/cookbook/adding-a-package.md#plugin-display-metadata) を参照。
 
-`ON_DEMAND_BUNDLES` names the public Official packages installed only on request. `OFFICIAL_ON_DEMAND_CATALOG` embeds their package-owned localized metadata and icons for offline discovery; `pnpm gen-official-bundle-catalog` explicitly updates generated content, and `verify-official-bundle-catalog` checks resource completeness and freshness; builds consume the committed catalog without importing provider code. The catalog contains no install target: [Plugin Manager](../plugin-manager/README.md#use-this-package) derives it from the running version and installation and uses the ordinary bundle installer. The [product-use check](../../../scripts/verify-product-use.ts) composes shipped and on-demand selections against Web without executing providers.
+`ON_DEMAND_BUNDLES` は要求時にのみインストールされる公開 Official パッケージを名指しする。`OFFICIAL_ON_DEMAND_CATALOG` はオフライン検出向けにパッケージ所有のローカライズ済みメタデータとアイコンを埋め込み、`pnpm gen-official-bundle-catalog` が生成内容を明示更新し、`verify-official-bundle-catalog` がリソース完全性と鮮度を検査する;ビルドはプロバイダーコードをインポートせずにコミット済みカタログを消費する。カタログはインストール先を含まない:[Plugin Manager](../plugin-manager/README.md#use-this-package) が実行バージョンとインストールからそれを導出して通常バンドルインストーラーを使う。[product-use 検査](../../../scripts/verify-product-use.ts) はプロバイダーを実行せずに出荷・オンデマンド選択を Web に対して合成する。
 
 <a id="startup-and-reload-failures"></a>
-### Startup and reload failures
+### 起動時と再読み込み時の失敗
 
-Profile reconciliation returns diagnostics for unchanged inactive entries without failing an unrelated mutation. A new inactive entry, a changed configuration or fiber, or a changed diagnostic fails reconciliation; removed fibers must still finish disposal. Explicit enablement targets must activate even when their failure predates the operation. `recomposeProfile(ctx, patches, binName, { requiredIds, running })` runs one recomposition together with the runtime resolution: it removes the rows the generation no longer lists and waits for their disposal while their packages are still mapped, publishes the latest generation of a recomputable resolution, runs the compatibility preflight against the published packages, applies the generation, starts the `running` entries and entries whose import failed that the update left without a running fiber, and judges activation. `running` lists the entries that ran before the caller stopped some of them; each that failed afterwards counts as a new failure. A failure before the generation applies puts the removed rows back at their places, which starts them again, and starts the `running` entries again. An entry waiting for a service is reported as a warning unless it is required, so it starts once a provider appears; `reconcileProfilePatches()` judges it the same way. A publication the resolution rejects is such a failure and reports `package-moved`. `reconcileProfilePatches()`, which the Config Editor uses, applies and judges the patches without publishing the resolution or retrying failed imports. An entry whose import failed is reported with the error Loader's import returns again, so judging it evaluates the module when the import now succeeds; the state recorded before the change imports nothing, so an entry whose import failed before counts as the same failure whatever its error now is. Successful reconciliation emits `app-boot/config-reload` after lifecycle settlement and diagnostic checks, including programmatic updates without HMR. The event carries no diff or parsed config. Successful reconciliation returns after lifecycle settlement and diagnostic checks; volatile-only entry changes are committed by Loader during the update.
+プロファイル再調整は、無関係な変更を失敗させずに不変の非活性エントリ向け診断を返す。新規非活性エントリ、変更された設定やファイバー、変更された診断は再調整を失敗させる;除去されたファイバーは破棄完了を待たなければならない。明示的有効化対象は失敗が操作に先行しても活性化しなければならない。`recomposeProfile(ctx, patches, binName, { requiredIds, running })` はランタイム解決とともに 1 回の再合成を実行する:生成が列挙しなくなった行を除去してパッケージ対応付けが残る間に破棄を待機し、再算出可能解決の最新生成を公開し、公開済みパッケージに対して互換性プリフライトを実行し、生成を適用して、`running` エントリと更新で実行ファイバーなしに残ったインポート失敗エントリを起動し、活性化を判定する。`running` は呼び出し側が一部を停止する前に実行していたエントリを列挙し、その後に失敗したものは各々新規失敗として数える。生成適用前の失敗は除去行を元の位置に戻し、それらを再起動して、`running` エントリも再起動する。サービス待ちエントリは必須でない限り警告として報告されるため、プロバイダー出現後に起動する;`reconcileProfilePatches()` も同様に判定する。解決が拒否した公開はそのような失敗であり `package-moved` を報告する。Config Editor が使う `reconcileProfilePatches()` は解決の公開も失敗インポートの再試行もせずにパッチを適用・判定する。インポート失敗エントリは Loader のインポートが返すエラーで再び報告されるため、それを判定するとインポート成功時にはモジュールが評価される;変更前に記録された状態は何もインポートしないため、以前からインポート失敗のエントリは現在のエラーにかかわらず同一失敗として数える。再調整の成功はライフサイクル解決と診断検査の後に `app-boot/config-reload` を送出し、HMR なしのプログラム更新を含む。イベントは差分も解析済み設定も運ばない。再調整の成功はライフサイクル解決と診断検査の後に復帰し、揮発性のみのエントリ変更は更新中に Loader がコミットする。
 
-After the Loader settles, app-boot warns when only optional entries are inactive. If an enabled required entry cannot activate, `boot()` rejects with `StartupError` after disposal. An independently owned logger exporter retains warning and error records through asynchronous disposal and is released before `boot()` settles. Its message groups all failed plugins and pending services, marks required entries, and retains original stacks, nested causes, and aggregate members. The CLI prints that message once and saves [full startup diagnostics](../../../apps/cli/reference/README.md#startup-diagnostics) before exiting with code 1; unrelated exceptions retain their normal stack output. In the table, stopping startup means disposing any mounted plugins and exiting nonzero without reporting readiness; continuing keeps successful plugins running. Later configuration HMR does not repeat the required-startup audit and does not roll back the whole update.
+Loader の解決後、app-boot は任意エントリのみが非活性の場合に警告する。有効な必須エントリが活性化できない場合、`boot()` は破棄後に `StartupError` で reject する。独立所有の logger エクスポーターは非同期破棄を通じて警告・エラー記録を保持し、`boot()` 解決前に解放される。そのメッセージは失敗プラグインと保留サービスをすべてグループ化し、必須エントリを標示して、元のスタック、入れ子原因、集約メンバーを保持する。CLI はそのメッセージを 1 回出力して [完全な起動診断](../../../apps/cli/reference/README.md#startup-diagnostics) を保存してから終了コード 1 で終了し、無関係な例外は通常のスタック出力を保つ。表において、起動停止とはマウント済みプラグインを破棄して準備完了報告なしに非ゼロ終了することであり、継続とは成功プラグインを実行し続けることである。後の設定 HMR は必須起動監査を繰り返さず、更新全体をロールバックしない。
 
-| Failure pattern | Optional entry at startup | Required entry at startup | Later configuration HMR |
+| 失敗パターン | 起動時の任意エントリ | 起動時の必須エントリ | 後の設定 HMR |
 |---|---|---|---|
-| Root config or required overlay is missing, unreadable, malformed, or contains invalid entries | Stop startup | Stop startup | Malformed or invalid live patches are rejected without changing the running configuration; a valid edit applies |
-| Module import fails or module evaluation throws | Warn; continue | Stop startup | Report the error; keep successful siblings; a corrected import can activate |
-| Plugin config schema validation fails | Warn; continue | Stop startup | A new entry stays inactive; an existing entry retains its prior instance and config; a valid correction applies |
-| Config `!!js` evaluation throws | Warn; continue | Stop startup | Report the error; keep successful siblings; a valid correction can activate |
-| `disabled: !!js` evaluation throws | Warn; continue | Stop startup | Report the evaluation error rather than treating the entry as disabled; a valid correction can activate |
-| Synchronous `apply()` throws | Warn; continue | Stop startup | Report the error; keep successful siblings; corrected config can activate |
-| Asynchronous `apply()` throws | Warn after settlement; continue | Stop startup after settlement | Report the error after settlement; keep successful siblings; corrected config can activate |
-| An injected service is unavailable | Warn; continue while the entry waits for its dependencies | Stop startup | Keep the entry waiting; adding the missing provider can activate it |
-| HTTP port binding fails | Warn; continue without that endpoint | Stop startup | Keep the process running without the failed endpoint; corrected config can restore it |
-| Detached asynchronous work outside the `apply()` return Promise produces an unhandled rejection | Fatal: dispose the app and exit nonzero | Fatal: dispose the app and exit nonzero | Fatal: dispose the app and exit nonzero, regardless of entry id |
-| A synchronous callback (a stream `'data'` listener, a timer) throws an uncaught exception at any point in the process lifetime | Fatal: dispose the app and exit nonzero; the failed operation is not resumed | Fatal: dispose the app and exit nonzero; the failed operation is not resumed | Fatal: dispose the app and exit nonzero, regardless of entry id |
-| Entry is absent or explicitly disabled | Ignore it | Ignore it | Do not activate it; no required-startup audit |
+| ルート設定または必須オーバーレイが欠落、読み取り不能、不正、または無効エントリを含む | 起動停止 | 起動停止 | 不正または無効なライブパッチは実行中設定を変更せずに拒否され、有効な編集は適用される |
+| モジュールインポートの失敗またはモジュール評価の throw | 警告し、継続 | 起動停止 | エラーを報告し、成功した兄弟を保持し、修正されたインポートは活性化できる |
+| プラグイン設定スキーマ検証の失敗 | 警告し、継続 | 起動停止 | 新規エントリは非活性のままであり、既存エントリは以前のインスタンスと設定を保持し、有効な修正は適用される |
+| 設定 `!!js` 評価の throw | 警告し、継続 | 起動停止 | エラーを報告し、成功した兄弟を保持し、有効な修正は活性化できる |
+| `disabled: !!js` 評価の throw | 警告し、継続 | 起動停止 | エントリを無効として扱うのではなく評価エラーを報告し、有効な修正は活性化できる |
+| 同期 `apply()` の throw | 警告し、継続 | 起動停止 | エラーを報告し、成功した兄弟を保持し、修正された設定は活性化できる |
+| 非同期 `apply()` の throw | 解決後に警告し、継続 | 解決後に起動停止 | 解決後にエラーを報告し、成功した兄弟を保持し、修正された設定は活性化できる |
+| 注入サービスが利用不能 | 警告し、エントリが依存先を待つ間継続 | 起動停止 | エントリを待機させ続け、欠落プロバイダーの追加で活性化できる |
+| HTTP ポート結合の失敗 | 警告し、当該エンドポイントなしで継続 | 起動停止 | 失敗したエンドポイントなしでプロセスを実行し続け、修正された設定で復元できる |
+| `apply()` 戻り Promise の外側の切り離された非同期作業が未処理 reject を生じる | 致命的:アプリを破棄して非ゼロ終了 | 致命的:アプリを破棄して非ゼロ終了 | 致命的:エントリ id にかかわらずアプリを破棄して非ゼロ終了 |
+| 同期コールバック(ストリーム `'data'` リスナー、タイマー)がプロセス存続期間中の任意時点で未捕捉例外を throw する | 致命的:アプリを破棄して非ゼロ終了し、失敗した操作は再開されない | 致命的:アプリを破棄して非ゼロ終了し、失敗した操作は再開されない | 致命的:エントリ id にかかわらずアプリを破棄して非ゼロ終了 |
+| エントリが不在または明示的に無効 | 無視する | 無視する | 活性化せず、必須起動監査なし |
 
-The required list above includes `modules` and `connection`; Web startup cannot succeed when either enabled entry fails. Failure of an optional provider can also prevent a required consumer from activating. Schema rejection before an existing entry updates is not a transactional rollback of sibling changes.
+上記の必須リストは `modules` と `connection` を含み、いずれかの有効エントリが失敗すると Web 起動は成功できない。任意プロバイダーの失敗が必須コンシューマーの活性化を妨げる場合もある。既存エントリ更新前のスキーマ拒否は兄弟変更のトランザクション的ロールバックではない。
 
-The [Web process matrix](../../../apps/cli/tests/profiles/web/tests/web-failure-matrix.expected.e2e.ts) and [startup acceptance](../../../apps/cli/tests/profiles/web/tests/web-best-effort-startup.expected.e2e.ts) verify these outcomes through the shipped Web profile; [app-boot tests](tests/app-boot.spec.ts) also exercise root Include failures.
+[Web プロセスマトリクス](../../../apps/cli/tests/profiles/web/tests/web-failure-matrix.expected.e2e.ts) と [起動受入](../../../apps/cli/tests/profiles/web/tests/web-best-effort-startup.expected.e2e.ts) は出荷 Web プロファイルを通じてこれらの結果を検証し、[app-boot テスト](tests/app-boot.spec.ts) もルート Include 失敗を対象とする。
 
-If your app owns the terminal, it can hand the terminal back before the process exits, so your shell is never left in raw mode. The handoff is bounded: a stuck cleanup delays the fatal exit but never cancels it.
+アプリが端末を所有する場合、プロセス終了前に端末を返却できるため、シェルが生モードに置き去りにされることは決してない。引き継ぎは有界である:行き詰まったクリーンアップは致命的終了を遅延させるが、取り消すことは決してない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains how the outcomes above are realized and points at the code that realizes them; everything here is developer-facing and not needed to use the package.
+この節では上記の結果がどのように実現されるかを説明し、それを実現するコードを指し示す;ここにあるものはすべて開発者向けであり、パッケージ使用には不要である。
 
-### Design notes
+### 設計メモ
 
-- **Runtime version.** `getDshRuntimeVersion()` reads this package's manifest through a filesystem path, including the executable's virtual filesystem; missing or invalid versions fail rather than bypassing compatibility checks.
-- **Profile launch data.** `ctx.profileContext` contains only profile locations, startup bundle names, parsed invocation overlays and the telemetry opt-out value. `readProfilePatches()` composes the supplied startup profile or reads current files at those locations; callers schedule and apply the result.
-- **Process-local module resolution.** The launcher installs the runtime resolution on Node's internal ESM and CommonJS resolvers before profile rows mount. Node still owns exports, conditions, subpaths, module caches, and error codes; routed ESM failures report the original importer. Explicit CommonJS `paths` always retain native lookup, including paths inside profiles.
-- **Linked directories.** A profile link to an external directory admits its importers to peer-aware ancestor lookup, even without its own `package.json`. At each `D/node_modules` position, current `D/package.json` peer names present in the runtime table use the runtime package; other names use the physical candidate. A nearer physical package precedes a later peer declaration, and a peer position needs no physical `node_modules`. Installation-scope package directories are excluded from linked interception; overlapping roots do not change the importer's lookup order ([rule](../../../.agents/notes/implemented/architecture/2026-09-19-profile-resolution-lookup-order.md)).
-- **Package metadata.** `ctx.pluginPackages.packageOf` locates the owning package without loading code or requiring an exported `package.json`; a subpath selects its package without validating that file. The installed runtime resolution owns selection even for a miss. Low-level embedders that install the service without one retain native lookup. Display metadata uses the separate entry-aware reader described above.
-- **Two Loader builtins.** `mountRootInclude` registers `cordis:include` and `cordis:group` as Loader builtins: a group row gives one `isolate` realm to a provider and its consumers together, and an agent preset outside this workspace cannot resolve `@deepseek-ai/cordis-plugin-group` by name. Both load through the ambient module pipeline rather than the included tree's own specifier resolution.
-- **Consumer-owned strictness.** Ordinary Loader groups keep successful siblings. App-boot applies the global required-entry policy after initial settlement; agent presets and dynamic multi-entry compositions own and dispose their separate Loader subtree when they require all-or-nothing setup. App-boot reads failed fibers to report their recorded errors and coalesces duplicate Loader rejection notifications through one process checkpoint.
-- **One runtime resolution.** The installation-first and ordered-bundle breadth-first traversal produces the runtime table. Runtime resolution creates no links; runtime resolution entries occupy their package names at `$DSH_HOME/profiles/node_modules`, and every other name sees that directory as an ordinary ancestor. Profile load removes the `.dsh-module-fallback` projections that link-backend releases wrote into a profile; pnpm-installed packages stay. External bare targets selected by package `imports` use the same package order, while Node retains mapping, conditions, and exact target resolution. A complete successor may add package names, remove profile-scoped mappings and profile-local names, and update linked-root membership atomically; retained mappings keep their normalized directory and scope. Installation mappings keep their version and anchor; a profile mapping may change its declarer and, for a package upgraded in place, its version. [Plugin Manager](../plugin-manager/README.md) publishes successors after package operations ([decision](../../../.agents/notes/implemented/architecture/2026-09-30-profile-package-refresh-and-manifest-invalidation.md)).
-- **Removing linked interception.** A successor may remove a linked root without restart. Directories outside all remaining roots use native lookup for subsequent requests, which may find a development copy or report a missing package. Existing module references and Node caches stay unchanged. A link name that is no profile mapping may point to another target, also after removal, and so may one whose mapping was removed first; Node's cached real paths of the previous target are relocated ([generation rules](../../../.agents/notes/implemented/architecture/2026-09-09-profile-resolution-generations.md#immutable-generations)).
-- **Application-owned profiles.** Application-owned profiles use the same runtime resolution. Links within the active profile directory, including pnpm store links, are not external roots even when the profile is outside the shared profiles tree. Resolution does not modify their `node_modules`; pnpm owns installed packages.
-- **Owned Workers.** Worker build banners import `@deepseek-ai/dsh-app-boot/worker/profile-resolution-bootstrap` before bundled business code. Each Worker installs the structured-cloned runtime resolution in its own isolate. The bootstrap bundle has no static package imports. Source Worker entries retain their self-contained dependency closure, and third-party Workers receive no injection.
-- **Update completion.** App boot observes restart failures through the `internal/update` waterfall. Live patch reloads wait for the tree's fibers before auditing activation; `Fiber.update()` and `Entry.update()` alone do not establish restart success.
-- **One rejection checkpoint.** `inactiveEntries` keeps the exact reasons it folds into the boot diagnostic visible through the next process rejection checkpoint, so `installFailLoud` coalesces Loader's duplicate notification while unrelated unhandled rejections remain fatal.
-- **Two-stage failure labels.** Outside startup audit failures, `boot()` distinguishes `host preparation failed` — `prepare` threw before any config-tree entry mounted — from `plugin tree failed to load`, and appends the deepest plugin error's stack. Plugin diagnostics retain nested causes and aggregate member failures; cyclic causes stop traversal without replacing the original error.
+- **ランタイムバージョン。** `getDshRuntimeVersion()` は実行ファイルの仮想ファイルシステムを含め、ファイルシステムパス経由でこのパッケージの manifest を読む;欠落または無効なバージョンは互換性検査を迂回せずに失敗する。
+- **プロファイル起動データ。** `ctx.profileContext` はプロファイル位置、起動バンドル名、解析済み呼び出しオーバーレイ、テレメトリオプトアウト値のみを含む。`readProfilePatches()` は供給された起動プロファイルを合成するか、それらの位置の現行ファイルを読み、呼び出し側が結果を予定・適用する。
+- **プロセス局所モジュール解決。** ランチャーはプロファイル行マウント前に Node 内部 ESM および CommonJS リゾルバーにランタイム解決を導入する。エクスポート、条件、サブパス、モジュールキャッシュ、エラーコードの所有は依然 Node にあり、経路付け ESM 失敗は元のインポーターを報告する。明示的 CommonJS `paths` はプロファイル内パスを含め常にネイティブ検索を保つ。
+- **リンク済みディレクトリ。** 外部ディレクトリへのプロファイルリンクは、独自 `package.json` がなくてもそのインポーターをピア対応祖先検索に受け入れる。各 `D/node_modules` 位置では、ランタイム表に存在する現行 `D/package.json` ピア名はランタイムパッケージを使い、他の名前は物理候補を使う。より近い物理パッケージは後のピア宣言に先行し、ピア位置に物理 `node_modules` は不要である。インストール範囲パッケージディレクトリはリンク介入から除外され、重なるルートはインポーターの検索順序を変えない([規則](../../../.agents/notes/implemented/architecture/2026-09-19-profile-resolution-lookup-order.md))。
+- **パッケージメタデータ。** `ctx.pluginPackages.packageOf` はコード読み込みもエクスポート済み `package.json` 要求もなしに所有パッケージを特定し、サブパスは当該ファイルの検証なしにそのパッケージを選択する。ミスでもインストール済みランタイム解決が選択を所有する。解決なしにサービスを導入する下位レベル埋め込み側はネイティブ検索を保つ。表示メタデータは上記エントリ対応読み手を使う。
+- **2 つの Loader 組み込み。** `mountRootInclude` は `cordis:include` と `cordis:group` を Loader 組み込みとして登録する:グループ行はプロバイダーとそのコンシューマーにまとめて 1 つの `isolate` 領域を与え、このワークスペース外のエージェントプリセットは `@deepseek-ai/cordis-plugin-group` を名前解決できない。どちらも含まれたツリー独自の指定子解決ではなくアンビエントモジュールパイプライン経由で読み込まれる。
+- **コンシューマー所有の厳格さ。** 通常 Loader グループは成功した兄弟を保持する。app-boot は初期解決後にグローバル必須エントリポリシーを適用し、エージェントプリセットと動的複数エントリ合成は全有無一括設定を要求する場合に個別 Loader サブツリーを所有・破棄する。app-boot は失敗ファイバーを読んで記録済みエラーを報告し、重複 Loader 拒否通知を 1 つのプロセスチェックポイント経由で合体する。
+- **単一ランタイム解決。** インストール優先および順序付きバンドル幅優先走査がランタイム表を生成する。ランタイム解決はリンクを作らず、ランタイム解決エントリは `$DSH_HOME/profiles/node_modules` でパッケージ名を占有し、他のすべての名前は当該ディレクトリを通常祖先として見る。プロファイル読み込みはリンクバックエンドリリースがプロファイルに書き込んだ `.dsh-module-fallback` 投影を除去し、pnpm インストール済みパッケージは残る。パッケージ `imports` が選択する外部素指定子は同じパッケージ順序を使い、対応付け、条件、正確な指定子解決の所有は依然 Node にある。完全な後継はパッケージ名の追加、プロファイル範囲対応付けとプロファイルローカル名の除去、リンクルート所属の更新を不可分に行え、保持対応付けは正規化ディレクトリと範囲を保つ。インストール対応付けはバージョンとアンカーを保ち、プロファイル対応付けは宣言者を変更でき、インプレース更新パッケージではバージョンも変更できる。[Plugin Manager](../plugin-manager/README.md) がパッケージ操作後に後継を公開する([決定](../../../.agents/notes/implemented/architecture/2026-09-30-profile-package-refresh-and-manifest-invalidation.md))。
+- **リンク介入の除去。** 後継は再起動なしにリンクルートを除去できる。残るルート外のディレクトリは後続要求にネイティブ検索を使い、開発複製を見つけるかパッケージ欠落を報告しうる。既存モジュール参照と Node キャッシュは不変である。プロファイル対応付けでないリンク名は除去後も別指定子を指せ、対応付けを先に除去したものも同様であり、以前指定子の Node キャッシュ実パスは移転される([生成規則](../../../.agents/notes/implemented/architecture/2026-09-09-profile-resolution-generations.md#immutable-generations))。
+- **アプリケーション所有プロファイル。** アプリケーション所有プロファイルは同じランタイム解決を使う。pnpm ストアリンクを含む有効プロファイルディレクトリ内のリンクは、共有プロファイルツリー外のプロファイルでも外部ルートではない。解決はその `node_modules` を変更せず、インストール済みパッケージは pnpm が所有する。
+- **所有 Workers。** Worker ビルドバナーは束ね業務コードの前に `@deepseek-ai/dsh-app-boot/worker/profile-resolution-bootstrap` をインポートする。各 Worker は構造化複製ランタイム解決を独自隔離に導入する。ブートストラップ束に静的パッケージインポートはない。ソース Worker エントリは自己完結依存閉包を保ち、第三者 Worker は注入を受けない。
+- **更新完了。** アプリブートは `internal/update` ウォーターフォール経由で再起動失敗を観測する。ライブパッチ再読み込みは活性化監査前にツリーのファイバーを待ち、`Fiber.update()` と `Entry.update()` だけでは再起動成功は成立しない。
+- **単一 reject チェックポイント。** `inactiveEntries` はブート診断に折り込む正確な理由を次回プロセス reject チェックポイントまで可視に保つため、`installFailLoud` は Loader の重複通知を合体させつつ無関係な未処理 reject は致命扱いのままである。
+- **2 段階失敗ラベル。** 起動監査失敗以外では、`boot()` は `host preparation failed` — 設定ツリーエントリのマウント前に `prepare` が throw した — と `plugin tree failed to load` を区別し、最深プラグインエラーのスタックを付加する。プラグイン診断は入れ子原因と集約メンバー失敗を保持し、循環原因は元エラーを置換せずに走査停止する。
 
-The startup error also retains inactive-entry metadata and raw startup warning/error records without retaining the Loader tree. Its `entries` and `startup` fields are non-enumerable: direct access and full diagnostic reports retain them, while ordinary error inspection omits them. Pending-only failures have no `cause`; failures with recorded errors retain their original values in an `AggregateError`. Import errors are collected through the logger before the Loader mounts because no failed Fiber exists for those imports. The temporary exporter is removed when boot settles.
+起動エラーは Loader ツリーを保持せずに非活性エントリメタデータと生の起動警告/エラー記録も保持する。その `entries` と `startup` フィールドは非列挙である:直接到達と完全診断報告はそれらを保持するが、通常のエラー検査は省略する。保留のみの失敗に `cause` はなく、記録済みエラーのある失敗は元の値を `AggregateError` に保持する。インポートエラーは当該インポートの失敗 Fiber が存在しないため Loader マウント前に logger 経由で収集される。一時エクスポーターはブート解決時に除去される。
 
-### Helper behavior
+### ヘルパーの動作
 
-The exports each own one stage of the boot: config resolution and snapshot replay, layered environment loading, fail-loud reporting, activation auditing, patch parsing, root-include mounting, config dump rendering, and profile composition. Per-export contracts live in the code, not this README — see [`src/index.ts`](src/index.ts) and [`src/profile.ts`](src/profile.ts).
+各エクスポートはブートの 1 段階を所有する:設定解決とスナップショット再生、層化環境読み込み、大声失敗報告、活性化監査、パッチ解析、ルートインクルードマウント、設定ダンプ描画、プロファイル合成である。エクスポート毎の契約はこの README ではなくコードに存在する — [`src/index.ts`](src/index.ts) と [`src/profile.ts`](src/profile.ts) を参照。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Boot helpers: config resolution, environment loading, fail-loud guard, activation audit, patch parsing, config dump |
-| [`src/profile.ts`](src/profile.ts) | Profile discovery, initialization, bundle resolution, runtime resolution construction |
-| [`src/profile-plugins.ts`](src/profile-plugins.ts) | Installed dependencies, bundle activation policy, and manifest updates |
-| [`src/profile-sanitize.ts`](src/profile-sanitize.ts) | Profile patch backup and recovery bundle activation |
-| [`src/config-schema/`](src/config-schema/) | Profile schema generation, discovery, native projection, and result types |
-| [`src/profile-resolution/`](src/profile-resolution/) | Runtime resolver, package-metadata service, and built Worker bootstrap |
+| [`src/index.ts`](src/index.ts) | ブートヘルパー:設定解決、環境読み込み、大声失敗ガード、活性化監査、パッチ解析、設定ダンプ |
+| [`src/profile.ts`](src/profile.ts) | プロファイル検出、初期化、バンドル解決、ランタイム解決構築 |
+| [`src/profile-plugins.ts`](src/profile-plugins.ts) | インストール済み依存、バンドル活性化ポリシー、manifest 更新 |
+| [`src/profile-sanitize.ts`](src/profile-sanitize.ts) | プロファイルパッチバックアップと回復バンドル活性化 |
+| [`src/config-schema/`](src/config-schema/) | プロファイルスキーマ生成、検出、ネイティブ投影、結果型 |
+| [`src/profile-resolution/`](src/profile-resolution/) | ランタイムリゾルバー、パッケージメタデータサービス、ビルド済み Worker ブートストラップ |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared boot mechanics to the composition model and the decision evidence behind it.
+パッケージレベルの契約で足りない場合にこれらのページを読む。共有ブート機構から合成モデルとその背後の決定証拠へ進む。
 
-- [Cordis primer](../../../docs/cordis-primer.md) — Loader, `!!js` config expressions, and include/group semantics.
-- [dsh app](../../../apps/cli/README.md) — the `dsh` bin that consumes these helpers.
-- [dsh-cmdline](../cmdline/README.md) — the launcher-to-app command-line handoff the bins use.
-- [Profile bundles](../../bundle/README.md) — installable patch layers composed into `dsh --profile`.
-- [dsh-home-paths](../../util/home-paths/README.md) — the Harness-home resolver (`resolveDshHome`).
-- [Configuration source ownership](../../../.agents/notes/implemented/architecture/2026-08-04-configuration-source-ownership.md) — why a discovered file may not decide bootstrap behavior.
-- [Profile plugin bundles](../../../.agents/notes/implemented/architecture/2026-08-05-profile-plugin-bundles.md) — the profile and bundle composition design.
-- [User-patch HMR tests](tests/user-patches.spec.ts) — ownership of live-patch behavior and native filesystem delivery.
+- [Cordis 入門](../../../docs/cordis-primer.md) — Loader、`!!js` 設定式、include/group 意味論。
+- [dsh アプリ](../../../apps/cli/README.md) — これらのヘルパーを消費する `dsh` bin。
+- [dsh-cmdline](../cmdline/README.md) — bin 群が使うランチャー-アプリ間コマンドラインハンドオフ。
+- [プロファイルバンドル](../../bundle/README.md) — `dsh --profile` に合成されるインストール可能パッチ層。
+- [dsh-home-paths](../../util/home-paths/README.md) — Harness ホームリゾルバー(`resolveDshHome`)。
+- [設定ソース所有権](../../../.agents/notes/implemented/architecture/2026-08-04-configuration-source-ownership.md) — 検出ファイルがブートストラップ動作を決定してはならない理由。
+- [プロファイルプラグインバンドル](../../../.agents/notes/implemented/architecture/2026-08-05-profile-plugin-bundles.md) — プロファイルとバンドルの合成設計。
+- [ユーザーパッチ HMR テスト](tests/user-patches.spec.ts) — ライブパッチ動作とネイティブファイルシステム配送の所有権。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the loaded plugin tree, which alone contributes model context; no export adds model-visible text.
+読み込まれたプラグインツリー経由で間接的にのみ関わり、モデルコンテキストに寄与するのはツリーだけである;モデル可視文を追加するエクスポートはない。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Boot itself changes no request prefix.
+ブート自体は要求プレフィックスを変更しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits describe when this boot library is a poor fit or needs special care. They are current package constraints, not a task backlog.
+これらの制限は、このブートライブラリが不向きな場合や特別な注意が必要な場合を記述する。現在のパッケージ制約であり、作業バックログではない。
 
-- **Runtime resolution depends on Node internals** — supported Node versions require the native builtin-access addon and executable compatibility coverage. Only built Harness-owned Workers receive the runtime resolution bootstrap; third-party Workers and custom `vm` linkers keep native resolution.
-- **Moving a profile package needs its removal first** — `replace()` rejects a retained profile mapping that moved to another directory or link target with `ResolutionRestartRequired`; removing the package and installing it again maps the new directory. A linked root may point to another directory once its profile mapping was removed. Node keeps the real path of every link it resolved through; once a link points elsewhere, or its name is installed again as a directory, a native lookup that selects a file below its previous target, for an importer outside it, selects the same file below the current one when that exists, including an explicit absolute path into the previous target. Installation mappings and local overrides still require a restart.
-- **Linked scope follows recorded real directories** — a hoisted dependency outside every linked root uses native Node. A peer read never invalidates Node caches or changes which files are watched.
-- **Source launches use an ESM-only hook** — CommonJS requests still need the JavaScript files selected by package exports; resolution does not supply missing build outputs.
-- **Snapshot replay swapping is basename-specific** — only a config ending in `cordis.yml` or `cordis.yaml` maps to the sibling `cordis.snapshot.yml`; custom config names require caller-managed selection.
-- **Environment discovery is launch-scoped** — `loadLayeredEnv` reads only the invocation directory and Harness home once; it does not search parents or follow a workspace selected later. `loadEnv` remains the one-directory helper for non-product bins.
-- **A user patch replaces the whole matched config** — an id-targeted patch does not deep-merge, so a profile override restates the bundle fields it keeps.
+- **ランタイム解決は Node 内部に依存する** — 対応 Node バージョンはネイティブ builtin-access アドオンと実行ファイル互換性対象を要求する。ビルド済み Harness 所有 Worker のみがランタイム解決ブートストラップを受け、第三者 Worker とカスタム `vm` リンカーはネイティブ解決を保つ。
+- **プロファイルパッケージの移動には先に除去が必要** — `replace()` は別ディレクトリまたはリンク指定子に移動した保持プロファイル対応付けを `ResolutionRestartRequired` で拒否する;パッケージを除去して再インストールすると新ディレクトリに対応付く。プロファイル対応付け除去後のリンクルートは別ディレクトリを指せる。Node は経由解決したすべてのリンクの実パスを保持し、リンクが他を指した後やその名前がディレクトリとして再インストールされた後は、その外側のインポーター向けに以前指定子下のファイルを選択するネイティブ検索は、存在すれば現在指定子下の同じファイルを選択する(以前指定子への明示絶対パスを含む)。インストール対応付けとローカル上書きは依然として再起動を要する。
+- **リンク範囲は記録済み実ディレクトリに従う** — すべてのリンクルート外に巻き上げられた依存はネイティブ Node を使う。ピア読み取りが Node キャッシュを無効化したり監視対象ファイルを変更したりすることは決してない。
+- **ソース起動は ESM 専用フックを使う** — CommonJS 要求は依然としてパッケージエクスポートが選択する JavaScript ファイルを必要とし、解決は欠落ビルド成果物を供給しない。
+- **スナップショット再生入れ替えはベース名固有** — `cordis.yml` または `cordis.yaml` で終わる設定のみが兄弟 `cordis.snapshot.yml` に対応し、カスタム設定名は呼び出し側管理の選択を要する。
+- **環境検出は起動範囲である** — `loadLayeredEnv` は呼び出しディレクトリと Harness ホームを 1 回だけ読み、親を探索したり後選択ワークスペースを追跡したりしない。`loadEnv` は非製品 bin 向け 1 ディレクトリヘルパーのままである。
+- **ユーザーパッチは一致設定全体を置換する** — id 指定パッチは深併合しないため、プロファイル上書きは保持するバンドルフィールドを再記述する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発メモはメンテナー向け作業コンテキストである:未決の設計上の問いと方向性。明示的に非権威であり — 出荷動作、制限、受容済み根拠は上記各節、パッケージコード、リンク済み Agent Note に存在する。
 
-#### Open: YAML config dump stability
+#### 未決:YAML 設定ダンプの安定性
 
-`renderConfigDump` output is a loadable YAML document whose `# ==` source comments and `!!js`-verbatim rendering serve the `--dump-config` diagnostic. Nothing promises byte stability across package versions; decide whether the dump becomes a serialization contract before anything consumes it programmatically. JSON Schema output follows the separate [pre-stable compatibility policy](../../../apps/cli/reference/README.md#config-schema-dump).
+`renderConfigDump` 出力は読み込み可能 YAML 文書であり、その `# ==` ソースコメントと `!!js` 逐語描画は `--dump-config` 診断に供される。パッケージバージョン間のバイト安定性を約束するものは何もなく、それをプログラム消費する前にダンプが直列化契約となるかを決めること。JSON Schema 出力は別個の [プレ安定互換性ポリシー](../../../apps/cli/reference/README.md#config-schema-dump) に従う。
 
 </details>

@@ -1,188 +1,188 @@
 ---
-description: "The browser GUI for dsh: interactive chat, model and settings management, and session history, for users running the dsh web surface."
+description: "dsh のブラウザー GUI: 対話型チャット、モデルと設定の管理、セッション履歴。dsh web サーフェスを実行するユーザーのための。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-web-app
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Desktop analytics follows the [product collection policy](../../client/product-analytics/README.md), including its live application setting. Web usage is excluded.
+Desktop 分析は[プロダクト収集ポリシー](../../client/product-analytics/README.md)に従う。そのライブアプリケーション設定も含む。Web の使用は除外される。
 
-Desktop analytics schedules partial batches every 30 seconds, with a 15-second exporter timeout and a 20-second processor timeout. Shutdown allows 2 seconds to drain, then cancels pending requests and retry waits so telemetry does not keep the Host alive. Pending events may be lost on exit.
+Desktop 分析は 30 秒ごとに部分バッチをスケジュールし、エクスポーターのタイムアウトは 15 秒、プロセッサーのタイムアウトは 20 秒である。シャットダウンはドレインに 2 秒を許し、その後、保留中のリクエストと再試行待ちをキャンセルして、テレメトリーが Host を生かし続けないようにする。保留中のイベントは終了時に失われることがある。
 
-## Summary
+## 概要
 
-Run `dsh --profile web` for browser chat, model and settings management, and session history, with the same model access, tools, and safety defaults as other dsh surfaces. Startup prints a tokenized URL and normally opens the default browser; SSH sessions and `--no-open` require manual opening. You can change the port, allow extra authorities, bind one concrete local IP, and serve HTTPS from a certificate you supply; wildcard addresses are rejected. Remote access uses an advertised HTTP(S) URL behind a prefix-stripping proxy, listener TLS, or plain HTTP on a non-loopback bind. Use the headless profile for one-shot command-line tasks.
+ブラウザーチャット、モデルと設定の管理、セッション履歴には `dsh --profile web` を実行する。他の dsh サーフェスと同じモデルアクセス、ツール、安全デフォルトを備える。起動はトークン化された URL を出力し、通常はデフォルトのブラウザーを開く。SSH セッションと `--no-open` では手動で開く。ポートの変更、追加の authority の許可、1 つの具体的なローカル IP へのバインド、供給した証明書からの HTTPS 配信が可能である。ワイルドカードアドレスは拒否される。リモートアクセスは、プレフィックス除去プロキシの背後でのアドバタイズされた HTTP(S) URL、リスナー TLS、または非ループバックバインド上の平文 HTTP を使用する。ワンショットのコマンドラインタスクには headless プロファイルを使用する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Start the GUI, open your browser, and start talking to the agent. The flags fine-tune the invocation.
+GUI を起動し、ブラウザーを開き、エージェントとの会話を始める。フラグは起動方法を微調整する。
 
-### Starting the Web GUI
+### Web GUI の起動
 
 ```sh
 dsh --profile web
 dsh --profile web --no-open --port 8080
 ```
 
-After startup you see a `dsh web:` line whose root URL carries a fresh process token. Unless `--no-open` or an SSH session suppresses it, the default browser opens that URL, receives a signed cookie, and redirects to the same directory without the token. You know it worked when the page loads and you can chat with the agent. Two failures to expect: if the frontend is not built, startup stops with a build hint (`pnpm run build` in a checkout); if the browser cannot be opened, a credential-free diagnostic prints to stderr while the server keeps running — open the printed startup URL yourself.
+起動後、ルート URL が新しいプロセストークンを持ち運ぶ `dsh web:` 行が表示される。`--no-open` または SSH セッションが抑制しない限り、デフォルトのブラウザーがその URL を開き、署名付きクッキーを受け取り、トークンなしの同じディレクトリにリダイレクトする。ページがロードされ、エージェントとチャットできれば成功である。予期すべき 2 つの失敗: フロントエンドがビルドされていない場合、起動はビルドのヒント(チェックアウトでは `pnpm run build`)とともに停止する。ブラウザーを開けない場合、資格情報を含まない診断が stderr に出力され、サーバーは実行を続ける — 表示された起動 URL を自分で開く。
 
-**Settings → Models** displays **DeepSeek**, using `DEEPSEEK_API_KEY`. The default is `deepseek-official` / `deepseek-flash` (DeepSeek-V4.1-Flash). The [DeepSeek plugin](../../llm/llm-deepseek/README.md#endpoint-and-wire-format) uses the Messages API.
+**設定 → モデル** は `DEEPSEEK_API_KEY` を使用して **DeepSeek** を表示する。デフォルトは `deepseek-official` / `deepseek-flash` (DeepSeek-V4.1-Flash)である。[DeepSeek プラグイン](../../llm/llm-deepseek/README.md#endpoint-and-wire-format)は Messages API を使用する。
 
-Saved model selections override the composition default. The settings card accepts a Messages-compatible API address and a credential reference.
+保存されたモデル選択は構成のデフォルトを上書きする。設定カードは Messages 互換の API アドレスと資格情報参照を受け入れる。
 
-### Configuration
+### 設定
 
-The `minimal` agent preset uses a persistent shell, the `read_image` tool, and a fixed persona, with automatic history compaction and the idle-session `/compact` command. It shares the Host token meter and owns an isolated compaction backend. [Compaction configuration and retention](../../compaction/compaction-basic/README.md#use-this-package) follow the existing backend. Image reads reuse the Host filesystem and attachment store and require an image-capable model; text read, write, and edit tools remain excluded.
+`minimal` エージェントプリセットは永続シェル、`read_image` ツール、固定ペルソナを使用し、自動履歴圧縮とアイドルセッションの `/compact` コマンドを備える。Host のトークンメーターを共有し、分離された圧縮バックエンドを所有する。[圧縮の設定と保持](../../compaction/compaction-basic/README.md#use-this-package)は既存のバックエンドに従う。画像読み取りは Host のファイルシステムとアタッチメントストアを再利用し、画像対応モデルを必要とする。テキストの read、write、edit ツールは引き続き除外される。
 
-`--host` and `--port` configure the listener; `--tls-cert` and `--tls-key` make it serve HTTPS; `--public-url` names the advertised public HTTP(S) root the GUI is reached at behind a prefix-stripping proxy, and `--trusted-host` adds further accepted authorities. All are described under [Listening, trust, and public deployments](#public-deployments), and the `tls` field those flags set is documented with the [carrier's config](../../../docs/subsystems/web-server.md#config):
+`--host` と `--port` はリスナーを設定する。`--tls-cert` と `--tls-key` は HTTPS を配信させる。`--public-url` は、プレフィックス除去プロキシの背後で GUI に到達するためにアドバタイズする公開 HTTP(S) ルートを名指しし、`--trusted-host` はさらに受け入れられる authority を追加する。すべては[リッスン、信頼、公開デプロイ](#public-deployments)で説明され、これらのフラグが設定する `tls` フィールドは[キャリアの設定](../../../docs/subsystems/web-server.md#config)で文書化されている:
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `openBrowser` | `true` | Open the default browser after startup; SSH launches suppress it |
-| `printUrl` | `true` | Print the `dsh web:` URL line at startup |
-| `surfaceContext` | `true` | Expose `DSH_WEB_URL` to the agent's shell commands |
-| `publicUrl` | Unset | Advertised HTTP(S) application root; otherwise announce the bind-address URL |
+| `openBrowser` | `true` | 起動後にデフォルトのブラウザーを開く。SSH 起動では抑制される |
+| `printUrl` | `true` | 起動時に `dsh web:` URL 行を出力する |
+| `surfaceContext` | `true` | `DSH_WEB_URL` をエージェントのシェルコマンドに公開する |
+| `publicUrl` | 未設定 | アドバタイズされる HTTP(S) アプリケーションルート。それ以外の場合はバインドアドレス URL を告知する |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web-app) lists this runtime plugin's accepted fields and their JSDoc. The shipped composition inserts the `schedule` service row and the `ui-schedule` task page row, while the clock reading and the four reminder tools belong to the `standard`, `cordis`, and `ptc` presets. The `tool-subagent` and `tool-subagent-fork` rows in those presets deny the four tools, so a delegated child's scope never lists them.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-web-app)は、このランタイムプラグインが受け入れるフィールドとその JSDoc を列挙する。同梱の構成は `schedule` サービス行と `ui-schedule` タスクページ行を挿入し、クロック読み取りと 4 つのリマインダーツールは `standard`、`cordis`、`ptc` プリセットに属する。それらのプリセットの `tool-subagent` と `tool-subagent-fork` 行は 4 つのツールを拒否するため、委譲された子のスコープがそれらを列挙することは決してない。
 
 <a id="public-deployments"></a>
-### Listening, trust, and public deployments
+### リッスン、信頼、公開デプロイ
 
-By default the GUI listens on loopback and accepts connections from this machine only. Only `--host` changes the listener: it accepts one concrete local IPv4 or IPv6 address, never a wildcard. A non-loopback listener without TLS serves plain HTTP and warns at startup, even when an HTTPS `--public-url` fronts it. The Host/Origin fence accepts the bind IP itself; other non-loopback authorities require `--trusted-host`, so a remote browser reaches the GUI behind a prefix-stripping proxy or through a port-forwarding client that presents a trusted hostname. The launch-token exchange and signed session cookie authenticate every API method and WebSocket stream.
+デフォルトでは GUI はループバックでリッスンし、このマシンからの接続のみを受け入れる。リスナーを変更するのは `--host` のみである: 1 つの具体的なローカル IPv4 または IPv6 アドレスを受け入れ、ワイルドカードは決して受け入れない。TLS なしの非ループバックリスナーは平文 HTTP を配信し、起動時に警告する。HTTPS の `--public-url` がその前面にあっても同様である。Host/Origin フェンスはバインド IP 自体を受け入れる。他の非ループバック authority は `--trusted-host` を必要とするため、リモートブラウザーはプレフィックス除去プロキシの背後、または信頼されたホスト名を提示するポートフォワーディングクライアントを通じて GUI に到達する。起動トークン交換と署名付きセッションクッキーが、すべての API メソッドと WebSocket ストリームを認証する。
 
-Pass `--tls-cert` and `--tls-key` together to serve HTTPS from the listener instead of plain HTTP. Each names a file resolved against the process working directory: the certificate file holds the full chain and the key file an unencrypted PEM private key. The flags are one setting — supplying only one is a usage error, and supplying neither keeps the plain-HTTP default. Startup fails when a file is missing, unreadable, empty, or not a valid certificate-and-key pair; it never falls back to HTTP. Nothing re-reads the material while the listener runs, so serving a different certificate needs a listener reload or a process restart. DSH issues, renews, and watches nothing: there is no ACME client, no self-signed fallback, and no redirect listener. The browser applies its own trust store and host-name matching, so a certificate the browser does not trust, or one whose subject alternative names miss the authority you open, fails before the page loads. The default port stays 3080, and `--tls-cert`/`--tls-key` do not follow `--public-url`: the listener's certificate covers the authority browsers dial. TLS changes nothing about authority: Connection still authenticates every request and still checks Host/Origin, and the session cookie it mints is `Secure` whenever the receiving listener serves HTTPS.
+HTTPS を平文 HTTP の代わりにリスナーから配信するには、`--tls-cert` と `--tls-key` を一緒に渡す。それぞれがプロセスの作業ディレクトリを基準に解決されるファイルを名指しする: 証明書ファイルは完全なチェーンを保持し、キーファイルは暗号化されていない PEM 秘密鍵を保持する。このフラグは 1 つの設定である — 片方のみの供給は使用法エラーであり、どちらも供給しなければ平文 HTTP のデフォルトが保たれる。ファイルが欠落、読み取り不能、空、または有効な証明書とキーのペアでない場合、起動は失敗する。HTTP にフォールバックすることは決してない。リスナーの実行中に素材が再読み取りされることはないため、別の証明書の配信にはリスナーのリロードまたはプロセスの再起動が必要である。DSH は発行、更新、監視のいずれも行わない: ACME クライアントも、自己署名のフォールバックも、リダイレクトリスナーもない。ブラウザーは自身のトラストストアとホスト名照合を適用するため、ブラウザーが信頼しない証明書、または subject alternative name が開く authority に一致しない証明書は、ページがロードされる前に失敗する。デフォルトポートは 3080 のままで、`--tls-cert`/`--tls-key` は `--public-url` に従わない: リスナーの証明書はブラウザーがダイヤルする authority をカバーする。TLS は authority について何も変えない: Connection は依然としてすべてのリクエストを認証し、Host/Origin をチェックし、生成するセッションクッキーは、受信リスナーが HTTPS を配信するときは常に `Secure` である。
 
-A container can bind its Pod address and advertise the ingress that fronts it:
+コンテナーは自身の Pod アドレスをバインドし、その前面にある ingress をアドバタイズできる:
 
 ```sh
 dsh --profile web --no-open --host "$(hostname -i | awk '{print $1}')" --public-url https://app.example/ --trusted-host app.example
 ```
 
-`hostname -i` may list several addresses; `--host` takes one, so the command selects the first. A zone ID such as `fe80::1%eth0` cannot appear in a URL, so the advertised root drops a redundant loopback zone while a non-loopback zone requires an explicit `--public-url`.
+`hostname -i` は複数のアドレスを列挙することがある。`--host` は 1 つを受け取るため、コマンドは最初のものを選択する。`fe80::1%eth0` のようなゾーン ID は URL に現れられないため、アドバタイズされるルートは冗長なループバックゾーンを落とす。非ループバックのゾーンには明示的な `--public-url` が必要である。
 
-Without `--public-url`, mapped IPv6 loopback binds such as `::ffff:127.0.0.1` advertise their IPv4 form, `127.0.0.1`, so the browser recognizes a local, trustworthy origin. The listener keeps the configured bind address. A dotted-quad IPv6 tail names the address's own low 32 bits, exactly as `listen` reads it, so `::0.0.0.1` is IPv6 loopback and advertises `[::1]`, while `::127.0.0.1` is a non-loopback address, not IPv4 loopback.
+`--public-url` なしでは、`::ffff:127.0.0.1` のようなマップされた IPv6 ループバックバインドはその IPv4 形式 `127.0.0.1` をアドバタイズするため、ブラウザーはローカルで信頼できるオリジンとして認識する。リスナーは設定されたバインドアドレスを保つ。ドット付きクワッド形式の IPv6 テールは、`listen` が読むのとまったく同じく、そのアドレス自身の下位 32 ビットを名指しする。したがって `::0.0.0.1` は IPv6 ループバックであり `[::1]` をアドバタイズし、`::127.0.0.1` は非ループバックアドレスであり、IPv4 ループバックではない。
 
-`--public-url` advertises the HTTP(S) root browsers use — the printed and opened startup URL, `DSH_WEB_URL`, and the Web GUI URL in the agent's runtime context. Advertisement grants no trust: the browser-visible authority must also be named with `--trusted-host`. The flag configures no listener, routing, or cookie scope, because the proxy owns the external leg: [Publish the Web UI behind a reverse proxy](../../../docs/user/guide/public-deployments.md) lists what such a deployment must provide.
+`--public-url` はブラウザーが使用する HTTP(S) ルート — 出力および開かれる起動 URL、`DSH_WEB_URL`、エージェントのランタイムコンテキスト内の Web GUI URL — をアドバタイズする。アドバタイズは信頼を与えない: ブラウザー可視の authority は `--trusted-host` でも名指しされなければならない。このフラグはリスナー、ルーティング、クッキースコープを設定しない。外部レッグはプロキシが所有するからである: [リバースプロキシの背後で Web UI を公開する](../../../docs/user/guide/public-deployments.md)は、そのようなデプロイが提供しなければならないものを列挙する。
 
-Neither the advertised URL nor the browser-trust fence protects the port itself, so restrict the port to the trusted proxy or network.
+アドバタイズされた URL もブラウザー信頼フェンスもポート自体を保護しないため、ポートを信頼されたプロキシまたはネットワークに制限する。
 
-The printed URL contains a process credential; share it only with intended users. `printUrl: false` suppresses the line with or without `--public-url`, and the credential never appears in the model context or in `DSH_WEB_URL`.
+出力される URL はプロセスの資格情報を含む。意図したユーザーとのみ共有する。`printUrl: false` は `--public-url` の有無にかかわらず行を抑制し、資格情報がモデルコンテキストや `DSH_WEB_URL` に現れることは決してない。
 
-### Running over SSH
+### SSH 経由での実行
 
-When you launch `dsh --profile web` over SSH, the URL line still prints but the browser is not opened for you: the SSH client or editor owns the local forwarding address. Without an advertised root the printed URL names the remote host's bind-address endpoint — loopback for a loopback bind — which you reach through your forwarding address. With `--public-url` the printed URL is the authenticated advertised root; the browser handoff stays suppressed, because opening a browser on the remote host cannot reach your screen.
+SSH 経由で `dsh --profile web` を起動すると、URL 行は依然として出力されるが、ブラウザーは開かれない: ローカル転送アドレスは SSH クライアントまたはエディターが所有する。アドバタイズされたルートがない場合、出力される URL はリモートホストのバインドアドレスエンドポイント(ループバックバインドならループバック)を名指しし、転送アドレスを通じてそれに到達する。`--public-url` の場合、出力される URL は認証されたアドバタイズ済みルートである。ブラウザーハンドオフは抑制されたままである。リモートホストでブラウザーを開いても画面には到達できないからである。
 
-### Per-session agent setup
+### セッションごとのエージェントセットアップ
 
-Each browser session selects a shipped preset (`standard` by default). The Agent presets settings page changes the default and edits preset child plugins; saves persist in `$DSH_HOME/profiles/web/cordis.patch.yml`. Creator's plugin-management tool is enabled only when the Host provides an editable profile.
+各ブラウザーセッションは同梱のプリセット(デフォルトでは `standard`)を選択する。Agent presets 設定ページはデフォルトを変更し、プリセットの子プラグインを編集する。保存は `$DSH_HOME/profiles/web/cordis.patch.yml` に永続化される。Creator のプラグイン管理ツールは、Host が編集可能なプロファイルを提供する場合にのみ有効化される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-The bundle is one patch layer of five files plus one runtime glue plugin: `cordis.patch.yml` carries the host rows and the preset registry, and each `presets/<id>.patch.yml` inserts one shipped preset declaration, applied in the order `dsh.bundle.patch` lists them. The storage stack and projection cache come from `dsh-base`; the web overlay's workspace and message-feedback rows consume that shared `storageDomain` service. The patch restates the surface-specific values the base deliberately omits, inserts the web-only host rows and browser roster, then moves the agent plane behind presets. The glue plugin owns dist serving, the advertised application URL, the plain-HTTP exposure warning, the bash variable, and the readiness announcements. The `office-to-pdf` row mounts one lazy [Office conversion provider](../../document/office-to-pdf/README.md) for Host consumers, including Desktop compositions using this bundle. The conversion service's Remote methods authorize preview reads, while Document Preview owns the Office viewer and Client cache.
+このバンドルは、5 つのファイルからなる 1 つのパッチレイヤーと 1 つのランタイムグループラグインである: `cordis.patch.yml` が host 行とプリセットレジストリを持ち運び、各 `presets/<id>.patch.yml` が 1 つの同梱プリセット宣言を挿入する(適用順は `dsh.bundle.patch` が列挙する順)。ストレージスタックとプロジェクションキャッシュは `dsh-base` から来る。Web オーバーレイの workspace 行と message-feedback 行は、その共有 `storageDomain` サービスを消費する。パッチは、ベースが意図的に省略するサーフェス固有の値を再掲し、Web 専用の host 行とブラウザー名簿を挿入し、その後エージェントプレーンをプリセットの背後に移動する。グループラグインは dist 配信、アドバタイズされるアプリケーション URL、平文 HTTP 露出の警告、bash 変数、レディネス告知を所有する。`office-to-pdf` 行は、このバンドルを使用する Desktop 構成を含む Host コンシューマーのために、1 つの遅延 [Office 変換プロバイダー](../../document/office-to-pdf/README.md)をマウントする。変換サービスの Remote メソッドはプレビュー読み取りを認可し、Document Preview が Office ビューアーと Client キャッシュを所有する。
 
-### Patch semantics
+### パッチセマンティクス
 
-A patch replaces the targeted row's whole `config`, so each web row restates every key it owns: the persona prefix template, the `DSH_TOOLS_MODE` PTC mode opt-in, and the `session-query-sqlite` values on the base rows, then `insert` adds the web host rows, transport, and browser roster. The `webserver`, `web-runtime`, and `connection` rows inject the `webStartup` provider and read their invocation values directly; Connection composes its accepted authorities from `ctx.webStartup.trustedHosts`, and the Host/Origin fence accepts the listener's bind IP independently of that list. The per-agent tool rows the base mounts process-wide are disabled here and the preset roster takes over; the reasoning for each host-plane versus preset-plane decision is inline in the patch.
+パッチは対象行の `config` 全体を置き換えるため、各 Web 行は自身が所有するすべてのキーを再掲する: ペルソナプレフィックステンプレート、`DSH_TOOLS_MODE` PTC モードのオプトイン、ベース行の `session-query-sqlite` の値である。次に `insert` が Web host 行、トランスポート、ブラウザー名簿を追加する。`webserver`、`web-runtime`、`connection` の各行は `webStartup` プロバイダーを注入し、呼び出し値を直接読む。Connection は `ctx.webStartup.trustedHosts` から受け入れ authority を構成し、Host/Origin フェンスはそのリストとは独立にリスナーのバインド IP を受け入れる。ベースがプロセス全体にマウントするエージェントごとのツール行はここでは無効化され、プリセット名簿が引き継ぐ。host プレーンとプリセットプレーンの各決定の根拠はパッチ内にインラインで記述されている。
 
-### Advertised application URL
+### アドバタイズされるアプリケーション URL
 
-Startup display and browser handoff receive the advertised root with its launch token; the agent's runtime context and `DSH_WEB_URL` receive it clean. The root itself is defined under [Listening, trust, and public deployments](#public-deployments).
+起動時の表示とブラウザーハンドオフは、起動トークン付きのアドバタイズされたルートを受け取る。エージェントのランタイムコンテキストと `DSH_WEB_URL` はそれをクリーンな形で受け取る。ルート自体は[リッスン、信頼、公開デプロイ](#public-deployments)で定義されている。
 
-### Readiness
+### レディネス
 
-The URL line and browser handoff are readiness signals: supervisors RPC as soon as they observe the line, and a browser requests the page as soon as it opens, so both run only after the Loader tree settles, the required-startup audit passes, and Connection authentication is available — or immediately in a hand-built tree without a Loader. Client combo JavaScript and source maps remain unmaterialized at this point. Optional plugin failures do not suppress readiness; a required startup failure or a tree disposed mid-boot announces nothing.
+URL 行とブラウザーハンドオフはレディネスシグナルである: スーパーバイザーはその行を観測するとすぐに RPC し、ブラウザーは開くとすぐにページを要求するため、両者は Loader ツリーが落ち着き、必須起動監査が合格し、Connection 認証が利用可能になった後にのみ実行される — または Loader のない手組みのツリーでは即座に実行される。この時点でクライアントのコンボ JavaScript とソースマップは未実体化のままである。オプションのプラグイン失敗はレディネスを抑制しない。必須起動の失敗またはブート途中で破棄されたツリーは何も告知しない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | The `web-app` glue plugin: dist resolution, advertised application URL, bash variable, URL line, browser handoff |
-| [`src/public-url.ts`](src/public-url.ts) | Advertised-root validation and trailing-slash normalization; a leaf module for local imports, not package API |
-| [`src/startup.ts`](src/startup.ts) | The `web-startup` provider: `--host`, `--port`, `--tls-cert`, `--tls-key`, `--public-url`, `--trusted-host`, `--no-open`, `--help` |
-| [`cordis.patch.yml`](cordis.patch.yml) | The web patch: restated base values, web host rows, browser roster, preset registry |
-| [`presets/`](presets) | One `@deepseek-ai/dsh-agent-preset` declaration per shipped preset (`standard`, `ptc`, `minimal`, `cordis`), each its own patch file |
-| [`tests/web-app.spec.ts`](tests/web-app.spec.ts) | Dist index anchoring, advertised-URL publication and warnings, bash variable, readiness publication |
-| [`tests/startup.spec.ts`](tests/startup.spec.ts) | Command-line parsing over a real Loader tree |
-| [`tests/public-url.spec.ts`](tests/public-url.spec.ts) | Advertised-root parsing and normalization |
-| [`tests/browser-open.spec.ts`](tests/browser-open.spec.ts) | Default-browser handoff after the page is reachable |
+| [`src/index.ts`](src/index.ts) | `web-app` グループラグイン: dist 解決、アドバタイズされるアプリケーション URL、bash 変数、URL 行、ブラウザーハンドオフ |
+| [`src/public-url.ts`](src/public-url.ts) | アドバタイズされたルートの検証と末尾スラッシュの正規化。ローカルインポート用のリーフモジュールであり、パッケージ API ではない |
+| [`src/startup.ts`](src/startup.ts) | `web-startup` プロバイダー: `--host`、`--port`、`--tls-cert`、`--tls-key`、`--public-url`、`--trusted-host`、`--no-open`、`--help` |
+| [`cordis.patch.yml`](cordis.patch.yml) | Web パッチ: 再掲されるベース値、Web host 行、ブラウザー名簿、プリセットレジストリ |
+| [`presets/`](presets) | 同梱プリセットごとに 1 つの `@deepseek-ai/dsh-agent-preset` 宣言(`standard`、`ptc`、`minimal`、`cordis`)。それぞれが独自のパッチファイルである |
+| [`tests/web-app.spec.ts`](tests/web-app.spec.ts) | dist インデックスのアンカリング、アドバタイズ URL の公開と警告、bash 変数、レディネス公開 |
+| [`tests/startup.spec.ts`](tests/startup.spec.ts) | 実際の Loader ツリー上でのコマンドライン解析 |
+| [`tests/public-url.spec.ts`](tests/public-url.spec.ts) | アドバタイズされたルートの解析と正規化 |
+| [`tests/browser-open.spec.ts`](tests/browser-open.spec.ts) | ページ到達可能後のデフォルトブラウザーハンドオフ |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when you want to go deeper into the shared core, the browser reload pipeline, or the built frontend.
+共有コア、ブラウザーリロードパイプライン、ビルド済みフロントエンドをより深く知りたいときにこれらのページを読む。
 
-- [Bundle package map](../README.md) — the surfaces built on the same core.
-- [dsh-base](../base/README.md) — the shared core the GUI runs on.
-- [dsh-client-hmr](../../client/hmr/README.md) — how client-plugin changes reload during development.
-- [frontend-static](../../host/frontend-static/README.md) — how the built frontend is served.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web-app) — every accepted config field and its source declaration.
+- [バンドルパッケージマップ](../README.md) — 同じコア上に構築されたサーフェス。
+- [dsh-base](../base/README.md) — GUI が実行される共有コア。
+- [dsh-client-hmr](../../client/hmr/README.md) — 開発中にクライアントプラグインの変更がどのようにリロードされるか。
+- [frontend-static](../../host/frontend-static/README.md) — ビルド済みフロントエンドがどのように配信されるか。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-web-app) — 受け入れられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Web runtime variable
+### Web ランタイム変数
 
-#### What the model sees
+#### モデルが見るもの
 
-When `surfaceContext` is true, `DSH_WEB_URL` appears in the managed bash environment with its description, resolved per invocation as the advertised application URL defined under Listening, trust, and public deployments above. When it is false, the variable is not registered. The GUI orientation, the implementation checkout, and the current GUI URL come from the [`dsh-harness-dev-context`](../../context/harness-dev-context/README.md) row this bundle mounts.
+`surfaceContext` が true のとき、`DSH_WEB_URL` はその説明とともに管理された bash 環境に現れ、呼び出しごとに、上記の「リッスン、信頼、公開デプロイ」で定義されたアドバタイズされたアプリケーション URL として解決される。false のとき、変数は登録されない。GUI のオリエンテーション、実装チェックアウト、現在の GUI URL は、このバンドルがマウントする [`dsh-harness-dev-context`](../../context/harness-dev-context/README.md) 行から来る。
 
-#### Token effect
+#### トークンへの影響
 
-Two managed-environment variable lines; constant per process.
+管理環境の変数行が 2 つ。プロセスごとに一定である。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; the plugin contributes no system-prompt text.
+なし。このプラグインはシステムプロンプトテキストを寄与しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits tell you what to expect in unusual setups — a source checkout, SSH sessions, or strict networks. They are current package constraints, not a general browser comparison or a task backlog.
+これらの制限は、ソースチェックアウト、SSH セッション、厳格なネットワークといった珍しいセットアップで何を予期すべきかを伝える。これらは現在のパッケージの制約であり、一般的なブラウザー比較やタスクバックログではない。
 
-- **The frontend must be built** — a source checkout needs `pnpm run build` first; startup stops with a build hint when the dist is missing, and there is no source-serving fallback.
-- **TLS is opt-in and unmanaged** — the listener serves HTTPS only when `--tls-cert` and `--tls-key` name a full chain and its unencrypted key; DSH never obtains, renews, or watches certificates, and a changed file needs a listener reload or a process restart. The browser must trust that certificate, its names must cover the authority you open, and the certificate is independent of `--public-url`.
-- **Without TLS the external leg is plain HTTP** — protect it with a TLS-terminating proxy, and do not send the launch URL over a network you do not trust.
-- **Only the handoff start is observable** — the GUI reports that the browser was asked to open, not that it actually opened; a later browser exit is never reported, and the printed URL is your manual fallback.
-- **SSH sessions keep the URL but skip the browser handoff** — without an advertised root the printed URL names the remote host's bind-address endpoint (loopback for a loopback bind); the SSH client or editor must expose and open the local forwarded address.
-- **`BROWSER` overrides only come from the environment** — a discovered `.env` cannot set `BROWSER`; only an inherited value can choose the executable for the automatic handoff.
-- **Binding all network interfaces is not supported** — a wildcard `--host`, including the IPv4-mapped forms Linux reads as IPv4 any, is rejected at startup for safety; bind one concrete IPv4 or IPv6 address of a local interface instead.
+- **フロントエンドはビルドが必要** — ソースチェックアウトでは先に `pnpm run build` が必要である。dist が欠落している場合、起動はビルドのヒントとともに停止し、ソース配信のフォールバックはない。
+- **TLS はオプトインで管理されない** — リスナーが HTTPS を配信するのは、`--tls-cert` と `--tls-key` が完全なチェーンとその暗号化されていないキーを名指しする場合のみである。DSH は証明書を取得、更新、監視することは決してなく、変更されたファイルにはリスナーのリロードまたはプロセスの再起動が必要である。ブラウザーがその証明書を信頼している必要があり、その名前が開く authority をカバーしていなければならず、証明書は `--public-url` とは独立である。
+- **TLS なしでは外部レッグは平文 HTTP** — TLS 終端プロキシで保護し、信頼しないネットワーク上で起動 URL を送らない。
+- **観測できるのはハンドオフの開始のみ** — GUI はブラウザーに開くよう要求したことだけを報告し、実際に開かれたことは報告しない。後のブラウザー終了は決して報告されず、出力された URL が手動のフォールバックである。
+- **SSH セッションは URL を保つがブラウザーハンドオフをスキップする** — アドバタイズされたルートがない場合、出力される URL はリモートホストのバインドアドレスエンドポイント(ループバックバインドならループバック)を名指しする。SSH クライアントまたはエディターがローカル転送アドレスを公開して開かなければならない。
+- **`BROWSER` の上書きは環境からのみ** — 発見された `.env` は `BROWSER` を設定できない。自動ハンドオフの実行ファイルを選べるのは継承された値のみである。
+- **すべてのネットワークインターフェースへのバインドはサポートされない** — 安全のため、ワイルドカードの `--host`(Linux が IPv4 any として読む IPv4 マップ形式を含む)は起動時に拒否される。代わりにローカルインターフェースの 1 つの具体的な IPv4 または IPv6 アドレスをバインドする。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>
 
-The Web composition includes the account Remote controller and Account settings section.
+Web 構成にはアカウント Remote コントローラーとアカウント設定セクションが含まれる。

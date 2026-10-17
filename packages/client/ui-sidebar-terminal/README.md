@@ -1,88 +1,88 @@
 ---
-description: "Open, recover and control interactive shell tabs in the Web right sidebar."
+description: "Web 右サイドバーで対話式シェルタブを開き、復旧し、制御する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-sidebar-terminal
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Choose an installed shell from the right sidebar's Start page to run commands in the Session's current working directory. Rename terminals in their tabs and recover retained processes after reloading the page. Collapse the sidebar to keep commands running; close a terminal tab to request process termination. Tab completion follows the shell configuration. Commands use the execution environment’s system-user permissions independently of Agent permissions; see [user-terminal execution](../../api/terminal-controller/README.md#use-this-package).
+右サイドバーの開始ページからインストール済みシェルを選んで、セッションの現在の作業ディレクトリでコマンドを実行する。ターミナルはタブで名前を変更し、ページ再読み込み後に保持されたプロセスを復旧する。サイドバーを折りたたんでもコマンドは動き続ける。ターミナルタブを閉じるとプロセス終了を要求する。タブ補完はシェル設定に従う。コマンドはエージェント権限とは独立に実行環境のシステムユーザー権限を使う。[user-terminal 実行](../../api/terminal-controller/README.md#use-this-package)を参照すること。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The `terminal.new` command creates a separate terminal in the focused dock pane, replacing a guide and retaining existing content pages. From the conversation or a floating content page, it uses the active dock pane. The guide card right-aligns the current effective shortcut as unboxed text without a duplicate tooltip. Windows and macOS Web use the [shortcut service’s platform defaults](../shortcuts/README.md); Linux Web leaves the command unbound by default.
+`terminal.new` コマンドはフォーカスされたドックペインに別のターミナルを作り、ガイドを置き換え、既存のコンテンツページを保持する。会話またはフローティングコンテンツページからはアクティブなドックペインを使う。ガイドカードは現在の有効ショートカットを重複ツールチップなしの囲みなしテキストとして右寄せする。Windows と macOS の Web は[ショートカットサービスのプラットフォームデフォルト](../shortcuts/README.md)を使う。Linux Web はデフォルトでコマンドをバインドしない。
 
-Open the right sidebar and click **New terminal** to open the remembered available shell immediately. The separate arrow beside the title opens the installed-shell menu; selecting an item remembers it and opens that shell directly. Discovery runs when the menu opens and does not allocate a terminal. A failed lookup offers Retry in the menu. Use **New tab** to return to the guide and open another terminal.
+右サイドバーを開いて **New terminal** をクリックすると記憶された利用可能シェルがすぐに開く。タイトル脇の別の矢印はインストール済みシェルメニューを開く。項目を選ぶとそれを記憶してそのシェルを直接開く。探索はメニューが開いたときに走り、ターミナルを確保しない。照会失敗はメニューに Retry を出す。**New tab** でガイドに戻ってもう 1 件のターミナルを開く。
 
-Double-click the terminal's tab title to rename it. **Take control** makes the current attachment writable when another page owns input. A temporary disconnect preserves the screen and offers **Reconnect**, without exposing transport diagnostics. An exited shell remains visible with its exit code and offers **New terminal**; it never restarts automatically. Exited terminals count toward the Session limit; close unused tabs when the limit is reached.
+ターミナルのタブタイトルをダブルクリックして名前を変更する。**Take control** は別のページが入力を所有しているときに現在の接続を書き込み可能にする。一時的な切断は画面を保ち、転送診断を出さずに **Reconnect** を出す。終了したシェルは終了コード付きで表示されたまま **New terminal** を出し、自動的に再起動しない。終了済みターミナルはセッション上限に数える。上限に達したら未使用タブを閉じること。
 
-Closing or replacing a terminal tab removes it immediately and ends its process in the background. Cleanup failures have no notification or manual retry action; saved unfinished close requests are retried when the Client plugin starts. Collapsing, switching tabs or Sessions, floating and fullscreen presentation preserve the process.
+ターミナルタブを閉じるか置き換えるとすぐに取り除き、そのプロセスをバックグラウンドで終了させる。クリーンアップ失敗は通知も手動再試行アクションもない。保存済みの未完了クローズ要求はクライアントプラグイン開始時に再試行される。折りたたみ、タブやセッションの切り替え、フローティングと全画面表示はプロセスを保つ。
 
-After reload, the [sidebar restores its layout](../../client/ui-sidebar-right/README.md#state) and each terminal reconnects to its saved Host identity in the original tab. Collapsed and inactive tabs do not create recovery duplicates or change selection. Host terminals absent from the saved layout do not reopen automatically and have no UI recovery entry; they remain subject to the controller's unattended idle reclamation and Session/Host disposal. A missing saved process shows a localized unavailable panel with **New terminal**. Clicking it replaces the unavailable tab in place with a fresh terminal; recovery never creates that replacement automatically.
+再読み込み後、[サイドバーはレイアウトを復元](../../client/ui-sidebar-right/README.md#state)し、各ターミナルは元のタブで保存済みホストアイデンティティに再接続する。折りたたまれたタブと非アクティブタブは復旧の重複を作らず、選択も変えない。保存済みレイアウトにないホストターミナルは自動的に開き直さず、UI 復旧入口もない。コントローラーの無人アイドル回収とセッション/ホスト破棄の対象のままである。保存済みプロセスが欠落しているとローカライズされた利用不可パネルと **New terminal** を表示する。それをクリックすると利用不可タブをその場で新しいターミナルに置き換える。復旧がその置換を自動的に作ることはない。
 
-The terminal background, default text, cursor, and selection follow the DSH theme, including system preference and theme-token overrides. Theme changes preserve the running shell, output, and application OSC color overrides. Reset commands restore colors to the current DSH defaults. The screen uses the Settings terminal font size and places the Settings terminal font ahead of its built-in monospace stack; changing either keeps the shell and output, and a visible writable screen refits the Host grid to the new cell size. xterm adjusts text toward 4.5:1 contrast; the cursor keeps at least 3:1 contrast against its cell background, including Vim colorschemes.
+ターミナル背景、既定テキスト、カーソル、選択はシステム設定とテーマトークン上書きを含む DSH テーマに従う。テーマ変更は実行中シェル、出力、アプリケーション OSC 色上書きを保つ。リセットコマンドは色を現在の DSH デフォルトに戻す。画面は設定のターミナルフォントサイズを使い、設定のターミナルフォントを組み込み等幅スタックの前に置く。どちらを変えてもシェルと出力は保たれ、表示可能な書き込み可能画面はホストグリッドを新しいセルサイズに合わせ直す。xterm はテキストを 4.5:1 コントラスト寄りに調整する。カーソルは Vim カラースキームを含めてセル背景に対して少なくとも 3:1 コントラストを保つ。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This plugin registers the `terminal` type and body/title seats with the right sidebar. The guide reuses the Plugins page’s blue terminal artwork; tab titles use the line glyph. The React-free terminal model belongs to `api-terminal-controller`; keyed framework hooks expose its state. `ui-primitives` Menu and Button provide the shell picker and startup controls, including keyboard navigation and the selected-item marker. The body loads its package-local `client.terminal.js` chunk when a terminal view mounts, keeping xterm.js and FitAddon out of the startup `client.js`; they then render the screen and measure the viewport. The body reserves an 8px gap below the tab strip within the pane height. Input, including Tab and control characters, travels unchanged to the PTY.
+このプラグインは右サイドバーに `terminal` 型とボディ/タイトル席を登録する。ガイドはプラグインページの青いターミナルアートワークを再利用する。タブタイトルはライングリフを使う。React フリーのターミナルモデルは `api-terminal-controller` に属する。キー付きフレームワークフックがその状態を公開する。`ui-primitives` の Menu と Button がキーボードナビゲーションと選択済み項目マーカーを含むシェルピッカーと起動コントロールを提供する。ボディはターミナルビューがマウントされたときにパッケージローカルの `client.terminal.js` チャンクを読み込み、xterm.js と FitAddon を起動時 `client.js` から外す。両者は画面を描画し、ビューポートを測る。ボディはペイン高さの中でタブストリップの下に 8px の隙間を確保する。Tab と制御文字を含む入力は PTY へ unchanged で届く。
 
-The terminal controller saves each globally unique content identity's Host association independently and owns content recovery; the sidebar owns layout persistence. A recovered view cannot allocate a replacement process. The sidebar's close handler schedules cleanup through the [terminal controller](../../api/terminal-controller/README.md#understand-the-implementation) and returns synchronously. Browser component cleanup and the tab's abort signal only detach browser work.
+ターミナルコントローラーはグローバルに一意な各コンテンツアイデンティティのホスト関連付けを独立に保存し、コンテンツ復旧を所有する。サイドバーはレイアウト永続化を所有する。復旧ビューは置換プロセスを確保できない。サイドバーのクローズハンドラーは[ターミナルコントローラー](../../api/terminal-controller/README.md#understand-the-implementation)経由でクリーンアップをスケジュールし、同期的に戻る。ブラウザーコンポーネントのクリーンアップとタブのアボートシグナルはブラウザー作業を切り離すだけである。
 
-At plugin startup, terminal-kind entries in the sidebar's complete open-tab inventory retain matching saved Host identities, including dormant Sessions. This window hold remains independent of React mounts and screen subscriptions. Removing the last matching occurrence releases it; collapsing or switching views does not. The [terminal controller](../../api/terminal-controller/README.md#use-this-package) owns unattended idle reclamation and long-command protection.
+プラグイン起動時、サイドバーの完全な開タブインベントリ中のターミナル種別エントリは休眠セッションを含む保存済みホストアイデンティティの一致を保持する。このウィンドウ保持は React マウントや画面購読とは独立である。最後の一致が取り除かれると解放される。折りたたみやビュー切り替えでは解放されない。[ターミナルコントローラー](../../api/terminal-controller/README.md#use-this-package)は無人アイドル回収と長時間コマンド保護を所有する。
 
 </details>
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
 - [Subprocess](../../subprocess/subprocess/README.md)
 - [Right Sidebar](../../client/ui-sidebar-right/README.md)
-- [Web terminal decision](../../../.agents/notes/implemented/feature/2026-09-09-web-sidebar-terminal.md)
+- [Web ターミナル決定](../../../.agents/notes/implemented/feature/2026-09-09-web-sidebar-terminal.md)
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package handles user terminal interaction without adding model input.
+なし。このパッケージはモデル入力を加えずにユーザーターミナル操作を扱うためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; terminal output travels only between the browser and Host.
+なし。ターミナル出力はブラウザーとホストの間だけを行き来する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Shell discovery or native PTY startup can fail. The tab reports the failure without launching a different shell.
-- Completion menus and inline suggestions depend on shell configuration. The Web UI adds no independent completion engine.
-- Application OSC color overrides are retained by the mounted renderer; a newly opened renderer cannot recover them from the Host screen snapshot.
-- Terminal history is bounded. The feature does not send terminal output to the Agent, provide split terminal panes inside a tab, or restore processes after Host restart.
-- A failed terminal chunk load requires a page reload because React caches a rejected lazy import for the page lifetime.
+- シェル探索やネイティブ PTY 起動は失敗し得る。タブは別のシェルを起動せずに失敗を報告する。
+- 補完メニューとインライン候補はシェル設定に依存する。Web UI は独立した補完エンジンを加えない。
+- アプリケーション OSC 色上書きはマウントされたレンダラーが保持する。新しく開いたレンダラーはホスト画面スナップショットからそれらを復旧できない。
+- ターミナル履歴は制限付きである。この機能はターミナル出力をエージェントに送らず、タブ内に分割ターミナルペインを提供せず、ホスト再起動後にプロセスを復元しない。
+- 失敗したターミナルチャンク読み込みはページ再読み込みを要する。React がページ存続期間中拒否された遅延 import をキャッシュするためである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

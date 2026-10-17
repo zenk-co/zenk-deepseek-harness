@@ -4,7 +4,7 @@ description: "查找从 V0 到工作区写入器版本的每个 Session 格式�
 
 # Session 持久化格式
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

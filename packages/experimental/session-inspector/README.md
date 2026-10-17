@@ -1,105 +1,105 @@
 ---
-description: "Virtualized raw Session log and Chat group/node tables with streamed delta rows, pagination, and update highlighting."
+description: "ストリーミングされるデルタ行、ページネーション、更新ハイライトを備えた仮想化された生セッションログと Chat グループ/ノードテーブル。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-experimental-session-inspector
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Inspect raw Session logs and Chat structures through the optional [Developer Tools bundle](../inspector-profile/README.md). Open **Session Log** from the Sidebar's new-tab menu or guide, then choose **Raw Log** or **Chat Group** from its upper-left selector. Follow object references between Nodes, Turns, and Steps, or locate a selected Node in Chat. Stream chunks appear as child rows, and Chat updates briefly highlight their rows. Both presentations support older history and resizable details without a composer.
+オプションの [Developer Tools バンドル](../inspector-profile/README.md) を通じて、生のセッションログと Chat 構造を検査できます。サイドバーの新規タブメニューまたはガイドから **セッションログ** を開き、左上のセレクターで **生ログ** または **チャットグループ** を選びます。ノード、ターン、ステップ間のオブジェクト参照をたどったり、選択したノードを Chat 内で特定したりできます。ストリームのチャンクは子行として表示され、Chat の更新はその行を短時間ハイライトします。どちらの表示も古い履歴とリサイズ可能な詳細に対応し、コンポーザーはありません。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [モデル体験](#model-experience)
+- [既知の制限と先送りされた作業](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The Developer Tools bundle mounts this plugin as `session-inspector`. It registers the `session-inspector-log` Sidebar page for the Sidebar's current Session, without a Conversation View or header label. The selector initially shows Session Log, with the current row count alongside it. Changing presentation resets local selection, type filtering, and scroll state. This plugin requires no debugging argument, accepts no configuration, and changes no Session data.
+Developer Tools バンドルはこのプラグインを `session-inspector` としてマウントします。これはサイドバーの現在のセッションに対して `session-inspector-log` サイドバーページを登録し、会話ビューやヘッダーラベルは持ちません。セレクターは最初にセッションログを表示し、その横に現在の行数を示します。表示を切り替えると、ローカルの選択、型フィルタリング、スクロール状態がリセットされます。このプラグインはデバッグ引数を必要とせず、設定も受け付けず、セッションデータも変更しません。
 
-Click the filter icon in the Type header to enter a type fragment. Suggestions update asynchronously from all loaded records. Enter or **Apply filter** confirms the fragment; clicking a suggestion or selecting it with arrow keys and Enter confirms that type. Matching ignores case and uses containment: `delta` and `*delta*` both match reasoning and tool-call deltas. Editing alone does not change the table. Escape, Cancel, or clicking outside discards the draft; clearing and confirming restores all types.
+Type ヘッダーのフィルターアイコンをクリックして型フラグメントを入力します。候補は読み込み済みの全レコードから非同期に更新されます。Enter または **フィルターを適用** でフラグメントを確定し、候補をクリックするか、矢印キーと Enter で選択すると、その型が確定されます。照合は大文字小文字を区別せず、包含方式です。`delta` と `*delta*` はどちらも reasoning と tool-call のデルタに一致します。編集だけではテーブルは変わりません。Escape、キャンセル、または外側をクリックすると下書きが破棄され、クリアして確定するとすべての型が復元されます。
 
-Filtered tables retain matching rows and their ancestor context, initially expanding folded ancestors. Context-only types appear muted and do not count toward the matching-row total. New and paginated rows use the confirmed filter. Confirming resets selection, disclosure choices, and reserved trailing space, and returns to the top. Following an object reference or picking a Chat element clears the filter if its target row is excluded, then reveals that row.
+フィルタリングされたテーブルは一致する行とその祖先コンテキストを保持し、折りたたまれた祖先は最初に展開されます。コンテキスト専用の型は淡色表示になり、一致行の合計には数えられません。新しい行とページネーションされた行には確定済みのフィルターが適用されます。確定すると選択、開閉の選択、確保された末尾スペースがリセットされ、先頭に戻ります。オブジェクト参照をたどるか Chat 要素をピックすると、対象行が除外されている場合はフィルターがクリアされ、その後その行が表示されます。
 
-Session Log groups records between `turn/start` and `turn/end`, with nested `step/start`–`step/end` ranges. The start record is the sticky group header; the end remains a raw child at the group's tail. Turn and Step groups stay expanded after completion and can be folded manually. Records between Steps belong to the Turn; records outside a loaded range remain ungrouped. Missing starts are not synthesized: loading an earlier start adds ancestry to the existing rows. Assistant streams retain their own nesting inside the Step.
+セッションログは `turn/start` と `turn/end` の間のレコードをグループ化し、その中に `step/start`–`step/end` の範囲がネストされます。start レコードは固定表示されるグループヘッダーで、end はグループ末尾の生の子行として残ります。ターンとステップのグループは完了後も展開されたままで、手動で折りたためます。ステップ間のレコードはターンに属し、読み込み範囲外のレコードはグループ化されません。欠落した start は合成されません。より前の start を読み込むと、既存の行に祖先情報が追加されます。Assistant ストリームはステップ内で独自のネストを保ちます。
 
-Assistant logs group original timed chunks beneath their matching `block-start`, including text, reasoning, and tool-call argument deltas. Unfinished blocks expand by default; `block-end` automatically collapses its block, which can then be reopened manually. Historical closed blocks start collapsed. Live chunks share an attempt row until settlement replaces them with the durable event. Chat Group nests actual group members below their group. Hidden or unlisted materialized Nodes remain root rows, inserted by event anchor between the existing roots instead of appended after the last Turn; the Inspector does not invent group membership. Inserts and updates briefly highlight unless the system requests reduced motion.
+Assistant ログは、元のタイミング付きチャンクを対応する `block-start` の下にグループ化します。これにはテキスト、reasoning、tool-call 引数のデルタが含まれます。未完了のブロックはデフォルトで展開され、`block-end` がそのブロックを自動的に折りたたみ、その後手動で再度開けます。履歴上の閉じたブロックは折りたたまれた状態で開始します。ライブチャンクは、確定が永続イベントで置き換えるまで試行行を共有します。チャットグループは実際のグループメンバーをそのグループの下にネストします。非表示または一覧にない実体化済みノードはルート行のままで、最後のターンの後に追加されるのではなく、イベントアンカーによって既存のルート間に挿入されます。Inspector はグループメンバーシップを捏造しません。挿入と更新は、システムがモーションの低減を要求している場合を除き、短時間ハイライトされます。
 
-Use the disclosure arrow to fold children and select a row's type or data to inspect raw details. Horizontal data previews omit `type`, `seq`, and `sequence`, plus top-level `time`. Chat Node also omits top-level `key` and `kind`, which already have their own columns. When one field remains, only its value appears. Tool-call delta previews show only the argument fragment; reasoning delta previews show only the text. Preview filtering does not remove fields from raw details. Drag the detail panel's upper separator, or use its Up/Down keys, to resize it; selecting another row retains its height.
+開閉矢印で子を折りたたみ、行の型またはデータを選択して生の詳細を検査します。横方向のデータプレビューでは `type`、`seq`、`sequence`、および最上位の `time` が省略されます。Chat ノードではさらに、専用の列がすでにある最上位の `key` と `kind` も省略されます。フィールドが 1 つだけ残る場合は、その値のみが表示されます。tool-call デルタのプレビューは引数フラグメントのみを表示し、reasoning デルタのプレビューはテキストのみを表示します。プレビューのフィルタリングによって生の詳細からフィールドが削除されることはありません。詳細パネルの上部セパレーターをドラッグするか、Up/Down キーを使用してサイズを変更できます。別の行を選択しても高さは維持されます。
 
-A folded reasoning `block-start` omits `index` and shows `blockType: reasoning` followed by its joined reasoning deltas, within the normal preview length. Interleaved blocks keep separate summaries. Expanding the block restores its ordinary fields and original child rows; raw details retain the original block-start without synthesized text.
+折りたたまれた reasoning の `block-start` は `index` を省略し、通常のプレビュー長の範囲で `blockType: reasoning` に続けて結合された reasoning デルタを表示します。インターリーブされたブロックは別々のサマリーを保ちます。ブロックを展開すると、通常のフィールドと元の子行が復元され、生の詳細は合成テキストなしの元の block-start を保持します。
 
-Chat details show a lazy object tree rather than JSON conversion. Maps retain object keys and values, Sets and arrays show members, and class instances retain their names and own fields. Collections expand in pages; getters are labelled without execution, and WeakMap/WeakSet contents remain opaque. The inspected root expands inline; unregistered cycles show their ancestor path. Expanded fields are cached until a Conversation publication changes, so mutable Turn/Step Data refreshes without resetting disclosure state or repeating enumeration for UI-only renders.
+Chat の詳細は JSON 変換ではなく、遅延評価のオブジェクトツリーを表示します。Map はオブジェクトのキーと値を保持し、Set と配列はメンバーを表示し、クラスインスタンスはその名前と自身のフィールドを保持します。コレクションはページ単位で展開され、getter は実行せずにラベル付けされ、WeakMap/WeakSet の内容は不透明なままです。検査対象のルートはインラインで展開され、未登録の循環は祖先パスを表示します。展開されたフィールドは会話のパブリケーションが変化するまでキャッシュされるため、可変のターン/ステップデータは、開閉状態をリセットしたり UI のみのレンダリングで列挙を繰り返したりせずに更新されます。
 
-Arrays and TypedArrays read only the disclosed index prefix, including sparse slots marked separately from explicit `undefined`. **Other properties** opens their non-index and symbol fields without invoking getters. The initial numeric page does not enumerate the whole collection; opening Other properties explicitly scans its own keys.
+配列と TypedArray は、開示されたインデックスの先頭部分のみを読み取ります。明示的な `undefined` とは別にマークされた疎なスロットも含みます。**その他のプロパティ** は getter を呼び出さずに、インデックス以外のフィールドとシンボルフィールドを開きます。最初の数値ページはコレクション全体を列挙せず、その他のプロパティを開くと明示的に自身のキーをスキャンします。
 
-Nested Node, Group, Turn, Step, and Data objects have reference buttons. Activating a reference opens its current loaded value and adds a breadcrumb; selecting an earlier breadcrumb returns to that level and discards the later path. The first breadcrumb retains the original row even when reference navigation selects another table row. A reference with a row unfolds its enclosing Inspector group, scrolls to the row, and flashes it. Node Data also has an inline disclosure arrow: expanding it stays in the current tree, while clicking its title navigates. Repeated Node Data ancestors remain links rather than recursively expanding. Selecting a table row or a picked Chat element starts a new breadcrumb path; Session Log keeps JSON details without reference navigation.
+ネストされたノード、グループ、ターン、ステップ、Data オブジェクトには参照ボタンがあります。参照を有効にすると、その現在読み込まれている値が開き、パンくずリストが追加されます。以前のパンくずを選択するとそのレベルに戻り、それ以降のパスは破棄されます。最初のパンくずは、参照ナビゲーションが別のテーブル行を選択しても元の行を保持します。行を持つ参照は、それを含む Inspector グループを展開し、その行までスクロールして点滅させます。Node Data にはインラインの開閉矢印もあり、展開すると現在のツリーにとどまり、タイトルをクリックするとナビゲートします。反復する Node Data の祖先は再帰的に展開されず、リンクのままになります。テーブル行またはピックした Chat 要素を選択すると、新しいパンくずパスが開始されます。セッションログは参照ナビゲーションなしの JSON 詳細を保持します。
 
-Selecting a Chat row or following a reference uses the Inspector's [DOM matcher](src/client/views/chat-node/dom.ts) to find existing Node, call, Group, or Turn attributes in the same Session's displayed main Chat. Inspector dispatches the existing `beforematch` behavior to searchable folded ancestors, then uses native scrolling and a body-level highlight overlay without adding elements to Chat content. A visible target only flashes; an offscreen target scrolls smoothly before flashing, with immediate scrolling and no flash for reduced motion. ID columns remain narrow; hover or focus an ID to read its complete value in a tooltip.
+Chat 行を選択するか参照をたどると、Inspector の [DOM マッチャー](src/client/views/chat-node/dom.ts) を使用して、同じセッションで表示されているメイン Chat 内の既存のノード、呼び出し、グループ、ターンの属性を検索します。Inspector は既存の `beforematch` 動作を検索可能な折りたたみ祖先にディスパッチし、Chat コンテンツに要素を追加せずに、ネイティブスクロールと body レベルのハイライトオーバーレイを使用します。表示されているターゲットは点滅するだけです。画面外のターゲットはスムーズにスクロールしてから点滅し、モーション低減時は即時スクロールで点滅しません。ID 列は幅が狭いままです。ID にホバーまたはフォーカスすると、ツールチップで完全な値を確認できます。
 
-Missing, empty, or still-hidden occurrences do not stop navigation. When event coordinates are available, Inspector tries nearby loaded content in the same Step, then the same Turn, then other loaded Turns, ordered by event distance. Existing Group and Turn occurrences also provide fallback positions. If no candidate can render, Inspector highlights the visible Chat column without moving it.
+欠落した、空の、またはまだ非表示の出現箇所があってもナビゲーションは停止しません。イベント座標が利用可能な場合、Inspector は同じステップ内の近くの読み込み済みコンテンツ、次に同じターン、次に他の読み込み済みターンを、イベント距離順に試します。既存のグループとターンの出現箇所もフォールバック位置を提供します。どの候補もレンダリングできない場合、Inspector は表示されている Chat 列を移動せずにハイライトします。
 
-Selecting a Session Log row passes the [original log coordinates](src/client/views/session-log/chat-target.ts) through the same DOM lookup while retaining the log presentation and JSON details. Inspector reads the existing Chat snapshot and prefers tool call identity, exact event anchors, and the owning Assistant step before applying the same fallback selection. Stream children inherit their owning event and prefer reasoning or response parts when available. Missing targets do not load history or switch the active View; an empty Chat has nothing to highlight.
+セッションログの行を選択すると、[元のログ座標](src/client/views/session-log/chat-target.ts) が同じ DOM ルックアップに渡されますが、ログ表示と JSON 詳細は維持されます。Inspector は既存の Chat スナップショットを読み取り、同じフォールバック選択を適用する前に、ツール呼び出しの同一性、正確なイベントアンカー、所有する Assistant ステップを優先します。ストリームの子は所有するイベントを継承し、利用可能な場合は reasoning またはレスポンスのパートを優先します。ターゲットが欠落していても履歴を読み込んだりアクティブなビューを切り替えたりしません。空の Chat にはハイライトするものがありません。
 
-The crosshair beside the presentation selector installs a transparent click-catching mask over the displayed main Chat. Inspector uses `elementsFromPoint()` to look below its mask and preview, then matches existing data attributes. A click selects that record in the current Inspector presentation, reveals its table ancestors, and opens its details without activating the underlying Chat control. Wheel movement is forwarded to the underlying Chat scrollport. Escape, the crosshair button, changing presentation or Session, hiding or closing the Inspector, or leaving the window cancels picking. Each plugin instance permits one active picker; separate instances do not cancel one another. Plugin unload releases its picker without calling panel callbacks and prevents old panels from restarting it.
+表示セレクターの横にあるクロスヘアは、表示されているメイン Chat の上に透明なクリック捕捉マスクを設置します。Inspector は `elementsFromPoint()` を使って自身のマスクとプレビューの下を調べ、既存のデータ属性を照合します。クリックすると、現在の Inspector 表示でそのレコードが選択され、そのテーブル祖先が表示され、基になる Chat コントロールをアクティブにせずに詳細が開きます。ホイール操作は基になる Chat のスクロールポートに転送されます。Escape、クロスヘアボタン、表示またはセッションの変更、Inspector の非表示またはクローズ、ウィンドウからの離脱はピッキングをキャンセルします。各プラグインインスタンスは 1 つのアクティブなピッカーを許可し、別々のインスタンスが互いをキャンセルすることはありません。プラグインのアンロードはパネルのコールバックを呼び出さずにピッカーを解放し、古いパネルがそれを再起動するのを防ぎます。
 
-Chat picking prefers the exact Node and reasoning/response part, then its Group, Step, or Turn. Session Log picking prefers a matching tool call or Node log anchor, then its Assistant, Step, or Turn record; a reasoning part selects its first reasoning block when available. Picking stays active with a notice if the loaded table has no match. Text similarity is not used. The [element and Chat-row matchers](src/client/views/chat-node/pick-match.ts) and the [log model's picker](src/client/views/session-log/model.ts) own these adjustable rules; nested tool calls may resolve to their root Node or log anchor.
+Chat のピッキングは、正確なノードと reasoning/レスポンスのパートを優先し、次にそのグループ、ステップ、ターンを優先します。セッションログのピッキングは、一致するツール呼び出しまたはノードログアンカーを優先し、次にその Assistant、ステップ、ターンのレコードを優先します。reasoning パートは、利用可能な場合は最初の reasoning ブロックを選択します。読み込み済みのテーブルに一致がない場合、ピッキングは通知付きでアクティブなままです。テキスト類似度は使用されません。[要素と Chat 行のマッチャー](src/client/views/chat-node/pick-match.ts) と [ログモデルのピッカー](src/client/views/session-log/model.ts) がこれらの調整可能なルールを所有します。ネストされたツール呼び出しは、ルートノードまたはログアンカーに解決される場合があります。
 
-Session Log uses the same field renderer for parsed JSON, with every nested object and array initially expanded. Containers can be collapsed individually; there are no reference buttons, breadcrumbs, collection-property disclosures, or collection paging. JSON retains `[Circular]` markers and readable bigint strings. Inspection failures appear locally without disabling the table. Preview filtering never removes fields from either detail presentation.
+セッションログは解析済み JSON に同じフィールドレンダラーを使用し、ネストされたすべてのオブジェクトと配列は最初に展開されます。コンテナーは個別に折りたためます。参照ボタン、パンくず、コレクションプロパティの開示、コレクションのページングはありません。JSON は `[Circular]` マーカーと可読な bigint 文字列を保持します。検査の失敗はテーブルを無効化せずにローカルに表示されます。プレビューのフィルタリングはどちらの詳細表示からもフィールドを削除しません。
 
-Ancestor rows remain sticky beneath the table header, one nesting level below another, with an opaque tinted background. Each level follows the first row not covered by the header or earlier sticky levels. Automatic block closure keeps the visible row or surviving parent at its screen position and leaves unused space only below the data; new rows fill that space before normal tail following resumes. A manual disclosure keeps the clicked header at its measured viewport position and pauses following, retaining only the trailing space needed to keep it visible. **Follow Latest** clears reserved space and resumes following. Scrolling upward or choosing **Load earlier** also pauses following. Raw Log shows UTC timestamps with the server's millisecond precision; Chat Group has no time column.
+祖先行はテーブルヘッダーの下に、ネストレベルごとに積み重なるように固定表示され、不透明な色付き背景を持ちます。各レベルは、ヘッダーやそれより前の固定レベルに覆われていない最初の行に追随します。自動ブロッククローズは、表示中の行または存続する親を画面上の位置に保ち、未使用スペースをデータの下にのみ残します。新しい行はそのスペースを埋めてから、通常の末尾追随が再開されます。手動開閉は、クリックしたヘッダーを計測されたビューポート位置に保ち、追随を一時停止し、表示を維持するために必要な末尾スペースだけを確保します。**最新に追随** は確保されたスペースをクリアして追随を再開します。上方向にスクロールするか **以前を読み込む** を選んでも追随は一時停止します。生ログはサーバーのミリ秒精度で UTC タイムスタンプを表示し、チャットグループには時間列がありません。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-[`src/index.ts`](src/index.ts) is the inert Host discovery entry. The [tab registration](src/client/views/index.ts) contributes a page type and its Session-scoped body, borrowing the Sidebar's existing Session reference. The [combined panel](src/client/views/View.tsx) selects between the [log model](src/client/views/session-log/model.ts) and [Chat model](src/client/views/chat-node/model.ts); only the selected table subscribes. The [object index](src/client/views/chat-node/objects.ts) uses weak identities for Node and Group snapshots, their data roots, and Turn/Step locations and Data readers. Named references read current values without retaining replaced snapshots. Node enumeration uses the existing `nodes.values()` reader. The [revealer](src/client/views/chat-node/reveal.ts) and [picker](src/client/views/chat-node/picker.ts) own all DOM interaction inside this package; neither adds a Chat or Conversation API. The shared [table](src/client/views/InspectorTable.tsx) uses TanStack Virtualizer.
+[`src/index.ts`](src/index.ts) は不活性な Host 発見エントリーです。[タブ登録](src/client/views/index.ts) はページタイプとそのセッションスコープのボディを提供し、サイドバーの既存のセッション参照を借用します。[統合パネル](src/client/views/View.tsx) は [ログモデル](src/client/views/session-log/model.ts) と [Chat モデル](src/client/views/chat-node/model.ts) の間で選択し、購読するのは選択されたテーブルのみです。[オブジェクトインデックス](src/client/views/chat-node/objects.ts) はノードとグループのスナップショット、そのデータルート、ターン/ステップの位置と Data リーダーに弱い同一性を使用します。名前付き参照は、置き換えられたスナップショットを保持せずに現在の値を読み取ります。ノードの列挙には既存の `nodes.values()` リーダーを使用します。[リビーラー](src/client/views/chat-node/reveal.ts) と [ピッカー](src/client/views/chat-node/picker.ts) はこのパッケージ内のすべての DOM 操作を所有し、どちらも Chat や会話 API を追加しません。共有の [テーブル](src/client/views/InspectorTable.tsx) は TanStack Virtualizer を使用します。
 
-Live log appends reuse historical row objects and the Turn/Step grouping cursor. Each chunk inserts one row into its block, replaces a closing header when needed, and shifts only following root offsets. Pagination, settlement, replacement, or missed revisions rebuild the hierarchy while preserving keyed record sources. DOM strings are matched to current Group references before registry access; ungrouped Chat keys retain their upstream string type without brand assertions.
+ライブログの追記は、履歴の行オブジェクトとターン/ステップのグループ化カーソルを再利用します。各チャンクはそのブロックに 1 行を挿入し、必要に応じて閉じるヘッダーを置き換え、後続のルートオフセットだけをシフトします。ページネーション、確定、置換、または見逃されたリビジョンは、キー付きレコードソースを保持したまま階層を再構築します。DOM 文字列はレジストリアクセスの前に現在のグループ参照に照合されます。グループ化されていない Chat キーは、ブランドアサーションなしで上流の文字列型を保ちます。
 
 </details>
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this Inspector adds no model-facing input.
+なし。この Inspector はモデル向けの入力を追加しません。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; the package does not modify model requests.
+なし。このパッケージはモデルリクエストを変更しません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送りされた作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Loaded history** — tables inspect the Session's loaded window; older records require pagination. Live-to-durable row identities persist across window rebuilds and are released when their rows leave the window.
-- **Projection controls** — Session Log does not display projection control-stream updates.
-- **Publication cadence** — highlighting follows published Node changes, not every internal mutation between publications. Raw data is unredacted.
-- **Large windows** — each publication still copies the immutable row-reference array; filtering and table layout also scan the loaded rows. Appends do not regroup or recreate historical rows. Opening ordinary-object fields or Other properties scans all own keys.
-- **Live suggestions** — refreshing type candidates resets keyboard selection, even for an unchanged candidate list; reselect the candidate or click it before confirming.
-- **Chat DOM dependency** — location and picking depend on existing Slot/Chat attributes and searchable-fold behavior. They require the inspected Session's Chat to be displayed in the main area; they do not switch Views or Sessions, load history, or render absent business Nodes. Approximation cannot recover an unrendered message's exact location.
+- **読み込み済み履歴** — テーブルはセッションの読み込み済みウィンドウを検査します。より古いレコードにはページネーションが必要です。ライブから永続への行の同一性はウィンドウの再構築をまたいで維持され、行がウィンドウを離れると解放されます。
+- **投影コントロール** — セッションログは投影コントロールストリームの更新を表示しません。
+- **パブリケーションの頻度** — ハイライトはパブリッシュされたノード変更に追随し、パブリケーション間のすべての内部変更には追随しません。生データはマスクされません。
+- **大きなウィンドウ** — 各パブリケーションは依然として不変の行参照配列をコピーします。フィルタリングとテーブルレイアウトも読み込み済みの行をスキャンします。追記は履歴行を再グループ化も再作成もしません。通常のオブジェクトフィールドやその他のプロパティを開くと、すべての自キーをスキャンします。
+- **ライブ候補** — 型候補を更新すると、候補リストが変わっていなくてもキーボード選択がリセットされます。確定する前に候補を再選択するかクリックしてください。
+- **Chat DOM 依存** — 位置特定とピッキングは、既存の Slot/Chat 属性と検索可能な折りたたみ動作に依存します。検査対象のセッションの Chat がメイン領域に表示されている必要があり、ビューやセッションの切り替え、履歴の読み込み、存在しないビジネスノードのレンダリングは行いません。近似では、レンダリングされていないメッセージの正確な位置を復元できません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,14 +1,14 @@
-# System Prompt Assembly
+# システムプロンプトの組み立て
 
-English | [中文](system-prompt.zh.md)
+日本語 | [English](system-prompt.en.md) | [中文](system-prompt.zh.md)
 
-The [system-prompt package](../../packages/core/system-prompt) owns the data exchanged between prompt contributors and one assembly call. The package [README](../../packages/core/system-prompt/README.md) documents registration, ordering, scoping, and rendering behavior; this page records the exact cross-package types that plugins implement or pass.
+[system-prompt パッケージ](../../packages/core/system-prompt)は、プロンプトコントリビューターと 1 回のアセンブリ呼び出しの間で交換されるデータを所有する。パッケージ [README](../../packages/core/system-prompt/README.md) は登録、順序付け、スコープ、レンダリングの動作を記録し、このページはプラグインが実装または渡す正確なパッケージ横断の型を記録する。
 
-Source: [`packages/core/system-prompt/src/index.ts`](../../packages/core/system-prompt/src/index.ts).
+ソース: [`packages/core/system-prompt/src/index.ts`](../../packages/core/system-prompt/src/index.ts)。
 
-## Assembly context
+## アセンブリコンテキスト
 
-`AssembleContext` identifies the scope layer one assembly resolves and may carry the explicit control signal for that request. It is merge-extensible: `dsh-agent` adds the optional live `agent` field, and `assembleContextFor(agent, signal)` sets the explicit fields together. A bare assembly has neither scope nor signal.
+`AssembleContext` は、1 回のアセンブリが解決するスコープ層を識別し、そのリクエストの明示的な制御シグナルを運んでよい。merge 拡張可能である: `dsh-agent` がオプションの生きた `agent` フィールドを追加し、`assembleContextFor(agent, signal)` が明示的なフィールドをまとめて設定する。素のアセンブリはスコープもシグナルも持たない。
 
 ```ts type-equiv
 /** Merge-extensible context for one prompt assembly. */
@@ -23,9 +23,9 @@ interface AssembleContext {
 }
 ```
 
-## Tool-provider result
+## ツールプロバイダーの結果
 
-`ToolProviderResult.schemas` is the model-visible set for the current assembly. `knownNames` is the provider's pre-restriction name universe used to distinguish a configured-name typo from a known tool that is deliberately hidden in this scope.
+`ToolProviderResult.schemas` は現在のアセンブリに対してモデル可視の集合である。`knownNames` はプロバイダーの制限前の名前宇宙であり、設定された名前のタイポと、このスコープで意図的に隠された既知のツールを区別するために使われる。
 
 ```ts type-equiv
 /** Tool schemas visible in one assembly and their pre-restriction name set. */
@@ -37,11 +37,11 @@ interface ToolProviderResult {
 }
 ```
 
-## Prompt sections
+## プロンプトセクション
 
-The exported `PERSONA_PREFIX_SECTION` (`deployment:persona-prefix`) and `PERSONA_SUFFIX_SECTION` (`deployment:persona-suffix`) name the slots shared by global configuration and scoped contributions. Their `PromptSectionOrderName` entries are `DEPLOYMENT_PERSONA_PREFIX` and `DEPLOYMENT_PERSONA_SUFFIX`; the [package README](../../packages/core/system-prompt/README.md#configure-the-prompt) owns their placement and template configuration.
+エクスポートされた `PERSONA_PREFIX_SECTION`（`deployment:persona-prefix`）と `PERSONA_SUFFIX_SECTION`（`deployment:persona-suffix`）は、グローバル構成とスコープ付きコントリビューションが共有するスロットを名指す。それらの `PromptSectionOrderName` エントリーは `DEPLOYMENT_PERSONA_PREFIX` と `DEPLOYMENT_PERSONA_SUFFIX` である。それらの配置とテンプレート構成は[パッケージ README](../../packages/core/system-prompt/README.md#configure-the-prompt)が所有する。
 
-`PromptSection` is a readonly same-process registration contract. Its text may be static or resolved from the current assembly context. Sections sort by ascending order and then code-unit name; repository contributors resolve the service-owned named allocation through `getSectionOrder()`. Runtime-context contributors resolve their independent allocation through `getContextOrder()`. One effective `complete` section becomes the sole prompt section after cooperative assembly. agent-loop renders the assembled sections with `renderPrompt` and commits the text as a `system/message` surface node — appended as surface node 0 on the first step, then replaced in place when the rendered text changes or, when the prepared call declares `systemPromptUpdate: 'in-history'`, appended after the cached history for non-empty updates in a continuing series — so the prompt reaches the model as a message of derived history rather than as a request field ([decision](../../.agents/notes/implemented/architecture/2026-09-02-system-prompt-as-surface-node.md); [decision rule](../../packages/core/agent-loop/README.md#understand-the-implementation)).
+`PromptSection` は読み取り専用の同一プロセス内登録契約である。そのテキストは静的でも、現在のアセンブリコンテキストから解決されてもよい。セクションは昇順の order、次にコードユニット名でソートされる。リポジトリのコントリビューターは `getSectionOrder()` を通じてサービス所有の名前付き割り当てを解決する。ランタイムコンテキストのコントリビューターは `getContextOrder()` を通じて独自の割り当てを解決する。協調的アセンブリの後、有効な `complete` セクション 1 つが唯一のプロンプトセクションになる。agent-loop は組み立てられたセクションを `renderPrompt` でレンダリングし、そのテキストを `system/message` サーフェスノードとしてコミットする。最初のステップではサーフェスノード 0 として追加され、その後、レンダリングされたテキストが変わるとその場で置き換えられ、または、準備された呼び出しが `systemPromptUpdate: 'in-history'` を宣言すると、継続する系列における空でない更新としてキャッシュ済み履歴の後に追加される。したがってプロンプトは、リクエストフィールドとしてではなく、派生履歴のメッセージとしてモデルに届く（[決定](../../.agents/notes/implemented/architecture/2026-09-02-system-prompt-as-surface-node.md)、[決定規則](../../packages/core/agent-loop/README.md#understand-the-implementation)）。
 
 ```ts type-equiv
 /** One contributed section of the system prompt (registry input). */
@@ -71,9 +71,9 @@ interface PromptSection {
 }
 ```
 
-## Dynamic prompt context
+## 動的プロンプトコンテキスト
 
-`PromptContext` is the cache-safe counterpart to `PromptSection`. The assembly resolves and orders these contributions, while agent-loop logs their complete current snapshot after retained model history only when it changed or compaction removed it.
+`PromptContext` は `PromptSection` のキャッシュ安全な対応物である。アセンブリはこれらのコントリビューションを解決して順序付け、agent-loop は保持されたモデル履歴の後にそれらの完全な現在のスナップショットを、変更されたかコンパクションがそれを除去したときにのみログ記録する。
 
 ```ts type-equiv
 /** Dynamic model context materialized as a durable user-role snapshot. */
@@ -91,7 +91,7 @@ interface PromptContext {
 }
 ```
 
-`required: true` keeps an operational contribution when optional runtime context is suppressed. `interpolate: false` preserves literal text, including variable-like directory names. `AssembledContext` carries the resolved text and that interpolation choice into rendering.
+`required: true` は、オプションのランタイムコンテキストが抑制されているときも運用上のコントリビューションを保つ。`interpolate: false` は、変数のようなディレクトリ名も含め、リテラルテキストを保持する。`AssembledContext` は解決されたテキストとその補間の選択をレンダリングへ運ぶ。
 
 ```ts type-equiv
 /** One resolved dynamic context contribution. */
@@ -111,13 +111,13 @@ interface AssembledContext {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxsystemprompt--systemprompt"></a>
 
 ### `ctx.systemPrompt` — `SystemPrompt`
 
-Registry service for the prompt inputs assembled before each model step.
+各モデルステップの前にアセンブリされるプロンプト入力のためのレジストリサービス。
 
 ```ts cordis-catalog
 /**
@@ -203,17 +203,17 @@ refreshContext(assembly: PromptAssembly, context: AssembleContext = {}): PromptA
 async assemble(context: AssembleContext = {}): Promise<PromptAssembly>
 ```
 
-Source: [`packages/core/system-prompt/src/index.ts`](../../packages/core/system-prompt/src/index.ts)
+ソース: [`packages/core/system-prompt/src/index.ts`](../../packages/core/system-prompt/src/index.ts)
 
 <a id="system-prompt-events"></a>
 
-### `system-prompt/*` events
+### `system-prompt/*` イベント
 
 <a id="system-promptassemble--waterfall"></a>
 
 #### `system-prompt/assemble` — waterfall
 
-Expert waterfall over the assembled sections, contexts, tools, and variables. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): scoped listeners receive only that scope's assemblies. The returned value is authoritative. A supplied signal controls only this explicit assembly request and must not be retained to control later turns. A registered complete section is restored after this waterfall, so listeners cannot add to or replace that scope's system prompt.
+組み立てられたセクション、コンテキスト、ツール、変数に対するエキスパート waterfall。スコープフィルターディスパッチ（`@deepseek-ai/dsh-scope`）: スコープ付きリスナーはそのスコープのアセンブリのみを受け取る。返された値が権威である。提供されたシグナルはこの明示的なアセンブリリクエストのみを制御し、後のターンを制御するために保持されてはならない。登録された complete セクションはこの waterfall の後に復元されるので、リスナーはそのスコープのシステムプロンプトに追加も置換もできない。
 
 ```ts cordis-catalog
 /**
@@ -231,15 +231,15 @@ Expert waterfall over the assembled sections, contexts, tools, and variables. Sc
 'system-prompt/assemble'(this: Scoped<SystemPrompt>, assembly: PromptAssembly, context: AssembleContext, next: () => Promise<PromptAssembly>): Promise<PromptAssembly>
 ```
 
-Types: [Scoped](scope.md)
+型: [Scoped](scope.md)
 
-Source: [`packages/core/system-prompt/src/index.ts`](../../packages/core/system-prompt/src/index.ts)
+ソース: [`packages/core/system-prompt/src/index.ts`](../../packages/core/system-prompt/src/index.ts)
 
 <a id="system-promptchange--emit"></a>
 
 #### `system-prompt/change` — emit
 
-Emitted when any prompt provider changes. This registry notification is unfiltered because a global change affects every scope.
+いずれかのプロンプトプロバイダーが変わったときに emit される。このレジストリ通知はフィルタリングされない。グローバルの変更がすべてのスコープに影響するためである。
 
 ```ts cordis-catalog
 /**
@@ -250,5 +250,5 @@ Emitted when any prompt provider changes. This registry notification is unfilter
 'system-prompt/change'(): void
 ```
 
-Source: [`packages/core/system-prompt/src/index.ts`](../../packages/core/system-prompt/src/index.ts)
+ソース: [`packages/core/system-prompt/src/index.ts`](../../packages/core/system-prompt/src/index.ts)
 <!-- END GENERATED cordis-surface -->

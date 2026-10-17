@@ -1,35 +1,35 @@
 ---
-description: "The shared Typert Remote protocol: decorators, wire descriptors, codecs, and provider contracts used by business packages, generated artifacts, the Host Gateway, and the Client API."
+description: "共有の Typert Remote プロトコル。ビジネスパッケージ、生成アーティファクト、Host Gateway、Client API が使用するデコレーター、wire 記述子、コーデック、プロバイダー契約。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-typert-protocol
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-With `dsh-typert-protocol`, business packages can expose Host methods to Remote clients: mark a method with `@Remote` (or `@RemoteScope` for scoped receivers), bind the service to a wire namespace, and associate Host objects and scoped Contexts with wire identities through the merge-extensible protocol maps. Generated artifacts, the Host Gateway, and the Client API consume the same invocation descriptors, codecs, and provider contracts. Invocation-owned values transfer cleanup to Gateway without adding a reference count. The package registers no Cordis service and runs no TypeScript analysis.
+`dsh-typert-protocol` を使うと、ビジネスパッケージは Host メソッドを Remote クライアントへ公開できる。メソッドを `@Remote`（スコープ付きレシーバーには `@RemoteScope`）でマークし、サービスを wire 名前空間へバインドし、merge 拡張可能なプロトコルマップを通じて Host オブジェクトとスコープ付き Context を wire 識別子に関連付ける。生成アーティファクト、Host Gateway、Client API は、同一の呼び出し記述子、コーデック、プロバイダー契約を消費する。呼び出しが所有する値は、参照カウントを増やすことなくクリーンアップを Gateway へ移譲する。このパッケージは Cordis サービスを登録せず、TypeScript 解析も実行しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-This package is for business-package and assembly maintainers who expose Host capabilities to Remote clients. It is a declarations library: mark methods, bind services, and let the generated pipeline and the Gateway do the rest.
+このパッケージは、Host のケイパビリティを Remote クライアントへ公開するビジネスパッケージおよびアセンブリのメンテナー向けである。これは宣言ライブラリであり、メソッドをマークし、サービスをバインドすれば、あとは生成パイプラインと Gateway が処理する。
 
-### Exposing a Host method
+### Host メソッドを公開する
 
-A business package marks a public instance method with `@Remote` (or `@RemoteScope(key)` when the receiver comes from a scoped Context), and the owning service either extends `TypertRemoteService` or declares a `typertRemote` binding through `bindTypertRemote()`:
+ビジネスパッケージは公開インスタンスメソッドを `@Remote`（レシーバーがスコープ付き Context 由来の場合は `@RemoteScope(key)`）でマークし、所有サービスは `TypertRemoteService` を継承するか、`bindTypertRemote()` で `typertRemote` バインディングを宣言する:
 
 ```text
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
@@ -42,35 +42,35 @@ export class GoalService extends TypertRemoteService {
 }
 ```
 
-Generation turns the method into a wire endpoint under the service's namespace; Clients call it as a typed method through `ctx.remote` (see the [API Gateway reference](../../../docs/api-gateway.md)). A method opts into cooperative cancellation by declaring `signal: AbortSignal` as its final parameter — the signal is injected, never a JSON parameter or lookup field.
+生成がそのメソッドをサービスの名前空間配下の wire エンドポイントに変換し、Client は `ctx.remote` を通じて型付きメソッドとして呼び出す（[API Gateway リファレンス](../../../docs/api-gateway.md)参照）。メソッドは、最後のパラメーターとして `signal: AbortSignal` を宣言することで協調的キャンセルにオプトインする。signal は注入されるのであって、JSON パラメーターやルックアップフィールドになることはない。
 
-A unary method can return `Uint8Array` directly or within nested objects, arrays, tuples, optional fields, unions, and recursive types. Generation supplies optional result codec `encode()` and `decode()` functions: encoding visits only subtrees whose types can contain bytes, while decoding validates reconstructed values; Client declarations use `Uint8Array<ArrayBuffer>` at every byte position while retaining other field types. Pure JSON results pass through without Host byte detection or Client parsing. Parameters, events, and stream items remain JSON-only; runtime object cycles are unsupported.
+単項メソッドは `Uint8Array` を直接、またはネストしたオブジェクト、配列、タプル、オプションのフィールド、union、再帰型の中に含めて返せる。生成はオプションの結果コーデック `encode()` / `decode()` を提供する。エンコードはバイトを含みうる型の部分木だけを訪問し、デコードは再構築した値を検証する。Client 側の宣言はすべてのバイト位置で `Uint8Array<ArrayBuffer>` を使い、その他のフィールド型はそのまま保つ。純粋な JSON 結果は、Host 側のバイト検出や Client 側のパースなしで通過する。パラメーター、イベント、ストリーム項目は JSON のみであり、実行時のオブジェクト循環参照はサポートされない。
 
-A stream method (`@Remote({ mode: 'stream' })`) returns `Iterable`, `AsyncIterable`, or `RemoteStream<Out, In>`. `In` declares the items the Client may send back on the same logical stream; the method reads them through `this.ctx.invocation.uplink<In>()`, and the descriptor carries their codec. `RemoteInvocation` also names the receiving `service`, the calling `peer` (the `PeerScope` its carrier names), and the carrier `signal`; `ctx.invocation` is `undefined` on a Context no Remote call derived: the first `bindTypertRemote()` binding in a tree, which every `TypertRemoteService` constructor makes, registers that accessor on the root. Cordis's cross-copy `Context.is()` recognizes a source Context passed to a built Service, so mixed source/built compositions retain this accessor and invocation-local principals. A generated Client stream method returns `RemoteStreamHandle<Out, In>`: the handle with `send`, `end`, and `dispose` beside the downlink iteration. Uplink items are validated one by one at the Host because they arrive from the browser; downlink items are values the Host method produced and pass through.
+ストリームメソッド（`@Remote({ mode: 'stream' })`）は `Iterable`、`AsyncIterable`、`RemoteStream<Out, In>` を返す。`In` は Client が同じ論理ストリーム上で送り返してよい項目を宣言し、メソッドは `this.ctx.invocation.uplink<In>()` でそれらを読む。記述子はそれらのコーデックを保持する。`RemoteInvocation` はさらに、受信側の `service`、呼び出し元の `peer`（そのキャリアが名指す `PeerScope`）、キャリアの `signal` を名指す。`ctx.invocation` は、Remote 呼び出しに由来しない Context では `undefined` である。ツリー内で最初の `bindTypertRemote()` バインディング（すべての `TypertRemoteService` コンストラクターが行う）が、そのアクセサーをルートに登録する。Cordis のコピーをまたぐ `Context.is()` は、ビルド済み Service に渡されたソース Context を認識するので、ソースとビルド済みが混在する構成でもこのアクセサーと呼び出しローカルのプリンシパルが維持される。生成された Client のストリームメソッドは `RemoteStreamHandle<Out, In>` を返す。すなわち、ダウンリンクの反復の隣に `send`、`end`、`dispose` を備えたハンドルである。アップリンク項目はブラウザーから到着するため Host で 1 つずつ検証され、ダウンリンク項目は Host メソッドが生成した値なのでそのまま通過する。
 
-`@Remote` options contain only `name`, `mode`, and the `resources` readers described below; input policy belongs to the consumer, not a method annotation. `method.input(options?: TypertRemoteInputOptions)` returns a cached `TypertRemoteValue<Input>`, with `strict?: boolean` as its only option. `method.input()` and `{ strict: false }` retain ordinary Remote handling: declared objects accept and strip unknown fields. `{ strict: true }` rejects undeclared fields recursively, while explicit JSON values and dictionary keys stay open and dictionary values retain their declared validation. Both named-argument envelopes reject extra arguments. Select one view (`const input = method.input({ strict: true })`) for matching `input.create().parse(raw)` and `input.jsonSchema`; this does not change Host dispatch. The [generator](<../generator/README.md#ordinary-remote-metadata>) owns publication and the paired codecs.
+`@Remote` のオプションには `name`、`mode`、および後述の `resources` リーダーしか含まれない。入力ポリシーはメソッド注釈ではなく消費者に属する。`method.input(options?: TypertRemoteInputOptions)` はキャッシュされた `TypertRemoteValue<Input>` を返し、その唯一のオプションは `strict?: boolean` である。`method.input()` と `{ strict: false }` は通常の Remote 処理を維持する。宣言されたオブジェクトは未知のフィールドを受け入れて除去する。`{ strict: true }` は宣言されていないフィールドを再帰的に拒否するが、明示的な JSON 値と辞書のキーはオープンのままで、辞書の値は宣言された検証を保持する。どちらの名前付き引数エンベロープも余分な引数を拒否する。一致する `input.create().parse(raw)` と `input.jsonSchema` のために 1 つのビューを選択する（`const input = method.input({ strict: true })`）。これは Host のディスパッチを変更しない。[generator](<../generator/README.md#ordinary-remote-metadata>) が公開と対になるコーデックを所有する。
 
-Ordinary `./remote` artifacts export `TYPERT_REMOTE` as a `TypertRemoteInfo`, extending the mountable `TypertRemoteContribution`. Its typed `methods[endpoint]` entries are the same direct descriptor objects found in `descriptors`, with derived `input(options?)` and `invoke(remote, input, signal?)`. Parameter documentation lives in `parameters[].description`; `result` is the single result codec, parser, and optional projection. Unary descriptors omit `mode`; streams use `'stream'`. Context-only receivers remain in `descriptors` and scoped declarations, not `methods`.
+普通の `./remote` アーティファクトは `TYPERT_REMOTE` を `TypertRemoteInfo` としてエクスポートし、マウント可能な `TypertRemoteContribution` を拡張する。その型付き `methods[endpoint]` エントリは `descriptors` にあるものと同じ直接記述子オブジェクトで、派生した `input(options?)` と `invoke(remote, input, signal?)` を持つ。パラメーターのドキュメントは `parameters[].description` にあり、`result` は単一の結果コーデック、パーサー、およびオプションの投影である。単項記述子は `mode` を省略し、ストリームは `'stream'` を使う。Context のみのレシーバーは `descriptors` とスコープ付き宣言に残り、`methods` には入らない。
 
-`createTypertRemoteInfo(spec, z)` from the published pure `@deepseek-ai/dsh-typert-protocol/remote-info` entry returns a class instance, not a constructor. Construction retains only the static spec and the caller-supplied Zod runtime; the first `descriptors` or `methods` read builds and caches their shared index. Each input-policy view, its parser, and its optional JSON Schema projection are independently lazy and cached; `method.input().create()` requests the ordinary parser. The raw spec requires Zod factories, while consumer-facing `TypertSchema<T>` promises only `parse(value: unknown): T`. JSON Schema comes from generator projections, not runtime `z.toJSONSchema()`. The leaf has no runtime imports; generated artifacts supply Zod. Metadata and schema access never invokes the network; the root also re-exports the factory but imports Cordis.
+公開された純粋な `@deepseek-ai/dsh-typert-protocol/remote-info` エントリーの `createTypertRemoteInfo(spec, z)` は、コンストラクターではなくクラスインスタンスを返す。構築は静的 spec と呼び出し元が提供する Zod ランタイムだけを保持し、最初の `descriptors` または `methods` の読み取りで共有インデックスを構築してキャッシュする。各入力ポリシービュー、そのパーサー、およびオプションの JSON Schema 投影は独立に遅延生成されキャッシュされる。`method.input().create()` は通常のパーサーを要求する。生の spec は Zod ファクトリーを必要とするが、消費者向けの `TypertSchema<T>` は `parse(value: unknown): T` だけを約束する。JSON Schema はランタイムの `z.toJSONSchema()` ではなく generator の投影から得られる。リーフにはランタイムインポートがなく、生成アーティファクトが Zod を提供する。メタデータとスキーマへのアクセスは決してネットワークを呼び出さない。ルートはファクトリーも再エクスポートするが、Cordis をインポートする。
 
-The invoker takes a caller-owned, mounted, unscoped Client Remote and resolves its namespace method at call time. It preserves the namespace receiver, optional positional holes, and signal, forwarding the same `Promise<RemoteResult<DecodedOutput>>` or complete `RemoteStreamHandle<Output, Uplink>` without an async wrapper. `DecodedOutput` defaults to the authored output; generation supplies `RemoteDecoded<Output>` only for byte-bearing unary methods, avoiding recursive remapping of ordinary JSON results; `result.create().parse()` retains the authored output type and does not normalize shared byte buffers. Documentation and parsing remain available when either input variant or the result lacks JSON Schema support; each variant's `jsonSchemaError` explains its absent projection. Registry readers use `isTypertRemoteMethod(descriptor)` from the same pure entry to narrow a base descriptor to these direct capabilities.
+invoker は呼び出し元が所有する、マウント済みの、スコープなし Client Remote を受け取り、呼び出し時にその名前空間メソッドを解決する。名前空間レシーバー、オプションの位置の穴、signal を保持し、同じ `Promise<RemoteResult<DecodedOutput>>` または完全な `RemoteStreamHandle<Output, Uplink>` を非同期ラッパーなしで転送する。`DecodedOutput` は既定で作成時の出力になり、生成はバイトを含む単項メソッドにのみ `RemoteDecoded<Output>` を提供し、通常の JSON 結果の再帰的再マッピングを避ける。`result.create().parse()` は作成時の出力型を保持し、共有バイトバッファーを正規化しない。入力バリアントまたは結果が JSON Schema サポートを欠いても、ドキュメントとパースは引き続き利用できる。各バリアントの `jsonSchemaError` がその投影が存在しない理由を説明する。レジストリの読み取り側は、同じ純粋エントリーの `isTypertRemoteMethod(descriptor)` を使って、ベース記述子をこれらの直接ケイパビリティに絞り込む。
 
-### Identifying the caller and admitting non-owner callers
+### 呼び出し元の識別と非オーナー呼び出し元の受け入れ
 
-`PeerScope.principal` is the caller identity that in-process Host code fixes when it creates the Peer; no wire field can set it, and `PeerScope.signal` aborts when the Peer scope ends. `PrincipalMap` is merge-extensible: each driver declares one JSON entry with a unique literal `kind` and no credential, because a principal can be persisted in a Session log; the built-in entry is `owner: { kind: 'owner' }`. A Remote method that records its caller on durable output calls `principalOf(this.ctx.invocation)`, which returns the principal of a non-owner caller and `undefined` for the owner and outside a Remote call, and writes the field only when it is defined.
+`PeerScope.principal` は、プロセス内の Host コードが Peer を作成するときに確定する呼び出し元 ID である。wire フィールドで設定することはできず、`PeerScope.signal` は Peer スコープの終了時にアボートする。`PrincipalMap` は merge 拡張可能であり、各ドライバーは一意のリテラル `kind` を持ち資格情報を含まない JSON エントリーを 1 つ宣言する。プリンシパルはセッションログに永続化されうるためである。組み込みエントリーは `owner: { kind: 'owner' }` である。呼び出し元を永続出力に記録する Remote メソッドは `principalOf(this.ctx.invocation)` を呼ぶ。これは非オーナー呼び出し元のプリンシパルを返し、オーナーおよび Remote 呼び出しの外では `undefined` を返す。フィールドはそれが定義されている場合にのみ書き込まれる。
 
-Every Remote method is under access control: [`dsh-api-remote-access`](../../api/remote-access/README.md) decides whether a non-owner caller may reach it on the resources the call touches. `TypertResourceMap` is merge-extensible beside `TypertLookupMap`: the package that owns an identity type declares its resource kind as `TypertResource<Id>` (`dsh-session` declares `session: TypertResource<SessionId>`, `dsh-workspace` declares `workspace: TypertResource<WorkspaceId>`). A `RemoteAccessResource` is either the built-in identity-less `{ kind: 'global' }` or one declared kind with its identity; resources are independent, so access to `global` implies nothing about any session. At runtime the domain that owns a kind registers its default wire field through `typert.resources.register(kind, { field })`, which rejects `global`; a lookup provider and a Host Context adapter name the kind their wire identity carries through `resource`, so a method with an Agent lookup parameter or an Agent-scoped receiver carries a `session` resource without options. The `resources` option of `@Remote` and `@RemoteScope` maps a kind to a reader that receives the method's wire arguments as its own parameters; their types are inferred from the decorated method, with lookup parameters mapped to their wire types, so `@Remote({ name: 'page', resources: { session: request => request.address.sessionId } })` reads a field the defaults cannot. A call whose readers and defaults name no resource touches `global`; they must name every resource the method accesses, because access control never checks one they omit. A forwarded `emit` entry of `TypertForwardableEventEntry` declares `resources` readers typed by its own event's parameters, and an entry without them touches `global`. Resource resolution belongs to the [API Gateway](../../api/gateway/README.md); decisions and refusal reasons belong to [`dsh-api-remote-access`](../../api/remote-access/README.md).
+すべての Remote メソッドはアクセス制御の下にある。[`dsh-api-remote-access`](../../api/remote-access/README.md) が、呼び出しが触れるリソース上で非オーナー呼び出し元がそのメソッドに到達してよいかを決定する。`TypertResourceMap` は `TypertLookupMap` の隣で merge 拡張可能であり、識別子型を所有するパッケージがそのリソース種別を `TypertResource<Id>` として宣言する（`dsh-session` は `session: TypertResource<SessionId>`、`dsh-workspace` は `workspace: TypertResource<WorkspaceId>` を宣言する）。`RemoteAccessResource` は、組み込みの識別子なし `{ kind: 'global' }` か、宣言された種別とその識別子のいずれかである。リソースは互いに独立なので、`global` へのアクセスはどのセッションについても何も含意しない。実行時、種別を所有するドメインは `typert.resources.register(kind, { field })` を通じて既定の wire フィールドを登録する（これは `global` を拒否する）。ルックアッププロバイダーと Host Context アダプターは、`resource` を通じて自身の wire 識別子が運ぶ種別を名指すので、Agent ルックアップパラメーターや Agent スコープのレシーバーを持つメソッドはオプションなしで `session` リソースを運ぶ。`@Remote` と `@RemoteScope` の `resources` オプションは、種別を、メソッドの wire 引数を自身のパラメーターとして受け取るリーダーへマップする。それらの型はデコレートされたメソッドから推論され、ルックアップパラメーターはその wire 型にマップされるので、`@Remote({ name: 'page', resources: { session: request => request.address.sessionId } })` は既定では読めないフィールドを読む。リーダーと既定がどのリソースも名指さない呼び出しは `global` に触れる。リーダーはメソッドがアクセスするすべてのリソースを名指さなければならない。アクセス制御は省略されたリソースを決して検査しないからである。`TypertForwardableEventEntry` の転送される `emit` エントリーは、自身のイベントのパラメーターで型付けられた `resources` リーダーを宣言し、それを持たないエントリーは `global` に触れる。リソース解決は [API Gateway](../../api/gateway/README.md) に属し、決定と拒否理由は [`dsh-api-remote-access`](../../api/remote-access/README.md) に属する。
 
-### Associating Host objects and Contexts with wire identities
+### Host オブジェクトと Context を wire 識別子に関連付ける
 
-Complex Host objects cannot cross the wire directly. A business package declares the association through the merge-extensible `TypertLookupMap` and `TypertContextMap`. A Host Context adapter owns the stable wire declaration and resolves wire identities to live Contexts. A Client Context adapter maps in both directions because scoped calls originate from a Client Context and forwarded Host events resolve their explicit wire identity there. Host composition may override its synchronous or asynchronous resolver. A resolver that refuses on policy grounds throws `RemoteError` with its own code, which reaches the caller unchanged.
+複雑な Host オブジェクトは wire を直接越えられない。ビジネスパッケージは merge 拡張可能な `TypertLookupMap` と `TypertContextMap` を通じて関連付けを宣言する。Host Context アダプターは安定した wire 宣言を所有し、wire 識別子を生きた Context に解決する。Client Context アダプターは双方向にマップする。スコープ付き呼び出しは Client Context から発し、転送された Host イベントはそこで明示的な wire 識別子を解決するからである。Host 側の構成はその同期または非同期リゾルバーを上書きしてよい。ポリシー上の理由で拒否するリゾルバーは自身のコードを持つ `RemoteError` をスローし、それはそのまま呼び出し元へ届く。
 
-Client Context resolution is synchronous. `typertOwnedValue(value, release)` transfers a non-throwing, idempotent cleanup to the invocation owner; Gateway calls it after handler and reply settlement. A borrowed Context requires no cleanup wrapper. The shared `TYPERT_OWNED_VALUE` symbol and `isTypertOwnedValue` recognizer work across independently bundled providers and Gateway; the wrapper itself does not retain a resource.
+Client の Context 解決は同期的である。`typertOwnedValue(value, release)` は、スローしない冪等なクリーンアップを呼び出し所有者へ移譲する。Gateway はハンドラーと応答の決着後にそれを呼び出す。借用された Context はクリーンアップラッパーを必要としない。共有の `TYPERT_OWNED_VALUE` シンボルと `isTypertOwnedValue` 認識子は、独立にバンドルされたプロバイダーと Gateway をまたいで機能する。ラッパー自体はリソースを保持しない。
 
-### Reporting and reading a Remote failure
+### Remote の失敗を報告し読む
 
-One class carries every Remote failure: `RemoteError`, holding a stable `<domain>/<reason>` code and the details typed for that code. This package declares the universal carrier codes (`gateway/bad-request`, `gateway/cancelled`, `gateway/internal`) and owns `RemoteErrorDetailsMap`, the merge-extensible table every other package extends beside its own throwing code:
+単一のクラスがすべての Remote 失敗を運ぶ。`RemoteError` は安定した `<domain>/<reason>` コードと、そのコード用に型付けられた詳細を保持する。このパッケージは普遍的なキャリアコード（`gateway/bad-request`、`gateway/cancelled`、`gateway/internal`）を宣言し、`RemoteErrorDetailsMap` を所有する。これは他のすべてのパッケージが自身のスローするコードの隣で拡張する merge 拡張可能なテーブルである:
 
 ```text
 declare module '@deepseek-ai/dsh-typert-protocol' {
@@ -81,96 +81,96 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 throw new RemoteError('goal/not-found', `goal "${id}" does not exist`, { goalId: id })
 ```
 
-An owner throws at the failure point; no package writes an error-class family or an exit-mapping function. A caller discriminates by `code` — never by `instanceof` — and a `code` branch narrows `details` with no cast, because `RemoteFailure` is the code-discriminated union of `RemoteError` instances. Infrastructure that must recognize a failure carried across a module or realm copy of the class calls `remoteErrorOf(value)`, which reads a structural marker instead of the prototype chain.
+オーナーは失敗点でスローする。エラークラスファミリーや終了コードマッピング関数を書くパッケージはない。呼び出し元は `code` で判別し（`instanceof` では決して判別しない）、`code` の分岐はキャストなしで `details` を絞り込む。`RemoteFailure` が `RemoteError` インスタンスのコード判別 union だからである。クラスがモジュールやレルムのコピーをまたいで運ばれた失敗を認識しなければならないインフラストラクチャーは、`remoteErrorOf(value)` を呼ぶ。これはプロトタイプチェーンではなく構造的マーカーを読む。
 
-### Receiving forwarded Host events on the Client
+### Client で転送された Host イベントを受信する
 
-The Host assembly extends `TypertRemoteEventSelection` with the Cordis events it forwards to consumers, which narrows the `ctx.remote.$on` key set. `TypertForwardableEvent` accepts unscoped `void` notifications and scoped async waterfalls whose final `next()` callback returns the event's result type. `TypertClientEventListener` derives the Client listener from that same `Events` member while preserving signals, optional and readonly fields, arrays, callbacks, and result types. `TypertClientRemote` exposes only `$mount()` and `$on()`; event transport remains private to Gateway.
+Host アセンブリは `TypertRemoteEventSelection` を、消費者へ転送する Cordis イベントで拡張し、それが `ctx.remote.$on` のキー集合を絞り込む。`TypertForwardableEvent` はスコープなしの `void` 通知と、最終の `next()` コールバックがイベントの結果型を返すスコープ付き非同期 waterfall を受け入れる。`TypertClientEventListener` は同じ `Events` メンバーから Client リスナーを導出し、signal、オプションおよび readonly フィールド、配列、コールバック、結果型を保持する。`TypertClientRemote` は `$mount()` と `$on()` のみを公開し、イベント転送は Gateway にプライベートのまま残る。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the declarations stay compiler-independent and where each contract is enforced; the programming model is covered in [Use this package](#use-this-package).
+この節は、宣言がどのようにコンパイラー非依存に保たれるかと、各契約がどこで強制されるかを説明する。プログラミングモデルは[このパッケージを使う](#use-this-package)で扱う。
 
-### Design concept
+### 設計概念
 
-The package keeps strict reflection in the compiler: decorator initializers retain minimal markers in a versioned descriptor on the Service prototype. The descriptor uses a stable string property name, so another installed copy of the protocol package can read the same markers. Full parameter, result, lookup, and schema reflection is the Typert build pipeline's job, delivered through `InvocationDescriptor`.
+このパッケージは厳密なリフレクションをコンパイラー内に保つ。デコレーターの初期化子は、Service プロトタイプ上のバージョン付き記述子に最小限のマーカーを保持する。記述子は安定した文字列プロパティ名を使うので、インストールされたプロトコルパッケージの別コピーが同じマーカーを読める。完全なパラメーター、結果、ルックアップ、スキーマのリフレクションは Typert ビルドパイプラインの仕事であり、`InvocationDescriptor` を通じて提供される。
 
-### Remote markers
+### Remote マーカー
 
-`@Remote` and `@RemoteScope` schedule an initializer that appends the method name, an optional export name, the invocation mode, and the frozen `resources` readers to the prototype descriptor; `remoteMethods(service)` validates its version and returns a detached declaration-order snapshot that the Gateway's source-mode fallback reads. Markers require public, non-static instance methods with string names, and conflicting markers on one method are rejected.
+`@Remote` と `@RemoteScope` は初期化子をスケジュールし、メソッド名、オプションのエクスポート名、呼び出しモード、フリーズされた `resources` リーダーをプロトタイプ記述子に追加する。`remoteMethods(service)` はそのバージョンを検証し、Gateway のソースモードフォールバックが読む切り離された宣言順スナップショットを返す。マーカーは文字列名を持つ公開の非 static インスタンスメソッドを必要とし、1 つのメソッド上の競合するマーカーは拒否される。
 
-Readers are validated when the decorator is created and frozen into one record per decorator application; the Gateway reads them from `remoteMethods(service)` by implementation member name, so another installed copy of the protocol package reads the same record.
+リーダーはデコレーター作成時に検証され、デコレーター適用ごとに 1 つのレコードへフリーズされる。Gateway は実装メンバー名で `remoteMethods(service)` からそれらを読むので、インストールされたプロトコルパッケージの別コピーも同じレコードを読む。
 
-### Protocol maps and descriptors
+### プロトコルマップと記述子
 
-The merge-extensible protocol maps keep static associations in the type system, while runtime providers register resolution with `ctx.typert`; the map names and shapes live in [`src/types.ts`](src/types.ts). `InvocationDescriptor` is the shared runtime form consumed by the registry, the Gateway, and the Client Remote, covering direct and Context receivers, JSON and lookup parameters, scope projections, the uplink codec, cancellation, result codecs, and documentation. Generated `TypertRemoteMethod` objects extend this descriptor directly.
+merge 拡張可能なプロトコルマップは静的な関連付けを型システムに保ち、実行時のプロバイダーは `ctx.typert` で解決を登録する。マップの名前と形は [`src/types.ts`](src/types.ts) にある。`InvocationDescriptor` はレジストリ、Gateway、Client Remote が消費する共有ランタイム形式であり、直接レシーバーと Context レシーバー、JSON パラメーターとルックアップパラメーター、スコープ投影、アップリンクコーデック、キャンセル、結果コーデック、ドキュメントを網羅する。生成された `TypertRemoteMethod` オブジェクトはこの記述子を直接拡張する。
 
-`RemoteInvocation.uplinkWindow` optionally describes the carrier's complete-frame inbox capacity and the UTF-8 envelope cost added to compact JSON items. Its absence means the carrier has no encoded-frame inbox limit; consumers still own their local buffering and acknowledgement policy.
+`RemoteInvocation.uplinkWindow` は、キャリアの完全フレーム受信箱の容量と、コンパクト JSON 項目に加算される UTF-8 エンベロープコストをオプションで記述する。その欠如は、キャリアにエンコード済みフレーム受信箱の制限がないことを意味する。消費者は依然として自身のローカルバッファリングと確認応答ポリシーを所有する。
 
-### Wire identity grammar
+### wire 識別子の文法
 
-Every namespace, method, lookup, and Context segment must satisfy `isTypertRemoteSegment()`, so generated names cross the shared RPC carrier unchanged. Strict codecs carry generated schema factories; `src-json` codecs identify the weaker source-launch path.
+すべての名前空間、メソッド、ルックアップ、Context セグメントは `isTypertRemoteSegment()` を満たさなければならず、生成された名前は共有 RPC キャリアをそのまま越える。厳密なコーデックは生成されたスキーマファクトリーを運び、`src-json` コーデックはより弱いソース起動パスを識別する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Decorators, Gateway bindings, `remoteMethods`, segment validation |
-| [`src/principal.ts`](src/principal.ts) | `principalOf`, the caller principal a Remote-call producer records |
-| [`src/remote-access.ts`](src/remote-access.ts) | `RemoteAccessResource`, `RemoteAccessResourceKind`, and `RemoteAccessResourceOf` over `TypertResourceMap` |
-| [`src/json-value.ts`](src/json-value.ts) | `isRemoteJsonValue` and `isRemoteUplinkItem`, the lossless JSON checks every carrier shares |
-| [`src/remote-error.ts`](src/remote-error.ts) | `RemoteError` and the structural `remoteErrorOf` recognizer |
-| [`src/remote-info.ts`](src/remote-info.ts) | Pure lazy info factory and direct-method type guard |
-| [`src/types.ts`](src/types.ts) | Protocol maps, `RemoteErrorDetailsMap`, `RemoteResult`, `RemoteStream`, `RemoteStreamHandle`, `PrincipalMap`, `Principal`, `PeerScope`, `RemoteInvocation`, `InvocationDescriptor`, codecs, provider contracts, registry interfaces, `TypertClientRemote` |
+| [`src/index.ts`](src/index.ts) | デコレーター、Gateway バインディング、`remoteMethods`、セグメント検証 |
+| [`src/principal.ts`](src/principal.ts) | `principalOf`、Remote 呼び出しプロデューサーが記録する呼び出し元プリンシパル |
+| [`src/remote-access.ts`](src/remote-access.ts) | `TypertResourceMap` 上の `RemoteAccessResource`、`RemoteAccessResourceKind`、`RemoteAccessResourceOf` |
+| [`src/json-value.ts`](src/json-value.ts) | すべてのキャリアが共有する可逆 JSON チェックである `isRemoteJsonValue` と `isRemoteUplinkItem` |
+| [`src/remote-error.ts`](src/remote-error.ts) | `RemoteError` と構造的な `remoteErrorOf` 認識子 |
+| [`src/remote-info.ts`](src/remote-info.ts) | 純粋な遅延 info ファクトリーと直接メソッド型ガード |
+| [`src/types.ts`](src/types.ts) | プロトコルマップ、`RemoteErrorDetailsMap`、`RemoteResult`、`RemoteStream`、`RemoteStreamHandle`、`PrincipalMap`、`Principal`、`PeerScope`、`RemoteInvocation`、`InvocationDescriptor`、コーデック、プロバイダー契約、レジストリインターフェース、`TypertClientRemote` |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough; they move from the declarations to the runtime and the call path.
+パッケージレベルの契約では足りないときにこれらのページを読む。宣言からランタイムと呼び出しパスへ進む。
 
-- [API Gateway reference](../../../docs/api-gateway.md) — how the declarations become running Host-to-Client calls.
-- [Typert subsystem reference](../../../docs/subsystems/typert.md) — the literal public contracts recorded from protocol and Gateway types.
-- [Typert registry](../registry/README.md) — where descriptors and providers are stored at runtime.
-- [Typert generator](../generator/README.md) — what generates the consumer-side declarations and descriptors.
-- [Remote-call Agent Note](../../../.agents/notes/implemented/architecture/2026-08-02-typert-remote-method-calls.md) — the architecture and transport decisions behind Remote calls.
+- [API Gateway リファレンス](../../../docs/api-gateway.md) — 宣言がどのように動作する Host から Client への呼び出しになるか。
+- [Typert サブシステムリファレンス](../../../docs/subsystems/typert.md) — protocol と Gateway の型から記録された文字どおりの公開契約。
+- [Typert レジストリ](../registry/README.md) — 実行時に記述子とプロバイダーが格納される場所。
+- [Typert generator](../generator/README.md) — 消費者側の宣言と記述子を生成するもの。
+- [Remote 呼び出しの Agent Note](../../../.agents/notes/implemented/architecture/2026-08-02-typert-remote-method-calls.md) — Remote 呼び出しの背後にあるアーキテクチャと転送の決定。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as compiler-independent Remote protocol declarations register nothing model-facing.
+なし。コンパイラー非依存の Remote プロトコル宣言はモデル向けの何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct effect; the declared contracts reach a request only when an assembly places them in one.
+直接の影響はない。宣言された契約は、アセンブリがそれらを 1 つのリクエストに配置したときにのみリクエストへ届く。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the declarations can represent; they are current package constraints, not a task backlog.
+これらの制限は宣言が表現できるものを定義する。それらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Decorator markers are minimal** — markers contain the method name, optional export alias, stream mode, resource readers, and direct or Context receiver selection; parameter, result, lookup, schema, and documentation metadata require the Typert build pipeline.
-- **Remote signatures are restricted** — decorators accept only public, non-static instance methods with string names, and source-mode execution cannot represent overloaded, destructured, defaulted, or rest-parameter signatures.
+- **デコレーターマーカーは最小限** — マーカーはメソッド名、オプションのエクスポートエイリアス、ストリームモード、リソースリーダー、直接または Context レシーバーの選択を含む。パラメーター、結果、ルックアップ、スキーマ、ドキュメントのメタデータには Typert ビルドパイプラインが必要である。
+- **Remote シグネチャーは制限される** — デコレーターは文字列名を持つ公開の非 static インスタンスメソッドのみを受け入れ、ソースモード実行はオーバーロード、分割代入、デフォルト引数、残余パラメーターのシグネチャーを表現できない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

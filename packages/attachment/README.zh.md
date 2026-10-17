@@ -5,7 +5,7 @@ kind: "package-group"
 
 # attachment/：持久附件能力族
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

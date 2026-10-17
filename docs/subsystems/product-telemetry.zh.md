@@ -1,6 +1,6 @@
 # 产品埋点
 
-[English](product-telemetry.md) | 中文
+[日本語](product-telemetry.md) | [English](product-telemetry.en.md) | 中文
 
 [产品埋点插件](../../packages/host/product-telemetry-otel/README.zh.md) 通过 OTLP/HTTP 发送明确选定的分析事件。`productTelemetry` 服务仅负责提交；产品消费方决定事件发生时机与获准采集的字段。导出器不自动采集 Session 数据或标识。[桌面埋点消费方](../../packages/client/product-analytics/README.zh.md)选择交互与实时压缩事件，补充缓存的静态环境和可用的登录身份，并遵守桌面启动时的采集开关。普通 Web 客户端不采集产品事件。
 

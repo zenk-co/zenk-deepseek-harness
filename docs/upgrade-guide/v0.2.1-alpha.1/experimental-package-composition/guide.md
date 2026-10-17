@@ -1,22 +1,22 @@
 ---
 kind: upgrade-guide
-description: "Explicit installation, peer dependencies, and configuration for optional hooks, webhooks, tools, and skills."
+description: "任意のフック、Webhook、ツール、スキルに関する明示的なインストール、ピア依存、および設定。"
 ---
 
-# Explicit installation and composition for optional capabilities
+# 任意ケイパビリティの明示的なインストールと構成
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-The CLI and Python runtime omit the hook bridges from their installation dependencies, and the CLI omits the webhook pair. Base and the full Web presets omit dormant Ralph rows, and base omits its dormant badge row. A patch that only enables a removed row does not insert its plugin. Default active behavior, plugin registration names, tool names, and recorded Session event names remain unchanged.
+CLI と Python ランタイムはインストール依存からフックブリッジを省き、CLI は Webhook ペアも省く。Base と完全な Web プリセットは休止中の Ralph 行を省き、base は休止中のバッジ行も省く。削除された行を有効化するだけのパッチでは、そのプラグインは挿入されない。デフォルトの有効な動作、プラグイン登録名、ツール名、および記録される Session イベント名は変更されていない。
 
-Package ownership and naming follow the [experimental package policy](../../../../scripts/experimental-package-policy.ts). Installation and composition are separate: installing a plugin package does not mount it, and a bundle must be selected before its contributed rows can be configured.
+パッケージの所有と命名は[実験的パッケージポリシー](../../../../scripts/experimental-package-policy.ts)に従う。インストールと構成は分離されている。プラグインパッケージのインストールではマウントされず、寄与された行を設定する前にバンドルを選択しなければならない。
 
-## Migration
+## 移行
 
-1. Install any packages missing from the target profile together with their required peers. Profiles disable automatic peer installation. For example, run `dsh plugin --profile web add @deepseek-ai/dsh-hooks-claude-code @deepseek-ai/dsh-hook-protocol`. The Codex bridge needs the same protocol peer; the GitHub adapter needs `@deepseek-ai/dsh-webhook` alongside `@deepseek-ai/dsh-webhook-github`.
-2. Select an available bundle before overriding its rows. For a capability composed manually, replace an override of a removed row with a complete insertion. Add preset-local tools inside that preset's `config.plugins`, including the services they require. A Host badge insertion is:
+1. 対象プロファイルに不足しているパッケージを、必要なピアと一緒にインストールする。プロファイルはピアの自動インストールを行わない。たとえば `dsh plugin --profile web add @deepseek-ai/dsh-hooks-claude-code @deepseek-ai/dsh-hook-protocol` を実行する。Codex ブリッジには同じプロトコルピアが必要であり、GitHub アダプターには `@deepseek-ai/dsh-webhook-github` と並べて `@deepseek-ai/dsh-webhook` が必要である。
+2. 行を上書きする前に、利用可能なバンドルを選択する。手動で構成されたケイパビリティについては、削除された行の上書きを完全な挿入に置き換える。プリセットローカルのツールは、そのプリセットの `config.plugins` 内に追加し、必要なサービスも含める。Host バッジの挿入は次のとおりである。
 
    ```yaml
    - insert:
@@ -24,5 +24,5 @@ Package ownership and naming follow the [experimental package policy](../../../.
          name: '@deepseek-ai/dsh-skill-badge'
    ```
 
-3. For GitHub review, use the example distributed with the adapter instead of the removed CLI example. Follow the [installed-profile instructions](../../../user/guide/github-review.md); keep customized rule modules inside the profile so their imports resolve its installed packages.
-4. Start the profile and confirm that its configured plugins activate without missing-package, missing-peer, or missing-row errors. Confirm the expected tool or skill is available in the intended Agent preset.
+3. GitHub レビューでは、削除された CLI の例ではなく、アダプターに同梱の例を使う。[インストール済みプロファイルの手順](../../../user/guide/github-review.md)に従い、カスタマイズしたルールモジュールはプロファイル内に保持して、インポートがインストール済みパッケージを解決できるようにする。
+4. プロファイルを開始し、設定されたプラグインがパッケージ不足、ピア不足、または行不足のエラーなく有効化されることを確認する。意図した Agent プリセットで期待どおりのツールまたはスキルが利用できることを確認する。

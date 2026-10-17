@@ -1,6 +1,6 @@
 # 插件配置
 
-[English](config.md) | 中文
+[日本語](config.md) | [English](config.en.md) | 中文
 
 让你的插件接受用户在 `cordis.yml` 中传入的配置。
 

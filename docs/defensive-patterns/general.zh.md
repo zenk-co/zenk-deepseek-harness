@@ -1,6 +1,6 @@
 # 防御性模式
 
-[English](general.md) | 中文
+[日本語](general.md) | [English](general.en.md) | 中文
 
 来之不易的缺陷类别规则：下面每条模式都是本项目实际发布或差点发布的一类缺陷，以防止其复发的规则形式陈述。在编写生命周期、并发、子进程或清理代码之前请先阅读本文。测试层面的对应规则（真实入口路径、验证实际结果、资源归属）见 [testing.zh.md](../testing.zh.md)；这些规则引用的类型定义正家见 [subsystems/](../subsystems/README.zh.md)。
 

@@ -1,6 +1,6 @@
 # 远程与 API 规则
 
-[English](remote-and-api.md) | 中文
+[日本語](remote-and-api.md) | [English](remote-and-api.en.md) | 中文
 
 `packages/api` 层及其对外远程方法的规则。调用模型本身见 [api-gateway.zh.md](../api-gateway.zh.md)。以下每条规则都给出要求、审查者的判定方式、不覆盖的内容、例外与批准人，以及一个正例与一个反例。
 

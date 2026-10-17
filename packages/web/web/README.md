@@ -1,39 +1,39 @@
 ---
-description: "The web access service (ctx.web): how deployments and plugin authors search the web and fetch URLs through interchangeable providers, with one selection policy and error vocabulary."
+description: "Web アクセスサービス (ctx.web): デプロイとプラグイン作者が、交換可能なプロバイダーを通じて Web 検索と URL 取得を行い、1 つの選択ポリシーとエラー語彙を共有する方法。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-web
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-web` to search the web or fetch a URL without tying callers to a specific vendor. It selects a usable backend for each operation and gives callers consistent cancellation, errors, and result limits. Choose it for plugins or tools that call `ctx.web.search()` or `ctx.web.fetch()`; the shipped `dsh-tool-web` tools load it for you. A search or fetch requires a configured, usable provider because this package does not make network requests on its own.
+`dsh-web` を使うと、呼び出し元を特定のベンダーに縛ることなく Web を検索したり URL を取得したりできる。各操作に対して使用可能なバックエンドを選択し、一貫したキャンセル、エラー、結果の上限を呼び出し元に与える。`ctx.web.search()` や `ctx.web.fetch()` を呼ぶプラグインやツールにこれを選ぶ。出荷される `dsh-tool-web` ツールが自動的にロードする。このパッケージ自身はネットワークリクエストを行わないため、検索や取得には設定された使用可能なプロバイダーが必要である。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-A composition that needs web access loads the `dsh-web` service and mounts at least one backend — a search provider and/or a fetch provider — and plugin or tool authors then call `ctx.web.search()` and `ctx.web.fetch()` directly. The service resolves the backend for each call, so callers never see provider ids unless they configured one.
+Web アクセスを必要とするコンポジションは、`dsh-web` サービスをロードし、少なくとも 1 つのバックエンド（検索プロバイダーまたは取得プロバイダー、あるいはその両方）をマウントする。その後、プラグインやツールの作者は `ctx.web.search()` と `ctx.web.fetch()` を直接呼ぶ。サービスは呼び出しごとにバックエンドを解決するため、呼び出し元が自分で設定しない限りプロバイダー id を見ることはない。
 
-### When to choose it
+### いつ選択するか
 
-Choose the service when a plugin or tool must search or fetch without hard-coding a vendor; a deployment that only uses the shipped `web_search`/`web_fetch` tools gets it for free through `dsh-tool-web`. You do not need it when the composition never reaches the web. The service adds no network access of its own: without at least one usable provider, every call fails with a structured `WebError`.
+プラグインやツールがベンダーをハードコードせずに検索や取得を行わなければならない場合にこのサービスを選ぶ。出荷される `web_search`/`web_fetch` ツールしか使わないデプロイは `dsh-tool-web` を通じてこれを無償で得る。コンポジションが Web に到達しない場合は必要ない。このサービスは独自のネットワークアクセスを追加しない: 使用可能なプロバイダーが 1 つもなければ、すべての呼び出しが構造化 `WebError` で失敗する。
 
-### Minimal configuration
+### 最小構成
 
-Load the service and let a single mounted backend auto-select, or pin a provider id with `searchProvider`/`fetchProvider`. The environment variables `$DSH_WEB_SEARCH_PROVIDER` and `$DSH_WEB_FETCH_PROVIDER` feed the same fields and are not a separate priority chain.
+サービスをロードし、マウントした単一のバックエンドに自動選択させるか、`searchProvider`/`fetchProvider` でプロバイダー id を固定する。環境変数 `$DSH_WEB_SEARCH_PROVIDER` と `$DSH_WEB_FETCH_PROVIDER` は同じフィールドを供給するものであり、別の優先順位チェーンではない。
 
 ```yaml
 - name: '@deepseek-ai/dsh-web'
@@ -41,16 +41,16 @@ Load the service and let a single mounted backend auto-select, or pin a provider
 - name: '@deepseek-ai/dsh-web-fetch-http'
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `searchProvider` | (unset) | Pinned search provider id; unset auto-selects when exactly one is usable |
-| `fetchProvider` | (unset) | Pinned fetch provider id; unset auto-selects when exactly one is usable |
+| `searchProvider` | (未設定) | 固定された検索プロバイダー id。未設定で使用可能なものがちょうど 1 つのとき自動選択する |
+| `fetchProvider` | (未設定) | 固定された取得プロバイダー id。未設定で使用可能なものがちょうど 1 つのとき自動選択する |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web) is the exhaustive source for every accepted field and its JSDoc.
+生成される [設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-web) が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### Searching and fetching
+### 検索と取得
 
-`search()` runs one query and returns an optional provider answer plus a list of citeable sources; the service enforces `request.maxResults` by truncating `sources[]` and setting `truncated`. `fetch()` retrieves one URL and returns its final URL, status code, decoded body, and a truncation flag; a non-2xx response is a result, not an error.
+`search()` は 1 つのクエリを実行し、任意のプロバイダー回答と引用可能なソースのリストを返す。サービスは `sources[]` を切り詰めて `truncated` を設定することで `request.maxResults` を強制する。`fetch()` は 1 つの URL を取得し、最終 URL、ステータスコード、デコード済みボディ、切り詰めフラグを返す。非 2xx レスポンスは結果であり、エラーではない。
 
 ```text
 // Search the web; sources[] is capped to maxResults:
@@ -60,109 +60,109 @@ const result = await ctx.web.search({ query: 'deepseek harness', maxResults: 8 }
 const page = await ctx.web.fetch({ url: 'https://example.com' })
 ```
 
-Both calls accept an optional `AbortSignal` that is forwarded to the provider for cancellation. The normalized request and result shapes are the contract callers build on; the vocabulary section of the [web subsystem](../../../docs/subsystems/web.md) reference describes them exhaustively.
+どちらの呼び出しも任意の `AbortSignal` を受け付け、キャンセルのためにプロバイダーへ転送される。正規化されたリクエストと結果は呼び出し元がその上に築く契約であり、[Web サブシステム](../../../docs/subsystems/web.md)リファレンスの語彙セクションがそれらを網羅的に説明している。
 
-### Provider selection
+### プロバイダー選択
 
-Each call resolves its provider at execution time, and registration or load order never matters. A configured provider id wins when it is registered and usable; without a configured id, the service runs the single usable provider or fails clearly:
+各呼び出しは実行時にプロバイダーを解決するため、登録やロードの順序は決して影響しない。設定されたプロバイダー id は、登録済みかつ使用可能なときに優先される。設定された id がなければ、サービスは唯一の使用可能なプロバイダーを実行するか、明確に失敗する:
 
-| Situation | Outcome |
+| 状況 | 結果 |
 |---|---|
-| configured id registered and usable | runs that provider |
-| configured id not registered | `WEB_PROVIDER_CONFIGURED_MISSING` |
-| configured id registered but unavailable | `WEB_PROVIDER_CONFIGURED_UNAVAILABLE` |
-| no id, exactly one registered usable provider | runs it |
-| no id, no usable provider | `WEB_PROVIDER_UNAVAILABLE` |
-| no id, multiple usable providers | `WEB_PROVIDER_AMBIGUOUS` |
+| 設定 id が登録済みかつ使用可能 | そのプロバイダーを実行する |
+| 設定 id が未登録 | `WEB_PROVIDER_CONFIGURED_MISSING` |
+| 設定 id が登録済みだが利用不可 | `WEB_PROVIDER_CONFIGURED_UNAVAILABLE` |
+| id なし、使用可能なプロバイダーがちょうど 1 つ | それを実行する |
+| id なし、使用可能なプロバイダーなし | `WEB_PROVIDER_UNAVAILABLE` |
+| id なし、使用可能なプロバイダーが複数 | `WEB_PROVIDER_AMBIGUOUS` |
 
-A provider's availability is a cheap local check — for example whether its API key is present — and never makes network calls, so selection stays fast and deterministic.
+プロバイダーの可用性は安価なローカルチェック（たとえば API キーが存在するかどうか）であり、ネットワーク呼び出しを行うことは決してないため、選択は高速かつ決定論的に保たれる。
 
-### Failures and recovery
+### 失敗と回復
 
-Failures throw `WebError` with a stable, machine-routable code; the message adds detail such as the missing provider id or the ambiguous candidate set. Callers route on the code and decide how to degrade. To change which backend a call uses, reconfigure the pinned id, mount or unmount providers, or fix the provider's configuration so its availability check passes.
+失敗は安定した機械ルーティング可能なコードを持つ `WebError` を投げる。メッセージは欠落したプロバイダー id や曖昧な候補集合といった詳細を追加する。呼び出し元はコードでルーティングし、どう劣化するかを決める。呼び出しが使うバックエンドを変えるには、固定 id を再設定する、プロバイダーをマウントまたはアンマウントする、またはプロバイダーの設定を直して可用性チェックを通過させる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the service; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではサービス背後の設計判断を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計哲学
 
-The package is built on one deliberate separation:
+このパッケージは 1 つの意図的な分離の上に築かれている:
 
-- **One seam, two independent operations.** Search and fetch share no request schema and no business logic, but they share one service so provider selection, cancellation, errors, and product configuration have a single owner. The parallel `Search`/`Fetch` method pairs are intentional.
-- **Selection is never order-dependent.** A capability either pins a provider id or auto-selects when exactly one usable provider is registered; `search()`/`fetch()` resolve the provider at execution time.
-- **The service owns the result bound.** `maxResults` is enforced by the seam after the provider returns, so an over-returning provider can never leak more sources than the caller asked for.
+- **1 つのシーム、2 つの独立した操作。** 検索と取得はリクエストスキーマもビジネスロジックも共有しないが、1 つのサービスを共有することで、プロバイダー選択、キャンセル、エラー、製品設定に単一のオーナーがいる。並行する `Search`/`Fetch` メソッドのペアは意図的である。
+- **選択は決して順序に依存しない。** ケイパビリティはプロバイダー id を固定するか、使用可能なプロバイダーがちょうど 1 つ登録されているとき自動選択する。`search()`/`fetch()` は実行時にプロバイダーを解決する。
+- **サービスが結果の上限を所有する。** `maxResults` はプロバイダーの返却後にシームによって強制されるため、過剰に返すプロバイダーが呼び出し元の求めた数より多くのソースを漏らすことはできない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: the `WebRuntime` service, both provider registries, and execution-time selection |
-| [`src/types.ts`](src/types.ts) | Vocabulary: request/result types, the closed `WebFetchBody` union, and the `WebError` taxonomy |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `WebRuntime` サービス、両方のプロバイダーレジストリ、実行時選択 |
+| [`src/types.ts`](src/types.ts) | 語彙: リクエスト/結果型、閉じた `WebFetchBody` ユニオン、`WebError` 分類 |
 
-### Data model
+### データモデル
 
-The request and result types define the normalized vocabulary callers build on — one `Search` pair and one `Fetch` pair — and the exhaustive fields and JSDoc live in [`src/types.ts`](src/types.ts) and the [web subsystem](../../../docs/subsystems/web.md) reference. Two deliberate choices shape them: `WebFetchBody` is a closed union (`html` | `text`) owned here, so adding a kind breaks compilation until every consumer handles it; `WebError` extends `HarnessError` with an open-string `code`, so consumers must tolerate provider-specific values. Source fields stay optional because not every provider returns all of them.
+リクエストと結果の型は呼び出し元がその上に築く正規化された語彙を定義する — 1 つの `Search` ペアと 1 つの `Fetch` ペア — そして網羅的なフィールドと JSDoc は [`src/types.ts`](src/types.ts) と [Web サブシステム](../../../docs/subsystems/web.md)リファレンスにある。2 つの意図的な選択がそれらを形作る: `WebFetchBody` はここが所有する閉じたユニオン（`html` | `text`）であり、種類の追加はすべてのコンシューマーが扱うまでコンパイルを壊す。`WebError` は `HarnessError` を開いた文字列の `code` で拡張するため、コンシューマーはプロバイダー固有の値を許容しなければならない。ソースフィールドが任意であるのは、すべてのプロバイダーがすべてを返すわけではないからである。
 
-### Selection flow
+### 選択フロー
 
-At call time the service resolves the provider — configured id first, then the unique usable provider — and throws the matching `WebError` when no clear winner exists. A search result then passes through `capSources`, which truncates `sources[]` to `maxResults` and flags `truncated`. Registration is effect-based: providers register with the calling fiber and unregister when it disposes, and a duplicate id within a capability kind is rejected at registration.
+呼び出し時にサービスはプロバイダーを解決し — まず設定された id、次に唯一の使用可能なプロバイダー — 明確な勝者が存在しないときは一致する `WebError` を投げる。検索結果はその後 `capSources` を通り、`sources[]` を `maxResults` に切り詰めて `truncated` をフラグする。登録はエフェクトベースである: プロバイダーは呼び出したファイバーに登録し、それが破棄されると登録解除され、同じケイパビリティ種別内の重複 id は登録時に拒否される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared vocabulary to the shipped backends, the model-facing tools, and the design rationale.
+パッケージレベルの契約では不十分なときにこれらのページを読む。共有語彙から、出荷されるバックエンド、モデル向けツール、設計根拠へと進む。
 
-- [Web subsystem](../../../docs/subsystems/web.md) — the exhaustive search/fetch requests and results, provider availability, and error codes.
-- [Web package map](../README.md) — the six-package family and each role.
-- [dsh-tool-web](../tool-web/README.md) — the model-facing `web_search` and `web_fetch` tools over this service.
-- [dsh-web-fetch-http](../web-fetch-http/README.md) — the shipped anonymous HTTP(S) fetch backend.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web) — every accepted config field and its source declaration.
-- [Web capability seam decision](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) — why search and fetch share one provider-selection service.
+- [Web サブシステム](../../../docs/subsystems/web.md) — 網羅的な検索/取得のリクエストと結果、プロバイダー可用性、エラーコード。
+- [Web パッケージマップ](../README.md) — 6 パッケージファミリーと各役割。
+- [dsh-tool-web](../tool-web/README.md) — このサービスの上に載るモデル向け `web_search` と `web_fetch` ツール。
+- [dsh-web-fetch-http](../web-fetch-http/README.md) — 出荷される匿名 HTTP(S) 取得バックエンド。
+- [生成される設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-web) — 受け付けられるすべての設定フィールドとそのソース宣言。
+- [Web ケイパビリティシームの決定](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) — 検索と取得が 1 つのプロバイダー選択サービスを共有する理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-tool-web`, which renders the seam's normalized search results and fetch bodies to the model while this service contributes no prompt or schema.
+間接的に、`dsh-tool-web` を通じて。これがシームの正規化された検索結果と取得ボディをモデルにレンダリングする。このサービスはプロンプトもスキーマも提供しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+直接の無効化はない。名前指しされたコンシューマーがリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the service is incomplete on its own. They are current package constraints.
+これらの制限は、サービスが単独では不完全になる状況を定義する。これらは現在のパッケージ制約である。
 
-- **No observation surface** — there is no provider-change event and no capability-status query; availability is observable only by running a search or fetch and routing the thrown code, and the no-provider failure is the generic `WEB_PROVIDER_UNAVAILABLE` with no per-provider reason enumeration ([Agent Note](../../../.agents/notes/archived/simplification/2026-07-04-drop-unconsumed-web-observation-surface.md)).
-- **Search requests carry only `query` and `maxResults`** — provider-neutral controls (recency, domain filters, regional hints, search depth) are deferred until the backends can honor them ([seam Agent Note](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md)).
-- **`WebFetchBody` has no `pdf` arm** — text-extractable PDF support is named deferred work; the closed union makes adding it a compile-enforced change across the web packages.
-- **Provider-backed page extraction is out of scope of `fetch()`** — a Firecrawl/Tavily-style `web_extract` capability is deferred rather than widening the fetch operation.
+- **観察サーフェスがない** — プロバイダー変更イベントもケイパビリティステータスクエリも存在しない。可用性は検索や取得を実行して投げられたコードをルーティングすることでのみ観察でき、プロバイダー不在の失敗はプロバイダーごとの理由の列挙を持たない汎用の `WEB_PROVIDER_UNAVAILABLE` である（[Agent Note](../../../.agents/notes/archived/simplification/2026-07-04-drop-unconsumed-web-observation-surface.md)）。
+- **検索リクエストは `query` と `maxResults` のみを運ぶ** — プロバイダー中立の制御（鮮度、ドメインフィルター、地域ヒント、検索深度）は、バックエンドがそれらを尊重できるようになるまで先送りされる（[シーム Agent Note](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md)）。
+- **`WebFetchBody` に `pdf` アームがない** — テキスト抽出可能な PDF サポートは明示的に先送りされた作業である。閉じたユニオンにより、その追加は Web パッケージ全体にわたるコンパイル強制の変更になる。
+- **プロバイダー支援のページ抽出は `fetch()` のスコープ外である** — Firecrawl/Tavily スタイルの `web_extract` ケイパビリティは、取得操作を広げるのではなく先送りされる。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior, limits, and rationale live in the sections above and the linked Agent Notes.
+この開発者ノートはメンテナー向けの作業コンテキストである: 未解決の疑問と未決定の方向性。これは明示的に非権威である — 出荷される動作、制限、根拠は上記のセクションとリンクされた Agent Notes にある。
 
-#### Future: observing provider state
+#### 将来: プロバイダー状態の観察
 
-No provider-change event or capability-status query exists; consumers observe availability only by executing a call and routing the thrown code. Restoring a small observation surface is possible if a consumer needs per-provider reasons, but the archived simplification note records why the earlier one was dropped.
+プロバイダー変更イベントもケイパビリティステータスクエリも存在しない。コンシューマーは呼び出しを実行して投げられたコードをルーティングすることでのみ可用性を観察する。コンシューマーがプロバイダーごとの理由を必要とするなら、小さな観察サーフェスを復元することは可能だが、アーカイブされた簡素化ノートが以前のものが落とされた理由を記録している。
 
 </details>

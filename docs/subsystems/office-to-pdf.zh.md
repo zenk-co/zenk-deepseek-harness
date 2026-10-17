@@ -1,6 +1,6 @@
 # Office 转 PDF
 
-[English](office-to-pdf.md) | 中文
+[日本語](office-to-pdf.md) | [English](office-to-pdf.en.md) | 中文
 
 [document 包族](../../packages/document/README.zh.md) 在 Node 宿主上将 Office 文件转换为 PDF。消费者负责源文件读取授权与展示；共享提供方负责转换、有界准入和临时 PDF 复用。此子系统不创建面向模型的工具或 Session 事件。
 

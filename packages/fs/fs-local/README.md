@@ -1,39 +1,39 @@
 ---
-description: "The host-filesystem backend for ctx.fs for deployments and maintainers choosing or debugging local file access."
+description: "デプロイとメンテナーがローカルファイルアクセスを選択またはデバッグするための、ctx.fs のホストファイルシステムバックエンド。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-fs-local
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-fs-local` to read, list, watch, atomically write, and edit files on the host filesystem. Relative paths resolve from a configurable base directory, while absolute paths and parent traversal remain unrestricted. Paths and symlinks that reach the same file share one identity. Writes preserve file permissions, and optional version guards reject stale overwrites. Choose this package for direct host access; use `fs-sandbox` for confined mutations.
+`dsh-fs-local` は、ホストファイルシステム上のファイルを読み、一覧し、監視し、アトミックに書き込み、編集するために使う。相対パスは構成可能なベースディレクトリから解決され、絶対パスと親方向のトラバーサルは制限されない。同じファイルに到達するパスとシンボリックリンクは 1 つの識別を共有する。書き込みはファイルのパーミッションを保ち、省略可能なバージョンガードが古い上書きを拒否する。直接のホストアクセスにはこのパッケージを選び、閉じ込められた変更には `fs-sandbox` を使う。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this backend when a composition needs `ctx.fs` backed by the real host filesystem and accepts a process-local implementation. The common path is explicit: load the backend, give it a base directory, and the model-facing tools (`dsh-tool-fs`) or your own plugins can read, write, and edit files.
+構成が実ホストファイルシステムに裏打ちされた `ctx.fs` を必要とし、プロセスローカルな実装を受け入れる場合にこのバックエンドをマウントする。一般的な経路は明示的である: バックエンドをロードしてベースディレクトリを与えると、モデルに面するツール（`dsh-tool-fs`）または独自のプラグインがファイルを読み、書き、編集できる。
 
-### When to choose it
+### いつ選ぶか
 
-Choose `fs-local` for ordinary host-file access in a single process. Choose [`fs-sandbox`](../fs-sandbox/README.md) when a session's writes and edits must be confined to its workspace and temp roots — it extends this backend and adds only the mode fence. `config.cwd` is a resolution default, not a containment boundary: absolute paths and `..` escape it.
+単一プロセスでの通常のホストファイルアクセスには `fs-local` を選ぶ。セッションの書き込みと編集をそのワークスペースと temp ルートに閉じ込める必要がある場合は [`fs-sandbox`](../fs-sandbox/README.md) を選ぶ —— これはこのバックエンドを拡張し、モードフェンスだけを追加する。`config.cwd` は解決のデフォルトであり、閉じ込め境界ではない: 絶対パスと `..` はそこから脱出する。
 
-### Minimal configuration
+### 最小構成
 
-Load the backend with a base directory; relative paths resolve against it, and absolute paths ignore it. A relative base is anchored to the provider process working directory, and display paths remain absolute. On POSIX, resolution follows filesystem semantics before lexical normalization: `symlink/..` reaches the parent of the link target, including when the final file does not exist yet. Directory listings preserve the same physical traversal in displayed child paths. Windows retains native drive-relative normalization.
+ベースディレクトリ付きでバックエンドをロードする。相対パスはそれを基準に解決され、絶対パスはそれを無視する。相対ベースはプロバイダープロセスの作業ディレクトリに固定され、表示パスは絶対のままである。POSIX では、解決は字句的正規化の前にファイルシステムのセマンティクスに従う: `symlink/..` は最終ファイルがまだ存在しない場合も含め、リンクターゲットの親に到達する。ディレクトリ一覧は表示される子パスでも同じ物理的トラバーサルを保つ。Windows はネイティブのドライブ相対正規化を保つ。
 
 ```yaml
 - name: '@deepseek-ai/dsh-fs-local'
@@ -41,109 +41,109 @@ Load the backend with a base directory; relative paths resolve against it, and a
     cwd: /absolute/path/to/workspace
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `cwd` | `process.cwd()` | Base directory for relative paths |
-| `diffBasisMaxBytes` | `10 MiB` | UTF-8 byte limit per overwrite-diff side; larger overwrites return `before: null` |
+| `cwd` | `process.cwd()` | 相対パスのベースディレクトリ |
+| `diffBasisMaxBytes` | `10 MiB` | 上書き diff の片側ごとの UTF-8 バイト上限。より大きい上書きは `before: null` を返す |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-fs-local) is the exhaustive source for every accepted field and its JSDoc.
+生成された[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-fs-local)が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### What you can do
+### できること
 
-Read any regular UTF-8 text file whole or as a stream, read raw bytes up to a cap you choose or in a byte window, and list one directory level in stable name order. Create or replace a file atomically, and apply a literal text edit atomically; both mutations serialize per file, so concurrent writers never interleave. The version guard is optional: omit it for unconditional create-or-overwrite, or supply it to fail when the file changed since you last observed it.
+任意の通常の UTF-8 テキストファイルを全体またはストリームとして読み、選択した上限まで、またはバイトウィンドウで生バイトを読み、1 つのディレクトリレベルを安定した名前順で一覧する。ファイルをアトミックに作成または置換し、リテラルなテキスト編集をアトミックに適用する。どちらの変更もファイルごとに直列化されるので、並行ライターが交互に割り込むことはない。バージョンガードは省略可能である: 無条件の作成または上書きには省略し、最後に観察してからファイルが変わったときに失敗させたい場合に指定する。
 
-Read, listing, and mutation failures are typed `FsError`s with stable codes — `FS_NOT_FOUND`, `FS_NOT_TEXT` (binary content), `FS_STALE_VERSION` (changed since observation), `FS_EDIT_NOT_FOUND` or `FS_AMBIGUOUS_EDIT` (no unique literal match), and others — so callers branch on the code, never on message text. A missing target on an edit reports `FS_STALE_VERSION` whether or not the version guard is supplied.
+読み取り、一覧、変更の失敗は安定したコードを持つ型付き `FsError` である —— `FS_NOT_FOUND`、`FS_NOT_TEXT`（バイナリ内容）、`FS_STALE_VERSION`（観察以降に変更）、`FS_EDIT_NOT_FOUND` または `FS_AMBIGUOUS_EDIT`（一意のリテラル一致なし）など —— なので、呼び出し側はメッセージテキストではなくコードで分岐する。編集時のターゲット不在は、バージョンガードの有無にかかわらず `FS_STALE_VERSION` を報告する。
 
-Chokidar observes one file or a directory's direct entries through OS events, without polling or recursive watching. Files use a filtered parent-directory watch, so readiness also covers creation of an initially missing file. File watches cover in-place writes, atomic replacement, deletion, and same-path recreation while the parent directory remains.
+Chokidar は 1 つのファイルまたはディレクトリの直接のエントリーを OS イベントを通じて監視し、ポーリングや再帰的監視は行わない。ファイルはフィルタリングされた親ディレクトリ監視を使うので、レディネスは最初は存在しないファイルの作成もカバーする。ファイル監視は、親ディレクトリが残っている間のその場での書き込み、アトミック置換、削除、同一パスの再作成をカバーする。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the local backend and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、ローカルバックエンドの背後にある設計上の決定を説明し、それを実現するコードを示す。観察可能な挙動は[このパッケージを使う](#use-this-package)で完全にカバーされている。
 
-### Design concept
+### 設計概念
 
-The backend builds on three ideas:
+このバックエンドは 3 つのアイデアに基づく:
 
-- **Realpath identity.** The `targetKey` is the file's `realpath`, so two input paths reaching the same file through symlinks share one identity, and writes land on the link target while preserving the link.
-- **Atomic publication.** Writes stage into an exclusive temp file inside a private staging directory next to the target, fsync, then publish; an existing file's mode is preserved and Windows DACLs survive replacement.
-- **One mutation critical section.** A per-target FIFO lock serializes read→guard→write windows, so concurrent writes and edits are deterministically ordered — one wins, the rest see the new version and reject as stale.
+- **Realpath 識別。** `targetKey` はファイルの `realpath` なので、シンボリックリンクを通じて同じファイルに到達する 2 つの入力パスは 1 つの識別を共有し、書き込みはリンクを保ったままリンクターゲットに着地する。
+- **アトミック公開。** 書き込みはターゲットの隣のプライベートなステージングディレクトリ内の排他的な一時ファイルにステージし、fsync してから公開する。既存ファイルのモードは保たれ、Windows の DACL は置換を生き延びる。
+- **1 つの変更クリティカルセクション。** ターゲットごとの FIFO ロックが read→guard→write のウィンドウを直列化するので、並行する書き込みと編集は決定的に順序付けられる —— 1 つが勝ち、残りは新しいバージョンを見て stale として拒否する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service wiring: `LocalFileSystem`, `Config`, per-target mutation lock |
-| [`src/fsio.ts`](src/fsio.ts) | Cordis-free raw I/O: probe, reads, atomic write, literal edit, line-ending handling |
-| [`src/win32.ts`](src/win32.ts) | Windows-specific DACL preservation for atomic replacement |
+| [`src/index.ts`](src/index.ts) | サービスの配線: `LocalFileSystem`、`Config`、ターゲットごとの変更ロック |
+| [`src/fsio.ts`](src/fsio.ts) | Cordis 非依存の生 I/O: プローブ、読み取り、アトミック書き込み、リテラル編集、行末処理 |
+| [`src/win32.ts`](src/win32.ts) | アトミック置換のための Windows 固有の DACL 保持 |
 
-### Write path
+### 書き込み経路
 
-Each write probes the target, enforces the optional guard (`createIfAbsent` or `replaceIfVersion`), captures a bounded `before` diff basis when both sides are small enough, stages the new content next to the target, fsyncs, and publishes atomically. Guarded creation uses a hard-link publication that never replaces a concurrent creator, rejecting it with `FS_NOT_OBSERVED` instead.
+各書き込みはターゲットをプローブし、省略可能なガード（`createIfAbsent` または `replaceIfVersion`）を強制し、両側が十分小さい場合は上限付きの `before` diff ベースをキャプチャし、新しい内容をターゲットの隣にステージし、fsync し、アトミックに公開する。ガード付き作成はハードリンク公開を使い、並行する作成者を決して置き換えず、代わりに `FS_NOT_OBSERVED` で拒否する。
 
-### Edit path
+### 編集経路
 
-Each edit probes, verifies the version guard before literal matching (so stale edits report `FS_STALE_VERSION`, never a misleading no-match), reads the file, applies the literal replacement with LF normalization, restores the file's dominant line-ending style, and republishes — all inside the per-target lock.
+各編集はプローブし、リテラルマッチングの前にバージョンガードを検証し（したがって stale な編集は誤解を招く no-match ではなく `FS_STALE_VERSION` を報告する）、ファイルを読み、LF 正規化を伴うリテラル置換を適用し、ファイルの支配的な行末スタイルを復元し、再公開する —— すべてターゲットごとのロックの内側で。
 
-### Ownership and invariants
+### 所有権と不変条件
 
-Raw I/O is Cordis-free and independently unit-tested in `src/fsio.ts`; `src/index.ts` stays thin wiring. `config.cwd` is a resolution default only — containment is the job of `fs-sandbox` or a `tools/execute` permission plugin. Cancellation is a best-effort `AbortSignal` checked before and after each asynchronous probe. For watches, the signal cancels initialization; after readiness, the caller must await the returned close function.
+生 I/O は Cordis 非依存で、`src/fsio.ts` で独立にユニットテストされる。`src/index.ts` は薄い配線に留まる。`config.cwd` は解決のデフォルトにすぎない —— 閉じ込めは `fs-sandbox` または `tools/execute` パーミッションプラグインの仕事である。キャンセルはベストエフォートの `AbortSignal` で、各非同期プローブの前後にチェックされる。監視では、シグナルは初期化をキャンセルする。レディネス後は、呼び出し側は返された close 関数を await しなければならない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the contract to the adjacent backends, tools, and policies.
+パッケージレベルの契約では足りないときにこれらのページを読む。契約から隣接するバックエンド、ツール、ポリシーへと進む。
 
-- [Filesystem subsystem](../../../docs/subsystems/filesystem.md) — exhaustive provider contract, policy events, and error taxonomy.
-- [dsh-fs](../fs/README.md) — the `ctx.fs` contract this backend implements.
-- [fs-sandbox](../fs-sandbox/README.md) — the sandbox-enforcing backend that extends this one.
-- [tool-fs](../tool-fs/README.md) — the model-facing tools that consume `ctx.fs`.
-- [fs-observation-policy](../fs-observation-policy/README.md) — the policy plugin that guards mutations through the `fs/*` events.
-- [Windows DACL preservation note](../../../.agents/notes/archived/bug-fix/2026-07-19-windows-atomic-write-dacl-preservation.md) — why atomic replacement copies the target's access policy.
+- [ファイルシステムサブシステム](../../../docs/subsystems/filesystem.md) — 網羅的なプロバイダー契約、ポリシーイベント、エラー分類。
+- [dsh-fs](../fs/README.md) — このバックエンドが実装する `ctx.fs` 契約。
+- [fs-sandbox](../fs-sandbox/README.md) — これを拡張するサンドボックス強制バックエンド。
+- [tool-fs](../tool-fs/README.md) — `ctx.fs` を消費するモデルに面するツール。
+- [fs-observation-policy](../fs-observation-policy/README.md) — `fs/*` イベントを通じて変更をガードするポリシープラグイン。
+- [Windows DACL 保持ノート](../../../.agents/notes/archived/bug-fix/2026-07-19-windows-atomic-write-dacl-preservation.md) — アトミック置換がターゲットのアクセスポリシーをコピーする理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-tool-fs`, which renders this provider's line-windowed UTF-8 content, mutation acknowledgements, and exact provider messages in capped retained results while versions, atomic-write mechanics, and directory metadata remain internal.
+間接的。`dsh-tool-fs` を通じ、このプロバイダーの行ウィンドウ化された UTF-8 コンテンツ、変更の確認、正確なプロバイダーメッセージを上限付きの保持結果にレンダリングする。バージョン、アトミック書き込みのメカニズム、ディレクトリメタデータは内部に留まる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+直接の無効化はない。リクエストプレフィックスの変更は、名指されたコンシューマーが所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the local backend is a poor fit or needs special operational care. They are current package constraints, not a general filesystem comparison or a task backlog.
+これらの制限は、ローカルバックエンドが不向きな場合、または特別な運用上の注意が必要な場合を定義する。現在のパッケージ制約であり、一般的なファイルシステム比較でもタスクバックログでもない。
 
-- **`config.cwd` is not a sandbox** — it is a resolution default, not containment: absolute paths and `..` escape it. Enforce containment with a stricter `ctx.fs` backend or a permission plugin on the `tools/execute` waterfall.
-- **Linux parent-directory recreation** — restoring observation after a parent directory is deleted and recreated is deferred; same-path file recreation while its parent remains is supported.
-- **Version tokens depend on filesystem metadata** — they combine device, inode, size, nanosecond mtime, and nanosecond ctime; a storage layer that cannot update any of those facts for a rewrite can still defeat the stale guard.
-- **`editText` holds the whole file (plus the edited copy) in memory** — streaming exists only on the read path.
-- **A sub-limit overwrite still buffers a contextual basis** — `writeText` may retain up to just below `config.diffBasisMaxBytes` of prior text in addition to the caller-owned replacement; the bound does not cap the returned `after` value or the whole-file presentation fallback.
-- **Binary detection is asymmetric** — reads NUL-sample only the first 8192 bytes while edits scan the whole buffer, so a file with a late NUL reads fine but rejects edits.
-- **The per-target mutation lock is in-process only** — guarded creation still uses an atomic no-replace publication across processes, but replacement writers in another process are caught only when the optional version guard observes their metadata change; they are never serialized.
-- **Guarded creation requires hard-link support** — filesystems or mounts that reject hard-link publication cannot serve `createIfAbsent`; the backend preserves the missing target and reports `FS_IO_ERROR`.
-- **Post-commit cleanup is best effort** — a successful publication remains successful if removal of its owner-only staging directory fails, leaving private residue for later operator cleanup.
+- **`config.cwd` はサンドボックスではない** — それは解決のデフォルトであり、閉じ込めではない: 絶対パスと `..` はそこから脱出する。閉じ込めは、より厳格な `ctx.fs` バックエンドまたは `tools/execute` ウォーターフォール上のパーミッションプラグインで強制する。
+- **Linux の親ディレクトリ再作成** — 親ディレクトリが削除されて再作成された後の監視の復元は先送りされている。親が残っている間の同一パスのファイル再作成はサポートされる。
+- **バージョントークンはファイルシステムメタデータに依存する** — デバイス、inode、サイズ、ナノ秒 mtime、ナノ秒 ctime を組み合わせる。書き換え時にそれらの事実を更新できないストレージ層は、依然として stale ガードを破りうる。
+- **`editText` はファイル全体（および編集後のコピー）をメモリに保持する** — ストリーミングは読み取り経路にのみ存在する。
+- **上限未満の上書きでもコンテキストベースをバッファする** — `writeText` は呼び出し側所有の置換に加えて、直前のテキストを最大 `config.diffBasisMaxBytes` のすぐ下まで保持することがある。この上限は返される `after` 値やファイル全体の表示フォールバックを制限しない。
+- **バイナリ検出は非対称** — 読み取りは最初の 8192 バイトだけを NUL サンプリングし、編集はバッファ全体をスキャンするので、遅い位置に NUL があるファイルは読み取りは通るが編集は拒否される。
+- **ターゲットごとの変更ロックはプロセス内のみ** — ガード付き作成はプロセス間でアトミックな no-replace 公開を使うが、別プロセスの置換ライターは、省略可能なバージョンガードがそのメタデータ変更を観察したときにだけ捕捉される。直列化されることは決してない。
+- **ガード付き作成はハードリンクのサポートを必要とする** — ハードリンク公開を拒否するファイルシステムやマウントは `createIfAbsent` を提供できない。バックエンドは不在のターゲットを保ち、`FS_IO_ERROR` を報告する。
+- **コミット後のクリーンアップはベストエフォート** — 公開が成功した後、オーナー専用のステージングディレクトリの削除が失敗しても公開は成功のままであるが、後でオペレーターが掃除するためのプライベートな残留物が残る。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

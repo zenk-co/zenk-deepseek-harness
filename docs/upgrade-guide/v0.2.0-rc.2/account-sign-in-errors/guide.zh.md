@@ -5,7 +5,7 @@ description: "账号登录传输失败现在报告 no-response，而非 network�
 
 # 账号登录错误码
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

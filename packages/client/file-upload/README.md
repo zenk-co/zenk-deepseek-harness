@@ -1,101 +1,101 @@
 ---
-description: "Session-addressed browser file uploads with streaming intake, progress, cancellation, and staged receipts for later prompts."
+description: "1 つのセッションに宛てたブラウザーファイルアップロード。ストリーミング取り込み、進捗、キャンセル、後のプロンプトのためのステージ済み受領証を備える。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-file-upload
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package lets browser features store a `Blob`, exact bytes, or a `ReadableStream<Uint8Array>` for one Session and receive an opaque receipt for a later prompt. Served pages send Blob and stream bodies without aggregating their bytes on the page thread; pages whose Host runs in another execution context supply a Fetch-shaped carrier before Cordis boots. Callers can observe consumed bytes and cancel an active operation. A stream body is consumed once and transfers ownership when it crosses a Worker boundary. Exact bytes use the generated Remote.
+このパッケージを使うと、ブラウザー機能が 1 つのセッションのために `Blob`、正確なバイト列、または `ReadableStream<Uint8Array>` を格納し、後のプロンプトのための不透明な受領証を受け取れる。提供されたページは Blob とストリーム本体をページスレッドでバイト列に集約せずに送信する。ホストが別の実行コンテキストで動作するページは Cordis 起動前に Fetch 形状のキャリアを供給する。呼び出し元は消費バイト数を観察し、進行中の操作をキャンセルできる。ストリーム本体は 1 回だけ消費され、Worker 境界を越えるときに所有権を移転する。正確なバイト列は生成されたリモートを使う。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the package before a consumer that injects `fileUpload`, then call `ctx.fileUpload.upload(sessionId, body, name, signal, onProgress)`. The Session identity addresses both the raw route and generated Remote fallback; callers do not assemble either request.
+`fileUpload` を注入するコンシューマーの前にこのパッケージをマウントし、`ctx.fileUpload.upload(sessionId, body, name, signal, onProgress)` を呼び出す。セッション identity が生ルートと生成されたリモートフォールバックの両方に宛てるため、呼び出し元はどちらのリクエストも組み立てない。
 
 ```yaml
 - id: file-upload
   name: '@deepseek-ai/dsh-client-file-upload'
 ```
 
-The package has no Cordis configuration fields. A `Blob` uses XMLHttpRequest inside a dedicated Worker so the service can report browser upload progress, including the total when the browser provides it. A `ReadableStream` transfers to that Worker and feeds Fetch incrementally; progress reports consumed bytes without a total. An `AbortSignal` terminates the dedicated Worker or reaches a page-owned carrier. Exact bytes use the generated Remote.
+このパッケージに Cordis 設定フィールドはない。`Blob` は専用 Worker 内で XMLHttpRequest を使い、ブラウザーのアップロード進捗を報告する。ブラウザーが提供する場合は合計値も含む。`ReadableStream` はその Worker に転送されて Fetch に逐次供給する。進捗は合計値なしで消費バイト数を報告する。`AbortSignal` は専用 Worker を終了させるか、ページ所有のキャリアに到達する。正確なバイト列は生成されたリモートを使う。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The Client plugin provides `ctx.fileUpload`. Its `upload()` method receives the owning Session identity, assembles the raw route request, and invokes the generated Remote for exact bytes. The provider reads the optional pre-Cordis `__DSH_FILE_UPLOAD__` hook once. Without a hook, each Blob or stream request owns a short-lived Worker and releases it after completion, failure, or cancellation. With the hook, the service sends the body through the page-owned Fetch carrier; the Web Worker runtime transfers stream bodies through its request frame and exposes them to the Host HTTP bridge as backpressured chunks.
+クライアントプラグインは `ctx.fileUpload` を提供する。その `upload()` メソッドは所有セッション identity を受け取り、生ルートリクエストを組み立て、正確なバイト列のために生成されたリモートを呼び出す。プロバイダーは任意の Cordis 起動前 `__DSH_FILE_UPLOAD__` フックを 1 回だけ読む。フックがなければ、各 Blob またはストリーム要求は短命な Worker を所有し、完了、失敗、キャンセル後に解放する。フックがあれば、サービスはページ所有の Fetch キャリアを通じて本体を送信する。Web Worker ランタイムはストリーム本体をリクエストフレームを通じて転送し、ホスト HTTP ブリッジにバックプレッシャー付きチャンクとして公開する。
 
-The Host plugin provides `ctx.fileUploads`. It owns the authenticated streaming route, encoded Remote fallback, command receipt resolver, and staged-receipt lifecycle; encoded admission, attachment-error recognition, and byte storage stay behind `ctx.attachments`. Host callers supply an Agent with its runtime-owned context; receipt tables use that Agent's exact Session object as their key. The Session Controller registers the resolver that can resume a cold ordinary Agent and consumes receipts during prompt admission. Prompt delivery holds each receipt binding in a disposable transaction: disposal restores the previous binding until successful delivery commits it, and queue or history observation then retires the committed receipt.
+ホストプラグインは `ctx.fileUploads` を提供する。認証済みストリーミングルート、符号化されたリモートフォールバック、コマンド受領証リゾルバー、ステージ済み受領証ライフサイクルを所有する。符号化された受付、添付ファイルエラー認識、バイト格納は `ctx.attachments` の背後に残る。ホスト呼び出し元はランタイム所有 Context 付きのエージェントを供給する。受領証テーブルはそのエージェントの正確なセッションオブジェクトをキーとする。セッションコントローラーはコールドな通常エージェントを再開できるリゾルバーを登録し、プロンプト受付時に受領証を消費する。プロンプト配信は各受領証束縛を破棄可能なトランザクションに保持する。正常な配信のコミットまで以前の束縛は復元され、キューまたは履歴観察がコミット済みの受領証を廃止する。
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Host streaming route, attachment-service admission, and Session-owned receipt lifecycle |
-| [`src/types.ts`](src/types.ts) | encoded request, receipt, and durable result types |
-| [`src/client/contract.ts`](src/client/contract.ts) | Client upload, progress, and page-hook types |
-| [`src/client/runtime.ts`](src/client/runtime.ts) | Dedicated Worker and page-owned carrier implementations |
-| [`src/client/index.ts`](src/client/index.ts) | Client plugin registration and `ctx.fileUpload` declaration |
+| [`src/index.ts`](src/index.ts) | ホストストリーミングルート、添付ファイルサービス受付、セッション所有の受領証ライフサイクル |
+| [`src/types.ts`](src/types.ts) | 符号化要求、受領証、永続的な結果型 |
+| [`src/client/contract.ts`](src/client/contract.ts) | クライアントアップロード、進捗、ページフック型 |
+| [`src/client/runtime.ts`](src/client/runtime.ts) | 専用 Worker とページ所有キャリアの実装 |
+| [`src/client/index.ts`](src/client/index.ts) | クライアントプラグイン登録と `ctx.fileUpload` 宣言 |
 
 </details>
 
-Each upload receipt belongs to one exact Session, and each request uses one selected carrier. Unsupported stream carriers fail before the body is sent.
+各アップロード受領証は正確に 1 つのセッションに属し、各要求は選択された 1 つのキャリアを使う。未対応のストリームキャリアは本体送信前に失敗する。
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Connection](../connection/README.md) — authenticated RPC, exact Host routes, and connection generations.
-- [Session Controller](../../api/session-controller/README.md) — prompt admission that consumes staged receipts.
-- [Web Worker runtime](../../experimental/webworker-runtime/README.md) — the page-to-Host Worker request tunnel.
-- [Client group map](../README.md) — browser services and UI feature packages.
+- [Connection](../connection/README.md) — 認証済み RPC、正確なホストルート、接続世代。
+- [Session Controller](../../api/session-controller/README.md) — ステージ済み受領証を消費するプロンプト受付。
+- [Web Worker ランタイム](../../experimental/webworker-runtime/README.md) — ページからホストへの Worker 要求トンネル。
+- [クライアントグループマップ](../README.md) — ブラウザーサービスと UI 機能パッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package transfers browser request bodies and contributes no model input.
+なし。このパッケージはブラウザー要求本体を転送するだけで、モデル入力に寄与しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダー要求を組み立てず送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits apply to the transport operation itself.
+これらの制限は転送操作自体に適用される。
 
-- **Uploads are not resumable** — a failed or cancelled retry starts from the first byte.
-- **Stream bodies are one-shot** — transferring a `ReadableStream` locks the caller's object, so retry requires a newly created stream.
-- **Stream progress has no total** — callers receive consumed-byte counts because the stream API carries no byte length.
-- **The browser Worker is self-contained** — its source is emitted from a function string. Adding runtime imports requires moving it to a standalone Worker entry bundled by tsdown.
+- **アップロードは再開できない** — 失敗やキャンセル後の再試行は先頭バイトから開始する。
+- **ストリーム本体は使い切りである** — `ReadableStream` の転送は呼び出し元のオブジェクトをロックするため、再試行には新しく作成したストリームが必要である。
+- **ストリーム進捗に合計値はない** — ストリーム API がバイト長を運ばないため、呼び出し元は消費バイト数のカウントを受け取る。
+- **ブラウザー Worker は自己完結である** — そのソースは関数文字列から生成される。ランタイムインポートを追加するには、スタンドアロンの Worker エントリーに移動して tsdown でバンドルする必要がある。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

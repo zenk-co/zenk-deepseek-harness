@@ -1,35 +1,35 @@
 ---
-description: "Shared subprocess and direct-agent harness for keyless example smoke tests, for test authors booting real Loader compositions."
+description: "キー不要の example スモークテスト用の共有サブプロセスおよび直接エージェントハーネス。実際の Loader コンポジションをブートするテスト作成者向け。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-loader-smoke
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-loader-smoke` to boot an application fixture from its real bin and `cordis.yml` in an isolated temporary directory, with captured output and cleanup. `runFixtureTurn` drives one task through the configured root agent and returns the final assistant text plus token usage. Tests can select zero-build source execution or built-package execution, so local and CI smoke tests use the intended consumer path for each environment. This support-tier library is for test authors, not product integrations.
+`dsh-loader-smoke` は、アプリケーションフィクスチャをその実際の bin と `cordis.yml` から分離された一時ディレクトリでブートし、出力をキャプチャしてクリーンアップするために使う。`runFixtureTurn` は 1 つのタスクを設定されたルートエージェントを通じて駆動し、最終的な assistant テキストとトークン使用量を返す。テストはゼロビルドのソース実行またはビルド済みパッケージ実行を選択できるため、ローカルと CI のスモークテストが各環境で意図されたコンシューマー経路を使う。このサポート層ライブラリはテスト作成者向けであり、プロダクト統合向けではない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [本パッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 本パッケージを使う
 
-This package boots an application fixture the way an installed consumer would and lets a test watch the result: choose source or built mode, launch the bin with its config from an isolated cwd, and either wait for a clean exit or drive one task through the root agent.
+このパッケージは、インストールされたコンシューマーがするようにアプリケーションフィクスチャをブートし、テストが結果を観察できるようにする: ソースまたはビルド済みモードを選び、分離された cwd からその設定とともに bin を起動し、クリーンな終了を待つか、ルートエージェントを通じて 1 つのタスクを駆動する。
 
-### Booting an application fixture
+### アプリケーションフィクスチャのブート
 
-`runLoaderSmoke` takes bin and config paths, optional complete bin arguments, environment overrides, stdin, pre-run setup, and pre-cleanup inspection. It owns the isolated cwd, DSH homes, diagnostics, deadline, termination, EOF, and cleanup of a cwd it created (a caller-provided cwd is left in place), and returns both streams after a zero exit or rejects with both streams on failure:
+`runLoaderSmoke` は bin と config のパス、省略可能な完全な bin 引数、環境の上書き、stdin、実行前セットアップ、およびクリーンアップ前検査を取る。分離された cwd、DSH ホーム、診断、期限、終了、EOF、および自身が作成した cwd のクリーンアップを所有し (呼び出し元提供の cwd はそのまま残される)、ゼロ終了後に両ストリームを返すか、失敗時に両ストリームとともに拒否する:
 
 ```text
 const result = await runLoaderSmoke({
@@ -41,90 +41,90 @@ const result = await runLoaderSmoke({
 })
 ```
 
-Set `sourceImport: 'tsx/esm'` when a source smoke exercises the supported `dsh` launcher; built mode ignores this option. Set `expectedExitCode` when the scenario pins a designed failure surface — a one-shot turn ending in an error result — and a run that exits any other way, including succeeding, still fails the smoke.
+ソーススモークがサポートされた `dsh` ランチャーを実証する場合は `sourceImport: 'tsx/esm'` を設定する; ビルド済みモードはこのオプションを無視する。シナリオが設計された失敗面 — エラー結果で終わるワンショットターン — を固定する場合は `expectedExitCode` を設定する; 他の方法で終了する実行 (成功を含む) は依然としてスモークを失敗させる。
 
-### Testing a shipped profile
+### 出荷済みプロファイルのテスト
 
-Profile integration drivers use the repository-only `tests/fixtures/production-profile.ts` helper. It loads the named shipped profile and its bundle patches through `loadProfile`, computes the runtime resolution, installs it through `PluginPackages`, and passes the bundle patches followed by the test's `*.patch.yml` files to the root `cordis:include` mounted by `boot`. Those patches should contain only the test provider or model, isolated persistence paths, and subject-specific changes. Package-level unit tests that need an agent loop without profile integration mount `dsh-agent-loop-testkit` locally instead.
+プロファイル統合ドライバーはリポジトリ専用の `tests/fixtures/production-profile.ts` ヘルパーを使う。それは指定された出荷済みプロファイルとそのバンドルパッチを `loadProfile` を通じてロードし、ランタイム解決を計算し、`PluginPackages` を通じてインストールし、バンドルパッチに続けてテストの `*.patch.yml` ファイルを `boot` がマウントするルート `cordis:include` へ渡す。それらのパッチはテストのプロバイダーまたはモデル、分離された永続化パス、および対象固有の変更のみを含むべきである。プロファイル統合なしでエージェントループを必要とするパッケージレベルのユニットテストは、代わりに `dsh-agent-loop-testkit` をローカルにマウントする。
 
-### Driving a fixture turn
+### フィクスチャターンの駆動
 
-`runFixtureTurn(ctx, options)` drives one task through exactly one configured root agent: it waits for the task to reach the durable inbox, forwards canonical events to your observer, flushes the session, and returns the final assistant text plus accumulated usage. Example-local drivers keep configuration, rendering, and assertion ownership.
+`runFixtureTurn(ctx, options)` はちょうど 1 つの設定済みルートエージェントを通じて 1 つのタスクを駆動する: タスクが永続受信箱に到達するのを待ち、正規のイベントをオブザーバーへ転送し、セッションをフラッシュし、最終的な assistant テキストと蓄積された使用量を返す。example ローカルのドライバーが設定、レンダリング、およびアサーションの所有権を保つ。
 
-### Source or built mode
+### ソースモードまたはビルド済みモード
 
-`resolveExampleLaunch` picks the artifact an example bin boots from. `src` mode runs the bin under tsx with `TSX_TSCONFIG_PATH` set, so workspace imports resolve through the tsconfig `paths` map — the zero-build dev path. `lib` mode runs the built `lib/` bin under plain Node, so bare package plugins resolve through real package `exports`, exactly as an installed consumer resolves them. The mode comes from an explicit value or `DSH_EXAMPLE_MODE` (CI sets `lib`, dev leaves it unset); anything else fails loud.
+`resolveExampleLaunch` は example bin がブートするアーティファクトを選ぶ。`src` モードは `TSX_TSCONFIG_PATH` を設定した tsx の下で bin を実行するため、ワークスペースインポートは tsconfig の `paths` マップを通じて解決される — ゼロビルドの開発経路である。`lib` モードはビルド済みの `lib/` bin をプレーンな Node の下で実行するため、ベアパッケージプラグインは実際のパッケージ `exports` を通じて、インストールされたコンシューマーが解決するのと正確に同じように解決される。モードは明示的な値または `DSH_EXAMPLE_MODE` から来る (CI は `lib` を設定し、開発は未設定のままにする); それ以外は大声で失敗する。
 
-### What can go wrong
+### 何がうまくいかないことがあるか
 
-- **The process never exits** — the smoke enforces a deadline and reports the captured streams in the failure; a faulty fixture that spawns its own process tree can outlive the smoke and needs external cleanup.
-- **Built mode needs a prior build** — run `pnpm run build` before selecting `DSH_EXAMPLE_MODE=lib`; the owning package manifest must also declare every package named by the config.
-- **Captured output is bounded by execa's default 100 MB `maxBuffer`** — a runaway child is terminated at that ceiling rather than at a smoke-chosen budget.
+- **プロセスが終了しない** — スモークは期限を強制し、失敗にキャプチャされたストリームを報告する; 自身のプロセスツリーを spawn する欠陥のあるフィクスチャはスモークより長生きしうるので、外部クリーンアップが必要である。
+- **ビルド済みモードには事前ビルドが必要である** — `DSH_EXAMPLE_MODE=lib` を選ぶ前に `pnpm run build` を実行する; 所有パッケージマニフェストは設定が名指すすべてのパッケージも宣言しなければならない。
+- **キャプチャされた出力は execa のデフォルト 100 MB `maxBuffer` によってのみ制限される** — 暴走する子はスモークが選んだ予算ではなくその上限で終了させられる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design of the harness; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションはハーネスの設計を説明する; 観察可能な挙動は[本パッケージを使う](#use-this-package)で完全に扱う。
 
-### Design
+### 設計
 
-The harness is built on one separation: the smoke runs in a child process under an isolated world, and the test process only observes and asserts. `runLoaderSmoke` creates a temporary cwd (or reuses a caller-provided one), prepares world state there, spawns the resolved bin with isolated DSH homes (`DSH_HOME`, `DSH_AGENTS_HOME` under that cwd), closes stdin immediately, and awaits a clean exit within the deadline before inspecting on every outcome and removing only a cwd it created. `runFixtureTurn` stays in-process: it looks up the composition's single root agent, follows the task from its durable inbox receipt through whole-agent idle, sums per-step usage, and flushes the session before returning.
+ハーネスは 1 つの分離の上に構築されている: スモークは分離されたワールドの下の子プロセスで実行され、テストプロセスは観察とアサートのみを行う。`runLoaderSmoke` は一時 cwd を作成し (または呼び出し元提供のものを再利用し)、そこでワールド状態を準備し、解決された bin を分離された DSH ホーム (`DSH_HOME`、その cwd 下の `DSH_AGENTS_HOME`) 付きで spawn し、stdin を直ちに閉じ、期限内のクリーンな終了を待ってから、すべての結果で検査し、自身が作成した cwd のみを削除する。`runFixtureTurn` はプロセス内にとどまる: コンポジションの単一のルートエージェントを探し、タスクをその永続受信箱の受領から全エージェントアイドルまで追跡し、ステップごとの使用量を合計し、返す前にセッションをフラッシュする。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Mode resolver, `runLoaderSmoke` subprocess harness, options and result types |
-| [`src/agent-turn.ts`](src/agent-turn.ts) | `runFixtureTurn` direct-agent driver and result envelope |
-| [`tests/fixtures/production-profile.ts`](tests/fixtures/production-profile.ts) | Repository-only shipped-profile composition helper for integration fixtures |
+| [`src/index.ts`](src/index.ts) | モードリゾルバー、`runLoaderSmoke` subprocess ハーネス、オプションと結果型 |
+| [`src/agent-turn.ts`](src/agent-turn.ts) | `runFixtureTurn` 直接エージェントドライバーと結果エンベロープ |
+| [`tests/fixtures/production-profile.ts`](tests/fixtures/production-profile.ts) | 統合フィクスチャ用のリポジトリ専用出荷済みプロファイルコンポジションヘルパー |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the harness to the composition it boots and the fixtures it serves.
+パッケージレベルの契約では不十分なときにこれらのページを読む。ハーネスから、それがブートするコンポジションとそれが提供するフィクスチャへ進む。
 
-- [llm-replay](../llm-replay/README.md) — the keyless model fixture smoke compositions mount to run without a provider key.
-- [Agent package](../../core/agent/README.md) — the root agent `runFixtureTurn` drives.
-- [Testing policy](../../../docs/testing.md) — the keyless snapshot and smoke tiers.
-- [Test-support group map](../README.md) — sibling harnesses and support packages.
+- [llm-replay](../llm-replay/README.md) — キー不要のモデルフィクスチャ。スモークコンポジションがプロバイダーキーなしで実行するためにマウントする。
+- [Agent パッケージ](../../core/agent/README.md) — `runFixtureTurn` が駆動するルートエージェント。
+- [テストポリシー](../../../docs/testing.md) — キー不要のスナップショットとスモークの層。
+- [Test-support グループマップ](../README.md) — 兄弟ハーネスとサポートパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the test harness submits only the consuming test's ordinary user task and delegates prompt and tool composition to the loaded tree.
+なし。テストハーネスは消費するテストの通常のユーザータスクのみを投入し、プロンプトとツールのコンポジションをロードされたツリーに委任するためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None beyond the loaded tree; the helper neither changes the request prefix nor retains state across runs.
+ロードされたツリーを超えるものはなし; ヘルパーはリクエストプレフィックスを変えず、実行間で状態も保持しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the harness needs special care. They are current package constraints, not a task backlog.
+これらの制限は、このハーネスが特別な注意を必要とする場合を定義する。それらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **Built mode requires a prior build** — the owning package manifest must also declare every package named by the config.
-- **Captured stdout and stderr are bounded only by execa's default 100 MB `maxBuffer`** — a runaway child is terminated at that ceiling rather than at a smoke-chosen budget.
-- **Timeout kills only the direct child** — a process tree spawned by a faulty fixture can outlive the smoke and needs external cleanup.
+- **ビルド済みモードには事前ビルドが必要である** — 所有パッケージマニフェストは設定が名指すすべてのパッケージも宣言しなければならない。
+- **キャプチャされた stdout と stderr は execa のデフォルト 100 MB `maxBuffer` によってのみ制限される** — 暴走する子はスモークが選んだ予算ではなくその上限で終了させられる。
+- **タイムアウトは直接の子のみを kill する** — 欠陥のあるフィクスチャが spawn したプロセスツリーはスモークより長生きしうるので、外部クリーンアップが必要である。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

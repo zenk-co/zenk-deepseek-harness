@@ -4,7 +4,7 @@ description: "Windows 已安装应用更新的人工清单，覆盖下载失败�
 
 # Windows 已安装应用更新演练
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 摘要
 

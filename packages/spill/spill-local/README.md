@@ -1,35 +1,35 @@
 ---
-description: "The local filesystem spill backend: how spilled text is saved to private session-scoped files and retrieved with read or grep."
+description: "ローカルファイルシステム spill バックエンド。プライベートなセッションスコープファイルへの spill テキスト保存と read や grep での取得方法。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-spill-local
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-spill-local` saves a caller's oversized text to a private, session-scoped file on the host filesystem and returns that file's path as the locator, with retrieval guidance telling the model to read or grep it. Mount it whenever a composition needs spill storage on the same machine the agent runs on. Files are private to the current user, names are unpredictable, and each session's files group under a stable directory, so a shared root cannot leak output or be redirected by a planted symlink. Configuration selects the root and the startup-cleanup retention period; previews and spill decisions live in other packages.
+`dsh-spill-local` は呼び出し元の大きすぎるテキストをホストファイルシステム上のプライベートなセッションスコープファイルに保存し、そのファイルパスをロケーターとして返す。取得案内はモデルに読むか grep するよう告げる。エージェントが動く同一マシンに spill 記憶域が必要な合成では常にマウントする。ファイルは現行ユーザーにプライベートであり、名前は予測不可であり、各セッションのファイルは安定ディレクトリ配下に束ねられるため、共有ルートは出力を漏らさず植え付け symlink で向きを変えられない。設定はルートと起動クリーンアップ保持期間を選ぶ。プレビューと spill 決定は他パッケージにある。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Mount this backend in a composition that spills text to the local filesystem. It registers as the `ctx.spillStore` service that the `dsh-spill-policy` plugin and other callers use.
+ローカルファイルシステムにテキストを spill する合成でこのバックエンドをマウントする。`dsh-spill-policy` プラグインや他呼び出し元が使う `ctx.spillStore` サービスとして登録される。
 
-### Minimal configuration
+### 最小構成
 
-Loading the plugin with no config is safe: files land in a lazily-created private (0700) per-process directory under the OS temp directory. Set `root` when the files must live under a known location.
+設定なしのプラグインロードは安全である。ファイルは OS temp ディレクトリ配下の遅延作成プライベート (0700) プロセス単位ディレクトリに着地する。既知位置配下に置くべき場合は `root` を設定する。
 
 ```yaml
 - name: '@deepseek-ai/dsh-spill-local'
@@ -38,104 +38,104 @@ Loading the plugin with no config is safe: files land in a lazily-created privat
     cleanupPeriodDays: 30
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `root` | private 0700 temp dir | Root directory for spill files; set to keep them under a known location |
-| `cleanupPeriodDays` | `30` | File age in days before the one-shot startup cleanup may delete it; `0` disables cleanup |
+| `root` | プライベート 0700 temp dir | spill ファイルのルートディレクトリ。既知位置に保つ場合に設定 |
+| `cleanupPeriodDays` | `30` | ワンショット起動クリーンアップが削除しうるまでのファイル経過日数。`0` はクリーンアップ無効 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-spill-local) is the exhaustive source for every accepted field.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-spill-local)が、受け入れられるすべてのフィールドの網羅的な情報源である。
 
-### What you get back
+### 戻り値
 
-Each `saveText` call writes the full text to a fresh file and returns three fields: `locator` (the file path), `bytes` (the exact UTF-8 byte count), and `retrievalHint` — "Use read with offset/limit, or grep this path to search within it." A consumer shows that hint to the model, which can then read or search the file with its ordinary file tools.
+各 `saveText` 呼び出しは全文を新規ファイルに書き、3 フィールドを返す。`locator` (ファイルパス)、`bytes` (正確な UTF-8 バイト数)、`retrievalHint` — "Use read with offset/limit, or grep this path to search within it." である。コンシューマーはそのヒントをモデルに示し、モデルは通常ファイルツールでそのファイルを読んだり探したりできる。
 
-### Where files land
+### ファイル配置
 
-Files are stored at `<root>/session-<hash>/<random>-<safeName>`, where `session-<hash>` is a short hash of the owning session id (so one session's files group together) and `<random>-<safeName>` pairs an unpredictable hex prefix with the caller's suggested name sanitized to one safe path segment. A relative `root` resolves from the process working directory.
+ファイルは `<root>/session-<hash>/<random>-<safeName>` に格納される。`session-<hash>` は所有セッション id の短いハッシュであり (1 セッションのファイルが束ねられる)、`<random>-<safeName>` は予測不可 hex 接頭辞と呼び出し元提案名を 1 安全パス segment に消毒したものの対である。相対 `root` はプロセス作業ディレクトリから解決される。
 
 <a id="startup-cleanup"></a>
-### Startup cleanup
+### 起動クリーンアップ
 
-One best-effort sweep starts after activation without delaying service availability. It scans the configured root and prior default `dsh-spill-*` roots under the OS temp directory, deletes regular files whose modification time is strictly older than the configured cutoff, prunes empty session directories, and removes only empty prior-default roots. A long-lived process does not sweep again until restart. Disposal waits for the sweep, and a concurrent write recreates a session directory if cleanup removes it.
+1 回の最善努力掃引が活性化後にサービス可用性を遅らせず始まる。設定ルートと OS temp ディレクトリ配下の以前既定 `dsh-spill-*` ルートを走査し、変更時刻が設定 cutoff より厳密に古い通常ファイルを削除し、空セッションディレクトリを刈り、空の以前既定ルートのみ除去する。長生きプロセスは再起動まで再掃引しない。破棄は掃引を待ち、同時書き込みはクリーンアップがセッションディレクトリを除去しても再作成する。
 
-The sweep resolves filesystem identities, never follows or deletes symlinks, and skips unrelated entries. On POSIX it admits only roots and session directories owned by the current user, not writable by group or others, and protected from replacement through their ancestor path; writable sticky temporary directories such as `/tmp` are permitted. Unsafe paths produce a warning and remain untouched. Filesystem and warning-sink failures are contained, so cleanup cannot fail activation or a concurrent spill write.
+掃引はファイルシステム識別子を解決し、symlink を辿らず削除せず、無関係項目を飛ばす。POSIX では現行ユーザー所有でありグループ他者書き込み不可であり祖先パス経由の置換から保護されるルートとセッションディレクトリのみ受け入れ、`/tmp` のような書き込み可 sticky 一時ディレクトリは許される。安全でないパスは警告を生み手つかずのまま残る。ファイルシステムと警告 sink の失敗は封じられるため、クリーンアップは活性化も同時 spill 書き込みも失敗させえない。
 
-### Failures and recovery
+### 失敗と回復
 
-A real storage failure — permissions, no space left, an unwritable root — rejects the `saveText` call; the caller decides how to degrade. The shipped policy treats the rejection as best-effort and keeps the original inline result.
+実記憶域失敗 — 権限、容量不足、書き込み不可ルート — は `saveText` 呼び出しを拒否する。どう劣化するかは呼び出し元が決める。出荷ポリシーは拒否を最善努力として扱い、元のインライン結果を保持する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the backend; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではバックエンドの背後にある設計上の決定を説明する。観測可能な動作はすべて[このパッケージの使い方](#use-this-package)で扱っている。
 
-### Design philosophy
+### 設計思想
 
-The backend owns storage details only, on one principle: **a spilled artifact must be private and unredirectable**. The root is private (0700), the session directory is a stable hash, the leaf name is unpredictable, and the write is exclusive and owner-only. The storage mechanics live in a Cordis-free module so they are unit-testable without a context.
+バックエンドは記憶域詳細のみを所有し、1 原則に基づく。**spill 成果物はプライベートかつ向き変更不可でなければならない**。ルートはプライベート (0700)、セッションディレクトリは安定ハッシュ、末端名は予測不可、書き込みは排他的かつ所有者のみである。記憶域機構は Cordis なしモジュールにあり、コンテキストなしで単体試験可能である。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config`, the `LocalSpillStore` service, cleanup lifecycle, locator and retrieval-hint assembly |
-| [`src/cleanup.ts`](src/cleanup.ts) | One-shot age sweep, filesystem-identity checks, symlink and ownership safeguards |
-| [`src/store.ts`](src/store.ts) | Cordis-free storage mechanics: private root, session directory, safe-name encoding, exclusive write |
+| [`src/index.ts`](src/index.ts) | プラグイン入口。`Config`、`LocalSpillStore` サービス、クリーンアップライフサイクル、ロケーターと取得ヒント組み立て |
+| [`src/cleanup.ts`](src/cleanup.ts) | ワンショット経過掃引、ファイルシステム識別子検査、symlink と所有権安全策 |
+| [`src/store.ts`](src/store.ts) | Cordis なし記憶域機構。プライベートルート、セッションディレクトリ、安全名符号化、排他書き込み |
 
-### File naming and write
+### ファイル命名と書き込み
 
-`suggestedName` is untrusted input, so `encodeSegment` escapes every character outside `[A-Za-z0-9._-]` (and `~` itself) into a `~XXXX` form, making the mapping injective over all JS strings: separators, `../`, NUL, and absolute paths can never escape one segment, and the whole-segment tokens `.`/`..` are escaped too. The write is `open(path, 'wx', 0o600)` — it fails on any existing path, symlink or not, so a pre-planted target cannot redirect it. Two saves of the same suggested name get distinct random prefixes.
+`suggestedName` は信頼できない入力のため、`encodeSegment` は `[A-Za-z0-9._-]` 外の全文字 (および `~` 自体) を `~XXXX` 形式に逃がし、対応付けを全 JS 文字列上で単射にする。区切り、`../`、NUL、絶対パスは 1 segment から決して逃げられず、全体 segment トークン `.`/`..` も逃がされる。書き込みは `open(path, 'wx', 0o600)` であり、既存パス・symlink を問わず存在すれば失敗するため、事前植え付け対象は向きを変えられない。同じ提案名の 2 保存は異なるランダム接頭辞を得る。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough.
+パッケージレベルの契約では足りない場合にこれらのページを読むとよい。
 
-- [Spill storage service](../spill/README.md) — the `saveText` contract and vocabulary this backend implements.
-- [Spill package map](../README.md) — the three-package family and each role.
-- [dsh-spill-policy](../spill-policy/README.md) — the policy that calls this backend when a result is too large.
-- [Spill subsystem](../../../docs/subsystems/spill.md) — the exhaustive vocabulary and ownership.
-- [Tool output spill decision](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md) — the capability boundary and design rationale.
+- [Spill 記憶域サービス](../spill/README.md) — このバックエンドが実装する `saveText` 契約と語彙。
+- [Spill パッケージマップ](../README.md) — 3 パッケージファミリーと各役割。
+- [dsh-spill-policy](../spill-policy/README.md) — 結果が大きすぎる場合にこのバックエンドを呼ぶポリシー。
+- [Spill サブシステム](../../../docs/subsystems/spill.md) — 網羅的語彙と所有権。
+- [ツール出力 spill 決定](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md) — ケイパビリティ境界と設計根拠。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through spill consumers, which render the saved file path and read/grep retrieval guidance to the model.
+spill コンシューマー経由で間接的に。保存ファイルパスと read/grep 取得案内をモデルに描画する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+直接の無効化なし。名前付きコンシューマーがリクエスト接頭辞変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the local backend is a poor fit or needs operational care. They are current package constraints.
+これらの制限はローカルバックエンドが不向きな場合や運用上の注意を要する場合を定義する。これらは現在のパッケージ制約である。
 
-- **A long-lived deployment is not swept until restart** — the one-shot sweep runs only after activation, so files that cross the age cutoff during a run are reclaimed on the next start.
-- **Locators require a co-located filesystem consumer** — a remote or virtual deployment needs another `SpillStore` backend whose locator and retrieval hint are meaningful there.
+- **長生きデプロイは再起動まで掃引されない** — ワンショット掃引は活性化後にのみ動くため、実行中に経過 cutoff を超えたファイルは次回開始で回収される。
+- **ロケーターは同居ファイルシステムコンシューマーを要する** — リモートや仮想デプロイはロケーターと取得ヒントがそこで意味を持つ別 `SpillStore` バックエンドを要する。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open directions. It is explicitly non-authoritative.
+この Dev Note はメンテナ向け作業コンテキストである。開かれた方向性であり、明示的に非権威である。
 
-#### Future: workspace-confinement interplay
+#### 将来: ワークスペース隔離相互作用
 
-The retrieval model assumes the model's `read`/`grep` tools can inspect the returned path even when the spill directory is outside the session working directory. A future workspace-confinement policy must either allow local spill paths explicitly or use a non-file spill backend.
+取得モデルは、spill ディレクトリがセッション作業ディレクトリ外でもモデルの `read`/`grep` ツールが返却パスを検査できることを仮定する。将来のワークスペース隔離ポリシーはローカル spill パスを明示許可するか、非ファイル spill バックエンドを使うかが必要である。
 
 </details>

@@ -5,7 +5,7 @@ kind: "package-group"
 
 # MCP — 模型上下文协议
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

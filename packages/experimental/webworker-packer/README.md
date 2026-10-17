@@ -1,74 +1,74 @@
 ---
-description: "Browser-worker VFS image packaging for maintainers building or debugging the experimental preview deployment."
+description: "実験的プレビューデプロイをビルド・デバッグするメンテナ向けブラウザーワーカー VFS イメージ包装。"
 kind: "package-library"
 ---
 
 # `@deepseek-ai/dsh-experimental-webworker-packer`
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The VFS image packer: turns one shipped profile's bundles and the installation's optional bundles into the gzip-compressed base tar the browser worker mounts as its filesystem, one archive per lazily loaded page chunk, and opaque data trees into ordered overlay tars ([experimental group](../README.md)). Nothing is compiled from source — the base image carries the repository's real build products, so a preview deployment debugs exactly what the served deployment ships. Read this page when packaging a preview image or diagnosing its contents.
+VFS イメージ packer。出荷プロファイル 1 件のバンドルとインストールの任意バンドルを、ブラウザーワーカーがファイルシステムとしてマウントする gzip 圧縮基底 tar に変え、遅延ロードページ chunk ごとに 1 アーカイブ、不透明データツリーは順序付きオーバーレイ tar にする ([experimental グループ](../README.md))。ソースからは何もコンパイルしない — 基底イメージはリポジトリの実ビルド成果物を運ぶため、プレビューデプロイは提供デプロイが出荷する正確なものをデバッグする。プレビューイメージの包装や内容診断の際にこのページを読む。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-The public npm package exposes `packVfsImage` and `packVfsOverlay` through its library entry. Callers supply the profile name, the package roster, the installation manifest, package directories, and the resolution root; no profile layer is installed and no composed configuration is packed — the worker composes the bundle layers at boot. An optional `homePatch` is written to `home/cordis.patch.yml`, the home layer the image's app-boot reads. The runtime's library entry supplies the module-proxy and replacement tables used during packing.
+公開 npm パッケージはライブラリ入口経由で `packVfsImage` と `packVfsOverlay` を公開する。呼び出し元はプロファイル名・パッケージ名簿・インストールマニフェスト・パッケージディレクトリ・解決ルートを提供する。プロファイル層のインストールも合成設定の包装もしない — ワーカーが起動でバンドル層を合成する。任意 `homePatch` は `home/cordis.patch.yml` に書かれ、イメージの app-boot が読むホーム層である。ランタイムのライブラリ入口は包装中に使うモジュールプロキシと置換表を提供する。
 
-The packer owns the internal `dsh.configTrees` declaration, its validation, and source directory resolution in [`src/repository.ts`](src/repository.ts). This field is not part of the public plugin manifest API.
+packer は内部 `dsh.configTrees` 宣言、その検証、[`src/repository.ts`](src/repository.ts) 内ソースディレクトリ解決を所有する。このフィールドは公開プラグインマニフェスト API の一部ではない。
 
-The pack is a three-layer standard stack:
+pack は 3 層標準スタックである:
 
-1. **Roster** — the shipped profile template's bundles and every bundle in app-boot's `OPTIONAL_BUNDLES`, each resolved from the CLI manifest as the launcher resolves it, plus every package their patch files name (insert lists and grouped rows included), plus the rows of every config tree the CLI declares in its `package.json` `dsh.configTrees`, materialized as a Node-style dependency closure. External peer edges never bind the worker; workspace peers stay on the chain. The CLI manifest itself enters the image alone at `node_modules/@deepseek-ai/dsh/package.json`, as the worker's bundle resolution anchor; the manifest records its name and the profile.
-2. **Publish view** — each workspace or vendored package contributes its built npm slice (`files` through picomatch) without source or workspace `dist/`. External packages retain published JavaScript under both `src/` and `dist/` because their `main` or `exports` may point there; only generic test, map, declaration, and archive exclusions apply.
-3. **Reachability sweep** — the runtime loader's own resolution walks from every non-wildcard workspace runtime export plus the worker assembly's seeds (`IMAGE_ENTRY_SEEDS`), lowering each reached module to the wrapper contract at pack time. Declaration-only condition trees do not seed the sweep; runtime requests for those exports still fail. The transform reports statically named imports, re-exports, and dynamic imports; calls through `require`; and module-scope direct calls of the form `createRequire(import.meta.url)('pkg')` through a named import from `node:module` or `module`, including an import alias. Page assets (`lib/client.js` behind `./client` exports) ship verbatim; an unresolvable request from our own code fails the pack, third-party ones are tolerated to fail loud at require time.
-4. **Lazy chunks** — every page chunk a page asset requests as a literal `require.async("./client.<name>.js")`, the only form the dynamic Client build emits, leaves the base image unless a `./client` export names it. Each becomes its own deterministic archive named `lazy/<sha256 of the archive>.tar.gz` beside the base image, and the manifest registers its path, size, and archive for the worker's lazy filesystem. A request for a chunk the package does not publish fails the pack.
+1. **名簿** — 出荷プロファイルテンプレートのバンドルと app-boot の `OPTIONAL_BUNDLES` 内全バンドルを、ランチャー解決通りに CLI マニフェストから解決し、さらにパッチファイルが名指す全パッケージ (insert 一覧とグループ行を含む)、さらに CLI が `package.json` `dsh.configTrees` で宣言する全設定ツリーの行を Node 流依存閉包として実体化する。外部ピア辺はワーカーを束縛せず、ワークスペースピアは連鎖に残る。CLI マニフェスト自体はワーカーのバンドル解決 anchor として `node_modules/@deepseek-ai/dsh/package.json` に単独で入り、マニフェストはその名前とプロファイルを記録する。
+2. **公開ビュー** — 各ワークスペースまたはベンダーパッケージはビルド済み npm slice (`files` を picomatch 経由) を寄与し、ソースやワークスペース `dist/` は含まない。外部パッケージは、その `main` や `exports` がそこを指しうるため `src/` と `dist/` 両方配下の公開 JavaScript を保持する。汎用テスト・マップ・宣言・アーカイブ除外のみ適用される。
+3. **到達性掃引** — ランタイムローダー独自解決が、すべての非ワイルドカードワークスペースランタイムエクスポートとワーカー組立シード (`IMAGE_ENTRY_SEEDS`) から歩き、到達各モジュールを包装時に wrapper 契約まで下げる。宣言のみ条件ツリーは掃引を seed しない。そのエクスポートへのランタイム要求は依然失敗する。変換は静的名付けインポート・再エクスポート・動的インポート、`require` 経由呼び出し、`node:module` や `module` からの名前付きインポート経由の `createRequire(import.meta.url)('pkg')` 形式のモジュールスコープ直接呼び出し (インポート別名を含む) を報告する。ページ資産 (`./client` エクスポート背後の `lib/client.js`) は逐語出荷される。自分たちのコードからの解決不可要求は pack を失敗させ、サードパーティものは require 時点の loud 失敗のため許容される。
+4. **遅延 chunk** — ページ資産がリテラル `require.async("./client.<name>.js")` (動的 Client ビルドが発する唯一形式) として要求する各ページ chunk は、`./client` エクスポートが名指さない限り基底イメージを離れる。各々は基底イメージ脇に `lazy/<アーカイブの sha256>.tar.gz` 名の決定性アーカイブとなり、マニフェストはワーカー遅延ファイルシステム向けにそのパス・サイズ・アーカイブを登録する。パッケージが公開しない chunk への要求は pack を失敗させる。
 
-`repository.ts` owns the repo-shaped inputs (workspace scan of `vendor/`, `packages/`, `native/system/packages/`, and `apps/`; the profile roster through app-boot's shipped templates, optional-bundle list, and bundle patch readers; the CLI manifest as the installation; the home patch, which sets the runtime's `PLATFORM_ENTRY_CONFIG` fields over each named row's config composed from the template's bundle layers); `pack.ts` owns none of them, so the same library packs a different tree by being called differently. The native scan makes the Landlock entry package an ordinary published-view dependency while its executable remains a Worker platform implementation. The CLI is `dsh-pack-vfs-image --out <file> [--profile web]`; it writes the lazy archives beside the base image, and `apps/web`'s `build:preview` runs it after the preview shell build.
+`repository.ts` はリポジトリ形状入力を所有する (`vendor/`、`packages/`、`native/system/packages/`、`apps/` のワークスペース走査。出荷テンプレート・任意バンドル一覧・バンドルパッチ読み取り経由のプロファイル名簿。インストールとしての CLI マニフェスト。テンプレートのバンドル層から合成された各名前付き行設定上にランタイム `PLATFORM_ENTRY_CONFIG` フィールドを設定するホームパッチ)。`pack.ts` はどれも所有しないため、同じライブラリは呼び方次第で異なるツリーを包装する。ネイティブ走査は Landlock 入口パッケージを通常公開ビュー依存にしつつ、その実行体は Worker プラットフォーム実装のままである。CLI は `dsh-pack-vfs-image --out <file> [--profile web]` であり、遅延アーカイブを基底イメージ脇に書き、`apps/web` の `build:preview` はプレビューシェルビルド後にそれを動かす。
 
-The repository adapter also declares the preview-only fixture trees under `webworker-runtime/tests/fixtures/`. The CLI packs each named fixture into a separate deterministic overlay archive plus a browser-readable manifest. Overlay files bypass npm publish-view and module-reachability exclusions, so dot directories and example source files remain intact; their mounts are limited to `home/` and `workspace/`. `packVfsOverlay` treats all files as opaque bytes.
+リポジトリアダプターは `webworker-runtime/tests/fixtures/` 配下のプレビュー専用 fixture ツリーも宣言する。CLI は各名前付き fixture を別の決定性オーバーレイアーカイブとブラウザー可読マニフェストに包装する。オーバーレイファイルは npm 公開ビューとモジュール到達性除外を迂回するため、ドットディレクトリと例ソースファイルは無傷のままである。そのマウントは `home/` と `workspace/` に限られる。`packVfsOverlay` は全ファイルを不透明バイトとして扱う。
 
-`packPreviewFixture` prepares the newest canonical raw Session generation in each fixture directory through the [Session format catalog](../../session/session-format-catalog/README.md) in Node. It collects direct-child discovery evidence from the same fixture root before completing historical parent catalogs. It strictly restores the source, encodes and strictly validates the current successor, and packs that successor beside unchanged source files. A malformed, unsupported, or future selected generation refuses the build without falling back. Temporary successors are removed after packing. Browser write-open then uses current data without invoking Node's migration-verification Worker. Projection caches remain owner-validated; an older generation cannot supply a current fold checkpoint.
+`packPreviewFixture` は各 fixture ディレクトリ内の最新正準 raw Session 生成を Node 内 [Session 形式カタログ](../../session/session-format-catalog/README.md)経由で準備する。履歴親カタログ完成前に同じ fixture ルートから直接子探索証拠を集める。ソースを厳密復元し、現行後継を符号化して厳密検証し、無変更ソースファイル脇にその後継を包装する。不正・未対応・未来の選択生成はフォールバックせずビルドを拒否する。一時後継は包装後に除去される。ブラウザー書き込みオープンは Node 移行検証 Worker を呼ばず現行データを使う。投影キャッシュは所有者検証のままである。旧世代は現行 fold checkpoint を提供できない。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package runs at build time and writes an image file; nothing it produces reaches a model request on its own.
+なし。このパッケージはビルド時に動きイメージファイルを書く。それが生むものが単独でモデルリクエストに届くことはない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **The rule tables are judgement calls** (`rules.ts`: exclude globs, page-asset patterns, entry seeds) pinned by `tests/`; a new asset class the worker must reach needs a table row, not a scanner change.
-- **Reachability infers only exact request forms** — computed `import` and `require` arguments, stored `createRequire` results, CommonJS-obtained `createRequire`, and bases other than `import.meta.url` resolve only at runtime and fail loud if the target was otherwise pruned; a target reachable only through those forms needs an explicit image entry seed.
-- **Vendored package sources (`src/*.ts`) are excluded** — nothing resolves them at runtime; a future in-worker source-inspection feature would need a dedicated include rule.
-- **The packer assumes built `lib/` artifacts are current**: it never compiles, so a stale workspace build packs stale bytes. Run the repository build first.
-- **The CLI requires its original repository location**: `dsh-pack-vfs-image` finds the checkout relative to its own installed file and reads the source CLI, configuration trees, and preview fixtures there. An npm installation supports the parameterized library API; the CLI and repository helpers require a complete, built DeepSeek Harness checkout.
-- **Preview Session inputs use raw JSONL** — `packPreviewFixture` rejects compressed and noncanonical Session generation filenames. Generic overlays remain byte-preserving.
+- **規則表は判断の産物** (`rules.ts`。除外 glob、ページ資産パターン、入口シード) であり `tests/` が固定する。ワーカーが到達すべき新規資産種は走査変更ではなく表行を要する。
+- **到達性は正確な要求形式のみ推論する** — 計算 `import` と `require` 引数、格納 `createRequire` 結果、CommonJS 取得 `createRequire`、`import.meta.url` 以外の基底はランタイム解決のみであり、対象が他で刈られていれば loud 失敗する。それら形式経由でのみ到達する対象は明示イメージ入口シードを要する。
+- **ベンダーパッケージソース (`src/*.ts`) は除外される** — ランタイムにそれらを解決するものはない。将来のワーカー内ソース検査機能は専用包含規則を要する。
+- **packer はビルド済み `lib/` 成果物が最新と仮定する**。コンパイルしないため、古いワークスペースビルドは古いバイトを包装する。先にリポジトリビルドを動かす。
+- **CLI は元のリポジトリ位置を要する**。`dsh-pack-vfs-image` は自インストールファイル相対でチェックアウトを見つけ、ソース CLI・設定ツリー・プレビュー fixture をそこで読む。npm インストールはパラメータ化ライブラリ API を支援する。CLI とリポジトリヘルパーは完全ビルド済み DeepSeek Harness チェックアウトを要する。
+- **プレビュー Session 入力は raw JSONL を使う** — `packPreviewFixture` は圧縮と非正準 Session 生成ファイル名を拒否する。汎用オーバーレイはバイト保持のままである。
 
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

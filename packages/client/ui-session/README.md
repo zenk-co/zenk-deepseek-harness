@@ -1,53 +1,53 @@
 ---
-description: "React and Slot adapters for Session Controller lists, interaction state, and per-session context."
+description: "セッションコントローラーの一覧、対話状態、セッションごとのコンテキスト向け React および Slot アダプター。"
 kind: "package-reference"
 ---
 # @deepseek-ai/dsh-client-ui-session
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to expose Session catalog, retain information, and unified UI status through standard Slot hooks. It materializes per-`SessionBinding` hooks and props, while `SessionProvider` can inherit an outer binding or bind an explicit `SessionReference`. It owns process-local pending-interaction and completion-reminder policy without owning Controller transport, history, or references.
+このパッケージを使うと、標準 Slot フック経由でセッションカタログ、保持情報、統一 UI 状態を公開できる。`SessionBinding` ごとのフックと props を実体化し、`SessionProvider` は外側のバインディングを継承するか、明示的な `SessionReference` をバインドできる。コントローラートランスポート、履歴、参照を所有せず、プロセス局所の保留中対話と完了リマインダーポリシーを所有する。
 
-Running status comes from Host list baselines or status events. Subagent catalog rows and retained subagent fallback rows do not establish running status; main view references still acknowledge completions.
+実行状態は Host の一覧ベースラインまたは状態イベントから来る。サブエージェントカタログ行と保持されたサブエージェントフォールバック行は実行状態を確立しない。メイン view 参照は引き続き完了を確認する。
 
-## Table of Contents
+## 目次
 
-- [Access Hooks](#access-hooks)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [アクセスフック](#access-hooks)
+- [モデル体験](#model-experience)
+- [既知の制限と将来の課題](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="access-hooks"></a>
-## Access Hooks
+## アクセスフック
 
-The package injects the Client `remoteAccess` service and publishes Session access Hooks over its `source()`: the root `useSessionAccess(sessionId, action)` answers on one Session resource, and the Session-scope `useAccess(action)` answers on the bound Session's resource; the `global` resource's answer is a different Hook, `useRemoteAccess(action)`, so neither shadows the other. The SessionMaybe-scope `useAccess(action)` returns `undefined` while no Session is bound, which callers treat as not allowed; a decision on the `global` resource reads `useRemoteAccess` instead. Snapshot semantics belong to [`dsh-api-remote-access`](../../api/remote-access/README.md#client-face).
+このパッケージはクライアントの `remoteAccess` サービスを挿入し、その `source()` 上でセッションアクセスフックを公開する。ルートの `useSessionAccess(sessionId, action)` は1つのセッションリソースに答え、セッションスコープの `useAccess(action)` はバインド済みセッションのリソースに答える。`global` リソースへの答えは別のフック `useRemoteAccess(action)` であり、互いに隠さない。セッションがバインドされていない間、セッションメイビースコープの `useAccess(action)` は `undefined` を返し、呼び出し元はそれを許可なしとして扱う。`global` リソースへの決定は代わりに `useRemoteAccess` を読む。スナップショットセマンティクスは [`dsh-api-remote-access`](../../api/remote-access/README.md#client-face) に属する。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package adapts browser-side Session state and registers nothing model-facing.
+なし。このパッケージはブラウザー側セッション状態を適合させるものであり、モデル向けには何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; Session selectors and Slot scopes do not assemble model requests.
+なし。セッションセレクターと Slot スコープはモデルリクエストを組み立てない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と将来の課題
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Pending interactions are process-local projections** — the owning Remote waterfall must replay an outstanding request after a browser reconnect.
+- **保留中の対話はプロセス局所の投影である** — 所有する Remote ウォーターフォールはブラウザー再接続後に未完了リクエストを再送しなければならない。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

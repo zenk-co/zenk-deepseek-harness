@@ -1,150 +1,150 @@
 ---
-description: "Client module system for the web GUI: the host composes the boot graph and serves plugin bundles, and the browser loads them lazily, for users and maintainers composing or debugging client plugins."
+description: "Web GUI のクライアントモジュールシステム: ホストがブートグラフを組み立ててプラグインバンドルを配信し、ブラウザーがそれらを遅延ロードする。クライアントプラグインを構成またはデバッグするユーザーとメンテナーのための。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-modules
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-client-modules` turns a plugin package's `dsh.client` declaration into a loadable browser bundle: the host half scans enabled Loader entries and composes the boot graph, an available Web carrier serves each bundle over `/plugins`, and a shell-owned carrier dispatches the same exact bundle responses through `fetchBundle()`. The browser half loads those bundles lazily on demand. Plugin bundles execute lazily — running a bundle only registers a factory, and module side effects run at materialization — so nothing runs until a plugin is first used. Everything here is browser-kernel machinery; the model never sees it.
+`dsh-client-modules` は、プラグインパッケージの `dsh.client` 宣言をロード可能なブラウザーバンドルに変換する: host ハーフは有効な Loader エントリをスキャンしてブートグラフを組み立て、利用可能な Web キャリアが各バンドルを `/plugins` 経由で配信し、シェル所有のキャリアが `fetchBundle()` を通じて同じ正確なバンドル応答をディスパッチする。ブラウザーハーフはそれらのバンドルを要求に応じて遅延ロードする。プラグインバンドルは遅延実行される — バンドルの実行はファクトリーを登録するだけで、モジュールの副作用は実体化時に実行される — ため、プラグインが最初に使用されるまで何も実行されない。ここにあるものはすべてブラウザーカーネルの仕組みであり、モデルはそれを決して見ない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use [`DshClientManifest`](../../util/package-manifest/README.md) for the declaration type. Client-modules validates the JSON and owns the normalized boot graph.
+宣言型には [`DshClientManifest`](../../util/package-manifest/README.md) を使用する。client-modules は JSON を検証し、正規化されたブートグラフを所有する。
 
-Use it when you compose or build a browser client plugin: the package turns a package's `dsh.client` declaration into a loadable browser bundle with no per-plugin wiring. It activates with the web composition; the shell boots it before any plugin runs.
+ブラウザークライアントプラグインを構成またはビルドするときにこれを使用する: このパッケージは、プラグインごとの配線なしで、パッケージの `dsh.client` 宣言をロード可能なブラウザーバンドルに変換する。Web 構成とともにアクティブ化され、シェルはどのプラグインが実行されるよりも前にそれをブートする。
 
-### Declaring a client plugin
+### クライアントプラグインを宣言する
 
-A browser plugin package declares `dsh.client` in its `package.json` with `platform: 'web'`, exports a `./client` bundle, and lists any non-baseline module requests under `dsh.client.external`. The host half turns each declaration into a served bundle under `/plugins`, ordered so dynamic providers load before their consumers.
+ブラウザープラグインパッケージは、`package.json` で `platform: 'web'` とともに `dsh.client` を宣言し、`./client` バンドルをエクスポートし、非ベースラインのモジュール要求を `dsh.client.external` の下に列挙する。host ハーフは各宣言を `/plugins` の下で配信されるバンドルに変換し、動的プロバイダーがそのコンシューマーより先にロードされるよう順序付ける。
 
-### What the browser loads
+### ブラウザーがロードするもの
 
-The application combo scripts carry only each plugin's `client.js` entry and register those factories once during boot; module bodies remain lazy and run only at first import or materialization. A source `import()` split by tsdown compiles to `require.async("./client.<name>.js")`; its versioned sibling script arrives only when that expression runs. Rows that share a combo URL share one in-flight script task. A combo whose `<script>` fails to load is requested once more; a combo that loads without registering a row is never re-executed, because the batch script registers its packages in sequence and a replay would stop at the first duplicate registration. In both cases each still-missing row then loads its own one-resource combo URL, so one failed batch costs at most three requests per missing row and leaves the rows it did register untouched. The module system records the last import failure per row (transport, registration, dependency cascade, or factory execution); the Web boot audit reports that text per entry. HMR switches one changed row to its revisioned one-resource combo URL. `<id>/client` and the bare id resolve to the same exports, because a plugin bundle is its package's client half.
+アプリケーションのコンボスクリプトは各プラグインの `client.js` エントリのみを持ち運び、ブート中にそれらのファクトリーを 1 回だけ登録する。モジュール本体は遅延のままで、最初のインポートまたは実体化のときにのみ実行される。tsdown によって分割されたソースの `import()` は `require.async("./client.<name>.js")` にコンパイルされ、そのバージョン付きの兄弟スクリプトはその式が実行されるときにのみ到着する。コンボ URL を共有する行は、1 つの実行中のスクリプトタスクを共有する。`<script>` のロードに失敗したコンボはもう一度要求される。行を登録せずにロードされたコンボは決して再実行されない。バッチスクリプトはそのパッケージを順番に登録し、リプレイは最初の重複登録で停止するからだ。どちらの場合も、まだ欠けている各行は自身の 1 リソースのコンボ URL をロードするため、1 つの失敗したバッチは欠落行ごとに最大 3 リクエストのコストで済み、登録済みの行はそのまま残される。モジュールシステムは行ごとに最後のインポート失敗(トランスポート、登録、依存関係のカスケード、またはファクトリー実行)を記録し、Web ブート監査がエントリごとにそのテキストを報告する。HMR は変更された 1 つの行をそのリビジョン付き 1 リソースコンボ URL に切り替える。`<id>/client` と裸の id は同じエクスポートに解決される。プラグインバンドルはそのパッケージの client ハーフだからである。
 
-### Live plugin composition
+### ライブのプラグイン構成
 
-An open Web page follows the Host's complete module graph through the HMR transport. Enabling an ordinary plugin adds its Loader entry; disabling it removes the entry and waits for its asynchronous effects before evicting unused modules and styles. Re-enabling loads one instance with its styles. Other Loader contributors and shared modules still needed by active entries remain loaded. Settings → Plugins → Plugin list shows page-local synchronization failures and offers retry without changing Host enablement.
+開いている Web ページは、HMR トランスポートを通じて Host の完全なモジュールグラフに追随する。通常のプラグインを有効化するとその Loader エントリが追加される。無効化するとエントリが削除され、未使用のモジュールとスタイルを追い出す前にその非同期効果を待つ。再有効化はそのスタイルとともに 1 つのインスタンスをロードする。他の Loader コントリビューターや、アクティブなエントリが依然として必要とする共有モジュールはロードされたままである。設定 → プラグイン → プラグインリストはページローカルの同期失敗を表示し、Host の有効化を変えずに再試行を提供する。
 
-### Host release changes
+### Host リリースの変更
 
-Every graph carries the Host release identity as `release`: this package's `version`, which releases share with the CLI, and the source `commit` that the client build fixes into the built Host artifact. Two releases are equal only when both fields are. A page applies graphs and rebuilt frames only while the connected Host serves the release the page booted from, so every module the page runs belongs to that release; when the Host returns to it, the usual revision comparison replaces exactly the changed modules. While the Host serves another release, the page applies nothing from it, keeps its current plugins running, and publishes `ctx.modules.entries.releaseChange` with the page's boot release, the Host's previous release, and its current release; only a page reload loads the other release. `dismissRelease()` withdraws the announcement and keeps the page quiet for that Host release until another one appears; it remembers only the last dismissed release, in page memory. Retrying failed plugins on the Plugins page does not load the other release either: the retry requests the boot release's artifacts, which a Host serving another release no longer has, so it ends in a download failure.
+すべてのグラフは Host リリース識別子を `release` として持ち運ぶ: このパッケージの `version`(リリースは CLI と共有する)と、クライアントビルドがビルド済み Host アーティファクトに固定するソース `commit` である。2 つのリリースが等しいのは、両方のフィールドが等しいときのみである。ページがグラフと再構築されたフレームを適用するのは、接続された Host がページのブート元リリースを配信している間だけであり、ページが実行するすべてのモジュールはそのリリースに属する。Host がそこに戻ると、通常のリビジョン比較が正確に変更されたモジュールを置き換える。Host が別のリリースを配信している間、ページはそこから何も適用せず、現在のプラグインを実行したままにし、ページのブートリリース、Host の以前のリリース、現在のリリースとともに `ctx.modules.entries.releaseChange` を公開する。別のリリースをロードするのはページリロードのみである。`dismissRelease()` は告知を取り下げ、別のリリースが現れるまでその Host リリースについてページを静かに保つ。記憶するのは最後に却下されたリリースのみで、ページメモリ内にある。プラグインページで失敗したプラグインを再試行しても別のリリースはロードされない。再試行はブートリリースのアーティファクトを要求し、別のリリースを配信している Host はそれをもう持っていないため、ダウンロード失敗に終わる。
 
-### Sharing modules
+### モジュールの共有
 
-The shell seeds a frozen module table ([`PLATFORM_MODULES`](../web/README.md#the-shared-module-table)); every dynamic bundle resolves its externals against exactly that baseline. `dsh.client.external` adds only exact non-baseline requests, each answered by the dynamic package row it names or an exact static-table key. Type-only imports are erased and create no request. Composition rejects malformed requests, missing suppliers, self-requests, and synchronous request cycles.
+シェルは凍結されたモジュールテーブル([`PLATFORM_MODULES`](../web/README.md#the-shared-module-table))をシードし、すべての動的バンドルはそのベースラインに対して正確に外部依存を解決する。`dsh.client.external` は正確な非ベースライン要求のみを追加し、それぞれが名指しする動的パッケージ行または正確な静的テーブルキーによって応答される。型のみのインポートは消去され、要求を作らない。構成は不正な要求、欠落したサプライヤー、自己要求、同期要求サイクルを拒否する。
 
-### Build requirements
+### ビルド要件
 
-The host serves built client bundles, so `pnpm run build` must have produced each `lib/client.js` before launch; a missing bundle fails activation loudly with one build instruction and a package/path list. Source launch maps host imports to TypeScript source but still consumes the built client export. The package accepts no plugin config of its own.
+host はビルド済みクライアントバンドルを配信するため、起動前に `pnpm run build` が各 `lib/client.js` を生成していなければならない。欠落したバンドルは、1 つのビルド指示とパッケージ/パスのリストを伴ってアクティベーションを大声で失敗させる。ソース起動は host インポートを TypeScript ソースにマップするが、ビルド済みの client エクスポートは依然として消費する。このパッケージは独自のプラグイン設定を受け入れない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-This section explains how the module system is built; observable behavior is covered in [Use this package](#use-this-package).
+このセクションでは、モジュールシステムがどのように構築されているかを説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で説明されている。
 
-### Design concept
+### 設計概念
 
-The package has two sides: the Node half is the composition and serving side (`ctx.clientModules`, `ClientModuleRegistry`), the browser half is the loading side (`ctx.modules`, `ClientModuleSystem`). The wire between them is the boot graph — `WebBootEntry` rows injected as `window.__DSH_BOOT__`, with `<` escaped so plugin-controlled strings cannot break out of the script element. The vendored Loader's only consumption point is `EntryTree.import`, so the module system is the single replacement for "how plugin code arrives".
+このパッケージには 2 つの側面がある: Node ハーフは構成と配信の側(`ctx.clientModules`、`ClientModuleRegistry`)であり、ブラウザーハーフはロードの側(`ctx.modules`、`ClientModuleSystem`)である。両者の間のワイヤはブートグラフである — `window.__DSH_BOOT__` として注入される `WebBootEntry` 行で、`<` はエスケープされるため、プラグインが制御する文字列が script 要素から抜け出すことはできない。ベンダーされた Loader の唯一の消費点は `EntryTree.import` であるため、モジュールシステムが「プラグインコードがどのように届くか」の唯一の置き換えである。
 
-### Lazy-CJS model
+### Lazy-CJS モデル
 
-Executing a plugin bundle only registers its factory; every module-body side effect (CSS injection included) lives in the factory closure and runs at materialization (`factory(require)` → exports, memoized in `loadCache`). A factory that requires another registered-but-unmaterialized module materializes it recursively; require cycles throw because factory-form CJS cannot deliver partial exports. Resolution checks the platform seed table, memoized records, boot-graph rows, and registered factories in that order; anything else throws. The synchronous `require` uses the same order without asynchronous graph-row loading and records observed edges into the module record. Its `require.async` operation returns a Promise and fetches a compiler-generated package-local chunk before materializing that chunk once. This protocol supports self-contained chunks only: entry and chunk outputs cannot synchronously require another relative `client*.js` output.
+プラグインバンドルの実行はそのファクトリーを登録するだけである。すべてのモジュール本体の副作用(CSS 注入を含む)はファクトリーのクロージャーに住み、実体化時に実行される(`factory(require)` → exports、`loadCache` にメモ化される)。登録済みだが未実体化の別のモジュールを require するファクトリーは、それを再帰的に実体化する。require サイクルは throw する。ファクトリー形式の CJS は部分的なエクスポートを渡せないからである。解決はプラットフォームシードテーブル、メモ化されたレコード、ブートグラフの行、登録済みファクトリーをこの順にチェックし、それ以外は throw する。同期 `require` は非同期のグラフ行ロードなしで同じ順序を使用し、観察されたエッジをモジュールレコードに記録する。その `require.async` 操作は Promise を返し、コンパイラー生成のパッケージローカルチャンクを取得してから、そのチャンクを 1 回実体化する。このプロトコルは自己完結チャンクのみをサポートする: エントリとチャンクの出力は、別の相対 `client*.js` 出力を同期的に require できない。
 
-### Incremental composition
+### 増分構成
 
-The Node half scans incrementally per package — no full-rescan path. Every `internal/plugin` emission marks the fiber's entry name dirty; a microtask flush reconciles each dirty name against the live loader entries, and the activation pass seeds the same dirty set and flushes synchronously, so first scan and steady state share one implementation. Package metadata is cached per Loader specifier and owning-tree base URL until restart, while the resolved manifest package name identifies the browser module. Distinct active Loader sources resolving to one package name are rejected; removing the conflict promotes the remaining source without requiring its fiber to restart. Bundle content changes reach the graph only through `rebuilt()` (the HMR hook).
+Node ハーフはパッケージごとに増分スキャンする — 全体再スキャンのパスはない。すべての `internal/plugin` 発行はファイバーのエントリ名をダーティとしてマークする。マイクロタスクのフラッシュが各ダーティ名をライブのローダーエントリと照合し、アクティベーションパスが同じダーティセットをシードして同期的にフラッシュするため、初回スキャンと定常状態が 1 つの実装を共有する。パッケージメタデータは Loader 指定子と所有ツリーのベース URL ごとに再起動までキャッシュされ、解決されたマニフェストパッケージ名がブラウザーモジュールを識別する。1 つのパッケージ名に解決される別個のアクティブな Loader ソースは拒否される。競合を取り除くと、残ったソースはそのファイバーの再起動を必要とせずに昇格する。バンドル内容の変更は `rebuilt()`(HMR フック)を通じてのみグラフに到達する。
 
-The Node half snapshots each `client.js` entry before publication and creates combo descriptors without building response bodies. It groups resources into combo route keys (`/plugins/??...&rev=...`), with one bootstrap combo for the modules row and one or more application combos for the other rows; each phase is partitioned before a URL exceeds 3 KiB. The graph and batch descriptors carry the app-directory-relative form of the same key (`plugins/??...&rev=...`), which a browser document resolves under its own mount, while the response table stays keyed by the absolute route; the source-map trailer is resolved against the combo script's own directory. A script body is combined once on its first `GET` and ends with its map reference. The corresponding map files are read, validated, and combined separately on the first map `GET`; `HEAD` materializes neither body. The Host does not scan or preload sibling chunks: an exact `/plugins/<package>/client.<name>.js?rev=<rev>` request reads that script through the asynchronous file API, so a filesystem that materializes files on first asynchronous read can supply it, and caches it; its map remains uncomputed until the map URL is requested. The chunk reference the browser derives from its owner row is document-relative as well (`plugins/<package>/client.<name>.js?rev=<rev>`), and a chunk script's map trailer is the bare `client.<name>.js.map?rev=<rev>` name, which resolves against the script's own directory. Every combo or chunk map is Indexed Source Map v3 and uses an authored section when available or an identity section for the packaged bundle. Initial publication and HMR derive per-plugin revisions from the entry's `mtimeMs`, `ctimeMs`, and size, without hashing artifact contents. Status-change time distinguishes rewrites that preserve mtime and size. Unchanged artifacts therefore retain their revisions across Host restarts, so SSE reconnection does not replace their browser plugins. The shared preset stamps `client.js` after every package output is written, so a chunk-only rebuild changes the owner revision without a Host-side chunk scan. Combo revisions derive from the ordered row revisions. Advertised combo responses and requested chunk responses remain immutable across unrelated graph recomposition, and an unknown resource or revision returns 404.
+Node ハーフは公開前に各 `client.js` エントリをスナップショットし、応答本文を構築せずにコンボ記述子を作成する。リソースをコンボルートキー(`/plugins/??...&rev=...`)にグループ化し、modules 行に 1 つのブートストラップコンボ、他の行に 1 つ以上のアプリケーションコンボを割り当てる。各フェイズは URL が 3 KiB を超える前に分割される。グラフとバッチの記述子は同じキーのアプリディレクトリ相対形式(`plugins/??...&rev=...`)を持ち運び、ブラウザードキュメントは自身のマウントの下でそれを解決する。一方、応答テーブルは絶対ルートをキーのままにし、ソースマップのトレーラーはコンボスクリプト自身のディレクトリを基準に解決される。スクリプト本文は最初の `GET` で 1 回結合され、そのマップ参照で終わる。対応するマップファイルは最初のマップ `GET` で別々に読まれ、検証され、結合される。`HEAD` はどちらの本文も実体化しない。Host は兄弟チャンクをスキャンまたはプリロードしない。正確な `/plugins/<package>/client.<name>.js?rev=<rev>` 要求はそのスクリプトを非同期ファイル API を通じて読み取るため、最初の非同期読み取りでファイルを実体化するファイルシステムでもそれを供給でき、キャッシュされる。そのマップはマップ URL が要求されるまで未計算のままである。ブラウザーが所有行から導出するチャンク参照もドキュメント相対であり(`plugins/<package>/client.<name>.js?rev=<rev>`)、チャンクスクリプトのマップトレーラーは裸の `client.<name>.js.map?rev=<rev>` 名で、スクリプト自身のディレクトリを基準に解決される。すべてのコンボまたはチャンクのマップは Indexed Source Map v3 であり、利用可能な場合は書かれたセクションを、パッケージされたバンドルには identity セクションを使用する。初回公開と HMR は、アーティファクト内容をハッシュせずに、エントリの `mtimeMs`、`ctimeMs`、サイズからプラグインごとのリビジョンを導出する。ステータス変更時刻が、mtime とサイズを保つ書き換えを区別する。したがって変更されていないアーティファクトは Host の再起動をまたいでリビジョンを保ち、SSE の再接続がそのブラウザープラグインを置き換えることはない。共有プリセットはすべてのパッケージ出力が書き込まれた後に `client.js` を刻印するため、チャンクのみの再ビルドは Host 側のチャンクスキャンなしにオーナーのリビジョンを変える。コンボのリビジョンは順序付けされた行のリビジョンから導出される。告知されたコンボ応答と要求されたチャンク応答は、無関係なグラフ再構成をまたいで不変のままであり、未知のリソースまたはリビジョンは 404 を返す。
 
-### Boot manifest injection
+### ブートマニフェストの注入
 
-The bundle route follows the injected `webServer` lifetime: it registers when the service is ready and is removed and re-registered when that service is replaced. Module composition and `fetchBundle()` remain available without a Web server.
+バンドルルートは注入された `webServer` ライフタイムに従う: サービスが準備完了のときに登録され、そのサービスが置き換えられると削除されて再登録される。モジュール構成と `fetchBundle()` は Web サーバーなしでも利用可能なままである。
 
-The host contributes structured index rows that inject, into `<head>`: the `window.__ModuleLoader__` queue facade, advisory preloads for every application combo, the parser-blocking bootstrap combo scripts, then the boot graph before the shell reads it. A Web carrier renders those rows into its index response; a shell-owned carrier can render the same rows without a Web server. The facade's `create()` materializes the modules bundle, delegates construction to its `createClientModuleSystem` export, and leaves the same facade in live-registration mode. The shell installs that returned system as its Loader's `internal`; the modules plugin publishes that instance as `ctx.modules`, so separate Cordis trees never select an instance through module-global state.
+host は構造化インデックス行を提供し、それらが `<head>` に注入する: `window.__ModuleLoader__` キューファサード、すべてのアプリケーションコンボの勧告的プリロード、パーサーをブロックするブートストラップコンボスクリプト、そしてシェルが読む前のブートグラフである。Web キャリアはそれらの行をそのインデックス応答にレンダリングする。シェル所有のキャリアは Web サーバーなしで同じ行をレンダリングできる。ファサードの `create()` は modules バンドルを実体化し、構築をその `createClientModuleSystem` エクスポートに委譲し、同じファサードをライブ登録モードのままにする。シェルは返されたシステムをその Loader の `internal` としてインストールする。modules プラグインはそのインスタンスを `ctx.modules` として公開するため、別々の Cordis ツリーがモジュールグローバル状態を通じてインスタンスを選択することは決してない。
 
-### Entry ownership
+### エントリの所有権
 
-`ClientEntries` records the entries created during boot and serializes full-graph updates, retries and code reloads over the same Loader. A local generation prevents an older download from mounting after its desired entry or code changes; snapshots of the same targets share the pending load. A graph from another release than the boot release stays outside the queue: retries keep reconciling the last applied graph, and rebuilt frames are ignored while the Host serves that release. New arrivals use single-resource URLs, never startup batches that could register existing factories twice. Factories retain their artifact revision before an entry exists; graph updates discard stale unowned factories, their styles and failed arrival targets before importing consumers. Cleanup retains declared and observed transitive module requests from every remaining Loader entry. Its observable status has no runtime library import because the modules bootstrap materializes before platform seeds are available.
+`ClientEntries` はブート中に作成されたエントリを記録し、同じ Loader 上の完全グラフ更新、再試行、コードリロードを直列化する。ローカルジェネレーションは、望ましいエントリまたはコードが変わった後に古いダウンロードがマウントされるのを防ぐ。同じターゲットのスナップショットは保留中のロードを共有する。ブートリリースとは別のリリースのグラフはキューの外に留まる: 再試行は最後に適用されたグラフを照合し続け、Host がそのリリースを配信している間は再構築されたフレームが無視される。新しいアライバルは単一リソース URL を使用し、既存のファクトリーを二重登録しうる起動バッチを決して使用しない。ファクトリーはエントリが存在する前にそのアーティファクトリビジョンを保持する。グラフ更新はコンシューマーをインポートする前に、古い非所有のファクトリー、そのスタイル、失敗したアライバルターゲットを破棄する。クリーンアップは、残っているすべての Loader エントリからの宣言済みおよび観察済みの推移的モジュール要求を保持する。その観測可能なステータスはランタイムライブラリのインポートを持たない。modules ブートストラップはプラットフォームシードが利用可能になる前に実体化するからである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Node half: `ClientModuleRegistry`, scan, artifact snapshots, optional combo route, structured index rows |
-| [`src/client/index.ts`](src/client/index.ts) | Browser half: bootstrap export, `ctx.modules` enrollment |
-| [`src/client/system.ts`](src/client/system.ts) | `ClientModuleSystem`: load/materialize/invalidate machinery |
-| [`src/client/entries.ts`](src/client/entries.ts) | Page entry reconciliation, retries and code replacement |
-| [`src/client/entry-lifecycle.ts`](src/client/entry-lifecycle.ts) | Loader fiber teardown through the registry and owned-style cleanup |
-| [`src/client/manifest.ts`](src/client/manifest.ts) | Wire types, boot-manifest parsing, and the `dsh.client` declaration parser |
+| [`src/index.ts`](src/index.ts) | Node ハーフ: `ClientModuleRegistry`、スキャン、アーティファクトスナップショット、オプションのコンボルート、構造化インデックス行 |
+| [`src/client/index.ts`](src/client/index.ts) | ブラウザーハーフ: ブートストラップエクスポート、`ctx.modules` への登録 |
+| [`src/client/system.ts`](src/client/system.ts) | `ClientModuleSystem`: ロード/実体化/無効化の仕組み |
+| [`src/client/entries.ts`](src/client/entries.ts) | ページエントリの照合、再試行、コード置換 |
+| [`src/client/entry-lifecycle.ts`](src/client/entry-lifecycle.ts) | レジストリを通じた Loader ファイバーのティアダウンと所有スタイルのクリーンアップ |
+| [`src/client/manifest.ts`](src/client/manifest.ts) | wire 型、ブートマニフェストのパース、`dsh.client` 宣言パーサー |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these when the module contract is not enough: the subsystem reference, the shell that boots the tree, and the client authoring rules behind the graph.
+モジュール契約では不十分な場合は、これらを読む: サブシステムリファレンス、ツリーをブートするシェル、グラフの背後にあるクライアント作成ルール。
 
-- [Client modules subsystem](../../../docs/subsystems/client-modules.md) — the web plugin table, `WebBootGraph` wire, and the bundle route.
-- [Web boot kernel](../web/README.md) — the shell that creates the module system and boots the plugin tree.
-- [Client HMR driver](../hmr/README.md) — the reload chain that drives `invalidate`/`prefetch` on rebuilt bundles.
-- [Client authoring rules](../AGENTS.md#shared-modules-and-the-module-graph) — the shared-module baseline and `dsh.client.external` semantics.
-- [Client group map](../README.md) — the browser half this package belongs to.
+- [クライアントモジュールサブシステム](../../../docs/subsystems/client-modules.md) — Web プラグインテーブル、`WebBootGraph` wire、バンドルルート。
+- [Web ブートカーネル](../web/README.md) — モジュールシステムを作成しプラグインツリーをブートするシェル。
+- [クライアント HMR ドライバー](../hmr/README.md) — 再構築されたバンドルで `invalidate`/`prefetch` を駆動するリロードチェーン。
+- [クライアント作成ルール](../AGENTS.md#shared-modules-and-the-module-graph) — 共有モジュールのベースラインと `dsh.client.external` のセマンティクス。
+- [クライアントグループマップ](../README.md) — このパッケージが属するブラウザーハーフ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the module loader is browser-side kernel machinery that registers nothing model-facing.
+なし。モジュールローダーはブラウザー側のカーネルの仕組みであり、モデルに提示されるものは何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダー要求を組み立てることも送信することもない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the module system does not do. They are current package constraints, not a task backlog.
+これらの制限は、モジュールシステムが行わないことを定義する。これらは現在のパッケージの制約であり、タスクバックログではない。
 
-- **Metadata-based revisions** — revisions identify filesystem generations, not content equality. Metadata-only changes can reload a plugin; changes invisible in mtime, ctime, and size cannot be distinguished.
-- **Flat module graph by design** — every bundle is one module node whose edges point only at table leaves; the interface (`loadCache`/`edges`/`invalidate`) already supports a general module graph, so the externalization granularity can change without an interface change.
-- **Host release detection rides the graph stream** — a page learns another Host release only from a graph frame. When a restarting Host answers `/plugins/events` with a non-200 status before registering the route, the browser closes that stream for good, and the page neither updates plugins nor detects a release change until it reloads.
-- **Source launch has no build step for the Host half** — a Host started from TypeScript source reads the commit that `pnpm run dev:web` places in its environment; a source launch without it publishes the version alone.
-- **Bootstrap and code replacement limits** — the page retains its modules bootstrap and static platform identities. Removing or replacing the bootstrap requires a page reload; live replacement requests report a page-local error while retaining its fiber and exports; replacing package code and all existing consumers is outside ordinary enable/disable synchronization.
-- **Lazy delivery retains requested bodies** — the Host holds each bundle and lazy response plan; a script or map body remains cached after its first `GET`, and HMR additionally retains one prior startup generation. Memory grows only for response bodies that clients request while preserving one-generation race tolerance.
-- **An unrequested prior-generation map reads the current map file** — combo revisions track executable bundles, not debug artifacts. If HMR rebuilds a map before the retained prior URL receives its first map `GET`, that response uses the current authored map with the prior bundle offsets; requesting the map before the rebuild fixes that URL's response.
+- **メタデータベースのリビジョン** — リビジョンはファイルシステムの世代を識別し、コンテンツの等価性を識別しない。メタデータのみの変更がプラグインをリロードすることがあり、mtime、ctime、サイズに現れない変更は区別できない。
+- **設計上フラットなモジュールグラフ** — すべてのバンドルは 1 つのモジュールノードであり、そのエッジはテーブルの葉のみを指す。インターフェース(`loadCache`/`edges`/`invalidate`)はすでに一般的なモジュールグラフをサポートしているため、外部化の粒度はインターフェース変更なしに変えられる。
+- **Host リリースの検出はグラフストリームに乗る** — ページが別の Host リリースを知るのはグラフフレームからのみである。再起動中の Host がルートを登録する前に `/plugins/events` に非 200 ステータスで応答すると、ブラウザーはそのストリームを永久に閉じ、ページはリロードするまでプラグインを更新せずリリース変更も検出しない。
+- **ソース起動には Host ハーフのビルドステップがない** — TypeScript ソースから起動された Host は、`pnpm run dev:web` がその環境に置く commit を読み取る。それなしのソース起動はバージョンのみを公開する。
+- **ブートストラップとコード置換の制限** — ページはその modules ブートストラップと静的プラットフォーム識別子を保持する。ブートストラップの削除または置換はページリロードを必要とする。ライブ置換要求はページローカルエラーを報告し、そのファイバーとエクスポートは保持される。パッケージコードと既存のすべてのコンシューマーの置換は通常の有効化/無効化同期の範囲外である。
+- **遅延配信は要求された本文を保持する** — Host は各バンドルと遅延応答プランを保持する。スクリプトまたはマップの本文は最初の `GET` の後もキャッシュされ、HMR は加えて直前の起動世代を 1 つ保持する。メモリは、1 世代の競合耐性を保ちながらクライアントが要求した応答本文に対してのみ増える。
+- **要求されなかった前世代のマップは現在のマップファイルを読む** — コンボのリビジョンは実行可能バンドルを追跡し、デバッグアーティファクトは追跡しない。HMR が、保持された前世代 URL が最初のマップ `GET` を受け取る前にマップを再ビルドした場合、その応答は前世代のバンドルオフセット付きの現在の書かれたマップを使用する。再ビルド前にマップを要求すれば、その URL の応答が修正される。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

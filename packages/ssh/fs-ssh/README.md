@@ -1,81 +1,81 @@
 ---
-description: "Remote filesystem semantics for consumers sharing files with SSH subprocesses."
+description: "SSH 子過程と文件を共有する利用者向け遠隔文件系意味論。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-fs-ssh
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-fs-ssh` provides `ctx.fs` in the SSH helper’s filesystem. File tools read and mutate the same files that remote Bash, terminals, language servers and Node programs see. Remote canonicalization, version guards and atomic mutations use the local filesystem implementations installed beside the helper.
+`dsh-fs-ssh` は SSH 補助者の文件系に `ctx.fs` を提供する。文件道具は遠隔 Bash、端末、言語服務器、Node 計画が見るのと同じ文件を読み変異させる。遠隔正準化、版防護、不可分変異は補助者脇に導入された地域文件系実装を使う。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに探る](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しの作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this provider with [`dsh-ssh`](../ssh/README.md) and `sandboxPolicy`; use its paired SSH subprocess and sandbox providers for execution. This provider has no configuration fields: connection identity and the default workspace belong to `dsh-ssh`, while file-effect mode belongs to `sandboxPolicy`.
+この提供子を [`dsh-ssh`](../ssh/README.md) と `sandboxPolicy` で載せ、実行には対の SSH 子過程と砂箱提供子を使う。この提供子に設定項目はない。接続同一性と既定作業域は `dsh-ssh` に属し、文件効果様式は `sandboxPolicy` に属する。
 
-`resolve()` canonicalizes paths on the remote host. `processPath()` and `fileUrl()` name files in that same remote namespace; they do not grant host-side access. File URLs encode literal percent signs, backslashes and newlines without changing the filename. `processPathFromHostPath()` returns `undefined`, so consumers requiring an installed executable or bootstrap must supply a remote artifact explicitly.
+`resolve()` は遠隔 host 上で経路を正準化する。`processPath()` と `fileUrl()` は同遠隔名空間の文件を名指し、host 側到達を与えない。文件 URL は文字通りの百分率記号、逆斜線、改行を文件名を変えずに符号化する。`processPathFromHostPath()` は `undefined` を返すため、導入済み実行物や起動素を要する利用者は遠隔成果物を明示に供給しなければならない。
 
-Reads preserve the shared filesystem error codes. Writes and edits send the resolved per-call policy to the helper, which canonicalizes the workspace and enforces it beside the atomic mutation. Lost transport reports an I/O failure; a mutation may already have committed and is not retried automatically.
+読み取りは共有文件系誤り符号を保つ。書込と編集は解決済み呼毎方針を補助者に送り、補助者は作業域を正準化して不可分変異の脇でそれを強制する。輸送喪失は入出力失敗を報告し、変異は既に確定して自動再試行されないことがある。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The helper reuses [`fs-local`](../../fs/fs-local/README.md) and [`fs-sandbox`](../../fs/fs-sandbox/README.md), preserving symlink identity, stale-version rejection, diff bases and publication semantics. UTF-8 streaming uses bounded pull requests and closes its remote iterator when the consumer stops early.
+補助者は [`fs-local`](../../fs/fs-local/README.md) と [`fs-sandbox`](../../fs/fs-sandbox/README.md) を再利用し、 symlink 同一性、古版拒否、差分基盤、公表意味論を保つ。UTF-8 流送は有界引張要求を使い、利用者が早く止めれば遠隔反復子を閉じる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに探る
 
-- [Filesystem subsystem](../../../docs/subsystems/filesystem.md) — shared operations and error meanings.
-- [SSH connection](../ssh/README.md) — deployment and disconnection behavior.
+- [文件系 subsystem](../../../docs/subsystems/filesystem.md) — 共有操作と誤り意味。
+- [SSH 接続](../ssh/README.md) — 配備と切断動作。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through existing filesystem consumers, which present remote paths and file contents while owning every tool and prompt.
+既存文件系利用者を通じて間接的に関わり、遠隔経路と文件内容を示しつつ道具と prompt はすべて所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-This provider contributes no request-prefix content. Its consumers own model-visible tools and results.
+この提供子は要求接頭辞内容を提供しない。その利用者が模型可視な道具と結果を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しの作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Whole-text reads and individual byte windows are limited to 8 MiB by the helper. Use text streaming or multiple byte windows for larger reads; other JSON transfers also obey the connection’s frame cap.
-- Filesystem watching is unsupported: the provider keeps no `watch()` override, so the base `FS_IO_ERROR` rejection applies without polling or opening a local watcher for a remote path. Ordinary reads and consumer-owned manual refresh remain available.
-- Remote file URLs are execution coordinates, not host filesystem handles or Web download links.
+- 全文読みと個別字窓は補助者により 8 MiB までである。大読みには文流送または複数字窓を使うこと。他の JSON 転送も接続の枠上限に従う。
+- 文件系監視は未対応である。提供子は `watch()` 上書きを保たないため、基底 `FS_IO_ERROR` 拒否が投票や遠隔経路用地域監視を開かずに当たる。通常読みと利用者所有の手動更新は利用可能なままである。
+- 遠隔文件 URL は実行座標であり、host 文件系把手でも Web 下載連鎖でもない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業背景 — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

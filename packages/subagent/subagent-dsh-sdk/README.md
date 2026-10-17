@@ -1,58 +1,58 @@
 ---
-description: "The out-of-process SDK subagent backend for users and maintainers choosing a delegation provider, configuring a child Harness runtime, or debugging local nested child runs."
+description: "委譲プロバイダーを選択し、子 Harness ランタイムを設定し、ローカルでネストされた子実行をデバッグするユーザーとメンテナー向けの、プロセス外 SDK サブエージェントバックエンド。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-subagent-dsh-sdk
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-subagent-dsh-sdk` runs each delegated task in a fresh DeepSeek Harness subprocess with its own profile, session, model route, and tools. The parent provides the task and working directory, while each child uses its configured runtime and remains isolated from the parent conversation. The parent receives the child's final assistant text or a safe error; intermediate messages and tool traffic stay inside the child process. Choose this backend when delegation needs a complete Harness runtime rather than shared in-process state, and accept the cost of starting a new process for every run.
+`dsh-subagent-dsh-sdk` は、委譲された各タスクを、独自のプロファイル、セッション、モデルルート、ツールを持つ新しい DeepSeek Harness サブプロセスで実行します。親はタスクと作業ディレクトリを提供し、各子は設定されたランタイムを使用して、親の会話から隔離されたままです。親は子の最終アシスタントテキストまたは安全なエラーを受け取ります。中間メッセージとツールトラフィックは子プロセス内にとどまります。委譲に共有されたプロセス内状態ではなく完全な Harness ランタイムが必要な場合はこのバックエンドを選び、実行ごとに新しいプロセスを起動するコストを受け入れてください。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送りされた作業](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this provider when a delegation should run as a complete Harness runtime in its own process. The common path is explicit: mount the seam, mount this provider, configure `dshBin` when needed, and select the child `profile` and ordered `patches`.
+委譲が独自プロセス内の完全な Harness ランタイムとして実行されるべき場合にこのプロバイダーをマウントします。一般的な手順は明示的です。シームをマウントし、このプロバイダーをマウントし、必要に応じて `dshBin` を設定し、子の `profile` と順序付き `patches` を選択します。
 
-### When to choose it
+### いつ選択するか
 
-Choose this backend when the child must be a full harness peer — its own composition, session persistence, model route, and tools — rather than an agent that shares the parent's process. Choose an in-process backend when the child must share the parent's composition or honor parent-enforced non-route capabilities: this provider accepts agent route options but rejects independent presets, structured output, and depth caps rather than silently omitting them.
+子が、親のプロセスを共有するエージェントではなく、完全な harness ピア — 独自の構成、セッション永続化、モデルルート、ツール — でなければならない場合はこのバックエンドを選びます。子が親の構成を共有するか、親が強制する非ルートのケイパビリティを守らなければならない場合はプロセス内バックエンドを選びます。このプロバイダーはエージェントルートオプションを受け入れますが、独立したプリセット、構造化出力、深さ上限は黙って省略するのではなく拒否します。
 
-The provider advertises `agentOptions: true`, with `agentPreset`/`outputSchema`/`depthLimit` false, and `inheritsParentContext: false`. Its immutable `agentRouteDefaults` publish the configured provider/model baseline to `dsh-tool-subagent` before model overrides and exact-route preflight; the backend applies the same configuration defaults during activation startup, including `maxTokens`. Agent route values cross the SDK wire as an explicit whitelist; the child remains a fresh runtime in another process, and the child process uses the selected effective directory while its Session retains the parent origin directory. `dsh-tool-subagent` deployments over this provider set `maxDepth: 'provider-managed'` — the child harness owns its own recursion budget.
+プロバイダーは `agentOptions: true` を通知し、`agentPreset`/`outputSchema`/`depthLimit` は false、`inheritsParentContext: false` です。その不変の `agentRouteDefaults` は、モデルオーバーライドと正確なルートのプレフライトの前に、設定された provider/model ベースラインを `dsh-tool-subagent` に公開します。バックエンドはアクティベーション起動時に同じ設定デフォルトを適用し、`maxTokens` も含みます。エージェントルートの値は明示的なホワイトリストとして SDK の wire を渡ります。子は別プロセスの新しいランタイムのままで、子プロセスは選択された有効ディレクトリを使用し、そのセッションは親の起点ディレクトリを保持します。このプロバイダー上の `dsh-tool-subagent` デプロイは `maxDepth: 'provider-managed'` を設定します — 子 harness が自身の再帰予算を所有します。
 
-### Configuration
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `providerName` | `dsh-sdk` | Registry name on `ctx.subagents` |
-| `dshBin` | SDK dependency | Explicit dsh CLI module, resolved and checked at plugin load; omission uses the SDK dependency |
-| `profile` | `sdk` | Named child profile |
-| `patches` | `[]` | Ordered per-launch profile patch files, resolved and checked at plugin load |
-| `dshHome` | required | Absolute isolated Harness home for every nested child process |
-| `provider` | `deepseek-official` | Provider route sent in the child's `initialize` |
-| `model` | `deepseek-v4-flash` | Model sent in the child's `initialize` |
-| `maxTokens` | adapter/provider route default | Per-request output-token cap sent in the child's `initialize` |
-| `env` | `{}` | Explicit child environment layered over the credential-scrubbed parent environment |
-| `shutdownTimeoutMs` | `1000` | Bound on the protocol `shutdown` exchange during dispose |
-| `disposeEofGraceMs` | `6000` | Grace after stdin EOF before platform termination |
-| `disposeGraceMs` | `3000` | Exit-confirmation grace after termination |
+| `providerName` | `dsh-sdk` | `ctx.subagents` 上のレジストリ名 |
+| `dshBin` | SDK 依存関係 | 明示的な dsh CLI モジュール。プラグインロード時に解決・確認されます。省略時は SDK 依存関係を使用 |
+| `profile` | `sdk` | 名前付き子プロファイル |
+| `patches` | `[]` | 起動ごとの順序付きプロファイルパッチファイル。プラグインロード時に解決・確認されます |
+| `dshHome` | 必須 | すべてのネストされた子プロセス用の絶対的な隔離 Harness ホーム |
+| `provider` | `deepseek-official` | 子の `initialize` で送信されるプロバイダールート |
+| `model` | `deepseek-v4-flash` | 子の `initialize` で送信されるモデル |
+| `maxTokens` | adapter/provider ルートのデフォルト | 子の `initialize` で送信されるリクエストごとの出力トークン上限 |
+| `env` | `{}` | 認証情報が洗浄された親環境の上に重ねられる明示的な子環境 |
+| `shutdownTimeoutMs` | `1000` | dispose 中のプロトコル `shutdown` 交換の上限 |
+| `disposeEofGraceMs` | `6000` | stdin EOF からプラットフォーム終了までの猶予 |
+| `disposeGraceMs` | `3000` | 終了後の終了確認の猶予 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-dsh-sdk) is the exhaustive source for every accepted field and its JSDoc.
+生成される [設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-subagent-dsh-sdk) が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源です。
 
-Request `agentOptions` override `provider`, `model`, and `maxTokens` independently. `reasoningEffort` has no provider-instance default: an omitted request leaves it absent so the selected child model resolves its own default. The model-facing subagent tool can select provider/model/reasoning per call; `maxTokens` remains deployment-controlled through tool config or this provider's default.
+リクエストの `agentOptions` は `provider`、`model`、`maxTokens` を独立に上書きします。`reasoningEffort` にはプロバイダーインスタンスのデフォルトがありません。省略されたリクエストでは存在しないままになり、選択された子モデルが自身のデフォルトを解決します。モデル向けサブエージェントツールは呼び出しごとに provider/model/reasoning を選択できます。`maxTokens` はツール設定またはこのプロバイダーのデフォルトを通じてデプロイが制御したままです。
 
 ```yaml
 - id: subagent-dsh-sdk
@@ -70,118 +70,118 @@ Request `agentOptions` override `provider`, `model`, and `maxTokens` independent
   config: { provider: dsh-sdk, toolName: subagent, maxDepth: 'provider-managed' }
 ```
 
-### What you get
+### 得られるもの
 
-A successful run returns the child's final assistant text (or accumulated partial text after cancellation) as result output. The child's model route, tools, and session come from the child runtime itself — the parent supplies the task, working directory, and `initialize` route. The child's last durable `turn/end` maps into the seam vocabulary: `completed` and `max-tokens` pass through, `blocked` becomes `refusal`, and an unexpected or missing terminal becomes `error`. An `aborted` result stays aborted; only a child-side `disposed` cause adds a `child-disposed` diagnostic.
+成功した実行は、子の最終アシスタントテキスト（キャンセル後は蓄積された部分テキスト）を結果出力として返します。子のモデルルート、ツール、セッションは子ランタイム自体から来ます — 親が供給するのはタスク、作業ディレクトリ、`initialize` ルートです。子の最後の永続 `turn/end` はシームの語彙にマップされます。`completed` と `max-tokens` はそのまま通り、`blocked` は `refusal` になり、予期しないまたは欠落した終端は `error` になります。`aborted` の結果は aborted のままです。子側の `disposed` 原因のみが `child-disposed` 診断を追加します。
 
-### Failure and recovery
+### 失敗と回復
 
-The configured SDK runtime must implement `session/wait`; a runtime without it reports an execution failure. Update the provider and a separately configured `dshBin` runtime together. An already-aborted request fails before path resolution or spawn. A route, spawn, handshake, or pre-publication cancellation failure ordinarily rejects only after the subprocess is reaped. If initialization and cleanup both fail, the ordered safe facts preserve both failures without claiming quiescence. A child runtime that fails after publication settles through the run rather than rejecting it; partial output stays separate from the safe diagnostic. Diagnostics expose only the provider plus `initialize`, `session-run`, or `shutdown` stage and a fixed category. They never copy SDK messages, stderr, paths, task content, environment values, credentials, or protocol payloads.
+設定された SDK ランタイムは `session/wait` を実装している必要があります。それのないランタイムは実行失敗を報告します。プロバイダーと別に設定された `dshBin` ランタイムは一緒に更新してください。すでに中止されたリクエストはパス解決や spawn の前に失敗します。ルート、spawn、ハンドシェイク、または公開前のキャンセル失敗は、通常、サブプロセスが回収された後にのみ拒否されます。初期化とクリーンアップの両方が失敗した場合、順序付けされた安全なファクトが両方の失敗を保持し、静止状態を主張しません。公開後に失敗する子ランタイムは、拒否ではなく実行を通じて確定します。部分出力は安全な診断から分離されたままです。診断はプロバイダーと `initialize`、`session-run`、または `shutdown` ステージ、および固定されたカテゴリのみを公開します。SDK メッセージ、stderr、パス、タスク内容、環境値、認証情報、プロトコルペイロードを決してコピーしません。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the backend drives a child Harness runtime and where the observable behavior comes from; the full contract lives in [Use this package](#use-this-package).
+このセクションでは、バックエンドが子 Harness ランタイムをどう駆動するか、観測可能な動作がどこから来るかを説明します。完全な契約は [このパッケージを使う](#use-this-package) にあります。
 
-### Design concept
+### 設計概念
 
-- **Full harness peer.** Each child is a complete Harness runtime in its own process — own composition, session, model route, and tools; only the resolved working directory and the `initialize` route cross from the parent.
-- **One runtime per run.** Every run spawns a fresh runtime process; there is no pooling.
-- **The JSON-RPC wire is the serialization boundary.** Same-process subagent values are not defensively cloned; the protocol is where hostile input is validated.
+- **完全な harness ピア。** 各子は独自プロセス内の完全な Harness ランタイムです — 独自の構成、セッション、モデルルート、ツール。親から渡るのは解決済みの作業ディレクトリと `initialize` ルートのみです。
+- **実行ごとに 1 つのランタイム。** すべての実行は新しいランタイムプロセスを spawn します。プーリングはありません。
+- **JSON-RPC の wire がシリアライズの境界です。** 同一プロセスのサブエージェント値は防御的にクローンされません。敵対的入力が検証されるのはプロトコル上です。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config schema, provider registration |
-| [`src/run.ts`](src/run.ts) | The SDK run lifecycle, answer extraction, and stop-reason mapping |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: 設定スキーマ、プロバイダー登録 |
+| [`src/run.ts`](src/run.ts) | SDK 実行ライフサイクル、回答抽出、停止理由マッピング |
 
-### Run flow
+### 実行フロー
 
-A start resolves the child's working directory and one process-wide SDK route before spawning. Each declared `request.agentOptions` field (`provider`, `model`, `reasoningEffort`, or `maxTokens`) overrides the matching provider-instance default; omission preserves the configured provider/model and optional cap, while reasoning effort remains absent unless the request supplies it. The provider spawns the runtime through the SDK client and completes the `initialize` handshake, including exact-model and effort validation, before it fulfills. A route, spawn, handshake, or pre-publication cancellation failure rejects only after the subprocess is reaped; a working-directory resolution failure rejects before spawning. After publication the provider subscribes to the child Session, queues its prompt, and waits through `session/wait` for managed descendants and subsequent root turns. It reads the child's answer from the ordered session events: the last complete non-empty `assistant/message` (an empty-content message that records usage is skipped), or the accumulated `text-delta` stream when no such message exists. Disposal is idempotent: it settles the result locally as `aborted`, sends a bounded protocol `shutdown` request, then escalates through stdin EOF → SIGTERM → SIGKILL to actual exit. The activation manager owns that run after acceptance; the caller's startup signal no longer cancels the child. Each activation executes once, and its receipt cancels execution and awaits cleanup.
+開始は spawn の前に、子の作業ディレクトリとプロセス全体で 1 つの SDK ルートを解決します。宣言された各 `request.agentOptions` フィールド（`provider`、`model`、`reasoningEffort`、または `maxTokens`）は対応するプロバイダーインスタンスのデフォルトを上書きします。省略は設定された provider/model とオプションの上限を保持し、reasoning effort はリクエストが供給しない限り存在しないままです。プロバイダーは SDK クライアントを通じてランタイムを spawn し、fulfill する前に（正確なモデルと effort の検証を含む）`initialize` ハンドシェイクを完了します。ルート、spawn、ハンドシェイク、または公開前のキャンセル失敗はサブプロセスが回収された後にのみ拒否され、作業ディレクトリ解決の失敗は spawn 前に拒否します。公開後、プロバイダーは子セッションを購読し、そのプロンプトをキューに入れ、管理された子孫と後続のルートターンのために `session/wait` を通じて待ちます。子の回答は順序付きセッションイベントから読み取ります。最後の完全な空でない `assistant/message`（使用量を記録する空コンテンツのメッセージはスキップされます）、またはそのようなメッセージが存在しない場合は蓄積された `text-delta` ストリームです。破棄は冪等です。結果をローカルで `aborted` として確定し、上限付きのプロトコル `shutdown` リクエストを送信し、その後 stdin EOF → SIGTERM → SIGKILL を経て実際の終了までエスカレートします。アクティベーションマネージャーが受け入れ後にその実行を所有し、呼び出し元の起動シグナルは子をキャンセルしなくなります。各アクティベーションは 1 回実行され、そのレシートは実行をキャンセルしてクリーンアップを待ちます。
 
-### Stop-reason mapping
+### 停止理由マッピング
 
-The child's last `turn/end` reason maps into the shared stop-reason vocabulary in [`src/run.ts`](src/run.ts).
+子の最後の `turn/end` 理由は [`src/run.ts`](src/run.ts) の共有停止理由語彙にマップされます。
 
-### Process boundary
+### プロセス境界
 
-The child environment is the subprocess seam's credential-scrubbed parent environment with explicit `config.env` values merged after the scrub. The child is spawned by the SDK client rather than through `ctx.subprocess` — the documented exception for SDK-managed transports — which is why this backend applies the scrub itself.
+子環境は、サブプロセスシームの認証情報洗浄済み親環境に、洗浄後に明示的な `config.env` 値をマージしたものです。子は `ctx.subprocess` を通じてではなく SDK クライアントによって spawn されます — SDK 管理トランスポートのための文書化された例外です — そのためこのバックエンドは自身で洗浄を適用します。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from this backend to the seam it plugs into and the SDK it drives.
+パッケージレベルの契約では足りないときにこれらのページを読んでください。このバックエンドから、それが差し込まれるシームと駆動する SDK へと進みます。
 
-- [Subagent subsystem](../../../docs/subsystems/subagent.md) — the service contract, provider contract, and terminal result semantics.
-- [dsh-subagent seam](../subagent/README.md) — the registry and start API this provider registers on.
-- [ACP subagent backend](../subagent-acp/README.md) — the sibling out-of-process provider over the Agent Client Protocol.
-- [TypeScript SDK client](../../sdk/client/README.md) — the stdio JSON-RPC client this backend drives the child through.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-dsh-sdk) — every accepted config field and its source declaration.
+- [Subagent サブシステム](../../../docs/subsystems/subagent.md) — サービス契約、プロバイダー契約、終端結果のセマンティクス。
+- [dsh-subagent シーム](../subagent/README.md) — このプロバイダーが登録するレジストリと start API。
+- [ACP subagent バックエンド](../subagent-acp/README.md) — Agent Client Protocol 上の姉妹プロセス外プロバイダー。
+- [TypeScript SDK クライアント](../../sdk/client/README.md) — このバックエンドが子を駆動する stdio JSON-RPC クライアント。
+- [生成設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-subagent-dsh-sdk) — 受け付けられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Child-agent request
+### 子エージェントのリクエスト
 
-#### What the model sees
+#### モデルが見るもの
 
-The child runtime's model receives the standalone task as its user message plus that runtime's own configured system prompt, tools, and fresh session. It receives no parent conversation. A parent tool call may choose the child provider, model, and reasoning effort for this run; the selected route and any deployment-owned output cap are fixed for the new child process. Independent presets, depth enforcement, and structured output remain unsupported and are rejected instead of silently omitted.
+子ランタイムのモデルは、スタンドアロンのタスクをそのユーザーメッセージとして受け取り、加えてそのランタイム自身に設定されたシステムプロンプト、ツール、新しいセッションを受け取ります。親の会話は受け取りません。親のツール呼び出しはこの実行の子プロバイダー、モデル、reasoning effort を選択できます。選択されたルートとデプロイ所有の出力上限は新しい子プロセスに対して固定されます。独立したプリセット、深さの強制、構造化出力は引き続きサポートされず、黙って省略されるのではなく拒否されます。
 
-#### Token effect
+#### トークンへの影響
 
-The child pays for an independent full context and its own multi-step history. These tokens never enter the parent's context.
+子は独立した完全なコンテキストと自身のマルチステップ履歴のコストを負担します。これらのトークンは親のコンテキストに入りません。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Independent of the parent request cache. Each SDK child can reuse only prefixes identical under its own provider, model, composition, and history; child steps otherwise grow append-only.
+親のリクエストキャッシュから独立しています。各 SDK の子は、自身の provider、model、構成、履歴の下で同一のプレフィックスのみを再利用できます。それ以外の子ステップは追記専用で成長します。
 
-### Parent tool result, indirectly
+### 間接的な親ツール結果
 
-#### What the model sees
+#### モデルが見るもの
 
-Through `dsh-tool-subagent`, the parent model first receives a child id, then a completion notice containing final or partial assistant text, the stop reason, and safe diagnostic. The parent Session independently retains the external task identity and complete terminal result. Intermediate messages and tool traffic do not enter the parent Session.
+`dsh-tool-subagent` を通じて、親モデルはまず子 ID を受け取り、次に最終または部分的なアシスタントテキスト、停止理由、安全な診断を含む完了通知を受け取ります。親セッションは外部タスクの同一性と完全な終端結果を独立に保持します。中間メッセージとツールトラフィックは親セッションに入りません。
 
-#### Token effect
+#### トークンへの影響
 
-Parent input grows by the start acknowledgement and completion notice, whose size depends on the result data and persists until compaction. This provider adds no parent schema by itself.
+親の入力は開始確認と完了通知の分だけ増え、そのサイズは結果データに依存し、コンパクションまで残ります。このプロバイダー自体は親スキーマを追加しません。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用です。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送りされた作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this backend is a poor fit or needs special operational care. They are current package constraints, not a general SDK comparison or a task backlog.
+これらの制限は、このバックエンドが不向きな場合、または特別な運用上の注意が必要な場合を定義します。これらは現在のパッケージ制約であり、一般的な SDK の比較やタスクバックログではありません。
 
-- **A fresh runtime process per run** — no pooling; a harness runtime boots a full plugin tree, so per-run spawn cost is higher than the ACP backend's typical child.
-- **No non-route start-time capabilities** — the parent can select the child agent route but cannot enforce `agentPreset`, `outputSchema`, or depth inside the child process; configure the selected child profile and its ordered patches instead.
-- **The child's transcript stays in the child's own session root** — the parent log retains the external task identity and full result, while the streamed `session.event` channel is consumed for output extraction rather than transcript replication.
-- **Local child processes only** — the resolved working directory is a local path; a remote runtime would need its own backend.
+- **実行ごとに新しいランタイムプロセス** — プーリングなし。harness ランタイムは完全なプラグインツリーをブートするため、実行ごとの spawn コストは ACP バックエンドの典型的な子より高くなります。
+- **非ルートの開始時ケイパビリティなし** — 親は子エージェントのルートを選択できますが、子プロセス内で `agentPreset`、`outputSchema`、深さを強制することはできません。代わりに選択した子プロファイルとその順序付きパッチを設定してください。
+- **子のトランスクリプトは子自身のセッションルートにとどまる** — 親ログは外部タスクの同一性と完全な結果を保持し、ストリーミングされる `session.event` チャネルはトランスクリプト複製ではなく出力抽出のために消費されます。
+- **ローカル子プロセスのみ** — 解決される作業ディレクトリはローカルパスです。リモートランタイムには独自のバックエンドが必要です。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
+この開発ノートはメンテナー向けの作業コンテキストです。未解決の問いと未決定の方向性を扱います。明示的に非権威です — 出荷される動作と制限は、上のセクションとパッケージコードにあります。
 
-- **Spawn cost** — the full plugin tree per run is the price of full isolation; pooling would change that trade-off.
-- **Remote runtimes** — a remote runtime would need its own backend and workspace mapping.
+- **Spawn コスト** — 実行ごとの完全なプラグインツリーは完全な隔離の代償です。プーリングはそのトレードオフを変えます。
+- **リモートランタイム** — リモートランタイムには独自のバックエンドとワークスペースマッピングが必要です。
 
 </details>

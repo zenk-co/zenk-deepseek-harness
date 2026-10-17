@@ -1,157 +1,157 @@
 ---
-description: "Document previews in the right Sidebar: shared file loading and controls, selectable Markdown, code, image, PDF, Office and HTML renderers, and plain-text fallback."
+description: "右 Sidebar のドキュメントプレビュー: 共有のファイル読み込みとコントロール、選択可能な Markdown、コード、画像、PDF、Office、HTML レンダラー、プレーンテキストのフォールバック。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-sidebar-documentpreview
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Preview files in the right Sidebar and choose among registered renderers. Markdown and code support paged text; PDF, HTML, common images, and spreadsheets receive complete bytes; unknown extensions use plain text. Word and PowerPoint documents convert locally to PDF; spreadsheets open in the browser. The tab provides file status, renderer selection, wrap, and automatic or manual reload. Plugins can add local opening controls to the header and unsupported-preview empty state.
+右 Sidebar でファイルをプレビューし、登録されたレンダラーの中から選択する。Markdown とコードはページ分割されたテキストをサポートし、PDF、HTML、一般的な画像、スプレッドシートは完全なバイトを受け取り、未知の拡張子はプレーンテキストを使う。Word と PowerPoint ドキュメントはローカルで PDF に変換され、スプレッドシートはブラウザーで開く。タブはファイルステータス、レンダラー選択、折り返し、自動または手動の再読み込みを提供する。プラグインはヘッダーと未対応プレビューの空状態にローカルで開くコントロールを追加できる。
 
-## Table of Contents
+## 目次
 
-- [What it registers](#what-it-registers)
-- [Addresses](#addresses)
-- [How it reads](#how-it-reads)
-- [Excel preview](#excel-preview)
-- [Office preview](#office-preview)
-- [Navigation](#navigation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [登録内容](#what-it-registers)
+- [アドレス](#addresses)
+- [読み取り方法](#how-it-reads)
+- [Excel プレビュー](#excel-preview)
+- [Office プレビュー](#office-preview)
+- [ナビゲーション](#navigation)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="what-it-registers"></a>
-## What it registers
+## 登録内容
 
-- **The type** — `ctx.sidebarRightTabs.register(...)` with id `@deepseek-ai/dsh-client-ui-sidebar-documentpreview` (this implementation's identity in the tab system, and the key its body registers under), kind `text`, a whole-address file-resource pattern, band `fallback`. `canOpen` accepts only Session addresses, whose paths may be relative or absolute; bare `absolute` addresses are not claimed. A type registered at the `extension` or `builtin` band for a narrower pattern (say `*.png`) takes those addresses; other supported files land here. The whole address is the content identity, so two files with one name in different directories, or one path under two sessions, are two tabs; the decoded basename is the tab title, and the keyed `sidebar.right.pane.tab.title` seat places its extension-specific `FileTypeIcon` before that title.
-- **The body** — the keyed `sidebar.right.pane.tab` seat under the type's id. Its fixed header shows the Host's absolute path when available, otherwise the requested path; the shared [`PathLabel`](../ui-primitives/README.md#component-catalog) subdues directories, preserves a clipped path’s trailing characters with a left-edge fade, and exposes the full value on hover. A dropdown appears when multiple supported renderers are available. Plain text is offered only for text-compatible sources; a single renderer shows no viewer control. A known binary container suffix without a registered renderer shows the file-type icon and an unsupported-preview message under the path header, without issuing a read. Two Session-scoped list child slots hand the previewed file to other plugins once its metadata reports a Host path, both with `absolutePath` as the owner prop: `sidebar.right.tab.document.actions` renders after the header's own controls in every state that shows the header, and `sidebar.right.tab.document.unpreviewable` renders in the unsupported empty state and in the empty state of a readable file the preview cannot render (`not-text`, `too-large`), where Retry would otherwise stand; a carrier or unclassified read failure keeps Retry, and a missing or non-regular path offers only its explanation. The shipped occupant of both is [`ui-open-in-app`](../ui-open-in-app/README.md). A wrap toggle appears only when the selected renderer declares `wrap: true`; its glyph describes the mode the click selects, and the per-tab preference starts on. Reload stays in this header, not the Sidebar's tab strip. Automatic refresh defaults to enabled; its separate toggle is hidden, with state, labels, styles, and toggle logic retained. The body reaches every pane edge; each renderer owns its content inset and may own an inner scrollport. This intentionally differs from the Files tab's 2px right-side scrollbar offset: previews keep the full pane width so edge-to-edge HTML and code scrollports end at the pane edge.
-- **Shared loading and view state**, session-scoped and bucketed by tab id. The store holds accumulated pages or complete bytes, read and observed versions, pending Resource changes, automatic-refresh state, loading/failure state, renderer choice, scroll offset, wrap, and the answered navigation revision. The ordinary inject face calls Remote readers and writes through declared store actions. Reloads and loading-mode changes retire older requests; the tab's abort signal forgets its state.
+- **タイプ** — id `@deepseek-ai/dsh-client-ui-sidebar-documentpreview`（タブシステムにおけるこの実装の同一性であり、そのボディが登録されるキー）を持つ `ctx.sidebarRightTabs.register(...)`、kind `text`、アドレス全体のファイルリソースパターン、バンド `fallback`。`canOpen` は Session アドレスのみを受け付け、そのパスは相対でも絶対でもよい。裸の `absolute` アドレスは要求されない。より狭いパターン（例えば `*.png`）で `extension` または `builtin` バンドに登録されたタイプがそれらのアドレスを取り、その他の対応ファイルはここに着地する。アドレス全体がコンテンツの同一性であるため、異なるディレクトリにある同名の 2 つのファイル、または 2 つのセッション下の 1 つのパスは 2 つのタブになる。デコードされたベースネームがタブタイトルであり、キー付きの `sidebar.right.pane.tab.title` シートがそのタイトルの前に拡張子固有の `FileTypeIcon` を置く。
+- **ボディ** — タイプの id の下のキー付き `sidebar.right.pane.tab` シート。その固定ヘッダーは、利用可能な場合は Host の絶対パスを、そうでなければ要求されたパスを表示する。共有の [`PathLabel`](../ui-primitives/README.md#component-catalog) はディレクトリを控えめにし、クリップされたパスの末尾文字を左端のフェード付きで保持し、ホバーで完全な値を公開する。複数の対応レンダラーが利用可能な場合にドロップダウンが表示される。プレーンテキストはテキスト互換のソースにのみ提供され、単一のレンダラーではビューアーコントロールを表示しない。登録されたレンダラーのない既知のバイナリコンテナ拡張子は、読み取りを発行せずに、パスヘッダーの下にファイルタイプアイコンと未対応プレビューのメッセージを表示する。2 つの Session スコープのリスト子スロットが、メタデータが Host パスを報告した時点でプレビュー対象ファイルを他のプラグインに渡す。どちらもオーナー prop として `absolutePath` を持つ。`sidebar.right.tab.document.actions` はヘッダーを表示するすべての状態でヘッダー自身のコントロールの後にレンダリングされ、`sidebar.right.tab.document.unpreviewable` は未対応の空状態と、プレビューがレンダリングできない（`not-text`、`too-large`）読み取り可能ファイルの空状態でレンダリングされる（そこでは通常 Retry が立つ）。キャリアまたは未分類の読み取り失敗は Retry を保持し、欠落または非通常のパスはその説明のみを提供する。両方の出荷済み占有者は [`ui-open-in-app`](../ui-open-in-app/README.md) である。折り返しトグルは選択されたレンダラーが `wrap: true` を宣言した場合にのみ表示される。そのグリフはクリックが選択するモードを表し、タブごとの設定はオンで開始する。Reload は Sidebar のタブストリップではなく、このヘッダーに留まる。自動更新はデフォルトで有効であり、その別個のトグルは非表示で、状態、ラベル、スタイル、トグルロジックは保持される。ボディはすべてのペインの端に達する。各レンダラーは自身のコンテンツインセットを所有し、内部スクロールポートを所有してよい。これは Files タブの右側 2px のスクロールバーオフセットとは意図的に異なる。プレビューはペインの全幅を保つため、端から端までの HTML とコードのスクロールポートはペインの端で終わる。
+- **共有の読み込み状態とビュー状態**。セッションスコープで、タブ id ごとにバケット化される。ストアは、蓄積されたページまたは完全なバイト、読み取り・観測されたバージョン、保留中の Resource 変更、自動更新状態、読み込み/失敗状態、レンダラー選択、スクロールオフセット、折り返し、応答済みのナビゲーションリビジョンを保持する。通常の inject フェイスは Remote リーダーを呼び、宣言されたストアアクションを通じて書き込む。再読み込みと読み込みモードの変更は古いリクエストを退去させる。タブの abort シグナルはその状態を忘却する。
 
-Document implementations register metadata with `ctx.documentPreviews.register({ id, extensions, binaryExtensions?, priority, title, loading, wrap? })` and a body under the same `id` in the keyed, Session-scoped `sidebar.right.tab.document` child slot. `binaryExtensions` lists suffixes in `extensions` that cannot be read as text and omit the plain-text option. Own both registrations with effects and wait for the child slot through `ctx.slots.inject`. Bodies receive `resourceAddress`, `content`, `wrap`, `scrollportRef`, `addResource`, `setResources`, and the standard `useTabInfo`/`useResource` hooks. Dependency membership belongs to a tab-owned `ResourceGroup`; replacing dependencies always retains the root Resource. An inner scrolling element attaches `scrollportRef`; unmounting restores the shared body as scroll owner. The registry retains all matching alternatives: `extension` (the default) ranks above `builtin`, then longer suffixes rank first, then registration order. The dropdown preserves a selected implementation while it remains available. HTML, SVG, and unmatched extensions retain the plain-text fallback independently of loading mode.
+ドキュメント実装は `ctx.documentPreviews.register({ id, extensions, binaryExtensions?, priority, title, loading, wrap? })` でメタデータを登録し、同じ `id` の下のボディを、キー付きの Session スコープ `sidebar.right.tab.document` 子スロットに登録する。`binaryExtensions` は `extensions` のうちテキストとして読めないサフィックスを列挙し、プレーンテキストの選択肢を省略する。両方の登録を effect で所有し、`ctx.slots.inject` を通じて子スロットを待つ。ボディは `resourceAddress`、`content`、`wrap`、`scrollportRef`、`addResource`、`setResources`、および標準の `useTabInfo`/`useResource` フックを受け取る。依存メンバーシップはタブ所有の `ResourceGroup` に属し、依存を置き換えても常にルート Resource は保持される。内部スクロール要素は `scrollportRef` をアタッチし、アンマウント時に共有ボディがスクロール所有者として復元される。レジストリは一致するすべての代替を保持する。`extension`（デフォルト）が `builtin` より上位にランクされ、次に長いサフィックスが先、次に登録順である。ドロップダウンは、選択された実装が利用可能である間はそれを保持する。HTML、SVG、および一致しない拡張子は、読み込みモードとは独立にプレーンテキストのフォールバックを保持する。
 
-`loading: 'text-pages'` and `'bytes-complete'` use the shared file reader. With `'renderer'`, the selected body mounts before any bytes are read and receives `content: { kind: 'renderer', revision, loaded, failed, reload }`. Its injected face owns content loading, errors, store updates, and cancellation. `loaded(version)` records the displayed source version and ends loading. `failed()` ends loading without recording a successful version, allowing a later file change to retry; reports from replaced revisions are ignored. `reload()` increments the revision, which the body observes to cancel and replace its request. The body also cancels on unmount and tab closure, retains settled content in its declared tab store, and releases that state when the tab ends. [Office previews](#office-preview) use this mode without putting converted bytes or font metadata in the shared file store.
+`loading: 'text-pages'` と `'bytes-complete'` は共有ファイルリーダーを使う。`'renderer'` では、選択されたボディがバイトを読み取る前にマウントされ、`content: { kind: 'renderer', revision, loaded, failed, reload }` を受け取る。その注入されたフェイスがコンテンツ読み込み、エラー、ストア更新、キャンセルを所有する。`loaded(version)` は表示されたソースバージョンを記録し、読み込みを終了する。`failed()` は成功したバージョンを記録せずに読み込みを終了し、後のファイル変更が再試行できるようにする。置き換えられたリビジョンからの報告は無視される。`reload()` はリビジョンをインクリメントし、ボディはそれを観測して自身のリクエストをキャンセルして置き換える。ボディはアンマウントとタブクローズでもキャンセルし、確定したコンテンツを宣言されたタブストアに保持し、タブが終了したときにその状態を解放する。[Office プレビュー](#office-preview) は、変換されたバイトやフォントメタデータを共有ファイルストアに入れずにこのモードを使う。
 
 <a id="addresses"></a>
-## Addresses
+## アドレス
 
-A tab uses the Session address built by `fileAddressFor`, carrying a relative or absolute path. Routing preserves `.` and `..` path segments in the address and its content identity; the Host resolves them. `hostFileOf(address)` takes the Session only from that address, with no external Session argument; neither current nor Tab Session is borrowed. The Host resolves file and related paths through the Session filesystem, whose backend controls read authority. Metadata for the same complete address is shared by every UI, including Global components. The [Workspace Files README](../../api/workspace-files/README.md) owns these rules; renderer selection does not change the navigation address.
+タブは `fileAddressFor` が構築する Session アドレスを使い、相対または絶対パスを持つ。ルーティングはアドレスとそのコンテンツ同一性の中の `.` と `..` パスセグメントを保持し、Host がそれらを解決する。`hostFileOf(address)` はそのアドレスから Session のみを取り、外部の Session 引数を取らない。現在の Session もタブの Session も借用されない。Host は Session ファイルシステムを通じてファイルと関連パスを解決し、そのバックエンドが読み取り権限を制御する。同じ完全なアドレスのメタデータは、Global コンポーネントを含むすべての UI で共有される。[Workspace Files README](../../api/workspace-files/README.md) がこれらのルールを所有する。レンダラー選択はナビゲーションアドレスを変更しない。
 
-After all text pages load, Markdown images use the authenticated `/api/file` route for absolute file paths and paths relative to the source document's directory. Relative images wait for the Host's absolute document path. URL escapes are decoded once; query and fragment suffixes are excluded from the filename. HTTP(S) images retain their authored URLs, and failed image loads show alt text. Local images require an HTTP(S) application base URL; image files are not added to automatic-refresh dependencies.
+すべてのテキストページが読み込まれた後、Markdown 画像は絶対ファイルパスとソースドキュメントのディレクトリからの相対パスに対して、認証済みの `/api/file` ルートを使う。相対画像は Host の絶対ドキュメントパスを待つ。URL エスケープは一度デコードされ、クエリとフラグメントのサフィックスはファイル名から除外される。HTTP(S) 画像は作成時の URL を保持し、画像の読み込みに失敗すると alt テキストを表示する。ローカル画像は HTTP(S) のアプリケーションベース URL を必要とする。画像ファイルは自動更新の依存に追加されない。
 
 <a id="how-it-reads"></a>
-## How it reads
+## 読み取り方法
 
-Coding Tools selects the HTML preview policy in both Web and desktop. The renderer receives `interactivePreview` from plugin assembly. Off uses a DOMPurify-sanitized complete static document in an iframe with no sandbox permissions: CSP blocks scripts, external resources, connections, forms, and nested frames; all `href` and `xlink:href` attributes, refresh directives, and declarative shadow roots are removed before reparsing. Inline styles and data images remain visible, and related files are not read. On uses the scripted Blob preview described below. A mode change unmounts the previous frame and aborts its pending related-file reads. Static preview releases CSS/JS resource subscriptions and keeps the root file watched. Other document formats retain their own policies.
+Coding Tools は Web とデスクトップの両方で HTML プレビューポリシーを選択する。レンダラーはプラグイン構成から `interactivePreview` を受け取る。Off は、サンドボックス権限のない iframe 内で DOMPurify でサニタイズされた完全な静的ドキュメントを使う。CSP はスクリプト、外部リソース、接続、フォーム、ネストされたフレームをブロックする。すべての `href` と `xlink:href` 属性、refresh ディレクティブ、宣言的シャドウルートは再パース前に削除される。インラインスタイルとデータ画像は表示されたままで、関連ファイルは読み取られない。On は後述するスクリプト付き Blob プレビューを使う。モード変更は以前のフレームをアンマウントし、その保留中の関連ファイル読み取りを abort する。静的プレビューは CSS/JS リソース購読を解放し、ルートファイルの監視を維持する。その他のドキュメント形式はそれぞれのポリシーを保持する。
 
-Both HTML modes set the initial iframe name to `dsh-sidebar-html-<tab-id>` for Desktop shortcut routing. This correlation does not grant the preview access to the parent document.
+どちらの HTML モードも、デスクトップのショートカットルーティングのために iframe の初期名を `dsh-sidebar-html-<tab-id>` に設定する。この相関はプレビューに親ドキュメントへのアクセスを与えない。
 
-The body reads its record, navigation and lifetime through `useTabInfo().tab`. `useResource<'file'>(tab.contentId)` supplies metadata; ordinary inject callbacks supply content reads:
+ボディは `useTabInfo().tab` を通じて自身のレコード、ナビゲーション、ライフタイムを読む。`useResource<'file'>(tab.contentId)` がメタデータを提供し、通常の inject コールバックがコンテンツ読み取りを提供する。
 
-- The resource snapshot contains only `status`, `value`, and `failure`; `value` is `WorkspaceFileStat` metadata. Content reads do not wait for the first metadata frame once the provider is available. Observation failures take precedence over Preview's change notice; loaded content remains while metadata is unavailable.
-- **Text pages** — plain text, Markdown, and code read through an inject callback to `remote.workspaceFiles.read(sessionId, path, { offset }, signal)`. The first mount reads page one; scrolling to the body end or **Load more** requests the next page until `eof`. The owner delivers the accumulated prefix as `{ kind: 'text', text, pages, eof }`, including source offsets and line counts. Markdown and code render that prefix incrementally; they do not render each page as a separate document. A newer-version page past page one restarts from the beginning rather than mixing versions. A failure before any content fills the body with the file-type icon, the explanation, and the recourse the failure names (Retry, the unpreviewable child slot, or nothing); a later failure retains loaded content and adds the retry below it.
-- **Complete bytes** — PDF, HTML, common images, and spreadsheets call `remote.workspaceFiles.readBytes(sessionId, path, {}, signal)`. The binary Remote returns `data: Uint8Array<ArrayBuffer>` directly for `{ kind: 'bytes', data }`. The Host's `maxFileBytes` cap rejects oversized files rather than truncating them. PDF and spreadsheet renderers copy retained bytes before Worker transfer, keeping the Preview buffer usable. Bytes stay in transient view state, never persisted layouts or Session JSONL. Loading-mode changes retire previous results.
-- **Reload** — manual reload rereads only the current Preview tab through its Remote callbacks, preserving its scroll preference and retiring older requests. Automatic refresh uses the same callbacks after a `ResourceGroup` member changes. Each member's first metadata establishes a baseline without triggering reload or first-read version reconciliation; later changes received during a read remain pending for another refresh. Reads neither refresh shared metadata nor clear another tab's notice.
+- リソーススナップショットは `status`、`value`、`failure` のみを含み、`value` は `WorkspaceFileStat` メタデータである。プロバイダーが利用可能になれば、コンテンツ読み取りは最初のメタデータフレームを待たない。観測失敗は Preview の変更通知より優先され、メタデータが利用できない間も読み込み済みコンテンツは残る。
+- **テキストページ** — プレーンテキスト、Markdown、コードは、`remote.workspaceFiles.read(sessionId, path, { offset }, signal)` への inject コールバックを通じて読む。最初のマウントは 1 ページ目を読み、ボディ末尾または **Load more** へのスクロールが `eof` まで次のページを要求する。オーナーは蓄積されたプレフィックスを `{ kind: 'text', text, pages, eof }` として配信し、ソースオフセットと行数を含む。Markdown とコードはそのプレフィックスをインクリメンタルにレンダリングし、各ページを別々のドキュメントとしてレンダリングしない。1 ページ目を超える新しいバージョンのページは、バージョンを混在させるのではなく最初からやり直す。コンテンツ以前の失敗は、ファイルタイプアイコン、説明、および失敗が示す対処（Retry、unpreviewable 子スロット、またはなし）でボディを満たす。後の失敗は読み込み済みコンテンツを保持し、その下に retry を追加する。
+- **完全なバイト** — PDF、HTML、一般的な画像、スプレッドシートは `remote.workspaceFiles.readBytes(sessionId, path, {}, signal)` を呼ぶ。バイナリ Remote は `{ kind: 'bytes', data }` に対して `data: Uint8Array<ArrayBuffer>` を直接返す。Host の `maxFileBytes` 上限は、サイズ超過のファイルを切り詰めるのではなく拒否する。PDF とスプレッドシートのレンダラーは Worker 転送前に保持バイトをコピーし、Preview バッファを使用可能なまま保つ。バイトは一時的なビュー状態に留まり、永続化されたレイアウトや Session JSONL には決して入らない。読み込みモードの変更は以前の結果を退去させる。
+- **Reload** — 手動の再読み込みは、現在の Preview タブのみをその Remote コールバックを通じて読み直し、スクロール設定を保持して古いリクエストを退去させる。自動更新は `ResourceGroup` メンバーが変更した後に同じコールバックを使う。各メンバーの最初のメタデータはベースラインを確立し、再読み込みや初回読み取りのバージョン調整をトリガーしない。読み取り中に受信した後の変更は、別の更新のために保留のままになる。読み取りは共有メタデータを更新せず、別のタブの通知もクリアしない。
 
-When Coding Tools is enabled, HTML fills the body edge to edge in a Blob iframe with exactly `sandbox="allow-scripts"`, without `allow-same-origin`; scripts cannot access the parent application's origin or file reader. The renderer loads directly declared relative `.js` classic scripts and `.css` stylesheets through its injected Remote callback, with fixed safety limits of 4 MiB per asset, 32 MiB total, and 64 distinct assets. Host code resolves the related path, and `readBytes` with `baseFile` returns native bytes. The dependency Resource is added after the read returns, using its `absolutePath` or a string `error.details.path` on failure; without a Host path, the Client does not guess one. Inside the renderer, base64 is used only to embed the iframe bootstrap payload in script text. A `<base href>` leaves dependency resolution to the browser, as do HTTPS resources. Local module imports, CSS `url()`/`@import`, and dynamic `fetch` do not use Host file access. Read failures, invalid UTF-8, or exceeded limits fail the preview rather than publishing a partial asset package. Replacing or unmounting the document releases its Blob URL.
+Coding Tools が有効な場合、HTML は Blob iframe 内でボディを端から端まで満たし、サンドボックスは正確に `sandbox="allow-scripts"` で `allow-same-origin` はない。スクリプトは親アプリケーションのオリジンやファイルリーダーにアクセスできない。レンダラーは、直接宣言された相対 `.js` クラシックスクリプトと `.css` スタイルシートを、注入された Remote コールバックを通じて読み込む。固定の安全制限はアセットあたり 4 MiB、合計 32 MiB、最大 64 個の個別アセットである。Host コードが関連パスを解決し、`baseFile` 付きの `readBytes` がネイティブバイトを返す。依存 Resource は読み取りが戻った後に追加され、その `absolutePath` または失敗時の文字列 `error.details.path` を使う。Host パスがない場合、Client は推測しない。レンダラー内部では、base64 は iframe ブートストラップペイロードをスクリプトテキストに埋め込むためだけに使われる。`<base href>` は依存解決をブラウザーに委ね、HTTPS リソースも同様である。ローカルモジュールインポート、CSS `url()`/`@import`、動的 `fetch` は Host のファイルアクセスを使わない。読み取り失敗、無効な UTF-8、制限超過は、部分的なアセットパッケージを公開するのではなくプレビューを失敗させる。ドキュメントの置き換えまたはアンマウントはその Blob URL を解放する。
 
-PNG, JPEG, GIF, WebP, BMP, ICO, and SVG render through Blob URLs in an `<img>` static-image context, rounded inside a 12px inset. Images default to fit width without enlarging content smaller than the pane; 100% uses the image's intrinsic CSS-pixel width. The shared zoom controls can produce horizontal and vertical scrolling, but do not provide drag-to-pan. Zoom changes retain the same `<img>` and Blob URL, so animated images continue playing. Raster formats can soften above their intrinsic size, while SVG remains on the browser's vector rendering path. SVG markup never enters the application DOM or an iframe, so its scripts cannot execute or reach the parent page. Replacing or unmounting the image revokes its Blob URL.
+PNG、JPEG、GIF、WebP、BMP、ICO、SVG は、`<img>` 静的画像コンテキスト内で Blob URL を通じてレンダリングされ、12px のインセット内で角が丸められる。画像はデフォルトで幅に合わせ、ペインより小さいコンテンツを拡大しない。100% は画像の固有の CSS ピクセル幅を使う。共有ズームコントロールは水平・垂直スクロールを生むが、ドラッグパンは提供しない。ズーム変更は同じ `<img>` と Blob URL を保持するため、アニメーション画像は再生を続ける。ラスター形式は固有サイズを超えると柔らかくなることがあるが、SVG はブラウザーのベクターレンダリング経路に留まる。SVG マークアップはアプリケーション DOM や iframe に決して入らないため、そのスクリプトは実行できず親ページにも到達できない。画像の置き換えまたはアンマウントはその Blob URL を取り消す。
 
-Shared copy comes from `sidebarDocumentPreview`; each builtin renderer owns its localized labels. PDF and converted Office previews use a cool light-grey background in light mode and a matte-black background in dark mode, with subtle page shadows and original document colors. PDF and image previews share a floating control with **Fit width**, 25%, 50%, 100%, 150%, and 200% choices plus 25% incremental zoom across the 25%–400% fixed range. Fit width is the default and tracks pane resizing; 100% means the PDF's 96-DPI page size or the image's intrinsic CSS-pixel size. On fine pointers, the control starts hidden, slides up when the pointer enters the bottom 72 CSS pixels, and slides down after a 420 ms leave delay; hover, keyboard focus, an open menu, and an active gesture keep it visible, while devices without hover keep it visible continuously. Chromium maps a macOS trackpad pinch to the same live, pointer-anchored path as Ctrl+wheel; the control displays the gesture percentage, and the settled value survives body remounts until the tab closes. HTML previews do not expose zoom controls. After zoom settles or fit width changes, nearby PDF pages redraw at the resolved scale multiplied by the device pixel ratio. The previous bitmap and selectable text stay visible until the replacement bitmap is ready; offscreen pages refresh when they approach the viewport.
+共有文言は `sidebarDocumentPreview` から来る。各組み込みレンダラーは自身のローカライズされたラベルを所有する。PDF と変換された Office プレビューは、ライトモードではクールなライトグレー背景、ダークモードではマットブラック背景を使い、かすかなページ影と元のドキュメント色を持つ。PDF と画像プレビューは、**Fit width**、25%、50%、100%、150%、200% の選択肢と、25%–400% の固定範囲にわたる 25% 刻みのズームを持つフローティングコントロールを共有する。Fit width がデフォルトで、ペインのリサイズに追従する。100% は PDF の 96-DPI ページサイズ、または画像の固有 CSS ピクセルサイズを意味する。ファインポインターでは、コントロールは最初は非表示で、ポインターが下部 72 CSS ピクセルに入るとスライドアップし、420 ms の退出遅延後にスライドダウンする。ホバー、キーボードフォーカス、開いているメニュー、アクティブなジェスチャーはそれを表示したままにし、ホバーのないデバイスでは継続的に表示される。Chromium は macOS トラックパッドのピンチを Ctrl+wheel と同じライブのポインターアンカー経路にマップする。コントロールはジェスチャー率を表示し、確定した値はタブが閉じるまでボディの再マウントを越えて存続する。HTML プレビューはズームコントロールを公開しない。ズームが確定した後、または Fit width が変わった後、近くの PDF ページは解決されたスケールにデバイスピクセル比を掛けた値で再描画される。以前のビットマップと選択可能なテキストは、置き換えビットマップの準備ができるまで表示されたままである。オフスクリーンのページはビューポートに近づくと更新される。
 
-Initial reads and renderer preparation, including Office conversion, share a centered 28px ongoing `StateDot` with the visible localized status “Rendering document...”. The status exposes the same accessible name and respects reduced-motion preferences. Additional text pages keep a compact inline spinner while loaded content stays visible. The PDF body loads its package-local `client.pdf.js` chunk only when a PDF preview mounts; PDF.js, its Worker source, and embedded support data stay out of the startup `client.js`. PDF and converted Word/PowerPoint pages form a vertical sequence with 12px page gaps and a 12px outer inset showing the theme-specific document background; fit width reserves this inset, and pages render lazily near the viewport; an unrendered page holds its place as a quiet 3:4 placeholder block. PDF.js’s official TextLayerBuilder manages selection boundaries and normalized copying over an aligned text layer. Selections use translucent blue in both themes while the canvas retains the document text; blank line breaks remain unhighlighted; alignment accounts for PDF page units, page rotation, and viewport resizing, and page disposal cancels both layers. Image-only PDFs contain no selectable text. Code previews show a tertiary-colored language label and a copy icon with a tooltip; wrapping remains in the document toolbar. They show source line numbers by default without including them in copied text; plain text uses the same font size and line height as code. Code sits on the pane's own background rather than the chat card's fill; its banner is adjacent to a full-height inner scrollport, so both scrollbars begin below the copy control.
+初回の読み取りとレンダラーの準備（Office 変換を含む）は、中央の 28px の進行中 `StateDot` と、表示されるローカライズ済みステータス “Rendering document...” を共有する。このステータスは同じアクセシブル名を公開し、低モーション設定を尊重する。追加のテキストページは、読み込み済みコンテンツが表示されたままの間、コンパクトなインラインスピナーを保つ。PDF ボディは、PDF プレビューがマウントされたときにのみパッケージローカルの `client.pdf.js` チャンクを読み込む。PDF.js、その Worker ソース、埋め込みサポートデータは起動時の `client.js` には入らない。PDF と変換された Word/PowerPoint のページは、12px のページ間隔と、テーマ固有のドキュメント背景を表示する 12px の外側インセットを持つ垂直シーケンスを形成する。fit width はこのインセットを予約し、ページはビューポート付近で遅延レンダリングされる。未レンダリングのページは、静かな 3:4 のプレースホルダーブロックとして場所を保持する。PDF.js の公式 TextLayerBuilder が、整列されたテキストレイヤー上での選択境界と正規化コピーを管理する。選択は両テーマで半透明の青を使い、キャンバスはドキュメントテキストを保持する。空白の改行はハイライトされないままである。整列は PDF ページ単位、ページ回転、ビューポートのリサイズを考慮し、ページの破棄は両方のレイヤーをキャンセルする。画像のみの PDF には選択可能なテキストがない。コードプレビューは tertiary 色の言語ラベルと、ツールチップ付きのコピーアイコンを表示する。折り返しはドキュメントツールバーに残る。ソース行番号をデフォルトで表示し、コピーされるテキストには含めない。プレーンテキストはコードと同じフォントサイズと行高を使う。コードはチャットカードの塗りではなくペイン自身の背景の上にあり、そのバナーは全高の内部スクロールポートに隣接するため、両方のスクロールバーはコピーコントロールの下から始まる。
 
-A leading YAML frontmatter block, opened by `---` on the first line and closed by `---` or `...`, renders above the Markdown body as a key/value list. String values show their resolved text, including folded and multiline strings; other scalars, lists, mappings, and aliases keep their authored YAML. Invalid YAML and non-mapping documents show the block verbatim, and a block without content shows nothing. An unterminated block remains Markdown. The YAML parser loads in the package-local `client.frontmatter-fields.js` chunk only when a document has frontmatter; the verbatim block stands in while it loads or if it fails to load. The source file is unchanged.
+先頭の YAML フロントマターブロックは、1 行目の `---` で開き、`---` または `...` で閉じ、Markdown ボディの上にキー/値リストとしてレンダリングされる。文字列値は、折りたたみ文字列や複数行文字列を含め、解決されたテキストを表示する。その他のスカラー、リスト、マッピング、エイリアスは作成時の YAML を保持する。無効な YAML とマッピングでないドキュメントはブロックをそのまま表示し、コンテンツのないブロックは何も表示しない。終端のないブロックは Markdown のままである。YAML パーサーは、ドキュメントにフロントマターがある場合にのみパッケージローカルの `client.frontmatter-fields.js` チャンクで読み込まれる。読み込み中または読み込み失敗時はそのままのブロックが代役を務める。ソースファイルは変更されない。
 
 <a id="excel-preview"></a>
-## Excel preview
+## Excel プレビュー
 
-Open `.xlsx`, `.xls`, `.csv`, and `.tsv` directly in the browser with worksheet tabs, cell selection, copying, and a read-only formula bar. XLSX retains fonts, solid fills, borders, number formats, rich text, merged cells, row and column sizes, hidden rows/columns/sheets, and frozen headings. XLS retains saved values, formulas, number formats, merges, and available row/column metadata; fonts, borders, and frozen panes are unsupported. Workbooks display saved formula results without recalculating; missing results remain blank, and a compact formula-bar warning marks workbooks whose displayed results may be incomplete or inaccurate. The workbook viewport fills the preview pane and follows its size changes without reloading its sheets or selection. Worksheet tabs start at the left edge; overflowing tabs scroll with horizontal trackpad gestures or left/right navigation beside a separate zoom control. Spreadsheet controls retain dark text on their light background in both app themes. Pixel-based trackpad gestures pan the grid on both axes together, including diagonally, at the gesture’s speed; frozen headings stay fixed. Reversing direction at a sheet edge retains the next gesture’s movement. Selection statistics and inactive worksheet menu arrows are hidden. Frozen headings remain fixed while scrolling, without freeze dividers or drag handles. Spreadsheet preview does not call the Office conversion service.
+`.xlsx`、`.xls`、`.csv`、`.tsv` をブラウザーで直接開く。ワークシートタブ、セル選択、コピー、読み取り専用の数式バー付き。XLSX はフォント、単色塗り、罫線、数値書式、リッチテキスト、結合セル、行と列のサイズ、非表示の行/列/シート、固定見出しを保持する。XLS は保存された値、数式、数値書式、結合、利用可能な行/列メタデータを保持する。フォント、罫線、ウィンドウ枠の固定はサポートされない。ワークブックは再計算せずに保存された数式結果を表示する。欠落した結果は空白のままで、コンパクトな数式バー警告が、表示結果が不完全または不正確である可能性のあるワークブックを示す。ワークブックのビューポートはプレビューペインを満たし、シートや選択を再読み込みせずにサイズ変更に追従する。ワークシートタブは左端から始まる。オーバーフローしたタブは、別個のズームコントロールの隣で水平トラックパッドジェスチャーまたは左右ナビゲーションでスクロールする。スプレッドシートのコントロールは、両方のアプリテーマで明るい背景上の暗いテキストを保つ。ピクセルベースのトラックパッドジェスチャーは、斜めを含む両軸でグリッドを同時に、ジェスチャーの速度でパンする。固定見出しは固定されたままである。シート端で方向を反転しても、次のジェスチャーの移動は保持される。選択統計と非アクティブなワークシートメニュー矢印は非表示である。固定見出しはスクロール中も固定されたままで、固定ディバイダーやドラッグハンドルはない。スプレッドシートプレビューは Office 変換サービスを呼ばない。
 
-XLSX preview omits DrawingML parts from an in-memory copy before parsing and ignores worksheet drawing references. The original file and worksheet XML remain unchanged. A notice above the table lists detected charts, images, shapes, and conditional formatting that are not displayed, and recommends opening the workbook in a system application. Files without these detected features have no notice; formula warnings remain separate.
+XLSX プレビューは、パース前にメモリ内コピーから DrawingML パーツを省略し、ワークシートの描画参照を無視する。元のファイルとワークシート XML は変更されない。テーブルの上の通知は、検出されたが表示されないグラフ、画像、図形、条件付き書式を列挙し、システムアプリケーションでワークブックを開くことを推奨する。これらの検出機能のないファイルには通知がない。数式警告は別個のままである。
 
-CSV and TSV default to the spreadsheet viewer and also offer Plain text; CSV additionally offers syntax-highlighted Code. Commas and tabs delimit their fields respectively; quoted separators, escaped quotes, multiline fields, empty fields, and unequal row lengths are supported. The first row remains data. Values remain literal strings, including leading zeros, dates, booleans, and formula-looking text. Text files accept UTF-8 or BOM-marked UTF-16; invalid encoding receives conversion guidance. Malformed quoted fields fail the table preview rather than silently dropping data.
+CSV と TSV はデフォルトでスプレッドシートビューアーを使い、Plain text も提供する。CSV はさらにシンタックスハイライト付きの Code を提供する。カンマとタブがそれぞれのフィールドを区切る。引用された区切り、エスケープされた引用符、複数行フィールド、空フィールド、行ごとに異なるフィールド数がサポートされる。先頭行はデータのままである。値は、先頭のゼロ、日付、真偽値、数式に見えるテキストを含め、リテラル文字列のままである。テキストファイルは UTF-8 または BOM 付き UTF-16 を受け付け、無効なエンコーディングには変換のガイダンスが表示される。不正な引用フィールドは、データを黙って落とすのではなくテーブルプレビューを失敗させる。
 
-Configure `excel` on the same `ui-sidebar-documentpreview` entry. These limits complement the Host's complete-file read limit; they do not cap browser process memory or decompression allocations.
+同じ `ui-sidebar-documentpreview` エントリで `excel` を構成する。これらの制限は Host の完全ファイル読み取り制限を補完するもので、ブラウザープロセスのメモリや解凍アロケーションを制限するものではない。
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `excel.maxBytes` | `16777216` (16 MiB) | Maximum source file bytes |
-| `excel.maxCells` | `250000` | Maximum combined rectangular worksheet area, including empty cells |
-| `excel.timeoutMs` | `15000` | Maximum parser Worker lifetime in milliseconds |
+| `excel.maxBytes` | `16777216` (16 MiB) | ソースファイルの最大バイト数 |
+| `excel.maxCells` | `250000` | 空セルを含む、結合された矩形ワークシート領域の最大値 |
+| `excel.timeoutMs` | `15000` | パーサー Worker の最大生存時間（ミリ秒） |
 
-The lazy Excel chunk bundles FortuneSheet, ExcelJS for XLSX, SheetJS CE for XLS, and PapaParse for CSV/TSV. Package-local, React-independent adapters map parser output directly to FortuneSheet cells and share cell formatting and initial selection. Third-party license texts remain in the published chunk; SheetJS CE retains its Apache-2.0 terms. Each parse owns a disposable Worker and transfers a copy of retained file bytes; replacement, unmount, failure, and timeout terminate that Worker. The stylesheet is scoped to the Excel preview. Charts, drawings/images, pivot tables, conditional formatting, editing, recalculation, and export are unsupported; font availability, Excel column-width approximation, and theme-tint approximation can affect fidelity. Hyperlinks display as text without loading their targets. ExcelJS decodes entity spellings in cached XLSX string formula results again; a saved literal `&lt;` is displayed as `<`.
+遅延 Excel チャンクは、FortuneSheet、XLSX 用の ExcelJS、XLS 用の SheetJS CE、CSV/TSV 用の PapaParse をバンドルする。パッケージローカルの React 非依存アダプターがパーサー出力を FortuneSheet のセルに直接マップし、セル書式と初期選択を共有する。サードパーティのライセンステキストは公開チャンクに残る。SheetJS CE は Apache-2.0 の条件を保持する。各パースは使い捨ての Worker を所有し、保持ファイルバイトのコピーを転送する。置き換え、アンマウント、失敗、タイムアウトはその Worker を終了させる。スタイルシートは Excel プレビューにスコープされる。グラフ、図形/画像、ピボットテーブル、条件付き書式、編集、再計算、エクスポートはサポートされない。フォントの可用性、Excel の列幅近似、テーマティント近似が忠実度に影響することがある。ハイパーリンクはターゲットを読み込まずにテキストとして表示される。ExcelJS はキャッシュされた XLSX 文字列数式結果のエンティティ表記を再びデコードする。保存されたリテラル `&lt;` は `<` として表示される。
 
-The read-only formula bar displays formulas and cell text literally on one line, with horizontal scrolling for long content. Copying preserves an HTML table with escaped cell contents, including saved formula results. The [FortuneSheet patch rationale](../../../.agents/notes/implemented/feature/2026-09-16-browser-excel-preview.md) explains the requirements for retaining these behaviors and worksheet selection when upgrading the dependency.
+読み取り専用の数式バーは、数式とセルテキストを 1 行で文字通りに表示し、長いコンテンツは水平スクロールする。コピーは、保存された数式結果を含む、エスケープされたセル内容を持つ HTML テーブルを保持する。[FortuneSheet パッチの根拠](../../../.agents/notes/implemented/feature/2026-09-16-browser-excel-preview.md) は、依存をアップグレードする際にこれらの挙動とワークシート選択を維持するための要件を説明する。
 
-The pinned [ExcelJS patch](../../../patches/exceljs@4.4.0.patch) resolves the workbook, styles, shared strings, worksheets, comments, Tables, and VML through package relationships, including absolute and relative targets and ASCII case-equivalent part names, and recognizes SpreadsheetML and VML names by namespace URI. Strict OOXML SpreadsheetML and relationship URIs map to the same supported preview features; this is not full Strict conformance. XML parts accept UTF-8 and either byte order of UTF-16; CDATA contributes literal text. Drawing and conditional-format notices follow relationships regardless of part directories. Unreferenced `xl/drawings/*.xml` parts and their relationship files are also omitted, without adding notices; comment VML remains. Missing referenced parts and ambiguous case-equivalent ZIP entries fail the preview. Comments and Table metadata survive parsing but have no dedicated preview controls. The patch covers the Node sources and `dist/exceljs.js`; its browser entry selects that patched bundle. Dependency upgrades must preserve both entry paths and pass the [independent-writer regressions and fuzz diagnostics](tests/fuzz/README.md).
+ピン留めされた [ExcelJS パッチ](../../../patches/exceljs@4.4.0.patch) は、ワークブック、スタイル、共有文字列、ワークシート、コメント、Tables、VML をパッケージリレーションシップを通じて解決する。絶対および相対ターゲット、ASCII で大文字小文字等価なパート名を含み、SpreadsheetML と VML の名前を名前空間 URI で認識する。Strict OOXML の SpreadsheetML とリレーションシップ URI は同じサポート対象プレビュー機能にマップされる。これは完全な Strict 準拠ではない。XML パーツは UTF-8 と UTF-16 の両方のバイト順を受け付け、CDATA はリテラルテキストとして寄与する。描画と条件付き書式の通知は、パーツディレクトリに関わらずリレーションシップに従う。参照されていない `xl/drawings/*.xml` パーツとそのリレーションシップファイルも省略され、通知は追加されない。コメント VML は残る。参照されたパーツの欠落と、大文字小文字等価ですでに曖昧な ZIP エントリはプレビューを失敗させる。コメントと Table メタデータはパースを生き延びるが、専用のプレビューコントロールを持たない。パッチは Node ソースと `dist/exceljs.js` をカバーし、そのブラウザーエントリはそのパッチ済みバンドルを選択する。依存のアップグレードは両方のエントリパスを保持し、[独立ライターの回帰とファズ診断](tests/fuzz/README.md) を通過しなければならない。
 
 <a id="office-preview"></a>
-## Office preview
+## Office プレビュー
 
-Open `.doc`, `.docx`, `.ppt`, and `.pptx` as PDF previews with the same loading state, zoom controls, cancellation, and selectable text as PDF files. The [Host provider](../../document/office-to-pdf/README.md) performs local conversion and retains its spreadsheet conversion API for other consumers. Invalid supported files, conversion failures, and timeouts receive localized messages. Missing Host services show configuration guidance.
+`.doc`、`.docx`、`.ppt`、`.pptx` を PDF プレビューとして開く。読み込み状態、ズームコントロール、キャンセル、選択可能なテキストは PDF ファイルと同じである。[Host プロバイダー](../../document/office-to-pdf/README.md) がローカル変換を行い、他の消費者のためにスプレッドシート変換 API を保持する。無効な対応ファイル、変換失敗、タイムアウトにはローカライズされたメッセージが表示される。Host サービスがない場合は構成ガイダンスが表示される。
 
-The [Web bundle](../../bundle/web-app/README.md) mounts this package as `ui-sidebar-documentpreview`. Configure its transient Office cache through that entry's `office` settings; the [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-client-ui-sidebar-documentpreview) defines accepted values. Settings are embedded in each served page; reload the browser page after changing YAML.
+[Web バンドル](../../bundle/web-app/README.md) はこのパッケージを `ui-sidebar-documentpreview` としてマウントする。そのエントリの `office` 設定を通じて一時的な Office キャッシュを構成する。[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-client-ui-sidebar-documentpreview) が受け入れられる値を定義する。設定は配信される各ページに埋め込まれる。YAML を変更した後はブラウザーページを再読み込みする。
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `office.maxCachedEntries` | `8` | Maximum retained completed PDFs |
-| `office.maxCachedBytes` | `67108864` (64 MiB) | Maximum retained binary PDF bytes, counted by buffer `byteLength` |
-| `office.maxPending` / `office.maxReaders` | `8` / `32` | Unsettled conversion RPCs / readers including metadata lookups |
+| `office.maxCachedEntries` | `8` | 保持される完了済み PDF の最大数 |
+| `office.maxCachedBytes` | `67108864` (64 MiB) | 保持されるバイナリ PDF バイトの最大値。バッファーの `byteLength` で数える |
+| `office.maxPending` / `office.maxReaders` | `8` / `32` | 未確定の変換 RPC / メタデータ参照を含むリーダー |
 
-Opening an Office file requests conversion on demand. Each read checks renderer generation and authorized source metadata before sharing an in-flight conversion or reusing a successful PDF. The cache uses renderer generation, Session, absolute source path, and source version as its identity; least-recently used PDFs leave to keep retention within both limits. Failures and PDFs larger than the byte limit are not retained. A converted PDF is retained only when its returned renderer generation matches the cache identity. Cancelling one reader leaves shared conversion running until the final reader leaves. Connection resets clear cached bytes and cancel pending reads; plugin disposal also waits for outstanding requests. PDFs are never persisted; transport strings, decoding storage, and PDF.js rendering memory remain outside the cache limit.
+Office ファイルを開くと、オンデマンドで変換が要求される。各読み取りは、進行中の変換を共有したり成功した PDF を再利用したりする前に、レンダラー世代と認可されたソースメタデータを確認する。キャッシュはレンダラー世代、Session、絶対ソースパス、ソースバージョンを同一性として使う。最近最も使われていない PDF から退去し、保持を両方の制限内に保つ。失敗とバイト制限を超える PDF は保持されない。変換された PDF は、返されたレンダラー世代がキャッシュの同一性と一致する場合にのみ保持される。1 つのリーダーをキャンセルしても、最後のリーダーが去るまで共有変換は実行されたままである。接続リセットはキャッシュされたバイトをクリアし、保留中の読み取りをキャンセルする。プラグインの破棄も未完了のリクエストを待つ。PDF は決して永続化されない。転送文字列、デコードストレージ、PDF.js のレンダリングメモリはキャッシュ制限の外に留まる。
 
-Background requests leave the final pending-request and reader slots available for foreground work; setting either limit to one rejects background reads. Renderer replacement restarts generation discovery and authorization once. Another replacement during that retry reports the localized busy message.
+バックグラウンドリクエストは、最後の保留リクエスト枠とリーダー枠をフォアグラウンド作業のために残す。どちらかの制限を 1 に設定すると、バックグラウンド読み取りは拒否される。レンダラーの置き換えは世代の検出と認可を一度再開する。その再試行中にさらに置き換えが起きると、ローカライズされたビジーメッセージを報告する。
 
-A yellow rounded-triangle warning appears before Reload in the document toolbar when the current Office preview has missing fonts. Hover or keyboard focus shows the missing-font count; clicking opens an anchored list. Escape, Close, or clicking outside closes the list without hiding the warning or moving the document. Reloading closes the old details; previews with no missing fonts show no warning. Viewed and dismissed states are not retained.
+現在の Office プレビューに欠落フォントがある場合、ドキュメントツールバーの Reload の前に黄色の丸い三角形の警告が表示される。ホバーまたはキーボードフォーカスで欠落フォント数が表示され、クリックでアンカー付きリストが開く。Escape、Close、または外側のクリックは、警告を隠したりドキュメントを動かしたりせずにリストを閉じる。再読み込みは古い詳細を閉じる。欠落フォントのないプレビューには警告が表示されない。閲覧済み・閉じ済みの状態は保持されない。
 
 <details>
-<summary>Office implementation — click to expand</summary>
+<summary>Office 実装 — クリックで展開</summary>
 
-Office registration, loading, caching, and font notices live in `src/client/office/`. The injected Office face writes converted PDF bytes, font metadata, and failures through the declared store actions. The Office body triggers loading, binds cancellation to its lifecycle, and declares a nested PDF slot that reuses the lazy PDF body and its tab viewing state. The keyed `sidebar.right.tab.document.action` slot places renderer controls before Reload. The Office action shares the body’s store and reads only the current revision’s font metadata. Registration remains available without the Host renderer; optional `remote.officeToPdf` and `remote.workspaceFiles` injections supply conversion and freshness callbacks, and their removal restores unavailable guidance. Registrations and tab retention follow effect lifetimes. The [conversion service](../../document/office-to-pdf/README.md) owns the Host Remote methods, mounted by `api/remotes`.
+Office の登録、読み込み、キャッシュ、フォント通知は `src/client/office/` にある。注入された Office フェイスは、宣言されたストアアクションを通じて変換された PDF バイト、フォントメタデータ、失敗を書き込む。Office ボディは読み込みをトリガーし、キャンセルを自身のライフサイクルにバインドし、遅延 PDF ボディとそのタブ表示状態を再利用するネストされた PDF スロットを宣言する。キー付きの `sidebar.right.tab.document.action` スロットは、Reload の前にレンダラーコントロールを置く。Office アクションはボディのストアを共有し、現在のリビジョンのフォントメタデータのみを読む。Host レンダラーなしでも登録は利用可能である。オプションの `remote.officeToPdf` と `remote.workspaceFiles` 注入が変換と鮮度のコールバックを提供し、それらが削除されると利用不可のガイダンスが復元される。登録とタブ保持は effect のライフタイムに従う。[変換サービス](../../document/office-to-pdf/README.md) が Host Remote メソッドを所有し、`api/remotes` がマウントする。
 
-The Office Remote returns converted PDFs as native `Uint8Array` values through Connection's multipart binary transport. Renderers borrow retained bytes read-only and copy them before Worker transfer.
+Office Remote は、Connection のマルチパートバイナリ転送を通じて、変換された PDF をネイティブの `Uint8Array` 値として返す。レンダラーは保持バイトを読み取り専用で借用し、Worker 転送前にコピーする。
 
-The page refresh shortcut reuses the selected preview’s reload operation, including its request retirement and scroll retention. The header reload tooltip and ARIA combination follow the effective shortcut binding.
+ページ更新ショートカットは、選択されたプレビューの再読み込み操作を再利用し、そのリクエストの退去とスクロール保持も含む。ヘッダーの再読み込みツールチップと ARIA の組み合わせは、有効なショートカットバインディングに従う。
 
 </details>
 
 <a id="navigation"></a>
-## Navigation
+## ナビゲーション
 
-`ctx.sidebarRight.openResource(address, { params: { line } })` carries a 1-based source line through the `file` parameters. In `text-pages` mode, the owner loads sequential pages until that line or EOF. Plain-text and code renderers expose source-line anchors; Markdown does not. A navigation remains pending while its selected renderer has no anchor and runs if the user switches to plain text or code. Code navigation scrolls the inner source viewport directly. Byte-mode renderers do not consume source-line navigation. Each completed navigation revision is answered once. Opening the same file without `revealIfOpened: false` focuses its existing tab and delivers a new revision.
+`ctx.sidebarRight.openResource(address, { params: { line } })` は、`file` パラメータを通じて 1 始まりのソース行を運ぶ。`text-pages` モードでは、オーナーはその行または EOF まで順にページを読み込む。プレーンテキストとコードのレンダラーはソース行アンカーを公開し、Markdown は公開しない。選択されたレンダラーにアンカーがない間、ナビゲーションは保留のままで、ユーザーがプレーンテキストまたはコードに切り替えると実行される。コードナビゲーションは内部ソースビューポートを直接スクロールする。バイトモードのレンダラーはソース行ナビゲーションを消費しない。完了した各ナビゲーションリビジョンは一度だけ応答される。`revealIfOpened: false` なしで同じファイルを開くと、既存のタブにフォーカスし、新しいリビジョンを配信する。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the preview is a browser-only viewer that registers no tool, prompt section, or session event.
+なし。プレビューはブラウザー専用のビューアーであり、ツール、プロンプトセクション、セッションイベントを何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-No direct effect; what the user reads here never enters a model request.
+直接の効果はない。ユーザーがここで読む内容はモデルリクエストに決して入らない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
-- **Preview, not editing.** The viewers provide no file editing or shared search interface; a directory address fails with `not-regular-file`. Unknown extensions use the plain-text reader and remain subject to its UTF-8/NUL checks.
-- **Office conversion limits.** The preview does not launch native Office editors or download an engine. Binary `.doc` and `.ppt` files return no missing-font diagnostics. Conversion fidelity and resource limits belong to the [LibreOffice provider](../../document/office-to-pdf/README.md).
-- **Sequential text and bounded complete files.** Deep source lines require the preceding pages; PDF, HTML, and images require a complete result within the Host's `maxFileBytes` cap.
-- **PDF raster allocation is bounded.** Each page bitmap is capped at 16,777,216 pixels; very large pages or high zoom on high-density displays can still render below device resolution.
-- **Byte-view scroll state is not restored.** PDF, HTML, and images can return to the top when their renderer remounts or reloads; fixed PDF and image zoom can overflow horizontally, and HTML iframe scrolling belongs to its opaque browsing context.
-- **Finite local HTML dependencies.** Only direct classic `.js` and stylesheet `.css` references are packed. Browser-resolved resources retain browser origin and network restrictions; no runtime file-read bridge is exposed to the iframe.
-- **Scroll writes are unthrottled.** Every scroll event records its offset in the store; the line blocks are memoized so the resulting re-render hands React the same elements back.
-- **A failed PDF chunk load requires a page reload.** React caches a rejected lazy import for the page lifetime; ordinary PDF open or render failures remain retryable inside the loaded body.
+- **プレビューであり、編集ではない。** ビューアーはファイル編集や共有検索インターフェイスを提供しない。ディレクトリアドレスは `not-regular-file` で失敗する。未知の拡張子はプレーンテキストリーダーを使い、その UTF-8/NUL チェックの対象のままである。
+- **Office 変換の制限。** プレビューはネイティブの Office エディターを起動したり、エンジンをダウンロードしたりしない。バイナリの `.doc` と `.ppt` ファイルは欠落フォント診断を返さない。変換の忠実度とリソース制限は [LibreOffice プロバイダー](../../document/office-to-pdf/README.md) に属する。
+- **逐次テキストと上限付きの完全ファイル。** 深いソース行は先行ページを必要とする。PDF、HTML、画像は Host の `maxFileBytes` 上限内の完全な結果を必要とする。
+- **PDF ラスター割り当てには上限がある。** 各ページビットマップは 16,777,216 ピクセルに制限される。非常に大きなページや高密度ディスプレイでの高ズームでは、デバイス解像度を下回ってレンダリングされることがある。
+- **バイトビューのスクロール状態は復元されない。** PDF、HTML、画像は、レンダラーが再マウントまたは再読み込みされると先頭に戻ることがある。固定された PDF と画像のズームは水平にオーバーフローすることがあり、HTML iframe のスクロールはその不透明なブラウジングコンテキストに属する。
+- **ローカル HTML 依存は限定的。** 直接のクラシック `.js` とスタイルシート `.css` の参照のみが梱包される。ブラウザーが解決するリソースはブラウザーのオリジンとネットワーク制限を保持する。実行時のファイル読み取りブリッジは iframe に公開されない。
+- **スクロール書き込みはスロットルされない。** すべてのスクロールイベントがそのオフセットをストアに記録する。行ブロックはメモ化されているため、結果の再レンダーは React に同じ要素を返す。
+- **PDF チャンクの読み込み失敗はページ再読み込みを必要とする。** React は拒否された遅延インポートをページのライフタイム中キャッシュする。通常の PDF オープンやレンダリングの失敗は、読み込み済みボディ内で再試行可能なままである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,49 +1,49 @@
 ---
-description: "Localization for the web GUI: the zh/en preference, browser-derived fallback, typed namespace dictionaries, and the framework translation seat, for users and plugin authors."
+description: "Web GUI のローカライズ: zh/en のプリファレンス、ブラウザー由来のフォールバック、型付き名前空間辞書、フレームワークの翻訳シート。ユーザーとプラグイン作者向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-locale
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-client-locale` to switch the web GUI between the shipped English and Chinese locales or languages added by client plugins. User selections take effect immediately; every authenticated browser persists them as `locale.preference` in `$DSH_HOME/cordis.patch.yml` through the Host settings service. New browsers use the first supported language requested by the browser until the Host read delivers a stored preference. Plugin authors add typed namespace dictionaries and translate through the public locale API; slot-rendered copy updates without a reload.
+`dsh-client-locale` を使うと、Web GUI を出荷済みの英語ロケールと中国語ロケールの間で、またはクライアントプラグインが追加した言語に切り替えられます。ユーザーの選択は直ちに有効になり、認証済みの各ブラウザーが Host 設定サービスを通じて `$DSH_HOME/cordis.patch.yml` の `locale.preference` にそれを永続化します。新しいブラウザーは、Host の読み取りが保存済みプリファレンスを届けるまで、ブラウザーが要求する最初のサポート対象言語を使います。プラグイン作者は型付き名前空間辞書を追加し、公開 locale API を通じて翻訳します。スロットレンダリングされたコピーはリロードなしで更新されます。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と保留作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use it wherever the web GUI needs a language switch or translated copy: the shipped settings row covers users, and plugin authors register their own dictionaries. Nothing needs configuration to mount — the package activates with the client tree.
+Web GUI が言語切り替えや翻訳されたコピーを必要とするあらゆる場所でこれを使います: 出荷済みの設定行がユーザーをカバーし、プラグイン作者は独自の辞書を登録します。マウントに設定は不要です — パッケージはクライアントツリーと共にアクティベートします。
 
-### Choosing a language
+### 言語の選択
 
-Open Settings → General and select a registered language. The active locale is applied immediately: the UI copy switches, `<html lang>` points at the external id or built-in document tag, and the choice is written to the durable settings section. A browser without an explicit Host preference selects the first registered language that matches `navigator` by full tag and then primary subtag, falling back to English. A stored external locale waits for its definition to register instead of becoming active while unavailable.
+設定 → 一般を開き、登録済みの言語を選択します。アクティブなロケールは直ちに適用されます: UI コピーが切り替わり、`<html lang>` が外部 ID または組み込みドキュメントタグを指し、選択は永続設定セクションに書き込まれます。Host プリファレンスを明示的に持たないブラウザーは、`navigator` に完全タグで一致し、次にプライマリサブタグで一致する最初の登録言語を選択し、英語にフォールバックします。保存された外部ロケールは、利用不能なままアクティブになるのではなく、その定義の登録を待ちます。
 
-Native shells may provide `__DSH_LOCALE__` with an asynchronous `read()` and an `onChange(locale)` callback. Initialization supplies the current Host preference and ordered OS languages before the Client mounts. Automatic selection stays provisional; only Settings selections write `locale.preference`. A fresh read on each page load prevents a stale preload preference after reload. Ordinary browsers keep navigator-based detection and their existing settings-scope policy.
+ネイティブシェルは非同期の `read()` と `onChange(locale)` コールバックを伴う `__DSH_LOCALE__` を提供できます。初期化は、Client がマウントする前に、現在の Host プリファレンスと順序付きの OS 言語を提供します。自動選択は暫定のままで、設定での選択だけが `locale.preference` を書き込みます。ページロードのたびに新しく読み取ることで、リロード後に古いプリロードプリファレンスが残るのを防ぎます。通常のブラウザーは navigator ベースの検出と既存の設定スコープポリシーを保ちます。
 
-### Registering a dictionary
+### 辞書の登録
 
-Call `ctx.locale.register(ns, { zh, en })` with a namespace merged into `LocaleNamespaceMap`; the compiler checks every key against the namespace's typed key union and requires both shipped locales. Consumers translate through `ctx.locale.bind(ns)` or the framework-injected `t` seat. A dictionary registered after the UI is already mounted is picked up without a remount.
+`ctx.locale.register(ns, { zh, en })` を呼び出し、名前空間を `LocaleNamespaceMap` にマージします。コンパイラーはすべてのキーをその名前空間の型付きキーユニオンに対してチェックし、出荷済みの両ロケールを要求します。コンシューマーは `ctx.locale.bind(ns)` またはフレームワークが注入する `t` シートを通じて翻訳します。UI がマウント済みの後に登録された辞書は、再マウントなしで取り込まれます。
 
-### Resolving package text
+### パッケージテキストの解決
 
-Use `ctx.locale.resolveText(text)` for [`LocalizedText`](../../util/package-manifest/README.md), such as installed plugin titles and descriptions. Literal strings are returned unchanged. Translation maps use lowercase language ids, require an `en` fallback, and follow the active language's declared fallback chain. They do not consult or register namespace dictionaries.
+インストール済みプラグインのタイトルや説明など [`LocalizedText`](../../util/package-manifest/README.md) には `ctx.locale.resolveText(text)` を使います。リテラル文字列は変更せずに返されます。翻訳マップは小文字の言語 ID を使い、`en` フォールバックを必須とし、アクティブな言語が宣言したフォールバックチェーンに従います。名前空間辞書の参照や登録は行いません。
 
-### Registering a language pack
+### 言語パックの登録
 
-An external client plugin registers the language definition and each translated namespace as owned effects; definitions and dictionaries may register in either order:
+外部クライアントプラグインは、言語定義と各翻訳済み名前空間を所有エフェクトとして登録します。定義と辞書はどちらの順でも登録できます:
 
 ```js
 export const inject = ['locale']
@@ -63,86 +63,86 @@ export function apply(ctx) {
 }
 ```
 
-An external id is a non-empty ASCII BCP 47-style tag. Its fallback must already be registered, and the chain must terminate at `en`; unknown targets, duplicate ids, and cycles fail at registration. Lookup walks the fallback chain in the requested namespace, repeats it in `common`, then displays the key. Unloading a definition removes it from the selector and returns an active selection to the available browser/default locale.
+外部 ID は空でない ASCII の BCP 47 形式タグです。そのフォールバックはすでに登録済みでなければならず、チェーンは `en` で終端しなければなりません。未知のターゲット、重複 ID、循環は登録時に失敗します。検索は要求された名前空間でフォールバックチェーンをたどり、`common` でそれを繰り返し、次にキー自体を表示します。定義のアンロードはそれをセレクターから削除し、アクティブな選択を利用可能なブラウザー/デフォルトロケールへ戻します。
 
-### What the Host half does
+### Host 側が行うこと
 
-Every authenticated browser persists the preference through the Host settings service under the shared [settings scope policy](../ui-settings/README.md).
+認証済みの各ブラウザーは、共有の[設定スコープポリシー](../ui-settings/README.md)の下で、Host 設定サービスを通じてプリファレンスを永続化します。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains how the locale service is built; observable behavior is covered in [Use this package](#use-this-package).
+このセクションでは locale サービスがどのように構築されているかを説明します。観察可能な動作は[このパッケージを使う](#use-this-package)で扱います。
 
-### Design concept
+### 設計概念
 
-One `LocaleRuntime` owns the preference and the dictionary registry, and is itself the slot system's `LocaleFace`: `getSnapshot`/`subscribe` back the framework-injected `t` seat through `ctx.slots.installLocale`. The immutable snapshot carries the active locale, the selectable locales, and a monotonic revision; dictionary registration and locale switches both advance the revision, but only a switch emits the `locale/change` event. Product-authored Client UI text must enter through these typed dictionaries or an already-localized primitive prop; `verify-client-ui-i18n` enforces that source ownership ([decision](../../../.agents/notes/implemented/architecture/2026-08-23-locale-owned-client-ui-copy.md)).
+1 つの `LocaleRuntime` がプリファレンスと辞書レジストリを所有し、それ自体がスロットシステムの `LocaleFace` です: `getSnapshot`/`subscribe` が `ctx.slots.installLocale` を通じてフレームワーク注入の `t` シートを支えます。不変スナップショットはアクティブなロケール、選択可能なロケール、単調増加するリビジョンを運びます。辞書の登録とロケールの切り替えはどちらもリビジョンを進めますが、`locale/change` イベントを発行するのは切り替えだけです。プロダクトが作成する Client UI テキストはこれらの型付き辞書か、すでにローカライズ済みのプリミティブプロパティを通らなければなりません。`verify-client-ui-i18n` がそのソース所有権を強制します ([決定](../../../.agents/notes/implemented/architecture/2026-08-23-locale-owned-client-ui-copy.md))。
 
-### Preference resolution
+### プリファレンスの解決
 
-The provisional locale comes from the browser (`navigator.languages` matched by full tag and then primary subtag, English as the fallback), standing in until the Host settings scope delivers its stored preference. The Host read runs after plugin activation so an unavailable settings scope cannot block the page, and the result replaces the provisional value live. A stored external locale waits for its definition to register. `setLocale` is the only write entry; it persists even when the id already matches the active locale, because the active value may be provisional and must survive a different browser sharing the same home.
+暫定ロケールはブラウザーから来ます (`navigator.languages` を完全タグ、次にプライマリサブタグで照合し、英語をフォールバックとする)。Host 設定スコープが保存済みプリファレンスを届けるまでそれを代用します。Host の読み取りはプラグインのアクティベーション後に実行されるため、利用不能な設定スコープがページをブロックすることはなく、結果は暫定値をライブで置き換えます。保存された外部ロケールはその定義の登録を待ちます。`setLocale` が唯一の書き込みエントリーで、ID がすでにアクティブなロケールと一致していても永続化します。アクティブな値は暫定的である可能性があり、同じホームを共有する別のブラウザーを生き延びなければならないからです。
 
-### Dictionary lookup
+### 辞書検索
 
-Document language synchronization writes `<html lang>` only when its value changes; dictionary-only revisions leave the attribute untouched.
+ドキュメント言語の同期は、値が変わるときにのみ `<html lang>` を書き込みます。辞書のみのリビジョンはその属性に触れません。
 
-The typed object form requires complete dictionaries for both built-in locales. The per-locale form lets language packs register each namespace independently. For each key, lookup walks the active language's declared fallback chain in the requested namespace, repeats that chain in `common`, then displays the key itself. Bound translate functions retain stable identity per namespace so they can ride inject surfaces without breaking memoization.
+型付きオブジェクト形式は両方の組み込みロケールに完全な辞書を要求します。ロケール別形式では言語パックが各名前空間を独立に登録できます。各キーについて、検索は要求された名前空間でアクティブな言語が宣言したフォールバックチェーンをたどり、`common` でそのチェーンを繰り返し、次にキー自体を表示します。バインドされた翻訳関数は名前空間ごとに安定したアイデンティティを保つため、メモ化を壊さずに inject サーフェスに乗せられます。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/client/index.ts`](src/client/index.ts) | `LocaleRuntime`, dictionary registry, Language row registration, `locale/change` event |
-| [`src/index.ts`](src/index.ts) | Node half: registers the `locale` settings namespace |
-| [`src/locale-settings.ts`](src/locale-settings.ts) | The durable schema for `locale.preference` |
-| [`src/locales/`](src/locales/) | The shipped `zh`/`en` dictionaries |
+| [`src/client/index.ts`](src/client/index.ts) | `LocaleRuntime`、辞書レジストリ、Language 行の登録、`locale/change` イベント |
+| [`src/index.ts`](src/index.ts) | Node 側: `locale` 設定名前空間の登録 |
+| [`src/locale-settings.ts`](src/locale-settings.ts) | `locale.preference` の永続スキーマ |
+| [`src/locales/`](src/locales/) | 出荷済みの `zh`/`en` 辞書 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these when the locale contract is not enough: the slot face it implements, the settings surface it rides, and the persistence decision behind the preference.
+locale 契約では足りないときに、これらを読んでください: それが実装するスロットフェイス、それが乗る設定サーフェス、プリファレンス背後の永続化の決定です。
 
-- [Client slot system](../ui-slots/README.md) — the slot model and the `LocaleFace` seat this package implements.
-- [historical Host-backed preferences decision](../../../.agents/notes/archived/bug-fix/2026-08-06-host-backed-web-preferences.md) — why the preference persists in Host settings instead of the browser.
-- [Settings group map](../../settings/README.md) — the settings service that stores the preference.
-- [Client group map](../README.md) — the browser half this package belongs to.
+- [Client スロットシステム](../ui-slots/README.md) — スロットモデルと、このパッケージが実装する `LocaleFace` シート。
+- [過去の Host ベースプリファレンスの決定](../../../.agents/notes/archived/bug-fix/2026-08-06-host-backed-web-preferences.md) — プリファレンスがブラウザーではなく Host 設定に永続化される理由。
+- [settings グループマップ](../../settings/README.md) — プリファレンスを保存する設定サービス。
+- [client グループマップ](../README.md) — このパッケージが属するブラウザー側。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the locale service is a browser-side UI plugin layer that registers nothing model-facing.
+なし。locale サービスはブラウザー側の UI プラグイン層で、モデル向けのものを何も登録しません。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てることも送信することもありません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と保留作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where localization is incomplete or frozen at registration time. They are current package constraints, not a task backlog.
+これらの制限は、ローカライズが不完全な箇所、または登録時に凍結される箇所を定義します。これらは現在のパッケージ制約であり、タスクバックログではありません。
 
-- **Registry-held text reads its translation once** — copy captured at registration time outside the slot render path (e.g. the `/model` command description in the command registry) keeps the language it was registered under until re-registration; slot-rendered copy follows switches live.
-- **Language packs own language-specific behavior** — the registry supplies selection, persistence, browser matching, key fallback, and `<html lang>`; it does not add plural rules or bidirectional layout.
+- **レジストリが保持するテキストは翻訳を 1 度だけ読む** — スロットレンダーパスの外で登録時にキャプチャされたコピー (たとえばコマンドレジストリ内の `/model` コマンドの説明) は、再登録まで登録時の言語を保ちます。スロットレンダリングされたコピーは切り替えにライブで追従します。
+- **言語固有の動作は言語パックが所有する** — レジストリは選択、永続化、ブラウザー照合、キーフォールバック、`<html lang>` を提供します。複数形のルールや双方向レイアウトは追加しません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

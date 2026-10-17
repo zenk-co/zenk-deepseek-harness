@@ -1,44 +1,44 @@
 ---
-description: "The subprocess service (ctx.subprocess) for composition authors and capability consumers starting, observing, and terminating managed child processes and terminal sessions."
+description: "コンポジションの作成者とケイパビリティのコンシューマーが、管理対象の子プロセスとターミナルセッションを開始、監視、終了するための subprocess サービス (ctx.subprocess)。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-subprocess
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`ctx.subprocess` resolves executables, starts explicitly specified child processes or real terminal sessions, streams or collects bounded output, and terminates the full managed process range. Configure one subprocess implementation for each composition, choosing local or remote execution according to where commands must run. Each request sets argv, working directory, stdio, environment overrides, termination grace, and cancellation, with no shell interpretation or hidden execution defaults. Child environments remove ambient credentials and `DSH_*` values before applying explicit overrides; callers own deadlines, teardown policy, and model-facing rendering, while collected output remains readable after exit.
+`ctx.subprocess` は実行ファイルを解決し、明示的に指定された子プロセスまたは実際のターミナルセッションを開始し、有界の出力をストリームまたは収集し、管理対象のプロセス範囲全体を終了させる。コンポジションごとに subprocess 実装を 1 つ構成し、コマンドを実行する必要のある場所に応じてローカルまたはリモート実行を選ぶ。各リクエストは argv、作業ディレクトリ、stdio、環境の上書き、終了の猶予、キャンセルを設定する。シェル解釈や隠れた実行の既定値はない。子の環境は明示的な上書きを適用する前に周囲の資格情報と `DSH_*` の値を除去する。期限、テアダウンのポリシー、モデル向けのレンダリングは呼び出し元が所有し、収集された出力は終了後も読み取り可能である。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount a subprocess provider in any composition that must run child processes, and call `ctx.subprocess` from the capability that owns the command. The common path is explicit: resolve the executable, spawn with a fully specified request, read the output you asked for, and terminate the managed range when the work is done.
+子プロセスを実行する必要のあるコンポジションに subprocess プロバイダーをマウントし、コマンドを所有するケイパビリティから `ctx.subprocess` を呼び出す。一般的な手順は明示的である。実行ファイルを解決し、完全に指定されたリクエストで spawn し、要求した出力を読み取り、作業が終わったら管理対象範囲を終了させる。
 
-### Mounting the service
+### サービスをマウントする
 
-One provider registers `ctx.subprocess` per composition; load it beside the consumers that spawn through it — the bash executors, the LSP host, the PTY shell backend, or an out-of-process subagent backend. Loading a second provider fails loudly (one service per context, Cordis standard).
+コンポジションごとに 1 つのプロバイダーが `ctx.subprocess` を登録する。これを経由して spawn するコンシューマー——bash エグゼキューター、LSP ホスト、PTY シェルバックエンド、プロセス外のサブエージェントバックエンド——の隣に読み込む。2 つ目のプロバイダーを読み込むと大きな失敗になる（コンテキストごとに 1 サービス、Cordis 標準）。
 
 ```yaml
 - name: '@deepseek-ai/dsh-subprocess-local'
 - name: '@deepseek-ai/dsh-bash-local'
 ```
 
-### Starting a managed process
+### 管理対象プロセスの開始
 
-The request is fully explicit: the program and arguments, the working directory, one stdio disposition per stream, a termination grace, an optional abort signal, and optional environment overrides. Target and managed-range identities remain provider-private. `done` resolves with the direct command's exit facts (`exitCode` and `signal`) and rejects for spawn or provider failures; collected output stays readable after exit.
+リクエストは完全に明示的である。プログラムと引数、作業ディレクトリ、ストリームごとに 1 つの stdio 処分、終了の猶予、任意の abort シグナル、任意の環境の上書き。ターゲットと管理対象範囲のアイデンティティはプロバイダー内に留まる。`done` は直接コマンドの終了事実（`exitCode` と `signal`）で解決し、spawn またはプロバイダーの失敗で拒否する。収集された出力は終了後も読み取り可能なままである。
 
 ```text
 const executable = await ctx.subprocess.resolveExecutable('bash')
@@ -52,112 +52,112 @@ const { exitCode, signal } = await handle.done
 const output = handle.collected.stdout?.readFrom(0)
 ```
 
-### Choosing how output is delivered
+### 出力の届け方を選ぶ
 
-- `'pipe'` hands you the raw stream for your own protocol framing — JSON-RPC for the LSP host, ndjson for the ACP backend.
-- `'inherit'` lets the child write to the parent's own stream, for pass-through diagnostics.
-- A collect object buffers a bounded in-memory tail; add a `spill` cap and the complete stream is also recoverable from a spill file.
+- `'pipe'` は独自のプロトコルフレーミング（LSP ホストの JSON-RPC、ACP バックエンドの ndjson）のために生ストリームを渡す。
+- `'inherit'` は子に親のストリームへ書かせ、診断のパススルーに使う。
+- collect オブジェクトは有界のメモリ内テールをバッファし、`spill` の上限を加えると完全なストリームも spill ファイルから回収できる。
 
-Reads are offset-based and non-consuming: a background reader and a final batch read can share one stream without stealing each other's bytes.
+読み取りはオフセットベースで非消費的である。バックグラウンドリーダーと最後のバッチ読み取りが、互いのバイトを奪わずに 1 つのストリームを共有できる。
 
 <a id="using-a-control-pipe"></a>
-### Using a control pipe
+### 制御パイプを使う
 
-Set `stdio.control: 'pipe'` to receive a separate raw `Duplex` in `handle.control`. The Node child opens fd 7 with `openInheritedControlChannel()` from `@deepseek-ai/dsh-subprocess/control`; this helper consumes the provider-owned `DSH_SUBPROCESS_CONTROL=pipe` marker. Callers cannot supply that marker through `env`. Control bytes never enter stdout/stderr collectors. The consumer owns framing, validation, backpressure, and closing its endpoint; provider disposal destroys any endpoint remaining after process teardown. Omitting the request returns `control: undefined`. This channel is available only for ordinary processes, and carries no authority to bypass tool approval.
+`stdio.control: 'pipe'` を設定すると、`handle.control` に別個の生の `Duplex` を受け取る。Node の子は `@deepseek-ai/dsh-subprocess/control` の `openInheritedControlChannel()` で fd 7 を開く。このヘルパーはプロバイダー所有の `DSH_SUBPROCESS_CONTROL=pipe` マーカーを消費する。呼び出し元が `env` を通じてそのマーカーを渡すことはできない。制御バイトが stdout/stderr コレクターに入ることはない。フレーミング、検証、バックプレッシャー、エンドポイントのクローズはコンシューマーが所有し、プロバイダーの破棄はプロセスのテアダウン後に残っているエンドポイントを破壊する。リクエストを省略すると `control: undefined` を返す。このチャネルは通常のプロセスでのみ利用でき、ツール承認を迂回する権限を持たない。
 
-### Managing process lifetime
+### プロセスのライフタイムの管理
 
-Termination and waiting use one provider-managed range. `terminate()` starts the provider's documented procedure, is idempotent, and becomes a no-op after that range is empty; the request's abort signal starts the same procedure. `waitForExit()` observes the same range and resolves only after the provider proves it quiescent, so direct command completion does not hide a surviving descendant. It rejects when the selected owner can no longer prove quiescence. Providers document their native owners and weaker fallbacks; callers own deadlines, teardown ladders, and cause classification.
+終了と待機は 1 つのプロバイダー管理の範囲を使う。`terminate()` はプロバイダーの文書化された手順を開始し、冪等で、その範囲が空になった後は no-op になる。リクエストの abort シグナルも同じ手順を開始する。`waitForExit()` は同じ範囲を観測し、プロバイダーが静止を証明した後にのみ解決するため、直接コマンドの完了が生き残った子孫を隠すことはない。選択されたオーナーがもはや静止を証明できない場合は拒否する。プロバイダーは自身のネイティブオーナーと弱いフォールバックを文書化する。期限、テアダウンのラダー、原因の分類は呼び出し元が所有する。
 
-### Running a terminal session
+### ターミナルセッションの実行
 
-For interactive programs, `spawnTerminal` allocates a real PTY: write text, read UTF-8 output, inspect and signal the current foreground process group, and await one `terminate()` that settles every session member the provider can still observe. Readiness, scrollback, and prompt policy stay with the PTY consumer.
+インタラクティブなプログラムには `spawnTerminal` が実際の PTY を割り当てる。テキストを書き込み、UTF-8 出力を読み取り、現在のフォアグラウンドプロセスグループを検査してシグナルを送り、プロバイダーがまだ観測できるすべてのセッションメンバーを決着させる 1 つの `terminate()` を待つ。準備完了、スクロールバック、プロンプトのポリシーは PTY コンシューマーに留まる。
 
-A terminal request can opt into `shellActivity`. `inspectActivity()` combines supported shell lifecycle evidence with owned-job observations and returns `idle`, `busy` or `unknown`, plus a handle-scoped revision. Unsupported or incomplete observations never imply idle; input invalidates existing prompt evidence. Opted-in terminals keep remaining work owned after the root shell exits instead of using that exit as permission to terminate descendants. Consumers own retention and cleanup deadlines.
+ターミナルリクエストは `shellActivity` にオプトインできる。`inspectActivity()` はサポートされるシェルライフサイクルの証拠と所有ジョブの観測を組み合わせ、`idle`、`busy`、`unknown` と、ハンドルスコープのリビジョンを返す。サポートされない、または不完全な観測が idle を意味することは決してない。入力は既存のプロンプトの証拠を無効化する。オプトインしたターミナルは、ルートシェルの終了を子孫を終了させる許可として使う代わりに、残った作業をその終了後も所有し続ける。保持とクリーンアップの期限はコンシューマーが所有する。
 
-### Environment every child starts from
+### すべての子が開始する環境
 
-Children never inherit the harness's ambient secrets: credential-shaped names and ambient `DSH_*` facts are scrubbed, and the caller's explicit `env` merges after that scrub. A deliberately forwarded credential or a current `DSH_*` deployment fact still reaches the child; an explicit `undefined` tombstone removes an ordinary ambient entry.
+子が harness の周囲の秘密を継承することは決してない。資格情報の形をした名前と周囲の `DSH_*` の事実は除去され、呼び出し元の明示的な `env` はその除去の後にマージされる。意図的に転送された資格情報や現在の `DSH_*` デプロイ事実は子に届く。明示的な `undefined` の墓標は通常の周囲のエントリを削除する。
 
-### What can go wrong
+### うまくいかない場合
 
-An executable that cannot be resolved fails loudly with a stable error. A spawn that never starts rejects `done`; there is no buffered output for a process that never ran. `waitForExit()` also rejects when the provider cannot prove its selected range is empty, and a provider fallback may not own descendants that escape its process group or observed session. When a transport owns its own spawn (the SDK client, MCP), route around the service and import `scrubbedParentEnv` directly so environment policy stays single-sourced.
+解決できない実行ファイルは安定したエラーで大きな失敗になる。開始しない spawn は `done` を拒否する。実行されなかったプロセスにバッファされた出力はない。`waitForExit()` は、プロバイダーが選択した範囲が空であることを証明できない場合も拒否し、プロバイダーのフォールバックがそのプロセスグループや観測セッションから逃れた子孫を所有しないことがある。トランスポートが独自の spawn を所有する場合（SDK クライアント、MCP）、サービスを迂回して `scrubbedParentEnv` を直接インポートし、環境ポリシーが単一の情報源に留まるようにする。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the seam and points at the code that realizes them; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションは seam の背後の設計判断を説明し、それを実現するコードを指し示す。観測可能な挙動は[このパッケージを使う](#use-this-package)でカバーされている。
 
-### Design concept
+### 設計概念
 
-The seam is built on one separation: the service owns process coordinates and lifetime; consumers own what a process means and every default that shapes one. That is why the spawn request is fully explicit — no hidden subprocess-service default — and why `SubprocessOutcome` carries exit facts only: callers own deadlines, teardown ladders, and cause classification. The `dsh-shell` request/spec split is the owning template.
+seam は 1 つの分離の上に成り立つ。サービスはプロセスの座標とライフタイムを所有し、コンシューマーはプロセスの意味とそれを形作るすべての既定値を所有する。だからこそ spawn リクエストは完全に明示的であり——隠れた subprocess サービスの既定値はない——`SubprocessOutcome` は終了事実のみを運ぶ。期限、テアダウンのラダー、原因の分類は呼び出し元が所有する。`dsh-shell` の request/spec 分割が手本である。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: abstract `SubprocessRuntime`, `ctx.subprocess` registration, the shared `scrubbedParentEnv` scrub |
-| [`src/types.ts`](src/types.ts) | Vocabulary: spawn spec, stdio modes, handles, readers, outcomes, `DSH_*` namespace |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: 抽象 `SubprocessRuntime`、`ctx.subprocess` の登録、共有の `scrubbedParentEnv` スクラブ |
+| [`src/types.ts`](src/types.ts) | 語彙: spawn スペック、stdio モード、ハンドル、リーダー、結果、`DSH_*` 名前空間 |
 
-### Data model and flow
+### データモデルとフロー
 
-A spawn returns a live handle immediately without exposing target identity. `done` independently reports the direct command outcome or failure, while `waitForExit()` reports managed-range quiescence. The request's abort signal drives the same termination procedure as `terminate()`. Collected readers are cursor-free: offsets are whole-stream byte coordinates the caller owns, so independent readers cannot consume one another's output, and a read whose offset slid out of the in-memory tail is `lossy` and points at the spill file when one exists. `spawnTerminal` is one deep primitive because ordinary pipes cannot allocate a controlling terminal or clean terminal-session members.
+spawn はターゲットのアイデンティティを公開せずに生きたハンドルを即座に返す。`done` は直接コマンドの結果または失敗を独立に報告し、`waitForExit()` は管理対象範囲の静止を報告する。リクエストの abort シグナルは `terminate()` と同じ終了手順を駆動する。収集リーダーはカーソルを持たない。オフセットは呼び出し元が所有するストリーム全体のバイト座標であるため、独立したリーダーが互いの出力を消費することはない。オフセットがメモリ内テールから滑り出た読み取りは `lossy` になり、spill ファイルが存在する場合はそれを指す。`spawnTerminal` が 1 つの深いプリミティブであるのは、通常のパイプが制御端末を割り当てたり、ターミナルセッションのメンバーをクリーンアップしたりできないためである。
 
-### Lifecycle and invariants
+### ライフサイクルと不変条件
 
-One implementation registers per context; loading a second throws (Cordis standard). Disposal of the service terminates every still-running managed process and awaits its exit, so process lifetime survives consumer reloads. `argv` is never shell-interpreted; a consumer that wants a shell passes `['bash', '-c', command]` itself. Terminal allocation cancellation (the spec signal) is separate from the published handle's lifetime.
+1 つの実装がコンテキストごとに登録する。2 つ目を読み込むと例外を投げる（Cordis 標準）。サービスの破棄はまだ実行中のすべての管理対象プロセスを終了させ、その終了を待つため、プロセスのライフタイムはコンシューマーのリロードを生き残る。`argv` はシェル解釈されることは決してない。シェルを望むコンシューマーは自ら `['bash', '-c', command]` を渡す。ターミナル割り当てのキャンセル（スペックのシグナル）は、公開されたハンドルのライフタイムとは別である。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the exhaustive type reference to the providers and the decision evidence behind the seam.
+パッケージレベルの契約で足りない場合はこれらのページを読む。網羅的な型リファレンスから、プロバイダーと seam の背後の決定の根拠へと進む。
 
-- [Subprocess subsystem](../../../docs/subsystems/subprocess.md) — spawn specs, output readers, outcomes, and the `DSH_*` environment in full.
-- [dsh-subprocess-local](../subprocess-local/README.md) — the local host provider that implements this contract.
-- [dsh-bash-local](../../shell/bash-local/README.md) — the largest consumer: bash commands over this service.
-- [Subprocess seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-subprocess-seam.md) — why the process half became its own seam and what moved with it.
+- [Subprocess サブシステム](../../../docs/subsystems/subprocess.md) — spawn スペック、出力リーダー、結果、`DSH_*` 環境の全体。
+- [dsh-subprocess-local](../subprocess-local/README.md) — この契約を実装するローカルホストプロバイダー。
+- [dsh-bash-local](../../shell/bash-local/README.md) — 最大のコンシューマー: このサービス上の bash コマンド。
+- [Subprocess seam の Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-subprocess-seam.md) — プロセスの半分がなぜ独自の seam になったのか、何が一緒に移ったのか。
 
 -----
 
-Terminal consumers use `terminalEnvironment()` to read the provider platform and preferred shell, and `resolveExecutable()` to verify candidates. A completed lookup miss throws `SubprocessExecutableNotFoundError`; transport failures remain distinct. `spawnTerminal` requires `terminalType` and initial dimensions, and its handle supports `resize(cols, rows)` without reallocating the process.
+ターミナルコンシューマーは `terminalEnvironment()` でプロバイダーのプラットフォームと優先シェルを読み取り、`resolveExecutable()` で候補を検証する。完了した検索のミスは `SubprocessExecutableNotFoundError` を投げ、トランスポートの失敗は別個のままである。`spawnTerminal` は `terminalType` と初期サイズを必要とし、そのハンドルはプロセスを再割り当てせずに `resize(cols, rows)` をサポートする。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through consumer seams such as the bash executor family, which own all model-facing rendering of process output and lifecycle.
+間接的。プロセス出力とライフサイクルのモデル向けレンダリングをすべて所有する bash エグゼキューター系などのコンシューマー seam を通じてである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumers own any request-prefix changes.
+直接の無効化はない。リクエストプレフィックスの変更は挙げられたコンシューマーが所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the seam is a poor fit or leaves work to its consumers. They are current package constraints, not a comparison or a backlog.
+これらの制限は、seam が不向きになる、または作業をコンシューマーに残す状況を定義する。現在のパッケージの制約であり、比較やバックログではない。
 
-- **SDK-managed spawns remain outside** — a transport that owns its internal spawn (the SDK client, MCP) cannot route that call through this service; it can still import `scrubbedParentEnv` so environment policy stays single-sourced.
-- **Teardown ladders are consumer-owned** — the seam ships signalling verbs and the managed-range wait, not a canned quiesce sequence; each out-of-process consumer encodes its child's cooperation shape itself (the ACP backend's stdin-EOF-first ladder is the in-repo template).
-- **Observability is provider-specific** — native providers may own escaped descendants through systemd scopes or Windows Jobs, while fallback providers expose weaker process-group, tree, or session visibility. The seam adds no continuous process-table monitor.
+- **SDK 管理の spawn は対象外のまま** — 内部の spawn を所有するトランスポート（SDK クライアント、MCP）はその呼び出しをこのサービス経由にできない。それでも `scrubbedParentEnv` をインポートして環境ポリシーを単一の情報源に保つことはできる。
+- **テアダウンのラダーはコンシューマー所有** — seam が提供するのはシグナルの動詞と管理対象範囲の待機であり、定型の静止シーケンスではない。プロセス外の各コンシューマーが自身の子の協力の形を自らエンコードする（ACP バックエンドの stdin-EOF 優先のラダーがリポジトリ内の手本である）。
+- **可観測性はプロバイダー固有** — ネイティブのプロバイダーは systemd スコープや Windows ジョブを通じて逃げた子孫を所有できる一方、フォールバックのプロバイダーはより弱いプロセスグループ、ツリー、またはセッションの可視性しか公開しない。seam は継続的なプロセステーブルモニターを追加しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発者ノートはメンテナー向けの作業コンテキストである。未決定の設計上の問いと方向性を示す。明示的に非権威である。出荷済みの挙動、制限、受け入れ済みの根拠は、上記のセクション、パッケージのコード、およびリンクされた Agent Note にある。
 
-Future: non-shell runners. The seam was split so a direct-argv executor or worker supervisor could consume it without reaching into bash internals; none is shipped yet, and the terminal primitive keeps readiness policy in its consumer.
+将来: 非シェルのランナー。seam は、直接 argv のエグゼキューターやワーカースーパーバイザーが bash の内部に踏み込むことなくそれを消費できるよう分割されたが、まだ何も出荷されていない。ターミナルプリミティブは準備完了のポリシーをそのコンシューマーに残している。
 
 </details>

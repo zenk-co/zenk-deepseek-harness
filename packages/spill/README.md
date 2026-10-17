@@ -1,51 +1,51 @@
 ---
-description: "Package map for the text spill capability family: what the storage service, the local backend, and the result policy each provide."
+description: "テキストスピルケイパビリティ群のパッケージマップ: ストレージサービス、ローカルバックエンド、結果ポリシーがそれぞれ何を提供するか。"
 kind: "package-group"
 ---
 
-# spill/ — text spill capability family
+# spill/ — テキストスピルケイパビリティ群
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `spill/` group stores full text outside the model's context and returns a locator with retrieval guidance. The family splits into the storage service in `spill/`, the local filesystem backend in `spill-local/`, and the tool-result policy in `spill-policy/`. Tool-result spilling is opt-in through `maxInlineTokens` and keeps the original result on storage failure. [Session references](../context/session-reference/README.md) also consume storage directly for truncated captured transcripts, with their own preview and failure notices; they do not require the tool-result policy.
+`spill/` グループはモデルのコンテキストの外に全文を保存し、取得ガイダンス付きのロケーターを返す。群は `spill/` 内のストレージサービス、`spill-local/` 内のローカルファイルシステムバックエンド、`spill-policy/` 内のツール結果ポリシーに分かれる。ツール結果のスピルは `maxInlineTokens` 経由のオプトインであり、ストレージ失敗時は元の結果を保持する。[Session 参照](../context/session-reference/README.md)も、切り詰められたキャプチャ済みトランスクリプト向けに独自のプレビューと失敗通知でストレージを直接利用する。ツール結果ポリシーは不要である。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-Three packages play the spill roles; the subsystem reference owns the exhaustive vocabulary and contracts.
+3 パッケージがスピル役割を担う。網羅的な語彙と契約はサブシステム参照が所有する。
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`spill/`](spill/README.md) | Storage service: saves oversized text and returns a locator plus retrieval guidance | `ctx.spillStore` |
-| [`spill-local/`](spill-local/README.md) | Saves spilled text to private session-scoped files on this machine | registers on `ctx.spillStore` |
-| [`spill-policy/`](spill-policy/README.md) | Replaces oversized plain-text tool results with a preview and locator | listens on `ctx.tools` |
+| [`spill/`](spill/README.md) | ストレージサービス: 過大なテキストを保存し、ロケーターと取得ガイダンスを返す | `ctx.spillStore` |
+| [`spill-local/`](spill-local/README.md) | スピル済みテキストをこのマシン上のプライベートなセッションスコープファイルに保存する | `ctx.spillStore` に登録 |
+| [`spill-policy/`](spill-policy/README.md) | 過大なプレーンテキストのツール結果をプレビューとロケーターに置き換える | `ctx.tools` を待ち受け |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Start with the subsystem reference for the shared vocabulary, then the design decision.
+共有語彙はサブシステム参照から始め、次に設計決定を読むこと。
 
-- [Spill subsystem](../../docs/subsystems/spill.md) — the `SaveTextSpill`/`SpillRef` vocabulary, ownership, and backend relationships.
-- [Tool output spill decision](../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md) — the capability boundary between storage, retention, and tool-owned output handling.
+- [スピルサブシステム](../../docs/subsystems/spill.md) — `SaveTextSpill`/`SpillRef` 語彙、所有権、バックエンド関係。
+- [ツール出力スピル決定](../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md) — ストレージ、保持、ツール所有の出力処理の間のケイパビリティ境界。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

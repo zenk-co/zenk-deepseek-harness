@@ -5,74 +5,74 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-sandbox-ssh
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-sandbox-ssh` supplies `ctx.sandbox` for processes launched by the SSH subprocess provider. The remote host selects its installed local sandbox backend and applies each call’s policy there. Bash and Node receive the same backend’s enforcement level, denial signatures and runner-failure classification.
+`dsh-sandbox-ssh` は SSH サブプロセスプロバイダーが起動するプロセス用に `ctx.sandbox` を提供する。リモートホストはインストール済みローカルサンドバックエンドを選択し、各呼び出しのポリシーをそこで適用する。Bash と Node は同じバックエンドの強制レベル、拒否シグネチャ、ランナー失敗分類を受ける。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this provider with the shared [`SSH connection`](../ssh/README.md), SSH filesystem and SSH subprocess providers. It has no package-specific configuration. Await `confine(argv, policy, signal)` to resolve each policy and command through the running remote helper.
+共有の [`SSH 接続`](../ssh/README.md)、SSH ファイルシステム、SSH サブプロセスプロバイダーと共にこのプロバイダーをマウントする。パッケージ固有の設定はない。実行中のリモートヘルパーを通じて各ポリシーとコマンドを解決するため、`confine(argv, policy, signal)` の待機を行う。
 
-Pass a complete `read-only` or `workspace-write` policy. The workspace is interpreted and canonicalized on the remote host. Consumers bypass `confine()` for `danger-full-access`; the connection does not invent an additional local/remote policy flag.
+完全な `read-only` または `workspace-write` ポリシーを渡す。ワークスペースはリモートホスト上で解釈・正規化される。`danger-full-access` については利用者が `confine()` を迂回する。接続が追加のローカル/リモートポリシーフラグを作り出すことはない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The running helper canonicalizes the policy root and asks its loaded sandbox provider for the enforcing argv, enforcement level and runner-failure evidence. The SSH subprocess provider executes that returned argv directly and owns fd 7 transport and managed process lifetime. Cancellation or an unavailable backend rejects before the caller receives a command to launch.
+実行中のヘルパーはポリシールートを正規化し、読み込んだサンドボックスプロバイダーに強制 argv、強制レベル、ランナー失敗証拠を問い合わせる。SSH サブプロセスプロバイダーは返された argv を直接実行し、fd 7 トランスポートと管理プロセスの存続期間を所有する。取り消しやバックエンド利用不可は、呼び出し元が起動コマンドを受け取る前に拒否される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Process sandbox subsystem](../../../docs/subsystems/sandbox.md) — policy meanings and enforcement disclosure.
-- [Local sandbox provider](../../sandbox/sandbox-local/README.md) — backends and platform limitations inherited on the remote host.
+- [プロセスサンドボックスサブシステム](../../../docs/subsystems/sandbox.md) — ポリシーの意味と強制開示。
+- [ローカルサンドボックスプロバイダー](../../sandbox/sandbox-local/README.md) — リモートホストが継承するバックエンドとプラットフォーム制限。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through existing sandbox consumers, which report mode, denial and enforcement and own approval presentation and model arguments.
+既存のサンドボックス利用者を通じて間接的に関与する。利用者はモード、拒否、強制を報告し、承認表示とモデル引数を所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-This provider contributes no request-prefix content. Its consumers own model-visible tools and results.
+このプロバイダーはリクエストプレフィックス内容を提供しない。利用者がモデル可視のツールと結果を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- File-effect modes do not restrict network access or process visibility. A remote `partial` backend remains partial.
-- The SSH host and installed helper are trusted infrastructure. Digest checks and file-effect confinement do not establish a hostile-host security boundary.
+- ファイル効果モードはネットワークアクセスやプロセス可視性を制限しない。リモートの `partial` バックエンドは partial のままである。
+- SSH ホストとインストール済みヘルパーは信頼されたインフラである。ダイジェスト検査とファイル効果制限は、敵対的ホストに対するセキュリティ境界を確立しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

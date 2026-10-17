@@ -1,37 +1,37 @@
 ---
-description: "Prerequisite mounting, production AgentLoop drivers, and explicit Inbox stubs for agent-loop tests."
+description: "エージェントループテスト向け前提マウント、本番 AgentLoop ドライバー、明示的 Inbox スタブ。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-agent-loop-testkit
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-agent-loop-testkit` to give AgentLoop tests the standard prerequisites and a production loop driver without repeating setup. The harness creates real Agents and exposes Inbox input claiming for tests of durable events, recovery, notifications, and claim behavior. For consumer tests that need only queue editing, choose the process-local Inbox stub; choose the fail-fast Inbox when pending input must never be touched. Tests still own adapters, optional plugins, load order, and context disposal, and the package adds no model-visible behavior.
+`dsh-agent-loop-testkit` を使って AgentLoop テストに標準前提と本番ループドライバーを与え、繰り返しセットアップをなくす。ハーネスは真のエージェントを作り、耐久イベント、回復、通知、クレーム動作のテスト向けに入力 Inbox の要求を公開する。キュー編集だけ要するコンシューマーテストにはプロセスローカル Inbox スタブを選ぶ。保留入力に決して触れてはならないときは fail-fast Inbox を選ぶ。テストは引き続きアダプター、任意プラグイン、読み込み順序、コンテキスト破棄を所有し、パッケージはモデルに見える動作を加えない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Consumer-only tests with structural Agent stubs can use `provideWorkingDirectoryFixture(ctx, defaultDirectory?)`. It supplies directory values without validating paths, changing directories, or recording events. Tests of directory behavior use `mountAgentLoopTestDependencies(ctx, { workingDirectory: true })` and real temporary directories.
+構造エージェントスタブ付きのコンシューマー専用テストは `provideWorkingDirectoryFixture(ctx, defaultDirectory?)` を使える。パス検証、ディレクトリ変更、イベント記録なしにディレクトリ値を提供する。ディレクトリ動作のテストは `mountAgentLoopTestDependencies(ctx, { workingDirectory: true })` と真の一時ディレクトリを使う。
 
-This package gives an AgentLoop test a working service topology and keeps the choice between production Inbox behavior and a structural stub explicit.
+このパッケージは AgentLoop テストに動作サービス位相を与え、本番 Inbox 動作と構造スタブの選択を明示的に保つ。
 
-### Drive a production Agent
+### 本番エージェントの駆動
 
-Use `mountAgentLoopTestHarness()` when the test covers durable Inbox events, projection recovery or validation, live Inbox notifications, or loop-driver claims. Mount any load-order-sensitive consumers after the prerequisites and before creating the Agent. The context owns the loop and every Agent returned by the harness.
+耐久 Inbox イベント、投影回復または検証、ライブ Inbox 通知、ループドライバークレームをカバーするときは `mountAgentLoopTestHarness()` を使う。読み込み順序に敏感なコンシューマーは前提の後、エージェント作成の前にマウントする。コンテキストはループとハーネスが返すすべてのエージェントを所有する。
 
 ```ts
 import { Context } from '@deepseek-ai/cordis'
@@ -53,11 +53,11 @@ agent.inbox.append('next-turn', message)
 const admitted = harness.claim(agent, 'next-turn', 1)
 ```
 
-The dependency helper forwards system-prompt and tool-registry configuration through `options` and provides no test defaults beyond those services' own defaults. A plugin-load failure rejects the helper call; services activated earlier in the sequence remain context-owned and unwind when the context is disposed.
+依存ヘルパーはシステムプロンプトとツールレジストリ構成を `options` 経由で転送し、それらサービス自身の既定を超えるテスト既定は提供しない。プラグイン読み込み失敗はヘルパー呼び出しを拒否する。シーケンス前半で活性化されたサービスは引き続きコンテキスト所有であり、コンテキスト破棄時に巻き戻る。
 
-### Build a structural Agent stub
+### 構造エージェントスタブの構築
 
-Use `createInboxStub()` when the test subject needs mutable pending lists but does not exercise durability, projection validation, live Inbox notifications, or the driver's claim policy. The stub implements the public queue operations with two process-local arrays and never writes to a Session. Use `unsupportedInbox()` when the test subject must not touch pending input; every mutation throws at the first unexpected dependency.
+テスト対象が変更可能な保留一覧を要するが耐久性、投影検証、ライブ Inbox 通知、ドライバークレームポリシーを exercise しないときは `createInboxStub()` を使う。スタブは公開キュー操作を 2 件のプロセスローカル配列で実装し、セッションに決して書かない。テスト対象が保留入力に触れてはならないときは `unsupportedInbox()` を使う。すべての変更は最初の予期せぬ依存で throw する。
 
 ```ts
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -68,71 +68,71 @@ const agent = {
 }
 ```
 
-### When to use it
+### 使うべきとき
 
-Use the dependency and loop helpers for tests whose subject is production loop or durable Inbox behavior. Use the structural stub for consumer-domain tests that only need queue editing. Mount dependencies directly when a test probes service injection failures or partial topologies, because the helper hides exactly the wiring those tests must control.
+本番ループまたは耐久 Inbox 動作が対象のテストには依存とループのヘルパーを使う。キュー編集だけ要するコンシューマードメインテストには構造スタブを使う。サービス注入失敗や部分位相を探るテストは依存を直接マウントする。ヘルパーはそれらのテストが制御しなければならない配線をちょうど隠すためである。
 
-### What can go wrong
+### 失敗し得ること
 
-The harness mounts no LLM adapter. Register an adapter before sending work that would start a model request. Dispose the owning context after every test so Agents reach quiescence and their scoped registrations unwind.
+ハーネスは LLM アダプターをマウントしない。モデル要求を開始する作業を送る前にアダプターを登録する。すべてのテスト後に所有コンテキストを破棄し、エージェントが静止に達し、スコープ登録が巻き戻るようにする。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains the design of the test utilities; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節はテストユーティリティの設計を説明する。観測可能な動作は[このパッケージを使う](#use-this-package)で完全にカバーされる。
 
-### Design
+### 設計
 
-`mountAgentLoopTestDependencies` mounts six service plugins in a fixed dependency order — LLM, session, session-projection registry, system-prompt registry, tool registry, then agent registry — and stops before `AgentLoop`, so the caller controls loop load order. `mountAgentLoopTestHarness` mounts the public production plugin, creates Agents through its service, and exposes the production driver's claim operation without exporting the loop's concrete Inbox class or projection definition. [`src/inbox.ts`](src/inbox.ts) contains only the process-local mutable stub and the fail-fast unsupported placeholder; it owns no projection or durable event implementation. The mounting and driver implementation lives in [`src/index.ts`](src/index.ts).
+`mountAgentLoopTestDependencies` は 6 件のサービスプラグインを固定依存順序でマウントする — LLM、セッション、セッションプロジェクションレジストリ、システムプロンプトレジストリ、ツールレジストリ、次にエージェントレジストリ — `AgentLoop` の手前で止まるため、呼び出し元はループ読み込み順序を制御する。`mountAgentLoopTestHarness` は公開本番プラグインをマウントし、そのサービス経由でエージェントを作り、ループの具体的 Inbox クラスや投影定義を export せずに本番ドライバーのクレーム操作を公開する。[`src/inbox.ts`](src/inbox.ts) はプロセスローカル変更可能スタブと fail-fast の unsupported プレースホルダーのみ含む。投影も耐久イベント実装も所有しない。マウントとドライバー実装は [`src/index.ts`](src/index.ts) にある。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level behavior is not enough. They move from the loop to the services the helper mounts and the tests that use it.
+パッケージレベルの動作では足りないときにこれらを読むこと。ループからヘルパーがマウントするサービスとそれを使うテストへ進む。
 
-- [Agent loop package](../../core/agent-loop/README.md) — the concrete loop this helper mounts for production behavior.
-- [Session package](../../core/session/README.md) — the durable event log used by production Inbox behavior.
-- [LLM package](../../llm/llm/README.md) — the LLM runtime and adapter interface the helper prepares.
-- [Testing policy](../../../docs/testing.md) — the coverage tiers these tests serve.
-- [Test-support group map](../README.md) — sibling harnesses and support packages.
+- [エージェントループパッケージ](../../core/agent-loop/README.md) — 本番動作向けにこのヘルパーがマウントする具体的ループ。
+- [セッションパッケージ](../../core/session/README.md) — 本番 Inbox 動作が使う耐久イベントログ。
+- [LLM パッケージ](../../llm/llm/README.md) — ヘルパーが準備する LLM ランタイムとアダプター界面。
+- [テストポリシー](../../../docs/testing.md) — これらのテストが仕えるカバレッジ層。
+- [test-support グループマップ](../README.md) — 兄弟ハーネスとサポートパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as these test-only utilities neither assemble nor modify model requests.
+なし。これらのテスト専用ユーティリティはモデル要求を組み立てず変更しないためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; the package itself sends no provider request.
+なし。パッケージ自体はプロバイダー要求を送らない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits define what the utilities do not share. They are current package constraints, not a task backlog.
+これらの制限はユーティリティが共有しないものを定める。現在のパッケージ制約であり、タスクバックログではない。
 
-- **Only the mandatory prerequisite spine is shared** — adapters, optional plugins, scenario-specific load order, and context teardown remain caller-owned.
-- **The production harness has no adapter default** — tests that start the loop must register the route they exercise.
-- **The mutable Inbox stub is process-local only** — use a harness-created Agent whenever durable events, projection recovery or validation, live notifications, or claim policy matter.
-- **The unsupported Inbox accepts no mutations** — use the mutable stub or a harness-created Agent whenever pending input is part of the test subject.
+- **共有されるのは必須前提脊柱のみ** — アダプター、任意プラグイン、シナリオ固有の読み込み順序、コンテキスト破棄は引き続き呼び出し元所有である。
+- **本番ハーネスにアダプター既定なし** — ループを開始するテストは exercise するルートを登録しなければならない。
+- **変更可能 Inbox スタブはプロセスローカルのみ** — 耐久イベント、投影回復または検証、ライブ通知、クレームポリシーが問題になるときはハーネス作成エージェントを使うこと。
+- **unsupported Inbox は変更を受け付けない** — 保留入力がテスト対象の一部であるときは変更可能スタブまたはハーネス作成エージェントを使うこと。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

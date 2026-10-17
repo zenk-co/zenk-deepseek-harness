@@ -1,37 +1,37 @@
 ---
-description: "jsdom slot test runtime for browser feature specs, for test authors exercising slots, stores, and rendering against production machinery."
+description: "ブラウザー機能スペック向けの jsdom スロットテストランタイム。スロット、ストア、レンダリングをプロダクション機構に対して試すテスト作成者向け。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-client-test-runtime
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`SlotTestRuntime.create()` lets Vitest suites drive production slots, stores, typed Session and Workspace fixtures, and local DOM assertions in jsdom. For plugin activation, reload, reconnect, and cleanup tests, `createClientTest` starts the web profile's bundle roster with endpoint-named Remote mocks, without a business Host. Missing services and unstubbed calls fail explicitly. The whole-client fixture owns startup and disposal; the local runtime provides idempotent disposal. Use this package through `devDependencies` for client tests; it is not a product plugin.
+`SlotTestRuntime.create()` により、Vitest スイートは jsdom 内でプロダクションのスロット、ストア、型付きセッションおよびワークスペースフィクスチャ、ローカル DOM アサーションを駆動できる。プラグインのアクティベーション、リロード、再接続、クリーンアップのテストには、`createClientTest` がビジネス Host なしで、エンドポイント名付き Remote モックとともに Web プロファイルのバンドルロースターを起動する。欠如したサービスとスタブ化されていない呼び出しは明示的に失敗する。クライアント全体フィクスチャが起動と破棄を所有し、ローカルランタイムは冪等な破棄を提供する。このパッケージはクライアントテスト用に `devDependencies` を通じて使用する。製品プラグインではない。
 
-Linked bundles resolve dependencies from their real package directories; dependencies next to any bundle take precedence over packages inherited from ancestor directories.
+リンクされたバンドルは依存関係を実際のパッケージディレクトリから解決する。任意のバンドルの隣にある依存関係は、祖先ディレクトリから継承されたパッケージより優先される。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-This package gives a browser feature spec a real runtime to mount against: create the bench, declare the slots your feature occupies, mount the feature plugin, render a slot, assert on the local view, and dispose — with no second implementation of production logic.
+このパッケージは、ブラウザー機能スペックにマウント対象の実ランタイムを与える。ベンチを作成し、機能が占めるスロットを宣言し、機能プラグインをマウントし、スロットを描画し、ローカルビューをアサートし、破棄する。プロダクションロジックの第 2 の実装は存在しない。
 
-### Setting up a feature spec
+### 機能スペックのセットアップ
 
-`SlotTestRuntime.create()` assembles the runtime, `declare(children)` registers an auto frame whose per-key `<div data-slot>` wrappers become snapshot roots, `mount(plugin)` runs the feature on a real fiber, and `renderSlot(key, owner, opts?)` returns the slot-local view with scoped queries and in-place updates:
+`SlotTestRuntime.create()` がランタイムを組み立て、`declare(children)` がキーごとの `<div data-slot>` ラッパーがスナップショットルートになる自動フレームを登録し、`mount(plugin)` が機能を実ファイバー上で実行し、`renderSlot(key, owner, opts?)` がスコープ付きクエリとインプレース更新を備えたスロットローカルビューを返す:
 
 ```text
 const runtime = await SlotTestRuntime.create()
@@ -42,23 +42,23 @@ expect(view.container).toMatchSnapshot()
 await runtime.dispose()
 ```
 
-`mount` prechecks required services and fails loud when one is missing — `provide(name, value)` supplies an extra service first. The runtime provides a `fileUpload` stub that rejects every call until a suite replaces `runtime.fileUpload.upload`. `storeOf(key, scopeKey)` returns the live store instance the renderer hands a slot's component for identity and action-driven-write assertions.
+`mount` は要求されるサービスを事前確認し、欠如していれば大きく失敗する。`provide(name, value)` が先に追加のサービスを提供する。ランタイムは `fileUpload` スタブを提供し、スイートが `runtime.fileUpload.upload` を置き換えるまで、すべての呼び出しを拒否する。`storeOf(key, scopeKey)` は、レンダラーがスロットのコンポーネントに渡すライブストアインスタンスを返し、identity とアクション駆動書き込みのアサーションに使用できる。
 
-The runtime installs `allowAllAccessPlugin` before ui-session: its `remoteAccess` service answers true for every resource, so every access Hook allows every action. Hand-built component props spread `...allowAllAccess` to receive the same Hooks; a spec of a refused path overrides one Hook.
+ランタイムは ui-session の前に `allowAllAccessPlugin` をインストールする。その `remoteAccess` サービスはすべてのリソースに対して true を返すため、すべてのアクセス Hook がすべてのアクションを許可する。手組みのコンポーネントプロップは `...allowAllAccess` を展開して同じ Hook を受け取る。拒否パスのスペックは 1 つの Hook を上書きする。
 
-The optional render options select a keyed entry with `entryKey` or a list item with `only`; `view.update(owner)` retains that selection. `runtime.panelInfo` supplies the default `usePanelInfo` source with no global panel selected. Release it with `releasePanelInfoSource()` before mounting the production Layout owner. `dispose()` releases both default Workspace and panel-info root sources; early release is idempotent and does not remove replacement owners.
+オプションのレンダーオプションは `entryKey` でキー付きエントリーを、`only` でリスト項目を選択する。`view.update(owner)` はその選択を保持する。`runtime.panelInfo` は、グローバルパネルが選択されていない既定の `usePanelInfo` ソースを提供する。プロダクションの Layout オーナーをマウントする前に `releasePanelInfoSource()` でそれを解放する。`dispose()` は既定のワークスペースとパネル情報の両方のルートソースを解放する。早期解放は冪等であり、置き換えられたオーナーを削除しない。
 
-The Session fixture resolves subagent addresses from explicitly supplied addresses or loaded parent projections without retaining a Session generation. External catalog entries have no local browsing address.
+セッションフィクスチャは、セッション世代を保持することなく、明示的に供給されたアドレスまたは読み込まれた親プロジェクションからサブエージェントアドレスを解決する。外部カタログエントリーはローカル閲覧アドレスを持たない。
 
-### Local DOM snapshots
+### ローカル DOM スナップショット
 
-A registered snapshot serializer folds CSS-module class hashes (`_frame_a1b2c3` → `frame`) so `.snap` files stay structural, and collapses `<svg>` internals to a `data-content` fingerprint. Suites needing a custom page frame use `root.declare(children, Frame)` instead of the auto frame; `dispose()` tears down views, feature fibers, minted scopes, and persisted store state on one axis and is idempotent.
+登録されたスナップショットシリアライザーは CSS モジュールのクラスハッシュ（`_frame_a1b2c3` → `frame`）を折りたたんで `.snap` ファイルを構造的に保ち、`<svg>` の内部を `data-content` フィンガープリントに縮約する。カスタムページフレームを必要とするスイートは自動フレームの代わりに `root.declare(children, Frame)` を使用する。`dispose()` はビュー、機能ファイバー、生成されたスコープ、永続化されたストア状態を 1 つの軸で破棄し、冪等である。
 
-### Scripting Remote answers and failures
+### Remote の応答と失敗のスクリプト化
 
-`TestRemote` is the double for the `ctx.remote` face: it registers itself plus one service per scripted namespace so a plugin injecting `remote.<name>` unparks, drives `$on` subscriptions from an explicit test event driver, and exposes `$host` as a plain mutable field a spec assigns to script a homed or non-loopback Host. This package is also where a UI spec takes the `RemoteError` constructor as a value — the `dsh-api-remotes` facade cannot carry it, because a value import from a spec would pull that assembly's unbuilt `/remote` artifact chain.
+`TestRemote` は `ctx.remote` 面のダブルである。それ自身と、スクリプト化された名前空間ごとに 1 つのサービスを登録するため、`remote.<name>` を注入するプラグインがアンパークされる。明示的なテストイベントドライバーから `$on` 購読を駆動し、`$host` を、スペックがホーム付きまたは非ループバック Host をスクリプト化するために代入できるプレーンで可変のフィールドとして公開する。このパッケージは、UI スペックが `RemoteError` コンストラクターを値として取る場所でもある。`dsh-api-remotes` ファサードはそれを運べない。スペックからの値インポートがそのアセンブリの未ビルドの `/remote` 成果物チェーンを引き込むためである。
 
-Script a failure by the code the Host would answer with, and assert the same way production code discriminates — on `code`, never on the class:
+Host が返すであろうコードで失敗をスクリプト化し、プロダクションコードが判別するのと同じ方法（`code` で、クラスでは決してない）でアサートする:
 
 ```text
 import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
@@ -70,9 +70,9 @@ remote.goals.create.mockResolvedValue({
 expect(view.getByRole('alert')).toHaveTextContent('goal/not-found')
 ```
 
-### Whole-client tier
+### クライアント全体ティア
 
-The slot tier above mounts one feature against doubles. The whole-client tier boots the real assembly: `TestClient.start(plan, mock, options)` imports every roster row's `/client` module in-process (or takes the plan's `provide` replacement), binds `{ rpc: mock.rpc }` to that client's Connection module, synthesizes the boot graph with `graphFromRoster` and hands the loaded modules to the production module system, boots through the production `bootClient`, optionally mounts `uiRenderer`, and waits for `ctx.connection.state === 'connected'`. It lives behind a deep import so slot-tier specs never load it:
+上記のスロットティアは、1 つの機能をダブルに対してマウントする。クライアント全体ティアは実アセンブリを起動する。`TestClient.start(plan, mock, options)` はロースターの各行の `/client` モジュールをインプロセスでインポートし（またはプランの `provide` 置換を取る）、`{ rpc: mock.rpc }` をそのクライアントの Connection モジュールにバインドし、`graphFromRoster` で起動グラフを合成し、読み込まれたモジュールをプロダクションのモジュールシステムに渡し、プロダクションの `bootClient` を通じて起動し、オプションで `uiRenderer` をマウントし、`ctx.connection.state === 'connected'` を待つ。スロットティアのスペックが決してそれを読み込まないように、深いインポートの背後にある:
 
 ```text
 // @vitest-environment jsdom
@@ -87,107 +87,107 @@ test('registers into the sidebar', async ({ remote, start }) => {
 })
 ```
 
-`createClientTest` uses native Vitest fixtures: each test gets a fresh `mock` loaded with `remoteDefaultResponses`, a `remote` proxy equal to `mock.remote`, and a `start()` that boots only after the test configures its responses. Repeated starts share one promise; await it to observe startup errors. Fixture teardown waits for startup, disposes the client even after a failed assertion, checks missing responses, and refuses a saved `start` after the test. Use `TestClient.start` directly for independently owned clients. These fixtures isolate their own state, not page globals such as `location`.
+`createClientTest` はネイティブの Vitest フィクスチャを使用する。各テストは `remoteDefaultResponses` を読み込んだ新しい `mock`、`mock.remote` と等しい `remote` プロキシ、およびテストが応答を構成した後にのみ起動する `start()` を受け取る。繰り返しの起動は 1 つの promise を共有する。それを await して起動エラーを観察する。フィクスチャの破棄は起動を待ち、失敗したアサーションの後でもクライアントを破棄し、欠如した応答をチェックし、テスト後の保存された `start` を拒否する。独立に所有されるクライアントには `TestClient.start` を直接使用する。これらのフィクスチャは自身の状態を分離し、`location` のようなページグローバルは分離しない。
 
-The [generic Remote proxy](../remote-mock/README.md#remote-proxy) supports every namespace in both tiers. An assembled test uses the `remote` fixture; a local `TestRemote` can receive `{ settings: mock.remote.settings }`. Configure returned data and read native `.mock.calls` directly. A mutation response does not update later describe answers automatically: change `remote.settings.describe.mockResolvedValue(...)` explicitly when the scenario publishes new data. The proxy documentation owns unbuilt typing and the required build-backed local typecheck.
+[汎用 Remote プロキシ](../remote-mock/README.md#remote-proxy)は両ティアのすべての名前空間をサポートする。アセンブル済みテストは `remote` フィクスチャを使用し、ローカルの `TestRemote` は `{ settings: mock.remote.settings }` を受け取れる。返されるデータを構成し、ネイティブの `.mock.calls` を直接読み取る。変更応答が以降の describe 応答を自動的に更新することはない。シナリオが新しいデータを公開するときは `remote.settings.describe.mockResolvedValue(...)` を明示的に変更する。未ビルドの型付けと、必要なビルド裏付けのローカル型チェックはプロキシのドキュメントが所有する。
 
-### Roster and startup behavior
+### ロースターと起動時の振る舞い
 
-`webApp` is the `web` profile's browser roster, read when the assembly entry is first imported from its bundles (`dsh-base`, then `dsh-web-app`) as the launcher composes them, except that a patch matching nothing throws here where the launcher warns: each bundle's `dsh.bundle.patch` list is parsed with the include plugin's YAML dialect and composed by its `applyEntryPatches`, and every enabled row whose package declares `dsh.client.platform === 'web'` becomes a row carrying that declaration's `inject` and `immediately`; `bundleRoster(bundles, anchor, disabledContext)` accepts an explicit Loader evaluation scope for conditional `disabled` flags; without one, browser expressions are rejected. `webApp` supplies the Web profile name, not business Host services. Nothing is copied from the bundles, so a bundle change is visible at the next test run. `webApp.closure(names)` keeps the named rows plus everything they inject, transitively (the rows a spec needs to boot those plugins as the bundle composes them), `webApp.pick(names)` and `webApp.without(names)` cut it down by hand, all three throw on unknown names, and `ClientRoster.of(rows)` builds one inline. `remoteDefaultResponses` holds default responses for exactly the Remote endpoints the roster calls while booting with no sessions, no workspaces, and default settings; a spec layers its own `RemoteTable` on top with `mock.load(table)`, and any call without a rule fails the test at `dispose()` through `mock.assertNoUnmatched()`. `mount` requires a roster that provides `uiRenderer`; `start` fails loud otherwise instead of returning an empty container. `client.connection` is the roster's Connection service (no `Context` augmentation declares it), and `connectTimeoutMs` bounds the readiness wait, whose failure message lists the mock log. `reload(name)` rebuilds one Loader entry through the shared Client Modules helper (registry-first teardown, then `entry.refresh()`); each client retains its own module system and instance-bound Connection replacement, so starts and reloads can overlap without changing a page global. `unload(name)` removes an entry and waits for plugin cleanup; `flush()` settles React inside `act`. jsdom implements neither `EventSource` (client-hmr opens one at apply) nor `ResizeObserver` nor the `document.fonts` event target (layout components observe size and font loading at mount), so `start` reference-counts inert stubs for whichever global is absent and `dispose` removes exactly those — a jsdom gap, not a client identity channel. The `@deepseek-ai/dsh-api-remotes` row is dropped from every roster: its generated Remote clients exist only in built `lib/`, and `remote.<ns>` is what the tier replaces anyway. The `@deepseek-ai/dsh-api-remote-access` row, which mounts its own generated contribution, is dropped too, and `start` installs `allowAllAccessPlugin` in its place; a plan `provide` entry for either row is refused. `start` instead provides one contract-free proxy per `remote.<ns>` service the roster injects (plus the namespaces the mock has rules for at that point; a namespace first registered later has no proxy); `ctx.remote.<ns>.<method>(...args)` becomes a call on the endpoint `<ns>/<method>` carrying the positional args, a stream when the mock registered a `stream()` script and a unary call otherwise, with the generated client's outcome folding (`gateway/internal` for carrier throws, `gateway/cancelled` on abort). An endpoint without a rule is still dispatched, so the mock logs it and `dispose()` fails the test.
+`webApp` は `web` プロファイルのブラウザーロースターであり、ランチャーがそれらを構成するときに、アセンブリエントリーが初めてそのバンドル（`dsh-base`、次に `dsh-web-app`）からインポートされたときに読み取られる。ただし、何にも一致しないパッチは、ランチャーが警告するところでここではスローする。各バンドルの `dsh.bundle.patch` リストはインクルードプラグインの YAML 方言で解析され、その `applyEntryPatches` によって構成される。有効で、そのパッケージが `dsh.client.platform === 'web'` を宣言するすべての行は、その宣言の `inject` と `immediately` を運ぶ行になる。`bundleRoster(bundles, anchor, disabledContext)` は条件付き `disabled` フラグのために明示的な Loader 評価スコープを受け入れる。それがなければ、ブラウザー式は拒否される。`webApp` は Web プロファイル名を提供し、ビジネス Host サービスは提供しない。バンドルから何もコピーされないため、バンドルの変更は次のテスト実行で見える。`webApp.closure(names)` は指定された行と、それらが推移的に注入するすべて（バンドルがそれらプラグインを構成するときにスペックがそれらを起動するのに必要な行）を保ち、`webApp.pick(names)` と `webApp.without(names)` は手作業でそれを削り、3 つすべてが未知の名前でスローし、`ClientRoster.of(rows)` はインラインで 1 つを組み立てる。`remoteDefaultResponses` は、セッションなし、ワークスペースなし、既定設定で起動する間にロースターが呼ぶ Remote エンドポイントちょうどの既定応答を保持する。スペックは `mock.load(table)` で自身の `RemoteTable` を上に重ね、ルールのない呼び出しは `dispose()` で `mock.assertNoUnmatched()` を通じてテストを失敗させる。`mount` は `uiRenderer` を提供するロースターを要求し、`start` はそうでなければ空のコンテナを返す代わりに大きく失敗する。`client.connection` はロースターの Connection サービスであり（`Context` 拡張がそれを宣言しない）、`connectTimeoutMs` は準備完了待ちを制限し、その失敗メッセージはモックログを列挙する。`reload(name)` は共有 Client Modules ヘルパーを通じて 1 つの Loader エントリーを再構築する（レジストリ優先の破棄、次に `entry.refresh()`）。各クライアントは自身のモジュールシステムとインスタンスバインドの Connection 置換を保つため、起動とリロードはページグローバルを変えることなく重なってよい。`unload(name)` はエントリーを削除し、プラグインのクリーンアップを待つ。`flush()` は `act` 内で React を決着させる。jsdom は `EventSource`（client-hmr が apply で 1 つ開く）も `ResizeObserver` も `document.fonts` イベントターゲット（レイアウトコンポーネントがマウント時にサイズとフォント読み込みを観測する）も実装していないため、`start` は欠如しているグローバルの不活性スタブを参照カウントし、`dispose` はそれらだけを削除する。これは jsdom のギャップであり、クライアント identity チャネルではない。`@deepseek-ai/dsh-api-remotes` 行はすべてのロースターから除外される。その生成された Remote クライアントはビルド済み `lib/` にのみ存在し、`remote.<ns>` こそがこのティアがとにかく置き換えるものだからである。自身の生成されたコントリビューションをマウントする `@deepseek-ai/dsh-api-remote-access` 行も除外され、`start` はその場所に `allowAllAccessPlugin` をインストールする。どちらの行へのプラン `provide` エントリーも拒否される。代わりに `start` は、ロースターが注入する `remote.<ns>` サービスごとに 1 つのコントラクトを持たないプロキシを提供する（加えて、その時点でモックがルールを持つ名前空間。後から最初に登録された名前空間はプロキシを持たない）。`ctx.remote.<ns>.<method>(...args)` は、位置引数を運ぶエンドポイント `<ns>/<method>` への呼び出しになる。モックが `stream()` スクリプトを登録した場合はストリーム、そうでなければ単項呼び出しであり、生成されたクライアントの結果折り畳み（キャリアスローで `gateway/internal`、アボートで `gateway/cancelled`）を伴う。ルールのないエンドポイントも依然としてディスパッチされるため、モックがそれをログし、`dispose()` がテストを失敗させる。
 
-### When to use it
+### いつ使うか
 
-Use the bench for feature suites that exercise slots, stores, rendering, and disposal under a real runtime — the production `SlotRegistry`, renderer, and provide-bundle materialization are mounted, never reimplemented. It is client-side test infrastructure: it never reaches a model request, and feature packages depend on it in `devDependencies` only.
+スロット、ストア、レンダリング、破棄を実ランタイムの下で試す機能スイートにはこのベンチを使用する。プロダクションの `SlotRegistry`、レンダラー、provide バンドルの実体化がマウントされ、再実装されることはない。これはクライアント側のテストインフラストラクチャである。モデルリクエストに到達することはなく、機能パッケージは `devDependencies` でのみこれに依存する。
 
-### What can go wrong
+### 起こり得る問題
 
-- **A declared service is not provided** — `mount` fails loud with the missing names; `provide()` them first.
-- **A render is attempted before `declare`** — `renderSlot` fails loud; declare the key first.
-- **A spec calls an unstubbed verb on a session behavior stub** — fixture stubs fail loud by design, so a missing stub surfaces at the call site rather than silently passing.
+- **宣言されたサービスが提供されていない** — `mount` が欠如している名前とともに大きく失敗する。先に `provide()` で提供する。
+- **`declare` の前にレンダーを試みた** — `renderSlot` が大きく失敗する。先にキーを宣言する。
+- **スペックがセッション振る舞いスタブ上のスタブ化されていないメソッドを呼び出した** — フィクスチャスタブは設計上大きく失敗するため、欠如したスタブは黙って通るのではなく呼び出し箇所で表面化する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design of the bench; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションはベンチの設計を説明する。観察可能な振る舞いは[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design
+### 設計
 
-The bench copies no production logic: it mounts the production `SlotRegistry`, production renderer, and `UiSession` adapter. `TestSessions` and `TestWorkspaces` implement the owner interfaces that features consume through Cordis, each fixture Session implements `SessionFace`, and `stubConfigForm` implements `ConfigForm`. `UiSession` derives standard renderer sources from those Controller bindings. Unstubbed `ISession` behavior fails with the missing method name.
+ベンチはプロダクションロジックをコピーしない。プロダクションの `SlotRegistry`、プロダクションレンダラー、`UiSession` アダプターをマウントする。`TestSessions` と `TestWorkspaces` は、機能が Cordis を通じて消費するオーナーインターフェースを実装し、各フィクスチャセッションは `SessionFace` を実装し、`stubConfigForm` は `ConfigForm` を実装する。`UiSession` はそれらの Controller バインディングから標準レンダラーソースを導出する。スタブ化されていない `ISession` の振る舞いは、欠如しているメソッド名とともに失敗する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `SlotTestRuntime` assembly, `TestRoot`, auto frame, `mount`/`dispose` |
-| [`src/sessions.ts`](src/sessions.ts) + [`src/workspaces.ts`](src/workspaces.ts) | `ISessions`/`IWorkspaces` test doubles and `FixtureSession` behavior stubs |
-| [`src/fixtures.ts`](src/fixtures.ts) | Plain fixture builders: conversation snapshots, workspace list state |
-| [`src/snapshot.ts`](src/snapshot.ts) | DOM snapshot serializer (class-hash folding, `<svg>` fingerprint) |
-| [`src/access.ts`](src/access.ts) | `allowAllAccess` props and `allowAllAccessPlugin`, the allow-all stand-in for the remote-access Client row |
-| [`src/remote.ts`](src/remote.ts) | `TestRemote` double for host RPC, `RemoteError` value re-export |
-| [`src/translate.ts`](src/translate.ts) + [`src/locale-env.ts`](src/locale-env.ts) | Translation and pinned-browser-language test helpers |
-| [`src/config-form.ts`](src/config-form.ts) | `stubConfigForm` with test-driven publications and write spies |
-| [`src/assembly/roster.ts`](src/assembly/roster.ts) | `ClientRosterRow`, `ClientRoster` (`of`/`closure`/`pick`/`without`), the `AssemblyPlan` it annotates, and `graphFromRoster` |
-| [`src/assembly/modules.ts`](src/assembly/modules.ts) | Source `/client` imports and replacements, registered through the production module facade's pending factory queue |
-| [`src/assembly/test-client.ts`](src/assembly/test-client.ts) | `TestClient`: instance-bound Connection, shared jsdom shims, `bootClient`, mount, readiness wait, `reload`/`unload`/`dispose` |
-| [`src/assembly/vitest.ts`](src/assembly/vitest.ts) | Test-scoped `mock` and lazy `start` fixtures |
-| [`src/assembly/remote-default-responses.ts`](src/assembly/remote-default-responses.ts) | `remoteDefaultResponses`: default responses of the Remote endpoints the roster calls at boot |
-| [`src/assembly/remote-proxies.ts`](src/assembly/remote-proxies.ts) | Contract-free `remote.<ns>` proxies over the Connection: `remoteNamespacesOf`, `remoteProxiesPlugin` |
-| [`src/assembly/bundle-roster.ts`](src/assembly/bundle-roster.ts) | `bundleRoster` and `webApp`: the browser roster read from bundle patch files with the include plugin's own schema and patch application |
+| [`src/index.ts`](src/index.ts) | `SlotTestRuntime` の組み立て、`TestRoot`、自動フレーム、`mount`/`dispose` |
+| [`src/sessions.ts`](src/sessions.ts) + [`src/workspaces.ts`](src/workspaces.ts) | `ISessions`/`IWorkspaces` テストダブルと `FixtureSession` 振る舞いスタブ |
+| [`src/fixtures.ts`](src/fixtures.ts) | プレーンなフィクスチャビルダー: 会話スナップショット、ワークスペースリスト状態 |
+| [`src/snapshot.ts`](src/snapshot.ts) | DOM スナップショットシリアライザー（クラスハッシュの折りたたみ、`<svg>` フィンガープリント） |
+| [`src/access.ts`](src/access.ts) | `allowAllAccess` プロップと `allowAllAccessPlugin`。remote-access Client 行の全許可スタンドイン |
+| [`src/remote.ts`](src/remote.ts) | host RPC 用の `TestRemote` ダブル、`RemoteError` の値再エクスポート |
+| [`src/translate.ts`](src/translate.ts) + [`src/locale-env.ts`](src/locale-env.ts) | 翻訳と固定ブラウザー言語のテストヘルパー |
+| [`src/config-form.ts`](src/config-form.ts) | テスト駆動の公開と書き込みスパイを備えた `stubConfigForm` |
+| [`src/assembly/roster.ts`](src/assembly/roster.ts) | `ClientRosterRow`、`ClientRoster`（`of`/`closure`/`pick`/`without`）、それが注釈する `AssemblyPlan`、および `graphFromRoster` |
+| [`src/assembly/modules.ts`](src/assembly/modules.ts) | ソース `/client` のインポートと置換。プロダクションモジュールファサードの保留中ファクトリーキューを通じて登録される |
+| [`src/assembly/test-client.ts`](src/assembly/test-client.ts) | `TestClient`: インスタンスバインドの Connection、共有 jsdom シム、`bootClient`、マウント、準備完了待ち、`reload`/`unload`/`dispose` |
+| [`src/assembly/vitest.ts`](src/assembly/vitest.ts) | テストスコープの `mock` と遅延 `start` フィクスチャ |
+| [`src/assembly/remote-default-responses.ts`](src/assembly/remote-default-responses.ts) | `remoteDefaultResponses`: 起動時にロースターが呼ぶ Remote エンドポイントの既定応答 |
+| [`src/assembly/remote-proxies.ts`](src/assembly/remote-proxies.ts) | Connection 上のコントラクトを持たない `remote.<ns>` プロキシ: `remoteNamespacesOf`、`remoteProxiesPlugin` |
+| [`src/assembly/bundle-roster.ts`](src/assembly/bundle-roster.ts) | `bundleRoster` と `webApp`: インクルードプラグイン自身のスキーマとパッチ適用でバンドルパッチファイルから読み取られたブラウザーロースター |
 
-### Lifecycle
+### ライフサイクル
 
-`create()` builds a fresh context, mounts the slot and conversation registries, installs the renderer, and provides the session/workspace doubles plus the fail-loud file-upload stub. `mount` checks every declared injection against the context before starting the fiber, so a missing provider fails loud instead of suspending forever. `dispose()` unmounts React trees first, then disposes feature fibers, releases the root registration, disposes minted session scopes, and clears persisted store state; every public mutator is act-wrapped, so tests never handle SlotCore microtask batching or React `act` themselves.
+`create()` は新しいコンテキストを構築し、スロットと会話レジストリをマウントし、レンダラーをインストールし、セッション/ワークスペースダブルと大きく失敗するファイルアップロードスタブを提供する。`mount` はファイバーを開始する前に、宣言されたすべての注入をコンテキストに対してチェックするため、欠如したプロバイダーは永遠に保留されるのではなく大きく失敗する。`dispose()` はまず React ツリーをアンマウントし、次に機能ファイバーを破棄し、ルート登録を解放し、生成されたセッションスコープを破棄し、永続化されたストア状態をクリアする。すべての公開ミューテーターは act でラップされるため、テストが SlotCore のマイクロタスクバッチや React の `act` を自分で扱うことはない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the bench to the production machinery it mounts and the tests that use it.
+パッケージレベルのコントラクトで足りない場合は、これらのページを読む。ベンチから、それがマウントするプロダクション機構とそれを使用するテストへと進む。
 
-- [ui-session](../../client/ui-session/README.md) — the production adapter that derives standard Slot sources from the Controller doubles.
-- [UI slots package](../../client/ui-slots/README.md) — the `SlotRegistry` contract the bench mounts.
-- [UI renderer package](../../client/ui-renderer/README.md) — the renderer the bench installs.
-- [Testing policy](../../../docs/testing.md) — the coverage tiers and browser snapshot lane.
-- [Test-support group map](../README.md) — sibling harnesses and support packages.
+- [ui-session](../../client/ui-session/README.md) — Controller ダブルから標準スロットソースを導出するプロダクションアダプター。
+- [UI slots パッケージ](../../client/ui-slots/README.md) — ベンチがマウントする `SlotRegistry` コントラクト。
+- [UI renderer パッケージ](../../client/ui-renderer/README.md) — ベンチがインストールするレンダラー。
+- [テストポリシー](../../../docs/testing.md) — カバレッジティアとブラウザースナップショットレーン。
+- [test-support グループマップ](../README.md) — 兄弟ハーネスとサポートパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package is browser-side test infrastructure; nothing here reaches a model request.
+なし。このパッケージはブラウザー側のテストインフラストラクチャであり、ここにあるものがモデルリクエストに到達することはない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define how the bench is consumed. They are current package constraints, not a task backlog.
+これらの制限は、ベンチがどのように消費されるかを定義する。それらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **The whole-client tier does not run the generated Remote clients** — `remote.<ns>` proxies forward positional arguments without the generated zod validation, wire-name mapping, or scoped-identity injection; mock handlers receive those arguments directly, and the generated clients stay covered by the built-artifact e2e lanes.
-- **Proxied calls bypass the Gateway client's `invoke` and `invokeStream`** — no `$mount` lifecycle check runs, stream failures are not re-marked through `normalizeConnectionStream`, and a unary rejection is folded by the proxy itself with the Gateway client's exported `carrierFailure` and `cancelledFailure`. `ctx.remote.$stream`, `$on`, and `$host` are the real Gateway client's.
-- **An undeclared endpoint is dispatched as a unary call** — the proxy learns each endpoint's mode from the mock's registrations; a stream endpoint the spec neither scripts nor declares (`RemoteTable.streams`, `mock.stream(endpoint)`) is logged as a `unary` miss and product code receives a folded result rather than a failing stream. `remoteDefaultResponses` declares the roster's later-opened streams; `dispose()` fails the test either way.
-- **The package's client compile program adds the `node` ambient types** so the roster reader can use `node:fs`; the slot-tier sources compile against them as well.
-- **Session, Conversation, and Chat fixtures stay separate** — `sessionSnapshot` contains only Session Controller state, `conversationSnapshot` contains target-neutral Conversation state, and `chatSnapshot` contains Chat target state. Assembly tests provide Session event entries instead of adding Conversation or Chat fields to `SessionSnapshot`.
+- **クライアント全体ティアは生成された Remote クライアントを実行しない** — `remote.<ns>` プロキシは、生成された zod 検証、ワイヤー名マッピング、スコープ付き identity 注入なしで位置引数を転送する。モックハンドラーはそれらの引数を直接受け取り、生成されたクライアントはビルド済み成果物の e2e レーンでカバーされ続ける。
+- **プロキシされた呼び出しは Gateway クライアントの `invoke` と `invokeStream` をバイパスする** — `$mount` ライフサイクルチェックは実行されず、ストリームの失敗は `normalizeConnectionStream` を通じて再マークされず、単項の拒否は Gateway クライアントがエクスポートする `carrierFailure` と `cancelledFailure` を使ってプロキシ自身が折り畳む。`ctx.remote.$stream`、`$on`、`$host` は本物の Gateway クライアントのものである。
+- **未宣言のエンドポイントは単項呼び出しとしてディスパッチされる** — プロキシは各エンドポイントのモードをモックの登録から知る。スペックがスクリプト化も宣言もしていないストリームエンドポイント（`RemoteTable.streams`、`mock.stream(endpoint)`）は `unary` ミスとしてログされ、プロダクトコードは失敗するストリームではなく折り畳まれた結果を受け取る。`remoteDefaultResponses` はロースターの後から開かれるストリームを宣言し、`dispose()` はいずれにせよテストを失敗させる。
+- **このパッケージのクライアントコンパイルプログラムは `node` のアンビエント型を追加する** ため、ロースターリーダーが `node:fs` を使用できる。スロットティアのソースも同様にそれらに対してコンパイルされる。
+- **セッション、会話、チャットのフィクスチャは分離されたままである** — `sessionSnapshot` は Session Controller の状態のみを含み、`conversationSnapshot` はターゲット中立の会話状態を含み、`chatSnapshot` はチャットターゲット状態を含む。アセンブリテストは、`SessionSnapshot` に会話やチャットのフィールドを追加する代わりに、セッションイベントエントリーを提供する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

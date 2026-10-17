@@ -1,25 +1,25 @@
-# Defensive patterns
+# 防御的パターン
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Hard-won rules: each pattern in this directory is a requirement this repository enforces in review, stated as the rule and the defect it prevents. Every rule states what must hold, the condition a reviewer judges it by, its boundary and who approves an exception, and a correct and a wrong example. Read the page for the artifact you are about to change, before you change it.
+苦労して得た規則: このディレクトリーの各パターンは、レビューでこのリポジトリーが強制する要件であり、規則とそれが防ぐ欠陥として記述される。各規則は、何が保持されなければならないか、レビュアーが判断する条件、その境界と例外を承認する者、正しい例と誤った例を述べる。変更しようとしている成果物のページを、変更前に読むこと。
 
-## Why these rules
+## なぜこれらの規則が必要か
 
-Five habits cover most of what follows, and each page is their application to one artifact:
+次の5つの習慣が大半をカバーし、各ページはそれらを1つの成果物への適用として示す。
 
-- **Make correctness explicit.** Write it into the structure — named call points, explicit lifecycles, explicit conditions and types — rather than compensating for it afterwards with timing.
-- **Keep one source of truth.** One read path for a piece of data, one home for a fact, one owner for shared state.
-- **Extend through the registered seam.** A new capability registers; an existing carrier stops taking new logic instead of growing a branch inside it.
-- **Keep the change face equal to the review face.** A change carries only the lines its stated behavior change needs, a migration moves code rather than rewriting it, and a performance-sensitive change carries its measurement.
-- **Require evidence.** A claim is falsifiable and recomputable — measured before and after, or checked by a gate — rather than kept in sync by hand.
+- **正確さを明示する。** 構造に書き込む。すなわち名前付き呼び出し点、明示的なライフサイクル、明示的な条件と型であり、後からタイミングで補正しない。
+- **信頼できる唯一の情報源を1つ保つ。** 1つのデータには1つの読み取りパス、1つの事実には1つのホーム、共有状態には1つの所有者。
+- **登録済みシーム経由で拡張する。** 新ケイパビリティは登録し、既存の担い手はその中に分岐を増やさず新しいロジックを取らない。
+- **変更面とレビュー面を等しく保つ。** 変更はその振る舞い変更に必要な行のみを運び、移行は書き直しではなくコードを移動し、性能に敏感な変更は測定値を運ぶ。
+- **証拠を要求する。** 主張は反証可能かつ再計算可能である。前後で測定するか、ゲートで検査する。手作業の同期に頼らない。
 
-| Changing | Read |
+| 変更対象 | 読むべきページ |
 |---|---|
-| Package exports, package shape, build faces, dependency declarations | [package-surface.md](package-surface.md) |
-| Remote services, `@Remote` methods, API dispatch, business ownership at the API layer | [remote-and-api.md](remote-and-api.md) |
-| Client components, slots, stores, hooks, effects | [client-components.md](client-components.md) |
-| Session reads, retention, conversation nodes, renderers | [conversation-and-session.md](conversation-and-session.md) |
-| Timing, state representation, shared ownership, decentralization, refactors, migrations, performance evidence, disposal, callbacks, subprocesses | [general.md](general.md) |
+| パッケージ公開、パッケージ形状、ビルド面、依存宣言 | [package-surface.md](package-surface.md) |
+| リモートサービス、`@Remote` メソッド、API ディスパッチ、API 層でのビジネス所有権 | [remote-and-api.md](remote-and-api.md) |
+| クライアントコンポーネント、スロット、ストア、フック、エフェクト | [client-components.md](client-components.md) |
+| セッション読み取り、保持、会話ノード、レンダラー | [conversation-and-session.md](conversation-and-session.md) |
+| タイミング、状態表現、共有所有権、分散化、リファクター、移行、性能証拠、破棄、コールバック、サブプロセス | [general.md](general.md) |
 
-Type definitions and per-subsystem semantics live in [subsystems/](../subsystems/README.md); this directory carries the rules, and the semantics pages carry what the types mean. [dsh-code-review](../../.agents/skills/dsh-code-review/SKILL.md) reads this directory when judging a pull request, and Development routes through the same table from [AGENTS.md](../../AGENTS.md).
+型定義とサブシステムごとのセマンティクスは [subsystems/](../subsystems/README.md) に属する。このディレクトリーは規則を運び、セマンティクスページは型が何を意味するかを運ぶ。[dsh-code-review](../../.agents/skills/dsh-code-review/SKILL.md) はプルリクエスト判定時にこのディレクトリーを読み、開発ルートは [AGENTS.md](../../AGENTS.md) の同じ表を経由する。

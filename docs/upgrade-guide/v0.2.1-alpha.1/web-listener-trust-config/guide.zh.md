@@ -5,7 +5,7 @@ description: "Web profile 用 `webStartup` 取代 `webRuntime` 服务与 `web-ru
 
 # Web 监听与信任配置迁移到 `webStartup`
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

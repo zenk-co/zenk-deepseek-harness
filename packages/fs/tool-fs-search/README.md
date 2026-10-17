@@ -1,37 +1,37 @@
 ---
-description: "The model-facing glob and grep discovery tools for users and maintainers composing or debugging workspace search for agents."
+description: "エージェント向けのワークスペース検索を構成またはデバッグするユーザーとメンテナー向けの、モデルに公開される glob および grep 探索ツール。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-fs-search
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-tool-fs-search` to give models `glob` file discovery and `grep` content search over a local workspace. Searches need no host `rg` installation or filesystem provider, return workdir-relative results, and include hidden and ignored files while excluding VCS metadata. Configurable caps bound inline output; with an optional spill store, capped results remain fully recoverable. Choose the sibling `dsh-tool-fs` package for reading, writing, or editing files.
+`dsh-tool-fs-search` を使用すると、モデルにローカルワークスペース上での `glob` ファイル探索と `grep` コンテンツ検索を提供できます。検索はホストへの `rg` インストールやファイルシステムプロバイダーを必要とせず、workdir 相対の結果を返し、VCS メタデータを除外しつつ隠しファイルと無視ファイルを含めます。設定可能な上限がインライン出力を制限し、オプションのスピルストアがあれば、上限付きの結果も完全に取り戻せます。ファイルの読み取り・書き込み・編集には姉妹パッケージ `dsh-tool-fs` を選んでください。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送りされた作業](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Searches use the Session's current working directory, including changes made with `working_directory`.
+検索はセッションの現在の作業ディレクトリを使用し、`working_directory` による変更も反映されます。
 
-Mount the tools after a `ctx.subprocess` backend; no host `rg` install is needed, and no filesystem provider is required. The model then gets modification-time-ordered file discovery and line-oriented content search, each bounded and timeout-guarded.
+`ctx.subprocess` バックエンドの後にツールをマウントします。ホストへの `rg` インストールは不要で、ファイルシステムプロバイダーも必要ありません。モデルは更新時刻順のファイル探索と行指向のコンテンツ検索を利用でき、それぞれ上限とタイムアウトで保護されます。
 
-### Minimal composition
+### 最小構成
 
-A subprocess backend, then the tools; the spill backend is optional and makes capped results fully recoverable.
+サブプロセスバックエンドの後にツール。スピルバックエンドはオプションで、上限付きの結果を完全に取り戻せるようにします。
 
 ```yaml
 - name: '@deepseek-ai/dsh-subprocess-local'
@@ -41,183 +41,183 @@ A subprocess backend, then the tools; the spill backend is optional and makes ca
 - name: '@deepseek-ai/dsh-spill-local'
 ```
 
-`sampleOverCapGlobResults` is required and has no fallback: deployments choose the over-cap ordering contract explicitly. When formatted spill succeeds, both modes preserve the complete sorted list in the spill artifact.
+`sampleOverCapGlobResults` は必須でフォールバックはありません。デプロイは上限超過時の並び順契約を明示的に選択します。フォーマット済みスピルが成功すると、どちらのモードでも完全なソート済みリストがスピル成果物に保持されます。
 
-### The tools
+### ツール
 
-| Tool | Arguments | Behavior |
+| ツール | 引数 | 動作 |
 |---|---|---|
-| `glob` | `pattern`, `path?` | Finds files whose paths match a glob pattern, including hidden and ignored files but excluding VCS metadata; a pattern with no `/` matches basenames at any depth, so `*` matches the whole tree; complete results stay modification-time ordered |
-| `grep` | `pattern`, `path?`, `include?` | Searches file contents with a ripgrep regex and returns matches grouped by file as `Line N: <preview>`; `include` is one positive glob filter, with comma-separated lists and negated values rejected up front |
+| `glob` | `pattern`, `path?` | パスが glob パターンに一致するファイルを検索します。隠しファイルと無視ファイルを含みますが VCS メタデータは除外します。`/` を含まないパターンは任意の深さのベース名に一致するため、`*` はツリー全体に一致します。完全な結果は更新時刻順に保たれます |
+| `grep` | `pattern`, `path?`, `include?` | ripgrep 正規表現でファイル内容を検索し、一致をファイルごとに `Line N: <preview>` としてグループ化して返します。`include` は正の glob フィルター 1 つで、カンマ区切りのリストや否定値は事前に拒否されます |
 
-Routine budgets stay out of the model-facing schema: a model that needs surrounding context reads the matched file with `read`, and one that needs later results follows the returned spill locator's retrieval hint.
+定型的な予算はモデル向けスキーマには含まれません。周囲のコンテキストが必要なモデルは `read` で一致ファイルを読み、後続の結果が必要なモデルは返されたスピルロケーターの取得ヒントに従います。
 
-### Configuration
+### 設定
 
-`sampleOverCapGlobResults` is required; the remaining keys are optional search caps with the defaults below.
+`sampleOverCapGlobResults` は必須です。残りのキーはオプションの検索上限で、デフォルトは以下です。
 
-| Key | Default | Meaning |
+| キー | デフォルト | 意味 |
 |---|---|---|
-| `sampleOverCapGlobResults` | none (required) | `true` samples an over-cap `glob` page across top-level entries; `false` keeps the modification-time-ordered head |
-| `globMaxResults` | `100` | Max paths one `glob` call shows inline |
-| `grepMaxMatches` | `250` | Max flat matches one `grep` call retains inline; later matches go to the formatted spill artifact |
-| `grepMaxLineBytes` | `2000` | Byte cap per matched-line preview, preserving UTF-8 boundaries |
-| `rawOutputMaxBytes` | `20000000` | Max complete raw `rg` stdout a search will parse; larger raw output fails with `SEARCH_RAW_OUTPUT_OVERFLOW` |
-| `timeoutMs` | `30000` | Cooperative tool-call budget on both tools, enforced through `exec.signal` |
-| `graceMs` | `3000` | Terminate-escalation grace the subprocess seam grants past `timeoutMs` |
-| `stderrMaxBytes` | `65536` | Diagnostic-tail budget for `rg` stderr |
-| `searchMetaMaxBytes` | `65536` | Max bytes of one search's serialized `presentationMeta`; trailing groups/paths drop past it |
+| `sampleOverCapGlobResults` | none（必須） | `true` は上限超過の `glob` ページを最上位エントリー全体からサンプリングします。`false` は更新時刻順の先頭を保持します |
+| `globMaxResults` | `100` | 1 回の `glob` 呼び出しがインラインで表示する最大パス数 |
+| `grepMaxMatches` | `250` | 1 回の `grep` 呼び出しがインラインで保持する最大フラット一致数。それ以降の一致はフォーマット済みスピル成果物に送られます |
+| `grepMaxLineBytes` | `2000` | 一致行プレビューごとのバイト上限。UTF-8 境界を保持します |
+| `rawOutputMaxBytes` | `20000000` | 検索が解析する完全な生 `rg` stdout の最大バイト数。それを超える生出力は `SEARCH_RAW_OUTPUT_OVERFLOW` で失敗します |
+| `timeoutMs` | `30000` | 両ツールに適用される協調的ツール呼び出し予算。`exec.signal` を通じて適用されます |
+| `graceMs` | `3000` | `timeoutMs` を過ぎてサブプロセスシームが与える終了エスカレーションの猶予 |
+| `stderrMaxBytes` | `65536` | `rg` stderr の診断末尾予算 |
+| `searchMetaMaxBytes` | `65536` | 1 回の検索のシリアライズされた `presentationMeta` の最大バイト数。それを超えると末尾のグループ/パスが削除されます |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-fs-search) is the exhaustive source for every accepted field and its JSDoc.
+生成される [設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-fs-search) が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源です。
 
-### Deployment requirement
+### デプロイ要件
 
-Node deployments receive the `@vscode/ripgrep` platform package on supported macOS, Linux, and Windows targets; Python SDK wheels copy the target-native binary beside the single-file runtime as a `-rg` sidecar. No carrier requires a host `rg`. Returned paths are displayed relative to the resolved workdir (the calling session's cwd when present) and are follow-up-readable with `read` only when that workdir and the filesystem root are the same workspace.
+Node デプロイは、サポート対象の macOS、Linux、Windows ターゲットで `@vscode/ripgrep` プラットフォームパッケージを受け取ります。Python SDK ホイールは、ターゲットネイティブのバイナリを単一ファイルランタイムの隣に `-rg` サイドカーとしてコピーします。どのキャリアもホストの `rg` を必要としません。返されるパスは解決済みの workdir（存在する場合は呼び出しセッションの cwd）を基準に表示され、その workdir とファイルシステムルートが同じワークスペースである場合にのみ `read` で後続読み取りできます。
 
-### Failures and recovery
+### 失敗と回復
 
-Search failures carry the package-owned codes `SEARCH_INVALID_PATTERN` (ripgrep rejected the regex or glob), `SEARCH_FAILED` (a failed launch, inaccessible target, signal kill, or malformed `--json` output), `SEARCH_RAW_OUTPUT_OVERFLOW` (raw output over the cap), and `SEARCH_ABORTED` (cooperative timeout or caller cancellation). Exit 0 is success with results and exit 1 is a successful empty search; model argument mistakes stay ordinary tool argument errors.
+検索の失敗はパッケージ所有のコードを持ちます。`SEARCH_INVALID_PATTERN`（ripgrep が正規表現または glob を拒否）、`SEARCH_FAILED`（起動失敗、アクセス不能なターゲット、シグナルによる kill、または不正な `--json` 出力）、`SEARCH_RAW_OUTPUT_OVERFLOW`（生出力が上限超過）、`SEARCH_ABORTED`（協調的タイムアウトまたは呼び出し元のキャンセル）です。終了コード 0 は結果ありの成功、終了コード 1 は空の検索の成功です。モデルの引数ミスは通常のツール引数エラーのままです。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the search tools and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは検索ツールの背後にある設計判断を説明し、それを実現するコードを示します。観測可能な動作は [このパッケージを使う](#use-this-package) で完全に説明されています。
 
-### Design concept
+### 設計概念
 
-Local workspace discovery is naturally a process-backed `rg` workflow, and putting search on `ctx.fs` would force every filesystem backend to grow a search API. The subprocess seam owns spawn execution, process-tree termination, environment scrubbing, and bounded output capture; this package owns schemas, argument validation, argv construction, parsing, retention, formatted-result spill, and timeout declaration. The tools never expose a background job — the call returns only after `rg` exits, is terminated by the cooperative timeout, is aborted, or fails.
+ローカルワークスペースの探索はもともとプロセス駆動の `rg` ワークフローであり、検索を `ctx.fs` に載せるとすべてのファイルシステムバックエンドが検索 API を備えることを強制されます。サブプロセスシームは spawn 実行、プロセスツリーの終了、環境の洗浄、上限付き出力捕捉を所有し、このパッケージはスキーマ、引数検証、argv 構築、解析、保持、フォーマット済み結果のスピル、タイムアウト宣言を所有します。ツールがバックグラウンドジョブを公開することはありません。呼び出しは `rg` が終了するか、協調的タイムアウトで終了させられるか、中止されるか、失敗した後にのみ戻ります。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config`, tool composition, cap validation |
-| [`src/glob.ts`](src/glob.ts) | `glob` schema, argv, parsing, inline sampling, formatting |
-| [`src/grep.ts`](src/grep.ts) | `grep` schema, argv, `--json` parsing, preview retention, formatting |
-| [`src/search-core.ts`](src/search-core.ts) | Shared spawn helper, `SEARCH_*` errors, spill handoff, workdir-relative display |
-| [`src/presentation.ts`](src/presentation.ts) | Search-card metadata projection |
-| [`src/direct-call.ts`](src/direct-call.ts) | Direct-call result acceptance for spill post-processing |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `Config`、ツール構成、上限検証 |
+| [`src/glob.ts`](src/glob.ts) | `glob` スキーマ、argv、解析、インラインサンプリング、フォーマット |
+| [`src/grep.ts`](src/grep.ts) | `grep` スキーマ、argv、`--json` 解析、プレビュー保持、フォーマット |
+| [`src/search-core.ts`](src/search-core.ts) | 共有 spawn ヘルパー、`SEARCH_*` エラー、スピル引き渡し、workdir 相対表示 |
+| [`src/presentation.ts`](src/presentation.ts) | 検索カードのメタデータ投影 |
+| [`src/direct-call.ts`](src/direct-call.ts) | スピル後処理のための直接呼び出し結果の受け入れ |
 
-### How a search runs
+### 検索の実行方法
 
-Each call resolves the packaged binary (`@vscode/ripgrep`, or the executable's `-rg` sidecar in a pkg single-file runtime), prepends `--no-config` so a host `RIPGREP_CONFIG_PATH` cannot inject a `--pre` preprocessor into the unconfined spawn, and passes every model-controlled value as a plain argv element — no shell layer exists, so no quoting applies. Collect-mode budgets bound complete stdout and a stderr tail; a lossy stdout read fails as `SEARCH_RAW_OUTPUT_OVERFLOW` rather than parsing a silently-partial stream. The tools never read a raw spill path.
+各呼び出しはパッケージ済みバイナリ（`@vscode/ripgrep`、または pkg 単一ファイルランタイムでは実行ファイルの `-rg` サイドカー）を解決し、`--no-config` を先頭に付けて、ホストの `RIPGREP_CONFIG_PATH` が非制限の spawn に `--pre` プリプロセッサを注入できないようにし、モデルが制御するすべての値をプレーンな argv 要素として渡します — シェル層が存在しないためクォートは適用されません。収集モードの予算は完全な stdout と stderr の末尾を制限し、損失のある stdout 読み取りは、黙って部分的なストリームを解析するのではなく `SEARCH_RAW_OUTPUT_OVERFLOW` として失敗します。ツールが生のスピルパスを読むことはありません。
 
-### Two budgets, two artifacts
+### 2 つの予算、2 つの成果物
 
-Raw stdout and stderr are internal transport details; the tools always collect the complete result in memory, and only the inline page is capped. When a call yields more logical results than the inline cap, a best-effort spill saves the complete formatted preview to the spill store and the page carries its locator, while dispatches whose full value never enters model context skip the spill. Missing or failed spill keeps the inline page and reports that the complete result could not be saved — never an error. The collection and spill handoff live in `src/search-core.ts` and `src/presentation.ts`.
+生の stdout と stderr は内部の転送詳細です。ツールは常に完全な結果をメモリに収集し、上限が付くのはインラインページのみです。呼び出しがインライン上限を超える論理結果を生成すると、ベストエフォートのスピルが完全なフォーマット済みプレビューをスピルストアに保存し、ページはそのロケーターを運びます。一方、完全な値がモデルコンテキストに入らないディスパッチはスピルをスキップします。スピルが欠落または失敗した場合はインラインページを保持し、完全な結果を保存できなかったことを報告します — エラーにはなりません。収集とスピルの引き渡しは `src/search-core.ts` と `src/presentation.ts` にあります。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the tools to the subprocess seam, the spill store, and the filesystem family.
+パッケージレベルの契約では足りないときにこれらのページを読んでください。ツールからサブプロセスシーム、スピルストア、ファイルシステムファミリーへと進みます。
 
-- [Filesystem subsystem](../../../docs/subsystems/filesystem.md) — exhaustive provider contract, policy events, and error taxonomy.
-- [tool-fs](../tool-fs/README.md) — the sibling `read`/`write`/`edit` tools for follow-up reads.
-- [Subprocess capability](../../../docs/subsystems/subprocess.md) — the spawn seam these tools execute through.
-- [Spill store](../../spill/spill/README.md) — the optional backend that makes capped results fully recoverable.
-- [Timeout utility](../../util/timeout/README.md) — the `MAX_TIMER_DELAY_MS` bound on the terminate grace.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-fs-search) — the exhaustive schemas this package registers.
+- [Filesystem サブシステム](../../../docs/subsystems/filesystem.md) — 網羅的なプロバイダー契約、ポリシーイベント、エラー分類。
+- [tool-fs](../tool-fs/README.md) — 後続読み取り用の姉妹 `read`/`write`/`edit` ツール。
+- [サブプロセスケイパビリティ](../../../docs/subsystems/subprocess.md) — これらのツールが実行に使用する spawn シーム。
+- [スピルストア](../../spill/spill/README.md) — 上限付き結果を完全に取り戻せるようにするオプションのバックエンド。
+- [タイムアウトユーティリティ](../../util/timeout/README.md) — 終了猶予に対する `MAX_TIMER_DELAY_MS` の上限。
+- [生成ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-fs-search) — このパッケージが登録する網羅的なスキーマ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-At assembly time, each section checks `ctx.tools.get(name, scope)` and renders only while its tool is visible. The grep paragraph includes its read follow-up sentence only while read is visible. The original text and section order stay unchanged for the same supported tool set, including PTC capabilities behind `run_code`. This scope-dependent text selection applies to system-prompt sections. Tool schema descriptions remain registration-time text and do not name other tools.
+アセンブリ時に、各セクションは `ctx.tools.get(name, scope)` を確認し、そのツールが可視の間だけレンダリングします。grep の段落は、read が可視の間だけその follow-up 文を含みます。サポートされるツールセットが同じであれば、`run_code` 背後の PTC ケイパビリティを含め、原文とセクション順は変わりません。このスコープ依存のテキスト選択はシステムプロンプトセクションに適用されます。ツールスキーマの説明は登録時のテキストのままで、他のツール名を挙げません。
 
-##### Glob guidance
+##### Glob ガイダンス
 
 ```markdown
 Use the glob tool — not shell find — to discover files by path pattern.
 ```
 
-##### Grep guidance
+##### Grep ガイダンス
 
 ```markdown
 Use the grep tool — not shell grep or rg — to search file contents. Use read on a matched file when you need surrounding context.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Guidance cost follows the visible tools; the required sampling choice selects one glob variant.
+ガイダンスのコストは可視のツールに依存し、必須のサンプリング選択が 1 つの glob バリアントを選びます。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the visible tool set, plugin scope, sampling choice, and guidance text are unchanged. Restrictions, activation, disposal, or changing the choice may invalidate reuse from the first changed section.
+可視のツールセット、プラグインスコープ、サンプリング選択、ガイダンステキストが変わらなければプレフィックス安定です。制限、アクティブ化、破棄、または選択の変更は、最初に変わったセクションからの再利用を無効化する可能性があります。
 
-### Tool schemas
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The glob description states the configured over-cap ordering. The generated [`glob` and `grep` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-fs-search) use `sampleOverCapGlobResults: true`; the tools are registered unconditionally.
+glob の説明は設定された上限超過時の並び順を述べます。生成される [`glob` と `grep` のスキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-fs-search) は `sampleOverCapGlobResults: true` を使用します。ツールは無条件に登録されます。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost on every request where the tools are visible.
+ツールが可視のすべてのリクエストで固定のスキーマコストです。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while tool visibility and definitions are unchanged. Registration lifecycle or scoped restrictions may invalidate reuse from the first changed schema token.
+ツールの可視性と定義が変わらなければプレフィックス安定です。登録ライフサイクルやスコープ付き制限は、最初に変わったスキーマトークンからの再利用を無効化する可能性があります。
 
-### Results and spill notices
+### 結果とスピル通知
 
-#### What the model sees
+#### モデルが見るもの
 
-`glob` returns one path per line; `grep` groups `Line <line>: <preview>` matches beneath each path. Empty searches return `No files found` or `No matches found`. A capped result ends with its omission count plus the spill locator and backend retrieval hint, or says the complete result could not be saved. With `sampleOverCapGlobResults: true`, an over-cap `glob` page takes paths round-robin across entries immediately beneath the actual search root, and the footer states the sampled basis and how many top-level entries it reached; with `false`, the page is the modification-time-ordered head and keeps the plain capped-result footer. The spill artifact always holds the complete list in modification-time order.
+`glob` は 1 行に 1 パスを返します。`grep` は `Line <line>: <preview>` の一致を各パスの下にグループ化します。空の検索は `No files found` または `No matches found` を返します。上限付きの結果は、省略件数に加えてスピルロケーターとバックエンドの取得ヒントで終わるか、完全な結果を保存できなかったと述べます。`sampleOverCapGlobResults: true` では、上限超過の `glob` ページは実際の検索ルート直下のエントリー間でラウンドロビンにパスを取り、フッターはサンプリングの基準と到達した最上位エントリー数を示します。`false` では、ページは更新時刻順の先頭で、通常の上限付き結果フッターを保ちます。スピル成果物は常に完全なリストを更新時刻順で保持します。
 
-#### Token effect
+#### トークンへの影響
 
-Inline paths and matches are bounded by `globMaxResults`, `grepMaxMatches`, and `grepMaxLineBytes`; the call and retained result remain in history until compaction.
+インラインのパスと一致は `globMaxResults`、`grepMaxMatches`、`grepMaxLineBytes` で制限されます。呼び出しと保持された結果はコンパクションまで履歴に残ります。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用です。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しません。
 
-### Tool errors
+### ツールエラー
 
-#### What the model sees
+#### モデルが見るもの
 
-Failures are normalized as `Error: <message>` with structured `SEARCH_INVALID_PATTERN`, `SEARCH_FAILED`, `SEARCH_RAW_OUTPUT_OVERFLOW`, or `SEARCH_ABORTED` metadata for callers.
+失敗は `Error: <message>` として正規化され、呼び出し元向けに構造化された `SEARCH_INVALID_PATTERN`、`SEARCH_FAILED`、`SEARCH_RAW_OUTPUT_OVERFLOW`、または `SEARCH_ABORTED` メタデータが付きます。
 
-#### Token effect
+#### トークンへの影響
 
-Only a failing call adds these retained tokens.
+これらの保持トークンを追加するのは失敗した呼び出しのみです。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用です。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送りされた作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the search tools are a poor fit or need special operational care. They are current package constraints, not a general search comparison or a task backlog.
+これらの制限は、検索ツールが不向きな場合、または特別な運用上の注意が必要な場合を定義します。これらは現在のパッケージ制約であり、一般的な検索の比較やタスクバックログではありません。
 
-- **Search and file access have no shared-workspace proof** — returned paths are follow-up-readable only when the workdir and filesystem root denote the same workspace; the package performs no runtime cross-service validation.
-- **The packaged binary is fixed at dependency version** — Node deployments use the version selected by `@vscode/ripgrep`; Python single-file runtimes copy that target-native version into the required `-rg` sidecar. An unsupported platform or a corrupted installation fails with `SEARCH_FAILED`, while the Python runtime package rejects a missing sidecar before launch. Remote or virtual filesystems need a co-located workspace or another search consumer.
-- **The schemas expose one bounded page** — offset pagination, case-mode switches, alternate output modes, and provider-backed discovery remain outside this package; capped complete output requires a spill backend.
-- **Sampling, when enabled, groups by first path segment beneath the search root only** — an over-cap `glob` page balances across those top-level entries, so a result concentrated deeper is still shown unevenly below that level; recursive balancing is deferred.
+- **検索とファイルアクセスには共有ワークスペースの証明がない** — 返されたパスが後続読み取り可能なのは、workdir とファイルシステムルートが同じワークスペースを指す場合のみです。このパッケージは実行時のクロスサービス検証を行いません。
+- **パッケージ済みバイナリは依存関係のバージョンに固定される** — Node デプロイは `@vscode/ripgrep` が選択するバージョンを使用し、Python 単一ファイルランタイムはそのターゲットネイティブのバージョンを必須の `-rg` サイドカーにコピーします。サポート外のプラットフォームや壊れたインストールは `SEARCH_FAILED` で失敗し、Python ランタイムパッケージは起動前にサイドカーの欠落を拒否します。リモートまたは仮想ファイルシステムには、同一配置のワークスペースか別の検索コンシューマーが必要です。
+- **スキーマは 1 つの上限付きページを公開する** — オフセットページネーション、大文字小文字モードの切り替え、代替出力モード、プロバイダー駆動の探索はこのパッケージの対象外です。上限付きの完全な出力にはスピルバックエンドが必要です。
+- **有効時のサンプリングは検索ルート直下の最初のパスセグメントによってのみグループ化する** — 上限超過の `glob` ページはそれらの最上位エントリー間でバランスを取るため、より深い場所に集中した結果はそのレベル以下では依然として不均等に表示されます。再帰的なバランシングは先送りされています。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

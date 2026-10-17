@@ -5,7 +5,7 @@ description: "“自动化任务”可选 bundle 已移除；Web 组合自行挂
 
 # “自动化任务” bundle 已移除
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

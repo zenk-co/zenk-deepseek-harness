@@ -1,32 +1,32 @@
-# Profile management
+# プロファイル管理
 
-English | [中文](boot.zh.md)
+日本語 | [English](boot.en.md) | [中文](boot.zh.md)
 
-The [boot package group](../../packages/boot/README.md) owns launcher-provided profile access and the plugin manager. [Plugin Manager](../../packages/boot/plugin-manager/README.md) documents persistence, reload and package-operation behavior.
+[boot パッケージグループ](../../packages/boot/README.md)が、launcher が提供するプロファイルアクセスとプラグインマネージャーを所有する。[Plugin Manager](../../packages/boot/plugin-manager/README.md) が永続化、リロード、パッケージ操作の動作を文書化する。
 
-## Management records
+## 管理レコード
 
-`PluginEntryId` identifies one Loader entry; callers obtain it from `listPlugins` rather than constructing a patch id.
+`PluginEntryId` は 1 つの Loader エントリーを識別する。呼び出し元は patch id を構築するのではなく、`listPlugins` からこれを取得する。
 
-`PluginInfo` carries module identity, effective enablement, fiber phase and optional display `meta`, plus a unique `patchId` or a `readOnlyReason`.
+`PluginInfo` はモジュールアイデンティティ、有効な有効化状態、ファイバーフェーズ、任意の表示用 `meta` を運び、さらに一意の `patchId` または `readOnlyReason` を持つ。
 
-`BundleInfo.official` identifies project-maintained shipped optional bundles and on-demand catalog entries independently of installation. `availability` identifies a readable installation-provided or profile package, or `missing`; on-demand catalog entries exclude undeclared transitive copies. `installed` records the profile dependency declaration. An on-demand `installTarget` carries the host-derived exact spec and version. `BundleInfo` also carries the package name, optional installed version, selected enablement, removal availability, optional resolution error, and, for a bundle the profile's own dependency supplies and the installation does not, `source`: that dependency as a spec `pnpm add` accepts. Its optional `meta` and each `BundleRowInfo.meta` contain display text or a metadata diagnostic; Clients select a language at render time.
+`BundleInfo.official` は、プロジェクトが保守する同梱のオプションバンドルとオンデマンドのカタログエントリーを、インストール状態とは独立に識別する。`availability` は、読み取り可能なインストール提供パッケージまたはプロファイルパッケージ、あるいは `missing` を識別する。オンデマンドのカタログエントリーは、宣言されていない推移的コピーを除外する。`installed` はプロファイルの依存関係宣言を記録する。オンデマンドの `installTarget` はホストが導出した正確な spec とバージョンを運ぶ。`BundleInfo` はさらに、パッケージ名、任意のインストール済みバージョン、選択された有効化状態、削除の可用性、任意の解決エラーを運び、プロファイル自身の依存関係が提供しインストールが提供しないバンドルについては `source` を運ぶ。`source` は `pnpm add` が受け入れる spec としてのその依存関係である。その任意の `meta` と各 `BundleRowInfo.meta` は表示テキストまたはメタデータ診断を含み、Client はレンダリング時に言語を選択する。
 
-`InstallBundleOptions.saveExact` passes `--save-exact` to the shared package installer. `InstallBundleOptions.enabled` defaults to true. False installs without selecting the bundle layer. `approvedBuilds` grants persistent script permission to the supplied pending package names before installation. `registry` names the registry asked first; absent, the configured one.
+`InstallBundleOptions.saveExact` は共有パッケージインストーラーに `--save-exact` を渡す。`InstallBundleOptions.enabled` はデフォルトで true である。false はバンドルレイヤーを選択せずにインストールする。`approvedBuilds` は、インストール前に、指定された保留中のパッケージ名に永続的なスクリプト権限を付与する。`registry` は最初に問い合わせるレジストリを名指す。省略時は設定済みのものが使われる。
 
-`PluginRegistries` carries the configured first registry, `null` for the one pnpm's own configuration names, the fallbacks asked after it, and `resolved`, the URL pnpm's own configuration names or `null` while unread. `InspectOptions.registry` names the registry a lookup asks first.
+`PluginRegistries` は、設定された最初のレジストリ（pnpm 自身の設定が名指すものを表す `null`）、その後に問い合わせるフォールバック、および `resolved`（pnpm 自身の設定が名指す URL で、未読の間は `null`）を運ぶ。`InspectOptions.registry` はルックアップが最初に問い合わせるレジストリを名指す。
 
-`ChangeResult.changed` reports a disk edit independently of `application`: `applied`, `restart-required`, `overridden` or `failed`. Optional `error` carries a localizable code and external diagnostic. `packageResult` records the pnpm exit code, bounded output, truncation flag and complete diagnostic log path, plus `timedOut` when the manager terminated a run that stopped printing. A terminated run is classified `timeout` whatever exit status the signal left behind, so installation and removal report failure instead of success and no further registry is asked. `pendingBuilds` lists undecided packages across the profile; `approvedBuilds` records the names granted permission by this operation; `registries` lists the registries an installation asked, in order; `bundle` and `version` name the package a finished installation added and its manifest version; `failedAt` says whether the last failed run could not reach the registry it asked or the host a git or tarball spec is fetched from.
+`ChangeResult.changed` は `application` とは独立にディスク編集を報告する。値は `applied`、`restart-required`、`overridden`、`failed` である。任意の `error` はローカライズ可能なコードと外部診断を運ぶ。`packageResult` は pnpm の終了コード、上限付き出力、切り捨てフラグ、完全な診断ログパスを記録し、さらに、印刷を停止した実行をマネージャーが終了した場合の `timedOut` を記録する。終了された実行は、シグナルが残した終了ステータスに関わらず `timeout` に分類されるため、インストールと削除は成功ではなく失敗を報告し、それ以上レジストリに問い合わせることはない。`pendingBuilds` はプロファイル全体で未決定のパッケージを列挙し、`approvedBuilds` はこの操作が権限を付与した名前を記録し、`registries` はインストールが問い合わせたレジストリを順に列挙する。`bundle` と `version` は、完了したインストールが追加したパッケージとそのマニフェストバージョンを名指す。`failedAt` は、最後に失敗した実行が、問い合わせたレジストリに到達できなかったのか、git または tarball の spec の取得先ホストに到達できなかったのかを述べる。
 
-## Market records
+## マーケットレコード
 
-[Plugin Market](../../packages/boot/plugin-market/README.md) reads index format 1, validated by [`dsh-plugin-market-index`](../../packages/util/plugin-market-index/README.md).
+[Plugin Market](../../packages/boot/plugin-market/README.md) はインデックスフォーマット 1 を読み取り、[`dsh-plugin-market-index`](../../packages/util/plugin-market-index/README.md) によって検証される。
 
-`MarketIndexSummary` carries one configured index URL with the `title` and `description` of its last successful read and, when the last read failed, its `error`.
+`MarketIndexSummary` は、1 つの設定済みインデックス URL と、最後に成功した読み取りの `title` と `description`、および最後の読み取りが失敗した場合の `error` を運ぶ。
 
-`MarketQuery` selects one page of an index: fuzzy `text`, a `category`, `labels` that must all be present, a `MarketSort`, `offset`, `limit` up to 100, `refresh` to fetch again instead of using a cached document, and `fetchedAt` to continue the pages of one document. `MarketSearchResult` carries the index URL, `title`, optional `description`, market `metadata`, the document's `fetchedAt`, the page's `entries`, the `total` number of matches, and the `nextOffset`. Each `MarketListingEntry` adds `defaultVersion`, the version installed by default, and `installation`, the profile's status for the package name; each of its `versions` adds `install`, the exact spec and optional first registry for `installBundle`, and `compatibility`, the evaluation of its `engines.dsh` including a version exemption.
+`MarketQuery` はインデックスの 1 ページを選択する。あいまいな `text`、`category`、すべて存在しなければならない `labels`、`MarketSort`、`offset`、最大 100 の `limit`、キャッシュされたドキュメントを使わずに再取得する `refresh`、1 つのドキュメントのページを継続する `fetchedAt` である。`MarketSearchResult` は、インデックス URL、`title`、任意の `description`、マーケットの `metadata`、そのドキュメントの `fetchedAt`、ページの `entries`、一致の総数 `total`、`nextOffset` を運ぶ。各 `MarketListingEntry` は `defaultVersion`（デフォルトでインストールされるバージョン）と `installation`（パッケージ名に対するプロファイルのステータス）を追加し、その各 `versions` は `install`（`installBundle` 用の正確な spec と任意の最初のレジストリ）と `compatibility`（バージョン免除を含む `engines.dsh` の評価）を追加する。
 
-## Profile reconciliation
+## プロファイルの調整
 
 <a id="profile-reconciliation"></a>
 

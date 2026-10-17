@@ -1,221 +1,221 @@
 ---
-description: "Shared React UI atoms for the dsh web client: controls, icons, markdown and math rendering, and the terminal/read/diff/search/web output cards (zero Cordis)."
+description: "dsh Web クライアント向けの共有 React UI アトム:コントロール、アイコン、Markdown と数式のレンダリング、terminal/read/diff/search/web 出力カード (Cordis なし)。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-client-ui-primitives
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-client-ui-primitives` to build web-client controls and render agent output with shared React UI. It includes standard controls, icons, anchored overlays, and renderers for Markdown with TeX, terminal output, file reads, diffs, search, web retrieval, and JSON. The renderers handle untrusted model output by dropping raw HTML, restricting links, and parsing ANSI escape sequences. The components import no Cordis runtime; callers supply localized labels, and theme-facing colors use `--dsw-*` design tokens.
+`dsh-client-ui-primitives` を使って Web クライアントのコントロールを構築し、共有 React UI でエージェント出力をレンダリングします。標準コントロール、アイコン、アンカー付きオーバーレイ、TeX 付き Markdown・ターミナル出力・ファイル読み取り・差分・検索・Web 取得・JSON 用のレンダラーを含みます。レンダラーは生 HTML の除去、リンクの制限、ANSI エスケープシーケンスの解析により、信頼できないモデル出力を扱います。コンポーネントは Cordis ランタイムをインポートしません。呼び出し側がローカライズ済みラベルを供給し、テーマ向けの色には `--dsw-*` デザイントークンを使います。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しの作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-`Toast` uses the theme’s toast background and label colors in both light and dark modes. `Menu` data rows and `MenuItemButton` component rows accept owner-provided effective shortcuts and align their keys at the trailing edge as muted text without a background, including submenus. `ShortcutKeys` defaults to unboxed keys for menu and inline hints. Its `tooltip` variant uses lighter keycaps over the dark bubble and groups plus-separated combinations into one filled block. `Tooltip.shortcutKeys` vertically centers keycaps beside optional localized action text, or shows only keys when the label is empty. The optional `className` supplies owner interaction styles. `Modal` uses the frame’s shared overlay inset, with a minimum 24px viewport margin. Its mask leaves the Windows caption unpainted while the full-viewport layer blocks background clicks. `Modal` and the settings shell share top-layer Escape and Tab handling through `useModalLayer`, restoring the previous focus on close. `closeTopModal(document)` requests the foreground modal’s current close action; newer menus or unregistered dialogs block dismissal of the modal behind them. Components use `isBehindModal` to avoid moving focus behind a nested dialog. Menus consume their local Escape before modal dismissal. `observeComposition` supplies the same composition-end and legacy IME guard to local modal and recording handlers; callers dispose its document listeners with their interaction lifetime.
+`Toast` はライトモードとダークモードの両方でテーマのトースト背景色とラベル色を使います。`Menu` のデータ行と `MenuItemButton` のコンポーネント行は、所有者指定の実効ショートカットを受け付け、サブメニューを含めてキーを末尾にミュート色テキストで背景なしに整列します。`ShortcutKeys` は既定でメニューとインラインヒント用の箱なしキーです。その `tooltip` バリアントはダークバブル上に明るいキーキャップを使い、プラス区切りの組み合わせを 1 つの塗りブロックにまとめます。`Tooltip.shortcutKeys` はキーキャップを任意のローカライズ済みアクションテキストの横に垂直中央揃えし、ラベルが空ならキーのみ表示します。任意の `className` は所有者のインタラクションスタイルを供給します。`Modal` はフレーム共有のオーバーレイインセットを使い、ビューポートマージンは最小 24px です。そのマスクは Windows キャプション部分を塗らずに残し、全ビューポート層が背後のクリックを遮断します。`Modal` と設定シェルは `useModalLayer` を介してトップレイヤーの Escape と Tab 処理を共有し、閉じたら以前のフォーカスを復元します。`closeTopModal(document)` は前面モーダルの現在のクローズ動作を要求します。新しいメニューや未登録ダイアログがあると背後のモーダルの解散は抑止されます。コンポーネントは `isBehindModal` を使い、ネストしたダイアログの背後へフォーカスを移しません。メニューはモーダル解散より先に自前の Escape を消費します。`observeComposition` はローカルのモーダルと記録ハンドラーに同じコンポジション終了ガードとレガシー IME ガードを供給します。呼び出し側はドキュメントリスナーをインタラクション存続期間とともに破棄します。
 
-Automatic modal entry and modal/menu return focus, including after Escape and application close shortcuts, use `focusWithoutRing(element, options?)` to suppress the outline until Tab or directional navigation resumes normal focus styling. Dialog containers keep their outline-free styling. Existing borders, shadows, and error states remain intact. Mark a dialog's initial control with `data-modal-autofocus` so the modal captures its invoking control before moving focus. Controls mounted with the dialog must not use React `autoFocus`, which runs before that capture. Tab and Shift+Tab from the dialog container enter its first and last focusable controls.
+自動モーダル突入とモーダル/メニューへのフォーカス復帰 (Escape 後やアプリケーション終了ショートカット後を含む) には `focusWithoutRing(element, options?)` を使い、Tab や方向キー操作で通常のフォーカススタイルに戻るまで輪郭線を抑止します。ダイアログコンテナーは輪郭線なしスタイルを保ちます。既存の境界線・影・エラー状態はそのままです。ダイアログの初期コントロールに `data-modal-autofocus` を付けて、フォーカス移動前にモーダルが起動元コントロールを捕捉できるようにします。ダイアログとともにマウントされるコントロールでは React の `autoFocus` を使わないでください (捕捉より先に実行されるため)。ダイアログコンテナーからの Tab と Shift+Tab は最初と最後のフォーカス可能コントロールに入ります。
 
-This package is a Web-shell build input. Its static ESM retains third-party imports and styles for Vite; independent consumers supply its development dependencies ([dependency rules](../AGENTS.md#dependency-declaration)).
+このパッケージは Web シェルビルド入力です。その静的 ESM はサードパーティのインポートとスタイルを Vite 用に保持します。独立したコンシューマーは開発依存関係を自前で供給します ([依存関係ルール](../AGENTS.md#dependency-declaration))。
 
-Compose feature UI from these atoms whenever the web client needs a standard control or an agent-output renderer. They render through React only and take `--dsw-*` design tokens from the theme, so they fit any plugin without importing the theme or the slot system.
+Web クライアントに標準コントロールやエージェント出力レンダラーが必要なときは、これらのアトムから機能 UI を組み立てます。React 経由でのみレンダリングし、テーマから `--dsw-*` デザイントークンを取るため、テーマやスロットシステムをインポートせずにどのプラグインにも収まります。
 
 <a id="component-catalog"></a>
-### Component catalog
+### コンポーネントカタログ
 
-Check this table before writing a control in a feature package. A plugin cannot import another plugin's component, so this package is the only place a control can be shared: reuse what fits, and lift a deliberate visual difference into a prop rather than starting a second copy.
+機能パッケージでコントロールを書く前にこの表を確認してください。プラグインは他のプラグインのコンポーネントをインポートできないため、コントロールを共有できる唯一の場所がこのパッケージです。合うものは再利用し、意図的な見た目の違いは複製から始めず prop に持ち上げてください。
 
-| Export | What it is |
+| エクスポート | 内容 |
 |---|---|
-| `Button` | Clickable action; `variant` selects `primary`, `ghost`, `outline`, or `toolbar`. Its ref targets the native button for focus and overlay anchoring. |
-| `Switch` | Two-state toggle, 36×20. The off-state thumb reads `--dsw-alias-switch-thumb` so it stays light in both themes, and the on-state thumb contrasts with the brand track. Disabled controls use half opacity. `label` is required, so the control cannot ship unnamed. |
-| `SegmentedControl` | Tablist of two or more equal-width segments with one sliding indicator, for switching a card or panel between a few modes; the owner holds the selection and `label` names the list. `id` seeds each tab's id (`<id>-<value>`) and the panel it controls (`<id>-<value>-panel`), which the owner renders and points back at the tab with `aria-labelledby`; a segment may be `disabled` with a `title`, and `disabled` on the control locks every segment while the shown panel has work in flight. |
-| `Checkbox` | Labeled native checkbox with controlled state, keyboard interaction, and disabled styling; the caller supplies localized `label` text. |
-| `Input` | Single-line text entry for search boxes and inline forms. Its ref targets the native input for focus and is cleared on unmount. |
-| `InlineEditor` | Autofocused multi-line inline editor for short drafts such as queued messages and goals. It grows with its text and its width up to six lines, then scrolls; Enter saves, Shift+Enter breaks the line, Enter during IME composition does nothing, and Escape cancels. The caller supplies the localized `label` and rebinds the scrollbar on an elevated surface. |
-| `Menu`, `MenuItemButton` | Dropdown of `items` data rows, separators, and group labels, with nested submenus; `children` adds component rows, each a `MenuItemButton` (`separatorBefore` starts a new group), in the same list. Every row shares the styling, the keyboard walk, and the focus return; closing stays the owner's state change for both kinds. While open, ↑/↓ (with Home and End) walk the list, Tab settles the focused row, and Escape or Shift+Tab close back to the anchor; selecting a row also returns the keyboard to the anchor unless the owner moved it itself. Only a keyboard on the anchor or inside the list is intercepted, and `autoFocus` decides solely whether opening focuses the first row. |
-| `MenuGroup`, `observeStickyMenuGroups` | Localized, accessible groups for custom menus and listboxes, with shared sticky-heading styling and native intersection/size observation; the caller owns the observer's lifetime. |
-| `Pill` | Selectable capsule button for view switchers and filters; takes `active` and `onClick`. |
-| `SegmentedTabs` | Controlled equal-width tabs with a sliding indicator and Left/Right, Home, and End navigation. The caller supplies labels, tab/panel ids, and panel content. |
-| `Tag` | Read-only capsule badge; `tone` selects one of eight palettes. |
-| `PathLabel` | Single-line file path with subdued directories, a primary filename, and the full path on hover. Fitting paths align left; clipped paths preserve their suffix with a left-edge fade that updates on path and size changes. |
-| `StateDot` | Solid green `done`, amber `warning`, red `error`, and neutral-grey `idle` marks in a 10px slot, plus a tertiary-grey 14px rotating `ongoing` loader whose animations pin to document time zero on mount and on every animation restart, such as a list reorder, so every visible loader rotates in phase. `aria-hidden`, so the render site owns the name. `appearance="step"` shows a filled check for completion and a hollow pending circle. |
-| `ConnectionIndicator` | Inline connection-recovery control across outage, retry, and recovered states. |
-| `DisclosureRow` | 24px compact disclosure that lays title and content side by side. The header supplies tertiary at rest and secondary on hover; text and icons inherit it regardless of expandability or open state unless the caller supplies a feature-specific override. Semantic status colors remain explicit. Collapsed rows preview a down chevron on hover, and expanded rows keep an up chevron visible. `headerAccessory` places an independent action outside the disclosure target and shimmer; with an accessory, the title row shrinks to its content width. Memoized with shallow prop comparison; keep callbacks and React-node props stable when their content is unchanged. |
-| `TextShimmer` | One left-to-right highlight across a row’s title, separators, summary, and suffix, with a 300ms initial delay, a one-second sweep and a 500ms rest. The mask spans the content width, capped by the visible row and tilts 15° from vertical, with a flat peak and soft edges. The moving decoration stays clipped to the row without enlarging its scrollable area. Base text inherits the caller’s color, including hover changes; the theme supplies the translucent highlight. Place icons and chevrons outside `TextShimmer` so only text and separators receive the highlight. A string child uses the same retained text interface; nested `TextShimmer` instances share the outer animation. Composite children render twice while active and must have no effects or element ids. Mark separators with `data-shimmer-decoration` so their fill receives the highlight. `DisclosureRow` forwards `contentClassName` for the text area and `contentLayoutClassName` for its inner layout. The inert decorative copy is excluded from interaction, selection, and accessibility; text updates retain the animation, and reduced-motion mode keeps the static base. |
-| `Modal` | Centered dialog over a page mask. A nested dialog can intercept keys with `onKeyDownCapture` before document Escape handlers. The tint and dialog fade in while backdrop blur stays fully applied, honoring reduced motion. Set `backdropBlur={false}` when the caller already blurs the source page. |
-| `RiskConfirmation` | Sensitive action gated behind an explicit checkbox. |
-| `Tooltip` | Hover and keyboard-focus text anchored to a cloned child; optional `delayMs` controls hover delay and `focusDelayMs` controls keyboard-focus delay, both defaulting to 0 ms. Optional `portal` rendering escapes clipping containers and ancestor stacking contexts that cap the bubble's z-index. |
-| `HoverCard`, `HoverCardGroup` | Readable, optionally copyable hover preview; a physical list can opt cards into shared first-display dwell and exclusive display. |
-| `ImageLightbox` | Shared image modal with focus restoration and Escape dismissal. |
-| `Toast` | Transient top-center banner held for the owner's `holdMs`. |
-| `SettingsForm`, `SettingsValueField`, `SettingsSecretField` | The frame and the controls of a plugin's settings page: the frame takes its copy as `labels`, saves only on its button, and discards on unmount; a value field shows staged text with the overridden badge and reset; a secret field starts blank, requests no saved-password autofill, and reports only whether a value is configured. |
-| `SettingsFormModel`, `settingsNumberField`, `settingsTextField` | The staged-edit model behind such a page over a settings scope: drafts are staged and written on save, a field is overridden by its presence in the user layer, and a save that did not land keeps its drafts. |
-| `JsonTree`, `JsonBlock` | Read-only JSON inspection. |
-| `MarkdownText`, `MarkdownDelegateProvider`, `CodeBlock` | Untrusted GFM with TeX math, owner-delegated HTTP(S) navigation, and highlighted code. `CodeBlock` accepts opt-in `lineNumbers`; copied source excludes the gutter, and `contentRef` exposes its stable source wrapper to an owner that uses it as a scrollport. Set `showHeader={false}` when the owner supplies its own language and copy toolbar. |
-| `UserTextRun`, `ReferenceChip` | Uninterpreted inline text and business-resolved reference labels or activation buttons. |
-| `CommandText` | Selectable command or argument text; only horizontal overflow adds a named keyboard focus target. |
-| `TerminalBlock`, `ReadBlock`, `DiffBlock`, `SearchBlock`, `WebBlock` | The agent-output card matching each tool-result intent. |
-| `icons/*`, `FishLogo`, `BrandWordmark`, `ReferenceIconRegular`/`ReferenceIconMedium`, `LinkIconRegular`/`LinkIconMedium` | Glyphs and brand marks. The thinking glyph keeps an inset orbit within its 16px view box. Use `LinkIconMedium` for 14px clickable-link categories and known-site marks. |
-| `PermissionIconReadOnlyRegular`/`Medium`, `PermissionIconWorkspaceWriteRegular`/`Medium`, `PermissionIconFullAccessRegular`/`Medium`, `PermissionIconAutoReviewRegular`/`Medium` | Permission-mode glyphs for read-only, workspace-write, full-access, and auto-review choices. |
-| `PluginArtworkTerminal`/`Loop`/`Subagent`/`Search`/`Default` | Fixed-palette 36×36 plugin artwork; `Terminal` supplies the light-blue prompt in plugin cards and sidebar guide entries. `Default` marks plugins without artwork of their own. Def ids are per-instance, so the same artwork repeats safely on one page. |
-| `GuideArtworkBrowser`/`Files` | Fixed-palette 36×36 browser and folder artwork for sidebar guide entries. |
-| `FileTypeIcon`, `classifyFileType`, `fileExtension` | A category-colored 28px file or folder glyph and the shared case-insensitive filename mapping behind it. Code and configuration files use detailed full-color technology glyphs; use `LinkIconMedium` for link-leading glyphs and image previews for image content. |
-| `languageForPath`, `CODE_HIGHLIGHT_EXTENSIONS`, `useCodeHighlighter` | The lazy line-token highlighter shared by code preview and diff review. The filename grammar selection is re-exported from `@deepseek-ai/dsh-util-code-language`, the single extension table also behind the read card's persisted short-id `lang` hint. |
+| `Button` | クリック可能なアクション。`variant` で `primary`・`ghost`・`outline`・`toolbar` を選択します。その ref はフォーカスとオーバーレイアンカー用にネイティブボタンを指します。 |
+| `Switch` | 2 状態トグル (36×20)。オフ状態のつまみは `--dsw-alias-switch-thumb` を読むため両テーマで明るく、オン状態のつまみはブランドトラックとコントラストします。無効コントロールは半透明です。`label` は必須のため、名前なしでは出荷できません。 |
+| `SegmentedControl` | カードやパネルを少数のモードで切り替える、等幅セグメント 2 つ以上のタブリストで、スライド式インジケーター付き。選択状態は所有者が保持し、`label` がリストに名前を付けます。`id` は各タブの id (`<id>-<value>`) とそれが制御するパネル (`<id>-<value>-panel`) の種になり、所有者がパネルをレンダリングして `aria-labelledby` でタブに指し戻します。セグメントは `title` 付きで個別に `disabled` でき、コントロール全体の `disabled` は表示パネルが処理中の間など全セグメントを固定します。 |
+| `Checkbox` | ラベル付きネイティブチェックボックス。制御状態・キーボード操作・無効時スタイル付き。呼び出し側がローカライズ済み `label` テキストを供給します。 |
+| `Input` | 検索ボックスやインラインフォーム用の単一行テキスト入力。その ref はフォーカス用にネイティブ input を指し、アンマウント時にクリアされます。 |
+| `InlineEditor` | キュー済みメッセージや目標などの短い下書き用の、自動フォーカスの複数行インラインエディター。テキスト量に応じて幅いっぱいに 6 行まで伸び、その後はスクロールします。Enter で保存、Shift+Enter で改行、IME 変換中の Enter は無視、Escape でキャンセルです。呼び出し側がローカライズ済み `label` を供給し、隆起サーフェス上でスクロールバーを再バインドします。 |
+| `Menu`、`MenuItemButton` | `items` データ行・区切り・グループラベルとネストしたサブメニューを持つドロップダウン。`children` でコンポーネント行を追加でき、各行は `MenuItemButton` (`separatorBefore` で新グループ開始) として同じリストに入ります。すべての行がスタイル・キーボード移動・フォーカス復帰を共有し、クローズは両種とも所有者の状態変更に留まります。開いている間、↑/↓ (Home・End 付き) でリストを移動し、Tab でフォーカス行を確定、Escape や Shift+Tab でアンカーに戻って閉じます。行の選択も、所有者が自前で移さない限りキーボードをアンカーに戻します。アンカー上またはリスト内のキー操作のみが捕捉され、`autoFocus` は開いたときに最初の行へフォーカスするかどうかだけを決めます。 |
+| `MenuGroup`、`observeStickyMenuGroups` | カスタムメニューとリストボックス用の、ローカライズ済みでアクセシブルなグループ。共有スティッキーヘッダースタイルとネイティブの intersection/size 監視付き。呼び出し側がオブザーバーの存続期間を所有します。 |
+| `Pill` | ビュー切り替えやフィルター用の選択可能なカプセルボタン。`active` と `onClick` を取ります。 |
+| `SegmentedTabs` | スライド式インジケーター付きの制御等幅タブで、Left/Right・Home・End 移動付き。呼び出し側がラベル・タブ/パネル id・パネル内容を供給します。 |
+| `Tag` | 読み取り専用カプセルバッジ。`tone` で 8 パレットから選択します。 |
+| `PathLabel` | 単一行のファイルパス表示。ディレクトリは控えめに、ファイル名はプライマリで、ホバーでフルパスを示します。収まるパスは左揃え。切り詰めパスは接尾辞を保持し、左端フェードがパスとサイズの変化で更新されます。 |
+| `StateDot` | 10px スロットの緑 `done`・黄 `warning`・赤 `error`・中性灰 `idle` マークと、三次灰 14px 回転 `ongoing` ローダー。そのアニメーションはマウント時とリスト並べ替えなどの再開ごとにドキュメント時刻ゼロへ固定され、可視ローダーはすべて同位相で回転します。`aria-hidden` のため命名はレンダー側が所有します。`appearance="step"` は完了に塗りチェック、保留に中空丸を示します。 |
+| `ConnectionIndicator` | 断絶・再試行・回復状態にまたがるインライン接続回復コントロール。 |
+| `DisclosureRow` | タイトルと内容を横並びにする 24px コンパクト開閉行。ヘッダーは静止時三次・ホバー時二次の色を供給し、展開可否や開閉状態にかかわらずテキストとアイコンが継承します (呼び出し側の機能固有オーバーライドがある場合を除く)。意味ステータス色は明示のままです。折りたたみ行はホバーで下向きシェブロンをプレビューし、展開行は上向きシェブロンを表示維持します。`headerAccessory` は開閉対象や shimmer の外に独立アクションを置きます。アクセサリー付きではタイトル行は内容幅に縮みます。浅い prop 比較でメモ化されているため、内容不変のコールバックや React ノード prop は安定に保ちます。 |
+| `TextShimmer` | 行タイトル・区切り・要約・接尾辞を横切る左から右への単一ハイライト。初期遅延 300ms、掃引 1 秒、休止 500ms。マスクは内容幅に広がり、可視行で上限され、垂直から 15° 傾き、平坦なピークと柔らかい縁を持ちます。移動装飾はスクロール領域を広げずに行内に切り詰められます。基本テキストはホバー変化を含む呼び出し側の色を継承し、テーマが半透明ハイライトを供給します。テキストと区切りのみがハイライトされるようアイコンとシェブロンは `TextShimmer` の外に置きます。文字列子は同じ保持テキストインターフェースを使い、ネストした `TextShimmer` は外側のアニメーションを共有します。複合子は作動中に二重レンダーされるため、副作用や要素 id を持ってはなりません。区切りには `data-shimmer-decoration` を付けて塗りにハイライトを受けます。`DisclosureRow` はテキスト領域用に `contentClassName`、内側レイアウト用に `contentLayoutClassName` を転送します。不活性な装飾コピーはインタラクション・選択・アクセシビリティから除外され、テキスト更新はアニメーションを維持し、モーション削減モードでは静止ベースに留まります。 |
+| `Modal` | ページマスク上の中央ダイアログ。ネストしたダイアログはドキュメント Escape ハンドラーより先に `onKeyDownCapture` でキーを捕捉できます。ティントとダイアログはフェードインし、背景ブラーは完全適用のまま (モーション削減を尊重)。呼び出し側が既に元ページをぼかしている場合は `backdropBlur={false}` を設定します。 |
+| `RiskConfirmation` | 明示チェックボックス背後の機密アクション。 |
+| `Tooltip` | 複製子にアンカーしたホバー・キーボードフォーカステキスト。任意の `delayMs` がホバー遅延、`focusDelayMs` がキーボードフォーカス遅延を制御し、既定はどちらも 0ms。任意の `portal` レンダリングで、バブルの z-index を抑える切り詰めコンテナーや祖先スタッキングコンテキストから脱出します。 |
+| `HoverCard`、`HoverCardGroup` | 読みやすく任意でコピー可能なホバープレビュー。物理リストはカードを共有初回表示 dwell と排他表示にできます。 |
+| `ImageLightbox` | フォーカス復元と Escape 解散を持つ共有画像モーダル。 |
+| `Toast` | 所有者の `holdMs` だけ保持する一過性上部中央バナー。 |
+| `SettingsForm`、`SettingsValueField`、`SettingsSecretField` | プラグイン設定ページの枠とコントロール。枠はコピーを `labels` として受け、保存はボタンでのみ行い、アンマウントで破棄します。値フィールドは上書きバッジとリセット付きでステージ済みテキストを表示し、シークレットフィールドは空で始まり、保存済みパスワードの自動入力を求めず、値が設定済みかだけを報告します。 |
+| `SettingsFormModel`、`settingsNumberField`、`settingsTextField` | 設定スコープ上のページ背後のステージ編集モデル。下書きはステージされて保存時に書き込まれ、フィールドはユーザー層への存在により上書きされ、着地しなかった保存は下書きを保持します。 |
+| `JsonTree`、`JsonBlock` | 読み取り専用 JSON 検査。 |
+| `MarkdownText`、`MarkdownDelegateProvider`、`CodeBlock` | TeX 数式付きの信頼できない GFM、所有者委譲の HTTP(S) ナビゲーション、ハイライト済みコード。`CodeBlock` は任意 `lineNumbers` を受け付け、コピー元はガターを除外し、`contentRef` はスクロールポートとして使う所有者に安定ソースラッパーを公開します。所有者が自前の言語・コピーツールバーを供給する場合は `showHeader={false}` を設定します。 |
+| `UserTextRun`、`ReferenceChip` | 未解釈インラインテキストと、業務解決済み参照ラベルまたは起動ボタン。 |
+| `CommandText` | 選択可能なコマンド・引数テキスト。水平オーバーフロー時のみ名前付きキーボードフォーカス対象を追加します。 |
+| `TerminalBlock`、`ReadBlock`、`DiffBlock`、`SearchBlock`、`WebBlock` | 各ツール結果意図に対応するエージェント出力カード。 |
+| `icons/*`、`FishLogo`、`BrandWordmark`、`ReferenceIconRegular`/`ReferenceIconMedium`、`LinkIconRegular`/`LinkIconMedium` | グリフとブランドマーク。思考グリフは 16px ビューボックス内にインセット軌道を保ちます。14px クリック可能リンクのカテゴリや既知サイトマークには `LinkIconMedium` を使います。 |
+| `PermissionIconReadOnlyRegular`/`Medium`、`PermissionIconWorkspaceWriteRegular`/`Medium`、`PermissionIconFullAccessRegular`/`Medium`、`PermissionIconAutoReviewRegular`/`Medium` | 読み取り専用・ワークスペース書き込み・フルアクセス・自動レビュー選択用の権限モードグリフ。 |
+| `PluginArtworkTerminal`/`Loop`/`Subagent`/`Search`/`Default` | 固定パレット 36×36 プラグインアートワーク。`Terminal` はプラグインカードとサイドバーガイド項目に薄青プロンプトを供給します。`Default` は独自アートワークなしプラグインの印です。def id はインスタンスごとのため、同じアートワークが 1 ページに繰り返しても安全です。 |
+| `GuideArtworkBrowser`/`Files` | サイドバーガイド項目用の固定パレット 36×36 ブラウザー・フォルダーアートワーク。 |
+| `FileTypeIcon`、`classifyFileType`、`fileExtension` | カテゴリ色 28px ファイル/フォルダーグリフと、その背後の共有大文字小文字不問ファイル名マッピング。コード・設定ファイルは詳細フルカラー技術グリフを使い、リンク先頭グリフには `LinkIconMedium`、画像内容には画像プレビューを使います。 |
+| `languageForPath`、`CODE_HIGHLIGHT_EXTENSIONS`、`useCodeHighlighter` | コードプレビューと差分レビューが共有する遅延行トークンハイライター。ファイル名文法選択は `@deepseek-ai/dsh-util-code-language` から再エクスポートされ、読み取りカードの永続短 id `lang` ヒント背後の単一拡張子テーブルでもあります。 |
 
-Four pairs are easy to confuse:
+混同しやすいペアが 4 組あります:
 
-- **`Tag` against `Pill`.** Reach for `Tag` for a read-only badge at the 11px capsule size, and for `Pill` when the capsule is selectable (`active` and `onClick`, as view switchers and filters use) or when it must sit on a 24px text line — `TerminalBlock` renders its exit status as a static `Pill` for exactly that reason. Size decides as much as interactivity here; the two are not interchangeable.
-- **`Pill` against `SegmentedControl`.** A row of `Pill`s is a set of independent chips — each one toggles on its own, and several may be active. `SegmentedControl` is one choice among a few mutually exclusive modes, drawn as a tablist with one indicator, and it comes with the tab keyboard pattern (arrow keys walk the segments, only the selected one is in the tab sequence); the Models settings add card switches its two forms with it.
-- **`DisclosureRow` against a card.** The row lays its title and content side by side at a fixed 24px. A card that stacks a name over a description is a different layout, and belongs in the feature package — `ui-settings-plugins`' `PluginCard` is the precedent and records why.
-- **`FoldToggle` against the exported surface.** It is package-internal and not exported; the output cards use it for their head-tail fold.
+- **`Tag` 対 `Pill`。** 読み取り専用バッジ (11px カプセルサイズ) には `Tag` を。カプセルが選択可能 (`active` と `onClick`。ビュー切り替えやフィルターの用法) な場合や 24px テキスト行に載せる場合には `Pill` を — `TerminalBlock` が終了ステータスを静的 `Pill` で描くのはまさにその理由です。ここでは操作可否と同じくらいサイズが決め手であり、両者は互換ではありません。
+- **`Pill` 対 `SegmentedControl`。** `Pill` の行は独立チップの集合で、各々が単独で切り替わり、複数がアクティブにもなれます。`SegmentedControl` は少数の相互排他モードからの単一選択で、タブリストと単一インジケーターとして描かれ、タブキーボードパターン付き (矢印キーでセグメント移動、タブ順序に入るのは選択中のみ) です。Models 設定の追加カードはこの 2 形態をこれで切り替えます。
+- **`DisclosureRow` 対カード。** 行はタイトルと内容を横並びにし、固定 24px です。名前の上に説明を積むカードは別レイアウトであり、機能パッケージ側の所属です — `ui-settings-plugins` の `PluginCard` が先例であり理由も記録しています。
+- **`FoldToggle` 対公開サーフェス。** パッケージ内部用でエクスポートされません。出力カードが head-tail 折りたたみに使います。
 
-Writing your own component in your own package is fine when the need is genuinely specific. What is not fine is copying a control that already exists here — and once a second package needs the same control, it belongs in this package.
+自分のパッケージに独自コンポーネントを書くのは、ニーズが真に固有なら問題ありません。問題なのは、ここに既にあるコントロールを複製することです — そして 2 つ目のパッケージが同じコントロールを必要としたら、それはこのパッケージの所属です。
 
-### Controls and icons
+### コントロールとアイコン
 
-The catalog above lists what each export is for; this section covers the behavior that props alone do not show. Product icon names omit artboard sizes and end in `Regular` for the supplied one-pixel artwork or `Medium` for the same geometry at a 1.3px stroke; the `size` prop controls rendered dimensions. Named components keep the chosen weight visible at import sites; the library owns stroke geometry instead of consumer CSS overrides. Each product, reference, link, and permission glyph intentionally keeps both weight exports even when the current product uses only one, so callers can choose emphasis without adding another API later; fill-only pairs render identically. `IconWarningOutlineRegular`/`Medium` use a circle; `IconWarningTriangleOutlineRegular`/`Medium` use a rounded triangle. `FishLogo` and `BrandWordmark` fill brand slots. `FileTypeIcon` renders the traditional 28px spreadsheet, folder, HTML, image, Markdown, generic, PDF, PPT, video, and Word glyphs, and uses the imported square technology artwork for the established 48 code and configuration categories. The import replaces artwork only: archive-only categories do not extend `CodeFileType`. `classifyFileType` applies exact filename, prefix, suffix, optional project-context, and extension rules in that order; React names win over TypeScript/JavaScript, Angular suffixes win over their base extension, and a Dart file becomes Flutter only when the supplied project files contain a `pubspec.yaml` with `flutter:`. Markdown and SVG remain traditional Markdown and image files. Spreadsheet mappings include CSV, TSV, Excel workbooks and templates, OpenDocument spreadsheets, and Numbers; KEY maps to slides, while RTF/ODT/Pages map to documents. `fileExtension` exposes the same basename and final-dot parsing for adjacent metadata labels. Traditional glyphs use a solid category-colored sheet with a white mark and translucent white corner; the generic code glyph uses angle brackets and a slash at the supplied 1.35px stroke; the generic file uses a grey sheet and darker grey corner. Callers may override the sheet color through `--dsh-file-type-icon-color`. The full-color technology artwork is the deliberate exception and retains its embedded palette. All glyphs are decorative and carry no label. `LinkIconMedium` is the leading glyph for clickable artifact links — globe, folder, code, image, document, or plain paper, and for a `url` link the mark of a well-known site named by its `href` — the developer sites a transcript usually cites (GitHub, GitLab, npm, PyPI, Stack Overflow, MDN, Wikipedia, Hacker News, YouTube, X, Bilibili, Zhihu, Juejin, CSDN) and mainstream search, video, social, shopping, and reference sites (Google, Baidu, DuckDuckGo, TikTok, Netflix, Spotify, Facebook, Instagram, Reddit, Telegram, WhatsApp, WeChat, QQ, Weibo, Taobao, AliExpress, eBay, Quora, V2EX, Apple) — while `classifyLinkPath` folds the shared file types into that existing six-category vocabulary. `ConnectionIndicator` renders a warning-colored disconnected action whose permanent retry glyph marks the retry action beside the owner-supplied outage label, the shared ongoing loader in the same warning color as its label whose one-to-three dots advance every 500ms independently of retry timing, or a success-colored recovered status. Clicking either warning state requests an immediate reconnect; no hover interaction changes the copy. The pill fades in on appearance, fades out for 150ms before unmounting, and sizes to its current label. Its owner supplies visibility, the recovery hold, localized labels, and the immediate-reconnect callback; the primitive uses no native title tooltip. `useAnchoredPosition` and `useAnchoredMaxHeight` keep floating panels and bottom-anchored overlays clamped to the viewport and following their anchor; anchored overlays and portalled `Menu` add 20px to the frame's published top clearance, or keep 20px in native fullscreen, while preserving their own minimum margins in ordinary browsers. `HoverCard` keeps its portaled preview reachable across the anchor gap and can expose a copy button through the `copyText` prop. Its `preview` variant uses the anchor or `widthAnchorRef` element’s width minus 48px, centers the panel with 24px side insets, and places it above or below the row within the viewport. The panel keeps the frame’s top clearance, caps its height at 420px, and follows content and anchor resizing; Escape or pointer and keyboard activation of the anchor dismisses it. The whole preview fades in and out over 100ms; a closing preview stops receiving pointer input and unmounts after the fade. Re-entering the anchor during the fade restores it. Reduced-motion preferences suppress the transition. Copy labels are required only when copying is enabled. `HoverCard` and nested action tooltips display independently; use `Tooltip.portal` to layer the small bubble above the card. A visible nested `Tooltip` suppresses only its enclosing tooltip, not the hover card. `Toast` uses the owner's `holdMs` for both the fade delay and its hold-and-fade lifetime. Rerenders with unchanged `holdMs` do not restart that lifetime; completion uses the latest callback, and fully faded actions cannot receive input. A new component key restarts the banner. `rankByName` is the `/` menu's shared candidate ranker for the command and skill sources: the query must be a case-insensitive ordered subsequence of the name; prefix hits rank first, then alignment score, then source order. Portalled `Menu` lists follow their anchor during dragging and CSS transforms, and stop tracking when closed. `Menu.autoFocus` focuses its first enabled item, supports Arrow Up/Down and Home/End navigation, and focuses the first button in the anchor on Escape; it is opt-in for action menus.
+上のカタログは各エクスポートの用途一覧であり、この節では props だけでは見えない振る舞いを扱います。製品アイコン名はアートボードサイズを省み、`Regular` で終わるものは供給 1px アートワーク、`Medium` は同形状の 1.3px ストロークです。`size` prop は描画寸法を制御します。名前付きコンポーネントは選択ウェイトをインポート側に見えるままにし、ストローク形状はコンシューマー CSS オーバーライドではなくライブラリが所有します。各製品・参照・リンク・権限グリフは、現製品が片方だけ使う場合も意図的に両ウェイトのエクスポートを保つため、後から API 追加なしに呼び出し側が強調を選べます。塗りのみのペアは同一に描画されます。`IconWarningOutlineRegular`/`Medium` は円、`IconWarningTriangleOutlineRegular`/`Medium` は角丸三角を使います。`FishLogo` と `BrandWordmark` はブランドスロットを埋めます。`FileTypeIcon` は伝統的 28px の表計算・フォルダー・HTML・画像・Markdown・汎用・PDF・PPT・動画・Word グリフを描き、確立 48 コード・設定カテゴリにはインポート済み方形技術アートワークを使います。インポートはアートワークのみ置換します。アーカイブのみのカテゴリは `CodeFileType` を拡張しません。`classifyFileType` は完全ファイル名・接頭辞・接尾辞・任意プロジェクトコンテキスト・拡張子の順に規則を適用します。React 名は TypeScript/JavaScript に勝ち、Angular 接尾辞は基本拡張子に勝ち、Dart ファイルは供給プロジェクトファイルに `flutter:` を含む `pubspec.yaml` がある場合のみ Flutter になります。Markdown と SVG は伝統的 Markdown・画像ファイルのままです。表計算マッピングは CSV・TSV・Excel ブックとテンプレート・OpenDocument 表計算・Numbers を含み、KEY はスライド、RTF/ODT/Pages は文書に写像します。`fileExtension` は隣接メタデータラベル用に同じベース名・最終ドット解析を公開します。伝統グリフは白マークと半透明白コーナー付きの単色カテゴリシートを使い、汎用コードグリフは供給 1.35px ストロークで山括弧とスラッシュ、汎用ファイルは灰シートと濃灰コーナーを使います。呼び出し側は `--dsh-file-type-icon-color` 経由でシート色を上書きできます。フルカラー技術アートワークは意図的例外として埋め込みパレットを保持します。すべてのグリフは装飾でありラベルを持ちません。`LinkIconMedium` はクリック可能成果物リンク (地球・フォルダー・コード・画像・文書・素紙) の先頭グリフであり、`url` リンクでは `href` が命名する周知サイトのマークです — 筆記録が通常引用する開発者サイト (GitHub、GitLab、npm、PyPI、Stack Overflow、MDN、Wikipedia、Hacker News、YouTube、X、Bilibili、Zhihu、Juejin、CSDN) と主要な検索・動画・社交・買い物・参照サイト (Google、Baidu、DuckDuckGo、TikTok、Netflix、Spotify、Facebook、Instagram、Reddit、Telegram、WhatsApp、WeChat、QQ、Weibo、Taobao、AliExpress、eBay、Quora、V2EX、Apple) — 一方 `classifyLinkPath` は共有ファイル種別を既存 6 カテゴリ語彙に折りたたみます。`ConnectionIndicator` は警告色の切断アクション (所有者供給の断絶ラベル脇に再試行動作を示す常設再試行グリフ)、同警告色の共有 ongoing ローダー (再試行タイミングと独立に 1〜3 ドットが 500ms ごとに進む) 付きラベル、または成功色の回復ステータスを描きます。どちらの警告状態のクリックも即時再接続を要求し、ホバー操作でコピーは変わりません。ピルは出現時にフェードインし、アンマウント前に 150ms フェードアウトし、現在ラベルに合わせて伸縮します。所有者は可視性・回復ホールド・ローカライズ済みラベル・即時再接続コールバックを供給し、プリミティブはネイティブ title ツールチップを使いません。`useAnchoredPosition` と `useAnchoredMaxHeight` は浮動パネルと下アンカーオーバーレイをビューポート内に締め、アンカー追従を保ちます。アンカー付きオーバーレイとポータル `Menu` はフレーム公表の上クリアランスに 20px を加え、ネイティブ全画面では 20px を保ち、通常ブラウザーでは独自最小マージンを保持します。`HoverCard` はポータル済みプレビューをアンカー間隙越しに到達可能に保ち、`copyText` prop 経由でコピーボタンを公開できます。その `preview` バリアントはアンカーまたは `widthAnchorRef` 要素の幅から 48px 引いた幅を使い、24px 側インセットでパネルを中央配置し、ビューポート内で行の上下に置きます。パネルはフレームの上クリアランスを保ち、高さを 420px に締め、内容とアンカーのリサイズに追従します。Escape またはアンカーのポインター・キーボード起動で解散します。プレビュー全体は 100ms でフェードイン・アウトし、閉じかけのプレビューはポインター入力を受け止めず、フェード後にアンマウントします。フェード中にアンカーへ再進入すると復元します。モーション削減設定では遷移を抑止します。コピーラベルはコピー有効時のみ必須です。`HoverCard` とネストしたアクション tooltip は独立に表示します。小バブルをカード上に重ねるには `Tooltip.portal` を使います。可視のネスト `Tooltip` は囲む tooltip のみ抑止し、ホバーカードは抑止しません。`Toast` は所有者の `holdMs` をフェード遅延と保持フェード存続期間の両方に使います。`holdMs` 不変の再レンダーは存続期間を再開せず、完了は最新コールバックを使い、完全フェード済みアクションは入力を受けません。新しいコンポーネントキーでバナーを再開します。`rankByName` はコマンド・スキルソース用の `/` メニュー共有候補ランカーです。クエリは名前の大文字小文字不問の順序付き部分列でなければならず、接頭辞一致が先、次に整列スコア、次にソース順です。ポータル `Menu` リストはドラッグや CSS 変形中にアンカーに追従し、閉じたら追従を止めます。`Menu.autoFocus` は最初の有効項目にフォーカスし、Arrow Up/Down と Home/End 移動に対応し、Escape でアンカー内最初ボタンにフォーカスします。アクションメニュー用に任意指定です。
 
-`Tooltip` reads the anchor on hover or keyboard focus and fits its bubble from `ResizeObserver` border-box sizes. The bubble stays hidden until its first fit, slides inside the horizontal viewport margin, and flips above or below only when the opposite side fits. Label-size and viewport changes reuse the anchor coordinates; fitting does not synchronously measure the bubble or trigger a React render. Opt-in `openOnClick` also lets an informational button pin the same bubble for reading and associates it with the anchor description. Another click, Escape, Tab, or an outside pointerdown closes it; ordinary action tooltips still dismiss on click.
+`Tooltip` はホバーまたはキーボードフォーカスでアンカーを読み、バブルを `ResizeObserver` の border-box サイズから合わせます。バブルは初回適合まで隠れたまま、水平ビューポートマージン内に滑り込み、反対側が収まる場合のみ上下反転します。ラベルサイズやビューポート変化はアンカー座標を再利用し、適合はバブルの同期的計測も React レンダーも引き起こしません。任意 `openOnClick` により情報ボタンが同じバブルを読み用に固定し、アンカー説明に関連付けも行います。もう一度のクリック・Escape・Tab・外側 pointerdown で閉じます。通常のアクション tooltip はクリックでも解散します。
 
 <a id="rendering-agent-output"></a>
 
-`HoverCardGroup` owns private state for one mounted physical list. A `HoverCard` with `grouped` shares the first actually displayed card's dwell: subsequent cards replace the current card immediately during the same pointer interaction. The list and its active portaled card form one pointer interaction: the pointer may enter the card to read or copy, then return to another list item for immediate replacement. After the pointer leaves both, the shared dwell resets when the active card closes through its existing pointer-grace and close lifecycle; the group adds no separate timer. Leaving a list with no active card resets the dwell immediately. Opening an inline card by keyboard focus while the pointer is outside the list does not warm the next pointer visit. Exclusive display includes fading previews: ordinary preview dismissal retains its fade, but a group replacement removes the previous card immediately. Cards without `grouped` remain independent.
+`HoverCardGroup` はマウント済み物理リスト 1 つ分のプライベート状態を所有します。`grouped` 付き `HoverCard` は実際に最初に表示されたカードの dwell を共有します。同じポインター操作中、後続カードは現在のカードを即座に置換します。リストと作動中のポータルカードは 1 つのポインター操作を形成します。ポインターはカードに入って読み・コピーし、別のリスト項目に戻って即座に置換できます。両方からポインターが出た後、共有 dwell は既存のポインター猶予・クローズライフサイクル経由で作動中カードが閉じるとリセットされます。グループは独自タイマーを追加しません。作動中カードなしのリスト離脱は dwell を即座にリセットします。ポインターがリスト外にある間のキーボードフォーカスによるインラインカード開放は、次のポインター訪問を温めません。排他表示はフェード中プレビューを含みます。通常のプレビュー解散はフェードを保持しますが、グループ置換は前カードを即座に除去します。`grouped` なしカードは独立のままです。
 
-### Rendering agent output
+### エージェント出力のレンダリング
 
-The nearest `MarkdownDelegateProvider` supplies optional `openExternalLink` and `openFile` navigation callbacks. Nested providers replace the enclosing capabilities, and callback changes reach already-rendered links without rebuilding Markdown. Its `openFile` makes local Markdown links clickable after settlement. Absolute and workspace-relative paths support percent escapes and `#L24` / `#L24-L30` fragments; ranges open at their first line. Literal `?` and `#` in filenames must be percent-encoded. The tooltip uses the decoded path and supplies the accessible name when the label is empty. The callback receives the decoded path and optional line, while the renderer preserves the label and displays a file icon. Without a callback, local links remain text. URL schemes, queries, unsupported fragments, and malformed destinations never reach the file opener.
+最も近い `MarkdownDelegateProvider` が任意の `openExternalLink` と `openFile` ナビゲーションコールバックを供給します。ネストしたプロバイダーは外側の機能を置換し、コールバック変更はレンダリング済みリンクに Markdown 再構築なしで届きます。その `openFile` は確定後にローカル Markdown リンクをクリック可能にします。絶対パスとワークスペース相対パスはパーセントエスケープと `#L24` / `#L24-L30` フラグメントに対応し、範囲は先頭行で開きます。ファイル名中のリテラル `?` と `#` はパーセントエンコード必須です。ツールチップはデコード済みパスを使い、ラベル空のときアクセシブル名を供給します。コールバックはデコード済みパスと任意の行を受け取り、レンダラーはラベルを保持してファイルアイコンを表示します。コールバックなしではローカルリンクはテキストのままです。URL スキーム・クエリ・未対応フラグメント・不正宛先はファイルオープナーに届きません。
 
-`MarkdownText` renders untrusted GFM and TeX math, blocks unsafe links and images, and can turn resolved file mentions into explicit controls. A surrounding `MarkdownDelegateProvider` receives sanitized HTTP(S) URLs from ordinary clicks; modified clicks and links outside a provider retain native external-anchor behavior. When the owner passes a `pathImages` vocabulary, image destinations that are local media paths rewrite to displayable URLs on settled renders only (the same streaming gate as file mentions); without a vocabulary, local destinations remain inert alt text. Rewritten images accept HTTP(S), data, blob, and the Desktop `dsh-app://app/api/file` route; authored Desktop URLs remain inert. A load or decode failure replaces the image with its authored alt text, or the original destination when alt is empty; `fileImages` additionally supplies a localized failure prefix. Changing the image source permits a fresh load. While a reply streams, it freezes completed blocks, advances a top-level open fence by completed lines, and highlights that fence from saved Shiki grammar state. Completed token lines enter fixed-size React groups, so later chunks reconcile only the growing group; an unchanged fence retains that DOM when the final full parse resolves cross-document syntax. `TerminalBlock`, `ReadBlock`, `DiffBlock`, `SearchBlock`, and `WebBlock` render the matching tool-result intent with copy controls, overflow handling, and ANSI processing where applicable. `JsonTree` and `JsonBlock` inspect JSON values read-only, while `UserTextRun` renders uninterpreted text and `ReferenceChip` renders business-resolved labels. An explicit `onActivate` makes a chip a keyboard-accessible button; repeated pointer clicks and an existing text selection do not activate it, while keyboard activation remains available. Labels inherit their host’s wrapping policy. Recognition and JSON transforms belong to [ui-conversation](../ui-conversation/README.md#sent-user-text).
+`MarkdownText` は信頼できない GFM と TeX 数式をレンダリングし、安全でないリンクと画像を遮断し、解決済みファイル言及を明示コントロールに変えられます。囲む `MarkdownDelegateProvider` は通常クリックからサニタイズ済み HTTP(S) URL を受け取ります。修飾クリックとプロバイダー外のリンクはネイティブ外部アンカー動作を保持します。所有者が `pathImages` 語彙を渡すと、ローカルメディアパスの画像宛先は確定レンダーのみで表示可能 URL に書き換えられます (ファイル言及と同じストリーミングゲート)。語彙なしではローカル宛先は不活性 alt テキストのままです。書き換え済み画像は HTTP(S)・data・blob と Desktop の `dsh-app://app/api/file` ルートを受け付け、オーサリング済み Desktop URL は不活性のままです。読み込み・デコード失敗では画像をオーサリング済み alt テキストに置換し、alt 空なら元の宛先にします。`fileImages` はさらにローカライズ済み失敗接頭辞を供給します。画像ソース変更で新規読み込みが許可されます。応答ストリーミング中は完了ブロックを凍結し、トップレベル開 fence を完了行で前進させ、保存済み Shiki 文法状態からその fence をハイライトします。完了トークン行は固定サイズ React グループに入るため、後続チャンクは成長中グループのみ調整します。不変 fence は最終フルパースで文書横断構文が解決してもその DOM を保持します。`TerminalBlock`・`ReadBlock`・`DiffBlock`・`SearchBlock`・`WebBlock` は対応するツール結果意図をコピー制御・オーバーフロー処理・(該当する) ANSI 処理付きでレンダリングします。`JsonTree` と `JsonBlock` は JSON 値を読み取り専用で検査し、`UserTextRun` は未解釈テキスト、`ReferenceChip` は業務解決済みラベルをレンダリングします。明示 `onActivate` でチップはキーボード操作可能なボタンになります。繰り返しポインタークリックや既存テキスト選択では起動せず、キーボード起動は利用可能です。ラベルはホストの折り返し方針を継承します。認識と JSON 変換は [ui-conversation](../ui-conversation/README.md#sent-user-text) の所属です。
 
-`MarkdownText` defaults to `variant="body"`. Use `variant="compact"` for secondary content: its 13px text and 20px line height follow the content-size setting, all heading levels use the same size with weight 600, and paragraphs and lists use tighter spacing. Text, links, and code keep the tertiary color; dotted underlines distinguish links. Code headers scroll with their blocks. Tables and math stay enabled at the surrounding text size and scroll horizontally within the available width. Both variants share the parser and streaming cache.
+`MarkdownText` は既定で `variant="body"` です。二次内容には `variant="compact"` を使います。13px テキストと 20px 行送りは内容サイズ設定に従い、全見出しレベルは同じサイズ・ウェイト 600、段落とリストは詰めた間隔です。テキスト・リンク・コードは三次色を保ち、点線下線でリンクを区別します。コードヘッダーはブロックとともにスクロールします。表と数式は周囲テキストサイズのまま有効で、利用可能幅内で水平スクロールします。両バリアントはパーサーとストリーミングキャッシュを共有します。
 
-`CodeBlock.toolbarLabels` enables the shared code-card header and spacing. `ReadBlock` and `DiffBlock` use the same header: tertiary-colored language and filename text, secondary-colored copy and wrap icons, and hover or keyboard-focus tooltips. Missing or unsupported languages use the owner’s localized code-block title; mixed-language diffs use that title too. Code cards share typography and content insets; their headers and bodies use the same background in both themes. Read gutters fit the largest returned line number, and diff fills cover the full scrollable row. The wrap toggle keeps a fixed accessible name and exposes its state through `aria-pressed`; its tooltip describes the next action. Wrapping is local to each mounted card and never changes copied text; code fences start wrapped, while reads and diffs preserve source columns until wrapping is enabled. Compact Markdown shares this toolbar, spacing, and code typography while retaining monochrome text. With `toolbarLabels`, source previews can pass `wrap` to follow their owner’s preference and show only the language and copy icon; owner CSS retains the source layout.
+`CodeBlock.toolbarLabels` は共有コードカードヘッダーと間隔を有効化します。`ReadBlock` と `DiffBlock` は同じヘッダーを使います。三次色の言語・ファイル名テキスト、二次色のコピー・折り返しアイコン、ホバーまたはキーボードフォーカスのツールチップです。言語不明・未対応や混在言語差分では所有者のローカライズ済みコードブロックタイトルを使います。コードカードは書体と内容インセットを共有し、ヘッダーと本文は両テーマで同じ背景です。読み取りガターは返却最大行番号に合わせ、差分フィルはスクロール可能行の全幅を覆います。折り返し切り替えは固定アクセシブル名を持ち、状態を `aria-pressed` で公開します。そのツールチップは次の動作を説明します。折り返しはマウント済みカードごとのローカルであり、コピーテキストは変えません。コード fence は折り返し開始、読み取りと差分は折り返し有効化まで元列を保持します。コンパクト Markdown はこのツールバー・間隔・コード書体を共有しつつモノクロテキストを保ちます。`toolbarLabels` 付きではソースプレビューは所有者設定に従う `wrap` を渡せて言語とコピーアイコンのみ表示し、所有者 CSS が元レイアウトを保持します。
 
-`DiffBlock` compares the old and new content by line. It shows actual additions and deletions with up to three neutral context lines on each side, separates distant changes with `⋯`, and excludes shared context from tool-summary totals. The card ends after the diff body. Search stops beyond 256 line additions/deletions per fragment; those fragments display and count the complete old and new contents as a coarse replacement, including shared lines. Copy includes the full displayed diff with its prefixes. A final newline is treated as a terminator; differences only in the presence of a final newline are not displayed.
+`DiffBlock` は新旧内容を行単位で比較します。最大 3 行の中性コンテキスト行付きで実際の追加・削除を示し、離れた変更は `⋯` で区切り、共有コンテキストはツール概要合計から除外します。カードは差分本体で終わります。検索は断片あたり 256 行の行追加/削除超で停止し、それらの断片は新旧完全内容を共有行込みで粗い置換として表示・計数します。コピーは接頭辞付き表示差分全体を含みます。末尾改行は終端子として扱われ、末尾改行有無のみの差異は表示されません。
 
-`JsonTree` clamps collapsed strings to `collapsedStringLines` (three by default). Expanded strings show raw text, retain sibling commas, and fit within the window and outer scrolling containers. Resize and ancestor-scroll events update that limit. Row copy feedback updates independently of JSON value rendering; pending clipboard writes cannot update a different row or an unmounted tree.
+`JsonTree` は折りたたみ文字列を `collapsedStringLines` (既定 3) に締めます。展開文字列は生テキストを表示し、兄弟カンマを保持し、ウィンドウと外側スクロールコンテナー内に収めます。リサイズと祖先スクロールイベントで上限を更新します。行コピーフィードバックは JSON 値レンダリングと独立に更新され、保留クリップボード書き込みは別行やアンマウント済みツリーを更新できません。
 
-`ImageLightbox` is the shared original-image modal with focus restoration and Escape dismissal. Like `Modal`, its mask leaves the Windows caption unpainted, and its close control sits 20px below the caption. The internal thumbnail renderer receives loading/failure labels from its owner. `HoverCard.inline` keeps a file link in the text flow and uses the shared menu material, keyboard-visible focus, and placement above or below the anchor without covering it. Escape closes an open thumbnail even when focus is elsewhere; subsequent Escape presses reach the owner. `MarkdownDelegateProvider.fileImages` supplies a decoded-path resolver and complete image labels: settled image links gain hover previews, and standalone images gain lightbox activation. Image-only anchors retain their single navigation target. The parser recovers only complete, unescaped, standalone local image references with bare spaces and an unambiguous supported image suffix; code and ambiguous destinations remain literal.
+`ImageLightbox` はフォーカス復元と Escape 解散付きの共有オリジナル画像モーダルです。`Modal` 同様、マスクは Windows キャプションを塗り残し、クローズ制御はキャプションから 20px 下です。内部サムネイルレンダラーは所有者から読み込み/失敗ラベルを受け取ります。`HoverCard.inline` はファイルリンクをテキストフロー内に保ち、共有メニューマテリアル・キーボード可視フォーカスを使い、アンカーを覆わず上下に配置します。フォーカスが他にあっても Escape で開サムネイルを閉じ、後続 Escape は所有者に届きます。`MarkdownDelegateProvider.fileImages` はデコード済みパスリゾルバーと完全画像ラベルを供給します。確定画像リンクはホバープレビューを得て、単独画像はライトボックス起動を得ます。画像のみアンカーは単一ナビゲーション先を保持します。パーサーは完全・非エスケープ・単独のローカル画像参照 (素の空白と明確な対応画像接尾辞付き) のみ回復し、コードと曖昧宛先はリテラルのままです。
 
-### Localizing copy
+### コピーのローカライズ
 
-The atoms cannot read the application locale, so every piece of user-facing copy arrives through required label props. `HoverCard`, `TerminalBlock`, `JsonTree`, `CodeBlock`, `MarkdownText`, `JsonBlock`, `ConnectionIndicator`, `Modal`, `DiffBlock`, `ReadBlock`, `SearchBlock`, and `WebBlock` accept complete localized labels. The package owns no language fallback; omission fails typechecking, and each feature maps its typed `t` seat into the primitive's label interface.
+アトムはアプリロケールを読めないため、ユーザー向けコピーはすべて必須ラベル prop 経由で届きます。`HoverCard`・`TerminalBlock`・`JsonTree`・`CodeBlock`・`MarkdownText`・`JsonBlock`・`ConnectionIndicator`・`Modal`・`DiffBlock`・`ReadBlock`・`SearchBlock`・`WebBlock` は完全なローカライズ済みラベルを受け付けます。パッケージは言語フォールバックを持たず、省略は型検査失敗となり、各機能は型付き `t` シートをプリミティブのラベルインターフェースに写像します。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-`Button` uses H36/R12 for `md` and H28/R8 for `sm`, including outlined controls. Menus and cards follow the [shared radius rules](../../../docs/web-styling.md#corner-radii-and-settings-cards); feature classes preserve control geometry.
+`Button` は `md` に H36/R12、`sm` に H28/R8 を使い、アウトライン制御を含みます。メニューとカードは[共有角丸ルール](../../../docs/web-styling.md#corner-radii-and-settings-cards)に従い、機能クラスはコントロール形状を保持します。
 
-`Menu.listClassName` styles the menu card independently of the anchor wrapper, including in portal mode. Leading icons use the `--dsw-alias-menu-icon` color; destructive icons retain their error color.
+`Menu.listClassName` はポータルモードを含むアンカーラッパーと独立にメニューカードをスタイルします。先頭アイコンは `--dsw-alias-menu-icon` 色、破壊アイコンはエラー色を保持します。
 
-`Menu` delegates its card material to `MenuSurface`; custom menus use the same component. `MenuSurface` forwards div props and refs, uses translucent fill and blur, and accepts `compact` for the smaller radius. Its default relative positioning contains the material layer; caller classes can supply fixed or absolute placement. On macOS, its non-interactive backing follows the card through CSS anchors and unmounts with it; the backing requires the Web shell’s isolated body. Feature classes control layout and elevation, while the component owns material and outer radius ([menu rules](../../../docs/web-styling.md#component-rules)). Modal masks retain their dark translucent fill without background blur.
+`Menu` はカードマテリアルを `MenuSurface` に委譲し、カスタムメニューも同じコンポーネントを使います。`MenuSurface` は div props と ref を転送し、半透明フィルとブラーを使い、小さい角丸用に `compact` を受けます。既定の相対配置はマテリアル層を内包し、呼び出し側クラスで fixed・absolute 配置を供給できます。macOS では非インタラクティブ backing が CSS アンカー経由でカードに追従し、ともにアンマウントします。backing は Web シェルの隔離 body を要します。機能クラスはレイアウトと高度を制御し、コンポーネントはマテリアルと外角丸を所有します ([メニュールール](../../../docs/web-styling.md#component-rules))。モーダルマスクは背景ブラーなしの暗い半透明フィルを保持します。
 
-`MenuGroup` renders a `role="group"` section named by its localized heading, with an instance-owned heading id. It shares heading typography, spacing, and sticky positioning between custom menus and listboxes. Headings are transparent at rest; only `data-stuck` enables the theme's 94%-opaque group-header fill in either palette. Outside `data-platform="darwin"`, headings use `--dsw-radius-md` corners; the enclosing menu keeps its translucent material.
+`MenuGroup` はローカライズ済み見出しで名付けた `role="group"` 節を描き、見出し id はインスタンス所有です。カスタムメニューとリストボックス間で見出し書体・間隔・スティッキー配置を共有します。見出しは静止時透明で、`data-stuck` 時のみどちらのパレットでもテーマの 94% 不透明グループヘッダーフィルが有効です。`data-platform="darwin"` 外では見出しは `--dsw-radius-md` 角を使い、囲むメニューは半透明マテリアルを保ちます。
 
-Call `observeStickyMenuGroups(viewport)` from an ordinary effect after rendering `MenuGroup` sections as direct children of an unpadded, borderless scroll container. Native intersection and viewport-size observations update the background asynchronously, without synchronous layout reads or scroll listeners. Headings remain transparent until observations identify a group crossing the viewport top; CSS owns their sticky positioning.
+パディングなし境界線なしスクロールコンテナーの直接子として `MenuGroup` 節を描いた後、通常 effect から `observeStickyMenuGroups(viewport)` を呼びます。ネイティブ intersection とビューポートサイズ監視が背景を非同期更新し、同期的レイアウト読み取りやスクロールリスナーは使いません。見出しはビューポート上端を横切るグループが監視で判明するまで透明のままです。スティッキー配置は CSS が所有します。
 
-Group membership is captured at setup. Dispose before observing changed groups, including after filtering, and clean up on unmount. Cleanup disconnects the observers, ignores queued callbacks, and clears managed `data-stuck` attributes. A viewport without direct groups acquires no observers. Without `IntersectionObserver` or `ResizeObserver`, headings keep CSS sticky positioning but remain transparent.
+グループ所属は setup 時に捕捉されます。フィルタリング後を含むグループ変更の監視前には破棄し、アンマウント時に片付けます。片付けはオブザーバーを切断し、キュー済みコールバックを無視し、管理下 `data-stuck` 属性を消去します。直接グループなしのビューポートはオブザーバーを取得しません。`IntersectionObserver` や `ResizeObserver` なしでは見出しは CSS スティッキー配置を保ちつつ透明のままです。
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-The package enforces one separation: presentational React atoms with zero Cordis and zero slot knowledge, styled only through `--dsw-*` tokens, while every feature-specific concern (locale, session data, composition) stays in the composing plugin.
+パッケージは 1 つの分離を強制します。`--dsw-*` トークンのみでスタイルする、Cordis なし・スロット知識なしの presentational React アトムと、構成プラグインに留まるすべての機能固有関心事 (ロケール・セッションデータ・構成) です。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Public atom exports |
-| [`src/markdown/`](src/markdown/) | Markdown and math pipeline: micromark parsing, KaTeX typesetting, incremental streaming renderer, `CodeBlock`/`JsonBlock` |
-| [`src/TerminalBlock.tsx`](src/TerminalBlock.tsx) | ANSI escape parsing (`anser`) and terminal card rendering |
-| [`src/ReadBlock.tsx`](src/ReadBlock.tsx) / [`src/DiffBlock.tsx`](src/DiffBlock.tsx) | Read and diff cards |
-| [`src/SearchBlock.tsx`](src/SearchBlock.tsx) / [`src/WebBlock.tsx`](src/WebBlock.tsx) | Search and web-retrieval cards |
-| [`src/icons/`](src/icons/) | Size-neutral `Regular` and `Medium` product glyph components |
-| [`src/code-highlighting.ts`](src/code-highlighting.ts) | Shared filename grammar selection and lazy line highlighting |
-| [`src/input-modality.ts`](src/input-modality.ts) | Document-wide input modality published on `<html>` |
-| [`src/plugin-artwork.tsx`](src/plugin-artwork.tsx) | Fixed-palette plugin artwork with per-instance SVG def ids |
-| [`src/useAnchoredPosition.ts`](src/useAnchoredPosition.ts) / [`src/useAnchoredMaxHeight.ts`](src/useAnchoredMaxHeight.ts) | Floating-panel and overlay geometry hooks |
-| [`src/settings-form/`](src/settings-form/) | The settings page kit: the staged form model over a settings scope, the value and secret fields, and the form frame |
+| [`src/index.ts`](src/index.ts) | 公開アトムのエクスポート |
+| [`src/markdown/`](src/markdown/) | Markdown・数式パイプライン:micromark 解析、KaTeX 組版、増分ストリーミングレンダラー、`CodeBlock`/`JsonBlock` |
+| [`src/TerminalBlock.tsx`](src/TerminalBlock.tsx) | ANSI エスケープ解析 (`anser`) とターミナルカード描画 |
+| [`src/ReadBlock.tsx`](src/ReadBlock.tsx) / [`src/DiffBlock.tsx`](src/DiffBlock.tsx) | 読み取り・差分カード |
+| [`src/SearchBlock.tsx`](src/SearchBlock.tsx) / [`src/WebBlock.tsx`](src/WebBlock.tsx) | 検索・Web 取得カード |
+| [`src/icons/`](src/icons/) | サイズ中立の `Regular`・`Medium` 製品グリフコンポーネント |
+| [`src/code-highlighting.ts`](src/code-highlighting.ts) | 共有ファイル名文法選択と遅延行ハイライト |
+| [`src/input-modality.ts`](src/input-modality.ts) | `<html>` に公表するドキュメント横断の入力モダリティ |
+| [`src/plugin-artwork.tsx`](src/plugin-artwork.tsx) | インスタンスごと SVG def id 付きの固定パレットプラグインアートワーク |
+| [`src/useAnchoredPosition.ts`](src/useAnchoredPosition.ts) / [`src/useAnchoredMaxHeight.ts`](src/useAnchoredMaxHeight.ts) | 浮動パネル・オーバーレイ形状フック |
+| [`src/settings-form/`](src/settings-form/) | 設定ページキット:設定スコープ上のステージ済みフォームモデル、値・シークレットフィールド、フォーム枠 |
 
 <a id="input-modality"></a>
-### Input modality
+### 入力モダリティ
 
-[`input-modality.ts`](src/input-modality.ts) tracks input for tooltips and publishes `data-input-modality` on `<html>` for the [theme's focus styles](../ui-theme/README.md#understand-the-implementation). `pointerModality()` is true after pointer input and false after any key, including IME composition keys; `Tooltip` uses it to decide whether focus may show a bubble. The published attribute stays `pointer` until a non-composing navigation key (Tab, arrows, Home/End, PageUp/PageDown), or focus on a different control after a non-composing key. Refocusing the same control does not restore keyboard modality. Pointer input, an IME composition key, and window blur each clear the pending key; focus changes without a pending key leave the modality unchanged. The listeners live for the document lifetime; Node imports install none. The focus-change rule observes events exposed to window; components own additional navigation inside shadow roots that do not expose those events.
+[`input-modality.ts`](src/input-modality.ts) はツールチップ用に入力を追跡し、[テーマのフォーカススタイル](../ui-theme/README.md#understand-the-implementation)向けに `data-input-modality` を `<html>` に公表します。`pointerModality()` はポインター入力後に真、IME 変換キーを含む任意キー入力後に偽です。`Tooltip` はフォーカスがバブル表示可かをこれで判断します。公表属性は、非変換ナビゲーションキー (Tab・矢印・Home/End・PageUp/PageDown) または非変換キー後の別コントロールへのフォーカスまで `pointer` のままです。同じコントロールへの再フォーカスはキーボードモダリティを復元しません。ポインター入力・IME 変換キー・ウィンドウブラーは各々保留キーを消去し、保留キーなしのフォーカス変化はモダリティ不変です。リスナーはドキュメント存続期間生きます。Node インポートでは付きません。フォーカス変化ルールは window に公開されるイベントを監視し、そうしたイベントを公開しないシャドウルート内追加ナビゲーションはコンポーネントが所有します。
 
-### Streaming markdown
+### ストリーミング Markdown
 
-While a reply streams, `MarkdownText` parses incrementally: all but the trailing two blocks freeze as cached React elements and only the source tail re-parses per chunk, so per-chunk work tracks the tail instead of the whole reply. A final unclosed top-level fence keeps its parsed code node and sends only the last completed line plus the current partial line through the same GFM grammar; a closing fence or ambiguous parse returns to the ordinary tail path. Highlighting likewise resumes from saved Shiki grammar state and publishes only newly completed lines plus the mutable tail. `CodeBlock` seals completed lines into fixed-size React groups, reuses earlier groups, and retains the whole highlighted tree across settlement when code and language are unchanged. The settled full parse still resolves references that crossed the freeze boundary.
+応答ストリーミング中、`MarkdownText` は増分解析します。末尾 2 ブロック以外はキャッシュ済み React 要素として凍結し、チャンクごとにソース末尾のみ再解析するため、チャンクごとの作業は応答全体ではなく末尾に追従します。最終の未閉じトップレベル fence は解析済みコードノードを保ち、最終完成行と現在部分行のみを同じ GFM 文法に通します。閉じ fence や曖昧解析では通常末尾経路に戻ります。ハイライトも保存済み Shiki 文法状態から再開し、新規完成行と可変末尾のみ公表します。`CodeBlock` は完成行を固定サイズ React グループに封じ、以前グループを再利用し、コードと言語不変なら確定後もハイライト木全体を保持します。確定フルパースは凍結境界を跨いだ参照を解決します。
 
-### Geometry and overflow
+### ジオメトリとオーバーフロー
 
-The output cards share one geometry model: `white-space: pre` with horizontal scrolling so column-aligned content keeps its alignment, and a head-plus-tail slice behind an expand button past `maxLines` (default 16) so a long body never stretches the card. `TerminalBlock` uses `CommandText` to keep each authored command line selectable and horizontally scrollable; the prompt and status stay fixed. The run-state dot aligns with the first visual command line, including when the command wraps. Only horizontally overflowing text enters the Tab order as a named group, using the owner’s localized `commandLine(line)` label. Text that fits, including wrapped Jobs commands, adds no Tab stop. Size, text, and font changes update focusability without changing the scroll position. `TerminalBlock` parses ANSI into React spans with a per-line column buffer for cursor movement, honoring erase-in-line, tab stops, and character width. Hosts opt out of the shared geometry per surface: rebinding `--dsl-terminal-command-whitespace` / `--dsl-terminal-line-whitespace` to `pre-wrap` wraps commands and output in full with no sideways scroll, `maxLines: Infinity` disables the fold for hosts capping height through `--dsl-terminal-output-max-height` instead, `copyText` overrides the copy payload (and keeps the control rendered before any output), and `runStateDot: false` omits the run-state dot when the surrounding row already carries the state, reclaiming its gutter via `--dsl-terminal-gutter`. `background` defaults to false and carries the call's background flag. For a background call, `running` indicates launch-call progress: Start shows that indicator; the acknowledgement sets `running` to false and leaves the command static without a state dot or assistive label. Background calls omit output, empty-output placeholders, exit pills, and the default output Copy control; an explicit `copyText` override remains available. The banner divider follows the rendered body, so a running card that streams live output separates its command from the text like a settled card.
+出力カードは 1 つの形状モデルを共有します。`white-space: pre` と水平スクロールで列揃え内容の整列を保ち、`maxLines` (既定 16) 超は展開ボタン背後の head-plus-tail スライスで長い本文がカードを伸ばしません。`TerminalBlock` は `CommandText` を使い、オーサリング済みコマンド行各々を選択・水平スクロール可能に保ち、プロンプトと状態は固定です。実行状態ドットはコマンド折り返し時を含む最初の可視コマンド行に整列します。水平オーバーフローするテキストのみが名前付きグループとして Tab 順序に入り、所有者のローカライズ済み `commandLine(line)` ラベルを使います。収まるテキスト (折り返し Jobs コマンドを含む) は Tab 停止を追加しません。サイズ・テキスト・フォント変化はスクロール位置を変えずにフォーカス可能性を更新します。`TerminalBlock` は ANSI を行ごと列バッファーで React スパンに解析し、カーソル移動用に行消去・タブストップ・文字幅を尊重します。ホストはサーフェスごとに共有形状から opt out できます。`--dsl-terminal-command-whitespace` / `--dsl-terminal-line-whitespace` を `pre-wrap` に再バインドするとコマンドと出力全体を横スクロールなしに折り返し、`maxLines: Infinity` は `--dsl-terminal-output-max-height` 経由で高さを締めるホスト用に折りたたみを無効化、`copyText` はコピーペイロードを上書き (出力前に制御を描画維持)、`runStateDot: false` は周囲行が既に状態を持つ場合に実行状態ドットを省き `--dsl-terminal-gutter` 経由でガターを回収します。`background` は既定 false で呼び出しのバックグラウンドフラグを運びます。バックグラウンド呼び出しでは `running` が起動呼び出し進捗を示します。Start がそのインジケーターを表示し、acknowledgement で `running` を false にしてコマンドを静止 (状態ドット・支援ラベルなし) のまま残します。バックグラウンド呼び出しは出力・空出力プレースホルダー・終了ピル・既定出力 Copy 制御を省き、明示 `copyText` 上書きは利用可能です。バナー区切りは描画本文に従うため、ライブ出力する実行中カードは確定カード同様にコマンドとテキストを分離します。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages place the atoms in the client stack and the design system.
+これらのページはクライアントスタックとデザインシステムにおけるアトムの位置付けを示します。
 
-- [ui-renderer](../ui-renderer/README.md) — the React renderer that mounts the assembled application and binds slot data.
-- [ui-tool](../ui-tool/README.md) — the tool-call presentation layer that composes these output cards.
-- [ui-conversation](../ui-conversation/README.md) — the chat surface that renders markdown replies and tool cards.
-- [ui-theme](../ui-theme/README.md) — the `--dsw-*` token system these atoms style through.
-- [Web styling](../../../docs/web-styling.md) — the authoritative styling rules for web client components.
+- [ui-renderer](../ui-renderer/README.md) — 組み立て済みアプリケーションをマウントしスロットデータを束縛する React レンダラー。
+- [ui-tool](../ui-tool/README.md) — これらの出力カードを組み立てるツール呼び出し表示層。
+- [ui-conversation](../ui-conversation/README.md) — Markdown 応答とツールカードを描くチャット面。
+- [ui-theme](../ui-theme/README.md) — アトムがスタイルに使う `--dsw-*` トークン系。
+- [Web スタイリング](../../../docs/web-styling.md) — Web クライアントコンポーネントの権威スタイリングルール。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+なし。このパッケージはモデルに面するものを何も登録しないブラウザー側 UI プラグイン層のため。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダー要求を組み立てず送信もしません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しの作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define how the atoms behave at the edges; they are current package constraints, not a component roadmap.
+これらの制限は境界でのアトムの振る舞いを定義します。現在のパッケージ制約であり、コンポーネントのロードマップではありません。
 
-- **Diff search is bounded, input processing is linear** — the edit-distance limit trades precise alignment for a coarse replacement on heavily changed fragments. Normalization, fallback rows, and copied output still scale with input size; the height cap limits visible rows, not those allocations.
-- **Known-site marks are a fixed list** — only the named hosts resolve to their own mark, and every other external host keeps the globe; recognizing an arbitrary site would require fetching its icon over the network.
-- **Streaming defers cross-boundary reference resolution** — a reference-style link or footnote whose definition sits on the other side of the incremental freeze boundary renders as literal text while the reply streams; the settled full parse at finalize resolves it.
-- **A long highlighted fence retains its complete token DOM** — streaming avoids re-parsing, re-tokenizing, and reconciling the completed prefix, but it does not discard old colors or virtualize token spans. Final DOM cardinality therefore still follows the fence's token count; nested/container fences and a pathological single long line remain on the general tail path.
-- **Overlong lines stay uncolored** — a source line of 1,000 or more UTF-16 units renders as one plain run in every highlighted surface, because TextMate scanning cost grows superlinearly with line length and a single generated line can otherwise block the page for seconds. The grammar state skips that line, so a comment or template literal that opens or closes on it mis-colors the following lines. Highlighting still runs synchronously during render, so a file with thousands of ordinary lines costs proportionally more.
-- **The fish logo is a redrawn approximation** — its font glyph has no exportable vector geometry in the local design data, so a hand-authored recreation stands in until an exact export path exists.
-- **`Pill` and `Input` have no design source** — both atoms are self-defined; the sidebar search field and view-tab strip that resemble them are consumer-owned compositions, not these atoms.
-- **No `Active` `StateDot` variant** — the supported states are done, warning, ongoing, error, and idle.
-- **User-facing copy is required at the render site** — the atoms are zero-Cordis and cannot reach `ctx.locale`; each feature must supply complete localized labels through the primitive's typed props ([decision](../../../.agents/notes/implemented/architecture/2026-08-23-locale-owned-client-ui-copy.md)).
-- **`TerminalBlock` is not a terminal emulator** — it renders settled or still-running command output, not an interactive session: SGR colors, carriage return, backspace, erase-in-line, tab stops, and character width are honored; absolute cursor positioning, screen clearing, and alternate-screen sequences are stripped.
+- **差分検索は有界、入力処理は線形** — 編集距離制限は大きく変わった断片で精密整列と引き換えに粗い置換を取ります。正規化・フォールバック行・コピー出力は入力サイズに応じた伸びのままです。高さ上限は可視行を制限し、それらの確保を制限しません。
+- **既知サイトマークは固定一覧** — 名指しホストのみ独自マークに解決し、他の外部ホストは地球のままです。任意サイトの認識にはネットワーク越しのアイコン取得が必要です。
+- **ストリーミングは境界横断の参照解決を延期** — 増分凍結境界の向こうに定義がある参照式リンクや脚注は、応答ストリーミング中はリテラルテキストとして描かれます。確定時の確定フルパースが解決します。
+- **長いハイライト済み fence は完全トークン DOM を保持** — ストリーミングは完成接頭辞の再解析・再トークン化・再調整を避けますが、古い色を破棄もトークンスパンを仮想化もしません。よって最終 DOM 要素数は fence のトークン数に従います。ネスト/コンテナー fence と病的単一長行は一般末尾経路のままです。
+- **過長行は無着色** — 1,000 UTF-16 単位以上のソース行は全ハイライト面で素の一続きとして描かれます。TextMate 走査コストが行長に超線形で伸び、生成単一行がページを数秒止めうるためです。文法状態はその行を飛ばすため、その行で開閉するコメントやテンプレートリテラルは後続行を誤着色します。ハイライトは描画中に同期実行のため、通常行数千のファイルは比例コストです。
+- **fish ロゴは描き起こし近似** — ローカルデザインデータにフォントグリフのエクスポート可能ベクター形状がないため、正確なエクスポート経路ができるまで手起こし再現が代役です。
+- **`Pill` と `Input` にデザインソースなし** — 両アトムは自己定義です。似たサイドバー検索欄やビュータブ帯はコンシューマー所有の合成であり、これらアトムではありません。
+- **`Active` の `StateDot` バリアントなし** — 対応状態は done・warning・ongoing・error・idle です。
+- **ユーザー向けコピーはレンダー側で必須** — アトムはゼロ Cordis で `ctx.locale` に届きません。各機能はプリミティブの型付き props 経由で完全なローカライズ済みラベルを供給必須です ([決定](../../../.agents/notes/implemented/architecture/2026-08-23-locale-owned-client-ui-copy.md))。
+- **`TerminalBlock` はターミナルエミュレーターではない** — 対話セッションではなく確定・実行中のコマンド出力を描きます。SGR 色・復帰・後退・行消去・タブストップ・文字幅は尊重し、絶対カーソル配置・画面消去・代替画面シーケンスは除去します。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

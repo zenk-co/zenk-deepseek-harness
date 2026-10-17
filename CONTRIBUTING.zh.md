@@ -1,6 +1,6 @@
 # 贡献
 
-[English](CONTRIBUTING.md) | 中文
+[日本語](CONTRIBUTING.md) | [English](CONTRIBUTING.en.md) | 中文
 
 感谢你愿意为 DeepSeek Harness 作出贡献！
 

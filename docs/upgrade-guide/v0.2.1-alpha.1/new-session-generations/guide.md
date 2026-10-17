@@ -1,20 +1,20 @@
 ---
 kind: upgrade-guide
-description: "New Session creates a fresh Agent instead of reusing an existing empty Session."
+description: "New Session は既存の空セッションを再利用せず、新しいエージェントを作成する。"
 ---
 
-# Start a fresh Agent with New Session
+# New Session で新しいエージェントを開始する
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-In Web and Desktop, New Session creates a fresh Session and Agent using the current preset definition. It previously reused an existing empty Session in the workspace, which could retain an earlier preset definition.
+Web と Desktop では、New Session は現在のプリセット定義を使って新しいセッションとエージェントを作成する。以前はワークスペース内の既存の空セッションを再利用しており、古いプリセット定義が残ることがあった。
 
-Client calls to `uiWorkspace.startSession(workspaceId)` follow the same behavior. Workspace reconnection through `openWorkspace` or `connectWorkspace` still reuses an eligible blank. Calls with draft-preparation options preserve their existing reuse and content rules. Existing Agents retain their preset composition; global optional tools update on their next request when a bundle is switched.
+`uiWorkspace.startSession(workspaceId)` へのクライアント呼び出しも同じ動作に従う。`openWorkspace` や `connectWorkspace` によるワークスペース再接続は引き続き対象の空きを再利用する。下書き準備オプション付きの呼び出しは既存の再利用・内容ルールを保つ。既存のエージェントはプリセット構成を保持し、グローバルオプションツールはバンドル切り替え時に次のリクエストで更新される。
 
-## Migration
+## 移行
 
-1. After changing a preset definition, use New Session to create an Agent with the current definition. Continue in an existing Session when its retained preset composition is intentional.
-2. Client integrations that reconnect a workspace should use `openWorkspace` or `connectWorkspace`. Keep explicit draft-preparation options when preparing an existing draft.
-3. Confirm that the new Agent uses the updated preset definition; no persisted Session files or profile patches need rewriting.
+1. プリセット定義を変更した後は New Session を使って現在の定義のエージェントを作成する。保持されたプリセット構成が意図的な場合は既存セッションで続行する。
+2. ワークスペースを再接続するクライアント統合は `openWorkspace` または `connectWorkspace` を使う。既存の下書きを準備する場合は明示的な下書き準備オプションを保つ。
+3. 新しいエージェントが更新後のプリセット定義を使っていることを確認する。永続化されたセッションファイルやプロファイルパッチの書き換えは不要である。

@@ -1,8 +1,8 @@
 # Token Meter
 
-English | [中文](token-meter.zh.md)
+日本語 | [English](token-meter.en.md) | [中文](token-meter.zh.md)
 
-`@deepseek-ai/dsh-token-meter` exposes one detached replay snapshot for request pressure and positional surface pricing. `logRevision` is the number of durable events consumed for every field in the measurement.
+`@deepseek-ai/dsh-token-meter` は要求圧力と位置サーフェス価格付け向けに 1 つの分離再送スナップショットを公開します。`logRevision` は測定のすべてのフィールドに消費された durable イベント数です。
 
 Source: [`packages/llm/token-meter/src/types.ts`](../../packages/llm/token-meter/src/types.ts)
 
@@ -26,7 +26,7 @@ interface TokenMeasurement {
 }
 ```
 
-Every measurement resolves the effective envelope's routed provider/model to that route's declared request-image pricing through `ctx.llm`, so image occurrences are priced as the visual tokens plus model-visible text the request actually sends; routes and compositions without declared pricing keep the fixed heuristic. `baseline.kind === 'usage'` means the latest successful provider call has the same canonical request envelope and its total is no lower than that call's full route-priced anchor. `estimated` means no reusable conservative usage anchor exists, so the service priced the complete envelope and surface itself. A later successful request replaces the earlier anchor; signed `surfaceDeltaTokens` preserves growth and shrinkage relative to a matching anchor, repricing both sides under the same route. `totalTokens` remains request-and-response pressure, while `surfaceTokens` is the surface-only route-priced total and equals the sum of the node prices.
+すべての測定は有効エンベロープのルーティング済みプロバイダー/モデルを `ctx.llm` 経由でそのルートの宣言済み要求画像価格付けに解決するため、画像出現は要求が実際に送る視覚トークンとモデル可視テキストとして価格付けされます。宣言済み価格付けのないルートと構成は固定ヒューリスティックを保持します。`baseline.kind === 'usage'` は直近成功プロバイダー呼び出しが同じ正規要求エンベロープを持ち、その合計がその呼び出しの完全ルート価格アンカーを下回らないことを意味します。`estimated` は再利用可能な保守的使用アンカーが存在せず、サービスが完全エンベロープとサーフェス自体を価格付けしたことを意味します。以降の成功要求は prior アンカーを置換します。符号付き `surfaceDeltaTokens` は一致アンカーに対する増加と縮小を保持し、両側を同じルートで再価格付けします。`totalTokens` は要求応答圧力のままです。一方 `surfaceTokens` はサーフェス限定のルート価格合計であり、ノード価格の合計に等しいです。
 
 ## `TokenSurfaceNode`
 
@@ -51,7 +51,7 @@ interface TokenSurfaceNode {
 }
 ```
 
-Surface order is authoritative; replacement nodes can have higher durable seqs than later positional nodes. The snapshot is immutable and does not grow when the underlying replay fold advances.
+サーフェス順序が正です。置換ノードは以降の位置ノードより大きな durable seq を持てます。スナップショットは不変であり、基盤再送畳み込みの進行で増加しません。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -65,7 +65,7 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.tokenMeter` — `TokenMeter`
 
-Replay owner for one service-wide estimator and isolated per-session folds.
+1 つのサービス全体推定器と分離セッションごと畳み込みの再送所有者です。
 
 ```ts cordis-catalog
 /**

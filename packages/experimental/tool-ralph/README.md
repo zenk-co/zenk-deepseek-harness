@@ -1,179 +1,179 @@
 ---
-description: "The model-facing ralph tool: a fixed foreground fresh-agent loop toward one immutable objective, for users and maintainers choosing or configuring fresh-agent iteration."
+description: "モデル向けの ralph ツール: 1 つの不変の目的に向けた固定のフォアグラウンド fresh-agent ループ。fresh-agent イテレーションを選択または構成するユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-ralph
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`ralph` runs a foreground sequence of fresh child agents against one immutable objective, with each round receiving only the previous bounded report and shared workspace state. It returns when a worker reports completion or a concrete blocker, or when the configured round limit is reached; those reports are not independently verified. Parent conversation and prior child sessions are never copied into a new round. Use it only when the direct human explicitly requests Ralph-style fresh-agent iteration; use goal tools for ordinary long-running work and subagents or workflows for bounded delegation.
+`ralph` は、1 つの不変の目的に対してフォアグラウンドで fresh な子エージェントのシーケンスを実行し、各ラウンドは前回の境界付きレポートと共有ワークスペース状態だけを受け取る。ワーカーが完了または具体的なブロッカーを報告したとき、または設定されたラウンド上限に達したときに戻る。それらのレポートは独立に検証されない。親の会話と以前の子セッションは新しいラウンドに決してコピーされない。直接の人間が Ralph 方式の fresh-agent イテレーションを明示的に要求した場合にのみ使う。通常の長時間実行作業には goal ツールを、境界付きの委譲には subagent や workflow を使う。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The `ralph` tool runs a fixed foreground loop: one fresh child per round works on the immutable objective in the shared workspace, and only a bounded structured report crosses rounds. Use it only when the direct human explicitly asks for a Ralph loop or fresh-agent iterative execution. For ordinary long-running same-session work, use goal tools; for bounded delegation and fan-out, use plain subagents or the `workflow` tool.
+`ralph` ツールは固定のフォアグラウンドループを実行する。ラウンドごとに 1 つの fresh な子が共有ワークスペース内の不変の目的に取り組み、ラウンドをまたぐのは境界付きの構造化レポートだけである。直接の人間が Ralph ループまたは fresh-agent の反復実行を明示的に求めた場合にのみ使う。通常の長時間実行の同一セッション作業には goal ツールを、境界付きの委譲とファンアウトには通常の subagent または `workflow` ツールを使う。
 
-### Calling the tool
+### ツールの呼び出し
 
-The model submits `{ objective, maxRounds? }` and the call blocks until the whole run settles. The deployment config's `maxRounds` is both the default and a ceiling on a call override. The terminal result is `complete`, `blocked`, or `budget-limited`, carrying the last bounded report and the number of rounds started; an ordinary child failure returns an error naming the failed round and retaining the last successful handoff when one exists.
+モデルは `{ objective, maxRounds? }` を送信し、呼び出しは実行全体が確定するまでブロックする。デプロイ設定の `maxRounds` は既定値であると同時に、呼び出しでの上書きに対する上限でもある。終端結果は `complete`、`blocked`、`budget-limited` のいずれかで、最後の境界付きレポートと開始したラウンド数を運ぶ。通常の子の失敗は、失敗したラウンドを名指しし、存在する場合は最後の成功したハンドオフを保持するエラーを返す。
 
-### What each round sees
+### 各ラウンドが見るもの
 
-Each child receives only the immutable objective, its current round and cap, a shared-workspace-as-authority instruction, and the previous structured handoff; parent conversation and prior child sessions are never seeded. The workspace is the long-term memory across rounds. Reports carry a status (`continue`, `complete`, or `blocked`), a non-empty summary, evidence, next steps, and blocker text; invalid or oversized reports fail the workflow instead of being truncated or mistaken for cap exhaustion.
+各子は、不変の目的、現在のラウンドと上限、共有ワークスペースを権威とする指示、前回の構造化ハンドオフだけを受け取る。親の会話と以前の子セッションは決してシードされない。ワークスペースがラウンドをまたぐ長期記憶である。レポートはステータス（`continue`、`complete`、`blocked`）、空でないサマリー、証拠、次のステップ、ブロッカーテキストを運ぶ。無効または過大なレポートは、切り捨てられたり上限枯渇と誤認されたりするのではなく、ワークフローを失敗させる。
 
-### Config
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `subagentProvider` | `spawn` | Fresh structured-output provider used for every round. |
-| `maxRounds` | `256` | Default and deployment ceiling for one Ralph run. |
-| `maxHandoffChars` | `16384` | Maximum serialized characters in one round report. |
-| `maxResultChars` | `16384` | Maximum characters in the complete successful parent result. |
+| `subagentProvider` | `spawn` | すべてのラウンドで使われる fresh な構造化出力プロバイダー。 |
+| `maxRounds` | `256` | 1 回の Ralph 実行の既定値およびデプロイ上限。 |
+| `maxHandoffChars` | `16384` | 1 つのラウンドレポートのシリアライズ済み最大文字数。 |
+| `maxResultChars` | `16384` | 成功した完全な親結果の最大文字数。 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-ralph) is the exhaustive source for every accepted field. The configured provider must exist, support structured output, and report `inheritsParentContext: false`; a call against a provider that violates this fails loudly before any round starts.
+生成された [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-ralph) が受け入れられるすべてのフィールドの網羅的なソースである。設定されたプロバイダーは存在し、構造化出力をサポートし、`inheritsParentContext: false` を報告しなければならない。これに違反するプロバイダーへの呼び出しは、どのラウンドも始まる前に大声で失敗する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-This section explains the fixed-script design and the validation and lifecycle mechanics; observable behavior is fully covered in [Use this package](#use-this-package).
+この節では固定スクリプトの設計と、検証およびライフサイクルの仕組みを説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱っている。
 
-### Design concept
+### 設計概念
 
-The loop is a deployment-owned fixed script: the model supplies data only and cannot alter the loop, provider route, schema, or handoff validation. The tool is an ordinary plugin over `ctx.workflowEngine` and `ctx.subagents` — no Ralph mode or fresh-agent loop is added to `agent-loop`, and the same-session goal domain stays independent.
+ループはデプロイが所有する固定スクリプトである。モデルはデータを供給するだけで、ループ、プロバイダールート、スキーマ、ハンドオフ検証を変更できない。このツールは `ctx.workflowEngine` と `ctx.subagents` 上の通常のプラグインである。`agent-loop` に Ralph モードや fresh-agent ループは追加されず、同一セッションの goal ドメインは独立したままである。
 
-### Fixed script and routing
+### 固定スクリプトとルーティング
 
-The configured provider is carried as `WorkflowStartRequest.subagentProvider`, so the fixed script cannot inspect or change routing and the ordinary model-written `workflow` tool gains no provider selector. The resolved round cap is carried as `WorkflowStartRequest.maxTotalAgents`, coordinating the fixed loop with the engine's total-child backstop; the engine rejects a cap above its deployment ceiling before publishing a run.
+設定されたプロバイダーは `WorkflowStartRequest.subagentProvider` として運ばれるので、固定スクリプトはルーティングを検査も変更もできず、通常のモデルが書く `workflow` ツールにプロバイダーセレクターは追加されない。解決されたラウンド上限は `WorkflowStartRequest.maxTotalAgents` として運ばれ、固定ループとエンジンの総子数バックストップを調整する。エンジンはデプロイ上限を超える上限を、実行を公開する前に拒否する。
 
-### Report validation
+### レポート検証
 
-Status-specific semantics and the serialized `maxHandoffChars` ceiling are validated inside the fixed workflow and again at the consumer boundary: a continuing report needs next steps and an empty blocker, a completion report needs evidence and no next steps, and a blocked report needs a concrete blocker. Invalid, missing, or oversized reports fail the workflow.
+ステータス固有の意味論とシリアライズされた `maxHandoffChars` 上限は、固定ワークフロー内で検証され、コンシューマー境界でも再度検証される。継続レポートには次のステップと空のブロッカー、完了レポートには証拠と次のステップなし、ブロックレポートには具体的なブロッカーが必要である。無効、欠如、過大なレポートはワークフローを失敗させる。
 
-### Lifecycle and cancellation
+### ライフサイクルとキャンセル
 
-The caller's agent is the parent of every fresh child, preserving cwd and lineage without copying its conversation. `exec.signal` enters the workflow engine and is also bridged to `run.cancel()` for implementation independence. The tool awaits `run.result` and calls `run.dispose()` in `finally`, so a cancelled parent step waits for process and child cleanup before returning. The PTC engine sets no overall workflow elapsed deadline; caller cancellation still applies.
+呼び出し元のエージェントはすべての fresh な子の親であり、その会話をコピーせずに cwd と系譜を保つ。`exec.signal` はワークフローエンジンに入り、実装独立性のために `run.cancel()` にもブリッジされる。ツールは `run.result` を待ち、`finally` で `run.dispose()` を呼ぶので、キャンセルされた親ステップはプロセスと子のクリーンアップを待ってから戻る。PTC エンジンはワークフロー全体の経過期限を設定しない。呼び出し元のキャンセルは引き続き適用される。
 
-### Render intent
+### レンダリング意図
 
-The pending call is a `generic` card titled `ralph` with the immutable objective as its `rawInput`; the result keeps the generic card. Both presentation functions depend only on tool arguments and the settled tool envelope, and the completion and blocker labels state that a worker reported the outcome, not independent certification.
+保留中の呼び出しは、不変の目的を `rawInput` とする `ralph` というタイトルの `generic` カードである。結果も generic カードのままである。両方のプレゼンテーション関数はツール引数と確定したツールエンベロープだけに依存し、完了とブロッカーのラベルは、独立した認定ではなくワーカーが結果を報告したことを述べる。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: fixed script, provider routing, report validation, tool registration |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: 固定スクリプト、プロバイダールーティング、レポート検証、ツール登録 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the tool-level contract is not enough. They move from the shared workflow model to the engine, the subagent seam, and the adjacent goal domain.
+ツールレベルのコントラクトでは足りないときにこれらのページを読む。共有ワークフローモデルから、エンジン、subagent シーム、隣接する goal ドメインへ進む。
 
-- [Workflow subsystem](../../../docs/subsystems/workflow.md) — the seam contract behind the fixed loop.
-- [Workflow seam](../../workflow/workflow/README.md) — the run and result vocabulary.
-- [PTC workflow engine](../../workflow/workflow-ptc/README.md) — the engine that executes the fixed script.
-- [subagent seam](../../subagent/subagent/README.md) — the fresh-child provider contract.
-- [Goal group](../../goal/goal/README.md) — same-session goal tools for ordinary long-running objectives.
-- [historical Harness-level goal-based execution Agent Note](../../../.agents/notes/archived/feature/2026-07-16-harness-level-loop.md) — the policy, provider requirements, and deferred work.
+- [ワークフローサブシステム](../../../docs/subsystems/workflow.md) — 固定ループ背後のシームコントラクト。
+- [ワークフローシーム](../../workflow/workflow/README.md) — run と result の語彙。
+- [PTC ワークフローエンジン](../../workflow/workflow-ptc/README.md) — 固定スクリプトを実行するエンジン。
+- [subagent シーム](../../subagent/subagent/README.md) — fresh な子プロバイダーのコントラクト。
+- [goal グループ](../../goal/goal/README.md) — 通常の長時間実行目的のための同一セッション goal ツール。
+- [歴史的な Harness レベルの goal ベース実行の Agent Note](../../../.agents/notes/archived/feature/2026-07-16-harness-level-loop.md) — ポリシー、プロバイダー要件、先送りされた作業。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-Every parent request in this plugin's registration scope receives the fixed routing guidance below.
+このプラグインの登録スコープ内のすべての親リクエストが以下の固定ルーティングガイダンスを受け取る。
 
-##### Ralph guidance
+##### Ralph ガイダンス
 
 ```markdown
 Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop or fresh-agent iterative execution. Each Ralph round starts a fresh child with no conversation seed and uses the shared workspace as durable memory. Completion and blockers are worker reports, not independent evaluation. Use same-session goal tools for ordinary long-running objectives, and plain subagents or workflows for bounded delegation and fan-out.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Small fixed guidance cost per request while the plugin is active.
+プラグインがアクティブな間、リクエストごとに小さな固定ガイダンスコスト。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the plugin scope and guidance text are unchanged. Activation or disposal may invalidate reuse from this prompt section.
+プラグインスコープとガイダンステキストが変わらない間はプレフィックス安定。アクティベーションまたは破棄は、このプロンプトセクションからの再利用を無効化しうる。
 
-### Tool schema
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The generated [`ralph` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-ralph) exposes one required `objective` string and one optional `maxRounds` number. Provider choice, handoff size, report schema, workflow script, and orchestration behavior are deployment-owned and absent from the call schema.
+生成された [`ralph` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-ralph) は、1 つの必須の `objective` 文字列と 1 つの任意の `maxRounds` 数値を公開する。プロバイダー選択、ハンドオフサイズ、レポートスキーマ、ワークフロースクリプト、オーケストレーション動作はデプロイが所有し、呼び出しスキーマには存在しない。
 
-#### Token effect
+#### トークンへの影響
 
-Small fixed schema cost on each request where the tool is visible.
+ツールが可視の各リクエストに小さな固定スキーマコスト。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the definition and visibility are unchanged.
+定義と可視性が変わらない間はプレフィックス安定。
 
-### Child requests and parent result
+### 子リクエストと親結果
 
-#### What the model sees
+#### モデルが見るもの
 
-Each child sees the standalone fixed round prompt plus the structured-output capture contract. The parent sees only the original call and one terminal result containing a worker-reported status, round count, and pretty-printed final report; intermediate child messages and reports do not enter the parent conversation. A failed ordinary child instead yields an error with its round number and, after round one, the last successful handoff.
+各子は、スタンドアロンの固定ラウンドプロンプトと構造化出力キャプチャコントラクトを見る。親は元の呼び出しと、ワーカー報告のステータス、ラウンド数、整形出力された最終レポートを含む 1 つの終端結果だけを見る。中間の子メッセージとレポートは親の会話に入らない。失敗した通常の子は、代わりにそのラウンド番号と、第 1 ラウンド以降は最後の成功したハンドオフを含むエラーを生む。
 
-#### Token effect
+#### トークンへの影響
 
-Every round pays for a fresh child context. `maxHandoffChars` bounds cross-round state and `maxResultChars` independently bounds the complete successful parent text; child work remains outside the parent context.
+すべてのラウンドが fresh な子コンテキストのコストを支払う。`maxHandoffChars` はラウンドをまたぐ状態を制限し、`maxResultChars` は成功した完全な親テキストを独立に制限する。子の作業は親コンテキストの外にとどまる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Each fresh child has an independent request cache. The parent result appends after the reusable request prefix.
+各 fresh な子は独立したリクエストキャッシュを持つ。親結果は再利用可能なリクエストプレフィックスの後に追記される。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the tool does not yet support. They are current constraints, not a task backlog.
+これらの制限は、ツールがまだサポートしていないものを定義する。現在の制約であり、タスクバックログではない。
 
-- **Completion is worker self-declaration** — there is no independent evaluator or verifier deciding whether the objective is complete; evaluator policy and evaluator-driven continuation are deferred. An evaluator needs separately defined inputs, tool access, deterministic checks, provider choice, isolation, and authority before it can certify completion or drive continuation.
-- **Foreground only** — there is no job id, background collection, process-resume checkpoint, scheduler, or wall-clock start policy.
-- **The workspace is the only cross-round long-term memory** — one bounded report is the explicit handoff, and uncommitted conversational reasoning disappears with each child.
-- **One round is one fresh child** — there is no within-round fan-out, model or provider switching, fork context, or model-call-selected provider.
-- **No enforced recursive-Ralph denial** — structural denial is not implemented; prompt guidance does not enforce a recursion ban.
-- **Ordinary child failure is terminal for the run** — the fixed script reports the failed round and last successful handoff but does not retry; fatal workflow infrastructure failures can end before that state is returned.
-- **Only round count bounds aggregate effort** — token, price, and elapsed-time budgets are deferred.
+- **完了はワーカーの自己申告** — 目的が完了したかを決める独立の評価者や検証者は存在しない。評価者ポリシーと評価者駆動の継続は先送りされている。評価者が完了を認定したり継続を駆動したりするには、別途定義された入力、ツールアクセス、決定論的チェック、プロバイダー選択、分離、権限が必要である。
+- **フォアグラウンドのみ** — ジョブ id、バックグラウンド収集、プロセス再開チェックポイント、スケジューラー、実時間開始ポリシーはない。
+- **ワークスペースが唯一のラウンド横断長期記憶** — 境界付きレポート 1 つが明示的なハンドオフであり、コミットされていない会話的推論は各子とともに消える。
+- **1 ラウンドは 1 つの fresh な子** — ラウンド内ファンアウト、モデルやプロバイダーの切り替え、fork コンテキスト、モデル呼び出しで選択されるプロバイダーはない。
+- **強制される再帰 Ralph 拒否はない** — 構造的拒否は実装されていない。プロンプトガイダンスは再帰禁止を強制しない。
+- **通常の子の失敗は実行にとって終端** — 固定スクリプトは失敗したラウンドと最後の成功したハンドオフを報告するが、再試行しない。致命的なワークフローインフラ失敗は、その状態が返る前に終了しうる。
+- **総合的な努力を制限するのはラウンド数だけ** — トークン、価格、経過時間の予算は先送りされている。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-This Dev Note is working context for maintainers: open directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発者ノートはメンテナー向けの作業コンテキストである。すなわち、決定されていない未決の方向性である。これは明示的に非権威である。出荷済みの動作、制限、受け入れられた根拠は、上の節、パッケージコード、リンクされた Agent Notes にある。
 
-Open directions: an independent evaluator with evaluator-driven continuation; within-round fan-out and provider selection; and token, price, and elapsed-time budgets beyond the round cap.
+未決の方向性: 評価者駆動の継続を伴う独立の評価者、ラウンド内ファンアウトとプロバイダー選択、ラウンド上限を超えるトークン、価格、経過時間の予算。
 
 </details>

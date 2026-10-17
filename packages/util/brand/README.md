@@ -1,33 +1,33 @@
 ---
-description: "Nominal string and number types with stateless constructors for packages that own confusable domain values."
+description: "混同しうる領域値を所有するパッケージ向けの、状態なし構築子付き名目文字列・数値型。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-brand
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-brand` makes structurally identical strings or numbers non-interchangeable at the type level: a `SessionId` cannot be passed where a `ToolCallId` is expected, and an event sequence cannot be passed where a log offset is required. `brandString<T>()` and `brandNumber<T>()` apply nominal brands without shared runtime state, so owning packages can define domain types without importing an unrelated capability.
+`dsh-brand` は構造的に同一の文字列や数値を型水準で交換不能にする。`SessionId` は `ToolCallId` を期待する箇所に渡せず、イベント連番はログオフセットを要求される箇所に渡せない。`brandString<T>()` と `brandNumber<T>()` は共有実行時状態なしに名目ブランドを適用するため、所有パッケージは無関係なケイパビリティをインポートせずに領域型を定義できる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Brand a domain value when it crosses a package boundary and could plausibly be confused with another value represented by the same primitive; not every string or number needs a brand. A branded value is a contract for TypeScript callers: it enters only functions that expect its domain, and a different brand is rejected at compile time.
+領域値がパッケージ境界を越え、同じプリミティブで表される別の値と混同しうるときにブランド化する。すべての文字列や数値にブランドが必要なわけではない。ブランド化された値は TypeScript 呼び出し側への契約である。その領域を期待する関数にのみ入り、異なるブランドはコンパイル時に拒否される。
 
-### Branding a string
+### 文字列のブランド化
 
-Declare the branded type in the owning package and apply it at the point where that package admits a string:
+所有パッケージでブランド化型を宣言し、そのパッケージが文字列を受け付ける箇所で適用する:
 
 ```ts
 import { brandString, type Branded } from '@deepseek-ai/dsh-brand'
@@ -37,11 +37,11 @@ export type SessionId = Branded<'SessionId'>
 const sessionId = brandString<SessionId>('session-1')
 ```
 
-`brandString()` changes only the static type and performs no runtime validation. Validate domain grammar before calling it when the owning type has one. Once branded, the id compares, logs, serializes to JSON, and crosses the wire as an ordinary string.
+`brandString()` は静的型のみを変え、実行時検証を行わない。所有型に文法がある場合は呼び出し前に領域文法を検証すること。ブランド化されれば、id は通常文字列として比較・記録・JSON 直列化・送受信される。
 
-### Branding a number
+### 数値のブランド化
 
-Declare a numeric brand in its owning package and apply it only after that package admits the number:
+所有パッケージで数値ブランドを宣言し、そのパッケージが数値を受け付けた後にのみ適用する:
 
 ```ts
 import { brandNumber, type BrandedNumber } from '@deepseek-ai/dsh-brand'
@@ -51,57 +51,57 @@ export type SessionSeq = BrandedNumber<'SessionSeq'>
 const seq = brandNumber<SessionSeq>(7)
 ```
 
-`brandNumber()` returns the original number and performs no validation. The owning package validates requirements such as non-negative safe-integer range before branding. Comparison, arithmetic, logging, JSON serialization, and wire transport retain ordinary number behavior; arithmetic produces an unbranded number that the owner must admit again before it re-enters the domain.
+`brandNumber()` は元の数値を返し、検証を行わない。所有パッケージはブランド化前に非負安全整数範囲などの要件を検証する。比較・算術・記録・JSON 直列化・送受信は通常数値の動作を保つ。算術はブランドなし数値を生むため、所有者は領域再進入の前に再受け付けしなければならない。
 
-### When to brand
+### ブランド化すべきとき
 
-Brand values that cross package boundaries and could plausibly be confused — `ToolCallId` in `dsh-llm`, the shared agent/session `SessionId` in `dsh-session`, `JobId` in `dsh-jobs`, and `SessionSeq` versus `SessionLogOffset` in `dsh-session`. Values that stay local or cannot be confused do not need this abstraction.
+パッケージ境界を越え、混同しうる値をブランド化する。`dsh-llm` の `ToolCallId`、`dsh-session` の共有エージェント・セッション `SessionId`、`dsh-jobs` の `JobId`、`dsh-session` の `SessionSeq` 対 `SessionLogOffset` がそれである。ローカルに留まる値や混同しえない値にこの抽象化は不要である。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-The package defines two intersection types, `string & { readonly [BRAND]: B }` and `number & { readonly [BRAND]: B }`, where `BRAND` is a module-private `unique symbol`.
+パッケージは 2 つの交差型 `string & { readonly [BRAND]: B }` と `number & { readonly [BRAND]: B }` を定義する。`BRAND` はモジュール非公開の `unique symbol` である。
 
-### Source map
+### ソース対応表
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Branded string and number types with stateless constructors |
+| [`src/index.ts`](src/index.ts) | 状態なし構築子付きのブランド化文字列・数値型 |
 
-### How values stay portable
+### 値が移植可能であり続ける仕組み
 
-The private symbol never exists at runtime: TypeScript erases it, so branded values have no tag or prototype. `brandString()` and `brandNumber()` return their inputs unchanged. Separate installed copies therefore produce interchangeable values without sharing a registry or constructor identity.
+非公開シンボルは実行時に存在しない。TypeScript が消去するため、ブランド化値に札もプロトタイプもない。`brandString()` と `brandNumber()` は入力をそのまま返す。したがって別々にインストールされたコピーはレジストリや構築子識別子を共有せずに交換可能な値を生む。
 
-### Why it stays dependency-free
+### 依存なしであり続ける理由
 
-Keeping these helpers in their own package means `dsh-jobs` can brand `JobId` without importing an unrelated capability package, while each capability still owns the meaning and validation of its concrete ids.
+これらのヘルパーを独自パッケージに保つことで、`dsh-jobs` は無関係なケイパビリティパッケージをインポートせずに `JobId` をブランド化でき、各ケイパビリティは具象 id の意味と検証を引き続き所有する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when you need the values these primitives brand or the type conventions around them.
+これらのプリミティブがブランド化する値や周囲の型慣習が必要なときにこれらのページを読む。
 
-- [Core subsystem](../../../docs/subsystems/core.md) — where the shared `SessionId` brand and the type rules are documented.
-- [LSP subsystem](../../../docs/subsystems/lsp.md) — `LspProviderId`, a branded provider id built on this primitive.
-- [Jobs package](../../jobs/jobs/README.md) — the `JobId` brand owned by the jobs capability.
+- [コアサブシステム](../../../docs/subsystems/core.md) — 共有 `SessionId` ブランドと型規則の文書化箇所。
+- [LSP サブシステム](../../../docs/subsystems/lsp.md) — このプリミティブ上に作られたブランド化プロバイダー id である `LspProviderId`。
+- [Jobs パッケージ](../../jobs/jobs/README.md) — ジョブケイパビリティが所有する `JobId` ブランド。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

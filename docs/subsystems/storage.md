@@ -1,16 +1,16 @@
-# Storage
+# ストレージ
 
-English | [中文](storage.zh.md)
+日本語 | [English](storage.en.md) | [中文](storage.zh.md)
 
-The storage subsystem persists everything that is not a session event log (session logs have their own seam — [persistence.md](persistence.md)). It is one optional capability, not part of the agent-loop spine, split as a [capability seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md): the hub and Service Definition ([dsh-storage](../../packages/storage/storage), `ctx.storage`), the Service Providers ([dsh-storage-json](../../packages/storage/storage-json), registered as `json`, and [dsh-storage-sqlite](../../packages/storage/storage-sqlite), registered as `sqlite`), and the Consumer data form ([dsh-storage-domain](../../packages/storage/storage-domain), `ctx.storageDomain`, also reachable as `ctx.storage.domain`) — the backend contract's only Consumer and the typed API everything else uses. The hub performs no IO itself: backends own media, data forms own semantics, and product packages never touch backends directly. Design record: [domain KV storage Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md).
+ストレージサブシステムは、セッションイベントログ以外のすべてを永続化する（セッションログには独自のシームがある — [persistence.md](persistence.md)）。これは 1 つのオプションのケイパビリティであり、エージェントループの背骨の一部ではなく、[ケイパビリティシーム](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md)として分割される: ハブとサービス定義（[dsh-storage](../../packages/storage/storage)、`ctx.storage`）、サービスプロバイダー（`json` として登録される [dsh-storage-json](../../packages/storage/storage-json) と `sqlite` として登録される [dsh-storage-sqlite](../../packages/storage/storage-sqlite)）、およびコンシューマー向けデータ形式（[dsh-storage-domain](../../packages/storage/storage-domain)、`ctx.storageDomain`、`ctx.storage.domain` としても到達可能） — バックエンド契約の唯一のコンシューマーであり、他のすべてが使う型付き API である。ハブ自身は IO を行わない: バックエンドが媒体を所有し、データ形式が意味論を所有し、製品パッケージがバックエンドに直接触れることはない。設計記録: [ドメイン KV ストレージの Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md)。
 
 Source: [`packages/storage/storage/src/backend.ts`](../../packages/storage/storage/src/backend.ts) · [`packages/storage/storage-domain/src/spec.ts`](../../packages/storage/storage-domain/src/spec.ts) · [`packages/storage/storage-domain/src/events.ts`](../../packages/storage/storage-domain/src/events.ts)
 
-## The hub: `ctx.storage`
+## ハブ: `ctx.storage`
 
-`Storage` ([signatures](#ctxstorage--storage)) is a meeting point, not a store. `ctx.storage.backend` is a name → backend table: multiple backends stay mounted side by side, and which backend serves which consumer is that consumer's configuration (the domain layer's route table), never a hub-global choice. `register(name, backend)` returns the disposer; duplicate names and unknown lookups throw `StorageError`. Disposal only unregisters the name — the owning plugin closes the backend after unregistering. Each backend plugin also publishes a lifecycle-only service key (`storageBackendServiceKey(name)`), which form providers inject so their activation cannot race backend registration.
+`Storage`（[シグネチャー](#ctxstorage--storage)）はストアではなく合流点である。`ctx.storage.backend` は名前 → バックエンドのテーブルである: 複数のバックエンドが並んでマウントされたままで、どのバックエンドがどのコンシューマーに提供するかはそのコンシューマーの構成（ドメイン層のルートテーブル）であり、ハブ全体の選択にはならない。`register(name, backend)` はディスポーザーを返し、重複した名前と未知のルックアップは `StorageError` を投げる。破棄は名前の登録解除のみを行い、所有プラグインが登録解除後にバックエンドを閉じる。各バックエンドプラグインはライフサイクル専用のサービスキー（`storageBackendServiceKey(name)`）も公開し、形式プロバイダーはそれを inject することでアクティベーションがバックエンド登録と競合しないようにする。
 
-Data forms mount on the hub under a merge-extensible key map:
+データ形式はマージ拡張可能なキーマップのもとでハブにマウントされる:
 
 ```ts type-equiv
 /**
@@ -21,9 +21,9 @@ Data forms mount on the hub under a merge-extensible key map:
 interface StorageForms {}
 ```
 
-`mount(form, facility)` is an effect whose disposer unmounts; a second mount of the same key throws `duplicate-mount`. `form(form)` resolves a mounted facility and throws `form-not-mounted` until the owning plugin loads — assemblies order plugins accordingly rather than silently deferring. The domain layer merges `domain: DomainFacility`, so `ctx.storage.domain` and `ctx.storageDomain` are the same object.
+`mount(form, facility)` はディスポーザーがアンマウントするエフェクトである。同じキーの 2 回目のマウントは `duplicate-mount` を投げる。`form(form)` はマウントされたファシリティを解決し、所有プラグインがロードされるまで `form-not-mounted` を投げる — アセンブリは暗黙に先送りするのではなく、それに合わせてプラグインを順序付ける。ドメイン層は `domain: DomainFacility` をマージするため、`ctx.storage.domain` と `ctx.storageDomain` は同じオブジェクトである。
 
-## The backend contract
+## バックエンド契約
 
 ```ts type-equiv
 /**
@@ -44,11 +44,11 @@ interface StorageBackend {
 }
 ```
 
-A backend owns one medium (a file-tree root, a database file) and exposes optional operation groups; `kv` is the only shipped group. `KvFacet.open(descriptor)` opens one named unit — `KvUnitDescriptor` carries the name, current format version, optional compatible record versions, table names, and whether a global singleton slot exists — and returns a `KvUnit` with `loadAll`, `putRecord`, `deleteRecord`, `setGlobal`, and `close`. Unit and table names must match `UNIT_NAME_RE` (safe as a file name and as a SQL identifier segment); record keys are arbitrary strings that never reach file paths. A unit does not serialize concurrent writes — ordering belongs to the caller — but each single call is atomic on the medium and durable once resolved. A `single` medium stamped with a different version rejects `version-mismatch`; a `per-record` document stamped outside the accepted set reads as absent. A medium that cannot be parsed as the unit rejects `malformed-medium`. [`backend.ts`](../../packages/storage/storage/src/backend.ts) is the normative clause-by-clause contract, and the shared conformance suite in [`tests/contract.ts`](../../packages/storage/storage/tests/contract.ts) checks every clause against each backend. The [json backend](../../packages/storage/storage-json/README.md) republishes one whole human-readable file per unit atomically; the [sqlite backend](../../packages/storage/storage-sqlite/README.md) stores one document per row in one database for frequently updated data.
+バックエンドは 1 つの媒体（ファイルツリーのルート、データベースファイル）を所有し、省略可能な操作グループを公開する。`kv` が唯一同梱されるグループである。`KvFacet.open(descriptor)` は 1 つの名前付きユニットを開く — `KvUnitDescriptor` は名前、現在の形式バージョン、省略可能な互換レコードバージョン、テーブル名、グローバルシングルトンスロットの有無を運ぶ — そして `loadAll`、`putRecord`、`deleteRecord`、`setGlobal`、`close` を持つ `KvUnit` を返す。ユニット名とテーブル名は `UNIT_NAME_RE` に一致しなければならない（ファイル名としても SQL 識別子セグメントとしても安全）。レコードキーは任意の文字列で、ファイルパスに達することはない。ユニットは同時書き込みを直列化しない — 順序は呼び出し元に属する — が、個々の呼び出しは媒体上でアトミックであり、解決された時点で耐久である。異なるバージョンが刻印された `single` 媒体は `version-mismatch` を拒否し、受け入れセット外のバージョンが刻印された `per-record` ドキュメントは存在しないものとして読まれる。ユニットとしてパースできない媒体は `malformed-medium` を拒否する。[`backend.ts`](../../packages/storage/storage/src/backend.ts) が条項ごとの規範的契約であり、[`tests/contract.ts`](../../packages/storage/storage/tests/contract.ts) の共有適合性スイートがすべての条項を各バックエンドに対して検査する。[json バックエンド](../../packages/storage/storage-json/README.md)はユニットごとに人間が読めるファイル 1 つを全体としてアトミックに再公開し、[sqlite バックエンド](../../packages/storage/storage-sqlite/README.md)は頻繁に更新されるデータのために 1 つのデータベースの行ごとに 1 ドキュメントを保存する。
 
-## Declaring a domain
+## ドメインの宣言
 
-A domain is declared once by its owning package as a spec object — the single source of the domain's identity, layout, and record schemas (zod, so `z.infer` keeps consumer types un-duplicated):
+ドメインは所有パッケージによって spec オブジェクトとして 1 回宣言される — ドメインのアイデンティティ、レイアウト、レコードスキーマの唯一の情報源である（zod なので `z.infer` がコンシューマー型を重複させずに保つ）:
 
 ```ts type-equiv
 /** Static declaration of one domain: identity, version, and record layout. */
@@ -92,9 +92,9 @@ interface DomainSpec {
 }
 ```
 
-`defineDomain(spec)` pins the spec's literal types and fails loud at the owner's module load, before any medium is touched: a domain or table name outside `UNIT_NAME_RE`, a version that is not a non-negative integer, or a global schema that accepts `null` all throw (`null` is the medium's "never written" sentinel, so a stored nullable global could not round-trip). `domainTable<K, V>(schema)` declares one table with a phantom compile-time key type (typically a [branded id](core.md#branded-ids)); `descriptorOf(spec)` projects the backend-facing unit descriptor.
+`defineDomain(spec)` は spec のリテラル型を固定し、どの媒体に触れるよりも前に所有側のモジュールロード時に大きな音を立てて失敗する: `UNIT_NAME_RE` 外のドメイン名やテーブル名、非負整数でないバージョン、`null` を受け入れるグローバルスキーマはすべて throw する（`null` は媒体の「未書き込み」センチネルであるため、保存された nullable グローバルはラウンドトリップできない）。`domainTable<K, V>(schema)` は 1 つのテーブルをファントムのコンパイル時キー型（通常は[ブランド付き id](core.md#branded-ids)）付きで宣言し、`descriptorOf(spec)` はバックエンドに面するユニット記述子を射影する。
 
-## The open domain
+## 開かれたドメイン
 
 ```ts type-equiv
 /** One open domain, typed by its spec. */
@@ -123,15 +123,15 @@ interface Domain<S extends DomainSpec> {
 }
 ```
 
-Reads are synchronous from authoritative in-memory state: `KvTable` exposes `get`/`entries`/`keys`/`size` (snapshot iterators that stay stable while queued writes land), and the global handle's `get()` serves the spec's `initial` until the first `set` materializes the slot on the medium. Every write — `put`, `delete`, `update`, `global.set` — queues on one per-domain chain and reaches backend durability first, then mutates memory, then emits `domain/changed`; a rejected backend write leaves memory untouched, so reads never diverge from the medium. `update(key, fn)` is an atomic read-modify-write at its chain slot (a missing key rejects `missing-key`); `delete` of an absent key resolves `false` with no write and no event. Returned records are the stored objects themselves, not copies — replace via `put`/`update`, never mutate in place.
+読み取りは権威あるインメモリ状態から同期的に行われる: `KvTable` は `get`/`entries`/`keys`/`size` を公開し（キューされた書き込みが着地する間も安定したスナップショットイテレーター）、グローバルハンドルの `get()` は、最初の `set` が媒体上でスロットを実体化するまで spec の `initial` を提供する。すべての書き込み — `put`、`delete`、`update`、`global.set` — はドメインごとの 1 本のチェーンにキューされ、まずバックエンドの耐久性に達し、次にメモリを変更し、次に `domain/changed` を発火する。拒否されたバックエンド書き込みはメモリを触らないため、読み取りが媒体から乖離することはない。`update(key, fn)` はチェーンスロットでのアトミックな読み取り-変更-書き込みである（欠けているキーは `missing-key` を拒否する）。存在しないキーの `delete` は書き込みもイベントもなく `false` に解決する。返されるレコードはコピーではなく保存されたオブジェクトそのものである — `put`/`update` で置き換え、その場での変更は決してしないこと。
 
-## The domain facility: `ctx.storageDomain`
+## ドメインファシリティ: `ctx.storageDomain`
 
-`DomainFacility` ([signatures](#ctxstoragedomain--domainfacility)) opens declared domains over routed backends. Routing is the domain plugin's configuration, never the hub's: `backend` names the required default route and `routes` overrides it per domain name. `open(spec)` runs a strict sequence, each step failing the whole call: it rejects a name already open or still closing (`already-open`), resolves the route (`backend-not-found`), requires the backend's `kv` facet (`facet-unsupported`), opens the unit (backend `version-mismatch`/`malformed-medium` pass through), and validates every stored record and global against the spec's zod schemas (`invalid-record` with the offending table and key). The caller owns the returned handle and releases it with `Domain.close()`; domains still open when the plugin unmounts are closed by the facility, and a closed domain's name frees for reopening only after teardown fully completes. `get(name)` is an untyped diagnostic lookup onto the package-private `DomainImpl` runtime behind every typed handle; `closeAll()` is the unmount path.
+`DomainFacility`（[シグネチャー](#ctxstoragedomain--domainfacility)）はルーティングされたバックエンド上で宣言済みドメインを開く。ルーティングはドメインプラグインの構成であり、決してハブのものではない: `backend` は必須の既定ルートを名指しし、`routes` はドメイン名ごとにそれを上書きする。`open(spec)` は厳密な順序で実行され、各ステップが呼び出し全体を失敗させる: すでに開いているか閉じ中の名前を拒否し（`already-open`）、ルートを解決し（`backend-not-found`）、バックエンドの `kv` ファセットを要求し（`facet-unsupported`）、ユニットを開き（バックエンドの `version-mismatch`/`malformed-medium` はそのまま通る）、すべての保存済みレコードとグローバルを spec の zod スキーマに対して検証する（違反したテーブルとキー付きの `invalid-record`）。呼び出し元が返されたハンドルを所有し、`Domain.close()` で解放する。プラグインのアンマウント時にまだ開いているドメインはファシリティが閉じ、閉じられたドメインの名前はティアダウンが完全に完了した後にのみ再オープンのために解放される。`get(name)` は、すべての型付きハンドルの背後にあるパッケージプライベートな `DomainImpl` ランタイムへの型なしの診断ルックアップであり、`closeAll()` はアンマウント経路である。
 
-## The change event: `domain/changed`
+## 変更イベント: `domain/changed`
 
-Every durable write emits one event strictly after the backend acknowledged durability, in the domain's write-chain order ([event entry](#domainchanged--emit)):
+すべての耐久書き込みは、バックエンドが耐久性を確認した厳密に後に、ドメインの書き込みチェーン順で 1 つのイベントを発火する（[イベント項目](#domainchanged--emit)）:
 
 ```ts type-equiv
 /** Shared location fields of one durable domain change. */
@@ -150,7 +150,7 @@ interface DomainChangedBase {
 type DomainChanged = DomainChangedPut | DomainChangedDeleted
 ```
 
-`put` (inserts, overwrites, and global writes) carries the new snapshot in `value` — never the old value; a diffing consumer keeps its own previous snapshot. `deleted` is a tombstone with no value. The event is a notification, not a transaction participant: the commit point has passed at emission, so a synchronously throwing listener is contained with a logged warning rather than rejecting the already-durable write, and emitted values equal the in-memory state at emission. The event is in-process only; cross-process change push is a recorded limitation ([package README](../../packages/storage/storage-domain/README.md)).
+`put`（挿入、上書き、グローバル書き込み）は新しいスナップショットを `value` に運ぶ — 古い値は決して運ばない。差分を取るコンシューマーは自身の前回スナップショットを保つ。`deleted` は値のないトゥームストーンである。イベントは通知であり、トランザクションの参加者ではない: 発火時点でコミットポイントは過ぎているため、同期的に throw するリスナーは、すでに耐久な書き込みを拒否するのではなく、記録された警告付きで封じ込められる。発火される値は発火時点のインメモリ状態に等しい。イベントはプロセス内のみであり、プロセス間の変更プッシュは記録された制限である（[パッケージ README](../../packages/storage/storage-domain/README.md)）。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -158,13 +158,13 @@ type DomainChanged = DomainChangedPut | DomainChangedDeleted
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxstorage--storage"></a>
 
 ### `ctx.storage` — `Storage`
 
-The storage hub service. Backends register under `backend`; data forms mount under their `StorageForms` key and are reached as `ctx.storage.<form>`.
+ストレージハブサービス。バックエンドは `backend` の下に登録され、データ形式は `StorageForms` キーの下にマウントされ、`ctx.storage.<form>` として到達される。
 
 ```ts cordis-catalog
 /**
@@ -190,7 +190,7 @@ Source: [`packages/storage/storage/src/index.ts`](../../packages/storage/storage
 
 ### `ctx.storageDomain` — `DomainFacility`
 
-The mounted domain facility. Opens declared domains over routed backends; one facility instance owns the open-domain table and enforces single-open per domain name.
+マウントされたドメインファシリティ。ルーティングされたバックエンド上で宣言済みドメインを開く。1 つのファシリティインスタンスがオープンドメインテーブルを所有し、ドメイン名ごとの単一オープンを強制する。
 
 ```ts cordis-catalog
 /**
@@ -235,13 +235,13 @@ Source: [`packages/storage/storage-domain/src/index.ts`](../../packages/storage/
 
 <a id="domain-events"></a>
 
-### `domain/*` events
+### `domain/*` イベント
 
 <a id="domainchanged--emit"></a>
 
 #### `domain/changed` — emit
 
-A domain record or the global singleton changed, emitted once per write strictly after the backend acknowledged durability. Events of one domain arrive in its write-chain order.
+ドメインレコードまたはグローバルシングルトンが変更された。書き込みごとに 1 回、バックエンドが耐久性を確認した厳密に後に発火される。1 つのドメインのイベントはその書き込みチェーン順に到着する。
 
 ```ts cordis-catalog
 /**

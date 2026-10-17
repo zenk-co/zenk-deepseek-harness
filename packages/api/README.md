@@ -1,60 +1,60 @@
 ---
-description: "Package map for the application's Remote layer: typed Client-to-Host capability calls, results, and forwarded events, for users and maintainers navigating the group."
+description: "アプリケーションの Remote 層のパッケージ対応表:型付きクライアント・ホスト間ケイパビリティ呼び出し・結果・転送イベント。グループ内を移動する利用者と保守者向け。"
 kind: "package-group"
 ---
 
-# api/ — Remote API layers
+# api/ — Remote API 層
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `api/` group provides the application's Remote layer: a Client environment can call the business capabilities running on the Host — manage goals, run commands, list the plugin inventory, discover file and session references — as typed method calls, receive results or streams, send uplink items on an open stream, and observe forwarded Host events. `remotes` decides which capabilities are exposed and how each call reaches the right session's agent; `gateway` carries the calls and their results between Client and Host. The stack runs over the application's shared Connection; streaming session data is deliberately outside it.
+`api/` グループはアプリケーションの Remote 層を提供する。クライアント環境はホストで動作する業務ケイパビリティ（ゴール管理・コマンド実行・プラグインインベントリ一覧・ファイルやセッション参照の探索）を型付きメソッド呼び出しとして呼び、結果やストリームを受け取り、開いたストリーム上で上り項目を送り、転送されたホストイベントを観測できる。`remotes` はどのケイパビリティを公開し、各呼び出しがどのセッションのエージェントに届くかを決め、`gateway` は呼び出しとその結果をクライアント・ホスト間で運ぶ。積み重ねはアプリケーション共有 Connection 上で動作する。ストリーミングセッションデータは意図的にその外である。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-The packages below provide the Remote layer; the package READMEs own the exhaustive contracts.
+下記のパッケージが Remote 層を提供する。網羅的な契約はパッケージ README が所有する。
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`remotes/`](remotes/README.md) | Chooses which Host capabilities and events the Client can consume. | — |
-| [`gateway/`](gateway/README.md) | Carries typed unary calls, multiplexed streams with their Client uplinks, and forwarded Host events. | `ctx.typertGateway` / `ctx.remote` |
-| [`remote-access/`](remote-access/README.md) | Decides which Remote methods non-owner Peers may call, filters list results, and streams each Peer's access snapshot. | `ctx.remoteAccess` / `ctx.remote.remoteAccess` |
-| [`job-controller/`](job-controller/README.md) | Streams one background job's observation record to the Client. | `ctx.jobController` / `ctx.remote.job` |
-| [`session-controller/`](session-controller/README.md) | Owns Session commands, history streams, live control state, and Agent/Session identity policy. | `ctx.sessionController` / `ctx.remote.session` |
-| [`settings-controller/`](settings-controller/README.md) | Owns the configuration-surface reads and writes over the settings-domain seams. | `ctx.settingsController`, `ctx.credentialsController` / `ctx.remote.settings`, `ctx.remote.credentials` |
-| [`workspace-controller/`](workspace-controller/README.md) | Owns Workspace mutations and the complete Client Workspace projection. | `ctx.workspaceController` / `ctx.remote.workspace` |
-| [`terminal-controller/`](terminal-controller/README.md) | Session-owned interactive shells, screen recovery and browser terminal control. | `ctx.terminalController` / `ctx.remote.terminal` |
-| [`workspace-files/`](workspace-files/README.md) | Owns bounded workspace file access — `stat`, paged `read`, `list`, and the instrumented-operation `changes` feed — and the Client `file` resource provider over it. | `ctx.workspaceFiles` / `ctx.remote.workspaceFiles` |
+| [`remotes/`](remotes/README.md) | クライアントが消費できるホストケイパビリティとイベントを選ぶ。 | — |
+| [`gateway/`](gateway/README.md) | 型付き単発呼び出し、それぞれのクライアント上りを伴う多重化ストリーム、転送ホストイベントを運ぶ。 | `ctx.typertGateway` / `ctx.remote` |
+| [`remote-access/`](remote-access/README.md) | 所有者でないピアが呼べる Remote メソッドを決め、一覧結果を絞り、各ピアのアクセススナップショットを流す。 | `ctx.remoteAccess` / `ctx.remote.remoteAccess` |
+| [`job-controller/`](job-controller/README.md) | 1 バックグラウンドジョブの観測記録をクライアントへ流す。 | `ctx.jobController` / `ctx.remote.job` |
+| [`session-controller/`](session-controller/README.md) | セッションコマンド・履歴ストリーム・稼働制御状態・エージェント/セッション識別子方針を所有する。 | `ctx.sessionController` / `ctx.remote.session` |
+| [`settings-controller/`](settings-controller/README.md) | 設定画面読み書きを所有する。設定領域シーム越し。 | `ctx.settingsController`、`ctx.credentialsController` / `ctx.remote.settings`、`ctx.remote.credentials` |
+| [`workspace-controller/`](workspace-controller/README.md) | ワークスペース変更と完全なクライアントワークスペース投影を所有する。 | `ctx.workspaceController` / `ctx.remote.workspace` |
+| [`terminal-controller/`](terminal-controller/README.md) | セッション所有の対話シェル・画面復旧・ブラウザーターミナル制御。 | `ctx.terminalController` / `ctx.remote.terminal` |
+| [`workspace-files/`](workspace-files/README.md) | 上限付きワークスペースファイルアクセス（`stat`・ページ式 `read`・`list`・計測操作 `changes` 送り）とその上のクライアント `file` 資源提供者を所有する。 | `ctx.workspaceFiles` / `ctx.remote.workspaceFiles` |
 
-Remote calls run Client → Host over the application's shared Connection; stream items flow Host → Client on the Gateway mux, and a stream's uplink items flow Client → Host on the same logical stream. API Gateway owns Remote transport, while the controller packages own Session, configuration-surface, and Workspace behavior. Feature packages register exact Connection Fetch routes for responses that do not fit Remote invocation, such as streamed downloads.
+Remote 呼び出しはアプリケーション共有 Connection 越しにクライアントからホストへ動作し、ストリーム項目は Gateway 多重器上でホストからクライアントへ流れ、ストリームの上り項目は同じ論理ストリーム上でクライアントからホストへ流れる。API Gateway は Remote 輸送を所有し、制御パッケージはセッション・設定画面・ワークスペース動作を所有する。機能パッケージは Remote 呼び出しに収まらない応答（流し込み受け渡しなど）向けに正確な Connection Fetch 経路を登録する。
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Start with the API Gateway reference to see the Remote model end to end, then the Typert subsystem page for the shared definitions and Connection for the physical carrier.
+まず API Gateway 参照で Remote 模型を通しで見て、次に共有定義は Typert サブシステムページ、物理担体は Connection を見ること。
 
-- [API Gateway reference](../../docs/api-gateway.md) — the current-state reference for the Typert API Gateway: programming model, generation pipeline, and runtime invocation.
-- [Typert subsystem reference](../../docs/subsystems/typert.md) — the public contracts shared by protocol, Gateway, and consumer assemblies.
-- [Connection](../client/connection/README.md) — the RPC carrier, `/api` trust fence, and response envelopes behind every Remote call.
+- [API Gateway 参照](../../docs/api-gateway.md) — Typert API Gateway の現状参照。プログラミングモデル・生成パイプライン・実行時呼び出し。
+- [Typert サブシステム参照](../../docs/subsystems/typert.md) — プロトコル・Gateway・利用者アセンブリが共有する公開契約。
+- [Connection](../client/connection/README.md) — すべての Remote 呼び出し背後の RPC 担体・`/api` 信頼 fence・応答封筒。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

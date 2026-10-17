@@ -1,10 +1,10 @@
-# Cookbook: live configuration forms
+# クックブック: ライブ設定フォーム
 
-English | [中文](adding-a-settings-card.zh.md)
+日本語 | [English](adding-a-settings-card.en.md) | [中文](adding-a-settings-card.zh.md)
 
-Declare live fields in the plugin Config schema and expose them through a product-owned settings card. The exported `Config` interface describes the values received by the plugin, including each `Volatile<T>` reference.
+プラグイン設定スキーマにライブ欄を宣言し、製品所有の設定カード越しに公開する。出力される `Config` インターフェースはプラグインが受け取る値を記述し、各 `Volatile<T>` 参照を含む。
 
-## 1. Declare live fields
+## 1. ライブ欄を宣言する
 
 ```ts
 import type { Context, Volatile } from '@deepseek-ai/cordis'
@@ -27,23 +27,23 @@ export function apply(ctx: Context, config: Config): void {
 }
 ```
 
-Read `.get()` when starting an operation. A request that needs a consistent snapshot captures its values once. Use `.check()` for cross-field Config validation; these checks run on the Host before persistence and are omitted from serialized form schemas.
+操作開始時に `.get()` を読む。一貫したスナップショットが必要な要求は値を一度取得する。欄間の設定検証には `.check()` を使う。これらの検査は永続化前にホストで実行され、直列化フォームスキーマからは省かれる。
 
-## 2. Compose the plugin
+## 2. プラグインを組み立てる
 
-Give each instance a unique profile entry id. The base bundle mounts settings and config-editor. For custom profiles, see their package READMEs before mounting the same services.
+各インスタンスに一意のプロファイルエントリー id を与える。ベースバンドルは設定と設定エディターをマウントする。独自プロファイルでは、同じサービスをマウントする前にそのパッケージ README を読むこと。
 
-`role('secret')` keeps a value out of form responses. Use credential references for values managed by the credentials domain. Ordinary fields stay out of the settings schema.
+`role('secret')` は値をフォーム応答から外す。資格情報ドメインが管理する値には資格情報参照を使う。通常欄は設定スキーマから外しておく。
 
-## 3. Verify editing
+## 3. 編集を検証する
 
-Change a field in Plugins and save. Verify the profile patch, the next consumer operation, unchanged plugin instance identity, and restoration after restart. Reject an invalid value and verify that neither the file nor the live value changed.
+プラグインで欄を変えて保存する。プロファイルパッチ・次の利用者操作・不変のプラグインインスタンス識別子・再起動後の復元を検証する。不正値を拒否し、ファイルもライブ値も変わっていないことを検証する。
 
-Custom plugin pages receive `form.state` and `form.mutate(operations, expectedRevision)` from the Plugins page owner. The Host validates full Config and applies edits through ConfigEditor and volatile HMR. The [plugin settings package](../../packages/client/ui-settings-plugins/README.md) owns the existing card examples.
+独自プラグインページはプラグインページ所有者から `form.state` と `form.mutate(operations, expectedRevision)` を受け取る。ホストは完全な設定を検証し、設定エディターと揮発性 HMR 経由で編集を適用する。[プラグイン設定パッケージ](../../packages/client/ui-settings-plugins/README.md)が既存カード例を所有する。
 
-## 4. Contribute to another plugin's page
+## 4. 別プラグインのページに寄与する
 
-A plugin with something to say about a bundle, a row, or an official plugin it does not own registers into `plugins.detail.actions` (a control at the head of the page), `plugins.detail.badge` (a tag beside the title), or `plugins.detail.section` (a section under the page's own content). Every entry is rendered with the page's `subject` — `{ kind: 'bundle', pkg }`, `{ kind: 'row', pkg, row }`, or `{ kind: 'item', id }` — and returns null for a subject it has nothing for:
+所有しないバンドル・行・Official プラグインについて述べたいプラグインは、`plugins.detail.actions`（ページ先頭の操作部品）・`plugins.detail.badge`（題名横の札）・`plugins.detail.section`（ページ独自内容の下の節）に登録する。すべてのエントリーはページの `subject`（`{ kind: 'bundle', pkg }`・`{ kind: 'row', pkg, row }`・`{ kind: 'item', id }`）と共に描画され、関係ない subject には null を返す:
 
 ```tsx ignore-check
 ctx.slots.inject('plugins.detail.badge', () => ctx.slots.register({
@@ -53,11 +53,11 @@ ctx.slots.inject('plugins.detail.badge', () => ctx.slots.register({
 }, ({ t, subject }) => subject.kind === 'bundle' && hasUpdate(subject.pkg) ? <Tag tone="info">{t('update')}</Tag> : null))
 ```
 
-## 5. Where the browser half rides
+## 5. ブラウザー側が乗る場所
 
-The browser half is served to the page by the [client module system](../../packages/client/modules), which scans the enabled Loader entries for packages declaring `dsh.client` and serves each one's built `./client` export — but it attaches a package's half to the Loader row whose specifier is the bare package name. A row mounted from a subpath export never carries a half, so a bundle that splits one package into several rows keeps its half on the root row, and every page it registers goes away when that row is switched off. A sub-plugin whose page must outlive the other rows ships as its own package.
+ブラウザー側は[クライアントモジュールシステム](../../packages/client/modules)によりページへ提供され、`dsh.client` を宣言するパッケージを求めて有効 Loader エントリーを走査し、各パッケージのビルド済み `./client` 出力を提供する。ただしパッケージ側は Loader 行の指定子が素パッケージ名のものに結び付く。サブパス出力からマウントされた行は側を持たないため、1 パッケージを複数行に分けるバンドルは側をルート行に保持し、その行を切ると登録したすべてのページが消える。他行より長生きしなければならないページを持つサブプラグインは独自パッケージとして出荷する。
 
-The built `./client` file must be in the client module system's lazy-CJS factory format: one script that registers the package name and a `factory(require)` with the page's module loader, described in the [client module system's README](../../packages/client/modules/README.md). The `clientBundle` tsdown preset that emits it lives in `packages/client/tsdown.client.ts` rather than in a published package, so a package outside this repository reproduces that build itself.
+ビルド済み `./client` ファイルはクライアントモジュールシステムの遅延 CJS ファクトリー形式でなければならない。ページのモジュールローダーにパッケージ名と `factory(require)` を登録する 1 スクリプトであり、[クライアントモジュールシステムの README](../../packages/client/modules/README.md)で説明される。それを出す `clientBundle` tsdown プリセットは公開パッケージではなく `packages/client/tsdown.client.ts` にあるため、このリポジトリ外のパッケージはそのビルドを自前で再現する。
 
 ```jsonc
 {
@@ -69,4 +69,4 @@ The built `./client` file must be in the client module system's lazy-CJS factory
 }
 ```
 
-A companion package for a built-in namespace is the same browser half in a client-only package with an empty Host `apply`, listed in the web composition's plugin roster ([`packages/bundle/web-app/cordis.patch.yml`](../../packages/bundle/web-app/cordis.patch.yml)) and registering into `plugins.item` through `ctx.configForms.whileServed`, so the page exists exactly while the Host serves the namespace.
+組み込み名前空間の伴走パッケージは、空のホスト `apply` を持つクライアント専用パッケージ内の同じブラウザー側であり、Web コンポジションのプラグイン名簿（[`packages/bundle/web-app/cordis.patch.yml`](../../packages/bundle/web-app/cordis.patch.yml)）に列挙され、`ctx.configForms.whileServed` 経由で `plugins.item` に登録するため、ホストが名前空間を提供するちょうどその間ページが存在する。

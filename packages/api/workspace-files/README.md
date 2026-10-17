@@ -1,158 +1,158 @@
 ---
-description: "Workspace file service for the web GUI: bounded reads and target-scoped filesystem watches, plus directory listing inside the Session workspace root."
+description: "Web GUI 向けのワークスペースファイルサービス: 境界付きの読み取りと対象スコープのファイルシステム監視、およびセッションワークスペースルート内のディレクトリ一覧。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-api-workspace-files
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to preview files readable through a Session's filesystem from the web client. It reads UTF-8 text by page, reads bounded byte windows or complete files, resolves related files from a base file's directory, and reports file metadata. Follow changes to a file or a directory's direct entries. File reads and watches may target paths outside the workspace; directory listing and watches remain workspace-scoped. The service exposes no mutation operation.
+このパッケージは、セッションのファイルシステムを通じて読めるファイルを Web クライアントからプレビューするために使う。UTF-8 テキストをページ単位で読み、境界付きのバイトウィンドウまたはファイル全体を読み、基準ファイルのディレクトリから関連ファイルを解決し、ファイルメタデータを報告する。ファイルまたはディレクトリの直接のエントリーへの変更を追跡する。ファイルの読み取りと監視はワークスペース外のパスを対象にできるが、ディレクトリ一覧と監視はワークスペーススコープのままである。このサービスは変更操作を公開しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the package beside `dsh-fs`, `dsh-sandbox-policy`, the Session store, and the Typert Gateway; the bundle does so right after the Session Controller. Every method takes the Session identity on the wire, so a Client calls `remote.workspaceFiles.read(sessionId, path, range, signal)`, `stat(sessionId, path, signal)`, `readBytes(sessionId, path, options, signal)`, `list(sessionId, path, signal)`, or `changes(sessionId, path, signal)` and never names a root itself. The Host reads a live Session header or uses persistence `stat` for a cold Session; it does not activate an Agent, read the event body, or borrow a parent Session's root. Session persistence is optional for live reads, but without it a cold Session cannot resolve and the Gateway returns `gateway/lookup-not-found`.
+このパッケージは `dsh-fs`、`dsh-sandbox-policy`、セッションストア、Typert Gateway の隣にマウントする。バンドルはセッションコントローラーの直後にそうする。すべてのメソッドはワイヤ上でセッションアイデンティティを受け取るため、Client は `remote.workspaceFiles.read(sessionId, path, range, signal)`、`stat(sessionId, path, signal)`、`readBytes(sessionId, path, options, signal)`、`list(sessionId, path, signal)`、または `changes(sessionId, path, signal)` を呼び、ルートを自分で名指しすることはない。Host はライブセッションのヘッダーを読むか、コールドセッションには永続化の `stat` を使う。Agent をアクティベートしたり、イベント本体を読んだり、親セッションのルートを借りたりはしない。セッション永続化はライブ読み取りにはオプションだが、それがないとコールドセッションを解決できず、Gateway は `gateway/lookup-not-found` を返す。
 
-| Method | Returns | Purpose |
+| メソッド | 戻り値 | 目的 |
 |---|---|---|
-| `stat(path)` | `WorkspaceFileStat { absolutePath, version, bytes? }` | Identity, version, and size of one regular file, without content |
-| `read(path, { offset?, limit? })` | `WorkspaceFileText` = stat + `{ offset, text, lines, eof }` | One window of lines from a UTF-8 text file; `lines` counts them, so one empty line and a page past the end read differently |
-| `readBytes(path, { range?, baseFile? })` | `WorkspaceFileBytes` = stat + `{ offset, data, eof }` | Complete file or bounded byte range as `Uint8Array`; optionally resolve from another file's directory |
-| `list(path)` | `WorkspaceDirectoryListing { path, entries, truncated }` | Direct children of one directory |
-| `changes(path)` | stream of `WorkspaceFileWatchFrame` | Subscription readiness, then invalidations of one file or a directory's direct entries |
+| `stat(path)` | `WorkspaceFileStat { absolutePath, version, bytes? }` | コンテンツなしの、1 つの通常ファイルのアイデンティティ、バージョン、サイズ |
+| `read(path, { offset?, limit? })` | `WorkspaceFileText` = stat + `{ offset, text, lines, eof }` | UTF-8 テキストファイルからの 1 行ウィンドウ。`lines` はそれらを数えるので、1 つの空行と末尾を越えたページは異なって読まれる |
+| `readBytes(path, { range?, baseFile? })` | `WorkspaceFileBytes` = stat + `{ offset, data, eof }` | 完全なファイル、または境界付きバイト範囲を `Uint8Array` として。オプションで別のファイルのディレクトリから解決する |
+| `list(path)` | `WorkspaceDirectoryListing { path, entries, truncated }` | 1 つのディレクトリの直接の子 |
+| `changes(path)` | `WorkspaceFileWatchFrame` のストリーム | サブスクリプションの準備完了、その後、1 つのファイルまたはディレクトリの直接のエントリーの無効化 |
 
-### Addressing and paths
+### アドレッシングとパス
 
-`read`, `readBytes`, and `stat` accept an absolute path or one relative to the selected Session's workspace root. The composed filesystem decides whether the path is readable; the service does not impose workspace containment on file reads. `readBytes` with `options.baseFile` resolves the relative target `path` from that file's directory, including when either file is outside the workspace. The base file itself accepts an absolute or workspace-relative path. Both files receive the same regular-file checks; an empty target, absolute target, URL, or NUL-containing target is rejected. File results report the absolute path in the filesystem's execution world. `list` remains workspace-scoped and reports the listed directory relative to that root. `changes` uses the same path resolution: file watches follow file-read authority, while directory watches remain workspace-scoped.
+`read`、`readBytes`、`stat` は絶対パス、または選択されたセッションのワークスペースルートからの相対パスを受け入れる。合成されたファイルシステムがそのパスが読めるかどうかを決める。サービスはファイル読み取りにワークスペース封じ込めを課さない。`options.baseFile` 付きの `readBytes` は、相対ターゲット `path` をそのファイルのディレクトリから解決する（どちらかのファイルがワークスペース外にある場合も含む）。基準ファイル自体は絶対パスまたはワークスペース相対パスを受け入れる。どちらのファイルも同じ通常ファイルチェックを受ける。空のターゲット、絶対ターゲット、URL、NUL を含むターゲットは拒否される。ファイル結果はファイルシステムの実行ワールドでの絶対パスを報告する。`list` はワークスペーススコープのままで、一覧したディレクトリをそのルートからの相対で報告する。`changes` は同じパス解決を使う: ファイル監視はファイル読み取りの権限に従い、ディレクトリ監視はワークスペーススコープのままである。
 
-### Pages
+### ページ
 
-`read` returns one line window, never the whole file. `range.offset` is the 1-based first line and defaults to 1; `range.limit` is the largest number of lines on the page and defaults to `maxLines`, which it may not exceed — a larger limit, or an offset or limit that is not a positive integer, is a `gateway/bad-request`. Lines end at `\n`, and a final `\n` terminates the last line rather than starting an empty one, so a two-line file has two lines. The page's `text` joins its lines with `\n` and carries no terminator after the last; `eof` is true when the page includes the file's last line, and an offset past the end returns an empty page with `eof` true. Every page also carries the file's `version` from the stat that preceded it, so a consumer can tell a fresh page from a stale one, and `bytes`, the complete file's size when the backend reports it. The service reads the file only up to the first character past the page, so a very large file costs one page of memory per request.
+`read` は 1 行ウィンドウを返し、ファイル全体は決して返さない。`range.offset` は 1 始まりの最初の行で、既定は 1。`range.limit` はページ上の行の最大数で、既定は `maxLines` であり、それを超えてはならない — それより大きな limit、または正の整数でない offset や limit は `gateway/bad-request` である。行は `\n` で終わり、最後の `\n` は空行を始めるのではなく最後の行を終端する。したがって 2 行のファイルは 2 行を持つ。ページの `text` は行を `\n` で連結し、最後の後に終端子を持たない。`eof` はページがファイルの最後の行を含むときに true になり、末尾を越えた offset は `eof` が true の空ページを返す。すべてのページは、その前に実行された stat からのファイルの `version` も運び、コンシューマーは新鮮なページと古いページを見分けられる。また `bytes`（バックエンドが報告する場合のファイル全体のサイズ）も運ぶ。サービスはページを越えた最初の文字までの位置までしかファイルを読まないため、非常に大きなファイルでもリクエストごとに 1 ページ分のメモリしか消費しない。
 
-### Binary reads
+### バイナリ読み取り
 
-`read` pages by lines and never by bytes; a byte window is `readBytes(path, { range: { offset?, length? } })`. `options.range.offset` is the 0-based first byte and defaults to 0; `options.range.length` is the largest number of bytes in the window and defaults to `maxBytes`, which it may not exceed — a longer window fails with `too-large` instead of arriving shortened, and an offset or length that is not an integer in range is a `gateway/bad-request`. The window comes back as `Uint8Array` data, shorter than `length` at the end of the file and empty at or past it; `eof` is true when the window includes the file's last byte. Nothing is decoded and nothing is refused as binary, so an image or a NUL-laden file reads where `read` fails with `not-text`. The same `version` and `bytes` ride along as on a page.
+`read` は行単位でページングし、バイト単位では決して行わない。バイトウィンドウは `readBytes(path, { range: { offset?, length? } })` である。`options.range.offset` は 0 始まりの最初のバイトで、既定は 0。`options.range.length` はウィンドウ内のバイトの最大数で、既定は `maxBytes` であり、それを超えてはならない — それより長いウィンドウは短縮されて届くのではなく `too-large` で失敗し、範囲内の整数でない offset や length は `gateway/bad-request` である。ウィンドウは `Uint8Array` データとして返り、ファイル末尾では `length` より短く、末尾以降では空になる。`eof` はウィンドウがファイルの最後のバイトを含むときに true になる。何もデコードされず、バイナリとして拒否されるものもないため、画像や NUL を含むファイルは、`read` が `not-text` で失敗する場所でも読める。同じ `version` と `bytes` がページと同様に付随する。
 
-Pass the required options object as `{}` for a complete file under `maxFileBytes`, or `{ range: {} }` for the default byte window under `maxBytes`. Oversized complete files fail rather than arriving truncated. `baseFile` and `range` can be combined, and windows remain independent of the complete-file cap. The binary Remote uses Connection's multipart response with JSON metadata and raw bytes; the generated Client returns `Uint8Array<ArrayBuffer>` without base64 decoding. Caller cancellation reaches the filesystem. The endpoint returns data, not a navigable document.
+必須の options オブジェクトは、`maxFileBytes` 未満のファイル全体には `{}` を、`maxBytes` 未満の既定バイトウィンドウには `{ range: {} }` を渡す。大きすぎるファイル全体は切り詰められて届くのではなく失敗する。`baseFile` と `range` は組み合わせ可能で、ウィンドウはファイル全体の上限とは独立している。バイナリ Remote は Connection の multipart レスポンス（JSON メタデータ + 生バイト）を使い、生成された Client は base64 デコードなしで `Uint8Array<ArrayBuffer>` を返す。呼び出し元のキャンセルはファイルシステムに到達する。このエンドポイントはデータを返し、ナビゲート可能なドキュメントは返さない。
 
-### File-read and directory checks
+### ファイル読み取りとディレクトリのチェック
 
-Every operation first uses `lstat` to reject a missing path or the wrong file kind; the file-reading operations also refuse a final symlink, even one pointing back inside the workspace. `list` instead follows a final link — a directory symlink on any platform, including a Windows junction — and requires it to resolve to a directory inside the workspace root, so a linked directory lists like its target; `changes` confines the watched directory the same way. File operations then resolve and read through the composed filesystem without an additional workspace-containment check. The configured page, window, complete-file, and listing caps still apply. Text pages additionally reject invalid UTF-8 and NUL bytes; byte reads do not decode content. An empty read or listing path is a `gateway/bad-request`.
+すべての操作はまず `lstat` を使い、存在しないパスまたは誤ったファイル種別を拒否する。ファイル読み取り操作はさらに、最終シンボリックリンク（ワークスペース内を指し返すものでも）を拒否する。`list` は逆に最終リンクに従う — 任意のプラットフォーム上のディレクトリシンボリックリンク（Windows ジャンクションを含む） — そしてそれがワークスペースルート内のディレクトリに解決されることを要求するため、リンクされたディレクトリはそのターゲットのように一覧される。`changes` も監視対象ディレクトリを同じ方法で封じ込める。ファイル操作はその後、追加のワークスペース封じ込めチェックなしで合成ファイルシステムを通じて解決・読み取りを行う。構成されたページ、ウィンドウ、ファイル全体、一覧の上限は引き続き適用される。テキストページはさらに無効な UTF-8 と NUL バイトを拒否する。バイト読み取りはコンテンツをデコードしない。空の読み取りまたは一覧パスは `gateway/bad-request` である。
 
-### The change feed
+### 変更フィード
 
-`changes` is a `stream` Remote accepting only a target path. The Host derives the target's type from `stat` and requires workspace containment whenever that type is a directory, including after a type change. A generation registers its observation queue, resolves the target, and starts `fs.watch` before yielding `{ kind: 'ready' }`. It then yields `{ kind: 'change', change }`, where `change` is current stat metadata `{ absolutePath, version }` or `{ absolutePath, absent: true }`. Local providers use Chokidar; directories watch only direct entries. Matching `fs/observed` emissions also invalidate the target. The generation queues changes during setup. Cancellation closes the watcher independently of consumer pulls, and generation or plugin teardown awaits closure. Missing files remain watchable for same-path recreation while their parent directory remains.
+`changes` はターゲットパスのみを受け入れる `stream` Remote である。Host は `stat` からターゲットの型を導出し、その型がディレクトリであるときは常に（型変更後も含めて）ワークスペース封じ込めを要求する。ジェネレーションは自身の観察キューを登録し、ターゲットを解決し、`{ kind: 'ready' }` を yield する前に `fs.watch` を開始する。その後 `{ kind: 'change', change }` を yield する。ここで `change` は現在の stat メタデータ `{ absolutePath, version }` または `{ absolutePath, absent: true }` である。ローカルプロバイダーは Chokidar を使い、ディレクトリは直接のエントリーのみを監視する。一致する `fs/observed` の発火もターゲットを無効化する。ジェネレーションはセットアップ中に変更をキューする。キャンセルはコンシューマーの pull とは独立にウォッチャーを閉じ、ジェネレーションまたはプラグインのティアダウンは閉鎖を待つ。存在しないファイルは、親ディレクトリが残っている限り、同じパスでの再作成のために監視可能なままである。
 
-### Configuration
+### 構成
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `maxBytes` | `2097152` (2 MiB) | Inclusive byte cap on one page's text and on one byte window; a larger page or window fails |
-| `maxFileBytes` | `33554432` (32 MiB) | Inclusive complete-file cap for `readBytes` without `range`; larger files fail with `too-large` |
-| `maxLines` | `5000` | Default and largest page size in lines; a larger `limit` is refused |
-| `maxEntries` | `2000` | Cap on returned directory entries; the rest is dropped and reported cut |
+| `maxBytes` | `2097152` (2 MiB) | 1 ページのテキストと 1 つのバイトウィンドウに対する境界を含むバイト上限。それより大きなページやウィンドウは失敗する |
+| `maxFileBytes` | `33554432` (32 MiB) | `range` なしの `readBytes` に対するファイル全体の境界を含む上限。それより大きなファイルは `too-large` で失敗する |
+| `maxLines` | `5000` | 既定かつ最大のページサイズ（行数）。それより大きな `limit` は拒否される |
+| `maxEntries` | `2000` | 返されるディレクトリエントリーの上限。残りは切り捨てられ、切り詰められたことが報告される |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-api-workspace-files) is the exhaustive source for every accepted field and its JSDoc.
+生成された[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-api-workspace-files)が、受け入れられる全フィールドとその JSDoc の網羅的な情報源である。
 
-### Failures
+### 失敗
 
-Each failure is one `RemoteError` code with typed details, declared in [`src/types.ts`](src/types.ts): `workspace-file/not-found`, `workspace-file/outside-workspace` (directory listing or watching), `workspace-file/watch-unsupported` (watch initialization failed), `workspace-file/too-large` (with `limit`, the applicable page, window, or complete-file cap), `workspace-file/not-text`, `workspace-file/not-regular-file` (`kind`: `directory`, `symlink`, or `other`), and `workspace-file/not-directory` (`kind`: `file`, `symlink`, or `other`). Callers branch on the code, never on message text.
+各失敗は型付き詳細を持つ 1 つの `RemoteError` コードであり、[`src/types.ts`](src/types.ts) で宣言される: `workspace-file/not-found`、`workspace-file/outside-workspace`（ディレクトリ一覧または監視）、`workspace-file/watch-unsupported`（監視の初期化失敗）、`workspace-file/too-large`（`limit` 付き、該当するページ、ウィンドウ、またはファイル全体の上限）、`workspace-file/not-text`、`workspace-file/not-regular-file`（`kind`: `directory`、`symlink`、または `other`）、および `workspace-file/not-directory`（`kind`: `file`、`symlink`、または `other`）。呼び出し元はコードで分岐し、メッセージテキストでは決して分岐しない。
 
-### Client file resources
+### Client ファイルリソース
 
-The browser export registers the `file` provider into `ctx.resources` and requires `resources`, `remote`, and `remote.workspaceFiles`. The bundle's single `workspace-files` row supplies both faces; the Client has no separate configuration. A component reads `WorkspaceFileStat { absolutePath, version, bytes? }` metadata through `useResource<'file'>(address)` and fetches content separately through the text or binary Remote. Any UI, including Global components, shares the observation for the same complete address.
+ブラウザエクスポートは `file` プロバイダーを `ctx.resources` に登録し、`resources`、`remote`、`remote.workspaceFiles` を要求する。バンドルの単一の `workspace-files` 行が両方のフェイスを供給し、Client に別個の構成はない。コンポーネントは `useResource<'file'>(address)` を通じて `WorkspaceFileStat { absolutePath, version, bytes? }` メタデータを読み、コンテンツはテキストまたはバイナリの Remote を通じて別途取得する。Global コンポーネントを含むどの UI も、同じ完全なアドレスの観察を共有する。
 
-A `session/<sessionId>/<path>` address carries the authorizing Session and a relative or absolute path; leading slashes are preserved, as in `dsh-resource://file/session/s//etc/hosts`. The Host receives the path unchanged and owns resolution and access checks; the Client needs no Session `cwd`. `absolute/<path>` remains parseable but has no authorizing Session and fails with `workspace-file/unknown-workspace`, without borrowing current or Tab Session. Unsupported addresses fail with `workspace-file/unsupported-address`. [Workspace-path](../../util/workspace-path/README.md) owns the grammar; the generic Resource layer knows only the address and `signal`.
+`session/<sessionId>/<path>` アドレスは、認可するセッションと相対または絶対パスを運ぶ。先頭のスラッシュは保持される（例: `dsh-resource://file/session/s//etc/hosts`）。Host はパスをそのまま受け取り、解決とアクセスチェックを所有する。Client はセッションの `cwd` を必要としない。`absolute/<path>` はパース可能なままだが、認可するセッションを持たず、現在または Tab のセッションを借りることなく `workspace-file/unknown-workspace` で失敗する。サポートされないアドレスは `workspace-file/unsupported-address` で失敗する。[Workspace-path](../../util/workspace-path/README.md) が文法を所有し、汎用 Resource 層はアドレスと `signal` だけを知る。
 
-The provider waits for the Host's `ready` frame before its first `stat`, queues changes during the read, then binds the follower to `stat.absolutePath`. Both queued and live changes match that Host-returned path. A new version or absence notice re-stats the file, refreshing its path, version, and byte size together; duplicate versions are ignored. A failed stat keeps the address followed so a later target change can recover it. If observation ends before ready, including `watch-unsupported`, an uncancelled provider still performs one stat and yields its result. Frames are `RemoteResult` values, and programming exceptions remain uncaught.
+プロバイダーは最初の `stat` の前に Host の `ready` フレームを待ち、読み取り中は変更をキューし、その後フォロワーを `stat.absolutePath` に結合する。キューされた変更もライブの変更も、その Host が返したパスに一致する。新しいバージョンまたは不在の通知はファイルを再 stat し、パス、バージョン、バイトサイズを一緒に更新する。重複するバージョンは無視される。失敗した stat はアドレスをフォローされたままにし、後のターゲット変更がそれを回復できるようにする。ready の前に観察が終了した場合（`watch-unsupported` を含む）でも、キャンセルされていないプロバイダーは 1 回の stat を実行してその結果を yield する。フレームは `RemoteResult` 値であり、プログラミング例外は捕捉されないままである。
 
-One supervised `changes` stream serves each Session and requested path; consumers of that target share it. Followers match absolute paths with backslashes normalized to slashes. Carrier loss reconnects through the Gateway supervisor and a new ready frame triggers stat again; a Host-ended or terminally failed feed ends its followers and leaves their last metadata readable until reopened. The last follower leaving disposes the stream, a successor waits for that disposal, and plugin teardown awaits all pending closes. The provider declares `ResourceProtocolMap.file`; the text preview declares its Sidebar line-navigation parameters.
+1 つの監督された `changes` ストリームが各セッションと要求されたパスにサービスし、そのターゲットのコンシューマーはそれを共有する。フォロワーはバックスラッシュをスラッシュに正規化した絶対パスで照合する。キャリアの喪失は Gateway スーパーバイザーを通じて再接続し、新しい ready フレームが再び stat をトリガーする。Host が終了したフィードまたは最終的に失敗したフィードはフォロワーを終了させ、再オープンまで最後のメタデータを読めるままにする。最後のフォロワーが去るとストリームがディスポーズされ、後継者はそのディスポーズを待ち、プラグインのティアダウンはすべての保留中のクローズを待つ。プロバイダーは `ResourceProtocolMap.file` を宣言し、テキストプレビューはそのサイドバー行ナビゲーションパラメーターを宣言する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-### Design concept
+### 設計コンセプト
 
-Reads through `ctx.fs` use the backend's read authority; the sandboxing backend fences writes and edits, not reads. A Typert lookup derives `WorkspaceFileScope` from a live Session header or the persistence service's header-only `stat`, so cold subagent Sessions need neither Agent activation nor event-body reads. The service adds regular-file checks and bounded transfer, while workspace containment belongs only to directory listing and directory watching. A page is cut from `streamText`, which decodes and rejects non-UTF-8 chunk by chunk: the cutter counts lines before the window without keeping them, admits each in-window segment against the byte cap before buffering it, and returns at the first character past the window. One `stat` before the stream names the version and size the page reports.
+`ctx.fs` を通じた読み取りはバックエンドの読み取り権限を使う。サンドボックス化バックエンドは書き込みと編集を柵で囲み、読み取りは囲まない。Typert ルックアップはライブセッションのヘッダー、または永続化サービスのヘッダーのみの `stat` から `WorkspaceFileScope` を導出するため、コールドなサブエージェントセッションは Agent アクティベーションもイベント本体の読み取りも必要としない。サービスは通常ファイルチェックと境界付き転送を加え、ワークスペース封じ込めはディレクトリ一覧とディレクトリ監視にのみ属する。ページは `streamText` から切り出される。これはチャンクごとにデコードし、非 UTF-8 を拒否する: カッターはウィンドウの前の行を保持せずに数え、ウィンドウ内の各セグメントをバッファリングする前にバイト上限に対して認め、ウィンドウを越えた最初の文字で戻る。ストリームの前の 1 回の `stat` が、ページが報告するバージョンとサイズを名指しする。
 
-Complete-file reads delegate size enforcement to `fs.readBytes` and return raw bytes through the binary Remote.
+ファイル全体の読み取りはサイズの強制を `fs.readBytes` に委譲し、生バイトをバイナリ Remote を通じて返す。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `WorkspaceFiles`: the `workspaceFiles` service and Remote namespace, `Config`, the gates, the page cutter, `read`, `readBytes`, `stat`, `list` |
-| [`src/changes.ts`](src/changes.ts) | `WorkspaceChangeFeed`: target watchers, matching `fs/observed` notifications, and one queue per generation |
-| [`src/types.ts`](src/types.ts) | Wire types and the `RemoteErrorDetailsMap` codes, published as `./types` for Client packages |
-| [`src/client/index.ts`](src/client/index.ts), [`provider.ts`](src/client/provider.ts), [`change-feed.ts`](src/client/change-feed.ts) | Browser plugin, file metadata, and per-target change feeds |
-| [`src/client/types.ts`](src/client/types.ts), [`remote.ts`](src/client/remote.ts) | Resource values, parameters, Client error codes, and generated Remote types |
+| [`src/index.ts`](src/index.ts) | `WorkspaceFiles`: `workspaceFiles` サービスと Remote 名前空間、`Config`、ゲート、ページカッター、`read`、`readBytes`、`stat`、`list` |
+| [`src/changes.ts`](src/changes.ts) | `WorkspaceChangeFeed`: ターゲットウォッチャー、一致する `fs/observed` 通知、ジェネレーションごとの 1 つのキュー |
+| [`src/types.ts`](src/types.ts) | ワイヤ型と `RemoteErrorDetailsMap` コード。Client パッケージ向けに `./types` として公開される |
+| [`src/client/index.ts`](src/client/index.ts)、[`provider.ts`](src/client/provider.ts)、[`change-feed.ts`](src/client/change-feed.ts) | ブラウザプラグイン、ファイルメタデータ、ターゲットごとの変更フィード |
+| [`src/client/types.ts`](src/client/types.ts)、[`remote.ts`](src/client/remote.ts) | リソース値、パラメーター、Client エラーコード、生成された Remote 型 |
 
-Typert generates the Host and Client Remote artifacts exposed by `./typert` and `./remote`.
+Typert は `./typert` と `./remote` が公開する Host と Client の Remote アーティファクトを生成する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Filesystem capability](../../fs/fs/README.md) — the `ctx.fs` contract this service reads through, including `fs/observed` and `readByteRange`.
-- [Sandbox policy](../../sandbox/sandbox-policy/README.md) — where the Session's workspace root comes from.
-- [Remote assembly](../../api/remotes/README.md) — how Client packages reach the `workspaceFiles` namespace.
-- [Client resources](../../client/resources/README.md) — the resource model, `useResource`, pins, and provider lifetime.
-- [Workspace path helpers](../../util/workspace-path/README.md) — `fileAddressFor` and `parseFileAddress`, the `dsh-resource://file/…` address grammar both ends share.
-- [Sidebar text preview](../../client/ui-sidebar-documentpreview/README.md) — the tab type that follows a file through the `file` provider and reads its pages.
+- [ファイルシステムケイパビリティ](../../fs/fs/README.md) — このサービスが読み取りに通す `ctx.fs` 契約（`fs/observed` と `readByteRange` を含む）。
+- [サンドボックスポリシー](../../sandbox/sandbox-policy/README.md) — セッションのワークスペースルートの出所。
+- [Remote アセンブリ](../../api/remotes/README.md) — Client パッケージが `workspaceFiles` 名前空間に到達する方法。
+- [Client リソース](../../client/resources/README.md) — リソースモデル、`useResource`、ピン、プロバイダーの寿命。
+- [ワークスペースパスヘルパー](../../util/workspace-path/README.md) — `fileAddressFor` と `parseFileAddress`、両端が共有する `dsh-resource://file/…` アドレス文法。
+- [サイドバーテキストプレビュー](../../client/ui-sidebar-documentpreview/README.md) — `file` プロバイダーを通じてファイルを追跡し、そのページを読むタブ型。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package registers no tool, contributes no prompt section, and appends no session event.
+なし。このパッケージはツールを登録せず、プロンプトセクションを提供せず、セッションイベントを追加しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てず、送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Provider watch support** — unsupported backends, including SSH, report `watch-unsupported`; ordinary reads and manual refresh remain available, without polling for external changes.
-- **Linux parent-directory recreation** — automatic watch recovery after a parent directory is deleted and recreated is deferred; see [fs-local](../../fs/fs-local/README.md).
-- **Directory scope only** — directory listing and watches stay inside the Session workspace; file reads and watches use the filesystem backend's read authority.
-- **No total line count** — a page reports `eof`, not how many lines follow; a consumer that needs the total pages to the end or estimates from `bytes`.
-- **One giant line has no page** — a single line above `maxBytes` fails `too-large` at every window that includes it, because pages are cut by lines, not bytes.
-- **Reads are not transactional** — result metadata comes from stat before content is read; a concurrent write can make the reported version and returned contents differ.
-- **Unbounded generation queue** — a `changes` generation buffers operation observations and target invalidations until its consumer pulls; a stalled consumer grows Host memory for the life of the stream.
-- **`maxEntries` bounds the answer, not the listing** — `list` asks `ctx.fs.listDir` for every child and cuts the array afterwards, so a directory far above the cap still costs the Host the whole listing (on `fs-local`, one stat per child); bounding that work needs a limit on the filesystem seam's `listDir`.
-- **Dead feeds retain metadata** — after the Host ends `changes` or the stream fails terminally, open values retain their last state until reopened.
+- **プロバイダーの監視サポート** — SSH を含むサポートされないバックエンドは `watch-unsupported` を報告する。通常の読み取りと手動リフレッシュは利用可能なままで、外部変更のポーリングはない。
+- **Linux の親ディレクトリ再作成** — 親ディレクトリが削除・再作成された後の自動監視回復は先送りである。[fs-local](../../fs/fs-local/README.md) を参照。
+- **ディレクトリスコープのみ** — ディレクトリ一覧と監視はセッションワークスペース内にとどまる。ファイル読み取りと監視はファイルシステムバックエンドの読み取り権限を使う。
+- **総行数なし** — ページは `eof` を報告し、続く行数は報告しない。総数が必要なコンシューマーは末尾までページングするか `bytes` から推定する。
+- **1 つの巨大な行はページを持たない** — `maxBytes` を超える単一行は、それを含むすべてのウィンドウで `too-large` に失敗する。ページは行単位で切り出され、バイト単位ではないためである。
+- **読み取りはトランザクショナルではない** — 結果メタデータはコンテンツを読む前の stat から来る。並行書き込みは報告されたバージョンと返されたコンテンツを食い違わせ得る。
+- **無制限のジェネレーションキュー** — `changes` ジェネレーションは、コンシューマーが pull するまで操作の観察とターゲットの無効化をバッファリングする。停滞したコンシューマーはストリームの生存期間中 Host メモリを増大させる。
+- **`maxEntries` は回答を制限し、一覧を制限しない** — `list` は `ctx.fs.listDir` にすべての子を要求し、その後で配列を切り詰める。そのため上限をはるかに超えるディレクトリでも Host は一覧全体のコストを払う（`fs-local` では子ごとに 1 回の stat）。その作業を制限するにはファイルシステムシームの `listDir` に上限が必要である。
+- **死んだフィードはメタデータを保持する** — Host が `changes` を終了した後、またはストリームが最終的に失敗した後、オープンされた値は再オープンまで最後の状態を保持する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

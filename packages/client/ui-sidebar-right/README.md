@@ -1,157 +1,157 @@
 ---
-description: "The right Sidebar of the dsh web client: one docking surface per session, two presentations, the navigation controller ctx.sidebarRight, the tab-type registry ctx.sidebarRightTabs, and the Tab domain."
+description: "dsh Web クライアントの右サイドバー: セッションごとに 1 つのドッキング面、2 つの表示形態、ナビゲーションコントローラー ctx.sidebarRight、タブ種別レジストリ ctx.sidebarRightTabs、そして Tab ドメイン。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-sidebar-right
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The right Sidebar: where the docking kit meets this product. It holds one docking surface per session, draws it as one edge-anchored panel in the frame's right column in either of two presentations, puts the expand button in the conversation header, and owns the navigation controller (`ctx.sidebarRight`), the tab-type registry (`ctx.sidebarRightTabs`), and the Tab domain that tells each open tab how it was navigated to and how long it lives.
+右サイドバー: ドッキングキットと本製品が出会う場所。セッションごとに 1 つのドッキング面を保持し、2 つの表示形態のいずれかで、フレームの右列にエッジ固定のパネルとしてそれを描画し、展開ボタンを会話ヘッダーに置き、ナビゲーションコントローラー (`ctx.sidebarRight`)、タブ種別レジストリ (`ctx.sidebarRightTabs`)、および各オープンタブがどのようにナビゲートされたか、どれだけ存続するかを伝える Tab ドメインを所有する。
 
-## Table of Contents
+## 目次
 
-- [What lives here, and what does not](#what-lives-here-and-what-does-not)
-- [Presentations](#presentations)
-- [The expand button](#the-expand-button)
-- [State](#state)
-- [Extension seats](#extension-seats)
+- [ここに何があり、何がないか](#what-lives-here-and-what-does-not)
+- [表示形態](#presentations)
+- [展開ボタン](#the-expand-button)
+- [状態](#state)
+- [拡張シート](#extension-seats)
 - [`ctx.sidebarRight`](#ctxsidebarright)
-- [The Tab domain](#the-tab-domain)
-- [The guide](#the-guide)
-- [Copy](#copy)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [Tab ドメイン](#the-tab-domain)
+- [ガイド](#the-guide)
+- [コピー](#copy)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="what-lives-here-and-what-does-not"></a>
-## What lives here, and what does not
+## ここに何があり、何がないか
 
-The layout itself — the split tree, its operations, the drag gestures, the floating panels — belongs to `@deepseek-ai/dsh-client-ui-dockkit` and stays host-agnostic. This package supplies everything that kit refuses to know: the product's copy, what a tab's `kind` means, which tab a fresh pane is seeded with, where the surface is mounted, and how other plugins reach it.
+レイアウト自体 — 分割ツリー、その操作、ドラッグジェスチャー、フローティングパネル — は `@deepseek-ai/dsh-client-ui-dockkit` に属し、ホスト非依存のままである。本パッケージは、このキットが知ることを拒むすべてを提供する: 製品のコピー、タブの `kind` の意味、新しいペインにどのタブがシードされるか、サーフェスがどこにマウントされるか、そして他のプラグインがどのようにそれへ到達するか。
 
 <a id="presentations"></a>
-## Presentations
+## 表示形態
 
-Normal and fullscreen presentations share the same content tree, so switching does not remount tabs. The normal panel anchors to the right column; fullscreen covers the viewport while retaining the wide-screen columns underneath. Opening below 768px uses fullscreen automatically; leaving fullscreen on a narrow viewport closes the panel, and widening does not reopen a closed panel. A fullscreen opening keeps the underlying columns unchanged until its slide finishes, then prepares the normal track without a column transition. Before a fullscreen panel retreats, closing prepares a full-width conversation and restoring prepares the normal right track; the background does not animate during the retreat.
+通常とフルスクリーンの表示形態は同じコンテンツツリーを共有するため、切り替えてもタブは再マウントされない。通常パネルは右列に固定され、フルスクリーンは下層のワイドスクリーン列を保持しつつビューポートを覆う。768px 未満でのオープンは自動的にフルスクリーンを使う。狭いビューポートでフルスクリーンを離れるとパネルは閉じられ、幅を広げても閉じたパネルは再び開かない。フルスクリーンでのオープンは、そのスライドが終わるまで下層の列を変えずに保ち、その後、列トランジションなしで通常トラックを準備する。フルスクリーンパネルが退く前に、クローズは全幅の会話を準備し、復元は通常の右トラックを準備する。退避中、背景はアニメーションしない。
 
-| Mode | The track | The panel |
+| モード | トラック | パネル |
 |---|---|---|
-| `push` (default) | Panel width: the conversation makes room | In the track; its left edge and the conversation's right edge travel together, on the frame's own curve |
-| `fullscreen` | Retains the wide-screen normal track; automatic narrow-screen fullscreen takes no track | Covers the entire viewport |
+| `push` (デフォルト) | パネル幅: 会話が場所を空ける | トラック内。その左端と会話の右端がフレーム自身のカーブで一緒に動く |
+| `fullscreen` | ワイドスクリーンの通常トラックを保持する。狭い画面での自動フルスクリーンはトラックを取らない | ビューポート全体を覆う |
 
-In Windows Electron, `html[data-windows-titlebar]` keeps fullscreen panels below the caption and to the right of the expanded sidebar. The frame's `--dsh-windows-sidebar-width` supplies that inset and maximum width; `--dsh-windows-content-radius` supplies the top-left radius. Only fullscreen panels clip overflow for that corner.
+Windows Electron では、`html[data-windows-titlebar]` がフルスクリーンパネルをキャプションの下、展開されたサイドバーの右側に保つ。フレームの `--dsh-windows-sidebar-width` がそのインセットと最大幅を供給し、`--dsh-windows-content-radius` が左上の角丸を供給する。その角のためにオーバーフローをクリップするのはフルスクリーンパネルだけである。
 
-The seat reports presentation through `ctx.layout.openRightbar(track, fullscreen)` / `closeRightbar()`; the frame does not inject this package. Switching fullscreen on a wide viewport leaves the center width unchanged, and the width handle appears only in expanded normal mode. Independent floating panels and `float`/`dock` operations remain available.
+シートは `ctx.layout.openRightbar(track, fullscreen)` / `closeRightbar()` を介して表示形態を報告する。フレームは本パッケージを注入しない。ワイドビューポートでフルスクリーンを切り替えても中央の幅は変わらず、幅ハンドルは展開された通常モードでのみ現れる。独立したフローティングパネルと `float`/`dock` 操作は引き続き利用できる。
 
-The panel has no header row. Its two controls — the presentation switch and the collapse button — ride the kit's chrome seat at the far end of the top-right pane's tab strip, so the strip is the panel's whole top edge. Each strip reads, left to right: the tab capsules with close controls where allowed, the add control (drawn only while that pane holds no guide tab; it opens the guide there through `ctx.sidebarRight.openTab`), the pane's split control, and in the top-right pane the two panel controls. Only the chips give way in a narrow pane; the controls after them never shrink or clip.
+パネルにはヘッダー行がない。その 2 つのコントロール — 表示形態スイッチと折りたたみボタン — はキットの chrome シートに乗って右上ペインのタブストリップの最端に位置するため、ストリップがパネルの上端全体となる。各ストリップは左から右へこう並ぶ: タブカプセル (許可される場合には閉じるコントロール付き)、追加コントロール (そのペインがガイドタブを持たない間だけ描画され、`ctx.sidebarRight.openTab` を介してそこにガイドを開く)、ペインの分割コントロール、そして右上ペインでは 2 つのパネルコントロール。狭いペインで譲るのはチップだけであり、それ以降のコントロールは決して縮んだりクリップされたりしない。
 
 <a id="the-expand-button"></a>
-## The expand button
+## 展開ボタン
 
-The shortcut reference includes right-sidebar toggle, split and panel fullscreen commands. The same effective binding appears on the corresponding controls. Split and fullscreen require focus within a visible dock pane; conversation focus leaves them unavailable. Split remains visible when unavailable; its focusable tooltip shows the current binding and explains the pane limit or width requirement. Files, browser, and terminal providers contribute their own commands. Guide buttons display effective shortcuts as unboxed text inline without duplicate tooltips.
+ショートカットリファレンスには、右サイドバーの切り替え、分割、パネルのフルスクリーンの各コマンドが含まれる。同じ実効バインディングが対応するコントロールに表示される。分割とフルスクリーンは可視のドックペイン内にフォーカスを必要とし、会話にフォーカスがある間は利用できない。分割は利用できないときも可視のままで、フォーカス可能なツールチップが現在のバインディングを示し、ペインの上限または幅の要件を説明する。ファイル、ブラウザー、ターミナルの各プロバイダーは独自のコマンドを提供する。ガイドボタンは実効ショートカットをボックスなしのテキストとしてインライン表示し、重複するツールチップを持たない。
 
-While the panel is hidden, one button in the conversation header's corner seat (`conversation.session.header.corner`, past the utilities' right edge and level with the Session log control) is the way back in. Its glyph is the left sidebar's collapse icon mirrored. It uses the shared compact Button, matching the adjacent More action’s radius and hover fill. It shares the panel's store (the slot runtime allows one handle across two same-scope seats); while the panel is shown it renders nothing, and the corner seat collapses with it. A collapsed Sidebar therefore costs the conversation nothing: no rail, no width, and the transcript's scrollbar stays at the column's edge. Without a session there is no button and no panel.
+パネルが隠れている間は、会話ヘッダーのコーナーシート (`conversation.session.header.corner`、ユーティリティの右端を過ぎて Session log コントロールと同じ高さ) にある 1 つのボタンが戻り道となる。そのグリフは左サイドバーの折りたたみアイコンを鏡映したものである。共有のコンパクト Button を使い、隣接する More アクションの角丸とホバーフィルに一致する。パネルのストアを共有し (スロットランタイムは同一スコープの 2 つのシートにまたがる 1 つのハンドルを許す)、パネルが表示されている間は何も描画せず、コーナーシートもそれに合わせて折りたたまれる。したがって折りたたまれたサイドバーは会話に何のコストもかけない: レールも幅もなく、トランスクリプトのスクロールバーは列の端にとどまる。セッションがなければボタンもパネルもない。
 
-The panel takes the conversation's ground colour and content font sizes rather than a raised layer of its own: it is a column of the page, not a card over it.
+パネルは独自の浮き上がったレイヤーではなく、会話の下地色とコンテンツのフォントサイズを引き継ぐ。それはページの 1 つの列であり、ページの上に載るカードではない。
 
-The root-scoped `rightbar` entry renders the selected Session and background Sessions with initialized `keepMounted` bodies through separate `rightbar.session` subtrees. Each View owns its Session reference. Only the foreground subtree reports a frame track; other subtrees stay hidden without deleting tab state.
+ルートスコープの `rightbar` エントリは、選択中の Session と、初期化された `keepMounted` ボディを持つバックグラウンド Session を、別々の `rightbar.session` サブツリーを介してレンダリングする。各 View は自身の Session 参照を所有する。フレームトラックを報告するのはフォアグラウンドのサブツリーだけであり、他のサブツリーはタブ状態を削除せずに隠れたままになる。
 
 <a id="state"></a>
-## State
+## 状態
 
-One `SurfaceState` per session id — the layout, its recorded sequence, and how many ids it has minted — held in a store declared at the registration. Every action follows the same shape: mint the ids the intent needs, ask a kit planner which operations carry it out, record them, then assign the session's whole surface back. No action edits a layout in place, which is what keeps the kit's pure functions the only thing that computes one.
+セッション id ごとに 1 つの `SurfaceState` — レイアウト、その記録されたシーケンス、およびそれが鋳造した id の数 — を、登録時に宣言されたストアに保持する。すべてのアクションは同じ形に従う: 意図が必要とする id を鋳造し、どの操作がそれを実行するかをキットのプランナーに問い合わせ、それらを記録し、その後セッションのサーフェス全体を書き戻す。どのアクションもレイアウトをその場で編集しない。これにより、レイアウトを計算する唯一のものはキットの純粋関数であり続ける。
 
-Carrying the mint counter in the surface is what makes a recorded sequence replayable: operations embed the ids they create, so replaying from the same initial state reproduces the same tree. Every action records one history entry, however many operations it needed. Expanding, collapsing, and switching presentation are recorded too.
+鋳造カウンターをサーフェスに持たせることが、記録されたシーケンスを再生可能にする: 操作は自身が作った id を埋め込むため、同じ初期状態から再生すれば同じツリーが再現される。すべてのアクションは、必要とした操作の数にかかわらず 1 つの履歴エントリを記録する。展開、折りたたみ、表示形態の切り替えも記録される。
 
-After every action the kit's settle planner keeps the expanded surface populated: a docked pane whose last tab was moved out or floated is merged away, and an emptied root pane receives the default page. A collapsed surface holds no such backfill — a session starts collapsed and empty, and a close that collapses the column leaves it empty — the expansion that would first show an empty layout is what seeds the default page. Explicit closing follows [the default-page and close rules](#the-guide). While expanded there is always at least one tab, and never an empty pane — so there is no separate "close pane" gesture.
+すべてのアクションの後、キットの settle プランナーが展開済みサーフェスを充足状態に保つ: 最後のタブが外へ移動されたかフロートされたドックペインはマージして消され、空になったルートペインはデフォルトページを受け取る。折りたたまれたサーフェスにはそのようなバックフィルがない — セッションは折りたたまれて空の状態で始まり、列を折りたたむクローズはそれを空のまま残す — 最初に空のレイアウトを見せることになる展開がデフォルトページをシードする。明示的なクローズは[デフォルトページとクローズのルール](#the-guide)に従う。展開中は常に少なくとも 1 つのタブがあり、空のペインは決してない — したがって「ペインを閉じる」ジェスチャーは別途存在しない。
 
-The docked surface's last tab carries one more rule, decided in the store's `closeTab` and mirrored to the kit through `canCloseTab`: the guide standing as the only docked tab draws no close control and no menu close item — its chip sits quiet, and with no extension item contributed a secondary press opens no menu — and a programmatic close of it records nothing; any other tab standing alone closes together with the column in one entry — the layout stays empty until the next expansion seeds its current default page. Floating panels take no part in the rule: the foreground Session's floats render whether or not the column is expanded, and their tabs close freely.
+ドックサーフェスの最後のタブにはもう 1 つのルールがかかる。これはストアの `closeTab` で決定され、`canCloseTab` を通じてキットに反映される: 唯一のドックタブとして立つガイドは閉じるコントロールもメニューの閉じる項目も描画しない — そのチップは静かに座り、拡張項目が何も提供されていなければ副ボタン押下でメニューは開かない — またそのプログラムによるクローズは何も記録しない。他の任意のタブが単独で立っている場合は、1 つのエントリで列ごと閉じられる — レイアウトは、次の展開が現在のデフォルトページをシードするまで空のままである。フローティングパネルはこのルールに関与しない: フォアグラウンド Session のフロートは列が展開されているかどうかに関係なくレンダリングされ、そのタブは自由に閉じられる。
 
-The store saves each Session's layout, tab identities, selection, split ratios, floating rectangles, presentation and identity counter as JSON under `dsh.sidebar-right.v1.<sessionId>` in localStorage. Reload restores that layout before tab bodies render; switching Sessions keeps their layouts independent. Providers restore their own content from the retained tab identity and resource address, including [terminal reconnection](../ui-sidebar-terminal/README.md#use-this-package). Navigation parameters, resource contents and live connections are not layout state. Undo history stays in memory and resets on reload. Saved field types, node membership, selection, identity counters and the one-pane or two-horizontal-pane dock layout are validated before adoption or startup discovery; invalid data clears only its Session key. Storage failures leave the current layout usable in memory. Windows at the same origin share the last saved layout per Session; each active window keeps its own current layout until reload.
+ストアは各 Session のレイアウト、タブ同一性、選択、分割比率、フローティング矩形、表示形態、同一性カウンターを JSON として localStorage の `dsh.sidebar-right.v1.<sessionId>` に保存する。リロードはタブボディがレンダリングされる前にそのレイアウトを復元し、Session を切り替えても各レイアウトは独立したままである。プロバイダーは保持されたタブ同一性とリソースアドレスから自身のコンテンツを復元する ([ターミナル再接続](../ui-sidebar-terminal/README.md#use-this-package)を含む)。ナビゲーションパラメーター、リソース内容、ライブ接続はレイアウト状態ではない。アンドゥ履歴はメモリーに残り、リロードでリセットされる。保存されたフィールド型、ノードメンバーシップ、選択、同一性カウンター、および 1 ペインまたは 2 水平ペインのドックレイアウトは、採用または起動時ディスカバリーの前に検証される。無効なデータはその Session キーだけをクリアする。ストレージ障害があっても現在のレイアウトはメモリー内で使用可能なままである。同一オリジンのウィンドウは Session ごとの最後に保存されたレイアウトを共有し、各アクティブウィンドウはリロードまで自身の現在のレイアウトを保つ。
 
-`sidebarRight.openTabs` publishes stable metadata for every open tab across saved and adopted Sessions. Startup discovery reads the layout keys without mounting dormant content, pinning files or activating Agents. Adopted stores replace their own metadata on membership commits, and permanently cleared scopes remove it. Other windows' storage writes do not overwrite this window's live membership. Providers use this inventory to restore their own resource lifetimes.
+`sidebarRight.openTabs` は、保存済みおよび採用済みの Session 全体にわたるすべてのオープンタブについて安定したメタデータを発行する。起動時ディスカバリーは、休眠中のコンテンツをマウントしたり、ファイルを固定したり、Agent をアクティブ化したりせずにレイアウトキーを読む。採用されたストアはメンバーシップのコミット時に自身のメタデータを置き換え、恒久的にクリアされたスコープはそれを削除する。他のウィンドウのストレージ書き込みは、このウィンドウのライブメンバーシップを上書きしない。プロバイダーはこのインベントリーを使って自身のリソースライフタイムを復元する。
 
 <a id="extension-seats"></a>
-## Extension seats
+## 拡張シート
 
-A tab type registers in two stages, and the shipped guide type goes through exactly the same public path a type from another package does (`ui-sidebar-documentpreview` is the live proof). Both stages sit inside the type's own `ctx.effect`, so the registration lives exactly as long as the plugin that made it.
+タブ種別は 2 段階で登録され、同梱のガイド種別も、他のパッケージの種別が通るのとまったく同じ公開パスを通る (`ui-sidebar-documentpreview` が実例の証明である)。両段階ともその種別自身の `ctx.effect` の内側にあるため、登録はそれを作ったプラグインと同じだけの寿命を持つ。
 
-1. **The type** — `ctx.sidebarRightTabs.register({ id, kind, patterns?, priority?, canOpen?, title, guide?, keepMounted? })`, a static declaration with no runtime hook, returning a disposer. `id` is this implementation's identity in the tab system, unique across every registration (a package name is the natural value; the shipped guide is `@deepseek-ai/dsh-client-ui-sidebar-right/guide`): a kind is not unique once an extension may take a builtin's over, so the implementation names itself, and a second registration of an `id` throws. A resource type names `patterns`, globs over `dsh-resource://` addresses: one containing `:` matches the whole address (`dsh-resource://file/**`); one without matches the URI's path at any depth, ignoring case (`*.md`), and an address that is not a URI matches no such pattern. A page type — the guide, a file tree — names none and is opened by kind. `canOpen(address)` vetoes a match. `title(address)` is the tab chip's text, captured when the tab opens. `guide` lists entry boxes for the guide page; picking one opens the contributing type as a page. A `kind` carries at most one `builtin` and one `extension` registration (the extension is in force; the builtin resumes when it leaves); any other collision on a kind throws. The `id` is also the key the type's body and title register under, so an extension and the builtin it takes over hold distinct cells and the seat renders the one in force.
-2. **The body** — `ctx.slots.register({ name: 'sidebar.right.pane.tab', key: definition.id }, Body)` reads `{ sidebar, panel, tab }` through the framework-injected `useTabInfo()`. `sidebar` supplies expansion and fullscreen information; `panel.id` identifies its pane; `tab` contains the record fields, `visible`, `navigation`, `signal`, and `actions`. These are not parallel owner props; the type's own store still uses `useStore`/`actions`. Optional title registrations and guide replacements share this hook; an absent title registration uses the text captured at open time. The title wrapper retains tab and occurrence DOM markers without adding a layout box, so dockkit controls icon spacing and vertical alignment in docked tabs and floating headers.
+1. **種別** — `ctx.sidebarRightTabs.register({ id, kind, patterns?, priority?, canOpen?, title, guide?, keepMounted? })`、ランタイムフックを持たない静的宣言で、disposer を返す。`id` はタブシステムにおけるこの実装の同一性であり、すべての登録を通じて一意である (パッケージ名が自然な値であり、同梱ガイドは `@deepseek-ai/dsh-client-ui-sidebar-right/guide`): 拡張がビルトインのものを引き継ぐ可能性がある時点で kind は一意ではないため、実装が自ら名乗るのであり、同じ `id` の 2 回目の登録は throw する。リソース種別は `patterns` を指定する。`dsh-resource://` アドレスに対するグロブであり、`:` を含むものはアドレス全体にマッチし (`dsh-resource://file/**`)、含まないものは URI のパスに任意の深さで大文字小文字を無視してマッチし (`*.md`)、URI でないアドレスはそのようなパターンにマッチしない。ページ種別 — ガイドやファイルツリー — は何も指定せず、kind によって開かれる。`canOpen(address)` はマッチを拒否する。`title(address)` はタブチップのテキストであり、タブが開くときにキャプチャーされる。`guide` はガイドページのエントリーボックスを列挙し、1 つを選ぶと寄与した種別がページとして開かれる。ある `kind` は最大 1 つの `builtin` と 1 つの `extension` 登録を持つ (extension が有効であり、それが去ると builtin が再開する)。kind 上のそれ以外の衝突は throw する。`id` はその種別のボディとタイトルが登録されるキーでもあるため、拡張とそれが引き継ぐビルトインは別々のセルを持ち、シートは有効な方をレンダリングする。
+2. **ボディ** — `ctx.slots.register({ name: 'sidebar.right.pane.tab', key: definition.id }, Body)` は、フレームワークが注入する `useTabInfo()` を通じて `{ sidebar, panel, tab }` を読む。`sidebar` は展開とフルスクリーンの情報を提供し、`panel.id` はそのペインを識別し、`tab` はレコードのフィールド、`visible`、`navigation`、`signal`、`actions` を含む。これらは並列のオーナープロップではなく、種別自身のストアは引き続き `useStore`/`actions` を使う。省略可能なタイトル登録とガイド置換もこのフックを共有し、タイトル登録がない場合はオープン時にキャプチャーされたテキストを使う。タイトルラッパーはタブとオカレンスの DOM マーカーを保ちつつレイアウトボックスを追加しないため、ドックタブとフローティングヘッダーにおけるアイコンの間隔と垂直方向の整列は dockkit が制御する。
 
-Which type opens a resource follows the editor-resolver convention: the types whose `patterns` match are ranked by `priority` band — `extension` (a type from outside the product, the highest, and the default when none is named), `builtin`, `fallback` (plain viewers anything more specific should beat) — then by the length of the matched pattern, then by registration order; `canOpen` removes a candidate. The bands are string literals so a type in another package needs no runtime import from here. `candidates(address)` returns the ranking, `claim(address, kind?)` the decision; naming a `kind` skips its globs but keeps its `canOpen`.
+どの種別がリソースを開くかはエディターリゾルバーの慣習に従う: `patterns` がマッチする種別は `priority` バンド — `extension` (製品外部の種別で最高位、何も指定されない場合のデフォルト)、`builtin`、`fallback` (それより具体的なものが打ち負かすべきプレーンなビューアー) — でランク付けされ、次にマッチしたパターンの長さ、次に登録順で決まる。`canOpen` は候補を除去する。バンドは文字列リテラルなので、他のパッケージの種別はここからランタイムインポートを必要としない。`candidates(address)` はランキングを返し、`claim(address, kind?)` は決定を返す。`kind` を指定するとそのグロブをスキップするが `canOpen` は維持する。
 
-Two more seats extend what is already there: `sidebar.right.tab.guide` (chain) replaces the guide tab's body without replacing the tab, and `sidebar.right.tab.menu.item` (list) appends content-level actions to a tab's menu after the kit's own layout actions. No seat exists for pane-level actions or for collapsed-state controls yet, because nothing needs one.
+さらに 2 つのシートが既存のものを拡張する: `sidebar.right.tab.guide` (chain) はタブ自体を置き換えずにガイドタブのボディを置き換え、`sidebar.right.tab.menu.item` (list) はキット自身のレイアウトアクションの後にコンテンツレベルのアクションをタブのメニューに追加する。ペインレベルのアクションや折りたたみ状態のコントロール用のシートはまだ存在しない。必要とするものがないからである。
 
 <a id="ctxsidebarright"></a>
 ## `ctx.sidebarRight`
 
-`openResource(address, options?)` and `openTab(kind, options?)` are the navigation controller, and every way into the column calls one of them: the conversation's file links and a tool row's line reference (`openResource(fileAddress, { params: { line } })`), the strip's add control and a guide entry box (`openTab`), a file tree's rows (`tab.actions.openResource`). A resource address is a `dsh-resource://<type>/…` URI; without `options.kind` the registry claims it (globs and `canOpen`, best band wins), with it that kind's type in force opens it. A page is named by kind; the tab is recorded under an address this package composes and nobody else spells (`contract/seed.ts`). Both run the same steps as one history entry: a resource tab already showing the same (kind, contentId) is focused wherever it sits unless `revealIfOpened: false`; ordinary page tabs always deduplicate within the target pane, regardless of that option; otherwise a new tab lands in `options.replaceTab`'s pane and slot (closing that tab), else `options.paneId`, else the active docked pane; the panel expands, because content the user cannot see is not opened. Then the Tab domain records the navigation — `params` reach the body as `navigation.params`, with `revision` stepped — outside the layout history. `params` is typed by what is opened: a viewer for a resource type merges its entry into `SidebarRightResourceParamsMap` (the text preview declares `{ line?: number }`); a page type that takes parameters merges into `SidebarRightTabParamsMap` under its kind; values are JSON-shaped by convention, unchecked at run time. An address outside `dsh-resource://`, one no type claims, or a kind nothing registered throws: that is a wiring mistake, not a user error.
+`openResource(address, options?)` と `openTab(kind, options?)` はナビゲーションコントローラーであり、列へのあらゆる入口がどちらかを呼ぶ: 会話のファイルリンクとツール行の行参照 (`openResource(fileAddress, { params: { line } })`)、ストリップの追加コントロールとガイドのエントリーボックス (`openTab`)、ファイルツリーの行 (`tab.actions.openResource`)。リソースアドレスは `dsh-resource://<type>/…` URI である。`options.kind` がなければレジストリがそれをクレームし (グロブと `canOpen`、最良のバンドが勝つ)、あればその kind で有効な種別がそれを開く。ページは kind によって名指され、タブは本パッケージが構成し誰も綴らないアドレスの下に記録される (`contract/seed.ts`)。どちらも同じステップを 1 つの履歴エントリとして実行する: 同じ (kind, contentId) をすでに表示しているリソースタブは、`revealIfOpened: false` でない限りどこに座っていてもフォーカスされる。通常のページタブはそのオプションに関係なくターゲットペイン内で常に重複排除される。それ以外の場合、新しいタブは `options.replaceTab` のペインとスロットに着地し (そのタブを閉じる)、なければ `options.paneId` に、それもなければアクティブなドックペインに着地する。パネルは展開する。ユーザーが見ることのできないコンテンツは開かれないからである。続いて Tab ドメインがナビゲーションを記録する — `params` は `navigation.params` としてボディに届き、`revision` が進む — これはレイアウト履歴の外である。`params` は開かれるものによって型付けされる: リソース種別のビューアーはそのエントリーを `SidebarRightResourceParamsMap` にマージし (テキストプレビューは `{ line?: number }` を宣言する)、パラメーターを取るページ種別はその kind の下で `SidebarRightTabParamsMap` にマージする。値は慣習により JSON 形であり、実行時には検査されない。`dsh-resource://` の外のアドレス、どの種別もクレームしないアドレス、何も登録していない kind は throw する: それは配線の誤りであり、ユーザーエラーではない。
 
-`preferNewPane: true` first asks the target docked pane to split under the normal two-pane and room rules, then falls back to that pane when no split is available. `replaceTab` takes precedence and disables this preference.
+`preferNewPane: true` は、まずターゲットのドックペインに通常の 2 ペインと余裕のルールの下で分割を求め、分割が利用できない場合はそのペインにフォールバックする。`replaceTab` は優先され、この設定を無効にする。
 
-`close(tabId)` closes a tab; `active()` reads the active tab. `isExpanded()` and `toggleExpanded()` read and drive the column's expansion; `toggleFullscreen(target)` applies the panel control’s display-mode action to a captured dock pane. Layout operations, for callers that arrange the column programmatically, each recorded like the gesture it stands in for: `focus(tabId)` focuses a tab and its pane; `split(paneId?)` splits a docked pane (the active one by default) under the same pane budget and room rule as the strip's control and returns the new pane's id, or `undefined` — recording nothing — when it cannot; `float(tabId, rect?)` takes a docked tab out into a panel; `dock(paneId)` returns a floating panel to the active docked pane. A tab or pane that does not exist, or already is where the call would put it, is left alone. The face exposes operations only: no layout snapshot, no operation log, no lookup by address. `_undo()` / `_redo()` step the on-screen surface's history; they are `@internal` — the sequence has no user-facing control, and these exist for tests. Commands act on the on-screen Session through its adopted store; with no Session on screen, or before the runtime mints its store, they throw rather than write into a surface nobody draws. `mounted` is the observable of the Session on screen: the selected Session while the Conversation fills the main column, `undefined` while a global panel replaces it or no Session is selected. The plugin derives it from the Session selection and `ctx.layout.panelInfo`, and it changes before React renders the change that causes it, so a component rendered in that commit reads the arriving Session and may act on it from its effects: the frame renders that Session's seat in the same pass, which mints its store. Seats never publish it; each reports only what it renders with: the room its docking kit measured, which `split` and `preferNewPane` apply to that Session's panes (unmeasured panes have room), and whether its frame width presents the panel fullscreen automatically, which the fullscreen command applies. The plan review's automatic open reads `mounted` through a bound hook.
+`close(tabId)` はタブを閉じ、`active()` はアクティブなタブを読む。`isExpanded()` と `toggleExpanded()` は列の展開を読み、操作する。`toggleFullscreen(target)` はパネルコントロールの表示モードアクションをキャプチャーされたドックペインに適用する。列をプログラム的に整える呼び出し元向けのレイアウト操作はそれぞれ、それが代理するジェスチャーと同じように記録される: `focus(tabId)` はタブとそのペインにフォーカスする。`split(paneId?)` は (デフォルトではアクティブな) ドックペインをストリップのコントロールと同じペイン予算と余裕のルールの下で分割し、新しいペインの id を返すか、不可能な場合は何も記録せずに `undefined` を返す。`float(tabId, rect?)` はドックタブをパネルへ取り出す。`dock(paneId)` はフローティングパネルをアクティブなドックペインへ戻す。存在しないタブやペイン、あるいはすでに呼び出しが置こうとする場所にあるものはそのままにされる。このフェイスは操作だけを公開する: レイアウトスナップショットも、操作ログも、アドレスによる照会もない。`_undo()` / `_redo()` はオンスクリーンサーフェスの履歴を進退させる。それらは `@internal` である — シーケンスにユーザー向けコントロールはなく、これらはテストのために存在する。コマンドは採用されたストアを通じてオンスクリーンの Session に作用する。オンスクリーンに Session がない場合、またはランタイムがストアを鋳造する前は、誰も描画しないサーフェスに書き込む代わりに throw する。`mounted` はオンスクリーンの Session の observable である: 会話がメイン列を満たしている間は選択中の Session、グローバルパネルがそれを置き換えている間または Session が選択されていない間は `undefined`。プラグインは Session の選択と `ctx.layout.panelInfo` からこれを導出し、それは React が原因となる変更をレンダリングする前に変わるため、そのコミットでレンダリングされたコンポーネントは到着しつつある Session を読み、そのエフェクトから作用できる: フレームは同じパスでその Session のシートをレンダリングし、それがストアを鋳造する。シートはこれを公開しない。各シートは自身がレンダリングに使うものだけを報告する: ドッキングキットが測定した余裕 (`split` と `preferNewPane` がその Session のペインに適用する。未測定のペインには余裕がある)、そして自身のフレーム幅がパネルを自動的にフルスクリーンで提示するかどうか (フルスクリーンコマンドが適用する)。プランレビューの自動オープンは、バインドされたフックを通じて `mounted` を読む。
 
-`focusedTarget(element?)` resolves the current DOM pane and tab, including an embedding iframe; outside focus returns no page. `commandTarget(element?)` additionally allows an outside open to use the on-screen Session's active dock pane. Captures include the occurrence and navigation revision; `isTargetCurrent(target)` rejects changed Sessions, moved or reopened tabs, and intervening navigation. Focus and pointer activation remain separate from persisted layout selection.
+`focusedTarget(element?)` は現在の DOM ペインとタブを解決し、埋め込み iframe も含む。フォーカス外はページを返さない。`commandTarget(element?)` はさらに、外部からのオープンがオンスクリーン Session のアクティブなドックペインを使うことを許す。キャプチャーにはオカレンスとナビゲーションのリビジョンが含まれ、`isTargetCurrent(target)` は変更された Session、移動または再オープンされたタブ、途中のナビゲーションを拒否する。フォーカスとポインターによるアクティブ化は、永続化されたレイアウト選択とは別のままである。
 
 <a id="the-tab-domain"></a>
-## The Tab domain
+## Tab ドメイン
 
-The Tab domain retains a branded occurrence id, navigation, an abort signal, and bound actions per (Session, tab id). A private assembly callback adopts each Session's store, reconciles restored records immediately, and follows its commits. Reconstructing a Session store replaces its adoption, releasing the old subscription and cleanup reference. Only record removal or plugin unload aborts the signal; closing the sidebar and switching Sessions retain records, while undo restores a new occurrence. `useTabInfo()` composes framework-bound store and navigation hooks without manual component subscriptions or render-time record creation. `tab.actions` always target their own Session; `tab.visible` distinguishes bodies from titles and excludes background Sessions; foreground floating tabs remain visible when the sidebar closes. `adopt` is absent from the public controller.
+Tab ドメインは、(Session, tab id) ごとにブランド付きオカレンス id、ナビゲーション、abort シグナル、バインドされたアクションを保持する。プライベートなアセンブリコールバックが各 Session のストアを採用し、復元されたレコードを即座に調停し、そのコミットを追従する。Session ストアの再構築はその採用を置き換え、古いサブスクリプションとクリーンアップ参照を解放する。シグナルを abort するのはレコードの除去かプラグインのアンロードだけである。サイドバーを閉じることと Session の切り替えはレコードを保持し、アンドゥは新しいオカレンスを復元する。`useTabInfo()` はフレームワークにバインドされたストアとナビゲーションのフックを構成し、手動のコンポーネントサブスクリプションやレンダー時のレコード作成を必要としない。`tab.actions` は常に自身の Session を対象とする。`tab.visible` はボディとタイトルを区別し、バックグラウンド Session を除外する。フォアグラウンドのフローティングタブはサイドバーが閉じても可視のままである。`adopt` は公開コントローラーには存在しない。
 
-A type's `keepMounted: true` retains visited bodies across tab and Session changes, collapse, and docking. Each View supplies its stable hold callback through owner props, so rebuilding Session injection bindings does not release a body. Unvisited bodies are not mounted eagerly.
+種別の `keepMounted: true` は、タブと Session の変更、折りたたみ、ドッキングをまたいで訪問済みボディを保持する。各 View はオーナープロップを通じて安定した hold コールバックを提供するため、Session 注入バインディングの再構築がボディを解放することはない。未訪問のボディは先回りしてマウントされない。
 
-Tab owners register `registerCloseHandler(kind, handler)` through an effect. A handler synchronously retains any background cleanup before allowing explicit close or replacement. The resource owner tracks completion and retry; the sidebar does not wait. A thrown handler preserves the tab. Collapse, presentation changes and plugin disposal do not invoke close handlers; the tab abort signal identifies occurrence disposal, not an explicit close.
+タブのオーナーはエフェクトを通じて `registerCloseHandler(kind, handler)` を登録する。ハンドラーは、明示的なクローズや置換を許可する前に、あらゆるバックグラウンドのクリーンアップを同期的に保持する。リソースオーナーが完了と再試行を追跡し、サイドバーは待たない。ハンドラーが throw した場合、タブは保持される。折りたたみ、表示形態の変更、プラグインの破棄はクローズハンドラーを呼び出さない。タブの abort シグナルは明示的なクローズではなく、オカレンスの破棄を識別する。
 
-Close and refresh commands resolve the focused pane and tab occurrence. Page bodies bind their refresh operation through `tab.actions.bindCommands()` and release it on unmount; ended occurrences cannot regain capabilities. Refresh never reloads the application. Shortcut page opens, sidebar expansion, and all splits focus the selected dock or floating pane after its DOM commits, including singleton reveals and guide replacements. Sidebar expansion focuses the active dock pane; collapse preserves focus inside floating panes. Pane focus preserves existing text selections. If a focused page input or iframe is replaced, focus returns to its visible pane only while no other element owns focus; an outside pointer gesture or explicit blur cancels this restoration. Close checks the captured identity again and uses resource cleanup. After a keyboard or native-menu close, focus moves to a surviving visible pane in the same Session so consecutive close commands continue there. Stale targets and cleanup failures never fall back to closing a window. Modal restrictions follow the [shortcut service](../shortcuts/README.md). The close command first requests the foreground modal’s close action; a modal that declines dismissal, a menu, or an unregistered dialog blocks closing the sidebar or window behind it. Closing the sole docked guide with a shortcut or native menu collapses the sidebar and retains the guide. Desktop requests window closure through the shortcut service only when no modal is open and no sidebar page owns focus; Web leaves the browser open.
+クローズとリフレッシュのコマンドはフォーカスされたペインとタブのオカレンスを解決する。ページボディは `tab.actions.bindCommands()` を通じてリフレッシュ操作をバインドし、アンマウント時に解放する。終了したオカレンスは能力を取り戻せない。リフレッシュはアプリケーションを決してリロードしない。ショートカットによるページオープン、サイドバーの展開、すべての分割は、DOM のコミット後に選択中のドックまたはフローティングペインにフォーカスする (シングルトンの出現とガイドの置換を含む)。サイドバーの展開はアクティブなドックペインにフォーカスし、折りたたみはフローティングペイン内のフォーカスを保つ。ペインのフォーカスは既存のテキスト選択を保つ。フォーカスされたページの input や iframe が置き換えられた場合、フォーカスは他の要素がフォーカスを所有していない場合に限り、その可視ペインに戻る。外部のポインター操作または明示的な blur はこの復元をキャンセルする。クローズはキャプチャーされた同一性を再確認し、リソースのクリーンアップを使う。キーボードまたはネイティブメニューによるクローズの後、フォーカスは同じ Session の生き残っている可視ペインへ移り、連続するクローズコマンドがそこで続行できる。古びたターゲットとクリーンアップの失敗は、ウィンドウのクローズにフォールバックすることは決してない。モーダルの制限は[ショートカットサービス](../shortcuts/README.md)に従う。クローズコマンドはまずフォアグラウンドモーダルのクローズアクションを要求する。閉じるのを拒否したモーダル、メニュー、または未登録のダイアログは、背後のサイドバーやウィンドウのクローズをブロックする。ショートカットまたはネイティブメニューで唯一のドックガイドを閉じると、サイドバーが折りたたまれ、ガイドは保持される。Desktop はモーダルが開いておらずサイドバーのページがフォーカスを所有していない場合にのみ、ショートカットサービスを通じてウィンドウのクローズを要求する。Web はブラウザーを開いたままにする。
 
 <a id="the-guide"></a>
-## The guide
+## ガイド
 
-Each `guide` entry has an `id` unique within its provider. The guide renders `sidebar.right.tab.guide.entry` by the active definition id, forwarding the entry id, resolved title and optional description, plus the framework `useTabInfo` hook. A provider can register a custom card under its definition id; otherwise the standard icon/title button renders. The sidebar owns width and placement, while custom components own their markup and interaction. Guide cards use the shared R20 radius, including hover fills and provider-owned split buttons. Entry identity remains stable across sorting and unrelated registrations. Unboxed shortcut text aligns at the right. The terminal shell menu sits beside its entry title.
+各 `guide` エントリーはそのプロバイダー内で一意な `id` を持つ。ガイドはアクティブな定義 id によって `sidebar.right.tab.guide.entry` をレンダリングし、エントリー id、解決されたタイトル、省略可能な説明、そしてフレームワークの `useTabInfo` フックを転送する。プロバイダーは自身の定義 id の下にカスタムカードを登録できる。そうでなければ標準のアイコン/タイトルボタンがレンダリングされる。幅と配置はサイドバーが所有し、カスタムコンポーネントは自身のマークアップとインタラクションを所有する。ガイドカードはホバーフィルとプロバイダー所有の分割ボタンを含め、共有の R20 角丸を使う。エントリーの同一性は並べ替えや無関係な登録をまたいでも安定している。ボックスなしのショートカットテキストは右に整列する。ターミナルシェルメニューはそのエントリータイトルの隣に座る。
 
-A tab type can declare `multiple: true` for independent instances such as terminals. Each open receives a distinct content address, so placement and docking preserve those instances; ordinary pages retain per-pane uniqueness.
+タブ種別は、ターミナルのような独立したインスタンスのために `multiple: true` を宣言できる。各オープンは個別のコンテンツアドレスを受け取るため、配置とドッキングはそれらのインスタンスを保つ。通常のページはペインごとの一意性を保つ。
 
-Default pages depend on the number of registered guide entries, not the number of tab types or open tabs. Exactly one entry opens its page directly; zero or multiple entries open the guide. Explicitly adding a guide still opens the guide, even with one entry. The sole docked guide is the only tab that cannot close; closing any other sole tab also collapses the column. The chip, context menu, and `close` API apply the same rule.
+デフォルトページは登録されたガイドエントリーの数に依存し、タブ種別の数や開いているタブの数には依存しない。エントリーがちょうど 1 つの場合はそのページを直接開き、0 または複数の場合はガイドを開く。明示的にガイドを追加した場合は、エントリーが 1 つでもガイドを開く。唯一のドックガイドは閉じることができない唯一のタブである。他の任意の単独タブを閉じると、同じく列が折りたたまれる。チップ、コンテキストメニュー、`close` API は同じルールを適用する。
 
-The guide tab is a muted compass over one entry capsule per `guide` entry the registered types contributed, in `order`, centred in the body; the guide has no words of its own. A capsule shows the entry's glyph — or the guide's quieter cube placeholder when the entry registered none — and its title; while at most four entries are listed, an entry that registered a `description` shows it under the title, and a longer list drops every description. Picking a default capsule calls `tab.actions.openTab(entry.kind, { replaceTab: true })`, so the guide gives way to the page it opened. A pane holds at most one guide tab. The strip's add control is drawn only while its pane holds none and opens one there with `openTab('guide', { paneId, revealIfOpened: false })`, so a guide in another pane does not capture the click; opening the guide into a pane that already has one focuses it instead; a guide dragged, dropped, or docked into such a pane merges into it — the arriving guide closes and the pane's own is focused; `duplicateTab` on the guide records nothing. A split, an expanded empty root pane, and the pane a sole tab vacates by dropping on its own edge use the same default-page rule, one tab per new pane; the self-edge drop leaves the dragged tab focused. A plain `openTab('guide')` opens or focuses the guide only within the active or named pane. Splitting an empty pane does nothing and returns no new pane. The product allows two horizontal panes, initially equal, with divider ratios limited to 20%–80%. Insufficient width blocks a new split; with two panes already present, a body drop moves the tab between panes instead of creating a third. At the two-pane limit, split controls are disabled with a focusable reason; closing back to one pane enables them.
+ガイドタブは、登録された種別が寄与した `guide` エントリーごとに 1 つのエントリーカプセル (順序は `order`) を並べた、ボディ中央の控えめなコンパスである。ガイド自身は言葉を持たない。カプセルはエントリーのグリフ — エントリーが何も登録していない場合はガイドのより静かなキューブプレースホルダー — とそのタイトルを表示する。エントリーが最大 4 つまで列挙されている間は、`description` を登録したエントリーはそれをタイトルの下に表示し、リストがそれより長くなるとすべての説明が落とされる。デフォルトのカプセルを選ぶと `tab.actions.openTab(entry.kind, { replaceTab: true })` を呼び出し、ガイドはそれが開いたページに道を譲る。1 つのペインは最大 1 つのガイドタブを保持する。ストリップの追加コントロールは、そのペインがガイドを持たない間だけ描画され、`openTab('guide', { paneId, revealIfOpened: false })` でそこに 1 つ開く。そのため別のペインのガイドがクリックを奪うことはない。すでにガイドを持つペインにガイドを開くと、代わりにそれがフォーカスされる。そのようなペインにドラッグ、ドロップ、ドッキングされたガイドはそこにマージされる — 到着したガイドは閉じ、ペイン自身のガイドがフォーカスされる。`duplicateTab` をガイドに対して行っても何も記録されない。分割、展開された空のルートペイン、単独タブが自身のエッジへのドロップで空けたペインは、同じデフォルトページルールを使い、新しいペインごとに 1 つのタブとなる。自己エッジへのドロップでは、ドラッグされたタブがフォーカスされたままである。素の `openTab('guide')` は、アクティブまたは指名されたペイン内でのみガイドを開くかフォーカスする。空のペインの分割は何もせず、新しいペインも返さない。製品は 2 つの水平ペインを許し、初期状態では等分で、ディバイダー比率は 20%–80% に制限される。幅が不足していると新しい分割はブロックされ、すでに 2 ペインある場合はボディのドロップがタブをペイン間で移動させ、3 つ目を作らない。2 ペインの上限では、分割コントロールがフォーカス可能な理由付きで無効化され、1 ペインに閉じ戻すと再び有効になる。
 
 <a id="copy"></a>
-## Copy
+## コピー
 
-Every string in the column comes from the `sidebarRight` locale namespace, including the kit's accessible names. A tab's title is fixed when the tab is minted; a type's display name follows the current language.
+列内のすべての文字列は、キットのアクセシブル名を含め、`sidebarRight` ロケール名前空間から来る。タブのタイトルはタブが鋳造された時点で固定され、種別の表示名は現在の言語に従う。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+なし。本パッケージはブラウザー側の UI プラグイン層であり、モデル向けのものを何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。本パッケージはプロバイダーリクエストを組み立てることも送信することもない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Browser-local layout.** Layout does not synchronize between devices; provider-specific state requires its provider's recovery support.
-- **No surface without a session.** State is keyed by session id, so the hero screen shows nothing on the right.
-- **Hard-coded stacking.** The content tree uses a fixed stacking layer; floats reorder within it without raising that layer above menus.
-- **Retained Session deletion.** Catalog absence alone does not retire an initialized retained View; its tab lifetimes and plugin teardown own release.
-- **Undo is not exposed.** The recorded sequence is stepped only through the `@internal` service methods; product controls are deliberately absent.
-- **Titles are fixed at open time.** A type's `title(address)` is captured into the record; a live title comes only from the optional title seat.
-- **No content navigation stack.** Stepping back replays layout operations; an editor-style back/forward over visited content is not built.
+- **ブラウザーローカルのレイアウト。** レイアウトはデバイス間で同期されない。プロバイダー固有の状態はそのプロバイダーの復元サポートを必要とする。
+- **セッションなしではサーフェスなし。** 状態はセッション id でキー付けされるため、ヒーロー画面では右側に何も表示されない。
+- **ハードコードされたスタッキング。** コンテンツツリーは固定のスタッキングレイヤーを使う。フロートはその中で順序を変えるが、そのレイヤーをメニューより上に持ち上げない。
+- **保持された Session の削除。** カタログからの不在だけでは、初期化された保持 View を退役させない。その解放はタブのライフタイムとプラグインの破棄が所有する。
+- **アンドゥは公開されない。** 記録されたシーケンスを進退させるのは `@internal` サービスのメソッドのみであり、製品のコントロールは意図的に存在しない。
+- **タイトルはオープン時に固定される。** 種別の `title(address)` はレコードにキャプチャーされる。ライブタイトルは省略可能なタイトルシートからのみ得られる。
+- **コンテンツナビゲーションスタックなし。** 戻る操作はレイアウト操作を再生する。訪問済みコンテンツに対するエディター形式の戻る/進むは作られていない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

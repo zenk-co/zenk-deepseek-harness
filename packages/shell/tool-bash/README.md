@@ -1,37 +1,37 @@
 ---
-description: "The model-facing bash tool for users and maintainers choosing, configuring, or debugging one-shot command execution, background jobs, and sandbox escalation."
+description: "ワンショットのコマンド実行、バックグラウンドジョブ、サンドボックスエスカレーションを選択・設定・デバッグするユーザーとメンテナーのための、モデルに提示される bash ツール。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-bash
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-tool-bash` runs Bash commands and returns stdout, stderr, and exit markers. Each call uses a fresh shell; cwd, variables, and functions do not persist. With a job registry composed, every command is a job from its start: `run_in_background` returns the id at once, a foreground command that outlives its timeout returns the same id, and `job_output`/`job_kill` collect and stop it. Commands receive the managed `DSH_*` environment; sandbox denials can be retried once with wider `sandbox_permissions`, a `justification`, and user approval. Nonzero exits are results for the agent to interpret. Mount an executor such as `dsh-bash-local` or `dsh-bash-sandbox` with `dsh-shell-env`.
+`dsh-tool-bash` は Bash コマンドを実行し、stdout、stderr、終了マーカーを返す。各呼び出しは新しいシェルを使用するため、cwd、変数、関数は持続しない。ジョブレジストリが構成されている場合、すべてのコマンドは開始時点からジョブである。`run_in_background` は即座に id を返し、タイムアウトを超えて生き残ったフォアグラウンドコマンドも同じ id を返し、`job_output`/`job_kill` がそれを収集・停止する。コマンドは管理された `DSH_*` 環境を受け取る。サンドボックスの拒否は、より広い `sandbox_permissions`、`justification`、ユーザーの承認を得て 1 回だけ再試行できる。非ゼロ終了はエージェントが解釈する結果である。`dsh-bash-local` や `dsh-bash-sandbox` などのエグゼキューターを `dsh-shell-env` とともにマウントする。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-New commands start in the Session's current working directory. Relative `workdir` values resolve from that directory; per-call overrides and background jobs do not change it.
+新しいコマンドはセッションの現在の作業ディレクトリで開始する。相対的な `workdir` 値はそのディレクトリから解決される。呼び出しごとの上書きとバックグラウンドジョブはそれを変更しない。
 
-Load this plugin in any composition where the agent should run bash commands: it registers the `bash` tool once an executor provider and the `dsh-shell-env` registry are mounted, and stays pending until the `tools`, `shell`, `systemPrompt`, and `shellEnv` services exist.
+エージェントが bash コマンドを実行すべきあらゆる構成でこのプラグインをロードする。エグゼキュータープロバイダーと `dsh-shell-env` レジストリがマウントされると `bash` ツールを登録し、`tools`、`shell`、`systemPrompt`、`shellEnv` サービスが存在するまで保留状態を保つ。
 
-### Minimal configuration
+### 最小構成
 
-The common path is an executor provider, the environment registry, and this tool; add the job runtime when the agent may run commands in the background.
+一般的な構成は、エグゼキュータープロバイダー、環境レジストリ、このツールである。エージェントがコマンドをバックグラウンドで実行する可能性がある場合はジョブランタイムを追加する。
 
 ```yaml
 - name: '@deepseek-ai/dsh-bash-local'
@@ -43,187 +43,187 @@ The common path is an executor provider, the environment registry, and this tool
 - name: '@deepseek-ai/dsh-tool-jobs'
 ```
 
-The config fields govern the background surface.
+設定フィールドはバックグラウンドサーフェスを制御する。
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `enableRunInBackground` | `true` | Expose `run_in_background` while a job registry is composed; when `false`, forced background calls are rejected |
-| `promoteOnTimeout` | `true` | Keep a foreground command that reaches its timeout running as its background job instead of killing it |
+| `enableRunInBackground` | `true` | ジョブレジストリが構成されている間 `run_in_background` を公開する。`false` の場合、強制されたバックグラウンド呼び出しは拒否される |
+| `promoteOnTimeout` | `true` | タイムアウトに達したフォアグラウンドコマンドを強制終了せず、そのバックグラウンドジョブとして実行し続ける |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-bash) is the exhaustive source for every accepted field and its JSDoc; the generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-bash) carries the full argument schema.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-bash)は、受け入れられるすべてのフィールドとその JSDoc の網羅的な情報源である。生成された[ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-bash)には完全な引数スキーマが含まれる。
 
-### Running a command
+### コマンドを実行する
 
-The tool executes `bash -c <command>` and returns the combined output. Commands run in a fresh shell every call, so state never persists — pass `workdir` instead of `cd`. A non-zero exit is reported as `[exit code: N]` for the agent to interpret, not surfaced as a tool error. A `description` in active voice (5–10 words) labels the call in the UI; the schema lists it before `command` and asks the model to emit it first, without enforcing JSON member order. `timeoutMs` overrides the executor's default and cap. Output beyond the executor's stream caps is truncated to its tail, with the full output saved to a spill file whose path is reported. The description tells the agent to verify the resolved absolute target path before any delete or move and to guard variables in such paths with `${VAR:?}`.
+ツールは `bash -c <command>` を実行し、結合された出力を返す。コマンドは毎回新しいシェルで実行されるため状態は決して持続しない。`cd` の代わりに `workdir` を渡す。非ゼロ終了はエージェントが解釈するための `[exit code: N]` として報告され、ツールエラーとしては提示されない。能動態の `description`(5〜10 語)が UI で呼び出しにラベルを付ける。スキーマはそれを `command` の前に列挙し、モデルに最初に出力するよう求めるが、JSON メンバーの順序は強制しない。`timeoutMs` はエグゼキューターのデフォルトと上限を上書きする。エグゼキューターのストリーム上限を超えた出力は末尾に切り詰められ、完全な出力はスピルファイルに保存され、そのパスが報告される。この説明は、削除や移動の前に解決された絶対ターゲットパスを検証すること、およびそのようなパス内の変数を `${VAR:?}` でガードすることをエージェントに指示する。
 
 <a id="running-long-commands-in-the-background"></a>
-### Running long commands in the background
+### 長時間実行されるコマンドをバックグラウンドで実行する
 
-Passing `run_in_background: true` admits a job and returns its id immediately; confinement preparation may still be pending, and no background execution timeout applies. Output is empty until the process is available. Job cancellation aborts preparation and stops any process that arrives afterward; startup failure settles the admitted job as failed. The agent reads its output with `job_output` (non-blocking unless `wait: true`), lists jobs with `job_list`, and stops it with `job_kill`; a finished job notifies the owning agent in-session. Background support needs the generic job runtime (`dsh-jobs-local`) and its control tools (`dsh-tool-jobs`) mounted. The background job hands the run's non-consuming `observed` readers to the job registry as pull sources; the registry pumps them into the job's output ring at its own cadence (`pumpPollMs` on `dsh-jobs-local`), so the Web client streams live output and the model's `job_output` reads consume the same bytes through a separate cursor. A reader that throws is logged once and its stream stops; the job runs on to its own settlement. The ring is a best-effort live preview: stdout and stderr are copied per poll round, so writes the two streams made inside one poll window appear stdout first rather than in write order.
+`run_in_background: true` を渡すとジョブが受け入れられ、その id が即座に返る。隔離の準備はまだ保留中である可能性があり、バックグラウンド実行のタイムアウトは適用されない。プロセスが利用可能になるまで出力は空である。ジョブのキャンセルは準備を中止し、その後に到着したプロセスを停止する。起動失敗は受け入れられたジョブを失敗として確定する。エージェントは `job_output` でその出力を読み(`wait: true` でない限りノンブロッキング)、`job_list` でジョブを一覧し、`job_kill` で停止する。終了したジョブは所有エージェントにセッション内で通知する。バックグラウンドサポートには、汎用ジョブランタイム(`dsh-jobs-local`)とその制御ツール(`dsh-tool-jobs`)がマウントされている必要がある。バックグラウンドジョブは、その実行の非消費的な `observed` リーダーをプルソースとしてジョブレジストリに引き渡す。レジストリは独自の周期(`dsh-jobs-local` の `pumpPollMs`)でそれらをジョブの出力リングに汲み出すため、Web クライアントはライブ出力をストリーミングし、モデルの `job_output` 読み取りは別のカーソルを通じて同じバイトを消費する。例外を投げたリーダーは一度ログに記録され、そのストリームは停止する。ジョブは自身の決着まで実行を続ける。リングはベストエフォートのライブプレビューである。stdout と stderr はポーリングラウンドごとにコピーされるため、1 つのポーリングウィンドウ内で 2 つのストリームが行った書き込みは、書き込み順ではなく stdout が先に現れる。
 
-### Foreground commands as jobs
+### ジョブとしてのフォアグラウンドコマンド
 
-With a job registry composed, a foreground command is registered with `ctx.jobs` at its start and the call waits on that job: the command is listed, streams through `job.list` and `job.follow`, and can be stopped from the Web task list for as long as it runs. A command that finishes within the timeout returns the ordinary foreground result and its job record leaves the registry with it, so the model never sees an id. A command that outlives the timeout keeps running as the job it already was, and the call returns `[still running after <timeoutMs>ms; moved to background job <id>]` plus the job hand-off guidance, seeded with one consuming read of the output so far — `job_output` continues exactly after it. A kill from outside the call (the human stopping the job) settles the foreground result with `[stopped: <reason>]` ahead of the signal marker, so the model reads the reason instead of a command failure; cancelling the call itself kills the job. Registration is best-effort: `promoteOnTimeout: false`, a missing job registry, or a registry that refuses the job at its start (the owner's job limit, no controller) run the command under the executor's deadline kill instead, and the `timeoutMs` parameter description advertises the hand-over only when it holds.
+ジョブレジストリが構成されている場合、フォアグラウンドコマンドは開始時に `ctx.jobs` に登録され、呼び出しはそのジョブを待機する。コマンドは一覧に表示され、`job.list` と `job.follow` を通じてストリーミングされ、実行中は Web のタスクリストから停止できる。タイムアウト内に終了したコマンドは通常のフォアグラウンド結果を返し、そのジョブ記録も一緒にレジストリを離れるため、モデルは id を目にしない。タイムアウトを超えて生き残ったコマンドは、すでにそうであったジョブとして実行を続け、呼び出しは `[still running after <timeoutMs>ms; moved to background job <id>]` に加えて、これまでの出力の消費読み取り 1 回分が先頭に含まれたジョブ引き継ぎガイダンスを返す。`job_output` はその直後から正確に継続する。呼び出しの外部からの kill(人間がジョブを停止する場合)は、シグナルマーカーより前に `[stopped: <reason>]` を付けてフォアグラウンド結果を確定するため、モデルはコマンド失敗ではなく理由を読む。呼び出し自体のキャンセルはジョブを強制終了する。登録はベストエフォートである。`promoteOnTimeout: false`、ジョブレジストリの不在、または開始時にジョブを拒否するレジストリ(オーナーのジョブ上限、コントローラーなし)の場合、代わりにエグゼキューターの期限 kill の下でコマンドを実行し、`timeoutMs` パラメーターの説明は引き継ぎが成立する場合にのみそれを告知する。
 
-### Sandboxed execution and escalation
+### サンドボックス実行とエスカレーション
 
-When the mounted executor confines commands (for example `dsh-bash-sandbox`), a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]` — a policy denial, not a command failure. The model may then retry the exact same command once in the same turn with `sandbox_permissions` (the narrowest wider mode that suffices) and a one-sentence `justification`; the approval prompt raised by that retry is how the user consents. Request wider access only after a real denial; a rejected escalation is final for that command. Repeating the current mode runs without approval, while a narrower target fails before execution. Without `sandbox_permissions`, `justification` may be omitted, empty, or whitespace-only; a non-empty reason without a mode is rejected. Repeating the effective mode also permits an omitted or blank reason. A different requested mode requires a non-empty reason; widening still requires approval.
+マウントされたエグゼキューターがコマンドを隔離する場合(例えば `dsh-bash-sandbox`)、ブロックされたファイル操作は `[sandbox: file access denied under <mode> mode]` として報告される — これはコマンド失敗ではなくポリシーによる拒否である。モデルはその後、同じターン内で `sandbox_permissions`(十分な範囲で最も狭い、より広いモード)と 1 文の `justification` を付けてまったく同じコマンドを 1 回だけ再試行できる。その再試行によって表示される承認プロンプトがユーザーの同意手段である。実際に拒否された後にのみ、より広いアクセスを要求する。拒否されたエスカレーションはそのコマンドに対して最終である。現在のモードを繰り返す場合は承認なしで実行され、より狭いターゲットは実行前に失敗する。`sandbox_permissions` がない場合、`justification` は省略、空、または空白のみでもよい。モードのない空でない理由は拒否される。実効モードの繰り返しも、理由の省略または空を許可する。異なるモードの要求には空でない理由が必要であり、拡大には依然として承認が必要である。
 
-### What can go wrong
+### 何がうまくいかなくなりうるか
 
-A composition with no executor provider never activates the tool. Background calls without the job runtime fail with `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`, and `sandbox_permissions` without a sandboxing executor fails with `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`. `enableRunInBackground: false` removes the parameter and rejects a forced background call at execution time.
+エグゼキュータープロバイダーのない構成では、ツールは決してアクティブにならない。ジョブランタイムなしのバックグラウンド呼び出しは `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs` で失敗し、サンドボックスエグゼキューターなしの `sandbox_permissions` は `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)` で失敗する。`enableRunInBackground: false` はパラメーターを削除し、実行時に強制されたバックグラウンド呼び出しを拒否する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-Structured foreground and background results expose `cwd`, the executor-resolved launch directory. Persisted presentation metadata carries the same value so settled cards retain the directory used by that call. A command’s own `cd` does not change this launch value; native result text remains stdout, stderr, and status markers.
+構造化されたフォアグラウンドおよびバックグラウンド結果は、エグゼキューターが解決した起動ディレクトリである `cwd` を公開する。永続化されたプレゼンテーションメタデータが同じ値を持ち運ぶため、確定したカードはその呼び出しで使用されたディレクトリを保持する。コマンド自体の `cd` はこの起動値を変更しない。ネイティブの結果テキストは stdout、stderr、ステータスマーカーのままである。
 
-This section explains the design decisions behind the tool and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、ツールの背後にある設計上の決定とそれを実現するコードを示す。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に説明されている。
 
-### Design philosophy
+### 設計方針
 
-- **Model-facing consumer of the shell seam.** The tool is the Consumer role of the bash capability: it registers the `bash` schema, renders results, and resolves per-call policy, while the executor seam owns process mechanics.
-- **Request from named args only.** The tool never exposes `stdin`, `env`, or `stdoutMaxBytes`; it builds each request from command/workdir/timeout/signal fields plus the registry-collected `dshEnv`, so model-supplied keys cannot replace managed values.
-- **Non-zero exits are reported, not errored.** Only infrastructure failures (spawn errors, aborts) surface as tool errors; the model interprets exit codes and markers.
-- **Every command belongs to the job runtime when one is composed.** A call registers its process handle with `ctx.jobs` as it starts, whether the model asked for the background or the tool waits on it; ids, ownership, completion notices, and disposal are the runtime's, and this tool only maps bash exit and sandbox facts into job output. Without a registry the tool is foreground-only, and it swaps between the two registrations as the registry comes and goes.
+- **shell シームのモデル向けコンシューマー。** このツールは bash ケイパビリティのコンシューマーの役割を担う。`bash` スキーマを登録し、結果をレンダリングし、呼び出しごとのポリシーを解決する一方、エグゼキューターシームがプロセスの仕組みを所有する。
+- **要求は名前付き引数のみから構築する。** ツールは `stdin`、`env`、`stdoutMaxBytes` を決して公開しない。各要求は command/workdir/timeout/signal フィールドとレジストリが収集した `dshEnv` から構築されるため、モデルが指定したキーが管理された値を置き換えることはできない。
+- **非ゼロ終了は報告され、エラーにはならない。** インフラストラクチャの失敗(spawn エラー、中断)のみがツールエラーとして表面化し、モデルが終了コードとマーカーを解釈する。
+- **ジョブランタイムが構成されている場合、すべてのコマンドはそれに属する。** 呼び出しは開始時にプロセスハンドルを `ctx.jobs` に登録する。モデルがバックグラウンドを要求したかツールがそれを待機するかは関係ない。id、所有権、完了通知、破棄はランタイムのものであり、このツールは bash の終了とサンドボックスの事実をジョブ出力にマッピングするだけである。レジストリがない場合、ツールはフォアグラウンド専用となり、レジストリの出現と消滅に応じて 2 つの登録の間で切り替わる。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: tool registration, prompt section, arg validation, escalation, request assembly |
-| [`src/background.ts`](src/background.ts) | Own asynchronous shell preparation, map process settlement onto job outcomes, and render a ring read as a process read |
-| [`src/render.ts`](src/render.ts) | Model-facing result text: streams, markers, truncation notices |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: ツール登録、プロンプトセクション、引数検証、エスカレーション、要求の組み立て |
+| [`src/background.ts`](src/background.ts) | 非同期シェル準備の所有、プロセスの確定をジョブ結果へマッピング、リング読み取りをプロセス読み取りとしてレンダリング |
+| [`src/render.ts`](src/render.ts) | モデル向け結果テキスト: ストリーム、マーカー、切り詰め通知 |
 
-### Request resolution
+### 要求の解決
 
-The tool resolves the workdir before `ctx.shell.resolve()` runs: an explicit relative `workdir` is resolved against the Session's current directory, independently of the sandbox permission root. Sandbox policy resolves per call through `ctx.sandboxPolicy`; an escalation request goes through `ctx.approval` before anything executes, and the tool fails at load if the executor confines but no policy service is mounted.
+ツールは `ctx.shell.resolve()` が実行される前に workdir を解決する。明示的な相対 `workdir` は、サンドボックスの許可ルートとは独立に、セッションの現在のディレクトリを基準に解決される。サンドボックスポリシーは呼び出しごとに `ctx.sandboxPolicy` を通じて解決される。エスカレーション要求は何かが実行される前に `ctx.approval` を通り、エグゼキューターが隔離するのにポリシーサービスがマウントされていない場合、ツールはロード時に失敗する。
 
-### Rendering story
+### レンダリングの仕組み
 
-The result text is stdout, then a marked `[stderr]` section, then conditional markers: truncation notice, sandbox denial (plus the same-turn escalation hint when the composition advertises escalation), timeout, signal, and exit code — each on its own line. The exit marker doubles as the UI card's exit-status pill: the shared `parseExitStatus` from `dsh-shell` consumes it from the output body, so replay shows the pill without duplicating the marker.
+結果テキストは stdout、次にマークされた `[stderr]` セクション、次に条件付きマーカーである: 切り詰め通知、サンドボックス拒否(構成がエスカレーションを告知する場合は同一ターンのエスカレーションヒント付き)、タイムアウト、シグナル、終了コード — それぞれが独自の行にある。終了マーカーは UI カードの終了ステータスピルを兼ねる。`dsh-shell` の共有 `parseExitStatus` が出力本文からそれを消費するため、リプレイはマーカーを重複させることなくピルを表示する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shell family to the executor seam, the job runtime, and the decision notes behind the behavior.
+パッケージレベルの契約では不十分な場合は、これらのページを読む。shell ファミリーからエグゼキューターシーム、ジョブランタイム、そしてこの動作の背後にある決定ノートへと進む。
 
-- [shell package map](../README.md) — the bash capability family and its roles.
-- [Bash executor subsystem](../../../docs/subsystems/shell.md) — request/spec vocabulary, results, and background processes.
-- [shell-env](../shell-env/README.md) — the managed `DSH_*` environment every call receives.
-- [tool-jobs](../../jobs/tool-jobs/README.md) — `job_output`, `job_list`, and `job_kill` controls for background runs.
-- [historical sandbox Agent Note](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) — escalation and mode-switching rationale.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-bash) — the exact `bash` argument schema.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-bash) — every accepted config field and its source declaration.
+- [shell パッケージマップ](../README.md) — bash ケイパビリティファミリーとその役割。
+- [Bash エグゼキューターサブシステム](../../../docs/subsystems/shell.md) — 要求/仕様の語彙、結果、バックグラウンドプロセス。
+- [shell-env](../shell-env/README.md) — すべての呼び出しが受け取る管理された `DSH_*` 環境。
+- [tool-jobs](../../jobs/tool-jobs/README.md) — バックグラウンド実行のための `job_output`、`job_list`、`job_kill` コントロール。
+- [過去のサンドボックス Agent Note](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) — エスカレーションとモード切り替えの根拠。
+- [生成されたツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-bash) — 正確な `bash` 引数スキーマ。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-bash) — 受け入れられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-Every request in this plugin's registration scope contains the bash guidance below at first-party order 1000. The policy owner contributes current sandbox state through its cache-safe runtime context rather than changing this section. Scoped tool restrictions can hide the schema without removing this independently registered section.
+このプラグインの登録スコープ内のすべての要求には、ファーストパーティ順序 1000 で以下の bash ガイダンスが含まれる。ポリシーオーナーはこのセクションを変更するのではなく、キャッシュセーフなランタイムコンテキストを通じて現在のサンドボックス状態を提供する。スコープ付きツール制限は、この独立して登録されたセクションを削除することなくスキーマを隠すことができる。
 
-##### Bash guidance
+##### bash ガイダンス
 
 ```markdown
 Check the [exit code: N] marker on every bash result; investigate failures before moving on.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Small fixed input cost per request while the plugin is active, unchanged by sandbox mode or mode switches.
+プラグインがアクティブな間、要求ごとに小さな固定入力コストがかかり、サンドボックスモードやモード切り替えによって変わらない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the registration scope and prompt text are unchanged. Plugin activation or disposal may invalidate reuse from this prompt section; sandbox mode switches do not.
+登録スコープとプロンプトテキストが変わらない間、プレフィックスは安定している。プラグインのアクティブ化または破棄はこのプロンプトセクションからの再利用を無効にする可能性があるが、サンドボックスモードの切り替えは無効にしない。
 
-### Tool schemas
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The model sees the generated [`bash` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-bash). `run_in_background` appears only when this producer enables it and a job registry is composed; `sandbox_permissions` and `justification` appear only when the mounted executor advertises sandboxing; the justification asks the model to use the language of the current user request. Agent-scoped tool restrictions can remove the definition for that agent.
+モデルは生成された [`bash` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-bash)を見る。`run_in_background` は、このプロデューサーがそれを有効にし、ジョブレジストリが構成されている場合にのみ現れる。`sandbox_permissions` と `justification` は、マウントされたエグゼキューターがサンドボックスを告知する場合にのみ現れる。justification は、現在のユーザー要求の言語を使用するようモデルに求める。エージェントスコープのツール制限は、そのエージェントの定義を削除できる。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost on every request where the tools are visible; sandbox support adds the escalation fields and its conditional description paragraph.
+ツールが可視のすべての要求に固定のスキーマコストがかかる。サンドボックスサポートはエスカレーションフィールドとその条件付き説明段落を追加する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while visibility, background support, and executor sandbox capabilities are unchanged. A restriction, config change, or executor change may invalidate reuse from the first changed tool definition.
+可視性、バックグラウンドサポート、エグゼキューターのサンドボックス機能が変わらない間、プレフィックスは安定している。制限、設定変更、またはエグゼキューターの変更は、最初に変更されたツール定義からの再利用を無効にする可能性がある。
 
-### Foreground result
+### フォアグラウンド結果
 
-#### What the model sees
+#### モデルが見るもの
 
-The renderer emits the data-dependent stdout tail, then optional `[stderr]` and the stderr tail. With no output it emits exactly `(no output)`. Conditional lines are exactly `[output truncated; full output: <path-or-(unavailable)>]`, `[sandbox: file access denied under <mode> mode]`, `[timed out after <timeoutMs>ms]`, `[stopped: <reason>]`, `[killed by signal: <signal>]`, and `[exit code: <exitCode>]`; the sandbox escalation and runner-failure lines are quoted in [`dsh-bash-sandbox`](../bash-sandbox/README.md).
+レンダラーはデータ依存の stdout 末尾を出力し、次にオプションの `[stderr]` と stderr 末尾を出力する。出力がない場合は正確に `(no output)` を出力する。条件付きの行は正確に `[output truncated; full output: <path-or-(unavailable)>]`、`[sandbox: file access denied under <mode> mode]`、`[timed out after <timeoutMs>ms]`、`[stopped: <reason>]`、`[killed by signal: <signal>]`、`[exit code: <exitCode>]` である。サンドボックスのエスカレーション行とランナー失敗行は [`dsh-bash-sandbox`](../bash-sandbox/README.md) に引用されている。
 
-#### Token effect
+#### トークンへの影響
 
-Zero result tokens before a call. Output is bounded per stream, while each emitted line remains in history until compaction.
+呼び出し前の結果トークンはゼロ。出力はストリームごとに制限される一方、出力された各行はコンパクションまで履歴に残る。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用。新たに可視になったコンテンツは再利用可能な要求プレフィックスに続き、既存の KV キャッシュエントリを無効にしない。
 
-### Background job context and results
+### バックグラウンドジョブのコンテキストと結果
 
-#### What the model sees
+#### モデルが見るもの
 
-Start returns exactly `started background job <jobId>`. This producer supplies incremental process output, optional `[some output was dropped from memory; full output: <paths-or-(unavailable)>]`, sandbox facts, and terminal detail such as `exit code: <exitCode>` or `signal: <signal>` to the generic job runtime. [`dsh-tool-jobs`](../../jobs/tool-jobs/README.md) owns the visible status line, completion notice, listing, and cancellation response.
+開始は正確に `started background job <jobId>` を返す。このプロデューサーは、増分プロセス出力、オプションの `[some output was dropped from memory; full output: <paths-or-(unavailable)>]`、サンドボックスの事実、および `exit code: <exitCode>` や `signal: <signal>` などの終端詳細を汎用ジョブランタイムに供給する。[`dsh-tool-jobs`](../../jobs/tool-jobs/README.md) が、可視のステータス行、完了通知、一覧表示、キャンセル応答を所有する。
 
-#### Token effect
+#### トークンへの影響
 
-The start acknowledgement is small and retained; collected output is data-dependent and bounded by the executor's stream buffers. Consuming reads do not repeat prior output.
+開始確認は小さく保持される。収集された出力はデータ依存であり、エグゼキューターのストリームバッファーによって制限される。消費読み取りは以前の出力を繰り返さない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用。新たに可視になったコンテンツは再利用可能な要求プレフィックスに続き、既存の KV キャッシュエントリを無効にしない。
 
-### Tool errors
+### ツールエラー
 
-#### What the model sees
+#### モデルが見るもの
 
-Validation and policy failures are normalized as `Error: <message>`. This package's stable messages are `invalid command: expected a non-empty string`, `invalid description: expected a non-empty string`, `invalid timeoutMs: expected a positive number, got <value>`, the escalation pairing failures, `run_in_background is disabled for this deployment (enableRunInBackground: false)`, `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`, `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`, the approval availability/rejection/cancellation variants, and `tool call aborted`.
+検証とポリシーの失敗は `Error: <message>` として正規化される。このパッケージの安定したメッセージは `invalid command: expected a non-empty string`、`invalid description: expected a non-empty string`、`invalid timeoutMs: expected a positive number, got <value>`、エスカレーションのペアリング失敗、`run_in_background is disabled for this deployment (enableRunInBackground: false)`、`background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`、`sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`、承認の可用性/拒否/キャンセルの各バリアント、および `tool call aborted` である。
 
-#### Token effect
+#### トークンへの影響
 
-Only the failing call adds these retained tokens; a rejected escalation does not add command output because the command does not run.
+失敗した呼び出しのみがこれらの保持トークンを追加する。拒否されたエスカレーションは、コマンドが実行されないためコマンド出力を追加しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用。新たに可視になったコンテンツは再利用可能な要求プレフィックスに続き、既存の KV キャッシュエントリを無効にしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the tool is a poor fit or needs special care. They are current package constraints, not a task backlog.
+これらの制限は、ツールが不向きな場合や特別な注意が必要な場合を定義する。これらは現在のパッケージの制約であり、タスクバックログではない。
 
-- **Replay exit pills parse from result text** — output whose final line happens to be exactly `[exit code: N]` / `[killed by signal: …]` shows a wrong pill on session replay and loses that line from the card body, because the parse treats it as the marker it consumes; a display-only known residual.
-- **The `bash` tool opts out of `timeout-policy` budgets** — it keeps the executor-owned `BASH_TIMEOUT` path, per [the tool-call timeout-policy Agent Note](../../../.agents/notes/implemented/architecture/2026-07-07-tool-call-timeout-policy.md).
-- **Background processes have no executor timeout** — callers must use `job_kill`, or rely on owner/service disposal, when work no longer matters; a foreground command registered as a job has none either, since its timeout bounds only the wait.
-- **The job list shows every foreground command while it runs** — a settled one leaves with its result, but the Web task list does not yet mark which running rows a tool call is still waiting on.
+- **リプレイの終了ピルは結果テキストから解析される** — 最終行がたまたま正確に `[exit code: N]` / `[killed by signal: …]` である出力は、セッションリプレイで誤ったピルを表示し、その行をカード本文から失う。解析がそれを消費するマーカーとして扱うためである。表示のみの既知の残存問題。
+- **`bash` ツールは `timeout-policy` の予算からオプトアウトする** — [ツール呼び出しタイムアウトポリシーの Agent Note](../../../.agents/notes/implemented/architecture/2026-07-07-tool-call-timeout-policy.md)に従い、エグゼキューターが所有する `BASH_TIMEOUT` パスを維持する。
+- **バックグラウンドプロセスにはエグゼキューターのタイムアウトがない** — 作業が不要になったとき、呼び出し元は `job_kill` を使用するか、オーナー/サービスの破棄に依存する必要がある。ジョブとして登録されたフォアグラウンドコマンドも同様である。そのタイムアウトは待機のみを制限するからだ。
+- **ジョブリストは実行中にすべてのフォアグラウンドコマンドを表示する** — 確定したものは結果とともに離れるが、Web のタスクリストは、ツール呼び出しがまだ待機している実行中の行をまだ示さない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

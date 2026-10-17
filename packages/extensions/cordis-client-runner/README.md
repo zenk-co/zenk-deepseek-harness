@@ -1,145 +1,145 @@
 ---
-description: "Browser half of dynamic Cordis packages for users and maintainers choosing, composing, or debugging how a page answers run requests and loads browser-half code."
+description: "動的 Cordis パッケージのブラウザ側半分。ページが実行リクエストにどう応答し、ブラウザ側コードをどうロードするかを選択・構成・デバッグするユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-cordis-client-runner
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-cordis-client-runner` runs the browser half of process-local dynamic packages for programmatic callers and existing browser controls. It loads a definition after an approved request or explicit user gesture, and removes it when the Host retracts the run. Page refresh does not restore definitions. Creator UI plugins use installed Client modules through Plugin Manager.
+`dsh-cordis-client-runner` は、プログラムによる呼び出し元と既存のブラウザコントロールのために、プロセスローカルな動的パッケージのブラウザ側半分を実行する。承認されたリクエストまたは明示的なユーザー操作の後に定義をロードし、Host が実行を撤回すると削除する。ページの更新は定義を復元しない。作成者向け UI プラグインは Plugin Manager を通じてインストール済みの Client モジュールを使う。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin in a web client whose composition also mounts the host runner — the host half runs in the process, this browser half in the page. When a dynamic package that has a browser half is run, the open pages receive a run request; this package carries out the load on this page, and the UI package (`ui-cordis`) renders the panel and cards a person uses to answer it. Host-only packages need no browser half and therefore no page: the host runs them itself.
+コンポジションがホストランナーもマウントする Web クライアントにこのプラグインをマウントする —— ホスト側半分はプロセス内で、このブラウザ側半分はページ内で実行される。ブラウザ側半分を持つ動的パッケージが実行されると、開いているページが実行リクエストを受け取る。このパッケージがこのページ上でロードを実施し、UI パッケージ（`ui-cordis`）がそれに応答するために人が使うパネルとカードをレンダリングする。ホスト専用パッケージはブラウザ側半分を必要とせず、したがってページも不要である: ホストが自ら実行する。
 
-### What the page does
+### ページがすること
 
-A browser half is written in plain JavaScript — no JSX, no TypeScript, no module imports — and runs as an async function. It receives a fixed set of names — `React`, `console`, `styles`, and `host` — while browser globals like `fetch` and `setTimeout` are unavailable. The plugin it returns can use the lifecycle verbs and only the services it declared in its own `inject`. Calling `host.call(method, args)` from the loaded half reaches its own host half. A crash that happens while React renders the loaded half is reported to the host with the slot, whether the crash removed the entry, and a message written for the author.
+ブラウザ側半分は素の JavaScript で書かれ（JSX なし、TypeScript なし、モジュールインポートなし）、非同期関数として実行される。固定の名前セット —— `React`、`console`、`styles`、`host` —— を受け取り、`fetch` や `setTimeout` のようなブラウザグローバルは利用できない。返されるプラグインはライフサイクル動詞と、自身の `inject` で宣言したサービスのみを使える。ロードされた半分から `host.call(method, args)` を呼ぶと、自身のホスト側半分に到達する。React がロードされた半分をレンダリングしている間に発生したクラッシュは、スロット、そのクラッシュがエントリーを削除したかどうか、作成者向けに書かれたメッセージとともにホストへ報告される。
 
-### What the run surface offers
+### 実行サーフェスが提供するもの
 
-A run surface can answer a pending host request — approving it, optionally covering future versions of the same plugin, or declining it — and can start a definition at the user's own gesture, which authorizes it. Each definition has at most one in-flight activity, so an affordance built on that state survives a remount. What the surface shows about this page is page-local: the last render crash per package, why this page's own attempt failed, and whether a package is loaded here — never the host's view of what is running.
+実行サーフェスは、保留中のホストリクエストに応答でき —— 承認する、任意で同じプラグインの将来のバージョンをカバーする、または拒否する —— 、ユーザー自身の操作で定義を開始でき、それが認可となる。各定義は最大 1 つの実行中アクティビティを持つので、その状態に基づくアフォーダンスは再マウントを生き延びる。サーフェスがこのページについて示すものはページローカルである: パッケージごとの最後のレンダークラッシュ、このページ自身の試行が失敗した理由、パッケージがここでロードされているかどうか —— 実行中のものについてのホストの見解ではない。
 
-### Lifecycle boundaries
+### ライフサイクル境界
 
-Loading is idempotent: asking to load a revision this page already runs changes nothing, a newer revision replaces the loaded one, and the same revision after a retract loads afresh. Operations on a definition serialize. A refresh starts clean by design — the host still holds the definition, this page does not run it until asked again.
+ロードは冪等である: このページが既に実行しているリビジョンのロードを要求しても何も変わらず、より新しいリビジョンはロード済みのものを置き換え、撤回後の同じリビジョンは新規にロードされる。定義に対する操作は直列化される。更新は設計上クリーンに開始する —— ホストは依然として定義を保持するが、このページは再び求められるまでそれを実行しない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design behind the browser half; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではブラウザ側半分の背後にある設計を説明する。観察可能な挙動は[このパッケージを使う](#use-this-package)で完全にカバーされている。
 
-### Design philosophy
+### 設計哲学
 
-The browser half is built on one principle: a dynamic package must ride the same activation gating, fiber-effect cleanup, and status projection as a static one. The evaluated plugin is seated in the module table and mounted through `loader.create`; unload removes the entry, waits for its fiber's cleanup, then invalidates its factory and removes its styles. The guard is a whitelist — lifecycle verbs plus declared services — that mirrors the host-side sandbox facade, so a package author meets one contract on both halves. One observer feeds two outlets: the slot registry's entry-error seam is watched only here, and a crash belonging to a package this runner seated goes upstream to the host for the model and onto this package's own `renderFailures` for the panel.
+ブラウザ側半分は 1 つの原則に基づく: 動的パッケージは静的パッケージと同じアクティベーションゲーティング、ファイバー効果クリーンアップ、ステータス投影に乗らなければならない。評価されたプラグインはモジュールテーブルに着席し、`loader.create` を通じてマウントされる。アンロードはエントリーを削除し、そのファイバーのクリーンアップを待ってから、ファクトリーを無効化し、そのスタイルを削除する。ガードはホワイトリスト —— ライフサイクル動詞と宣言されたサービス —— であり、ホスト側のサンドボックスファサードを写しており、パッケージ作成者は両方の半分で 1 つの契約に出会う。1 つのオブザーバーが 2 つの出口に供給する: スロットレジストリのエントリーエラーシームはここでだけ監視され、このランナーが着席させたパッケージに属するクラッシュは、モデル向けにホストへ上流送信され、パネル向けにこのパッケージ自身の `renderFailures` に載る。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/client/index.ts`](src/client/index.ts) | Plugin entry: runner, orchestrator, inspect registry, forwarded-event subscription |
-| [`src/client/runtime.ts`](src/client/runtime.ts) | Load engine: convergence by run identity, guarded mount, retract |
-| [`src/client/orchestrator.ts`](src/client/orchestrator.ts) | Run orchestration: host half first, source fetch, browser half, one resolution |
-| [`src/client/evaluator.ts`](src/client/evaluator.ts) | Closure evaluation: the symbol surface and its teaching traps |
-| [`src/client/guard.ts`](src/client/guard.ts) | The whitelisting `ctx` façade for loaded browser halves |
-| [`src/client/inspect-registry.ts`](src/client/inspect-registry.ts) | Client Inspect Providers and the pending-query router |
-| [`src/client/providers.ts`](src/client/providers.ts) | First-party client Inspect Providers (slots, theme, events) |
-| [`src/client/timer.ts`](src/client/timer.ts) | The client timer service dynamic packages inject |
+| [`src/client/index.ts`](src/client/index.ts) | プラグインエントリー: ランナー、オーケストレーター、inspect レジストリ、転送イベント購読 |
+| [`src/client/runtime.ts`](src/client/runtime.ts) | ロードエンジン: 実行識別による収束、ガード付きマウント、撤回 |
+| [`src/client/orchestrator.ts`](src/client/orchestrator.ts) | 実行オーケストレーション: ホスト側半分を先に、ソース取得、ブラウザ側半分、1 つの解決 |
+| [`src/client/evaluator.ts`](src/client/evaluator.ts) | クロージャ評価: シンボルサーフェスとその教育用トラップ |
+| [`src/client/guard.ts`](src/client/guard.ts) | ロードされたブラウザ側半分のためのホワイトリスト `ctx` ファサード |
+| [`src/client/inspect-registry.ts`](src/client/inspect-registry.ts) | Client Inspect Providers と保留クエリルーター |
+| [`src/client/providers.ts`](src/client/providers.ts) | ファーストパーティのクライアント Inspect Providers（スロット、テーマ、イベント） |
+| [`src/client/timer.ts`](src/client/timer.ts) | 動的パッケージが inject するクライアントタイマーサービス |
 
-### Inspecting slot inputs
+### スロット入力の検査
 
-The Slots provider's exact `listSubTree` lookup includes documented owner fields and top-level alias, intersection, and union declarations. Nested field-value types remain named references, so inspecting a Tool view exposes its shared callbacks and stage union without expanding the full Session graph.
+Slots プロバイダーの正確な `listSubTree` ルックアップは、文書化されたオーナーフィールドとトップレベルのエイリアス、交差、ユニオンの宣言を含む。ネストされたフィールド値の型は名前付き参照のままなので、Tool ビューを検査すると、完全な Session グラフを展開せずに、その共有コールバックとステージユニオンが露出する。
 
-### How a run is carried out
+### 実行の実施方法
 
-A `cordis/request-run` event asks this page whether to run a definition. Whoever answers — the page after an approval, or the user pressing run — drives the orchestration: the host half first (so a host-half failure short-circuits before the browser has moved), then the source fetch, then the browser half, then one resolution carrying what happened. The browser half's source is evaluated as an async function body with the symbol surface as parameters, the returned plugin is guard-wrapped and mounted through the loader, and the resolution reports the loaded revision or the failing stage with the closure's, guard's, or fiber's message. `host.call` routes through the Remote namespace; an omitted argument travels as `null`, and a payload the generated codec refuses becomes a teaching error naming the call and the contract.
+`cordis/request-run` イベントは、定義を実行すべきかどうかをこのページに問い合わせる。誰であれ応答する者 —— 承認後のページ、またはユーザーが実行を押すこと —— がオーケストレーションを駆動する: まずホスト側半分（ホスト側半分の失敗はブラウザが動く前に短絡する）、次にソース取得、次にブラウザ側半分、次に何が起こったかを運ぶ 1 つの解決。ブラウザ側半分のソースはシンボルサーフェスをパラメーターとして非同期関数本体として評価され、返されたプラグインはガードでラップされローダーを通じてマウントされ、解決はロードされたリビジョンまたは失敗ステージをクロージャ、ガード、またはファイバーのメッセージとともに報告する。`host.call` は Remote 名前空間を通じてルーティングされる。省略された引数は `null` として伝わり、生成されたコーデックが拒否するペイロードは、呼び出しと契約を名指す教育用エラーになる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the browser half to the host that asks it, the tools whose runs it answers, and the surface that renders it.
+パッケージレベルの契約では足りないときにこれらのページを読む。ブラウザ側半分から、それを要求するホスト、その実行に応答するツール、それをレンダリングするサーフェスへと進む。
 
-- [Host runner](../cordis-host-runner/README.md) — the registry and run round trip this package answers.
-- [Tool package](../tool-cordis/README.md) — read-only runtime API discovery.
-- [UI package](../ui-cordis/README.md) — the panel and cards that operate this face.
-- [Extensions subsystem](../../../docs/subsystems/extensions.md) — the generated `ctx.dynamicCordisRunner` API and `cordis/*` events.
-- [Client shells and dynamic packages Agent Note](../../../.agents/notes/implemented/architecture/2026-08-15-client-shells-and-dynamic-packages.md) — package placement and build faces for the client halves.
+- [ホストランナー](../cordis-host-runner/README.md) — このパッケージが応答するレジストリと実行ラウンドトリップ。
+- [ツールパッケージ](../tool-cordis/README.md) — 読み取り専用のランタイム API ディスカバリー。
+- [UI パッケージ](../ui-cordis/README.md) — このフェイスを操作するパネルとカード。
+- [拡張サブシステム](../../../docs/subsystems/extensions.md) — 生成された `ctx.dynamicCordisRunner` API と `cordis/*` イベント。
+- [クライアントシェルと動的パッケージの Agent Note](../../../.agents/notes/implemented/architecture/2026-08-15-client-shells-and-dynamic-packages.md) — クライアント半分のパッケージ配置とビルドフェイス。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Run resolution relayed by the Host
+### Host が中継する実行解決
 
-#### What the model sees
+#### モデルが見るもの
 
-This package contributes no tool or prompt. It resolves `cordis/request-run` with activation success, missing services, rejection, or Host/Client failures. The Host runner owns any message relayed to the session.
+このパッケージはツールやプロンプトを提供しない。`cordis/request-run` をアクティベーション成功、サービス欠如、拒否、または Host/Client の失敗で解決する。セッションへ中継されるメッセージは Host ランナーが所有する。
 
-#### Token effect
+#### トークンへの影響
 
-Conditional and bounded: at most one resolution per run request, spent inside the runner result the host already emits. The text is data-dependent (a definition's own error message) and this package retains nothing across requests — a page's later load failures are page-local diagnostics with no model-visible carrier.
+条件的かつ上限付き: 実行リクエストごとに最大 1 つの解決で、ホストが既に発行するランナー結果の内側で消費される。テキストはデータ依存（定義自身のエラーメッセージ）であり、このパッケージはリクエストをまたいで何も保持しない —— ページのその後のロード失敗は、モデル可視のキャリアを持たないページローカルな診断である。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Host steering appends to the session history; this package does not rewrite earlier messages.
+Host のステアリングはセッション履歴に追記する。このパッケージは以前のメッセージを書き換えない。
 
-### Render failure, after the run settled
+### 実行確定後のレンダー失敗
 
-#### What the model sees
+#### モデルが見るもの
 
-React can fail after a successful load. The Client reports each owned entry failure with its slot, message, and whether the entry was removed. The Host retains the latest failure and steers the owning session; the page also displays its local failure.
+React はロード成功後に失敗することがある。Client は所有する各エントリーの失敗を、そのスロット、メッセージ、エントリーが削除されたかどうかとともに報告する。Host は最新の失敗を保持し、所有セッションをステアリングする。ページもローカルの失敗を表示する。
 
-#### Token effect
+#### トークンへの影響
 
-Conditional and bounded by the host's retention, not by this page: one report per crash, and the host keeps only the latest per package, so a repeatedly crashing entry costs the model one message rather than a growing list. The report never enters a tool result of its own — the model pays for it only when it is steered or asks.
+条件的かつホストの保持によって上限制約される（このページによってではない）: クラッシュごとに 1 つのレポートで、ホストはパッケージごとに最新のものだけを保持するので、繰り返しクラッシュするエントリーは成長するリストではなく 1 つのメッセージのコストで済む。レポートがそれ自体のツール結果に入ることは決してない —— モデルはステアリングされたとき、または問い合わせたときにのみコストを払う。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None of its own. Reports travel over RPC and are stored, not appended to the conversation; the model reads them through a steering message or an inspection it chose to make, which extends the tail like any other tool result.
+それ自体ではなし。レポートは RPC を渡り保存されるが、会話に追記されない。モデルはステアリングメッセージまたは自身が選択した検査を通じてそれらを読む。それは他のツール結果と同様に末尾を拡張する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the browser half needs special care. They are current package constraints, not a task backlog.
+これらの制限は、ブラウザ側半分が特別な注意を必要とする場所を定義する。現在のパッケージ制約であり、タスクバックログではない。
 
-- **A refused resolution is not retried** — the acknowledgement of `resolveRequestRun` is not read, so when the host declines a stale success (`accepted: false`, because the definition's revision moved on while this page was loading) the page keeps what it loaded and does not orchestrate again. The request stays answerable — another page's answer or the caller's cancellation settles it — and the stop that bumped the revision retracts the stale load.
-- **The plugin stays parked until the host namespace exists** — it declares `remote.dynamicCordisRunner`, so it loads no browser half whose host half it could never reach.
-- **Slot admission has no carrier** — the dispatched row declares services, not target slots, so per-deployment allow or deny lists for slot admission have nowhere to ride.
-- **Guard whitelists are hand-mirrored twins** — the browser guard replicates the host-side sandbox facade; sharing one specification is deferred.
+- **拒否された解決はリトライされない** — `resolveRequestRun` の確認応答は読まれないので、ホストが stale な成功（`accepted: false`、このページのロード中に定義のリビジョンが進んだため）を拒否したとき、ページはロードしたものを保ち、再びオーケストレーションしない。リクエストは応答可能なままである —— 別のページの応答または呼び出し元のキャンセルがそれを確定させる —— そしてリビジョンを進めた停止が stale なロードを撤回する。
+- **ホスト名前空間が存在するまでプラグインは停止したまま** — `remote.dynamicCordisRunner` を宣言するので、ホスト側半分に決して到達できないブラウザ側半分はロードしない。
+- **スロットアドミッションにキャリアがない** — ディスパッチされる行はターゲットスロットではなくサービスを宣言するので、スロットアドミッションのデプロイごとの許可/拒否リストに乗る場所がない。
+- **ガードホワイトリストは手で写した双子** — ブラウザガードはホスト側サンドボックスファサードを複製している。1 つの仕様の共有は先送りされている。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

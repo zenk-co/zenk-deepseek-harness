@@ -1,76 +1,76 @@
 ---
-description: "Manage the profile's plugin bundles, their rows, and the plugins' configuration from the Web sidebar."
+description: "Web サイドバーからプロファイルのプラグインバンドル、その行、およびプラグインの設定を管理する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-plugin-manager
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Desktop product events use the optional [product analytics service](../product-analytics/README.md); ordinary Web interactions are excluded.
+デスクトップの製品イベントはオプションの[プロダクト分析サービス](../product-analytics/README.md)を使用する。通常の Web インタラクションは除外される。
 
-## Summary
+## 概要
 
-Use the **Plugins** entry in the Web sidebar to manage the profile's installed bundles and the official bundles the installation ships switched off. Switch bundles and their rows on and off, install a bundle after the Host has read what the spec names, watch pnpm's output, stop a run, and enable what it added. Uninstalling asks for confirmation. A plugin that registers a configuration page is edited here, on its own page; Settings keeps the read-only inventory.
+Web サイドバーの **Plugins** エントリーを使用して、プロファイルにインストール済みのバンドルと、インストールに同梱され無効状態で出荷される公式バンドルを管理する。バンドルとその行をオン・オフし、Host が spec の指す内容を読み取った後にバンドルをインストールし、pnpm の出力を監視し、実行を停止し、追加されたものを有効化する。アンインストールには確認が求められる。設定ページを登録するプラグインはここで、そのプラグイン自身のページ上で編集する。Settings には読み取り専用のインベントリーが残る。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Select **Plugins** in the sidebar. The information button uses an 11px caption-colored icon in a 20px square hover area, with a 4px gap after the subtitle. It explains that this page configures official plugins and installs or manages other plugins, while **Settings → Built-in plugins** shows the built-in inventory and runtime status. Hover or focus shows the shared tooltip; clicking keeps it open until another click, Escape, Tab, or an outside click. The page reads the inventory and the bundles through `api-remotes` when first opened; a Host without a managed profile shows the page as unavailable. **Built-in plugin settings** lists official configuration pages by their configured order: Subagent, web search, agent loop, then shell. **Experimental plugins** shows the primary optional bundles, with **More** beside its heading opening a separate page of the same title. That page lists all offered official bundles, including those on the main list, with Codex and Claude Code subagents last. Its back button returns to the main list, where **Installed plugins** remains below Experimental plugins. Bundle details return to the list they were opened from. Catalog entries keep their position after installation or removal. **Installed plugins** lists other profile bundles. Installation-carried optional bundles have no uninstall action. Experimental packages retain the **Experimental** marker on both lists. Bundle details can show a feature preview below the description, also while the bundle is disabled; **DSH badge skill** shows one in English or Chinese following the UI language, and a decode failure shows a short notice without blocking management. Switching on a bundle that page holds back adds it to the main list in the position that page shows it, and switching it off leaves it on that page alone; other bundles keep their place on both. A dependency without a bundle patch is not a plugin and is not listed unless the profile selects it, in which case it carries a problem tag. Global configuration remains in the Settings **Built-in plugins** section.
+サイドバーで **Plugins** を選択する。情報ボタンは 20px 四方のホバー領域内に 11px のキャプション色アイコンを使用し、サブタイトルの後に 4px の間隔を空ける。このページは公式プラグインを設定し、他のプラグインをインストールまたは管理すること、**Settings → Built-in plugins** には組み込みインベントリーとランタイム状態が表示されることを説明する。ホバーまたはフォーカスで共有ツールチップが表示され、クリックすると再度のクリック、Escape、Tab、または外側のクリックまで開いたままになる。ページは初回オープン時に `api-remotes` 経由でインベントリーとバンドルを読み取る。管理対象プロファイルを持たない Host ではページは利用不可として表示される。**Built-in plugin settings** には公式の設定ページが設定された順序で並ぶ。Subagent、web search、agent loop、shell の順である。**Experimental plugins** には主要な任意バンドルが表示され、見出し横の **More** から同名の別ページが開く。そのページにはメインリストにあるものを含む提供中の公式バンドルがすべて並び、Codex と Claude Code のサブエージェントが最後に来る。戻るボタンでメインリストに戻り、**Installed plugins** は Experimental plugins の下に残る。バンドル詳細は開いた元のリストに戻る。カタログエントリーはインストール後や削除後も位置を保つ。**Installed plugins** には他のプロファイルバンドルが並ぶ。インストールに付随する任意バンドルにはアンインストール操作がない。Experimental パッケージは両方のリストで **Experimental** マーカーを保持する。バンドル詳細では、バンドルが無効な間も説明文の下に機能プレビューを表示できる。**DSH badge skill** は UI 言語に従って英語または中国語で表示し、デコード失敗時は管理を妨げない短い通知を表示する。そのページだけが保持するバンドルをオンにすると、そのページが示す位置でメインリストに追加され、オフにするとそのページだけに残る。他のバンドルは両方で位置を保つ。バンドルパッチを持たない依存はプラグインではなく、プロファイルが選択しない限り一覧に載らず、選択された場合は問題タグを付けて載る。グローバル設定は Settings の **Built-in plugins** セクションに残る。
 
-The heading moves its complete action group to another line when space is insufficient. Action labels stay on one line, and the information button follows the subtitle text.
+見出しは幅が足りない場合、アクション群全体を別の行に移動する。アクションラベルは 1 行に収まり、情報ボタンはサブタイトルのテキストに続く。
 
-Installed bundles and their plugin rows display their own title and description in the current UI language on cards and detail pages. Each field falls back from exported locale `meta` to the accessible `package.json` of a package-root plugin; subpath plugins never read one; the final title is the full package or module name, with no package description when both sources omit it. See [Plugin display metadata](../../../docs/cookbook/adding-a-package.md#plugin-display-metadata) for the author format. Bundle cards, details, and component rows display the package root's manifest `icon` or exported `./icon`, or a subpath plugin's exported `<subpath>/icon`; absent or undecodable images retain the default artwork. Installation previews still use registry or manifest information.
+インストール済みバンドルとそのプラグイン行は、カードと詳細ページに現在の UI 言語でのタイトルと説明文を表示する。各フィールドは、エクスポートされたロケールの `meta` から、パッケージルートのプラグインのアクセス可能な `package.json` へフォールバックする。サブパスプラグインはそれを読み取らない。最終的なタイトルは完全なパッケージ名またはモジュール名となり、両方のソースが省略した場合はパッケージ説明文なしとなる。著者形式については[プラグイン表示メタデータ](../../../docs/cookbook/adding-a-package.md#plugin-display-metadata)を参照する。バンドルカード、詳細、およびコンポーネント行は、パッケージルートのマニフェストの `icon` またはエクスポートされた `./icon`、あるいはサブパスプラグインのエクスポートされた `<subpath>/icon` を表示する。存在しない、またはデコードできない画像はデフォルトのアートワークのままとなる。インストールプレビューは引き続きレジストリまたはマニフェストの情報を使用する。
 
-On-demand Official cards are visible offline before installation. Turning one On opens the existing install progress dialog, installs the [target offered by the running Host](../../boot/plugin-manager/README.md#use-this-package), and selects its layer. The same registry fallback, cancellation, and script-approval controls apply. Turning Off keeps the dependency installed; Remove is separate. A different version or development link source offers **Update**; details show current and offered sources and versions. An update removes the installed package and installs the offered one with the same selection, reporting whether a restart is required; when the installation fails after the removal, the package stays uninstalled. Missing or unreadable packages keep their recorded dependency source alongside the diagnostic. An enabled bundle can still be switched Off when its checkout target is unavailable.
+オンデマンドの Official カードはインストール前にオフラインで表示される。その 1 つをオンにすると既存のインストール進行ダイアログが開き、[実行中 Host が提供するターゲット](../../boot/plugin-manager/README.md#use-this-package)をインストールして、そのレイヤーを選択する。同じレジストリフォールバック、キャンセル、スクリプト承認コントロールが適用される。オフにしても依存はインストールされたままであり、Remove は別操作である。異なるバージョンや開発リンクソースには **Update** が提供される。詳細には現在と提供中のソースおよびバージョンが表示される。更新ではインストール済みパッケージを削除し、同じ選択内容で提供中のものをインストールして、再起動が必要かどうかを報告する。削除後のインストールに失敗した場合、パッケージはアンインストールされたままになる。見つからない、または読み取れないパッケージは、診断とともに記録された依存ソースを保持する。チェックアウトターゲットが利用不可でも、有効なバンドルはオフに切り替えられる。
 
-The first list read shows a short group-heading placeholder and four skeleton cards, using the real cards' row, icon, and text-line spacing, with the action area left blank. They use the same opacity pulse as Session search and remain static with reduced motion. The accessible loading label and read timing are unchanged; refreshes retain the existing list, and installation and component-loading indicators keep their own states.
+最初のリスト読み取りでは短いグループ見出しプレースホルダーと 4 つのスケルトンカードが表示され、実際のカードの行・アイコン・テキスト行の間隔を使用し、アクション領域は空欄となる。Session 検索と同じ不透明度パルスを使用し、モーション削減時は静止する。アクセス可能な読み込みラベルと読み取りタイミングは変更されず、更新時は既存リストを保持し、インストールおよびコンポーネント読み込みインジケーターはそれぞれの状態を保つ。
 
-The **Refresh** button shows its tooltip after 500 ms of hovering or keyboard focus. During a manual refresh, the button shows a spinner and stays disabled until all pending reads settle and at least 400 ms have elapsed, preventing a brief spinner flash; repeated refresh requests are ignored and the existing list remains visible. Success shows no toast. With a loaded list, a failed manual refresh keeps the cached content and shows a failure toast, including after leaving Plugins; select **Refresh** again to retry. Before any successful list read, failures show an in-place message with **Retry**. Background reads do not show the refresh spinner.
+**Refresh** ボタンは 500ms のホバーまたはキーボードフォーカスの後にツールチップを表示する。手動更新中、ボタンはスピナーを表示し、保留中の読み取りがすべて解決して少なくとも 400ms が経過するまで無効のままであり、短いスピナーのちらつきを防ぐ。繰り返しの更新要求は無視され、既存リストは表示されたままとなる。成功時はトーストを表示しない。リスト読み込み済みの場合、手動更新の失敗ではキャッシュ内容を保持して失敗トーストを表示し、Plugins から離れた後も同様である。再試行するには **Refresh** を再度選択する。最初のリスト読み取り成功前の失敗では、**Retry** 付きのインプレースメッセージを表示する。バックグラウンド読み取りでは更新スピナーを表示しない。
 
-### Installing a bundle
+### バンドルのインストール
 
-The **Add plugin** control has a main button and a separate arrow for choosing how to add a plugin.
+**Add plugin** コントロールにはメインボタンと、プラグインの追加方法を選ぶための別の矢印がある。
 
-| Button or menu item | Result |
+| ボタンまたはメニュー項目 | 結果 |
 | --- | --- |
-| **Add plugin** | Opens the installation dialog with focus in its package field. |
-| Arrow: **Choose how to add a plugin** | Opens the menu of installation and plugin-contributed actions. |
-| **Install a third-party plugin** | Closes the menu and opens the same dialog for a package name, Git repository, or local directory. |
-| **Let the agent create a plugin** | When [ui-agent-preset](../ui-agent-preset/README.md#use-this-package) contributes this item, closes the menu and opens Creator to author a DSH plugin. |
+| **Add plugin** | パッケージフィールドにフォーカスした状態でインストールダイアログを開く。 |
+| Arrow: **Choose how to add a plugin** | インストールおよびプラグイン提供のアクションのメニューを開く。 |
+| **Install a third-party plugin** | メニューを閉じて、パッケージ名、Git リポジトリ、またはローカルディレクトリ用の同じダイアログを開く。 |
+| **Let the agent create a plugin** | [ui-agent-preset](../ui-agent-preset/README.md#use-this-package) がこの項目を提供している場合、メニューを閉じて Creator を開き、DSH プラグインを作成する。 |
 
-On first use, when pnpm uses the unconfigured official npm registry and npmmirror is offered, the Host probes both registries in parallel. The first successful HTTPS ping response selects the initial source. The dialog preserves remembered choices, manual selections, explicit manager configuration, and custom or unknown pnpm registries. An install clicked during initial probing waits for that bounded operation; a late result cannot overwrite a manual choice or reopen a closed dialog.
+初回使用時、pnpm が未設定の公式 npm レジストリを使用し、npmmirror が提供される場合、Host は両方のレジストリに並列でプローブする。最初の成功した HTTPS ping 応答が初期ソースを選択する。ダイアログは記憶された選択、手動選択、明示的なマネージャー設定、カスタムまたは不明な pnpm レジストリを保持する。初期プローブ中にクリックされたインストールは、その制限付き操作の完了を待つ。遅れた結果が手動選択を上書きしたり、閉じたダイアログを再び開いたりすることはない。
 
-The Host sends GET requests to `https://registry.npmjs.org/-/ping` and `https://registry.npmmirror.com/-/ping` through its normal fetch proxy. A 2xx response wins; redirects and failures do not. The remaining request is cancelled, both response bodies are discarded, and cleanup completes before the result returns. The default deadline is 1500 ms and results, including unavailable results, are cached for five minutes. Configure `registryProbeTimeoutMs` and `registryProbeCacheTtlMs` on `ui-plugin-manager`; `registryProbeEnabled: false` disables probing. If both requests fail or time out, the existing default remains selected. No IP-location service or Session content is involved.
+Host は通常の fetch プロキシ経由で `https://registry.npmjs.org/-/ping` と `https://registry.npmmirror.com/-/ping` に GET 要求を送る。2xx 応答が勝ちとなり、リダイレクトと失敗は対象外である。残りの要求はキャンセルされ、両方の応答ボディは破棄され、結果が返る前にクリーンアップが完了する。デフォルトの期限は 1500ms であり、利用不可の結果を含む結果は 5 分間キャッシュされる。`ui-plugin-manager` 上で `registryProbeTimeoutMs` と `registryProbeCacheTtlMs` を設定する。`registryProbeEnabled: false` でプローブを無効化する。両方の要求が失敗またはタイムアウトした場合、既存のデフォルトが選択されたままとなる。IP 位置情報サービスや Session コンテンツは関与しない。
 
-**Add plugin** takes a package name with an optional version, a Git address, a tarball, or an absolute local path; the dialog says a package name is what follows `dsh plugin add` in a README. Enter in the package or custom-registry field submits the install request, but Enter used to confirm an input-method candidate does not. **Install guide and examples** under the field opens a guide that shows the package-name example; **Use example** drops it into the field. Typing or pasting the Git or local-path template verbatim still raises the reminder asking for the actual value. A trust box above **Install** stays visible including when the guide is collapsed, and explains that on-demand Official entries offer explicit Update, while other plugins are upgraded by uninstalling and reinstalling. **Registry** beside it names the registry the install asks first and unfolds the choice: pnpm's own registry, named by the registry it actually names — the official npm registry, the mainland China mirror, or its host — which keeps the neutral default name until the Host reads it, is listed once, and carries its host unless that host is already its name; each mirror the Host configured (`pluginManager.registries`), npmmirror as the mainland China mirror; and a typed http(s) address. The options use an opaque selector panel, fill rows only on hover, and show hosts in tertiary text without parentheses. The custom-address area highlights on hover; clicking anywhere in it selects the custom registry and focuses its input, whose focus style matches the package field. Keyboard focus alone preserves the selected registry; activating the custom radio or editing the address selects the custom registry. Tab moves from the selected radio to the address, and Shift+Tab moves back; leaving either end closes the selector and returns focus to **Registry**. Switching to an offered registry retains the custom URL draft for switching back. Submitting an invalid custom address blocks installation, opens the registry selector, and focuses the address. Invalid package and custom-address fields keep a red error border and add the shared blue inset focus ring on focus. The options float over the dialog from the control, so unfolding them never lengthens the card, and the card's content scrolls when the guide makes it taller than the viewport. The initial choice follows the response comparison above; the choice is then remembered in this browser (`localStorage`) and starts the next dialog, and a remembered address the Host no longer offers stays as a typed one and remains the requested address when installation starts before the registry list returns. **Install** first asks the Host to read what the spec names (`pluginManager.inspect`) at the chosen registry: a name the list already shows, a name no registry has, a path without a package, a package without a bundle patch, or a spec pnpm would refuse comes back under the field as one sentence, with the spec kept for editing; when no registry could be reached, the sentence names every one asked. The install then starts at the registry that answered. An accepted spec opens the installing screen, which shows the package's name, one-liner, and version as the Host read them and folds pnpm's command and output behind **Show install details**. Each command line stays on one line and scrolls horizontally; selecting its text includes offscreen arguments. A finished install shows the version pnpm installed; when a run that asked one registry installed another version than the one read, it names both versions, attributes the difference to pnpm's supply-chain security policy (`minimumReleaseAge`), states the risk of a newly published version, and gives the exact `name@version` to install after uninstalling. A finished install offers **Enable now**, which switches the new bundle on, closes the dialog, and scrolls to its card if it is on the current page; closing instead leaves it installed and off. While the Host moves on to another registry, the installing screen says which registry could not serve the package and which is asked now, and each pnpm run behind the details carries a badge naming its registry. A failed install says what went wrong in one line, as the Host attributed it — no registry could be reached, naming every one asked; the host a GitHub address or a tarball link is fetched from could not be reached, which no registry helps; the package was not found, the disk is full, the profile is not writable, pnpm blocked a build script — with pnpm's output behind the details and **Retry** at hand, and **Change registry** beside it when the Host laid the failure at the registry it asked, which returns to the spec with the registry options open; the Host has already put the profile files back. When pnpm blocked a dependency's install scripts, the failed screen lists the packages whose scripts wait for permission and offers **Allow these scripts and retry** in place of **Retry**; the Host saves the permission in the profile's `pnpm-workspace.yaml`, which a failed run leaves as pnpm wrote it, then runs pnpm again, and the installed screen names what was allowed. A successful installation does not certify that a module can activate.
+**Add plugin** は、任意バージョン付きのパッケージ名、Git アドレス、tarball、または絶対ローカルパスを受け付ける。ダイアログではパッケージ名は README 内の `dsh plugin add` に続くものであると説明する。パッケージフィールドまたはカスタムレジストリフィールドでの Enter はインストール要求を送信するが、入力方式の候補確定に使われた Enter は送信しない。フィールド下の **Install guide and examples** はパッケージ名の例を示すガイドを開き、**Use example** はそれをフィールドに入れる。Git またはローカルパスのテンプレートをそのまま入力・貼り付けしても、実際の値を求めるリマインダーが表示される。**Install** 上の信頼ボックスはガイド折りたたみ時も含め常に表示され、オンデマンドの Official エントリーは明示的な Update を提供する一方、他のプラグインはアンインストール後の再インストールでアップグレードすると説明する。その横の **Registry** はインストールが最初に問い合わせるレジストリ名を示し、選択肢を展開する。pnpm 自身のレジストリは、それが実際に指すレジストリ名で呼ばれる——公式 npm レジストリ、中国本土ミラー、またはそのホスト——Host が読み取るまでは中立のデフォルト名を保ち、一度だけ一覧に載り、そのホストが既に名前である場合を除きホストを伴う。Host が設定した各ミラー (`pluginManager.registries`)、中国本土ミラーとしての npmmirror、および入力された http(s) アドレス。選択肢は不透明なセレクターパネルを使用し、ホバー時のみ行を埋め、ホストを括弧なしのターシャリーテキストで表示する。カスタムアドレス領域はホバーで強調表示され、領域内のどこをクリックしてもカスタムレジストリを選択して入力にフォーカスし、そのフォーカススタイルはパッケージフィールドと一致する。キーボードフォーカスのみでは選択中のレジストリを保持し、カスタムラジオの有効化またはアドレス編集でカスタムレジストリを選択する。Tab は選択中のラジオからアドレスへ移動し、Shift+Tab は戻る。どちらかの端を離れるとセレクターが閉じて **Registry** にフォーカスが戻る。提供中のレジストリへの切り替えは、切り戻し用にカスタム URL の下書きを保持する。無効なカスタムアドレスの送信はインストールを阻止し、レジストリセレクターを開いてアドレスにフォーカスする。無効なパッケージフィールドとカスタムアドレスフィールドは赤いエラーボーダーを保ち、フォーカス時には共有の青いインセットフォーカスリングを加える。選択肢はコントロールからダイアログ上にフロートするため、展開してもカードは伸びず、ガイドでビューポートより高くなった場合カードの内容はスクロールする。初期選択は上記の応答比較に従い、その選択はこのブラウザーに記憶され (`localStorage`)、次のダイアログを開始する。Host が提供しなくなった記憶済みアドレスは入力済みのものとして残り、レジストリ一覧が返る前にインストールが開始された場合も要求アドレスであり続ける。**Install** はまず Host に spec の指す内容の読み取りを求める (`pluginManager.inspect`)。選択中のレジストリにて、一覧に既にある名前、どのレジストリにもない名前、パッケージのないパス、バンドルパッチのないパッケージ、または pnpm が拒否する spec は、フィールド下に 1 文で返り、spec は編集用に保持される。どのレジストリにも到達できなかった場合は、問い合わせたすべてをその文が指名する。インストールは応答したレジストリで開始される。受け付けられた spec はインストール画面を開き、Host が読み取ったパッケージ名、1 行説明、バージョンを表示し、pnpm のコマンドと出力は **Show install details** の背後に折りたたむ。各コマンド行は 1 行に収まり水平スクロールし、そのテキスト選択には画面外の引数も含まれる。完了したインストールは pnpm がインストールしたバージョンを表示する。1 つのレジストリに問い合わせた実行が読み取り時と異なるバージョンをインストールした場合、両方のバージョンを指名し、その差を pnpm のサプライチェーンセキュリティポリシー (`minimumReleaseAge`) に帰し、新規公開バージョンのリスクを述べ、アンインストール後にインストールすべき正確な `name@version` を示す。完了したインストールは **Enable now** を提供し、新しいバンドルをオンにしてダイアログを閉じ、現在のページにあればそのカードまでスクロールする。代わりに閉じるとインストール済み・オフのままとなる。Host が別のレジストリに移る間、インストール画面はどのレジストリがパッケージを提供できず、次にどれに問い合わせるかを示し、詳細背後の各 pnpm 実行にはレジストリ名のバッジが付く。失敗したインストールは、Host が帰した原因を 1 行で述べる——到達できたレジストリがなく、問い合わせたすべてを指名する。GitHub アドレスや tarball リンクの取得元ホストに到達できず、どのレジストリも助けにならない。パッケージが見つからない、ディスクが一杯、プロファイルが書き込み不可、pnpm がビルドスクリプトを阻止した——pnpm の出力は詳細の背後にあり、**Retry** が手元にあり、Host が失敗を問い合わせたレジストリに帰した場合は横に **Change registry** があり、spec に戻ってレジストリ選択肢を開く。Host は既にプロファイルファイルを元に戻している。pnpm が依存のインストールスクリプトを阻止した場合、失敗画面は許可待ちスクリプトのパッケージを一覧し、**Retry** の代わりに **Allow these scripts and retry** を提供する。Host は許可をプロファイルの `pnpm-workspace.yaml` に保存し、失敗した実行は pnpm が書き込んだままの状態で残し、pnpm を再実行する。インストール完了画面は許可内容を指名する。成功したインストールはモジュールがアクティベートできることを保証しない。
 
-During preparation and download, **Cancel install** asks the Host to stop the run and waits for confirmation. Loading the bundle cannot be cancelled. Closing with ×, Escape, or the backdrop hides the dialog immediately and requests cancellation when possible. **View installation** reopens the same task with its output; another installation cannot start while its outcome is pending or unconfirmed. Confirmed cancellation returns to the spec and shows a toast; the manifest and lockfile are restored, while downloaded files can remain. A lost installation response triggers a request to recover the result; **Check installation status** and reconnect retry that request. If the Host has no active request, **Installation result unavailable** allows returning to editing after checking the plugin list. A cancellation sent before acceptance waits and retries automatically; a failed cancellation can be retried manually. Hidden tasks report their outcome through toasts without reopening the dialog.
+準備中とダウンロード中、**Cancel install** は Host に実行の停止を求めて確認を待つ。バンドルの読み込みはキャンセルできない。×、Escape、または backdrop での閉鎖はダイアログを直ちに隠し、可能な場合はキャンセルを要求する。**View installation** は同じタスクをその出力とともに再び開く。結果が保留中または未確認の間は別のインストールを開始できない。確認済みのキャンセルは spec に戻ってトーストを表示する。マニフェストと lockfile は復元され、ダウンロード済みファイルは残る場合がある。失われたインストール応答は結果の回復要求を引き起こす。**Check installation status** と再接続がその要求を再試行する。Host にアクティブな要求がない場合、**Installation result unavailable** によりプラグイン一覧の確認後に編集に戻れる。受け付け前に送られたキャンセルは待機して自動的に再試行する。失敗したキャンセルは手動で再試行できる。隠れたタスクはダイアログを再び開かずトーストで結果を報告する。
 
-When the Host attributes a network failure or timeout to a GitHub address and offers npmmirror, the dialog says **Cannot access GitHub**, or **GitHub connection timed out** for a timeout, and offers **Use mainland China mirror** or **Cancel**. Choosing the mirror returns to an empty package-name field and remembers the selected registry without starting another installation. When the install already asks npmmirror, whether picked, typed, or named by pnpm's own configuration, the button reads **Try another way** instead and returns to the same empty field with **Install guide and examples** unfolded and the registry unchanged. Other failures retain their existing diagnostics and actions. The mirror supplies registry packages and dependencies, not the GitHub repository itself.
+Host がネットワーク失敗またはタイムアウトを GitHub アドレスに帰し、npmmirror を提供する場合、ダイアログは **Cannot access GitHub**、タイムアウト時は **GitHub connection timed out** と述べ、**Use mainland China mirror** または **Cancel** を提供する。ミラーを選ぶと空のパッケージ名フィールドに戻り、別のインストールを開始せずに選択レジストリを記憶する。インストールが既に npmmirror を問い合わせている場合、選択・入力・pnpm 自身の設定の指名のいずれであっても、ボタンは代わりに **Try another way** と読み、同じ空フィールドに **Install guide and examples** を展開した状態で戻り、レジストリは変更しない。他の失敗は既存の診断とアクションを保つ。ミラーはレジストリパッケージと依存を提供するもので、GitHub リポジトリ自体ではない。
 
-### Switching a bundle
+### バンドルの切り替え
 
-A bundle's page shows its full package name under the title. Its **Source** section, after the rows, names the spec that installs it elsewhere, as `pnpm add` accepts it, or **Built in** for an official bundle the installation ships, then its current version. A bundle's switch changes its layer selection. A profile with HMR recomposes before the operation completes; one without HMR, and a bundle a higher layer overrides, say so in a toast. A bundle the Host cannot read carries a problem tag and its reason on its page and cannot be switched on; one that provides the management components stays locked. The Host answers with error codes, which the page's dictionary words; pnpm's and the Loader's own diagnostics are shown as they are. The page excludes built-in profile bundles from cards even when the profile holds them as dependencies or the Host reports an error. The Host inventory remains complete; the Settings Plugins section's Plugin list tab inspects their plugins.
+バンドルのページはタイトルの下に完全なパッケージ名を表示する。その **Source** セクションは行の後にあり、他所にインストールする spec を `pnpm add` が受け付ける形で指名する。インストールに同梱される公式バンドル向けには **Built in** とし、続いて現在のバージョンを示す。バンドルのスイッチはそのレイヤー選択を変更する。HMR 付きプロファイルは操作完了前に再構成する。HMR なしのプロファイルや、上位レイヤーに上書きされるバンドルについてはトーストで知らせる。Host が読み取れないバンドルは問題タグとその理由をページに載せ、オンに切り替えられない。管理コンポーネントを提供するものはロックされたままとなる。Host はエラーコードで応答し、ページの辞書がそれを言葉にする。pnpm と Loader 自身の診断はそのまま表示される。ページは、プロファイルが依存として保持していたり Host がエラーを報告していたりしても、組み込みプロファイルバンドルをカードから除外する。Host インベントリーは完全なままである。Settings Plugins セクションの Plugin list タブがそれらのプラグインを検査する。
 
-### Switching one row of a bundle
+### バンドルの 1 行の切り替え
 
-A row's switch on the bundle's page calls `pluginManager.setPluginEnabled`, which records the row's enablement in the profile's `cordis.patch.yml` under the [toggle rules](../../boot/plugin-manager/README.md#use-this-package). The tree recomposes at once on a profile with HMR, so the row's host half unmounts or mounts while the rest of the bundle keeps running, and the page follows the client module graph without reloading. Rows use the shared status marker for their Host fiber phase: pending and disabled are idle, loading and unloading are ongoing, active is done, and failed is error. The switch appears only on a bundle that is on; a row without a live entry, or one the Host will not address through the profile patch, is locked with the Host's reason. A list longer than ten rows gets a filter over localized titles, descriptions, row ids, and module names.
+バンドルページ上の行スイッチは `pluginManager.setPluginEnabled` を呼び出し、[トグル規則](../../boot/plugin-manager/README.md#use-this-package)の下でプロファイルの `cordis.patch.yml` にその行の有効化を記録する。HMR 付きプロファイルではツリーが直ちに再構成されるため、その行の host 側はバンドルの残りが動き続ける中でアンマウントまたはマウントし、ページはクライアントモジュールグラフに追従して再読み込みしない。行は Host ファイバーフェーズに共有ステータスマーカーを使用する。pending と disabled は idle、loading と unloading は進行中、active は完了、failed はエラーである。スイッチはオンのバンドルにのみ表示される。ライブエントリーのない行、または Host がプロファイルパッチ経由で扱わない行は、Host の理由付きでロックされる。10 行を超える一覧には、ローカライズされたタイトル、説明文、行 id、モジュール名に対するフィルターが付く。
 
-### Configuration pages
+### 設定ページ
 
-A plugin that carries its own configuration renders it on this page rather than in Settings, through three slots the page declares: `plugins.item` (list) for an official plugin, listed in Built-in plugin settings by its `label`; `plugins.bundle.config` (keyed by the bundle's package name) for a bundle's own configuration, shown on the bundle's page between its description and its rows; and `plugins.row.config` (keyed by `<package name>#<row id>`) for one row's configuration, which gives that row a **Configure** control opening the row's page. The page renders `view: 'page'` for forms with their own save controls. Official plugin cards also render `view: 'summary'` under the title; a row's detail page uses that view only when its package description is absent. Only a save writes: the page draws the title, icon, and crumb, and the entry's form drops its staged edits when the page is left. The four host-plane pages the installation ships — the shell executor, the agent loop, Subagent, and the DeepSeek search provider — come from one companion package each, [ui-settings-shell](../ui-settings-shell/README.md), [ui-settings-agent-loop](../ui-settings-agent-loop/README.md), [ui-settings-subagent](../ui-settings-subagent/README.md), and [ui-settings-web-search](../ui-settings-web-search/README.md), registered while the Host serves their namespaces. A bundle's browser half registers the same way:
+自身の設定を持つプラグインは Settings ではなくこのページに描画され、ページが宣言する 3 つのスロット経由で行われる。公式プラグイン用の `plugins.item` (一覧) は `label` により Built-in plugin settings に並ぶ。バンドルの自身の設定用の `plugins.bundle.config` (バンドルのパッケージ名をキーとする) はバンドルのページ上で説明文と行の間に表示される。1 行の設定用の `plugins.row.config` (`<package name>#<row id>` をキーとする) はその行に **Configure** コントロールを与え、行のページを開く。ページは独自の保存コントロールを持つフォーム向けに `view: 'page'` を描画する。公式プラグインカードはタイトル下にも `view: 'summary'` を描画する。行の詳細ページはパッケージ説明文がない場合にのみそのビューを使用する。書き込むのは保存時のみである。ページはタイトル、アイコン、パンくずを描き、エントリーのフォームはページを離れると staged な編集を破棄する。インストールに同梱される 4 つの host プレーンのページ——shell 実行子、agent loop、Subagent、DeepSeek 検索プロバイダー——はそれぞれ 1 つのコンパニオンパッケージに由来する。[ui-settings-shell](../ui-settings-shell/README.md)、[ui-settings-agent-loop](../ui-settings-agent-loop/README.md)、[ui-settings-subagent](../ui-settings-subagent/README.md)、[ui-settings-web-search](../ui-settings-web-search/README.md)であり、Host がそれらの名前空間を提供する間に登録される。バンドルのブラウザー側も同様に登録する。
 
 ```tsx ignore-check
 ctx.slots.inject('plugins.row.config', () => ctx.slots.register({
@@ -80,11 +80,11 @@ ctx.slots.inject('plugins.row.config', () => ctx.slots.register({
 }, ({ t, view }) => view === 'summary' ? t('summary') : <SidebarForm t={t} />))
 ```
 
-The bundle's patch must declare the row under that id, and the registration exists while the bundle is on, so a bundle that is off shows no configure control.
+バンドルのパッチはその id の下で行を宣言しなければならず、登録はバンドルがオンの間存在するため、オフのバンドルには設定コントロールが表示されない。
 
-### Detail page extension points
+### 詳細ページの拡張点
 
-A plugin with something to say about a bundle, a row, or an official plugin it does not own contributes to that object's page through three list slots the page declares: `plugins.detail.actions` for a control at the head of the page, before the page's own switch and uninstall; `plugins.detail.badge` for a tag beside the title, after the version, experimental, and problem tags; and `plugins.detail.section` for a section under the page's own content — after the rows on a bundle's page, after the configuration on a row's or an official plugin's page. Every entry is rendered with the page's `subject`: `{ kind: 'bundle', pkg }`, `{ kind: 'row', pkg, row }`, or `{ kind: 'item', id }`, where `pkg` and `row` carry the name, version, installed and enabled facts, and the row list a contribution decides on. An entry renders null for a subject it has nothing for and draws its own section chrome; the page orders entries by `order`.
+バンドル、行、または自身が所有しない公式プラグインについて述べたいことがあるプラグインは、ページが宣言する 3 つの一覧スロット経由でそのオブジェクトのページに寄稿する。ページ先頭のコントロール用の `plugins.detail.actions` (ページ自身のスイッチとアンインストールの前)、タイトル横のタグ用の `plugins.detail.badge` (バージョン、experimental、問題タグの後)、ページ自身の内容の下のセクション用の `plugins.detail.section` (バンドルページでは行の後、行または公式プラグインページでは設定の後)。各エントリーはページの `subject` とともに描画される。`{ kind: 'bundle', pkg }`、`{ kind: 'row', pkg, row }`、または `{ kind: 'item', id }` であり、`pkg` と `row` は名前、バージョン、インストール済み・有効化の事実、および寄稿が判断する行一覧を運ぶ。エントリーは何もない subject には null を描画し、独自のセクションクロームを描く。ページはエントリーを `order` で並べる。
 
 ```tsx ignore-check
 ctx.slots.inject('plugins.detail.section', () => ctx.slots.register({
@@ -94,93 +94,93 @@ ctx.slots.inject('plugins.detail.section', () => ctx.slots.register({
 }, ({ t, subject }) => subject.kind === 'bundle' ? <HealthSection pkg={subject.pkg} t={t} /> : null))
 ```
 
-A row's page exists only while a `plugins.row.config` entry names the row, so a contribution meant for a row renders on the page that configuration opens.
+行のページは `plugins.row.config` エントリーが行を指名する間だけ存在するため、行向けの寄稿はその設定が開くページに描画される。
 
-### Page tabs
+### ページタブ
 
-Another plugin adds a tab after the page's own **Installed** tab by registering into the `plugins.tab` list slot; the entry's `label` names the tab and `order` places it. The tabs appear under the page header once one entry exists and are hidden on a bundle's, row's, or official plugin's page; the selected tab survives leaving **Plugins**, and a tab whose entry leaves falls back to **Installed**. The page renders the selected entry in place of its groups and hides its own refresh and add buttons there. The owner props carry `install({ spec, registry?, title, version })` and `openPackage(name)`. `install` is for a version the person already confirmed in the tab: the install dialog opens at its check screen, without the spec form, names the plugin with `title` and `version` above the spec, which it shows in smaller monospace text, keeps that name on the progress and result screens, with the installed version once done, asks `registry` first for that install only and never remembers it, and offers **Retry** after a refusal; a hidden installation reopens instead. `openPackage` switches to **Installed** and opens the bundle's page when that tab lists it; a bundle the page leaves out, such as a built-in profile bundle, leaves the Installed list open. A confirmed install offers no GitHub mirror recovery, since that recovery reopens the spec form, and its back button cancels a running install. [`ui-plugin-market`](../ui-plugin-market/README.md) contributes the **Discover** tab here.
+別のプラグインは `plugins.tab` 一覧スロットに登録することで、ページ自身の **Installed** タブの後にタブを追加する。エントリーの `label` がタブ名となり、`order` が配置を決める。タブはエントリーが 1 つでも存在すればページ見出しの下に表示され、バンドル・行・公式プラグインのページでは隠される。選択中のタブは **Plugins** を離れても保持され、エントリーを離れたタブは **Installed** にフォールバックする。ページは選択中のエントリーをグループの代わりに描画し、自身の更新ボタンと追加ボタンをそこでは隠す。オーナー props は `install({ spec, registry?, title, version })` と `openPackage(name)` を運ぶ。`install` はタブ内で人が既に確認したバージョン用である。インストールダイアログは spec フォームなしでチェック画面から開き、プラグインを spec の上に `title` と `version` で指名し、spec は小さな等幅テキストで示し、進行画面と結果画面でもその名前を保ち、完了後はインストール済みバージョンを伴う。そのインストールに限り `registry` を最初に問い合わせ、記憶することはなく、拒否後には **Retry** を提供する。隠れたインストールは代わりに再び開く。`openPackage` は **Installed** に切り替えて、そのタブが一覧する場合はバンドルのページを開く。組み込みプロファイルバンドルのようにページが除外するバンドルでは Installed 一覧を開いたままにする。確認済みインストールは GitHub ミラー回復を提供しない。その回復は spec フォームを再び開くためであり、その戻るボタンは実行中のインストールをキャンセルする。[`ui-plugin-market`](../ui-plugin-market/README.md) がここに **Discover** タブを提供する。
 
 -----
 
-Built-in illustrations follow the [feature preview authoring guide](../../../docs/cookbook/adding-a-plugin-preview.md): optional, one 640×300 SVG per language, with both English and Chinese required. The internal map and its asset test enforce the format; packages have no preview declaration interface.
+組み込みイラストは[機能プレビュー作成ガイド](../../../docs/cookbook/adding-a-plugin-preview.md)に従う。任意であり、言語ごとに 1 つの 640×300 SVG で、英語と中国語の両方が必須である。内部マップとそのアセットテストが形式を強制し、パッケージにプレビュー宣言インターフェースはない。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-Package management uses the profile's dependency records: installed bundles can be toggled and removed; installation-owned bundles remain locked. A selected bundle that neither the profile nor the installation holds also offers uninstall, which only removes it from the profile's bundle list. This distinction does not select startup failure policy.
+パッケージ管理はプロファイルの依存レコードを使用する。インストール済みバンドルは切り替えと削除が可能であり、インストール所有のバンドルはロックされたままとなる。プロファイルもインストールも保持しない選択済みバンドルもアンインストールを提供するが、それはプロファイルのバンドル一覧からの削除のみである。この区別は起動失敗ポリシーを選択しない。
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-### Registration
+### 登録
 
-The Host entry exposes `pluginRegistryProbe.fastest()` through the generated Remote interface. It shares pending comparisons, expires cached results, and aborts and awaits outstanding probes on unload. Calls after unload return a rejected Promise.
+Host エントリーは生成された Remote インターフェース経由で `pluginRegistryProbe.fastest()` を公開する。保留中の比較を共有し、期限切れの結果を破棄し、アンロード時に進行中のプローブを中断して待機する。アンロード後の呼び出しは拒否された Promise を返す。
 
-The browser plugin registers the `plugins` sidebar entry and its `main` panel through `ctx.slots.inject()`, so both follow late slot declaration, locale changes and teardown. The page is global and belongs to no Session. Display text comes from package metadata and the page's dictionary.
+ブラウザープラグインは `ctx.slots.inject()` 経由で `plugins` サイドバーエントリーとその `main` パネルを登録するため、どちらも遅延スロット宣言、ロケール変更、ティアダウンに追従する。ページはグローバルであり、Session に属さない。表示テキストはパッケージメタデータとページの辞書に由来する。
 
-The add control reuses `Button`, `Menu`, and `MenuItemButton`. Both installation actions call the same `openInstall` callback and use `InstallDialog` and `PluginManagerController`. The root-scoped list slot `plugins.add.actions` accepts contributed `MenuItemButton` rows after the install action; each contribution receives an `onDismiss()` callback to close the menu before starting its action.
+追加コントロールは `Button`、`Menu`、`MenuItemButton` を再利用する。両方のインストールアクションは同じ `openInstall` コールバックを呼び出し、`InstallDialog` と `PluginManagerController` を使用する。ルートスコープの一覧スロット `plugins.add.actions` はインストールアクションの後に寄稿された `MenuItemButton` 行を受け付け、各寄稿はアクション開始前にメニューを閉じるための `onDismiss()` コールバックを受け取る。
 
-### The store
+### ストア
 
-`PluginManagerController` owns the bundle views, busy keys, notices, install progress and the uninstall confirmation. Each read asks the inventory whether the Host manages a profile, then joins `listBundles` with `listPlugins` into one view per bundle, whose rows carry the live entry's enablement and fiber phase. It coalesces overlapping reads, refreshes after operations, on `plugin-manager/changed`, and on reconnect, and ignores late results after disposal. Install output is grouped by job id. The install dialog moves `idle → checking → starting → running → done | failed`, with `cancelling` and `applying` as the Host reports them and `unconfirmed` when an installation or cancellation response is lost; confirmed `applying` progress never regresses. Recovery uses `waitForInstall`, settling to `unknown` if no active request remains; checking and every active phase use ongoing, while the final screens use done or error. The check runs under an `AbortController` that going back or closing aborts, and its settlement is dropped; a run is stopped only through `pluginManager.cancelInstall`. Closing hides a run without discarding its state. A cancellation that overtakes installation is retried when progress or output acknowledges the request. A change the Host could not apply, a restart it waits for, and an override by a higher layer become toasts that retire on their own.
+`PluginManagerController` はバンドルビュー、ビジーキー、通知、インストール進行状況、アンインストール確認を所有する。各読み取りは Host がプロファイルを管理しているかをインベントリーに問い合わせ、次に `listBundles` と `listPlugins` を結合してバンドルごとに 1 つのビューとし、その行はライブエントリーの有効化とファイバーフェーズを運ぶ。重なる読み取りを合体し、操作後、`plugin-manager/changed` 時、再接続時に更新し、破棄後の遅延結果を無視する。インストール出力はジョブ id ごとにグループ化される。インストールダイアログは `idle → checking → starting → running → done | failed` と遷移し、Host の報告による `cancelling` と `applying`、インストールまたはキャンセル応答の喪失時の `unconfirmed` を伴い、確認済みの `applying` 進行状況は後退しない。回復は `waitForInstall` を使用し、アクティブな要求がなければ `unknown` に落ち着く。チェックとすべてのアクティブフェーズは進行中を使用し、最終画面は完了またはエラーを使用する。チェックは `AbortController` の下で実行され、戻る操作や閉鎖で中断されて、その解決は破棄される。実行の停止は `pluginManager.cancelInstall` 経由でのみ行う。閉鎖は実行を破棄せずに隠す。インストールを追い越したキャンセルは、進行状況または出力が要求を確認した時点で再試行される。Host が適用できなかった変更、待機中の再起動、上位レイヤーによる上書きは、自動的に消えるトーストとなる。
 
-### Configuration slots
+### 設定スロット
 
-Custom item pages use the Host entry id as their registration id; row pages use the bundle package and row id. The page owner supplies `form.state` and `form.mutate(operations, expectedRevision)` when the entry exposes editable Config fields. A custom page owns its draft and validation display, and may reuse `ConfigField` from ui-primitives. Bundle-wide pages can contain several entries and have no single form.
+カスタム項目ページは Host エントリー id を登録 id として使用し、行ページはバンドルパッケージと行 id を使用する。エントリーが編集可能な Config フィールドを公開する場合、ページオーナーは `form.state` と `form.mutate(operations, expectedRevision)` を提供する。カスタムページは下書きと検証表示を所有し、ui-primitives の `ConfigField` を再利用できる。バンドル全体のページは複数のエントリーを含み得て、単一のフォームを持たない。
 
-The page's `main` registration declares `plugins.item`, `plugins.bundle.config`, and `plugins.row.config` as its children, so the slots exist while the page does and a registrant's `ctx.slots.inject` waits for them. `configLedgerSource` projects the three ledgers into one observable — the official items in ledger order with their labels resolved in the active locale, and the bundle and row keys — cached until a ledger or the locale moves; the page binds it as `useConfigLedger` beside the store and never names a configurable plugin itself. The registration-owned navigation store selects the main list, the full experimental plugin list, a bundle, an official plugin, or a bundle row; switching away from the Plugins panel resets it to the list, while React remounts preserve the selected target. A fresh registration starts on the main list. Installation highlighting scrolls to a card only when it is on the current page; it does not change the selected page. Other Client plugins inject `pluginNavigation` and call `ctx.pluginNavigation.openBundle(packageName)` to open bundle details without changing the current Session. The target survives the initial inventory load; an absent bundle displays the list. A registration lives with the browser half that made it. `dsh-client-modules` attaches a package's browser half to the Loader row whose specifier is the bare package name, so every page a bundle registers, for itself or for any of its rows, goes away when that row is switched off; a sub-plugin whose page must outlive the other rows ships as its own package. Official packages whose names begin with `@deepseek-ai/dsh-experimental-` display the Experimental marker. Feature previews are SVG files under `src/client/assets/`, keyed by package name in the page and embedded in the Client bundle; packages cannot declare their own ([rationale](../../../.agents/notes/implemented/feature/2026-10-14-built-in-plugin-feature-previews.md)).
+ページの `main` 登録は `plugins.item`、`plugins.bundle.config`、`plugins.row.config` を子として宣言するため、スロットはページの存続中存在し、登録者の `ctx.slots.inject` はそれらを待つ。`configLedgerSource` は 3 つの台帳を 1 つの observable に投影する——台帳順の公式項目とアクティブロケールで解決されたラベル、およびバンドルと行のキー——台帳またはロケールが動くまでキャッシュされる。ページはストアの横で `useConfigLedger` としてそれを束縛し、設定可能なプラグイン自体を指名しない。登録所有のナビゲーションストアはメインリスト、完全な experimental プラグイン一覧、バンドル、公式プラグイン、またはバンドル行を選択する。Plugins パネルから離れるとリセットされて一覧に戻る一方、React の再マウントは選択中のターゲットを保持する。新規登録はメインリストから開始する。インストールの強調表示は現在のページにある場合にのみカードまでスクロールし、選択中のページは変更しない。他の Client プラグインは `pluginNavigation` を注入し、現在の Session を変更せずにバンドル詳細を開くために `ctx.pluginNavigation.openBundle(packageName)` を呼ぶ。ターゲットは初期インベントリー読み込みを越えて存続し、存在しないバンドルは一覧を表示する。登録はそれを作ったブラウザー側とともに生きる。`dsh-client-modules` はパッケージのブラウザー側を、指定子が素のパッケージ名である Loader 行に結び付けるため、バンドルが登録するすべてのページは、そのバンドル自身またはその行のいずれ向けであっても、その行がオフになると消える。他の行より長生きすべきページを持つサブプラグインは独自のパッケージとして出荷する。`@deepseek-ai/dsh-experimental-` で始まる名前の公式パッケージは Experimental マーカーを表示する。機能プレビューは `src/client/assets/` 下の SVG ファイルであり、ページ内でパッケージ名をキーとし、Client バンドルに埋め込まれる。パッケージは独自のものを宣言できない ([根拠](../../../.agents/notes/implemented/feature/2026-10-14-built-in-plugin-feature-previews.md))。
 
-`plugins.bundle.config` supplies bundle detail configuration, keyed by npm package name. `plugins.bundle.activation` offers bundle-owned guidance after explicit enablement from the list, with callbacks to dismiss it or open the bundle details. It does not appear merely because an enabled bundle was listed.
+`plugins.bundle.config` はバンドル詳細設定を提供し、npm パッケージ名をキーとする。`plugins.bundle.activation` は一覧からの明示的な有効化の後にバンドル所有のガイダンスを提供し、それを閉じるコールバックとバンドル詳細を開くコールバックを伴う。有効なバンドルが一覧に載ったというだけでは表示されない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the sidebar, the Remote calls, and the Host-side manager.
+以下のページはサイドバー、Remote 呼び出し、Host 側マネージャーを扱う。
 
-- [ui-sidebar](../ui-sidebar/README.md) — the panel list the Plugins entry registers into; [ui-layout](../ui-layout/README.md) — the main slot the page occupies.
-- [api-remotes](../../api/remotes/README.md) — the Remote BFF surface behind `pluginManager.*` and `pluginInventory.*`.
-- [plugin-manager](../../boot/plugin-manager/README.md) — the Host-side manager this page drives.
-- [ui-settings-shell](../ui-settings-shell/README.md), [ui-settings-agent-loop](../ui-settings-agent-loop/README.md), [ui-settings-subagent](../ui-settings-subagent/README.md), [ui-settings-web-search](../ui-settings-web-search/README.md) — the official configuration pages that register into this page's `plugins.item` slot.
+- [ui-sidebar](../ui-sidebar/README.md) — Plugins エントリーが登録されるパネル一覧。[ui-layout](../ui-layout/README.md) — ページが占めるメインスロット。
+- [api-remotes](../../api/remotes/README.md) — `pluginManager.*` と `pluginInventory.*` 背後の Remote BFF サーフェス。
+- [plugin-manager](../../boot/plugin-manager/README.md) — このページが駆動する Host 側マネージャー。
+- [ui-settings-shell](../ui-settings-shell/README.md)、[ui-settings-agent-loop](../ui-settings-agent-loop/README.md)、[ui-settings-subagent](../ui-settings-subagent/README.md)、[ui-settings-web-search](../ui-settings-web-search/README.md) — このページの `plugins.item` スロットに登録する公式設定ページ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side management surface that registers nothing model-facing.
+なし。このパッケージはモデルに面するものを何も登録しないブラウザー側の管理画面であるため。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てることも送信することもない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
-- Feature previews have one image per language and no dark-theme variant, so the badge skill preview keeps its light background in dark theme.
-- Ping response time does not measure package-download throughput. Probes use the Host fetch route, which pnpm-specific proxy settings can differ from; users can always choose the registry manually, and installation retains its existing fallback rules.
+- 機能プレビューは言語ごとに 1 画像であり、ダークテーマ用バリアントがないため、バッジスキルプレビューはダークテーマでも明るい背景のままとなる。
+- ping 応答時間はパッケージダウンロードのスループットを測らない。プローブは Host の fetch 経路を使用し、pnpm 固有のプロキシ設定とは異なる場合がある。ユーザーは常に手動でレジストリを選べ、インストールは既存のフォールバック規則を保持する。
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the reach of the management view; they are current package constraints.
+これらの制限は管理ビューの到達範囲を定めるものであり、現在のパッケージ制約である。
 
-- **Page lifetime** — refreshing the browser loses the tracked request and output. Reconnecting within the same page can recover an active request; completed results are not retained by the Host. Profile file locking serializes installation writes.
-- **Only bundles are managed** — a dependency without a bundle patch is refused before it installs; one the profile already holds is left off the page unless the profile selects it, and loading plain plugin modules stays a file operation.
-- **Rows show a phase, not a reason** — a failed row reads as failed without the Host's error text; the Host log has it.
-- **One install at a time** — the dialog runs one pnpm command; a second spec waits for the first to finish.
-- **No version picker** — the spec is typed as pnpm accepts it; the page does not list registry versions. Official on-demand entries offer the [running installation’s target](../../boot/plugin-manager/README.md#use-this-package). Other profile-installed plugins use uninstall and reinstall to change versions; installation-carried bundles upgrade with DSH.
-- **The registry choice is this browser's** — it lives in `localStorage`, so another browser applies its own initial recommendation; the `dsh plugin` command and the agent tool use the Host's configured registry.
-- **Every registry read runs pnpm** — opening the dialog, the check, and the install each ask pnpm what its own configuration names; a machine without pnpm reads it as unknown and is offered no fallback.
+- **ページの有効期間** — ブラウザーの更新は追跡中の要求と出力を失う。同じページ内での再接続はアクティブな要求を回復できる。完了した結果は Host に保持されない。プロファイルファイルのロックはインストール書き込みを直列化する。
+- **管理対象はバンドルのみ** — バンドルパッチのない依存はインストール前に拒否される。プロファイルが既に保持するものは、プロファイルが選択しない限りページから外れたままとなり、素のプラグインモジュールの読み込みはファイル操作のままである。
+- **行は理由ではなくフェーズを示す** — 失敗した行は Host のエラーテキストなしに失敗として読み取られる。Host ログにそれはある。
+- **同時にインストールできるのは 1 件** — ダイアログは 1 つの pnpm コマンドを実行する。2 つ目の spec は最初の完了を待つ。
+- **バージョン選択 UI なし** — spec は pnpm が受け付ける形で入力され、ページはレジストリバージョンを一覧しない。オンデマンドの Official エントリーは[実行中のインストールのターゲット](../../boot/plugin-manager/README.md#use-this-package)を提供する。他のプロファイルインストール済みプラグインはバージョン変更にアンインストール後の再インストールを使用し、インストール付随のバンドルは DSH とともにアップグレードする。
+- **レジストリ選択はこのブラウザーのもの** — ブラウザーごとの選択であり `localStorage` に存在するため、別のブラウザーは独自の初期推奨を適用する。`dsh plugin` コマンドとエージェントツールは Host の設定済みレジストリを使用する。
+- **レジストリ読み取りのたびに pnpm を実行** — ダイアログを開く、チェック、インストールの各操作は pnpm 自身の設定指名を pnpm に問い合わせる。pnpm のないマシンは不明として読み取り、フォールバックは提供されない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

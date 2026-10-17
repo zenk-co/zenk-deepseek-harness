@@ -1,37 +1,37 @@
 ---
-description: "The model-facing read, read_image, write, and edit tools for users and maintainers composing or debugging filesystem access for agents."
+description: "エージェントのファイルシステムアクセスを構成またはデバッグするユーザーとメンテナー向けの、モデル向け read、read_image、write、edit ツール。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-fs
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-tool-fs` to let a model read UTF-8 files with line numbers, read supported images, create or atomically replace files, and apply targeted literal edits. Results are capped, and failures provide stable error codes and recovery instructions. Add `dsh-fs-observation-policy` when writes and edits must follow a successful read; without it, mutations remain atomic but are unconditional. Image reads require durable attachment storage and an image-capable routed model. Choose the sibling discovery package for glob or grep searches.
+`dsh-tool-fs` を使うと、モデルは行番号付きで UTF-8 ファイルを読み、サポートされる画像を読み、ファイルを作成またはアトミックに置換し、対象を絞ったリテラル編集を適用できる。結果は上限付きで、失敗は安定したエラーコードと回復手順を提供する。write と edit が成功した read に続くことを要求する場合は `dsh-fs-observation-policy` を追加する。それなしでは、変更はアトミックなままだが無条件である。画像の読み取りには永続的な添付ストレージと画像対応のルーティングされたモデルが必要である。glob や grep 検索には兄弟のディスカバリーパッケージを選ぶ。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Relative paths use the Session's current working directory. A directory change affects subsequent reads and mutations without changing sandbox permission roots. Successful results return the canonical absolute path from `fs.processPath`, and root result metadata retains that operation-time path for replay and navigation.
+相対パスは Session の現在の作業ディレクトリを使う。ディレクトリの変更は、サンドボックスの許可ルートを変えずに、以降の読み取りと変更に影響する。成功した結果は `fs.processPath` からの正規の絶対パスを返し、ルート結果メタデータはリプレイとナビゲーションのためにその操作時点のパスを保持する。
 
-Mount the tools after a `ctx.fs` backend and, for read-before-write/edit behavior, the policy plugin. The model then gets line-numbered reads, atomic writes and edits, and — with an attachment store mounted — image reads; every result is capped, and failures carry stable codes with recovery instructions.
+`ctx.fs` バックエンドの後ろにツールをマウントし、read-before-write/edit の動作にはポリシープラグインもマウントする。するとモデルは行番号付きの読み取り、アトミックな書き込みと編集、そして添付ストアがマウントされている場合は画像の読み取りを得る。すべての結果は上限付きで、失敗は回復手順付きの安定したコードを運ぶ。
 
-### Minimal composition
+### 最小構成
 
-A backend, the policy plugin, then the tools; the attachment store is optional and enables `read_image`.
+バックエンド、ポリシープラグイン、次にツール。添付ストアはオプションで、`read_image` を有効にする。
 
 ```yaml
 - name: '@deepseek-ai/dsh-fs-local'
@@ -39,228 +39,228 @@ A backend, the policy plugin, then the tools; the attachment store is optional a
 - name: '@deepseek-ai/dsh-tool-fs'
 ```
 
-The policy plugin is optional: without it the tools run against the bare provider (unconditional write, overwrite, and edit with no observed-state). A deployment that loads these tools is expected to also load it, so the behavior is read-before-write/edit. `read_image` registers only while a durable `ctx.attachments` service is mounted; execution additionally refuses on a route whose exact model does not declare image input, so a text route's durable history stays free of image blocks.
+ポリシープラグインはオプションである。それなしではツールは素のプロバイダーに対して実行される（観測状態なしの無条件の write、上書き、edit）。これらのツールをロードするデプロイはそれもロードすることが期待されるため、動作は read-before-write/edit になる。`read_image` は永続的な `ctx.attachments` サービスがマウントされている間だけ登録され、実行はさらに、正確なモデルが画像入力を宣言しないルート上で拒否する。これによりテキストルートの永続履歴は画像ブロックを含まないままになる。
 
-### The tools
+### ツール
 
-| Tool | Arguments | Behavior |
+| ツール | 引数 | 動作 |
 |---|---|---|
-| `read` | `file_path`, `offset?`, `limit?` | Line-numbered UTF-8 content with a pagination footer; `offset` is 1-based and `limit` defaults to and caps at the configured `readLimit` |
-| `read_image` | `file_path` | Reads and persists a PNG/JPEG/WebP/GIF source; an extension-less path (normalized attachment object paths included) is identified from its file signature; normalization can downscale it before the next model request, so the model need not create a thumbnail first |
-| `write` | `file_path`, `content` | Creates or fully replaces a file; with the policy plugin, overwriting requires a prior `read` at the unchanged version, creating does not |
-| `edit` | `file_path`, `old_string`, `new_string`, `replace_all?` | Literal replacement requiring a unique match unless `replace_all` is true; with the policy plugin, requires a prior `read` and an unchanged file |
+| `read` | `file_path`, `offset?`, `limit?` | ページネーションフッター付きの行番号付き UTF-8 コンテンツ。`offset` は 1 始まりで、`limit` は設定された `readLimit` をデフォルトとし、それを上限とする |
+| `read_image` | `file_path` | PNG/JPEG/WebP/GIF ソースを読み取って永続化する。拡張子のないパス（正規化された添付オブジェクトパスを含む）はファイルシグネチャから識別される。正規化は次のモデルリクエストの前に縮小できるため、モデルは先にサムネイルを作る必要がない |
+| `write` | `file_path`, `content` | ファイルを作成または完全に置換する。ポリシープラグイン付きでは、上書きには変更されていないバージョンでの事前の `read` が必要で、作成には不要である |
+| `edit` | `file_path`, `old_string`, `new_string`, `replace_all?` | `replace_all` が true でない限り一意の一致を要求するリテラル置換。ポリシープラグイン付きでは、事前の `read` と変更されていないファイルを要求する |
 
-Field names are snake_case to match Claude Code and existing harness tool schemas. The `write` and `edit` path descriptions ask the model to emit `file_path` before the content or replacement strings; this guides streaming presentation but does not enforce JSON member order. Successes return compact envelopes — a read window, an image reference, or a `Created file`/`Updated file` confirmation — and `write`/`edit` derive replayable diff-card metadata for UI presentation.
+フィールド名は Claude Code と既存の harness ツールスキーマに合わせて snake_case である。`write` と `edit` のパス説明は、コンテンツや置換文字列より前に `file_path` を出力するようモデルに求める。これはストリーミング表示を導くが、JSON メンバー順序を強制しない。成功はコンパクトなエンベロープ（読み取りウィンドウ、画像参照、または `Created file`/`Updated file` の確認）を返し、`write`/`edit` は UI 表示用のリプレイ可能な diff カードメタデータを導出する。
 
-### Configuration
+### 設定
 
-All keys are optional. The `read`, `readImage`, `write`, and `edit` switches default to `true`; set a switch to `false` to omit that tool and its guidance. All four may be disabled. Enabling `readImage` still requires an attachment store and an image-capable model. Read caps remain validated when `read` is disabled.
+すべてのキーはオプションである。`read`、`readImage`、`write`、`edit` スイッチはデフォルトで `true`。スイッチを `false` にすると、そのツールとそのガイダンスを省略する。4 つとも無効にできる。`readImage` を有効にしても、依然として添付ストアと画像対応モデルが必要である。`read` を無効にしても読み取り上限の検証は残る。
 
-| Key | Default | Meaning |
+| キー | デフォルト | 意味 |
 |---|---|---|
-| `read` | `true` | Register `read` and its guidance |
-| `readImage` | `true` | Register `read_image` while an attachment store is mounted |
-| `write` | `true` | Register `write` and its guidance |
-| `edit` | `true` | Register `edit` and its guidance |
-| `readLimit` | `2000` | Default and maximum lines returned by one `read` call |
-| `readMaxLineLength` | `2000` | Characters kept per line before truncation |
-| `readMaxBytes` | `51200` | Byte cap on one `read` call's selected lines; overflow ends the window with a capped footer |
-| `readStreamMinSize` | `10485760` | Files at or above this size (or of unknown size) stream instead of loading whole into memory |
+| `read` | `true` | `read` とそのガイダンスを登録する |
+| `readImage` | `true` | 添付ストアがマウントされている間 `read_image` を登録する |
+| `write` | `true` | `write` とそのガイダンスを登録する |
+| `edit` | `true` | `edit` とそのガイダンスを登録する |
+| `readLimit` | `2000` | 1 回の `read` 呼び出しが返す行数のデフォルトかつ最大値 |
+| `readMaxLineLength` | `2000` | 切り詰め前に 1 行あたり保持される文字数 |
+| `readMaxBytes` | `51200` | 1 回の `read` 呼び出しで選択された行のバイト上限。オーバーフローは上限付きフッターでウィンドウを終了する |
+| `readStreamMinSize` | `10485760` | このサイズ以上（またはサイズ不明）のファイルはメモリに全体をロードせずストリームする |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-fs) is the exhaustive source for every accepted field and its JSDoc.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-fs)が、受け付けられるすべてのフィールドとその JSDoc の網羅的なソースである。
 
-With `fs-observation-policy` mounted and `read` disabled, `write` can still create files, and successful writes or edits record the versions needed for later mutations in that session. Existing unobserved files remain protected; disabling `read` does not relax the policy. Another filesystem reader must emit `fs/observed` for an existing file to become observed.
+`fs-observation-policy` がマウントされ `read` が無効な場合でも、`write` はファイルを作成でき、成功した書き込みや編集はそのセッション内の以降の変更に必要なバージョンを記録する。既存の未観測ファイルは保護されたままである。`read` を無効にしてもポリシーは緩まない。既存ファイルが観測済みになるには、別のファイルシステムリーダーが `fs/observed` を発する必要がある。
 
-### Policy and sandbox behavior
+### ポリシーとサンドボックスの動作
 
-Path authorization for `read` and `read_image` belongs entirely to `ctx.fs`; media-type declarations and file signatures only decide whether `read_image` accepts the bytes returned by that backend.
+`read` と `read_image` のパス認可は完全に `ctx.fs` に属する。メディアタイプの宣言とファイルシグネチャは、`read_image` がそのバックエンドの返すバイトを受け入れるかどうかだけを決める。
 
-With the policy plugin mounted, `write` and `edit` obtain their guard from the `fs/*` intent slots, so an unread target or a stale observation fails with `FS_NOT_OBSERVED` or `FS_STALE_VERSION` and a recovery instruction. Under a confining backend (`fs-sandbox`), `write`/`edit` additionally advertise `sandbox_permissions` and `justification`; a denied mutation returns the `[sandbox: file access denied under <mode> mode]` marker with the same-turn escalation hint, and an approved retry may stamp a strictly wider mode for that one call. The justification asks the model to use the language of the current user request.
+ポリシープラグインがマウントされている場合、`write` と `edit` は `fs/*` intent スロットからガードを得るため、未読み取りのターゲットや古い観測は `FS_NOT_OBSERVED` または `FS_STALE_VERSION` と回復手順で失敗する。閉じ込め型バックエンド（`fs-sandbox`）では、`write`/`edit` はさらに `sandbox_permissions` と `justification` を告知する。拒否された変更は同じターンでのエスカレーションヒント付きの `[sandbox: file access denied under <mode> mode]` マーカーを返し、承認された再試行はその 1 回の呼び出しに対して厳密に広いモードを刻印してよい。justification は現在のユーザーリクエストの言語を使うようモデルに求める。
 
-### Failures and recovery
+### 失敗と回復
 
-Failures are normalized as `Error: <message>` with a structured code preserved for callers. Stable messages include `file_path must be a non-empty string`, `limit must be less than or equal to <max>`, `cannot read "<path>": not found`, `cannot read "<path>": not a regular file`, and the image-route refusal `cannot read "<path>" as an image: model "<model>" does not declare image input; switch to an image-capable model to read images`. `FS_NOT_OBSERVED` is normalized to `cannot modify "<path>": file has not been read — read the file, then retry`, independent of whether the policy or provider rejected the operation; `FS_STALE_VERSION` retains the provider's reason and appends `— re-read the file, then retry`. After the reread confirms absence, `edit` reports `FS_NOT_FOUND` instead of repeating a stale remedy, while `write` uses guarded creation.
+失敗は `Error: <message>` として正規化され、呼び出し元のために構造化コードが保持される。安定したメッセージには `file_path must be a non-empty string`、`limit must be less than or equal to <max>`、`cannot read "<path>": not found`、`cannot read "<path>": not a regular file`、および画像ルートの拒否 `cannot read "<path>" as an image: model "<model>" does not declare image input; switch to an image-capable model to read images` が含まれる。`FS_NOT_OBSERVED` は、ポリシーとプロバイダーのどちらが操作を拒否したかに関係なく、`cannot modify "<path>": file has not been read — read the file, then retry` に正規化される。`FS_STALE_VERSION` はプロバイダーの理由を保持し、`— re-read the file, then retry` を付加する。再読み取りが不在を確認した後、`edit` は古い対処法を繰り返す代わりに `FS_NOT_FOUND` を報告し、`write` はガード付きの作成を使う。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-This section explains the design decisions behind the tool suite and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションはツールスイートの背後にある設計判断を説明し、それを実現するコードを指し示す。観測可能な動作は[このパッケージを使う](#use-this-package)で完全に扱っている。
 
-### Design concept
+### 設計コンセプト
 
-The tools are the executor; policy is an event gate. The tools inject no policy service and inspect no cache — each mutation asks the single intent slot for its guard through `ctx.waterfall`, and each operation emits `fs/observed` only after it succeeded. Reads do exactly one provider `stat` (type and size routing plus the observed version); mutations do none, because the guard comes from the intent slot and the provider re-checks under its lock.
+ツールは実行者であり、ポリシーはイベントゲートである。ツールはポリシーサービスを注入せず、キャッシュも検査しない。各変更は `ctx.waterfall` を通じて単一の intent スロットにガードを求め、各操作は成功した後にのみ `fs/observed` を発する。読み取りはプロバイダーの `stat` をちょうど 1 回行う（タイプとサイズのルーティングと観測バージョン）。変更は行わない。ガードは intent スロットから来て、プロバイダーがそのロックの下で再チェックするためである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config`, tool composition, `read_image` attachments gate |
-| [`src/read.ts`](src/read.ts) | `read` executor: one stat, streaming decision, window build, observation |
-| [`src/read-image.ts`](src/read-image.ts) | `read_image` executor: route and media-type gates, bounded bytes, attachment save |
-| [`src/write.ts`](src/write.ts) | `write` executor: intent waterfall, atomic write, observation |
-| [`src/edit.ts`](src/edit.ts) | `edit` executor: intent waterfall, literal edit, observation |
-| [`src/read-render.ts`](src/read-render.ts) | Cordis-free windowing and envelope formatting |
-| [`src/sandbox.ts`](src/sandbox.ts) | Escalation API shared by `write`/`edit`: policy resolution and denial-marker mapping |
-| [`src/error.ts`](src/error.ts) | Stable model-facing diagnostics for guarded-mutation failures |
-| [`src/mutation-result.ts`](src/mutation-result.ts) | Successful mutation observation and canonical result paths |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `Config`、ツール構成、`read_image` の添付ゲート |
+| [`src/read.ts`](src/read.ts) | `read` 実行者: stat 1 回、ストリーミング判断、ウィンドウ構築、観測 |
+| [`src/read-image.ts`](src/read-image.ts) | `read_image` 実行者: ルートとメディアタイプのゲート、有界バイト、添付保存 |
+| [`src/write.ts`](src/write.ts) | `write` 実行者: intent waterfall、アトミック書き込み、観測 |
+| [`src/edit.ts`](src/edit.ts) | `edit` 実行者: intent waterfall、リテラル編集、観測 |
+| [`src/read-render.ts`](src/read-render.ts) | Cordis 非依存のウィンドウ処理とエンベロープフォーマット |
+| [`src/sandbox.ts`](src/sandbox.ts) | `write`/`edit` が共有するエスカレーション API: ポリシー解決と拒否マーカーのマッピング |
+| [`src/error.ts`](src/error.ts) | ガード付き変更の失敗に対する安定したモデル向け診断 |
+| [`src/mutation-result.ts`](src/mutation-result.ts) | 成功した変更の観測と正規の結果パス |
 
-### Per-tool flow
+### ツールごとのフロー
 
-All four tools share one flow shape: resolve the path with the calling session's cwd, run the applicable gate, perform exactly one provider operation, and emit `fs/observed` only after success. `read` and `read_image` pay one `stat` for type and size routing; `write` and `edit` pay none because their guard comes from the intent slot, and provider failures surface as typed `FsError` results. The per-tool executors live in `src/read.ts`, `src/read-image.ts`, `src/write.ts`, and `src/edit.ts`.
+4 つのツールはすべて 1 つのフロー形状を共有する。呼び出し元セッションの cwd でパスを解決し、該当するゲートを実行し、プロバイダー操作をちょうど 1 回行い、成功した後にのみ `fs/observed` を発する。`read` と `read_image` はタイプとサイズのルーティングのために `stat` を 1 回払い、`write` と `edit` は払わない。ガードが intent スロットから来るためであり、プロバイダーの失敗は型付きの `FsError` 結果として現れる。ツールごとの実行者は `src/read.ts`、`src/read-image.ts`、`src/write.ts`、`src/edit.ts` にある。
 
-### Observation and concurrency
+### 観測と並行性
 
-`fs/observed` fires after the operation succeeded via a plain `ctx.emit`; a listener is contractually a synchronous, side-effect-only recorder, so async or fallible observation does not belong on this event. `read` opts into concurrent scheduling because its only mutation is the synchronous version recorder; recorder races fail closed when a later `write` or `edit` re-checks the version under its target lock, and both mutation tools remain exclusive.
+`fs/observed` は操作が成功した後にプレーンな `ctx.emit` で発火する。リスナーは契約上、同期的で副作用のみのレコーダーであるため、非同期または失敗しうる観測はこのイベントに属さない。`read` は並行スケジューリングを選ぶ。その唯一の変更が同期的なバージョンレコーダーだからである。レコーダーの競合は、後の `write` または `edit` がターゲットロックの下でバージョンを再チェックするときにフェイルクローズし、両方の変更ツールは排他的なままである。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the tools to the contract, backends, and policy they compose with.
+パッケージレベルの契約では足りないときにこれらのページを読む。ツールから、それが構成する契約、バックエンド、ポリシーへと進む。
 
-- [Filesystem subsystem](../../../docs/subsystems/filesystem.md) — exhaustive provider contract, policy events, and error taxonomy.
-- [dsh-fs](../fs/README.md) — the `ctx.fs` contract these tools consume.
-- [fs-local](../fs-local/README.md) — the host-filesystem backend these tools run against.
-- [fs-sandbox](../fs-sandbox/README.md) — the sandbox-enforcing backend that adds the escalation fields.
-- [fs-observation-policy](../fs-observation-policy/README.md) — the policy plugin that guards mutations through the `fs/*` events.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-fs) — the exhaustive schemas this package registers.
+- [ファイルシステムサブシステム](../../../docs/subsystems/filesystem.md) — 網羅的なプロバイダー契約、ポリシーイベント、エラー分類。
+- [dsh-fs](../fs/README.md) — これらのツールが消費する `ctx.fs` 契約。
+- [fs-local](../fs-local/README.md) — これらのツールが実行される対象のホストファイルシステムバックエンド。
+- [fs-sandbox](../fs-sandbox/README.md) — エスカレーションフィールドを追加するサンドボックス強制バックエンド。
+- [fs-observation-policy](../fs-observation-policy/README.md) — `fs/*` イベントを通じて変更をガードするポリシープラグイン。
+- [生成されるツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-fs) — このパッケージが登録する網羅的なスキーマ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-At assembly time, each guidance section checks `ctx.tools.get(name, scope)` and renders only while its tool is visible to that agent. The write paragraph recommends edit only while edit is visible. The text below is unchanged when all three tools are available; restrictions, their removal, and tool registration changes take effect on the next assembly. The same check works for direct agent restrictions and historical subagent filters restored from descriptors, including PTC capabilities behind `run_code`. The read-before-mutation sentences in write/edit describe the observation policy, not a requirement to invoke the tool named `read`. They remain when `read` is hidden: the policy still guards mutations, and another observing operation, such as `str_replace_editor` with `command: view`, can establish the same file observation. Tool visibility does not disable that precondition.
+組み立て時に、各ガイダンスセクションは `ctx.tools.get(name, scope)` を確認し、そのツールがそのエージェントに見える間だけレンダリングする。write の段落は edit が可視の間だけ edit を推奨する。以下に示すテキストは 3 つのツールすべてが利用可能なときは変わらない。制限、その解除、ツール登録の変更は次の組み立てで有効になる。同じチェックは、直接のエージェント制限と、記述子から復元された歴史的サブエージェントフィルター（`run_code` の背後の PTC ケイパビリティを含む）でも機能する。write/edit の read-before-mutation の文は観測ポリシーを説明するものであり、`read` という名前のツールの呼び出しを要求するものではない。それらは `read` が隠されているときも残る。ポリシーは依然として変更をガードし、`command: view` を伴う `str_replace_editor` のような別の観測操作が同じファイル観測を確立できる。ツールの可視性はこの前提条件を無効にしない。
 
-##### Read guidance
+##### read ガイダンス
 
 ```markdown
 Use the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files.
 ```
 
-##### Write guidance
+##### write ガイダンス
 
 ```markdown
 Read an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes.
 ```
 
-##### Edit guidance
+##### edit ガイダンス
 
 ```markdown
 Read a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Guidance cost follows the visible tools and their applicable cross-tool recommendations.
+ガイダンスのコストは、可視のツールとその適用可能なツール横断の推奨に従う。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the visible tool set, plugin scope, and guidance text are unchanged. Restrictions or plugin lifecycle changes may invalidate reuse from the first changed section.
+可視のツールセット、プラグインスコープ、ガイダンステキストが変わらない間はプレフィックス安定である。制限やプラグインライフサイクルの変更は、最初に変わったセクションから再利用を無効化しうる。
 
-### Tool schemas
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The model sees the generated [`read`, `read_image`, `write`, and `edit` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-fs), with snake_case arguments. The image tool appears only while a durable attachment store is mounted; its schema is route-independent, and the strict gate refuses at execution. Scoped tool restrictions can remove any definition for one agent.
+モデルは生成された [`read`、`read_image`、`write`、`edit` のスキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-fs)を snake_case の引数とともに見る。画像ツールは永続的な添付ストアがマウントされている間だけ現れる。そのスキーマはルート非依存で、厳格なゲートが実行時に拒否する。スコープ付きツール制限は任意の定義を 1 つのエージェントから取り除ける。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost on every request in that tool view.
+そのツールビューでは、すべてのリクエストに固定のスキーマコストがかかる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the visible tool definitions and order are unchanged. Registration lifecycle or scoped restrictions may invalidate reuse from the first changed schema token.
+可視のツール定義とその順序が変わらない間はプレフィックス安定である。登録ライフサイクルやスコープ付き制限は、最初に変わったスキーマトークンから再利用を無効化しうる。
 
-### Read result
+### read の結果
 
-#### What the model sees
+#### モデルが見るもの
 
-A successful read is exactly `<path><resolvedPath></path>`, newline, `<type>file</type>`, newline, `<content>`, numbered lines as `<lineNumber>: <text>`, a blank line, one footer, and `</content>`. The footer is exactly `(Output capped. Showing lines <start>-<end>. Use offset=<next> to continue.)`, `(Showing lines <start>-<end> of <total>. Use offset=<next> to continue.)`, or `(End of file - total <total> lines)`. A long line ends exactly `... (line truncated to <max> chars)`. A missing read still returns `FS_NOT_FOUND`, but it records confirmed absence for the calling session; after an externally deleted file is re-read, a retried `write` can safely recreate it through the provider's no-replace guard.
+成功した read は正確に `<path><resolvedPath></path>`、改行、`<type>file</type>`、改行、`<content>`、`<lineNumber>: <text>` としての番号付き行、空行、1 つのフッター、`</content>` である。フッターは正確に `(Output capped. Showing lines <start>-<end>. Use offset=<next> to continue.)`、`(Showing lines <start>-<end> of <total>. Use offset=<next> to continue.)`、または `(End of file - total <total> lines)` である。長い行は正確に `... (line truncated to <max> chars)` で終わる。見つからない read も `FS_NOT_FOUND` を返すが、呼び出し元セッションのために不在確認を記録する。外部で削除されたファイルを再読み取りした後、再試行された `write` はプロバイダーの no-replace ガードを通じて安全に再作成できる。
 
-#### Token effect
+#### トークンへの影響
 
-Read output is capped by `readLimit`, `readMaxLineLength`, and `readMaxBytes`; the retained call and result are resent until compaction.
+read の出力は `readLimit`、`readMaxLineLength`、`readMaxBytes` で上限付きである。保持された呼び出しと結果はコンパクションまで再送される。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-### Image read result
+### 画像 read の結果
 
-#### What the model sees
+#### モデルが見るもの
 
-A successful `read_image` returns `<path><resolvedPath></path>`, `<type>image</type>`, and a `<content>` envelope naming the media type, normalized dimensions, and byte size, followed by the image itself as a native image block. The result is logged with its durable reference before the next model request.
+成功した `read_image` は `<path><resolvedPath></path>`、`<type>image</type>`、およびメディアタイプ、正規化された寸法、バイトサイズを示す `<content>` エンベロープを返し、続いて画像自体がネイティブの画像ブロックとして続く。結果は次のモデルリクエストの前に、その永続参照とともにログに記録される。
 
-#### Token effect
+#### トークンへの影響
 
-The image is billed on every later request until compaction. Each call is independently bounded by the attachment store's `maxImageBytes`/`maxImagePixels`/`maxImageDimension`; repeated successful calls accumulate history, and content addressing deduplicates only the stored bytes, not the per-request token cost.
+画像はコンパクションまで以降のすべてのリクエストで課金される。各呼び出しは添付ストアの `maxImageBytes`/`maxImagePixels`/`maxImageDimension` によって独立に制限される。繰り返しの成功呼び出しは履歴を蓄積し、コンテンツアドレッシングが重複排除するのは保存バイトのみで、リクエストごとのトークンコストは重複排除しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-### Write and edit results
+### write と edit の結果
 
-#### What the model sees
+#### モデルが見るもの
 
-Write returns the exact five-line envelope `<path><resolvedPath></path>`, `<type>file</type>`, `<content>`, `Created file` or `Updated file`, then `</content>`. Edit returns exactly `The file <resolvedPath> has been updated successfully.` or, for `replace_all`, `The file <resolvedPath> has been updated. All occurrences were successfully replaced.` The full write or replacement text remains in the assistant tool-call arguments.
+Write は正確に 5 行のエンベロープ `<path><resolvedPath></path>`、`<type>file</type>`、`<content>`、`Created file` または `Updated file`、`</content>` を返す。Edit は正確に `The file <resolvedPath> has been updated successfully.`、または `replace_all` の場合は `The file <resolvedPath> has been updated. All occurrences were successfully replaced.` を返す。書き込みまたは置換テキスト全体はアシスタントのツール呼び出し引数に残る。
 
-#### Token effect
+#### トークンへの影響
 
-Success text is small, but large mutation arguments and any result are resent until compaction.
+成功テキストは小さいが、大きな変更引数と結果はコンパクションまで再送される。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-### Tool errors
+### ツールエラー
 
-#### What the model sees
+#### モデルが見るもの
 
-Failures are normalized as `Error: <message>`. This package's stable validation and read messages are `file_path must be a non-empty string`, `limit must be less than or equal to <max>`, `old_string must be a non-empty string`, `old_string and new_string must differ`, `cannot read "<path>": not found`, `cannot read "<path>": not a regular file`, `offset <offset> is out of range for "<path>" (<total> lines)`, `cannot read "<path>": the <ext> extension does not declare a supported image format; read_image accepts PNG/JPEG/WebP/GIF files, including extension-less files in those formats`, `cannot read "<path>": the file content is not a supported image format; read_image accepts PNG/JPEG/WebP/GIF`, `cannot read "<path>": the bytes do not decode as a supported PNG/JPEG/WebP/GIF image; the file may be truncated or corrupt`, `cannot read "<path>" as an image: model "<model>" does not declare image input; switch to an image-capable model to read images`, and the mismatch repair `cannot read "<path>": the <ext> extension declares <type>, but the bytes use a different image format; rename the file to match its actual format if it is PNG/JPEG/WebP/GIF, or convert it to one of those formats` (an extension-less mismatch reports `cannot read "<path>": the file signature claims <type>, but the bytes decode as a different image format; the file may be corrupt`). A failed 16-bit conversion reports `cannot read "<path>": the 16-bit PNG could not be converted to the normalized 8-bit sRGB form; convert it to an 8-bit PNG/JPEG/WebP and retry`. Provider and policy templates are quoted in their package READMEs. The model-facing error wrapper normalizes every `FS_NOT_OBSERVED` source to `cannot modify "<path>": file has not been read — read the file, then retry`; `FS_STALE_VERSION` keeps the provider's reason and adds `— re-read the file, then retry`. Both retain the structured error code and original cause. After that reread confirms absence, `edit` reports `FS_NOT_FOUND` instead of repeating a stale remedy, while `write` uses guarded creation.
+失敗は `Error: <message>` として正規化される。このパッケージの安定した検証および読み取りメッセージは `file_path must be a non-empty string`、`limit must be less than or equal to <max>`、`old_string must be a non-empty string`、`old_string and new_string must differ`、`cannot read "<path>": not found`、`cannot read "<path>": not a regular file`、`offset <offset> is out of range for "<path>" (<total> lines)`、`cannot read "<path>": the <ext> extension does not declare a supported image format; read_image accepts PNG/JPEG/WebP/GIF files, including extension-less files in those formats`、`cannot read "<path>": the file content is not a supported image format; read_image accepts PNG/JPEG/WebP/GIF`、`cannot read "<path>": the bytes do not decode as a supported PNG/JPEG/WebP/GIF image; the file may be truncated or corrupt`、`cannot read "<path>" as an image: model "<model>" does not declare image input; switch to an image-capable model to read images`、および不一致の修復 `cannot read "<path>": the <ext> extension declares <type>, but the bytes use a different image format; rename the file to match its actual format if it is PNG/JPEG/WebP/GIF, or convert it to one of those formats`（拡張子なしの不一致は `cannot read "<path>": the file signature claims <type>, but the bytes decode as a different image format; the file may be corrupt` を報告する）である。16 ビット変換の失敗は `cannot read "<path>": the 16-bit PNG could not be converted to the normalized 8-bit sRGB form; convert it to an 8-bit PNG/JPEG/WebP and retry` を報告する。プロバイダーとポリシーのテンプレートはそれぞれのパッケージ README に引用されている。モデル向けエラーラッパーは、すべての `FS_NOT_OBSERVED` ソースを `cannot modify "<path>": file has not been read — read the file, then retry` に正規化する。`FS_STALE_VERSION` はプロバイダーの理由を保ち、`— re-read the file, then retry` を加える。どちらも構造化エラーコードと元の原因を保持する。その再読み取りが不在を確認した後、`edit` は古い対処法を繰り返す代わりに `FS_NOT_FOUND` を報告し、`write` はガード付きの作成を使う。
 
-#### Token effect
+#### トークンへの影響
 
-Only a failing call adds these retained tokens.
+失敗した呼び出しだけがこれらの保持トークンを追加する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the tool suite is a poor fit or needs special operational care. They are current package constraints, not a general filesystem comparison or a task backlog.
+これらの制限は、ツールスイートが不向きになる、または特別な運用上の注意を要する場合を定義する。これらは現在のパッケージ制約であり、一般的なファイルシステムの比較でもタスクバックログでもない。
 
-- **No model-facing directory listing ships** — `ctx.fs.listDir` serves provider code such as skill discovery, while the sibling `dsh-tool-fs-search` package supplies ripgrep-backed `glob` and `grep` rather than extending the filesystem seam.
-- **`read` handles UTF-8 text files only** — images use the separate `read_image` tool; PDF, audio, and video remain deferred. A directory target is `FS_NOT_REGULAR_FILE`.
-- **Extension-declared media type** — an extension selects the declared type and the attachment store's magic-byte validation stays authoritative; a correctly formatted image under a wrong extension is refused with the rename remedy rather than sniffed. Only a path with no extension is identified from its file signature.
-- **Object paths re-enter source admission** — `read_image` on a normalized attachment object re-admits its bytes as a new source, so a deployment whose `maxImageBytes`/`maxMessageImageBytes` sit below the normalized-image byte budget can refuse an object path that `ctx.attachments.readImage` still serves; shipped defaults keep the normalized budget (4 MiB) far under the source caps (20 MiB).
-- **Inline image preview rides the UI composition** — the tool-result card renders the image through the browser's `tool.call.images` slot, which the attachment presentation plugin fills; a UI without that plugin shows the result's envelope text instead.
-- **No attachment-region tool** — an agent may crop an image through another available tool when it has a filesystem path; a pasted or dragged image without a path cannot be re-read at higher resolution.
-- **No timeout surface** — `read`/`write`/`edit` take no timeout argument and declare no timeout budget; cancellation rides `exec.signal` only ([provider rationale](../README.md)).
+- **モデル向けのディレクトリ一覧は出荷されない** — `ctx.fs.listDir` はスキルディスカバリーなどのプロバイダーコードに使われ、兄弟の `dsh-tool-fs-search` パッケージがファイルシステムシームを拡張するのではなく、ripgrep を基盤とする `glob` と `grep` を提供する。
+- **`read` が扱うのは UTF-8 テキストファイルのみ** — 画像は別の `read_image` ツールを使う。PDF、音声、動画は先送りのままである。ディレクトリをターゲットにすると `FS_NOT_REGULAR_FILE` になる。
+- **拡張子で宣言されるメディアタイプ** — 拡張子が宣言タイプを選択し、添付ストアのマジックバイト検証が権威のままである。誤った拡張子の下にある正しい形式の画像は、sniff されるのではなくリネームの対処法付きで拒否される。ファイルシグネチャから識別されるのは拡張子のないパスのみである。
+- **オブジェクトパスはソース受け入れに再入する** — 正規化された添付オブジェクトへの `read_image` はそのバイトを新しいソースとして再受け入れするため、`maxImageBytes`/`maxMessageImageBytes` が正規化画像のバイトバジェットを下回るデプロイは、`ctx.attachments.readImage` がまだ提供するオブジェクトパスを拒否しうる。出荷デフォルトは正規化バジェット（4 MiB）をソース上限（20 MiB）のはるか下に保つ。
+- **インライン画像プレビューは UI 構成に乗る** — ツール結果カードは、添付プレゼンテーションプラグインが埋めるブラウザーの `tool.call.images` スロットを通じて画像を描画する。そのプラグインのない UI は代わりに結果のエンベロープテキストを表示する。
+- **添付領域のツールはない** — エージェントはファイルシステムパスがあれば、別の利用可能なツールで画像を切り抜いてよい。パスのない貼り付けまたはドラッグされた画像は高解像度で再読み取りできない。
+- **タイムアウトサーフェスはない** — `read`/`write`/`edit` はタイムアウト引数を取らず、タイムアウトバジェットも宣言しない。キャンセルは `exec.signal` にのみ乗る（[プロバイダーの根拠](../README.md)）。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

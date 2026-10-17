@@ -1,18 +1,18 @@
 ---
 kind: upgrade-guide
-description: "Bundled NumPy and pandas omit their upstream test suites."
+description: "バンドルされた NumPy と pandas は上流テストスイートを含まない。"
 ---
 
-# NumPy and pandas upstream tests require a separate environment
+# NumPy と pandas の上流テストには別環境が必要である
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-Desktop and Python SDK runtime distributions previously included NumPy and pandas test directories. Bundled distributions now omit those directories, so scripts importing their test modules or running their complete upstream suites need a separate installation. Data processing, Office authoring, `numpy.testing`, `pandas.testing`, and `pandas._testing` remain available.
+Desktop と Python SDK ランタイム配布には以前 NumPy と pandas のテストディレクトリーが含まれていた。バンドル配布は現在それらのディレクトリーを含まないため、テストモジュールをインポートするスクリプトや完全な上流スイートを実行するスクリプトには別途インストールが必要である。データ処理、Office オーサリング、`numpy.testing`、`pandas.testing`、`pandas._testing` は引き続き利用できる。
 
-## Migration
+## 移行
 
-1. If your scripts import `numpy.*.tests` or `pandas.tests`, install the original NumPy and pandas distributions and their upstream testing dependencies in a separate Python environment. Keep that environment outside the managed Harness runtime directory, which upgrades replace.
-2. Run the affected scripts or upstream suites with that environment's interpreter. Scripts that use only library functionality or retained testing helpers require no changes.
-3. Confirm that the previously failing test-module imports and affected scripts succeed with the separate interpreter. The bundled versions are recorded in the [runtime lock](../../../../scripts/primary-runtime/lock.json).
+1. スクリプトが `numpy.*.tests` や `pandas.tests` をインポートする場合は、オリジナルの NumPy と pandas 配布および上流テスト依存を別の Python 環境にインストールする。その環境は管理された Harness ランタイムディレクトリーの外に保つ。アップグレードでそのディレクトリーは置き換えられる。
+2. 影響を受けるスクリプトや上流スイートはその環境のインタープリターで実行する。ライブラリー機能や残されたテストヘルパーのみを使うスクリプトに変更は不要である。
+3. 以前失敗していたテストモジュールのインポートと影響を受けるスクリプトが別のインタープリターで成功することを確認する。バンドルされたバージョンは [ランタイムロック](../../../../scripts/primary-runtime/lock.json) に記録されている。

@@ -1,39 +1,39 @@
 ---
-description: "Persistent terminal sessions for deployments and consumers choosing, composing, or extending the owner-scoped ctx.terminals service."
+description: "所有者スコープの ctx.terminals サービスを選択・コンポーズ・拡張するデプロイメントとコンシューマー向けの永続ターミナルセッション。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-terminal
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-terminal` provides persistent, owner-scoped terminal sessions to the harness: a session keeps shell or REPL state across tool calls, and every operation is fenced to the exact agent that created it. It provides the `ctx.terminals` service, which mints opaque session ids, routes session creation through registered backends, and waits for quiescent cleanup when an owner or the service disposes. It defines no terminal mechanics itself: backends such as the shipped `dsh-terminal-bash` own spawning and readiness, and the model-facing tools in `dsh-tool-terminal` own presentation. Sessions are process-local: they do not survive a harness restart.
+`dsh-terminal` はハーネスに永続的な所有者スコープのターミナルセッションを提供します: セッションはツール呼び出しをまたいでシェルまたは REPL の状態を保ち、すべての操作はそれを作成した正確なエージェントにフェンスされます。これは `ctx.terminals` サービスを提供し、不透明なセッション ID を発行し、セッション作成を登録済みバックエンドへルーティングし、所有者またはサービスが破棄されたときに静穏なクリーンアップを待ちます。ターミナルのメカニクス自体は定義しません: 出荷済みの `dsh-terminal-bash` などのバックエンドがスポーンと準備完了を所有し、`dsh-tool-terminal` のモデル向けツールがプレゼンテーションを所有します。セッションはプロセスローカルです: ハーネスの再起動を生き延びません。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と保留作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount `@deepseek-ai/dsh-terminal` whenever a composition needs terminal sessions whose state survives across tool calls. The service alone does nothing useful: pair it with a backend such as `@deepseek-ai/dsh-terminal-bash` and a tool package such as `@deepseek-ai/dsh-tool-terminal`, and load all three in one composition.
+ツール呼び出しをまたいで状態が存続するターミナルセッションをコンポジションが必要とするときはいつでも `@deepseek-ai/dsh-terminal` をマウントします。サービス単体では有用なことを何もしません: `@deepseek-ai/dsh-terminal-bash` などのバックエンドと、`@deepseek-ai/dsh-tool-terminal` などのツールパッケージと組み合わせ、3 つすべてを 1 つのコンポジションにロードしてください。
 
-### When to choose it
+### 選ぶべきとき
 
-Choose persistent terminals for work whose state lives in the terminal rather than a file: stepping a debugger, exploring in a Python or Node REPL, or returning to a shell after interrupting its foreground command. Choose the one-shot bash, read, write, and edit tools for bounded operations — they keep stronger validation, approval, output-bound, and replay contracts. Sessions are process-local: they disappear when the harness process exits, so durable work belongs in files or another persistent system.
+状態がファイルではなくターミナルに存在する作業には永続ターミナルを選びます: デバッガーのステップ実行、Python や Node の REPL での探索、フォアグラウンドコマンドを中断した後のシェルへの復帰などです。境界付きの操作にはワンショットの bash、read、write、edit ツールを選んでください — それらはより強力な検証、承認、出力境界、リプレイの契約を保ちます。セッションはプロセスローカルです: ハーネスプロセスの終了時に消えるため、永続的な作業はファイルや別の永続システムに属します。
 
-### Composition
+### コンポジション
 
-Load the session service together with a backend and a tool package:
+セッションサービスをバックエンドとツールパッケージと共にロードします:
 
 ```yaml
 - name: '@deepseek-ai/dsh-terminal'
@@ -41,111 +41,111 @@ Load the session service together with a backend and a tool package:
 - name: '@deepseek-ai/dsh-tool-terminal'
 ```
 
-A backend provides one stable type — the shipped shell backend provides `shell` — and the tools open sessions by that type. The shell backend additionally requires the sandbox, sandbox-policy, and subprocess providers; see its [README](../terminal-bash/README.md) for the full composition.
+バックエンドは 1 つの安定した種別を提供し — 出荷済みシェルバックエンドは `shell` を提供します — ツールはその種別でセッションを開きます。シェルバックエンドはさらに sandbox、sandbox-policy、subprocess プロバイダーを必要とします。完全なコンポジションはその [README](../terminal-bash/README.md) を参照してください。
 
-### What sessions give you
+### セッションでできること
 
-Once a session exists, consumers can open a session and receive its id and bounded startup output, send text (optionally submitting Enter) and wait until the shell is ready again or the send times out, read bounded retained output, deliver one allowed signal to the foreground process group, close a session and wait for its process tree to end, and list the sessions a caller owns. Exactly one send can be active per session at a time; a second send fails until the first settles.
+セッションが存在すれば、コンシューマーはセッションを開いてその ID と境界付きの起動出力を受け取り、テキストを送信して (任意で Enter を送信) シェルが再び準備完了になるか送信がタイムアウトするまで待ち、保持された出力の境界付きページを読み取り、許可されたシグナルを 1 つフォアグラウンドプロセスグループへ配信し、セッションを閉じてそのプロセスツリーの終了を待ち、呼び出し元が所有するセッションを一覧表示できます。セッションごとに同時にアクティブにできる送信はちょうど 1 つで、2 つ目の送信は最初が確定するまで失敗します。
 
-### Ownership and isolation
+### 所有権と分離
 
-Every session is owned by the exact agent that opened it. Operations that name a session are rejected when the caller is not that agent, so the model cannot reach another agent's terminal even if it learns the id. An optional session `name` is owner-local display metadata — labels such as `main` or `gdb` — and is unique only within its owner.
+すべてのセッションは、それを開いた正確なエージェントが所有します。セッションを名指す操作は、呼び出し元がそのエージェントでない場合に拒否されるため、モデルが ID を知っても別のエージェントのターミナルに到達することはできません。任意のセッション `name` は所有者ローカルの表示メタデータ — `main` や `gdb` などのラベル — で、その所有者の範囲内でのみ一意です。
 
-### Observable outcomes and failures
+### 観察可能な結果と失敗
 
-A successful open returns the session id, type, pid when the backend has one, status, and a bounded startup message. Sends settle with a wait reason: `stdin_read` (the shell is waiting for input), `inferred_idle` (output silence), `timeout`, or `session_exit` (the top-level shell exited). Failures carry stable machine-routable codes: a missing backend type (`NO_BACKEND`), an unknown session (`NO_SESSION`), another agent's session (`FOREIGN_SESSION`), a second concurrent send (`SEND_ACTIVE`), or an owner that is no longer live (`OWNER_NOT_LIVE`). Backend setup failures reject the open before anything is published, and a failed cleanup rejects the close rather than claiming success.
+成功したオープンは、セッション ID、種別、バックエンドが持つ場合は pid、状態、境界付きの起動メッセージを返します。送信は待機理由と共に確定します: `stdin_read` (シェルが入力を待っている)、`inferred_idle` (出力の沈黙)、`timeout`、または `session_exit` (トップレベルシェルが終了した)。失敗は安定した機械ルーティング可能なコードを運びます: バックエンド種別の欠落 (`NO_BACKEND`)、未知のセッション (`NO_SESSION`)、別のエージェントのセッション (`FOREIGN_SESSION`)、2 つ目の同時送信 (`SEND_ACTIVE`)、またはもはやライブでない所有者 (`OWNER_NOT_LIVE`)。バックエンドのセットアップ失敗は何かが公開される前にオープンを拒否し、失敗したクリーンアップは成功を主張するのではなくクローズを拒否します。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains the design behind the service and points at the code that realizes it; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションではサービス背後の設計を説明し、それを実現するコードを示します。観察可能な動作は[このパッケージを使う](#use-this-package)で扱います。
 
-### Design concept
+### 設計概念
 
-The service owns everything except terminal mechanics: session identity, publication, authorization, and cleanup. Backends own how a session starts, detects readiness, retains output, and shuts down; the service publishes a session only after backend setup succeeds. The split keeps one registry usable with different terminal substrates.
+サービスはターミナルのメカニクス以外のすべてを所有します: セッションのアイデンティティ、公開、認可、クリーンアップです。バックエンドはセッションがどう開始し、準備完了をどう検出し、出力をどう保持し、どうシャットダウンするかを所有し、サービスはバックエンドのセットアップが成功した後にのみセッションを公開します。この分割により、1 つのレジストリを異なるターミナル基盤で使えるまま保てます。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `TerminalSessionService`: backend registry, spawn/send/read/signal/kill/list, owner cleanups, disposal |
-| [`src/types.ts`](src/types.ts) | Shared contracts: backend interface, session types, wait reasons, signal set, error codes |
+| [`src/index.ts`](src/index.ts) | `TerminalSessionService`: バックエンドレジストリ、spawn/send/read/signal/kill/list、所有者クリーンアップ、破棄 |
+| [`src/types.ts`](src/types.ts) | 共有契約: バックエンドインターフェイス、セッション種別、待機理由、シグナル集合、エラーコード |
 
-### Data model and lifecycle
+### データモデルとライフサイクル
 
-Each published session is a record of its id, owner, optional name, backend type, and backend session, plus the one active send. Unpublished spawns are tracked per owner as reservations with a service-owned abort signal. Disposal aborts pending spawns, awaits their settlement and rollback, then closes every owned session and awaits quiescence before running owner detachers; a cleanup failure rejects the lifecycle instead of claiming success.
+公開された各セッションは、その ID、所有者、任意の名前、バックエンド種別、バックエンドセッション、および 1 つのアクティブな送信のレコードです。未公開のスポーンは、サービス所有の中断シグナルを伴う予約として所有者ごとに追跡されます。破棄は保留中のスポーンを中断し、その確定とロールバックを待ち、次にすべての所有セッションを閉じて静穏を待ってから所有者デタッチャーを実行します。クリーンアップの失敗は、成功を主張するのではなくライフサイクルを拒否します。
 
-### Ownership and cleanup rules
+### 所有権とクリーンアップのルール
 
-- Fencing uses the exact `Agent` object: `hasOwnerActivity(owner)` spans unpublished setup through final close with no publication gap, so lifecycle policy can fence the owner precisely.
-- A backend that cannot clean partial startup resources rejects with `TerminalBackendCleanupError`; the service retains that failure as tracked owner activity until owner or service disposal consumes and reports it.
-- Caller cancellation keeps its exact `AbortSignal.reason`; `kill()` and disposal resolve only after the backend's captured process tree is quiescent.
+- フェンシングは正確な `Agent` オブジェクトを使います: `hasOwnerActivity(owner)` は未公開のセットアップから最終クローズまで公開の隙間なく及ぶため、ライフサイクルポリシーが所有者を正確にフェンスできます。
+- 部分的な起動リソースをクリーンアップできないバックエンドは `TerminalBackendCleanupError` で拒否します。サービスはその失敗を、所有者またはサービスの破棄が消費して報告するまで、追跡対象の所有者アクティビティとして保持します。
+- 呼び出し元のキャンセルは正確な `AbortSignal.reason` を保ちます。`kill()` と破棄は、バックエンドがキャプチャしたプロセスツリーが静穏になった後にのみ解決します。
 
-### Send reservation
+### 送信の予約
 
-The service reserves a session synchronously for one active send before returning the operation, including before a background job id becomes visible; a second send fails with `SEND_ACTIVE`, so output and cancellation never cross operation ownership.
+サービスは、操作を返す前に — バックグラウンドジョブ ID が可視になる前も含めて — 1 つのアクティブな送信のためにセッションを同期的に予約します。2 つ目の送信は `SEND_ACTIVE` で失敗するため、出力とキャンセルが操作の所有権をまたぐことは決してありません。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared terminal model to the shipped backend, the tools, and the design evidence.
+パッケージレベルの契約では足りないときに、これらのページを読んでください。共有ターミナルモデルから、出荷済みバックエンド、ツール、設計の証拠へと進みます。
 
-- [Terminal subsystem reference](../../../docs/subsystems/terminal.md) — shared types, backend and session contracts, and the generated `ctx.terminals` surface.
-- [terminal/ package map](../README.md) — the three-package family and how it composes.
-- [terminal-bash backend](../terminal-bash/README.md) — the shipped shell backend that provides the `shell` type.
-- [tool-terminal tools](../../experimental/tool-terminal/README.md) — the six model-facing tools that operate sessions.
-- [Persistent PTY Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — design rationale, alternatives, and deferred boundaries.
+- [ターミナルサブシステムリファレンス](../../../docs/subsystems/terminal.md) — 共有型、バックエンドとセッションの契約、生成された `ctx.terminals` サーフェス。
+- [terminal/ パッケージマップ](../README.md) — 3 パッケージのファミリーとそのコンポーズ方法。
+- [terminal-bash バックエンド](../terminal-bash/README.md) — `shell` 種別を提供する出荷済みシェルバックエンド。
+- [tool-terminal ツール](../../experimental/tool-terminal/README.md) — セッションを操作する 6 つのモデル向けツール。
+- [永続 PTY の Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — 設計根拠、代替案、保留された境界。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Indirect consumer
+### 間接的なコンシューマー
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing directly. This package registers no prompt or tool; `@deepseek-ai/dsh-tool-terminal` owns visible schemas and result text.
+直接には何もありません。このパッケージはプロンプトもツールも登録しません。可視スキーマと結果テキストは `@deepseek-ai/dsh-tool-terminal` が所有します。
 
-#### Token effect
+#### トークン効果
 
-None directly. Live session state stays process-local until a consumer returns a bounded result.
+直接にはなし。ライブセッション状態は、コンシューマーが境界付きの結果を返すまでプロセスローカルに留まります。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-No direct invalidation; `@deepseek-ai/dsh-tool-terminal` owns request-prefix changes.
+直接の無効化はなし。リクエストプレフィックスの変更は `@deepseek-ai/dsh-tool-terminal` が所有します。
 
-## Known Limitations and Deferred Work
+## 既知の制限と保留作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the service is a poor fit. They are current package constraints, not a task backlog.
+これらの制限は、サービスが不向きな場合を定義します。これらは現在のパッケージ制約であり、タスクバックログではありません。
 
-- **Process-local sessions** — sessions and raw scrollback live only in this process and do not survive a harness restart; durable work must be committed to files or another persistent system.
-- **No cross-agent sharing** — sessions are intentionally single-owner, with no path to share or transfer a session.
-- **No declarative auto-start** — sessions are created only during agent tool calls.
+- **プロセスローカルなセッション** — セッションと生のスクロールバックはこのプロセスにのみ存在し、ハーネスの再起動を生き延びません。永続的な作業はファイルまたは別の永続システムへコミットしなければなりません。
+- **エージェント間の共有なし** — セッションは意図的に単一所有者で、セッションを共有または転送する経路はありません。
+- **宣言的な自動起動なし** — セッションはエージェントのツール呼び出し中にのみ作成されます。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-This Dev Note is working context for maintainers and is explicitly non-authoritative: shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発メモはメンテナー向けの作業コンテキストであり、明示的に非権威です: 出荷済みの動作、制限、受理された根拠は、上のセクション、パッケージのコード、リンクされた Agent Notes にあります。
 
-#### Undecided directions
+#### 未決定の方向性
 
-- A shared-session design would need a separate authority contract.
-- A declarative auto-start feature would compose through unpublished agent setup.
+- 共有セッションの設計には別個の権限契約が必要です。
+- 宣言的な自動起動機能は、未公開のエージェントセットアップを通じてコンポーズすることになります。
 
 </details>

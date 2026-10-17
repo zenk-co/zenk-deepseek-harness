@@ -1,207 +1,207 @@
 ---
-description: "The complete V2-to-V3 Session conversion: system heads, audited references, PTC and preset names, canonical envelopes, preservation, and refusal."
+description: "完全な V2→V3 Session 変換: システムヘッド、監査済み参照、PTC とプリセット名、正規エンベロープ、保持、拒否。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-session-format-v2-to-v3
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Restore supported released V2 Sessions as V3 without changing historical request meaning. This page is the single specification for this adjacent edge: what it transforms, preserves, and refuses, followed separately by native V3 admission. The library promotes system prompts into messages, remaps local event references, translates PTC and preset names, and canonicalizes envelopes. Persistence consumes it through the static catalog; the library does not read or publish files.
+サポートされるリリース済み V2 Session を、歴史的リクエストの意味を変えずに V3 として復元する。このページはこの隣接エッジの唯一の仕様である。何を変換し、保持し、拒否するかを扱い、その後にネイティブ V3 受け入れを別に扱う。ライブラリはシステムプロンプトをメッセージへ昇格し、ローカルイベント参照を再マップし、PTC とプリセット名を変換し、エンベロープを正規化する。永続化は静的カタログを通じてこれを消費する。ライブラリはファイルを読まず、公開もしない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [V2-to-V3 specification](#v2-to-v3-specification)
-  - [Header and preset references](#header-and-presets)
-  - [System head and message identities](#system-head)
-  - [Sequence references and inheritance](#sequence-references)
-  - [PTC vocabulary](#ptc-vocabulary)
-  - [Canonical envelopes and tool errors](#canonical-envelopes)
-  - [Delivery guards](#delivery-guards)
-  - [Source audit and refusal](#source-audit)
-- [Native V3 admission](#native-v3-admission)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [V2→V3 仕様](#v2-to-v3-specification)
+  - [ヘッダーとプリセット参照](#header-and-presets)
+  - [システムヘッドとメッセージ ID](#system-head)
+  - [シーケンス参照と継承](#sequence-references)
+  - [PTC 語彙](#ptc-vocabulary)
+  - [正規エンベロープとツールエラー](#canonical-envelopes)
+  - [デリバリーガード](#delivery-guards)
+  - [ソース監査と拒否](#source-audit)
+- [ネイティブ V3 受け入れ](#native-v3-admission)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-### When to use it
+### いつ使うか
 
-Use the [catalog](../session-format-catalog/README.md) to restore a Session. Direct imports serve catalog assembly and tests; this library has no Cordis mount configuration. The [public exports](src/index.ts) provide the migration declaration, released V2 source codec, V3 target codec, target header validator, and target restorer.
+Session を復元するには[カタログ](../session-format-catalog/README.md)を使う。直接インポートはカタログ組み立てとテストに用いられる。このライブラリに Cordis マウント設定はない。[公開エクスポート](src/index.ts)は、マイグレーション宣言、リリース済み V2 ソースコーデック、V3 ターゲットコーデック、ターゲットヘッダー検証器、ターゲット復元器を提供する。
 
-### Entry point
+### エントリーポイント
 
-The header-only operation does not convert or validate an event body:
+ヘッダーのみの操作はイベント本体を変換も検証もしない:
 
 ```text
 const targetHeader = sessionFormatV2ToV3.migrateHeader(sourceHeader)
 ```
 
-Full restoration feeds decoded events through a fresh stage and validates the target artifact. Callers must not treat partial stage emissions as a successful restore: an error can occur at a later event or at `finish()`. The [format protocol](../session-format/README.md) owns stage scheduling and catalog error handling; [JSONL persistence](../session-persistence-jsonl/README.md) owns read preparation and immutable successor publication.
+完全な復元はデコード済みイベントを新しいステージに通し、ターゲットアーティファクトを検証する。呼び出し元はステージの部分的な発出を成功した復元として扱ってはならない。エラーは後のイベントまたは `finish()` で発生しうる。[フォーマットプロトコル](../session-format/README.md)がステージのスケジューリングとカタログのエラー処理を所有し、[JSONL 永続化](../session-persistence-jsonl/README.md)が読み取り準備と不変の後継の公開を所有する。
 
 -----
 
 <a id="v2-to-v3-specification"></a>
-## V2-to-V3 specification
+## V2→V3 仕様
 
-The complete edge is not an identity conversion. It preserves the relative order and timestamps of source events and the meaning of each historical request, but inserted system events change event count, dense sequence positions, local references, and inherited cuts. PTC/preset translation and final envelope canonicalization add no events. Only the named fields below change; preservation applies to admitted input, not arbitrary unaudited extensions.
+完全なエッジは恒等変換ではない。ソースイベントの相対順序とタイムスタンプ、および各歴史的リクエストの意味を保持するが、挿入されたシステムイベントはイベント数、稠密シーケンス位置、ローカル参照、継承カットを変える。PTC/プリセット変換と最終エンベロープ正規化はイベントを追加しない。変更されるのは以下に名指すフィールドのみである。保持は受け入れられた入力に適用され、任意の未監査の拡張には適用されない。
 
 <a id="header-and-presets"></a>
-### Header and preset references
+### ヘッダーとプリセット参照
 
-The logical header changes `version: 2` to `version: 3`. It retains `id`, `createdAt`, `isSeeded`, `delegationDepth`, and admitted optional `cwd`, `parentSession`, and `origin`. The exact preset id `code` becomes `ptc` in `header.agentPreset` and every `agent-preset/selected.data.agentPreset`, including inherited and local selections. Other strings and an absent header preset remain unchanged. Selection payloads require a string preset id and reject unaudited members.
+論理ヘッダーは `version: 2` を `version: 3` に変える。`id`、`createdAt`、`isSeeded`、`delegationDepth`、および受け入れられたオプションの `cwd`、`parentSession`、`origin` を保持する。正確なプリセット id `code` は `header.agentPreset` とすべての `agent-preset/selected.data.agentPreset`（継承およびローカルの選択を含む）で `ptc` になる。他の文字列と存在しないヘッダープリセットは変わらない。選択ペイロードは文字列のプリセット id を要求し、未監査のメンバーを拒否する。
 
-This conversion does not inspect installed presets or rewrite other occurrences of `code`. Released V0/V1 data receives it only after the frozen preceding edges reach V2. Native V3 custom preset ids are not renamed, and `settings.yaml` is outside this package.
+この変換はインストール済みプリセットを検査せず、`code` の他の出現を書き換えない。リリース済み V0/V1 データは、凍結された先行エッジが V2 に到達した後にのみこれを受ける。ネイティブ V3 のカスタムプリセット id は改名されず、`settings.yaml` はこのパッケージの外である。
 
 <a id="system-head"></a>
-### System head and message identities
+### システムヘッドとメッセージ ID
 
-The first `step/start` is followed immediately by an empty `system/message` append, even if the step aborts without a request. Later steps do not create another head. A log with no step and no surface receives no head or invented request.
+最初の `step/start` の直後に空の `system/message` append が続く。ステップがリクエストなしで中断しても同じである。以降のステップは別のヘッドを作らない。ステップもサーフェスもないログはヘッドも捏造されたリクエストも受けない。
 
-At every `request/header`, absent `data.header.system` means the empty prompt; otherwise its string is compared exactly with the current prompt. A change inserts a system message immediately before that request header, replacing exactly the current protected head and citing it in `sourceEventSeqs`. An unchanged prompt inserts nothing. Empty strings and absent fields clear an earlier prompt; whitespace-only strings remain nonempty text. Every request header loses `data.header.system`, regardless of whether a replacement was needed.
+すべての `request/header` で、`data.header.system` が存在しないことは空のプロンプトを意味し、それ以外の場合はその文字列が現在のプロンプトと正確に比較される。変更がある場合はそのリクエストヘッダーの直前にシステムメッセージを挿入し、現在の保護ヘッドを正確に置き換え、`sourceEventSeqs` でそれを引用する。変更のないプロンプトは何も挿入しない。空文字列と存在しないフィールドは以前のプロンプトをクリアする。空白のみの文字列は空でないテキストのままである。すべてのリクエストヘッダーは、置換が必要だったかどうかに関係なく `data.header.system` を失う。
 
-Synthetic messages carry the open step's `turn` and `step`, the anchor event's `time`, role `system`, and source `{ kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' }`. Empty prompts use `content: []`; other prompts use one text block containing the exact string. The first append has no source-event reference; each replacement uses the preceding head's target sequence for both endpoints and its sole source reference. Empty heads retain protection but produce no model message.
+合成メッセージは、開いているステップの `turn` と `step`、アンカーイベントの `time`、ロール `system`、ソース `{ kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' }` を運ぶ。空のプロンプトは `content: []` を使い、それ以外のプロンプトは正確な文字列を含む 1 つのテキストブロックを使う。最初の append はソースイベント参照を持たない。各置換は両方の端点に前のヘッドのターゲットシーケンスを、その唯一のソース参照に前のヘッドを使う。空のヘッドは保護を保つが、モデルメッセージを生成しない。
 
-Each synthetic id is `v2-to-v3-system-` followed by the hexadecimal SHA-256 of `JSON.stringify(['session-format-v2-to-v3', sourceHeader.id, anchor.seq, anchor.type])`. The anchor is the source `step/start` for initial creation or the changed `request/header` for replacement. Collisions with generated or source message ids are refused in either encounter order, including ids in inbox insertions and title-request messages. Existing message ids never change. In particular, a `TOOL_NOT_STARTED` repair id retains its canonical historical `interrupted-tool-result-<callId>-<integer>` suffix; that suffix is not a target sequence coordinate.
+各合成 id は `v2-to-v3-system-` の後に `JSON.stringify(['session-format-v2-to-v3', sourceHeader.id, anchor.seq, anchor.type])` の 16 進 SHA-256 が続く。アンカーは、初回作成ではソースの `step/start`、置換では変更された `request/header` である。生成されたメッセージ id やソースメッセージ id との衝突は、遭遇順に関係なく拒否される。inbox 挿入やタイトルリクエストメッセージ内の id も含む。既存のメッセージ id は決して変わらない。特に `TOOL_NOT_STARTED` 修復 id は、その正規の歴史的サフィックス `interrupted-tool-result-<callId>-<integer>` を保つ。そのサフィックスはターゲットシーケンス座標ではない。
 
 <a id="sequence-references"></a>
-### Sequence references and inheritance
+### シーケンス参照と継承
 
-Source events must be dense from zero. Each original event receives its target position after any preceding insertion. The [reference mapper](src/references.ts) changes only these same-artifact references; every referenced source position must name an earlier event with an established mapping:
+ソースイベントはゼロから稠密でなければならない。各元イベントは、前にある挿入の後にターゲット位置を受ける。[参照マッパー](src/references.ts)はこれらの同一アーティファクト参照のみを変更する。参照される各ソース位置は、確立されたマッピングを持つより早いイベントを名指さなければならない:
 
-| Owner | Fields remapped |
+| 所有者 | 再マップされるフィールド |
 |---|---|
-| Surface envelope | `sourceEventSeqs[]`; `surfaceOp.start/end` before their canonical rename |
-| `command/done.data` | `sourceEventSeq` when present |
-| `compaction/summary.data` and `compaction/prune.data` | `shadowedRange.start/end` and `shadowedSeqs[]` |
-| `session/title.data` and `session/title-llm-request.data` | `messageSeqs[]` |
+| サーフェスエンベロープ | `sourceEventSeqs[]`、正規リネーム前の `surfaceOp.start/end` |
+| `command/done.data` | 存在する場合の `sourceEventSeq` |
+| `compaction/summary.data` と `compaction/prune.data` | `shadowedRange.start/end` と `shadowedSeqs[]` |
+| `session/title.data` と `session/title-llm-request.data` | `messageSeqs[]` |
 
-There is no recursive numeric-field rewrite. Delivery `throughSeq` and `sessionFormatVersion`, session-reference `capturedThroughSeq` and `capturedFormatVersion`, workflow-local `seq`, stream block indices, turn/step numbers, inbox indices, token/byte counts, and all ids keep their source values. Embedded assistant streams, model replay state, tool arguments/results, title-request input text and `data.system` retain their recorded meaning. Compaction payload endpoints keep the names `start/end`; only envelope replacement endpoints are renamed.
+再帰的な数値フィールドの書き換えはない。デリバリーの `throughSeq` と `sessionFormatVersion`、セッション参照の `capturedThroughSeq` と `capturedFormatVersion`、ワークフローローカルの `seq`、ストリームブロックインデックス、turn/step 番号、inbox インデックス、トークン/バイト数、およびすべての id はソース値を保つ。埋め込みアシスタントストリーム、モデルリプレイ状態、ツール引数/結果、タイトルリクエスト入力テキストと `data.system` は記録された意味を保つ。コンパクションペイロードの端点は `start/end` という名前を保つ。リネームされるのはエンベロープ置換の端点のみである。
 
-For a seeded Session, the last `session/end-seed` with `data.inherited: true` identifies the source cut. Its source sequence is the inherited event count, excluding that marker; its mapped target sequence is the target cut. Synthetic events before it are inherited, and later ones are local. An untagged marker does not establish the cut. A supplied `sourceInheritedEventCount` must agree; a seeded log without a marker and an unseeded log with one are refused. Unseeded stages expose `headerInheritedEventCount: 0`; seeded stages leave it unknown until `finish()` derives the exact cut. This also supports V0/V1 chains whose preceding stage changes event count and cannot supply the cut before EOF.
+シード済み Session では、`data.inherited: true` を持つ最後の `session/end-seed` がソースカットを特定する。そのソースシーケンスは、そのマーカーを除く継承イベント数である。そのマップされたターゲットシーケンスがターゲットカットである。その前の合成イベントは継承され、後のものはローカルである。タグのないマーカーはカットを確立しない。供給された `sourceInheritedEventCount` は一致しなければならない。マーカーのないシード済みログとマーカーのある未シードログは拒否される。未シードのステージは `headerInheritedEventCount: 0` を公開する。シード済みのステージは `finish()` が正確なカットを導出するまでそれを不明のままにする。これは、前段がイベント数を変えて EOF 前にカットを供給できない V0/V1 チェーンも支える。
 
 <a id="ptc-vocabulary"></a>
-### PTC vocabulary
+### PTC 語彙
 
-The exact event tags `tool/code-dispatch-start` and `tool/code-dispatch` become `tool/ptc-dispatch-start` and `tool/ptc-dispatch`. Their payloads retain their values. Plugin attribution changes from exactly `tools-code-mode` to `tools-ptc` only when `source.kind === 'plugin'` in these three slots:
+正確なイベントタグ `tool/code-dispatch-start` と `tool/code-dispatch` は `tool/ptc-dispatch-start` と `tool/ptc-dispatch` になる。そのペイロードは値を保つ。プラグイン帰属は、次の 3 つのスロットで `source.kind === 'plugin'` のときにのみ、正確に `tools-code-mode` から `tools-ptc` に変わる:
 
 - `user/message.data.source.plugin`
 - `agent/inbox/spliced.data.inserted[].source.plugin`
 - `session/title-llm-request.data.messages[].source.plugin`
 
-Similar plugin names, other source kinds, arbitrary text, nested JSON, and historical ids including `:code:` remain unchanged. This does not rename `run_code` or its `code` argument. V2 source events already using either reserved V3 PTC tag are refused even when ignorable; an opaque source extension must not acquire current lifecycle meaning through migration.
+類似のプラグイン名、他のソース kind、任意のテキスト、ネストされた JSON、および `:code:` を含む歴史的 id は変わらない。これは `run_code` やその `code` 引数を改名しない。予約された V3 PTC タグのいずれかをすでに使っている V2 ソースイベントは、ignorable であっても拒否される。不透明なソース拡張がマイグレーションを通じて現在のライフサイクルの意味を獲得してはならない。
 
 <a id="canonical-envelopes"></a>
-### Canonical envelopes and tool errors
+### 正規エンベロープとツールエラー
 
-After structural insertion and reference remapping, canonicalization converts exact envelope replacements `{ op: 'replace', start, end }` to `{ op: 'replace', startSeq, endSeq }` on original and synthetic events. It omits exactly `tools: []` and `adapterDefaults: {}` from `request/header.data.header`. This final operation preserves its input event count, coordinates, timestamps, order, and inherited cut; it neither remaps twice nor normalizes unrelated empty values such as `config.stop: []`.
+構造挿入と参照再マップの後、正規化は元および合成イベント上で、正確なエンベロープ置換 `{ op: 'replace', start, end }` を `{ op: 'replace', startSeq, endSeq }` に変換する。`request/header.data.header` から正確に `tools: []` と `adapterDefaults: {}` を省略する。この最終操作は入力のイベント数、座標、タイムスタンプ、順序、継承カットを保持する。二重に再マップすることも、`config.stop: []` のような無関係な空値を正規化することもない。
 
-All four V3 surface types (`system/message`, `user/message`, `assistant/message`, `tool/result`) require `surfaceOp`. Assistant messages alone forbid `sourceEventSeqs`; for the others, a supplied list must be nonempty, unique, and refer only to earlier events. Known log-only events allow neither surface metadata field. Replacements allow no aliases or extra keys. Their endpoints identify an inclusive span in current surface order, not numeric sequence order; restoration checks live membership, endpoint order, and complete source-event coverage.
+4 つすべての V3 サーフェスタイプ（`system/message`、`user/message`、`assistant/message`、`tool/result`）は `surfaceOp` を要求する。アシスタントメッセージだけが `sourceEventSeqs` を禁じる。他のタイプでは、供給されるリストは空でなく、一意で、より早いイベントのみを参照しなければならない。既知のログ専用イベントはサーフェスメタデータフィールドをどちらも許さない。置換はエイリアスも余分なキーも許さない。その端点は、数値シーケンス順ではなく現在のサーフェス順における両端を含むスパンを特定する。復元は実在のメンバーシップ、端点の順序、完全なソースイベント網羅を確認する。
 
-Source surface events already require placement; migration does not invent missing append markers. A `tool/result` with `data.error` requires its single tool-result block to carry `isError: true`. Failed results may omit structured error identity. Contradictory outcomes are refused, never repaired by adding `isError` or deleting diagnostics. Ordinary tool and PTC lifecycle relationships still require validation after these event-local checks.
+ソースのサーフェスイベントはすでに配置を要求する。マイグレーションは欠落した append マーカーを捏造しない。`data.error` を持つ `tool/result` は、その単一の tool-result ブロックが `isError: true` を運ぶことを要求する。失敗した結果は構造化エラー識別を省略してよい。矛盾する結果は拒否され、`isError` の追加や診断の削除によって修復されることは決してない。通常のツールと PTC のライフサイクル関係は、これらのイベントローカルなチェックの後にも検証を要する。
 
 <a id="delivery-guards"></a>
-### Delivery guards
+### デリバリーガード
 
-A V2 `session-log-deepseek/delivery-accepted` with `data.sessionFormatVersion === 3` is refused, not promoted into a V3 upload watermark. Markers for other generations retain their payloads, including an absent generation and future non-target generations. A V2-generation marker must have a valid earlier `throughSeq`; if it names a different Session, it is permitted only in the inherited prefix of a Session with `parentSession`. A foreign local marker or one without parent metadata is refused. The marker's envelope sequence changes normally; its captured acceptance coordinates do not.
+`data.sessionFormatVersion === 3` を持つ V2 の `session-log-deepseek/delivery-accepted` は拒否され、V3 のアップロードウォーターマークへ昇格されない。他の世代のマーカーはペイロードを保つ。存在しない世代や将来の非ターゲット世代も含む。V2 世代のマーカーは、有効なより早い `throughSeq` を持たなければならない。異なる Session を名指す場合、`parentSession` を持つ Session の継承プレフィックス内でのみ許される。外来のローカルマーカーまたは親メタデータのないものは拒否される。マーカーのエンベロープシーケンスは通常どおり変わり、キャプチャされた受け入れ座標は変わらない。
 
 <a id="source-audit"></a>
-### Source audit and refusal
+### ソース監査と拒否
 
-Migration classifies the [released V2 event inventory](../session-format-v1-to-v2/src/dispositions.ts), including log-only `assistant/attempt`, plus `feedback/message-put` and `feedback/message-delete`. The [payload validator](src/payload.ts) applies exact admitted envelope and payload members and released nested validation. Unknown events, even ignorable ones, and unaudited members at checked records are refused. Message-source classification covers the five Message slots below: unknown source kinds are refused, while agent relay attribution is admitted without interpreting ids as Session references.
+マイグレーションは[リリース済み V2 イベント目録](../session-format-v1-to-v2/src/dispositions.ts)（ログ専用の `assistant/attempt` を含む）に加えて `feedback/message-put` と `feedback/message-delete` を分類する。[ペイロード検証器](src/payload.ts)は、正確に受け入れられたエンベロープとペイロードのメンバー、およびリリース済みのネスト検証を適用する。未知のイベントは ignorable なものでも、チェック対象レコードの未監査メンバーも拒否される。メッセージソースの分類は以下の 5 つの Message スロットを対象とする。未知のソース kind は拒否され、エージェントリレー帰属は id を Session 参照として解釈せずに受け入れられる。
 
-The content audit admits exactly `text`, `reasoning`, `image`, `file`, `tool-call`, and `tool-result`. It validates owned block fields and recursively audits every nested `tool-result.content` in this finite set of positions:
+コンテンツ監査は正確に `text`、`reasoning`、`image`、`file`、`tool-call`、`tool-result` を受け入れる。所有ブロックフィールドを検証し、次の有限の位置集合でネストされたすべての `tool-result.content` を再帰的に監査する:
 
-| Owner | Audited content |
+| 所有者 | 監査されるコンテンツ |
 |---|---|
-| Five Message slots | `user/message.data.content`; `assistant/message.data.message.content`; `tool/result.data.message.content`; `agent/inbox/spliced.data.inserted[].content`; `session/title-llm-request.data.messages[].content` |
-| Queued team message | `team/message/queued.data.message.content`; the historical Team payload remains `version: 1` with `message.delivery` |
-| Compaction output | `compaction/summary.data.summary` and optional `compaction/summary.data.rawOutput` |
-| PTC predecessor output | `tool/code-dispatch.data.content` |
-| Embedded assistant streams | In `assistant/message.data.stream[]` and `assistant/attempt.data.stream[]`, raw `type: 'chunk'` records: `chunk.block` for `block-end` and `chunk.blockType` for `block-start`, including starts with no completed block |
+| 5 つの Message スロット | `user/message.data.content`、`assistant/message.data.message.content`、`tool/result.data.message.content`、`agent/inbox/spliced.data.inserted[].content`、`session/title-llm-request.data.messages[].content` |
+| キューされたチームメッセージ | `team/message/queued.data.message.content`。歴史的 Team ペイロードは `message.delivery` 付きの `version: 1` のままである |
+| コンパクション出力 | `compaction/summary.data.summary` とオプションの `compaction/summary.data.rawOutput` |
+| PTC 前身出力 | `tool/code-dispatch.data.content` |
+| 埋め込みアシスタントストリーム | `assistant/message.data.stream[]` と `assistant/attempt.data.stream[]` 内の生の `type: 'chunk'` レコード: `block-end` には `chunk.block`、`block-start` には `chunk.blockType`（完了したブロックのない start を含む） |
 
-All positions use the same historical kind set; a partial start cannot introduce an unknown kind. Unknown kinds and malformed owned blocks refuse the whole migration; catalog restoration reports `SessionFormatUnsupportedMigrationError`. The diagnostic identifies the source event type, source sequence, full indexed payload path, and violated rule. Unknown-kind errors name the offending kind; malformed known-block errors name the kind and field error. A malformed content container or missing block reports its location without inventing a kind. Persistence leaves source bytes unchanged and publishes no successor on refusal.
+すべての位置が同じ歴史的 kind 集合を使う。部分的な start は未知の kind を導入できない。未知の kind と不正な所有ブロックはマイグレーション全体を拒否し、カタログ復元は `SessionFormatUnsupportedMigrationError` を報告する。診断はソースイベントタイプ、ソースシーケンス、完全なインデックス付きペイロードパス、違反したルールを特定する。未知 kind のエラーは問題の kind を名指す。不正な既知ブロックのエラーは kind とフィールドエラーを名指す。不正なコンテンツコンテナーや欠落ブロックは kind を捏造せずにその位置を報告する。永続化はソースバイトを変えず、拒否時に後継を公開しない。
 
-Admission does not rewrite content. In particular, embedded stream bytes are preserved although their owned block fields are inspected. Tool arguments, `replayState.response`, and `replayState.blocks` remain opaque; matching field names inside arbitrary JSON do not trigger this audit. File attachment metadata is validated without interpreting ids or byte counts as Session references. This is not a general schema audit or recursive coordinate inference, and native V3 extension acceptance is separate.
+受け入れはコンテンツを書き換えない。特に、埋め込みストリームのバイトは、所有ブロックフィールドが検査されても保持される。ツール引数、`replayState.response`、`replayState.blocks` は不透明のままである。任意の JSON 内の一致するフィールド名はこの監査を引き起こさない。ファイル添付メタデータは、id やバイト数を Session 参照として解釈せずに検証される。これは一般的なスキーマ監査や再帰的な座標推論ではなく、ネイティブ V3 の拡張受け入れは別である。
 
-A surface event before the first step, a changed prompt outside an open step, or a generated-id collision raises `SessionFormatUnsupportedMigrationError` rather than moving events or inventing ownership. Malformed source fields, missing placement, invalid references, inconsistent cuts, delivery violations, and contradictory tool results raise format errors in the direct stage or target validator. The catalog reports migration-stage and transformed-target validation failures as typed unsupported migration; physical decoding failures remain corruption under its selected recovery policy. No source or target repair, generation fallback, or file rewrite is performed by this edge.
+最初のステップより前のサーフェスイベント、開いているステップの外でのプロンプト変更、または生成 id の衝突は、イベントを移動したり所有権を捏造したりせずに `SessionFormatUnsupportedMigrationError` を発生させる。不正なソースフィールド、欠落した配置、無効な参照、矛盾するカット、デリバリー違反、矛盾するツール結果は、直接ステージまたはターゲット検証器でフォーマットエラーを発生させる。カタログはマイグレーションステージと変換済みターゲットの検証失敗を型付きの unsupported migration として報告する。物理デコードの失敗は、選択された回復ポリシーの下での corruption のままである。このエッジによるソースまたはターゲットの修復、世代フォールバック、ファイル書き換えは行われない。
 
 -----
 
 <a id="native-v3-admission"></a>
-## Native V3 admission
+## ネイティブ V3 受け入れ
 
-Input already marked V3 does not run V2-to-V3. Native catalog reads with `validation: 'transformed'` apply codec checks only and skip artifact restoration; full relationships, open-step ownership, protected-head operations, and vocabulary checks require `restoreReleasedV3Artifact` or catalog `validation: 'current'`. The following rules distinguish those restoration checks from codec admission; they are not additional historical transformations:
+すでに V3 とマークされた入力は V2→V3 を実行しない。`validation: 'transformed'` のネイティブカタログ読み取りはコーデックチェックのみを適用し、アーティファクト復元をスキップする。完全な関係、開いているステップの所有権、保護ヘッド操作、語彙チェックには `restoreReleasedV3Artifact` またはカタログの `validation: 'current'` が必要である。以下のルールはそれらの復元チェックをコーデック受け入れと区別するものであり、追加の歴史的変換ではない:
 
-- Native V3 admits in-history system appends, non-head system replacements, and compaction of non-head system nodes. System messages require valid payloads and matching open-step ownership. The first surface system head can be replaced only by a system message covering exactly that head; ordinary replacements and compaction cannot consume it. Migration itself produces only the initial head and head replacements, not route-dependent in-history updates.
-- Native V3 rejects every `request/header.data.header.system`, even empty or malformed, and rejects noncanonical replacement spellings and the two empty header optionals. It preserves whitespace content, empty stop lists, and admitted nested header/source/data extensions. That extension admission does not widen the V2 source audit or the exact logical Session header fields.
-- Required predecessor PTC tags are refused even if installed. Obsolete or unknown ignorable events remain opaque, including their logical metadata, and cannot satisfy current PTC relationships. Installed ordinary event additions are admitted as log-only envelopes; unknown required types are refused by vocabulary-aware restoration. The physical codec still enforces released framing and source-event range encoding.
-- V3 event-local checks run before encoding and after decoding. Raw retired-system-header, malformed-system-payload, and required predecessor-PTC refusal run before recoverable suppression, including after corrupt rows. Strict reads reject canonical errors immediately. Recoverable canonical decoding withholds the first invalid event and its suffix; a later `turn/end` establishes a commit and rejects that suffix. Only accepted inherited markers count; a seeded accepted prefix without one is refused. Unclassified event metadata is deferred to vocabulary-aware restoration rather than discarded as canonical corruption, so it cannot hide an unknown required type.
+- ネイティブ V3 は履歴内のシステム append、非ヘッドのシステム置換、非ヘッドのシステムノードのコンパクションを受け入れる。システムメッセージは有効なペイロードと一致する開いているステップの所有権を要求する。最初のサーフェスシステムヘッドは、正確にそのヘッドを覆うシステムメッセージによってのみ置換できる。通常の置換とコンパクションはそれを消費できない。マイグレーション自体は初期ヘッドとヘッド置換のみを生成し、ルート依存の履歴内更新は生成しない。
+- ネイティブ V3 はすべての `request/header.data.header.system` を、空または不正であっても拒否し、非正規の置換表記と 2 つの空のヘッダーオプションを拒否する。空白コンテンツ、空の stop リスト、受け入れられたネストされた header/source/data 拡張は保持する。その拡張受け入れは V2 ソース監査や正確な論理 Session ヘッダーフィールドを広げない。
+- 必要な前身 PTC タグは、インストールされていても拒否される。廃止または未知の ignorable イベントは、その論理メタデータを含めて不透明のまま残り、現在の PTC 関係を満たせない。インストールされた通常のイベント追加はログ専用エンベロープとして受け入れられる。未知の required タイプは語彙認識の復元によって拒否される。物理コーデックは依然としてリリース済みのフレーミングとソースイベント範囲エンコーディングを強制する。
+- V3 のイベントローカルなチェックはエンコード前とデコード後に実行される。生の retired-system-header、不正な system-payload、必要な前身 PTC の拒否は、破損行の後を含め、回復可能な抑制の前に実行される。厳格な読み取りは正規のエラーを直ちに拒否する。回復可能な正規デコードは最初の無効イベントとそのサフィックスを保留する。後の `turn/end` がコミットを確立し、そのサフィックスを拒否する。カウントされるのは受け入れられた継承マーカーのみである。それのないシード済みの受け入れ済みプレフィックスは拒否される。未分類のイベントメタデータは、正規の corruption として破棄されるのではなく語彙認識の復元へ持ち越されるため、未知の required タイプを隠せない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-The [stage](src/migration.ts) owns synchronous per-artifact sequence maps, message identity sets, and prompt/lifecycle state. Compact runs expand incrementally. The [codec](src/codec.ts) reuses frozen V2 framing; the [restorer](src/validation.ts) validates V3 structure before giving frozen ordinary relationship validation a private system/PTC/repair-id and endpoint view. That view retains the actual target generation for delivery checks and never escapes: restoration returns the original V3 artifact and identities. Frozen V0-to-V1 and V1-to-V2 semantics remain unchanged.
+[ステージ](src/migration.ts)はアーティファクトごとの同期的なシーケンスマップ、メッセージ ID 集合、プロンプト/ライフサイクル状態を所有する。コンパクトな実行は増分的に展開する。[コーデック](src/codec.ts)は凍結された V2 フレーミングを再利用する。[復元器](src/validation.ts)は V3 構造を検証してから、凍結された通常の関係検証にプライベートな system/PTC/repair-id と端点のビューを与える。そのビューはデリバリーチェックのために実際のターゲット世代を保ち、決して外へ漏れない。復元は元の V3 アーティファクトと ID を返す。凍結された V0→V1 と V1→V2 の意味は変わらない。
 
-[Combined catalog tests](tests/combined-migration.spec.ts) exercise transformation composition and native reopen; [migration tests](tests/migration.spec.ts) and [canonical tests](tests/canonical-envelopes.spec.ts) pin preservation and refusal. [Persistence integration](../session-persistence-jsonl/tests/v2-ptc-migration.spec.ts) owns publication evidence. The [released-format decision](../../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md) owns the rationale for testing adjacent composition separately from native admission.
+[結合カタログテスト](tests/combined-migration.spec.ts)は変換の合成とネイティブ再オープンを実行する。[マイグレーションテスト](tests/migration.spec.ts)と[正規テスト](tests/canonical-envelopes.spec.ts)が保持と拒否を固定する。[永続化統合](../session-persistence-jsonl/tests/v2-ptc-migration.spec.ts)が公開の証拠を所有する。[リリース済みフォーマットの決定](../../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md)が、隣接する構成をネイティブ受け入れと別にテストする根拠を所有する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Released V1 to V2](../session-format-v1-to-v2/README.md) — frozen preceding conversion and source codec.
-- [System-prompt surface decision](../../../.agents/notes/implemented/architecture/2026-09-02-system-prompt-as-surface-node.md) — prompt ownership and protected-head rationale.
-- [Canonical V3 envelope decision](../../../.agents/notes/implemented/architecture/2026-09-06-v3-canonical-session-envelopes.md) — strict acceptance and validation ownership.
+- [リリース済み V1→V2](../session-format-v1-to-v2/README.md) — 凍結された先行変換とソースコーデック。
+- [システムプロンプトサーフェスの決定](../../../.agents/notes/implemented/architecture/2026-09-02-system-prompt-as-surface-node.md) — プロンプト所有権と保護ヘッドの根拠。
+- [正規 V3 エンベロープの決定](../../../.agents/notes/implemented/architecture/2026-09-06-v3-canonical-session-envelopes.md) — 厳格な受け入れと検証の所有権。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Historical restoration
+### 履歴の復元
 
-#### What the model sees
+#### モデルが見るもの
 
-Each historical request retains its prompt text and ordinary message content. Empty system heads produce no model message. PTC attribution uses `tools-ptc`; dispatch events remain log-only.
+各歴史的リクエストはそのプロンプトテキストと通常のメッセージコンテンツを保つ。空のシステムヘッドはモデルメッセージを生成しない。PTC 帰属は `tools-ptc` を使う。ディスパッチイベントはログ専用のままである。
 
-#### Token effect
+#### トークンへの影響
 
-The edge adds no model-visible text; it moves the recorded prompt from the request header into the message history.
+このエッジはモデルに見えるテキストを追加しない。記録されたプロンプトをリクエストヘッダーからメッセージ履歴へ移す。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The edge preserves historical request meaning and model configuration; it does not guarantee provider cache hits or byte-identical native V3 recordings.
+このエッジは歴史的リクエストの意味とモデル設定を保持する。プロバイダーのキャッシュヒットやバイト単位で同一のネイティブ V3 記録を保証しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Historical preset ambiguity** — released `code` references cannot distinguish a custom preset with the legacy built-in id; the [exact rename](#header-and-presets) is host-independent.
-- **No file or settings migration** — this package never changes committed generations or `settings.yaml`. Persistence owns publishing the final successor; an existing V3 generation does not rerun its incoming edge. See [format release status](../../../docs/session-format-status.md) and the compatibility obligations in the [released-format policy](../../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md).
+- **歴史的プリセットの曖昧さ** — リリース済みの `code` 参照は、レガシー組み込み id を持つカスタムプリセットを区別できない。[正確なリネーム](#header-and-presets)はホスト非依存である。
+- **ファイルや設定のマイグレーションはない** — このパッケージはコミット済み世代や `settings.yaml` を決して変更しない。最終後継の公開は永続化が所有する。既存の V3 世代はその入ってくるエッジを再実行しない。[フォーマットリリース状況](../../../docs/session-format-status.md)と[リリース済みフォーマットポリシー](../../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md)の互換性義務を参照。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

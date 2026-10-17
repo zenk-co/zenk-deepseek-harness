@@ -1,16 +1,16 @@
-# Workflow
+# ワークフロー
 
-English | [中文](workflow.zh.md)
+日本語 | [English](workflow.en.md) | [中文](workflow.zh.md)
 
-The workflow seam lets an agent run a model-written orchestration SCRIPT that starts subagents. Like [subagent](subagent.md) it is **one optional capability**, not part of the agent loop, so its types and operations live here rather than in [core.md](core.md). Like bash, it permits ONE engine implementation per context to provide `ctx.workflowEngine`; there is no named-provider registry (a second engine replaces the first through plugin configuration rather than running beside it).
+ワークフローシームは、エージェントがサブエージェントを起動するモデル作成のオーケストレーション SCRIPT を実行できるようにする。[subagent](subagent.md) と同様、これは **1 つのオプションのケイパビリティ**であり、エージェントループの一部ではないため、その型と操作は [core.md](core.md) ではなくここに置かれる。bash と同様、コンテキストごとに 1 つのエンジン実装が `ctx.workflowEngine` を提供することを許す。名前付きプロバイダーレジストリは存在しない (2 番目のエンジンはその隣で動くのではなく、プラグイン設定を通じて最初のものを置き換える)。
 
-Service Definition: [dsh-workflow](../../packages/workflow/workflow) (`ctx.workflowEngine` and the vocabulary below). [dsh-workflow-ptc](../../packages/workflow/workflow-ptc) executes the VM and helpers through the shared Node PTC process runtime under the calling Session's file policy. The consumers are [dsh-tool-workflow](../../packages/workflow/tool-workflow) and the opt-in [dsh-tool-ralph](../../packages/experimental/tool-ralph). [Workflow sandbox reuse](../../.agents/notes/implemented/architecture/2026-09-13-workflow-ptc-sandbox-reuse.md) owns execution choices; the [dynamic-workflows reference](../../packages/workflow/workflow/README.md) owns script semantics.
+Service Definition: [dsh-workflow](../../packages/workflow/workflow) (`ctx.workflowEngine` と以下の語彙)。[dsh-workflow-ptc](../../packages/workflow/workflow-ptc) は、呼び出し元 Session のファイルポリシーの下で、共有の Node PTC プロセスランタイムを通じて VM とヘルパーを実行する。コンシューマーは [dsh-tool-workflow](../../packages/workflow/tool-workflow) とオプトインの [dsh-tool-ralph](../../packages/experimental/tool-ralph) である。[ワークフローサンドボックスの再利用](../../.agents/notes/implemented/architecture/2026-09-13-workflow-ptc-sandbox-reuse.md)が実行の選択肢を所有し、[dynamic-workflows リファレンス](../../packages/workflow/workflow/README.md)がスクリプトのセマンティクスを所有する。
 
-Sources: browser-safe vocabulary in [`packages/workflow/workflow/src/types.ts`](../../packages/workflow/workflow/src/types.ts), Host request and live-run handles in [`runtime-types.ts`](../../packages/workflow/workflow/src/runtime-types.ts).
+ソース: ブラウザーセーフな語彙は [`packages/workflow/workflow/src/types.ts`](../../packages/workflow/workflow/src/types.ts) に、Host のリクエストとライブラン実行のハンドルは [`runtime-types.ts`](../../packages/workflow/workflow/src/runtime-types.ts) にある。
 
-## The start request
+## 開始リクエスト
 
-What a caller asks for when starting a run. The ordinary workflow tool builds this from the model's `{ script, meta, args }` call plus the calling agent; specialized consumers may also select one engine-wide `subagentProvider` and lower `maxTotalAgents` for the run, but the script cannot observe or replace either policy. `meta` and `args` are plain JSON DATA (the engine validates `meta` against its schema and rejects loud BEFORE anything runs — no script text is ever evaluated to obtain it). `parent` is REQUIRED — every child the script starts is attributed to it, and cwd, lineage, and depth pass through the [subagent seam](subagent.md).
+呼び出し元が実行を開始するときに要求するもの。通常の workflow ツールはこれをモデルの `{ script, meta, args }` 呼び出しと呼び出し元エージェントから組み立てる。特化したコンシューマーは実行のためにエンジン全体の 1 つの `subagentProvider` を選択し、`maxTotalAgents` を引き下げることもできるが、スクリプトはどちらのポリシーも観察も置き換えもできない。`meta` と `args` はプレーンな JSON DATA である (エンジンは `meta` をそのスキーマに対して検証し、何かが実行される前に大きな声で拒否する — それを得るためにスクリプトテキストが評価されることは決してない)。`parent` は必須である — スクリプトが起動するすべての子はそれに帰属し、cwd、系統、深さは [subagent シーム](subagent.md)を通る。
 
 ```ts type-equiv
 /**
@@ -36,9 +36,9 @@ interface WorkflowStartRequest {
 }
 ```
 
-## The workflow's identity: `WorkflowMeta`
+## ワークフローのアイデンティティ: `WorkflowMeta`
 
-The identity block carried as data on the start request (the tool's `meta` parameter; the field vocabulary matches the Claude Code dynamic-workflows meta block). `phases` is progress vocabulary only: `phase()` calls match titles for observers; no execution structure is implied.
+開始リクエストにデータとして運ばれるアイデンティティブロック (ツールの `meta` パラメーター。フィールド語彙は Claude Code dynamic-workflows の meta ブロックと一致する)。`phases` は進捗の語彙にすぎない: `phase()` 呼び出しはオブザーバー向けにタイトルを一致させるだけで、実行構造は何も含意しない。
 
 ```ts type-equiv
 /**
@@ -60,9 +60,9 @@ interface WorkflowMeta {
 }
 ```
 
-## The terminal result: `WorkflowResult`
+## 終端結果: `WorkflowResult`
 
-The outcome of one run, resolved by `WorkflowRun.result`. `value` is the script's materialized return value — plain host-realm JSON data (`null` when the script returned nothing) — meaningful only for `completed`. `stopReason` is a CLOSED union (engine-owned; consumers may exhaust it): `completed` | `cancelled` | `error`. A non-`completed` reason carries the failure in `error`, and the consumer maps it to an `isError` tool result rather than reporting partial output as success.
+1 回の実行の結果であり、`WorkflowRun.result` によって解決される。`value` はスクリプトの実体化された戻り値 — プレーンな host レルムの JSON データ (スクリプトが何も返さなかった場合は `null`) — であり、`completed` の場合にのみ意味を持つ。`stopReason` は CLOSED なユニオンである (エンジン所有。コンシューマーはそれを網羅してよい): `completed` | `cancelled` | `error`。`completed` 以外の理由は失敗を `error` に運び、コンシューマーは部分的な出力を成功として報告するのではなく、それを `isError` ツール結果に写像する。
 
 ```ts type-equiv
 /**
@@ -90,9 +90,9 @@ interface WorkflowResult {
 }
 ```
 
-## A live run: `WorkflowRun`
+## ライブラン: `WorkflowRun`
 
-The consumer awaits `result`, may `cancel` during execution, and must `dispose` on every path. `result` never rejects: script failure resolves with `stopReason: 'error'`, and cancellation with `'cancelled'`. The PTC engine has no overall elapsed deadline; it immediately aborts the managed process when cancelled. Disposal awaits process and child cleanup under their provider contracts, without an independent workflow cleanup deadline.
+コンシューマーは `result` を await し、実行中に `cancel` してよく、すべての経路で `dispose` しなければならない。`result` は決して reject しない: スクリプトの失敗は `stopReason: 'error'` で、キャンセルは `'cancelled'` で解決する。PTC エンジンには全体の経過期限はない。キャンセルされると管理対象プロセスを即座に中断する。破棄は独立したワークフロー片付け期限なしに、それぞれのプロバイダー契約の下でプロセスと子の片付けを待つ。
 
 ```ts type-equiv
 /**
@@ -111,21 +111,21 @@ interface WorkflowRun {
 }
 ```
 
-## Failure discipline: `WorkflowError.fatal`
+## 失敗の規律: `WorkflowError.fatal`
 
-Hook misuse inside a script — bad arguments, unknown/deferred `agent()` options, a schema outside the [structured-output subset](../../packages/core/tools/README.md), a tripped cap, a seam start failure, cancellation — throws a `WorkflowError` with `fatal: true`. The `parallel()`/`pipeline()` combinators RE-THROW fatal errors instead of mapping the item to `null`: a typo'd option must kill the script loudly, never dissolve into something that reads as an ordinary child failure. The per-item `null` is reserved for child-run failures (a non-`completed` stop reason) and ordinary in-stage script errors.
+スクリプト内でのフックの誤用 — 不正な引数、未知/先送りされた `agent()` オプション、[structured-output サブセット](../../packages/core/tools/README.md)の外のスキーマ、上限への到達、シームの開始失敗、キャンセル — は `fatal: true` を持つ `WorkflowError` を投げる。`parallel()`/`pipeline()` コンビネーターは致命的エラーを `null` に写像する代わりに再スローする: タイポしたオプションはスクリプトを大きな声で殺さなければならず、通常の子の失敗として読めるものに溶解してはならない。項目ごとの `null` は子実行の失敗 (`completed` 以外の停止理由) と通常のステージ内スクリプトエラーのために予約されている。
 
-## Events
+## イベント
 
-The `workflow/*` events (`workflow/start`, `workflow/phase`, `workflow/log`, `workflow/agent-start`, `workflow/agent-end`, `workflow/end` — see the [events catalog](#cordis-surface)) are **observe-only** emits carrying DATA SNAPSHOTS: every payload starts with `WorkflowRunInfo` (id + meta), never the live `WorkflowRun`, so a subscriber cannot gain `cancel`/`dispose`, and `workflow/end` deliberately omits the result value (a listener observing outcomes must not receive a mutable alias of the caller's result). Every emit is per-listener contained — a throwing subscriber is logged, never propagated, and cannot starve the listeners registered after it — and every listener receives its own payload clone, so mutating it corrupts neither the engine nor other listeners; the containment mirrors `subagent/start`/`subagent/end`.
+`workflow/*` イベント (`workflow/start`、`workflow/phase`、`workflow/log`、`workflow/agent-start`、`workflow/agent-end`、`workflow/end` — [イベントカタログ](#cordis-surface)を参照) は、DATA SNAPSHOTS を運ぶ **observe-only** の emit である: すべてのペイロードは `WorkflowRunInfo` (id + meta) で始まり、ライブの `WorkflowRun` では決してないので、サブスクライバーは `cancel`/`dispose` を得られない。`workflow/end` は意図的に結果値を省略する (結果を観察するリスナーが呼び出し元の結果の可変エイリアスを受け取ってはならない)。すべての emit はリスナーごとに封じ込められる — 投げるサブスクライバーはログに記録され、決して伝播されず、その後に登録されたリスナーを飢えさせることができない — そしてすべてのリスナーは自身のペイロードクローンを受け取るので、それを変更してもエンジンも他のリスナーも破壊しない。この封じ込めは `subagent/start`/`subagent/end` を鏡写しにする。
 
-## Durable Chat records
+## 耐久 Chat レコード
 
-The top-level `dsh-tool-workflow` consumer projects display facts into its calling parent Session without changing execution ownership. It writes `tool-workflow/run-start` after a run is accepted, pairs member start and end by `runId + seq`, and writes `tool-workflow/run-end` only after the result is known and disposal reaches quiescence. Nested transport calls write no record. The first append failure disables later writes for that run, so the log remains empty or a legal continuous prefix and the tool result is unchanged.
+最上位の `dsh-tool-workflow` コンシューマーは、実行の所有権を変えることなく、表示上の事実を呼び出し元の親 Session に射影する。実行が受け入れられた後に `tool-workflow/run-start` を書き込み、`runId + seq` でメンバーの開始と終了を対にし、結果が判明して破棄が静止に達した後にのみ `tool-workflow/run-end` を書き込む。ネストしたトランスポート呼び出しはレコードを書かない。最初の追記失敗はその実行の以後の書き込みを無効化するので、ログは空か法的な連続プレフィックスのままであり、ツール結果は変わらない。
 
-The record protocol allows one start per run, positive unique member sequences, paired member endings, no run ending with open members, and no updates after the run ending. A missing member ending or run ending at the log tail is valid interruption evidence rather than corruption.
+レコードプロトコルは、実行ごとに 1 つの start、正で一意なメンバーシーケンス、対になったメンバー終了、開いたメンバーを持ったままの実行終了の禁止、および実行終了後の更新の禁止を許す。ログ末尾で欠落したメンバー終了または実行終了は、破損ではなく有効な中断の証拠である。
 
-`dsh-client-ui-workflow-run` folds the four events through the Conversation Node engine into one `workflow-run` Chat node anchored at the run-start sequence, after the original workflow tool node. Phase groups come only from actual member starts and preserve exact strings, including the distinction between an omitted phase and `''`. Closed Locations turn missing terminal facts into interrupted presentation. The [UI package README](../../packages/client/ui-workflow-run/README.md) owns disclosure, status, and same-parent local navigation behavior.
+`dsh-client-ui-workflow-run` は 4 つのイベントを Conversation Node エンジンを通じて折り畳み、元の workflow ツールノードの後に、実行開始シーケンスにアンカーされた 1 つの `workflow-run` Chat ノードにする。フェーズグループは実際のメンバー開始からのみ生じ、省略されたフェーズと `''` の区別を含め、正確な文字列を保つ。クローズされた Location は、欠落した終端の事実を中断されたプレゼンテーションに変える。[UI パッケージ README](../../packages/client/ui-workflow-run/README.md)が開示、ステータス、および同一親のローカルナビゲーション動作を所有する。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -133,13 +133,13 @@ The record protocol allows one start per run, positive unique member sequences, 
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される (doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成)。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxworkflowengine--workflowengine-abstract-seam"></a>
 
-### `ctx.workflowEngine` — `WorkflowEngine` (abstract seam)
+### `ctx.workflowEngine` — `WorkflowEngine` (抽象シーム)
 
-Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, and disposal waits for script and child cleanup. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.
+Workflow Service Definition の契約。無効なリクエストは公開前に投げる。ライブランは保持者所有であり、その結果は決して reject せず、破棄はスクリプトと子の片付けを待つ。ライフサイクルリスナーの失敗は封じ込められ、`workflow/end` は結果の確定とともにちょうど 1 回発火する。
 
 ```ts cordis-catalog
 /**
@@ -151,7 +151,7 @@ Workflow Service Definition contract. Invalid requests throw before publication;
 abstract start(request: WorkflowStartRequest): WorkflowRun
 ```
 
-Source: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
+ソース: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
 
 <a id="workflow-events"></a>
 
@@ -161,7 +161,7 @@ Source: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/work
 
 #### `workflow/agent-end` — emit
 
-One `agent()` call settled (clean result, child failure, or run cancellation). Paired with Events['workflow/agent-start'] by `agent.seq`, exactly once per started call on every stop path — on an engine termination path the end is engine-synthesized with outcome `'cancelled'`.
+1 つの `agent()` 呼び出しが確定した (クリーンな結果、子の失敗、または実行のキャンセル)。`agent.seq` によって Events['workflow/agent-start'] と対になり、開始された呼び出しごとにすべての停止経路でちょうど 1 回発火する — エンジンの終了経路では、end は結果 `'cancelled'` でエンジンが合成する。
 
 ```ts cordis-catalog
 /**
@@ -177,13 +177,13 @@ One `agent()` call settled (clean result, child failure, or run cancellation). P
 'workflow/agent-end'(info: WorkflowRunInfo, agent: WorkflowAgentEndInfo): void
 ```
 
-Source: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
+ソース: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
 
 <a id="workflowagent-start--emit"></a>
 
 #### `workflow/agent-start` — emit
 
-One `agent()` call established a published child run. Paired with Events['workflow/agent-end'] by `agent.seq`. A call that never receives a published run from the provider emits neither event in this pair.
+1 つの `agent()` 呼び出しが公開された子実行を確立した。`agent.seq` によって Events['workflow/agent-end'] と対になる。プロバイダーから公開された実行を決して受け取らない呼び出しは、このペアのどちらのイベントも発火しない。
 
 ```ts cordis-catalog
 /**
@@ -198,13 +198,13 @@ One `agent()` call established a published child run. Paired with Events['workfl
 'workflow/agent-start'(info: WorkflowRunInfo, agent: WorkflowAgentInfo): void
 ```
 
-Source: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
+ソース: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
 
 <a id="workflowend--emit"></a>
 
 #### `workflow/end` — emit
 
-A workflow run settled (any stop reason). Fired when WorkflowRun.result resolves. Paired with Events['workflow/start'].
+ワークフロー実行が確定した (任意の停止理由)。WorkflowRun.result が解決したときに発火する。Events['workflow/start'] と対になる。
 
 ```ts cordis-catalog
 /**
@@ -219,13 +219,13 @@ A workflow run settled (any stop reason). Fired when WorkflowRun.result resolves
 'workflow/end'(info: WorkflowRunInfo, result: WorkflowResultInfo): void
 ```
 
-Source: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
+ソース: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
 
 <a id="workflowlog--emit"></a>
 
 #### `workflow/log` — emit
 
-The script emitted a narration line (a `log(message)` call).
+スクリプトがナレーション行 (`log(message)` 呼び出し) を出力した。
 
 ```ts cordis-catalog
 /**
@@ -237,13 +237,13 @@ The script emitted a narration line (a `log(message)` call).
 'workflow/log'(info: WorkflowRunInfo, message: string): void
 ```
 
-Source: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
+ソース: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
 
 <a id="workflowphase--emit"></a>
 
 #### `workflow/phase` — emit
 
-The script entered a phase (a `phase(title)` call) — progress grouping for observers; no execution semantics.
+スクリプトがフェーズに入った (`phase(title)` 呼び出し) — オブザーバー向けの進捗グルーピングであり、実行セマンティクスはない。
 
 ```ts cordis-catalog
 /**
@@ -256,13 +256,13 @@ The script entered a phase (a `phase(title)` call) — progress grouping for obs
 'workflow/phase'(info: WorkflowRunInfo, title: string): void
 ```
 
-Source: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
+ソース: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
 
 <a id="workflowstart--emit"></a>
 
 #### `workflow/start` — emit
 
-A workflow run started — the script's meta block validated, the body about to execute. Paired with Events['workflow/end'].
+ワークフロー実行が開始した — スクリプトの meta ブロックが検証され、本体がまもなく実行される。Events['workflow/end'] と対になる。
 
 ```ts cordis-catalog
 /**
@@ -274,5 +274,5 @@ A workflow run started — the script's meta block validated, the body about to 
 'workflow/start'(info: WorkflowRunInfo): void
 ```
 
-Source: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
+ソース: [`packages/workflow/workflow/src/index.ts`](../../packages/workflow/workflow/src/index.ts)
 <!-- END GENERATED cordis-surface -->

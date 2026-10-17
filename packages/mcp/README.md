@@ -1,52 +1,52 @@
 ---
-description: "The MCP package group: connect external Model Context Protocol servers, call their tools, and read their resources."
+description: "MCP パッケージグループ: 外部 Model Context Protocol サーバーに接続し、そのツールを呼び、リソースを読む。"
 kind: "package-group"
 ---
 
 # MCP — Model Context Protocol
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `mcp/` group lets the model call external Model Context Protocol (MCP) tools and read server resources. Configure only `mcp-client` entries; shipped profiles already mount `mcp-resources` once. MCP tools and prompt text appear only for callers with a configured server in scope. Connections also supply server instructions. Package READMEs own configuration and limitations.
+`mcp/` グループでは、モデルが外部 Model Context Protocol（MCP）ツールを呼び、サーバーリソースを読める。`mcp-client` エントリのみを設定すること。出荷プロファイルは `mcp-resources` を 1 回マウント済みである。MCP ツールとプロンプトテキストは、スコープ内に設定済みサーバーを持つ呼び出し元にのみ現れる。接続はサーバー指示も供給する。設定と制限はパッケージ README が所有する。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-The client owns each configured connection; the shared resource package supplies resource tools across those connections.
+設定済み接続はクライアントが所有し、共有リソースパッケージがそれらの接続を横断してリソースツール群を供給する。
 
 | Package | What it provides |
 |---|---|
-| [`mcp-client/`](mcp-client/README.md) | Connect one MCP server, expose its tools and instructions, and provide its resource operations |
-| [`mcp-resources/`](mcp-resources/README.md) | Discover and read resources through shared tools with explicit server selection |
+| [`mcp-client/`](mcp-client/README.md) | 1 つの MCP サーバーに接続し、そのツールと指示を公開し、そのリソース操作を提供する |
+| [`mcp-resources/`](mcp-resources/README.md) | 明示的なサーバー選択を伴う共有ツール群でリソースを探索して読む |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Try the worked example configurations to see the plugin in action, then read the Agent Note for the behavior decisions behind it.
+プラグインの動作を見るには実践的な設定例から試し、その背後の動作決定は Agent Note を読むこと。
 
-- [historical MCP client plugin Agent Note](../../.agents/notes/archived/feature/2026-07-07-mcp-client-plugin.md) — the bridge's design: server-qualified naming, discovery, execution, and environment scrubbing.
-- [Resources and instructions reference](mcp-resources/README.md) — on-demand resource access and scoped server guidance.
-- [Third-party memory MCP guide](../../docs/user/guide/mcp-memory.md) — runnable overlay rows and setup instructions.
-- [Tools subsystem reference](../../docs/subsystems/tools.md) — the `ToolRuntime` that receives the registered tools.
+- [歴史的な MCP クライアントプラグイン Agent Note](../../.agents/notes/archived/feature/2026-07-07-mcp-client-plugin.md) — ブリッジの設計: サーバー修飾命名、探索、実行、環境スクラブ。
+- [リソース・指示参照](mcp-resources/README.md) — オンデマンドのリソースアクセスとスコープ付きサーバーガイダンス。
+- [サードパーティ製メモリ MCP ガイド](../../docs/user/guide/mcp-memory.md) — 実行可能なオーバーレイ行と設定手順。
+- [ツールサブシステム参照](../../docs/subsystems/tools.md) — 登録済みツールを受け取る `ToolRuntime`。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,101 +1,101 @@
 ---
-description: "Durable workflow-run Conversation Node for the dsh web client: reconstructs top-level workflow runs as independent chat nodes with nested member disclosure."
+description: "dsh Web クライアント向け耐久ワークフロー実行会話ノード: トップレベルワークフロー実行を入れ子メンバー開示付きの独立チャットノードとして再構成する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-workflow-run
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-client-ui-workflow-run` to inspect each durable top-level workflow run as an independent Chat node. Expand a run to see its phases and expand a phase to see members; running, failed, cancelled, and interrupted levels open by default, while completed levels remain closed. A running member can open its child Session only when it belongs to the current Session and is available locally. The node shows identities and statuses only; scripts, outputs, errors, logs, usage, topology, and controls remain outside this surface.
+`dsh-client-ui-workflow-run` を使って耐久性のある各トップレベルワークフロー実行を独立したチャットノードとして検査する。実行を展開してフェーズを見て、フェーズを展開してメンバーを見る。実行中、失敗、キャンセル、中断のレベルは既定で開き、完了レベルは閉じたままである。実行中メンバーは現在セッションに属し、ローカルに利用可能なときにのみその子セッションを開ける。ノードはアイデンティティと状態のみ示す。スクリプト、出力、エラー、ログ、利用量、位相、制御はこの表面の範囲外のままである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-A top-level workflow run through `dsh-tool-workflow` appears in the conversation as its own node: expand the run to see its phases, and expand a phase to see its members. Phase groups come only from members that started, and settlement changes status without removing or reordering members.
+`dsh-tool-workflow` 経由のトップレベルワークフロー実行は会話中に独自ノードとして現れる。実行を展開してフェーズを見て、フェーズを展開してメンバーを見る。フェーズ群は開始したメンバーからのみ来て、確定はメンバーを取り除かず並べ替えずに状態を変える。
 
-### Navigating the node
+### ノードの移動
 
-Run and phase headers keep 6px gaps between their title, count, and status fields, with the status aligned to the right. The run uses a 32-pixel row with persistent chevrons, an inline state dot, and status text; phases use disclosure rows with title and member count in the main area and a fixed aggregate-status tail; members use a 16-pixel dot slot, a truncating name area, and a fixed status column. Opening a member's child Session requires both member and child to be running, with the current Session recorded as its parent and an available child identity projection. Navigation uses the child's own mode for both continuable and historical one-shot children; external executions have no local Session to open. Child activity uses the unified UI status, falling back to the Session summary when unknown. Workflow events establish membership; missing child identity, a different parent, or a terminal member keeps the row non-interactive.
+実行とフェーズのヘッダーはタイトル、件数、状態フィールド間に 6px 間隔を保ち、状態は右寄せである。実行は永続シェブロン、インライン状態ドット、状態テキスト付きの 32 ピクセル行を使う。フェーズは主領域にタイトルとメンバー件数、固定集計状態末尾を持つ開示行を使う。メンバーは 16 ピクセルドット枠、切り詰める名前領域、固定状態列を使う。メンバーの子セッションを開くにはメンバーと子が共に実行中であり、現在セッションがその親として記録され、利用可能な子アイデンティティ投影があることを要する。移動は継続可能と履歴一回切りの両子に子の独自モードを使う。外部実行には開くべきローカルセッションがない。子活動は統一 UI 状態を使い、不明時はセッション概要にフォールバックする。ワークフローイベントは所属を確立する。子アイデンティティ欠落、異なる親、終端メンバーは行を非対話のままにする。
 
-### State and completion
+### 状態と完了
 
-Completion updates the visible status immediately but delays its automatic close while focus remains inside the content. A run or member without terminal events stays running after its Turn or Step ends normally, because a background run outlives its Tool Step. It is presented as interrupted, without changing the tool result, once its Turn is closed after a crash or at a fork boundary.
+完了は可視状態をすぐ更新するが、フォーカスが内容内に残る間はその自動クローズを遅らせる。終端イベントのない実行またはメンバーはターンまたはステップが正常に終わっても実行中のままである。バックグラウンド実行はツールステップより長生きするためである。クラッシュ後またはフォーク境界でターンが閉じられると、ツール結果を変えずに中断として提示される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The node is a deterministic replay of durable session events: `tool-workflow/run-start` creates one Context keyed by `runId`, and member starts, member endings, and the run ending update that Context in log order. A history tail containing only updates remains pending until an older page supplies the unique start, after which prepend, complete replay, and live append produce the same state.
+ノードは耐久セッションイベントの確定的リプレイである。`tool-workflow/run-start` は `runId` でキー化されたコンテキストを 1 件作り、メンバー開始、メンバー終了、実行終了がログ順にそのコンテキストを更新する。更新のみ含む履歴末尾は一意の開始を古いページが供給するまで保留のまま残り、その後は前置、完全リプレイ、ライブ追加が同じ状態を生む。
 
-### Disclosure choices
+### 開示選択
 
-Ordinary running updates preserve the current choice, the first abnormal edge opens once, normal completion closes once, and a completed phase plus the outer run open again when a new running member starts under the same phase key. If an entire new clean cycle arrives in one render while the run remains active, the phase finishes folded but the outer run opens once to expose its updated summary. `WorkflowRunPanel` owns the phase choices, so closing and reopening the outer run does not reset them; a renderer remount reconstructs every initial choice from durable facts.
+通常の実行中更新は現在の選択を保ち、最初の異常端は 1 回開き、正常完了は 1 回閉じ、完了済みフェーズと外側実行は同じフェーズキー配下に新しい実行中メンバーが始まると再び開く。実行が活性のまま 1 描画でまったく新しいクリーンサイクル全体が届くと、フェーズは折りたたまれたまま終わるが、外側実行は更新概要を公開するために 1 回開く。`WorkflowRunPanel` はフェーズ選択を所有するため、外側実行を閉じて開き直してもそれらはリセットされない。レンダラー再マウントは耐久事実からすべての初期選択を再構成する。
 
-### Composition
+### 構成
 
-The package registers its Definition, locale dictionary, and `workflow-run` renderer as Cordis effects; removing the client entry retracts all three contributions. The shipped Web bundle includes the plugin after `ui-conversation` and `ui-tool`.
+パッケージは定義、ロケール辞書、`workflow-run` レンダラーを Cordis エフェクトとして登録する。クライアントエントリーを取り除くと 3 寄与すべてが撤回される。出荷 Web バンドルは `ui-conversation` と `ui-tool` の後にプラグインを含む。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the tool seam, the conversation host, and the tool presentation layer.
+これらのページはツールシーム、会話ホスト、ツール提示層をカバーする。
 
-- [tool-workflow](../../workflow/tool-workflow/README.md) — the tool that owns the four `tool-workflow/*` Session events.
-- [ui-conversation](../ui-conversation/README.md) — the chat surface hosting the `conversation.chat.node` slot.
-- [ui-tool](../ui-tool/README.md) — the tool-call presentation layer this node sits beside.
-- [Conversation subsystem](../../../docs/subsystems/conversation.md) — how a business-owned feature registers a Conversation node.
+- [tool-workflow](../../workflow/tool-workflow/README.md) — 4 件の `tool-workflow/*` セッションイベントを所有するツール。
+- [ui-conversation](../ui-conversation/README.md) — `conversation.chat.node` スロットをホストするチャット表面。
+- [ui-tool](../ui-tool/README.md) — このノードが脇に座るツール呼び出し提示層。
+- [会話サブシステム](../../../docs/subsystems/conversation.md) — 事業所有機能が会話ノードを登録する仕組み。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that renders durable workflow records without changing model context.
+なし。パッケージはモデルコンテキストを変えずに耐久ワークフロー記録を描画するブラウザー側 UI プラグイン層であるためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダー要求を組み立てず送らない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define which runs produce records and what the node exposes; they are current package constraints.
+これらの制限はどの実行が記録を生み、ノードが何を公開するかを定める。現在のパッケージ制約である。
 
-- **Only top-level calls through `dsh-tool-workflow` produce these records** — nested PTC mode calls and direct `WorkflowEngine` consumers do not.
-- **A run lost without terminal events in a normally ended Turn stays running** — for example a background run whose process crashed during a later Turn, or a run whose recording stopped after a failed append; the session log carries no fact that marks it stopped.
-- **Navigation is intentionally live-only** — terminal members remain visible for review but never expose a cold-session opener from this node.
-- **The node shows run, phase, member identity, and status only** — scripts, outputs, errors, logs, usage, static topology, and controls remain outside this surface.
+- **`dsh-tool-workflow` 経由のトップレベル呼び出しのみがこれらの記録を生む** — 入れ子 PTC モード呼び出しと直接 `WorkflowEngine` コンシューマーは生まない。
+- **通常終了ターンで終端イベントなく失われた実行は実行中のままである** — 例えば後のターン中にプロセスがクラッシュしたバックグラウンド実行、または失敗追加後に記録が止まった実行。セッションログはそれが止まったことを示す事実を運ばない。
+- **移動は意図的にライブのみ** — 終端メンバーはレビュー向けに表示されたまま残るが、このノードからコールドセッションオープナーを決して公開しない。
+- **ノードは実行、フェーズ、メンバーアイデンティティ、状態のみを示す** — スクリプト、出力、エラー、ログ、利用量、静的位相、制御はこの表面の範囲外のままである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

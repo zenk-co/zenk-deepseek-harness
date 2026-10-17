@@ -1,6 +1,6 @@
 # MCP
 
-[English](mcp.md) | 中文
+[日本語](mcp.md) | [English](mcp.en.md) | 中文
 
 ## 摘要
 

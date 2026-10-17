@@ -5,7 +5,7 @@ kind: "package-group"
 
 # terminal/：持久 PTY 能力家族
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

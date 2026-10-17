@@ -5,7 +5,7 @@ kind: "package-group"
 
 # boot/：共享的 app bin 启动粘合层
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

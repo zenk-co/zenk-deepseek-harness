@@ -1,74 +1,74 @@
 ---
-description: "SDK stdio application profile for users and maintainers launching a JSON-RPC harness runtime."
+description: "JSON-RPC ハーネスランタイムを起動するユーザーとメンテナー向けの SDK stdio アプリケーションプロファイル。"
 kind: "package-bundle"
 ---
 
 # `@deepseek-ai/dsh-sdk-app`
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The SDK stdio application as a `dsh` profile bundle over [`dsh-base`](../base/README.md). It inherits the base's disabled module-HMR policy; its patch mounts an app-owned zero-option command provider, and starts [`dsh-sdk-jsonrpc-server`](../../sdk/server/README.md) only after that provider accepts the invocation. `dsh --profile sdk --help` therefore writes help and exits without claiming stdin or stdout. The standalone [`sdk-minimal`](../sdk-minimal/README.md) bundle reuses the same startup provider with its own profile name.
+[`dsh-base`](../base/README.md) 上の `dsh` プロファイルバンドルとしての SDK stdio アプリケーション。ベースの無効化されたモジュール HMR ポリシーを継承する。そのパッチはアプリ所有のゼロオプションコマンドプロバイダーをマウントし、そのプロバイダーが起動を受け入れた後にのみ [`dsh-sdk-jsonrpc-server`](../../sdk/server/README.md) を起動する。したがって `dsh --profile sdk --help` は help を書いて、stdin や stdout を主張せずに終了する。スタンドアロンの [`sdk-minimal`](../sdk-minimal/README.md) バンドルは、独自のプロファイル名で同じ起動プロバイダーを再利用する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The startup provider binds stdin EOF to the launcher's bounded successful shutdown. SDK protocol `shutdown`, SIGINT, and SIGTERM retain their owning server or launcher paths; disposal drains the root profile tree and persistence. Stdout is reserved for newline-delimited JSON-RPC frames. The bundle disables model-generated session titles because the SDK exposes no title surface; deterministic fallback titles remain durable without an auxiliary model request. The inherited projection cache checkpoints SDK-created sessions for later consumers; its durability barrier flushes each covered log prefix before publishing the cache row and may split otherwise coalesced JSONL runs. A deployment selects a different complete composition through profile bundles and patch files, not another app bin.
+起動プロバイダーは stdin の EOF を、ランチャーの上限付きの正常シャットダウンに束縛する。SDK プロトコルの `shutdown`、SIGINT、SIGTERM は、それらを所有するサーバーまたはランチャーの経路を保つ。破棄はルートプロファイルツリーと永続化をドレインする。stdout は改行区切りの JSON-RPC フレームのために予約されている。SDK はタイトルを公開する面を持たないので、バンドルはモデル生成のセッションタイトルを無効化する。決定論的なフォールバックタイトルは、補助的なモデルリクエストなしで耐久性を保つ。継承された投影キャッシュは、後のコンシューマーのために SDK が作成したセッションをチェックポイントする。その耐久性バリアは、キャッシュ行を公開する前に、対象となる各ログプレフィックスをフラッシュし、それ以外では合体される JSONL ランを分割することがある。デプロイメントは、別のアプリ bin ではなく、プロファイルバンドルとパッチファイルを通じて別の完全な構成を選択する。
 
-| Config | Default | Behavior |
+| 設定 | デフォルト | 動作 |
 |---|---|---|
-| `profile` | `sdk` | Profile name rendered in command help; a bundle mounting this provider sets its own shipped profile name. |
+| `profile` | `sdk` | コマンド help にレンダリングされるプロファイル名。このプロバイダーをマウントするバンドルは、自身の出荷プロファイル名を設定する。 |
 
-`DSH_MAX_TOKENS_AS_SUCCESS` retains the SDK deployment mapping: unset or JSON `true` reports token-limited subagent completion as accepted, while JSON `false` reports it as an error. Provider/model and workspace cwd arrive through the SDK initialization request; the base profile owns adapters, tools, persistence, policy, settings, and credentials.
+`DSH_MAX_TOKENS_AS_SUCCESS` は SDK デプロイメントのマッピングを保つ: 未設定または JSON の `true` は、トークン制限によるサブエージェント完了を受理済みとして報告し、JSON の `false` はそれをエラーとして報告する。プロバイダー/モデルとワークスペース cwd は SDK 初期化リクエストを通じて到着する。ベースプロファイルがアダプター、ツール、永続化、ポリシー、設定、資格情報を所有する。
 
-The SDK uses the base `read`, `write`, and `edit` defaults. To add `str_replace_editor`, use the explicit insertion patch in the [base configuration guide](../base/README.md#use-this-package). The standalone `sdk-minimal` profile owns its separate tool selection.
+SDK はベースの `read`、`write`、`edit` デフォルトを使う。`str_replace_editor` を追加するには、[ベース設定ガイド](../base/README.md#use-this-package)の明示的な挿入パッチを使う。スタンドアロンの `sdk-minimal` プロファイルは独自のツール選択を所有する。
 
-The Python runtime exposes explicitly downloaded authoring resources and Office sidecars to this profile. `DSH_PRIMARY_RUNTIME` overrides the authoring payload; an empty value disables its query. Office skills can use either resource independently. Profile patches can disable `skill-office` or replace its `assetRoot` independently of `workspace-dependencies`; filesystem skills with the same name take precedence. See the [runtime package](../../../python/sdk-runtime/README.md) for downloads and configuration.
+Python ランタイムは、明示的にダウンロードされたオーサリングリソースと Office サイドカーをこのプロファイルに公開する。`DSH_PRIMARY_RUNTIME` はオーサリングペイロードを上書きし、空の値はそのクエリを無効化する。Office スキルはどちらのリソースも独立に使える。プロファイルパッチは `workspace-dependencies` とは独立に `skill-office` を無効化したり、その `assetRoot` を置き換えたりできる。同じ名前のファイルシステムスキルが優先される。ダウンロードと設定については[ランタイムパッケージ](../../../python/sdk-runtime/README.md)を参照。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### SDK model context
+### SDK モデルコンテキスト
 
-#### What the model sees
+#### モデルが見るもの
 
-The profile inherits the base system prompt, including the `You are an AI agent powered by DeepSeek Harness.` identity, and adds the same model-interpolated coding persona as the Web and headless profiles. Each Session receives its current directory in required user-role context from [`dsh-working-directory`](../../session/working-directory/README.md). Default file tool schemas include `read`, `write`, and `edit`; they omit `str_replace_editor`.
+プロファイルは、`You are an AI agent powered by DeepSeek Harness.` というアイデンティティを含むベースのシステムプロンプトを継承し、Web プロファイルおよびヘッドレスプロファイルと同じ、モデルが補間するコーディングペルソナを追加する。各 Session は [`dsh-working-directory`](../../session/working-directory/README.md) から、必須の user-role コンテキストで現在のディレクトリを受け取る。デフォルトのファイルツールスキーマは `read`、`write`、`edit` を含み、`str_replace_editor` を含まない。
 
-#### Token effect
+#### トークン効果
 
-The base prompt sections and selected tool schemas determine token usage; this profile adds one coding-persona sentence.
+トークン使用量を決めるのはベースのプロンプトセクションと選択されたツールスキーマである。このプロファイルはコーディングペルソナの文を 1 つ追加する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Stable for a fixed profile, provider, model, and tool roster. Profile changes take effect on the next process because the shipped SDK profile uses startup-only patches.
+固定のプロファイル、プロバイダー、モデル、ツールロスターに対して安定している。出荷される SDK プロファイルは起動時のみのパッチを使うので、プロファイルの変更は次のプロセスで有効になる。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **A profile can omit the SDK server** — a custom profile selected by the TypeScript client must retain this bundle or another `dsh-sdk-jsonrpc-server` row; client initialization fails when no peer answers.
-- **User plugins can violate stdout purity** — profile and per-launch patches are trusted application composition. The shipped bundle writes no non-protocol stdout, but it cannot contain an arbitrary inserted plugin.
-- **Configuration changes require restart** — the `sdk-app` bundle disables HMR in YAML so one stdio connection never observes a replacement server or Agent dependency.
+- **プロファイルは SDK サーバーを省略できる** — TypeScript クライアントが選択するカスタムプロファイルは、このバンドルまたは別の `dsh-sdk-jsonrpc-server` 行を保たなければならない。応答するピアがないとクライアントの初期化は失敗する。
+- **ユーザープラグインは stdout の純粋性を破りうる** — プロファイルと起動ごとのパッチは信頼されたアプリケーション構成である。出荷されるバンドルはプロトコル以外の stdout を書かないが、任意に挿入されたプラグインを封じ込めることはできない。
+- **設定変更には再起動が必要である** — `sdk-app` バンドルは YAML で HMR を無効化するので、1 つの stdio 接続が置き換えられたサーバーや Agent 依存関係を観測することは決してない。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

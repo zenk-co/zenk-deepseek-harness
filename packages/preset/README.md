@@ -1,24 +1,24 @@
 ---
-description: "This group declares Agent capabilities through ordinary Cordis configuration and manages selection and runtime revisions. The Host shares the Agent loop; each Agent sees the tools, prompts and skills of its selected revision."
+description: "このグループは通常の Cordis 設定を通じてエージェントケイパビリティを宣言し、選択とランタイムリビジョンを管理する。ホストはエージェントループを共有し、各エージェントは選択したリビジョンのツール、プロンプト、スキルを見る。"
 kind: "package-group"
 ---
 
 # packages/preset
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This group declares Agent capabilities through ordinary Cordis configuration and manages selection and runtime revisions. The Host shares the Agent loop; each Agent sees the tools, prompts and skills of its selected revision.
+このグループは通常の Cordis 設定を通じてエージェントケイパビリティを宣言し、選択とランタイムリビジョンを管理する。ホストはエージェントループを共有し、各エージェントは選択したリビジョンのツール、プロンプト、スキルを見る。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
 | Package | Role | ctx key |
 |---|---|---|
@@ -27,17 +27,17 @@ This group declares Agent capabilities through ordinary Cordis configuration and
 | [persona](persona/README.md) | Composable Agent persona | — |
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Scope](../../docs/subsystems/scope.md)
+- [スコープ](../../docs/subsystems/scope.md)
 - [Cordis](../../docs/cordis-primer.md)
-- [Agent preset](../../.agents/notes/implemented/architecture/2026-09-18-declarative-agent-presets.md)
+- [エージェントプリセット](../../.agents/notes/implemented/architecture/2026-09-18-declarative-agent-presets.md)
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
 None.
 

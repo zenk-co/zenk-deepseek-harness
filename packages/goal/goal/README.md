@@ -1,39 +1,39 @@
 ---
-description: "The persisted same-session goal service for users and maintainers choosing, configuring, or debugging one durable completion objective per session."
+description: "セッションごとに 1 つの永続的な完了目標を選択、設定、またはデバッグするユーザーとメンテナーのための、永続化された同一セッション目標サービス。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-goal
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-goal` lets one long-running completion objective persist across turns, session resume, fork, and process restarts. Users and agents can create, edit, pause, resume, complete, block, or clear it; compare-and-set updates reject stale views. A configurable round cap (256 by default) bounds automatic continuation, and blocked goals retain a stable policy code with a human-readable explanation. The package stores goal state but does not schedule work, and continuation permission remains process-local rather than durable. Choose it for one objective spanning many turns; skip it for routine single-turn work or parallel objectives.
+`dsh-goal` は、1 つの長時間実行される完了目標をターン、セッション再開、フォーク、プロセス再起動をまたいで永続化させる。ユーザーとエージェントはそれを作成、編集、一時停止、再開、完了、ブロック、またはクリアできる; コンペアアンドセット更新は古いビューを拒否する。設定可能なラウンド上限 (デフォルト 256) が自動継続を制限し、ブロックされた目標は人間が読める説明を伴う安定したポリシーコードを保持する。このパッケージは目標状態を保存するが作業をスケジュールせず、継続の許可は永続的ではなくプロセスローカルにとどまる。多数のターンにまたがる 1 つの目標にはこれを選び、日常的な単一ターンの作業や並行する目標には使わない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [本パッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 本パッケージを使う
 
-Mount `dsh-goal` whenever a session should remember one long-running completion objective across many turns and restarts. The package is a service: the model tools, the `/goal` command, and the continuation driver are separate packages that consume the same goal state, so mounting only this package stores and serves the goal without starting any work.
+多くのターンと再起動をまたいで 1 つの長時間実行される完了目標をセッションに記憶させる場合は常に `dsh-goal` をマウントする。このパッケージはサービスである: モデルツール、`/goal` コマンド、および継続ドライバーは同じ目標状態を消費する別々のパッケージであるため、このパッケージだけをマウントすると、作業を開始せずに目標を保存して提供する。
 
-### When to use it
+### いつ使うか
 
-A goal suits one long-running completion objective that should continue across autonomous goal rounds — for example shipping a migration or fixing every failing documentation gate. Routine single-turn work should not create a goal. The service keeps at most one current goal per session: an unfinished goal must be edited, paused, resumed, blocked, or cleared before another takes its place, while a completed goal can be replaced directly.
+目標は、自律的な目標ラウンドをまたいで継続すべき 1 つの長時間実行される完了目標に適する — たとえば移行の出荷や、失敗しているすべてのドキュメントゲートの修正である。日常的な単一ターンの作業は目標を作るべきではない。サービスはセッションごとに最大 1 つの現在の目標を保つ: 未完了の目標は、別の目標がその場所を取る前に編集、一時停止、再開、ブロック、またはクリアされなければならないが、完了した目標は直接置き換えられる。
 
-### Set up the service
+### サービスをセットアップする
 
-Load the package with a composition entry; the only deployment choice is the default round cap applied to creates that do not name their own.
+コンポジションエントリーでパッケージをロードする; 唯一のデプロイメント上の選択は、自身の上限を名指さない作成に適用されるデフォルトのラウンド上限である。
 
 ```yaml
 - name: '@deepseek-ai/dsh-goal'
@@ -41,39 +41,39 @@ Load the package with a composition entry; the only deployment choice is the def
     defaultMaxGoalRounds: 256
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `defaultMaxGoalRounds` | `256` | Round cap applied when a create request omits its own |
+| `defaultMaxGoalRounds` | `256` | 作成リクエストが自身の上限を省略したときに適用されるラウンド上限 |
 
-`defaultMaxGoalRounds` must be a positive safe integer; a create request that names its own cap overrides it. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-goal) is the exhaustive source for every accepted field.
+`defaultMaxGoalRounds` は正の安全な整数でなければならない; 自身の上限を名指す作成リクエストはそれを上書きする。生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-goal)が、受け入れられるすべてのフィールドの網羅的な情報源である。
 
-### Session projection
+### セッションプロジェクション
 
-`GoalService` requires `ctx.sessionProjections` ([`@deepseek-ai/dsh-session-projection`](../../session/session-projection/README.md)) and registers the `goal` projection unit at startup; a composition that omits the projection registry cannot activate `ctx.goals`. The unit's version 6 host state retains the latest valid current goal, every previously used goal id, and the first strict replay failure. Its client view exposes the current goal or `null` before the first create and after a clear tombstone. The key merges into both `SessionProjectionStateMap` and `SessionProjectionMap`; carriers serve the client value on the history tail page and the `session/projection` push frame.
+`GoalService` は `ctx.sessionProjections` ([`@deepseek-ai/dsh-session-projection`](../../session/session-projection/README.md)) を必要とし、起動時に `goal` プロジェクションユニットを登録する; プロジェクションレジストリを省略したコンポジションは `ctx.goals` をアクティブ化できない。ユニットのバージョン 6 のホスト状態は、最新の有効な現在の目標、以前に使われたすべての目標 id、および最初の厳格なリプレイ失敗を保持する。そのクライアントビューは、最初の作成前とクリアのトゥームストーンの後には現在の目標または `null` を公開する。キーは `SessionProjectionStateMap` と `SessionProjectionMap` の両方にマージされる; キャリアは履歴テールページと `session/projection` プッシュフレームでクライアント値を提供する。
 
-### Drive the lifecycle
+### ライフサイクルを駆動する
 
-A goal moves through four durable phases — `active`, `paused`, `blocked`, `complete` — plus a process-local flag that says whether automatic continuation is armed. The verbs:
+目標は 4 つの永続フェーズ — `active`、`paused`、`blocked`、`complete` — と、自動継続がアームされているかを示すプロセスローカルなフラグを通って進む。動詞:
 
-| Operation | What it does |
+| 操作 | 何をするか |
 |---|---|
-| `create` | Starts an active goal with an objective and round cap |
-| `edit` | Changes the objective and/or round cap without changing the phase |
-| `pause` | Stops automatic continuation and keeps the state |
-| `resume` | Restarts continuation; also rearms an active goal after session resume or fork |
-| `complete` | Marks the goal achieved and stops continuation |
-| `block` | Records a stable blocker code and explanation |
-| `clear` | Removes the current goal; its history stays in the session log |
+| `create` | 目的とラウンド上限を指定してアクティブな目標を開始する |
+| `edit` | フェーズを変えずに目的とラウンド上限の一方または両方を変更する |
+| `pause` | 自動継続を停止し、状態を保つ |
+| `resume` | 継続を再開する; セッション再開またはフォーク後のアクティブな目標も再アームする |
+| `complete` | 目標を達成済みとしてマークし、継続を停止する |
+| `block` | 安定したブロッカーコードと説明を記録する |
+| `clear` | 現在の目標を削除する; その履歴はセッションログに残る |
 
-Pause, completion, blocking, and clear all disarm continuation. Blocking is the one phase that keeps a policy-owned lower-kebab-case code and a free-form explanation, so provider limits, exhausted budgets, execution errors, and requests for human input share a single durable phase instead of multiplying lifecycle states. Resume accepts a stopped goal, or an active but disarmed one, only while the round cap has remaining capacity, and it clears any former blocker reason.
+一時停止、完了、ブロック、クリアはすべて継続をディスアームする。ブロックは、ポリシー所有の lower-kebab-case コードと自由形式の説明を保つ唯一のフェーズであり、プロバイダーの制限、枯渇した予算、実行エラー、人間の入力への要求が、ライフサイクル状態を増殖させる代わりに 1 つの永続フェーズを共有する。再開は、停止した目標、またはアクティブだがディスアームされた目標を、ラウンド上限に残容量がある間だけ受け入れ、以前のブロッカー理由をクリアする。
 
-### What survives and what does not
+### 何が生き残り、何がそうでないか
 
-Every accepted change is recorded durably in the session log — the only store of goal state — so goal state never depends on transient message delivery. After session resume or fork, the goal, its phase, its revisions, and its admitted-round count are all still there. Automatic continuation is the exception: an active goal is disarmed after any session-start edge, so the agent does not continue on its own until someone explicitly resumes it.
+受け入れられたすべての変更はセッションログ — 目標状態の唯一のストア — に永続的に記録されるため、目標状態が一時的なメッセージ配信に依存することは決してない。セッション再開またはフォーク後も、目標、そのフェーズ、そのリビジョン、および承認済みラウンド数はすべてそのまま残る。自動継続は例外である: アクティブな目標は任意のセッション開始エッジの後にディスアームされるため、誰かが明示的に再開するまでエージェントは自力で継続しない。
 
-### Observing a goal
+### 目標を観察する
 
-Consumers read the current goal with `ctx.goals.get(agent)` and receive a detached view: objective, phase, rounds started versus the cap, blocker reason when blocked, and whether continuation is armed. Mutations must carry the exact `{ id, revision }` from that view, so a consumer holding older state receives a clear stale-revision error instead of silently overwriting newer state:
+コンシューマーは `ctx.goals.get(agent)` で現在の目標を読み、デタッチされたビューを受け取る: 目的、フェーズ、開始済みラウンド対上限、ブロック時のブロッカー理由、および継続がアームされているかどうかである。ミューテーションはそのビューからの正確な `{ id, revision }` を運ばなければならないため、古い状態を保持するコンシューマーは、新しい状態を暗黙に上書きする代わりに明確な stale-revision エラーを受け取る:
 
 ```text
 const view = ctx.goals.get(agent)      // undefined when no goal is current
@@ -85,87 +85,87 @@ view.activation                        // 'armed' | 'disarmed' — not persisted
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the service realizes the behavior above; the observable contract is covered in [Use this package](#use-this-package).
+このセクションは、サービスが上記の挙動をどのように実現するかを説明する; 観察可能な契約は[本パッケージを使う](#use-this-package)で扱う。
 
-### Design
+### 設計
 
-- **Event-sourced state.** Every mutation appends a durable `goal/change` event (version 1) carrying the complete post-mutation snapshot; `clear` writes a revisioned tombstone. The session log is the only durable authority.
-- **Compare-and-set mutations.** `ctx.goals` accepts only the exact live `Agent` registered under its id. `get()` returns a detached `GoalView`; mutations take a `GoalRef { id, revision }` and reject stale refs. Creation resolves the deployment default internally before committing.
-- **Activation is process-local.** `armed` and `disarmed` live in a per-session cache and are never persisted. A fresh cache and every `agent/created` edge disarm continuation even when replay finds an active durable phase; `disarm()` removes authority without writing a revision or emitting a mutation.
-- **Strict replay.** The fold derives lifecycle mutations only from `goal/change` and rejects malformed shapes, discontinuous revisions, illegal phase transitions, non-monotonic per-goal timestamps, and non-sequential admitted rounds. Positive rounds advance only on admitted goal-sourced `user/message` events, and mutation timestamps clamp against the preceding update when wall time moves backward.
-- **Projection unit.** The package requires the projection registry and registers a strict `goal` unit. Its host state retains replay validation data and the first failure, while its client view exposes the latest valid whole goal or `null`; `GoalService` rejects access after a retained replay failure.
+- **イベントソースの状態。** すべてのミューテーションは、ミューテーション後の完全なスナップショットを運ぶ永続的な `goal/change` イベント (バージョン 1) を追加する; `clear` はリビジョン付きトゥームストーンを書き込む。セッションログが唯一の永続的な権威である。
+- **コンペアアンドセットのミューテーション。** `ctx.goals` はその id の下に登録された正確な生きた `Agent` だけを受け入れる。`get()` はデタッチされた `GoalView` を返す; ミューテーションは `GoalRef { id, revision }` を取り、古い ref を拒否する。作成はコミット前にデプロイメントのデフォルトを内部で解決する。
+- **アクティベーションはプロセスローカル。** `armed` と `disarmed` はセッションごとのキャッシュに存在し、永続化されることは決してない。新しいキャッシュとすべての `agent/created` エッジは、リプレイがアクティブな永続フェーズを見つけた場合でも継続をディスアームする; `disarm()` はリビジョンを書いたりミューテーションを emit したりせずに権限を除去する。
+- **厳格なリプレイ。** fold はライフサイクルミューテーションを `goal/change` からのみ導出し、不正な形、不連続なリビジョン、不正なフェーズ遷移、単調でない目標ごとのタイムスタンプ、連続していない承認済みラウンドを拒否する。正のラウンドは、承認された目標由来の `user/message` イベントでのみ進み、実時間が逆戻りしたときはミューテーションのタイムスタンプが直前の更新に対してクランプされる。
+- **プロジェクションユニット。** このパッケージはプロジェクションレジストリを必要とし、厳格な `goal` ユニットを登録する。そのホスト状態はリプレイ検証データと最初の失敗を保持し、クライアントビューは最新の有効な目標全体または `null` を公開する; `GoalService` は保持されたリプレイ失敗の後のアクセスを拒否する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `GoalService`, config schema, mutations, activation cache, projection unit |
-| [`src/domain.ts`](src/domain.ts) | Durable change payloads, `goal/changed` event, goal message-source attribution |
-| [`src/types.ts`](src/types.ts) | Pure client-safe types: `GoalView`, `GoalSnapshot`, `GoalActivationChanged`, projection-key declaration |
-| [`src/fold.ts`](src/fold.ts) | Strict replay fold and decoder for durable goal changes |
-| [`src/runtime.ts`](src/runtime.ts) | `GoalId` brand, `GoalError` codes, change-version constant |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `GoalService`、設定スキーマ、ミューテーション、アクティベーションキャッシュ、プロジェクションユニット |
+| [`src/domain.ts`](src/domain.ts) | 永続変更ペイロード、`goal/changed` イベント、目標メッセージソースの帰属 |
+| [`src/types.ts`](src/types.ts) | 純粋でクライアント安全な型: `GoalView`、`GoalSnapshot`、`GoalActivationChanged`、プロジェクションキー宣言 |
+| [`src/fold.ts`](src/fold.ts) | 永続的な目標変更の厳格なリプレイ fold とデコーダー |
+| [`src/runtime.ts`](src/runtime.ts) | `GoalId` ブランド、`GoalError` コード、変更バージョン定数 |
 
-### Events and attribution
+### イベントとアトリビューション
 
-`goal/changed` fires after the durable event commits, with listener failures contained; the payload carries the operation, the exact ref, and the fresh view (absent for a clear tombstone). `goal/activation-changed` forwards a process-local `armed`/`disarmed` edge with the exact current ref, or no goal after a clear, without changing durable state. Admitted continuation rounds are attributed through `GoalMessageSource { goalId, revision, round }` on the `user/message` event, which the strict fold validates as the next admitted round of the current goal.
+`goal/changed` は永続イベントのコミット後に発火し、リスナーの失敗は封じ込められる; ペイロードは操作、正確な ref、および新鮮なビュー (クリアのトゥームストーンでは存在しない) を運ぶ。`goal/activation-changed` はプロセスローカルな `armed`/`disarmed` エッジを、正確な現在の ref とともに、またはクリア後は目標なしで転送し、永続状態を変えない。承認された継続ラウンドは `user/message` イベント上の `GoalMessageSource { goalId, revision, round }` を通じて帰属され、厳格な fold がそれを現在の目標の次の承認済みラウンドとして検証する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-The package-level contract is enough for most consumers; read these when you need the surrounding domain and the design rationale.
+パッケージレベルの契約はほとんどのコンシューマーに十分である; 周辺ドメインと設計根拠が必要なときにこれらを読む。
 
-- [Goal subsystem](../../../docs/subsystems/goal.md) — the goal types, durable change payloads, and generated service API.
-- [Goal group map](../README.md) — the goal packages and how they compose.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-goal) — every accepted config field and its source declaration.
-- [historical Goal domain Agent Note](../../../.agents/notes/archived/feature/2026-07-19-persisted-same-session-goal-domain.md) — the domain design, alternatives, and decisions.
+- [Goal サブシステム](../../../docs/subsystems/goal.md) — 目標型、永続変更ペイロード、および生成されたサービス API。
+- [Goal グループマップ](../README.md) — 目標パッケージとそれらがどのように構成されるか。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-goal) — 受け入れられるすべての設定フィールドとそのソース宣言。
+- [歴史的な Goal ドメインの Agent Note](../../../.agents/notes/archived/feature/2026-07-19-persisted-same-session-goal-domain.md) — ドメイン設計、代替案、および決定。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Goal-state mutations
+### Goal 状態のミューテーション
 
-#### What the model sees
+#### モデルが見るもの
 
-Goal mutations do not inject model context. Tools such as `get_goal` return the current state, and a continuation consumer may render the objective and round state when it schedules model work.
+目標ミューテーションはモデルコンテキストを注入しない。`get_goal` などのツールは現在の状態を返し、継続コンシューマーはモデル作業をスケジュールするときに目的とラウンド状態をレンダリングしてよい。
 
-#### Token effect
+#### トークンへの影響
 
-Goal mutation events add no model tokens by themselves. Tool results and scheduled continuation prompts account for their own visible state.
+目標ミューテーションイベントはそれ自体ではモデルトークンを追加しない。ツール結果とスケジュールされた継続プロンプトが自身の可視状態を説明する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-There is no KV-cache effect until another component exposes goal state in model-visible input.
+別のコンポーネントが目標状態をモデル可視の入力に公開するまで、KV キャッシュへの影響はない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the goal service is a poor fit or needs special care. They are current package constraints, not a task backlog.
+これらの制限は、目標サービスが適さない場合や特別な注意が必要な場合を定義する。それらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **State, not scheduling** — this package does not decide when an armed goal continues, retry abnormal failures, or cancel an active turn; those policies belong to consumer packages such as `dsh-goal-round-driver`.
-- **Round-count budget only** — `maxGoalRounds` does not meter tokens, currency, wall time, or provider quotas.
-- **No independent evaluator** — the caller that records completion or blocking is authoritative; evaluator-backed certification is deferred to a separate policy layer.
-- **One current goal** — parallel objectives and a separate goal database are intentionally absent; history remains available in the session log after replacement or clear.
-- **Trusted in-process producers** — a plugin with direct `Session` access can append counterfeit `goal/change` data. Strict replay detects malformed or inconsistent records and leaves goal access failed at that record until the log is repaired; this is integrity detection, not plugin isolation.
+- **状態であり、スケジューリングではない** — このパッケージは、アームされた目標がいつ継続するか、異常な失敗を再試行するか、アクティブなターンをキャンセルするかを決定しない; それらのポリシーは `dsh-goal-round-driver` などのコンシューマーパッケージに属する。
+- **ラウンド数予算のみ** — `maxGoalRounds` はトークン、通貨、実時間、プロバイダークォータを計量しない。
+- **独立した評価者なし** — 完了またはブロックを記録する呼び出し元が権威である; 評価者に裏付けられた認定は別のポリシー層へ先送りされる。
+- **現在の目標は 1 つ** — 並行する目標と別の目標データベースは意図的に存在しない; 置き換えまたはクリアの後も履歴はセッションログで利用できる。
+- **信頼されたプロセス内プロデューサー** — `Session` へ直接アクセスできるプラグインは偽造された `goal/change` データを追加し得る。厳格なリプレイは不正または不整合なレコードを検出し、ログが修復されるまでそのレコードの位置で目標アクセスを失敗させたままにする; これは完全性の検出であり、プラグインの分離ではない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-This Dev Note is working context for maintainers; it is explicitly non-authoritative. Open, undecided directions: an always-visible goal context plugin for deployments that want the objective in every model request, and evaluator-backed certification of completion and blocking claims.
+この開発メモはメンテナー向けの作業コンテキストであり、明示的に非権威である。未解決で未決定の方向性: すべてのモデルリクエストに目的を含めたいデプロイメント向けの常時可視の目標コンテキストプラグイン、および完了とブロックの主張の評価者に裏付けられた認定。
 
 </details>

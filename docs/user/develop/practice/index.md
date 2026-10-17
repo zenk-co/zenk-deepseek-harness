@@ -1,20 +1,20 @@
-# Three-role capability design
+# 3 役割ケイパビリティ設計
 
-English | [中文](index.zh.md)
+日本語 | [English](index.en.md) | [中文](index.zh.md)
 
-This page has two parts: a concept reference for the three-role capability pattern, followed by an advanced tutorial that builds one capability. Complete the [basic plugin path](../basic/index.md) and [services tutorial](../framework/service.md) first.
+このページは 2 部構成である。3 役割ケイパビリティパターンの概念リファレンスと、1 つのケイパビリティを構築する上級チュートリアルである。先に[基本プラグインパス](../basic/index.md)と[サービスチュートリアル](../framework/service.md)を完了すること。
 
-## Concept reference
+## 概念リファレンス
 
-When a capability is general enough to need replaceable providers, such as Bash execution, Harness separates three roles: a **Service Definition**, a **Service Provider**, and a **Consumer**. Put the roles in separate packages when they need to evolve or be replaced independently; a package may otherwise own more than one role. The complete capability is its seam. No individual role is a seam.
+ケイパビリティが Bash 実行のように置換可能なプロバイダーを必要とするほど汎用的である場合、Harness は 3 つの役割、すなわち**サービス定義**、**サービスプロバイダー**、**コンシューマー**に分離する。役割が独立に進化または置換される必要がある場合に別パッケージに置く。そうでない場合、パッケージは複数の役割を所有してよい。完全なケイパビリティがそのシームである。個々の役割はシームではない。
 
-## Bash example
+## Bash の例
 
-The Bash execution capability consists of:
+Bash 実行ケイパビリティは以下から構成される。
 
-- **Service Definition** (`dsh-shell`) — defines the Cordis service and Bash request and result types
-- **Service Provider** (`dsh-bash-local`) — executes commands on the local machine
-- **Consumer** (`dsh-tool-bash`) — exposes the capability as a model-callable tool
+- **サービス定義**（`dsh-shell`） — Cordis サービスと Bash 要求・結果型を定義する
+- **サービスプロバイダー**（`dsh-bash-local`） — ローカルマシンでコマンドを実行する
+- **コンシューマー**（`dsh-tool-bash`） — ケイパビリティをモデル呼び出し可能なツールとして公開する
 
 ```
 ┌─────────────┐     ┌──────────────────┐     ┌──────────────┐
@@ -26,11 +26,11 @@ The Bash execution capability consists of:
                     inject: ['shell']
 ```
 
-## Benefits of the split
+## 分割の利点
 
-### Replace providers
+### プロバイダーを置換する
 
-One Service Definition can have multiple providers selected through `cordis.yml`:
+1 つのサービス定義は `cordis.yml` を通じて選択される複数のプロバイダーを持てる。
 
 ```yaml
 # Local execution
@@ -39,25 +39,25 @@ One Service Definition can have multiple providers selected through `cordis.yml`
 # Replace this row with another package that provides the same service.
 ```
 
-The Service Definition and tool remain unchanged while the provider changes.
+プロバイダーが変わってもサービス定義とツールは変わらないままである。
 
-### Evolve independently
+### 独立に進化する
 
-- The Service Definition changes rarely after callers depend on its contract.
-- Service Providers can improve performance and security independently.
-- Consumers can change how they present the capability to the model.
+- サービス定義は呼び出し元が契約に依存した後はめったに変わらない。
+- サービスプロバイダーは性能と安全性を独立に改善できる。
+- コンシューマーはケイパビリティのモデルへの見せ方を変えられる。
 
-### Decouple dependencies
+### 依存を分離する
 
-- The Service Provider depends on the Service Definition.
-- The Consumer depends on the Service Definition.
-- The Service Provider and Consumer **do not depend on each other**.
+- サービスプロバイダーはサービス定義に依存する。
+- コンシューマーはサービス定義に依存する。
+- サービスプロバイダーとコンシューマーは**互いに依存しない**。
 
-The [capability-seam reference](../../../capability-seams.md) owns the current built-in families and package links.
+[ケイパビリティシームリファレンス](../../../capability-seams.md)は現在の組み込みファミリーとパッケージリンクを所有する。
 
-## Tutorial: develop a three-role capability
+## チュートリアル: 3 役割ケイパビリティを開発する
 
-### Step 1: write the Service Definition
+### ステップ 1: サービス定義を書く
 
 ```ts ignore-check
 // packages/my-cap/my-cap/src/index.ts
@@ -87,7 +87,7 @@ export interface MyCapResult {
 }
 ```
 
-### Step 2: write a Service Provider
+### ステップ 2: サービスプロバイダーを書く
 
 ```ts ignore-check
 // packages/my-cap/my-cap-local/src/index.ts
@@ -108,7 +108,7 @@ export function apply(ctx: Context) {
 }
 ```
 
-### Step 3: write a consumer
+### ステップ 3: コンシューマーを書く
 
 ```ts ignore-check
 // packages/my-cap/tool-my-cap/src/index.ts
@@ -137,19 +137,19 @@ export function apply(ctx: Context) {
 }
 ```
 
-### Compose them in cordis.yml
+### cordis.yml でそれらを構成する
 
 ```yaml
 - name: '@deepseek-ai/dsh-my-cap-local'
 - name: '@deepseek-ai/dsh-tool-my-cap'
 ```
 
-## Design points
+## 設計要点
 
-- **Do not split preemptively** — use separate packages only when the roles need to evolve independently. A simple tool plugin does not.
-- **The Service Definition owns Request/Result types** — Service Providers and Consumers depend only on the Service Definition package.
-- **Explicit > implicit** — resolve defaults in an explicit `resolve(request): Spec` step rather than hiding `?? default` expressions inside `run()`.
+- **先回りして分割しない** — 役割が独立に進化する必要がある場合にのみ別パッケージを使う。単純なツールプラグインはそうではない。
+- **サービス定義が要求・結果型を所有する** — サービスプロバイダーとコンシューマーはサービス定義パッケージにのみ依存する。
+- **明示は暗黙に勝る** — `run()` 内部に `?? default` 式を隠すのではなく、明示的な `resolve(request): Spec` 手順で既定値を解決する。
 
-## Next steps
+## 次の手順
 
-- [LLM adapter](./llm-adapter.md) — implement an LLM provider
+- [LLM アダプター](./llm-adapter.md) — LLM プロバイダーを実装する

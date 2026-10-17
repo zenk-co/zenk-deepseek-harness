@@ -1,39 +1,39 @@
 ---
-description: "The local PowerShell executor for deployments and maintainers choosing, configuring, or debugging unconfined PowerShell command execution over the shell seam."
+description: "shell シーム上で非封じ込めの PowerShell コマンド実行を選択、設定、またはデバッグするデプロイメントとメンテナーのためのローカル PowerShell エグゼキューター。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-pwsh-local
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-pwsh-local` is the PowerShell executor: every command runs as a fresh, non-interactive `pwsh -Command` process with no profile files, so no shell state survives between calls. It mirrors `dsh-bash-local`'s semantics call-for-call and adds PowerShell-shaped concerns: executable resolution, UTF-8 output pinning, and the model-friendly terminal environment. Commands run with the harness process's own authority — this executor confines nothing; compose `dsh-pwsh-sandbox` when commands need the sandbox capability. The model-facing `pwsh` tool talks to it once it is mounted.
+`dsh-pwsh-local` は PowerShell エグゼキューターである: すべてのコマンドはプロファイルファイルのない新しい非対話的な `pwsh -Command` プロセスとして実行されるため、呼び出し間でシェル状態は一切残らない。`dsh-bash-local` のセマンティクスを呼び出しごとにミラーし、PowerShell 固有の関心事 — 実行ファイルの解決、UTF-8 出力の固定、およびモデルにやさしいターミナル環境 — を加える。コマンドは Harness プロセス自身の権限で実行される — このエグゼキューターは何も封じ込めない; コマンドがサンドボックスケイパビリティを必要とする場合は `dsh-pwsh-sandbox` をコンポーズする。モデル向けの `pwsh` ツールは、これがマウントされるとそれと対話する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [本パッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 本パッケージを使う
 
-Mount this executor when a composition needs PowerShell command execution — typically on Windows — without confinement. It registers as `ctx.shell`, and the model-facing `pwsh` tool works over it immediately: an agent calls the tool, and the command runs as a fresh `pwsh -Command` process with the budgets below.
+コンポジションが封じ込めなしの PowerShell コマンド実行 — 通常は Windows 上 — を必要とする場合にこのエグゼキューターをマウントする。これは `ctx.shell` として登録され、モデル向けの `pwsh` ツールは直ちにその上で機能する: エージェントがツールを呼び出すと、コマンドは以下の予算で新しい `pwsh -Command` プロセスとして実行される。
 
-### When to choose it
+### いつ選ぶか
 
-It is the Windows counterpart of `dsh-bash-local`: choose it where `pwsh` is the platform shell, so a composition can swap the POSIX rows for the pwsh rows and keep the same semantics. The executor resolves the `pwsh` executable from an explicit `pwshPath`, well-known Windows install locations, PATH entries, or Windows PowerShell 5.1 as a last resort. For unconfined execution it is the default; compose `dsh-pwsh-sandbox` when commands need the sandbox capability.
+これは `dsh-bash-local` の Windows 版である: `pwsh` がプラットフォームシェルである場所でこれを選び、コンポジションが POSIX の行を pwsh の行に入れ替えても同じセマンティクスを保てるようにする。エグゼキューターは `pwsh` 実行ファイルを、明示的な `pwshPath`、よく知られた Windows のインストール場所、PATH エントリー、または最後の手段として Windows PowerShell 5.1 から解決する。非封じ込め実行ではこれがデフォルトである; コマンドがサンドボックスケイパビリティを必要とする場合は `dsh-pwsh-sandbox` をコンポーズする。
 
-### Minimal configuration
+### 最小構成
 
-Load the executor with the budgets you want; every field has a default, so the smallest composition is the plugin entry alone. The settings provider (when composed) layers a user section over this entry, so budgets can change at runtime without a reload (see [Adjusting budgets at runtime](#adjusting-budgets-at-runtime)).
+望む予算でエグゼキューターをロードする; すべてのフィールドにデフォルトがあるため、最小のコンポジションはプラグインエントリーのみである。settings プロバイダー (コンポーズされている場合) はこのエントリーの上にユーザーセクションを重ねるため、リロードなしで実行時に予算を変更できる ([実行時の予算の調整](#adjusting-budgets-at-runtime)を参照)。
 
 ```yaml
 - id: bash
@@ -43,21 +43,21 @@ Load the executor with the budgets you want; every field has a default, so the s
     timeoutMs: 120000
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `cwd` | `process.cwd()` | Default working directory for commands |
-| `timeoutMs` | `120,000` | Default foreground timeout, in milliseconds |
-| `maxTimeoutMs` | `600,000` | Cap for per-call timeout overrides |
-| `maxOutputBytes` | `64,000` | Per-stream in-memory output cap; overflow spills to a temp file |
-| `maxSpillBytes` | `67,108,864` | Per-stream full-output spill cap |
-| `graceMs` | `3,000` | Grace period for kill escalation and post-exit pipe draining |
-| `pwshPath` | resolved | Explicit pwsh executable; else well-known locations, then PATH |
+| `cwd` | `process.cwd()` | コマンドのデフォルト作業ディレクトリ |
+| `timeoutMs` | `120,000` | デフォルトのフォアグラウンドタイムアウト (ミリ秒) |
+| `maxTimeoutMs` | `600,000` | 呼び出しごとのタイムアウト上書きの上限 |
+| `maxOutputBytes` | `64,000` | ストリームごとのインメモリ出力上限; 超過分は一時ファイルへ spill される |
+| `maxSpillBytes` | `67,108,864` | ストリームごとの全出力 spill 上限 |
+| `graceMs` | `3,000` | kill エスカレーションと終了後のパイプドレインの猶予期間 |
+| `pwshPath` | 解決済み | 明示的な pwsh 実行ファイル; なければよく知られた場所、次に PATH |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-pwsh-local) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-pwsh-local)が、受け入れられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### Running commands
+### コマンドの実行
 
-Run a command by awaiting the execution's `result()` projection; a nonzero exit, a timeout, or a cancellation resolves descriptively, and only infrastructure failures reject. The command string rides as one argument to `-Command`: PowerShell parses the text itself and no intermediate shell exists, so there is no shell-quoting layer to escape and native Win32 paths pass through unchanged. Every command pins UTF-8 output first, so non-ASCII output is not garbled even on the Windows PowerShell 5.1 fallback. The environment is model-friendly: `NO_COLOR=1 PAGER=cat GIT_PAGER=cat` (no `TERM=dumb` — a POSIX concept), with explicit caller-provided entries still winning.
+実行の `result()` プロジェクションを await してコマンドを実行する; 非ゼロ終了、タイムアウト、またはキャンセルは説明的に解決し、インフラストラクチャの失敗だけが拒否する。コマンド文字列は `-Command` への 1 つの引数として渡される: PowerShell がテキスト自体を解析し、中間シェルは存在しないため、エスケープすべきシェル引用層はなく、ネイティブの Win32 パスはそのまま通る。すべてのコマンドは最初に UTF-8 出力を固定するため、Windows PowerShell 5.1 フォールバックでも非 ASCII 出力が文字化けしない。環境はモデルにやさしい: `NO_COLOR=1 PAGER=cat GIT_PAGER=cat` (`TERM=dumb` は POSIX の概念なのでなし)、呼び出し元が明示的に提供したエントリーは引き続き優先される。
 
 ```text
 const execution = await ctx.shell.execute(ctx.shell.resolve({ command: 'Get-ChildItem' }))
@@ -65,97 +65,97 @@ const result = await execution.result()
 if (result.timedOut) console.log('timed out after', result.timeoutMs)
 ```
 
-### Background processes
+### バックグラウンドプロセス
 
-Resolve with `onExpiry: 'none'` and await `execute` to run a command in the background; no deadline is armed. Cancellation or preparation failure rejects before a handle is published. `readOutput()` merges the stream deltas into one consuming read, marking stderr under a `[stderr]` section; `kill()` terminates the provider-managed range; `done` settles when the direct command closes and never rejects. Job ids, ownership, polling, and notices belong to the generic `ctx.jobs` runtime, which the tool layer registers the handle with.
+`onExpiry: 'none'` で解決し `execute` を await してコマンドをバックグラウンドで実行する; 期限は設定されない。キャンセルまたは準備の失敗はハンドルが公開される前に拒否する。`readOutput()` はストリーム差分を 1 つの消費読み取りにマージし、stderr を `[stderr]` セクションの下に印付ける; `kill()` はプロバイダー管理レンジを終了させる; `done` は直接コマンドが閉じたときに決着し、決して拒否しない。ジョブ id、所有権、ポーリング、通知は汎用の `ctx.jobs` ランタイムに属し、ツール層がハンドルをそこに登録する。
 
 <a id="adjusting-budgets-at-runtime"></a>
-### Adjusting budgets at runtime
+### 実行時の予算の調整
 
-Execution budgets are volatile Config fields sampled when resolving each command. The Plugins page edits the active executor’s profile entry. Complete Config validation rejects invalid numbers and timer limits before a form write reaches disk.
+実行予算は揮発性の Config フィールドであり、各コマンドの解決時に標本化される。Plugins ページはアクティブなエグゼキューターのプロファイルエントリーを編集する。完全な Config 検証は、フォーム書き込みがディスクに到達する前に無効な数値とタイマー制限を拒否する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design of the executor and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションはエグゼキューターの設計と、それを実現するコードを指し示す; 観察可能な挙動は[本パッケージを使う](#use-this-package)で完全に扱う。
 
-### Design concept
+### 設計概念
 
-The executor is the PowerShell Service Provider for the `ctx.shell` seam built on the subprocess capability: it owns everything pwsh-shaped — executable resolution, command defaulting and caps, deadline fusion and cause classification, UTF-8 output pinning, the model-friendly terminal environment, and the background read merge — while managed-range mechanics (bounded spill-backed output, credential scrub, termination escalation, quiescence, and disposal) belong to the subprocess service. Every call spawns a fresh non-interactive `pwsh -Command` with `-NoLogo -NoProfile -NonInteractive`, so commands are deterministic and profile state never leaks between calls.
+エグゼキューターは subprocess ケイパビリティ上に構築された `ctx.shell` シームの PowerShell サービスプロバイダーである: pwsh 固有のものすべて — 実行ファイルの解決、コマンドのデフォルト化と上限、期限の融合と原因分類、UTF-8 出力の固定、モデルにやさしいターミナル環境、バックグラウンド読み取りのマージ — を所有し、管理レンジの機構 (上限付き spill ベースの出力、クレデンシャル洗浄、終了エスカレーション、静止、および破棄) は subprocess サービスに属する。すべての呼び出しは `-NoLogo -NoProfile -NonInteractive` 付きの新しい非対話的な `pwsh -Command` を spawn するため、コマンドは決定論的で、プロファイル状態が呼び出し間で漏れることは決してない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `PwshLocalExecutor`, `Config`, settings wiring, argv seam |
-| [`src/resolve.ts`](src/resolve.ts) | Pure `resolvePwshPath`/`candidatePwshPaths` executable resolution |
-| `tests/` | Exercised behavior: budgets, classification, resolution, background handles |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `PwshLocalExecutor`、`Config`、settings 配線、argv シーム |
+| [`src/resolve.ts`](src/resolve.ts) | 純粋な `resolvePwshPath`/`candidatePwshPaths` 実行ファイル解決 |
+| `tests/` | 実証される挙動: 予算、分類、解決、バックグラウンドハンドル |
 
-### Main flow
+### メインフロー
 
-A call runs through three steps: `resolve()` fills `workdir`/`timeoutMs`/`stdoutMaxBytes` from config (capping the per-call `timeoutMs` override); the executor builds the pwsh argv — `pwsh -NoLogo -NoProfile -NonInteractive -Command <encoding preamble + command>` — fuses the config-clamped timeout with the caller's abort signal into one deadline, and spawns through `ctx.subprocess` with explicit byte caps and the `graceMs`; the settled outcome is classified and projected into a `ShellRunResult`. Windows reports forced termination as exit 1 without a signal, so signal-stamped facts are POSIX-only there; the timeout/abort classification is platform-independent.
+呼び出しは 3 つのステップを通る: `resolve()` が設定から `workdir`/`timeoutMs`/`stdoutMaxBytes` を埋め (呼び出しごとの `timeoutMs` 上書きに上限を適用する); エグゼキューターは pwsh の argv — `pwsh -NoLogo -NoProfile -NonInteractive -Command <encoding preamble + command>` — を構築し、設定でクランプされたタイムアウトと呼び出し元の abort シグナルを 1 つの期限に融合し、明示的なバイト上限と `graceMs` を伴って `ctx.subprocess` を通じて spawn する; 決着した結果は分類され `ShellRunResult` へ投影される。Windows は強制終了をシグナルなしの終了コード 1 として報告するため、シグナルを刻まれた事実はそこでは POSIX 専用である; タイムアウト/abort の分類はプラットフォーム非依存である。
 
-The foreground deadline starts before argv preparation and retains the same signal and remaining budget through execution. Preparation timeout returns empty output, `timedOut: true`, and null `exitCode` and `signal`; caller cancellation before process publication still rejects. Late preparation success or failure cannot trigger a spawn.
+フォアグラウンドの期限は argv 準備の前に始まり、実行を通じて同じシグナルと残り予算を保持する。準備のタイムアウトは空の出力、`timedOut: true`、および null の `exitCode` と `signal` を返す; プロセス公開前の呼び出し元キャンセルは依然として拒否する。遅れての準備の成功または失敗が spawn を引き起こすことはできない。
 
-### Invariants and ownership
+### 不変条件と所有権
 
-- The `graceMs` budget must be positive, finite, and no greater than `MAX_TIMER_DELAY_MS` so Node can represent it with one timer; invalid values are refused where they are written.
-- Environment layering is fixed: terminal overrides first, then the caller's `env`, then the trusted `dshEnv` snapshot last; the subprocess service scrubs ambient credentials and inherited `DSH_*` names independently.
-- Executable resolution is a pure function of `(configured, env, platform)` and re-probes the filesystem only when the stored `pwshPath` differs from the one the current executable was resolved from.
-- A background process belongs to the subprocess service: it survives an executor-only reload and is killed and joined when the service disposes.
+- `graceMs` 予算は正で有限であり、Node が 1 つのタイマーで表現できるよう `MAX_TIMER_DELAY_MS` 以下でなければならない; 無効な値は書き込まれる場所で拒否される。
+- 環境の重ね合わせは固定である: 最初にターミナルの上書き、次に呼び出し元の `env`、最後に信頼された `dshEnv` スナップショット; subprocess サービスはアンビエントのクレデンシャルと継承された `DSH_*` 名を独立に洗浄する。
+- 実行ファイル解決は `(configured, env, platform)` の純粋関数であり、保存された `pwshPath` が現在の実行ファイルの解決元と異なる場合にのみファイルシステムを再探索する。
+- バックグラウンドプロセスは subprocess サービスに属する: エグゼキューターだけのリロードを生き延び、サービスの破棄時に kill されて join される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the executor contract is not enough. They move from the seam to the confining sibling and the PowerShell tool.
+エグゼキューターの契約では不十分なときにこれらのページを読む。シームから封じ込めを行う兄弟と PowerShell ツールへ進む。
 
-- [shell seam](../shell/README.md) — the executor contract this provider implements, including the request/spec split.
-- [bash-local](../bash-local/README.md) — the POSIX counterpart this executor mirrors call-for-call.
-- [pwsh-sandbox](../pwsh-sandbox/README.md) — the confining executor to compose instead when commands need the sandbox capability.
-- [tool-pwsh](../tool-pwsh/README.md) — the model-facing `pwsh` tool over this executor.
-- [Bash executor subsystem](../../../docs/subsystems/shell.md) — request/spec vocabulary, results, and the service contract in full.
+- [shell シーム](../shell/README.md) — このプロバイダーが実装するエグゼキューター契約 (request/spec 分割を含む)。
+- [bash-local](../bash-local/README.md) — このエグゼキューターが呼び出しごとにミラーする POSIX の対応物。
+- [pwsh-sandbox](../pwsh-sandbox/README.md) — コマンドがサンドボックスケイパビリティを必要とするときに代わりにコンポーズする封じ込めエグゼキューター。
+- [tool-pwsh](../tool-pwsh/README.md) — このエグゼキューター上のモデル向け `pwsh` ツール。
+- [Bash エグゼキューターサブシステム](../../../docs/subsystems/shell.md) — request/spec の語彙、結果、およびサービス契約の全体。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-tool-pwsh`, which renders this executor's bounded stdout/stderr tails, background-process deltas (through the generic job runtime), spill-file paths, and infrastructure failures.
+間接的に、`dsh-tool-pwsh` を通じて。それはこのエグゼキューターの上限付き stdout/stderr テール、バックグラウンドプロセスの差分 (汎用ジョブランタイム経由)、spill ファイルパス、およびインフラストラクチャの失敗をレンダリングする。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+直接の無効化はなし; 名前を挙げられたコンシューマーがリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this executor is a poor fit. They are current package constraints, not a roadmap.
+これらの制限は、このエグゼキューターが適さない場合を定義する。それらは現在のパッケージ制約であり、ロードマップではない。
 
-- **Unconfined by itself** — commands run with the harness process's authority; deployments needing confinement compose a sandboxing executor or policy instead.
-- **No persistent shell or PTY** — every call starts a fresh `pwsh -Command`.
-- **The command string is PowerShell text** — the `-Command` domain has no shell-quoting layer, but a model-facing command is parsed by PowerShell itself, so PowerShell syntax errors are command failures, not launch failures.
-- **A background provider-failure note is the whole stderr stream** — `SubprocessHandle.done` can reject before or after target execution begins, and the subprocess service buffers no output for a target that never reported, so the executor serves the stage-neutral `subprocess failed before reporting an outcome: …` as the observed stderr stream (offset readers re-read it at their own offsets) and folds it into exactly one `readOutput()` delta; a consuming reader that discards that delta recovers it only through `observed.stderr`.
-- **Windows termination reports no signal** — a force-killed process settles as exit 1 with `signal: null`, so signal-based status classification does not apply on Windows; `kill()`-initiated stops still stamp `killed` directly.
-- **The encoding preamble precedes the command** — PowerShell requires `param(...)`, `#requires`, and `using` statements at the very top of a script, so a command whose first statement is one of those cannot run under the UTF-8 output preamble; wrap a `param(...)` script in `& { … }`, and run `using`/`#requires` scripts from a file instead.
-- **Non-ASCII stdin under Windows PowerShell 5.1 may be mis-decoded** — the preamble pins output encoding only; `[Console]::InputEncoding` stays at the host default because setting it under redirected stdin throws; pwsh 7 defaults to UTF-8 and is unaffected.
+- **単体では非封じ込め** — コマンドは Harness プロセス権限で実行される; 封じ込めを必要とするデプロイメントは代わりにサンドボックスエグゼキューターまたはポリシーをコンポーズする。
+- **永続シェルまたは PTY なし** — すべての呼び出しが新しい `pwsh -Command` を開始する。
+- **コマンド文字列は PowerShell テキストである** — `-Command` の領域にはシェル引用層はないが、モデル向けのコマンドは PowerShell 自身が解析するため、PowerShell の構文エラーは起動の失敗ではなくコマンドの失敗である。
+- **バックグラウンドのプロバイダー失敗ノートが stderr ストリームの全体である** — `SubprocessHandle.done` はターゲット実行の開始前または後に拒否しうるし、subprocess サービスは報告しなかったターゲットの出力を何もバッファしないため、エグゼキューターはステージ中立の `subprocess failed before reporting an outcome: …` を観察された stderr ストリームとして提供し (オフセットリーダーは自身のオフセットで再読する)、それをちょうど 1 つの `readOutput()` 差分に畳み込む; その差分を捨てる消費リーダーは `observed.stderr` を通じてのみそれを回復できる。
+- **Windows の終了はシグナルを報告しない** — 強制 kill されたプロセスは `signal: null` とともに終了コード 1 として決着するため、シグナルベースのステータス分類は Windows では適用されない; `kill()` 起点の停止は依然として直接 `killed` を刻む。
+- **エンコーディングプリアンブルはコマンドの前に置かれる** — PowerShell は `param(...)`、`#requires`、および `using` ステートメントをスクリプトの最上部に要求するため、最初のステートメントがそれらのいずれかであるコマンドは UTF-8 出力プリアンブルの下では実行できない; `param(...)` スクリプトは `& { … }` で包み、`using`/`#requires` スクリプトは代わりにファイルから実行する。
+- **Windows PowerShell 5.1 での非 ASCII stdin は誤デコードされる可能性がある** — プリアンブルは出力エンコーディングのみを固定する; `[Console]::InputEncoding` は、リダイレクトされた stdin の下で設定すると例外を投げるため、ホストのデフォルトのままである; pwsh 7 は UTF-8 がデフォルトであり影響を受けない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

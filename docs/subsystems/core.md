@@ -1,27 +1,27 @@
-# Core
+# コア
 
-English | [中文](core.zh.md)
+日本語 | [English](core.en.md) | [中文](core.zh.md)
 
-The **core** subsystem is [`packages/core`](../../packages/core/README.md) — the packages every composition boots: the event-sourced session log, system-prompt assembly, the tool registry, the agent types, and the concrete loop that drives them. This page explains what the `agent`/`agent-loop` pair declares — how an agent is created and owned, and the `Agent` handle's delivery, cancellation, and interception contracts — plus the two type patterns every subsystem follows. The group's dedicated pages and the rest of the folder are indexed in the [subsystems README](README.md).
+**core** サブシステムは [`packages/core`](../../packages/core/README.md) であり、すべてのコンポジションが起動するパッケージ群である: イベントソーシングされたセッションログ、システムプロンプトの組み立て、ツールレジストリー、エージェントの型、そしてそれらを駆動する具体的なループ。このページでは `agent`/`agent-loop` ペアが宣言する内容 — エージェントの作成と所有の方法、`Agent` ハンドルの配送・キャンセル・介入コントラクト — およびすべてのサブシステムが従う 2 つの型パターンを説明する。このグループの専用ページとフォルダーの残りは [subsystems README](README.md) に索引化されている。
 
-## The spine, package by package
+## パッケージごとに見た中核構成
 
-A turn flows through the six packages in one loop: the driver in [`agent-loop`](../../packages/core/agent-loop) claims a queued prompt, opens a turn on the [session log](session.md) (`ctx.sessions`), assembles the request prefix through [system-prompt](system-prompt.md) (`ctx.systemPrompt`) and derives history from the log, streams the model response through the [LLM seam](llm-streaming.md), dispatches tool calls through the [tool registry](tools.md) (`ctx.tools`), and appends every model-visible fact back onto the log before the next step derives from it. The conversation vocabulary the loop moves — `Message`, `ContentBlock`, `StreamChunk`, the model request — is declared by [`packages/llm`](../../packages/llm/README.md) and documented on [llm-streaming.md](llm-streaming.md).
+1 つのターンは 6 つのパッケージを 1 つのループで流れる: [`agent-loop`](../../packages/core/agent-loop) 内のドライバーがキューに入ったプロンプトを取得し、[セッションログ](session.md) (`ctx.sessions`) 上でターンを開き、[system-prompt](system-prompt.md) (`ctx.systemPrompt`) を通じてリクエストのプレフィックスを組み立ててログから履歴を導出し、[LLM シーム](llm-streaming.md)を通じてモデルの応答をストリーミングし、[ツールレジストリー](tools.md) (`ctx.tools`) を通じてツール呼び出しをディスパッチし、次のステップが導出する前にモデル可視の事実をすべてログに追記する。ループが運ぶ会話ボキャブラリー — `Message`、`ContentBlock`、`StreamChunk`、モデルリクエスト — は [`packages/llm`](../../packages/llm/README.md) が宣言し、[llm-streaming.md](llm-streaming.md) で文書化されている。
 
-| Package | Owns | Page |
+| パッケージ | 担当 | ページ |
 |---|---|---|
-| `session/` | The append-only `SessionEvent` log and in-memory store — the single source of truth (`ctx.sessions`) | [session.md](session.md) |
-| `system-prompt/` | Prompt-section and tool-schema assembly (`ctx.systemPrompt`) | [system-prompt.md](system-prompt.md) |
-| `tools/` | The scoped tool registry and guarded execution pipeline (`ctx.tools`) | [tools.md](tools.md) |
-| `agent/` | The `Agent` interface, live registry, initiator scope, and `agent/*` event vocabulary (`ctx.agents`) | this page |
-| `agent-loop/` | The concrete driver implementing the public `Agent` contract (`ctx.agentLoop`) | this page |
-| `scope/` | The scoped-registration primitive the registries and loop build per-agent scoping on | [scope.md](scope.md) |
+| `session/` | 追記専用の `SessionEvent` ログとインメモリストア — 単一の真実の源 (`ctx.sessions`) | [session.md](session.md) |
+| `system-prompt/` | プロンプトセクションとツールスキーマの組み立て (`ctx.systemPrompt`) | [system-prompt.md](system-prompt.md) |
+| `tools/` | スコープ付きツールレジストリーとガード付き実行パイプライン (`ctx.tools`) | [tools.md](tools.md) |
+| `agent/` | `Agent` インターフェース、ライブレジストリー、イニシエータースコープ、`agent/*` イベントボキャブラリー (`ctx.agents`) | このページ |
+| `agent-loop/` | 公開 `Agent` コントラクトを実装する具体的なドライバー (`ctx.agentLoop`) | このページ |
+| `scope/` | レジストリーとループがエージェントごとのスコープ構築の土台とするスコープ付き登録プリミティブ | [scope.md](scope.md) |
 
-`scope/` is the one non-service package: a dependency-free library (`createScope`/`scopeOf`/`scopeTarget`) that sits below `session/` and `system-prompt/` in the module graph precisely so they can consume it without a cycle. `agent-loop` is the one concrete implementation of the public `Agent` contract and lives here because it is the harness's default product loop; it runs each driver inside `ctx.agents.withInitiator()`. Extension plugins depend on `agent` — including when they need the initiating Agent — and never on `agent-loop` directly, so the loop stays swappable. [`dsh-base`](../../packages/bundle/base/README.md) is the default product composition, while [`dsh-sdk-minimal`](../../packages/bundle/sdk-minimal/README.md) declares a smaller standalone tree.
+`scope/` は唯一の非サービスパッケージである: 依存関係を持たないライブラリー (`createScope`/`scopeOf`/`scopeTarget`) で、モジュールグラフにおいて `session/` と `system-prompt/` の下位に位置することで、それらが循環なしに利用できるようになっている。`agent-loop` は公開 `Agent` コントラクトの唯一の具体的な実装であり、ハーネスの既定のプロダクトループであるためここに属する; 各ドライバーを `ctx.agents.withInitiator()` 内で実行する。拡張プラグインは `agent` に依存し — 起動元エージェントが必要な場合も含めて — `agent-loop` に直接依存しないため、ループは交換可能に保たれる。[`dsh-base`](../../packages/bundle/base/README.md) は既定のプロダクトコンポジションであり、[`dsh-sdk-minimal`](../../packages/bundle/sdk-minimal/README.md) はより小さなスタンドアロンツリーを宣言する。
 
-## Creation and ownership
+## 作成と所有権
 
-Consumers create agents through `ctx.agents` — `create()` builds a fresh session and agent under one caller-supplied `SessionId`, `resume()` loads a persisted session first — or declaratively through the loop's config entries. Programmatic creation returns the owner's handle:
+コンシューマーは `ctx.agents` を通じてエージェントを作成する — `create()` は呼び出し元が指定した 1 つの `SessionId` の下で新しいセッションとエージェントを構築し、`resume()` は永続化されたセッションを先に読み込む — またはループの設定エントリーを通じて宣言的に作成する。プログラムによる作成は所有者のハンドルを返す:
 
 Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index.ts)
 
@@ -46,13 +46,13 @@ interface AgentHandle {
 }
 ```
 
-`CreateAgentOptions` carries the shared identity and everything a fresh agent needs before publication: an optional live `parentAgent`, session metadata (`meta` — validated `cwd`, fork lineage, the `isSeeded` marker, origin classification, delegation depth, and `agentPreset`), the exact fork cut in sibling field `inheritedEventCount`, an optional `seed` replay prefix, per-agent `AgentOptions`, a creation-only cancellation `signal`, and `setup`. `ResumeAgentOptions` is the persisted-identity counterpart: `resumeSessionId`, `parentAgent`, `agentOptions`, `signal`, and `setup`. The `setup` callback (`AgentSetup`) receives `(agentCtx, agent)` while both ids are still unpublished: the context owns scoped registrations, while the explicit Agent supplies the exact child Session without a reverse property on the Context. Everything registered through `agentCtx` exists before `agent/created` and the first prompt assembly. Setup may return a synchronous commit invoked immediately before publication; a setup rejection, commit throw, or owner disposal rolls the transaction back without publishing either id.
+`CreateAgentOptions` は共有の同一性と、新しいエージェントが公開前に必要とするすべてのものを運ぶ: 任意のライブの `parentAgent`、セッションメタデータ (`meta` — 検証済みの `cwd`、フォークの系譜、`isSeeded` マーカー、生成元の分類、委譲の深さ、`agentPreset`)、兄弟フィールド `inheritedEventCount` 内の正確なフォーク切り分け点、任意の `seed` リプレイプレフィックス、エージェントごとの `AgentOptions`、作成時のみのキャンセル用 `signal`、および `setup`。`ResumeAgentOptions` は永続化された同一性に対応する: `resumeSessionId`、`parentAgent`、`agentOptions`、`signal`、および `setup`。`setup` コールバック (`AgentSetup`) は両方の id がまだ公開されていない間に `(agentCtx, agent)` を受け取る: コンテキストはスコープ付き登録を所有し、明示的な Agent は Context 上の逆方向プロパティなしに正確な子 Session を提供する。`agentCtx` を通じて登録されたものはすべて `agent/created` と最初のプロンプト組み立ての前に存在する。Setup は公開直前に実行される同期コミットを返してもよい; setup の拒否、コミットの throw、または所有者の破棄は両方の id を公開せずにトランザクションをロールバックする。
 
-`AgentFactory` is the creation interface behind the registry: the loop registers its factory via `ctx.agents.setFactory()`, so consumers use `ctx.agents` without depending on the concrete loop package. A runtime child creator sets `options.parentAgent`; the registry passes the options and caller Context to the factory without deriving one from the other. The exact `create`/`resume` signatures and rollback contracts are in the [generated section](#ctxagents--agentregistry) below.
+`AgentFactory` はレジストリー背後の作成インターフェースである: ループは `ctx.agents.setFactory()` を通じてそのファクトリーを登録するため、コンシューマーは具体的なループパッケージに依存せずに `ctx.agents` を使う。ランタイムの子作成者は `options.parentAgent` を設定する; レジストリーはオプションと呼び出し元 Context をファクトリーに渡し、一方から他方を導出しない。正確な `create`/`resume` シグネチャーとロールバックコントラクトは下の[生成セクション](#ctxagents--agentregistry)にある。
 
-## The agent handle
+## エージェントハンドル
 
-`Agent` is the surface every plugin (UI, hooks, orchestrators) programs against; `ctx.agents.get(id)` returns it, and the [initiator scope](#initiating-agent) carries it. The concrete implementation is package-internal to dsh-agent-loop; nothing outside the loop depends on it. The unified `send` method exposes target and wakeup routing directly; `followup`, `steer`, and `inject` are fixed-preset aliases.
+`Agent` はすべてのプラグイン (UI、フック、オーケストレーター) がプログラム対象とするサーフェスである; `ctx.agents.get(id)` がそれを返し、[イニシエーター$scope](#initiating-agent) がそれを運ぶ。具体的な実装は dsh-agent-loop 内部のパッケージプライベートであり、ループ外の何ものもそれに依存しない。統一された `send` メソッドがターゲットとウェイクアップのルーティングを直接公開する; `followup`、`steer`、`inject` は固定プリセットの別名である。
 
 Source: [`packages/core/agent/src/types.ts`](../../packages/core/agent/src/types.ts)
 
@@ -190,7 +190,7 @@ type AssistantStreamFrame =
   }
 ```
 
-`running` describes the driver-wide drain interval and may span consecutive queued turns; it does not prove a turn is still open. Disposal removes the agent from the registry and emits `agent/disposed`; it is not a terminal status value. `followup()` returns no handle: its `MessageId` identifies durable inbox insertion, claim, and discard facts, not a later assistant output or turn ending. `whenIdle()` observes the whole agent, so callers may call a receipt-to-idle interval a run only when they explicitly own that interval ([decision](../../.agents/notes/implemented/architecture/2026-07-30-followup-enqueue-and-owned-runs.md)).
+`running` はドライバー全体の排出区間を表し、連続するキュードターンをまたぐことがある; ターンがまだ開いていることの証明にはならない。破棄はエージェントをレジストリーから除去し `agent/disposed` を送出する; 終端の状態値ではない。`followup()` はハンドルを返さない: その `MessageId` は耐久化されたインボックスへの挿入・取得・破棄の事実を識別し、後のアシスタント出力やターンの終了を識別しない。`whenIdle()` はエージェント全体を観測するため、呼び出し元はその区間を明示的に所有する場合にのみ受領からアイドルまでの区間をランと呼べる ([決定](../../.agents/notes/implemented/architecture/2026-07-30-followup-enqueue-and-owned-runs.md))。
 
 ```ts type-equiv
 /** Merge-extensible agent creation options. Persona belongs to system-prompt sections. */
@@ -206,9 +206,9 @@ interface AgentOptions {
 }
 ```
 
-Dispatch requires `provider` and `model` after `agent/request`. An explicit `reasoningEffort` seeds the first request on that route; exact-model resolution validates it, while omission allows the adapter default to materialize. When present, `maxTokens` must be a positive safe integer and caps every conversation-model request; omission allows the exact-model adapter default to materialize before the request header, or otherwise leaves provider behavior unchanged. An agent-scoped `deployment:persona-prefix` prompt section may shadow the global default persona.
+ディスパッチには `agent/request` の後で `provider` と `model` が必要である。明示的な `reasoningEffort` はそのルート上の最初のリクエストをシードし、厳密モデル解決がそれを検証する一方、省略時はアダプターの既定が具体化する。存在する場合、`maxTokens` は正の安全整数でなければならず、会話モデルリクエストごとに上限を設ける; 省略時は厳密モデルアダプターの既定がリクエストヘッダーの前に具体化するか、そうでなければプロバイダーの動作を変えない。エージェントスコープの `deployment:persona-prefix` プロンプトセクションはグローバルの既定ペルソナを隠蔽できる。
 
-The inbox is the delivery vocabulary — two ordered pending-message lists the agent owns as a durable projection:
+インボックスは配送ボキャブラリーである — エージェントが耐久プロジェクションとして所有する 2 つの順序付き保留メッセージリストである:
 
 ```ts type-equiv
 /** Agent-owned access to pending work; concrete storage belongs to the driver. */
@@ -272,9 +272,9 @@ interface Inbox {
 type InboxTarget = 'next-turn' | 'next-step'
 ```
 
-Every pending occurrence is its `UserMessage`; `MessageId` is the sole identity. The structural `Inbox` methods record normalized durable `agent/inbox/spliced` mutations and reject duplicate pending ids. `replace(messageId, newMessage)` and `remove(messageId)` locate the pending message across both lists; replacement may change identity and emits the old message as discarded followed by the new message as inserted. Ordinary removals and `clear()` are cancellations. At a step boundary, dsh-agent-loop's package-internal `ReactLoopInbox` removes the proposed batch — all `next-step` input plus, at a turn boundary, one `next-turn` message — through pure deletion splices without discarded notifications, then emits per-message claimed notifications. Loop-only pending detection and claiming are not part of `Agent.inbox`. The `AgentLoop` service registers the standard `inbox` projection before publishing its factory; its cell is the sole live state, and the same fold serves cold consumers even when no Agent exists. The fold rejects unsafe or out-of-range splice coordinates and duplicate identities across both lists, identifying malformed durable history by event seq. Consumers following one message use the exact `agent/inbox/inserted`, `claimed`, and `discarded` notifications.
+保留中の出現はすべてその `UserMessage` である; `MessageId` が唯一の同一性である。構造的な `Inbox` メソッドは正規化された耐久 `agent/inbox/spliced` 変更を記録し、重複する保留 id を拒否する。`replace(messageId, newMessage)` と `remove(messageId, newMessage)` は両リストにわたり保留メッセージを探す; 置換は同一性を変えることがあり、古いメッセージを破棄済みとして、新しいメッセージを挿入済みとして送出する。通常の除去と `clear()` はキャンセルである。ステップ境界では、dsh-agent-loop のパッケージ内部 `ReactLoopInbox` が提案バッチ — すべての `next-step` 入力に加え、ターン境界では 1 件の `next-turn` メッセージ — を破棄通知なしの純粋な削除 splice で取り除き、次にメッセージごとの取得済み通知を送出する。ループ専用の保留検出と取得は `Agent.inbox` の一部ではない。`AgentLoop` サービスはファクトリー公開前に標準の `inbox` プロジェクションを登録する; そのセルが唯一のライブ状態であり、エージェントが存在しないコールドコンシューマーにも同じ fold が適用される。fold は安全でない範囲外の splice 座標と両リストにわたる重複同一性を拒否し、イベント seq により不正な耐久履歴を識別する。1 つのメッセージを追跡するコンシューマーは正確な `agent/inbox/inserted`、`claimed`、`discarded` 通知を使う。
 
-Cancellation:
+キャンセル:
 
 ```ts type-equiv
 /** Options for {@link Agent.cancel}. */
@@ -297,23 +297,23 @@ type AgentCancelCause =
   | { readonly kind: 'disposed' }
 ```
 
-The cause is a TypeScript-enforced same-process input. An active cancellation holder exposes that same object as the runtime-only `AbortSignal.reason`; a signal grants cooperating listeners no classification authority. Durable `turn/end` records the outcome as `{ kind: 'aborted', reason: TurnEndCancelCause }`, so the cancel cause lands in the terminal result.
+cause は TypeScript で強制される同一プロセス入力である。アクティブなキャンセル保持者はその同じオブジェクトをランタイム専用の `AbortSignal.reason` として公開する; シグナルは協調リスナーに分類権限を与えない。耐久 `turn/end` は結果を `{ kind: 'aborted', reason: TurnEndCancelCause }` として記録するため、キャンセル cause は終端結果に残る。
 
-The [event taxonomy](../architecture.md#events) owns the `agent/*` lifecycle, checkpoint, and waterfall contracts. Turn and step boundaries are durable session events rather than agent emits.
+[`イベント分類`](../architecture.md#events) が `agent/*` ライフサイクル、チェックポイント、ウォーターフォールのコントラクトを所有する。ターンとステップの境界はエージェント送出ではなく耐久セッションイベントである。
 
-## Initiating Agent
+## 起動元エージェント
 
-The process-local initiator carried by `ctx.agents` is the exact `Agent` above, not a separate frame or copied identity. Ambient presence is neither liveness proof nor authorization; the [initiator-scope decision](../../.agents/notes/implemented/architecture/2026-07-15-agent-initiator-scope.md) defines its lifetime and scope rules.
+`ctx.agents` が運ぶプロセス好きイニシエーターは正確に上記の `Agent` であり、別のフレームや複製された同一性ではない。常駐は生存証明でも認可でもない; [イニシエータースコープの決定](../../.agents/notes/implemented/architecture/2026-07-15-agent-initiator-scope.md) がその存続期間とスコープ規則を定義する。
 
-## Interception decisions
+## 介入の決定
 
-Pre-step decisions use the same identified `UserMessage` type as durable user-role input. The entered batch is authoritative and preserves every message's `id` and `source`. Hook bridges map their native decision fields onto this typed result.
+ステップ前決定は耐久ユーザー入力と同じ識別付き `UserMessage` 型を使う。取得済みバッチは権威があり、すべてのメッセージの `id` と `source` を保持する。フックブリッジはネイティブ決定フィールドをこの型付き結果に写像する。
 
 Source: [`packages/core/agent/src/types.ts`](../../packages/core/agent/src/types.ts)
 
-`agent/pre-step` receives one payload carrying the exclusive claimed batch (`messages`), the proposed step's coordinates (`turn`, `step`), and the current turn's cancellation `signal`. The initial proposal runs inside an open turn before any step; a tool continuation may submit an empty claimed batch between steps:
+`agent/pre-step` は取得済み排他バッチ (`messages`)、提案ステップの座標 (`turn`、`step`)、現在のターンのキャンセル用 `signal` を運ぶ 1 つのペイロードを受け取る。初期提案はステップ前の開いたターン内で実行される; ツール継続はステップ間で空の取得済みバッチを提出できる:
 
-It returns a `PreStepDecision`. Reject opens no step. Enter supplies the complete message batch appended after `step/start`; claimed messages omitted by the final decision remain removed, while input inserted after the claim stays pending:
+それは `PreStepDecision` を返す。Reject はステップを開かない。Enter は `step/start` の後に追記される完全なメッセージバッチを提供する; 最終決定で省かれた取得済みメッセージは除去されたまま残り、取得後に挿入された入力は保留中のままである:
 
 ```ts type-equiv
 /** Whether and with which messages the loop enters a proposed step. */
@@ -327,43 +327,43 @@ type PreStepDecision =
   }
 ```
 
-`agent/request-error` runs after a failed model step closes and before its turn closes. Listeners can repair durable state or await policy work while the failed turn's signal is still live. A handling listener returns `{ kind: 'retry' }` without calling `next()`; the default `undefined` leaves the failure terminal.
+`agent/request-error` は失敗したモデルステップの終了後、そのターンの終了前に実行される。リスナーは失敗したターンのシグナルがまだ有効な間に耐久状態を修復したりポリシー作業を待ったりできる。回復を所有するハンドリングリスナーは `next()` を呼ばずに `{ kind: 'retry' }` を返す; 既定の `undefined` は失敗を終端のままにする。
 
 ```ts type-equiv
 /** Action returned by a listener that owns model-request recovery. */
 type RequestErrorAction = { kind: 'retry' } | undefined
 ```
 
-`agent/pre-step` is the only waterfall listener chain before request derivation. `agent/turn-stopping` runs when a turn has no tool or steering continuation, before one final steering drain.
+`agent/pre-step` はリクエスト導出前の唯一のウォーターフォールリスナーチェーンである。`agent/turn-stopping` はツールやステアリングの継続がないターンが、最後のステアリング排出の前に実行される。
 
-`agent/created` carries a `SessionStartSource` (why the session lifecycle began; a bridge keys its SessionStart matcher on it):
+`agent/created` は `SessionStartSource` (セッションライフサイクルが開始した理由; ブリッジはその SessionStart マッチャーにキーを付ける) を運ぶ:
 
 ```ts type-equiv
 /** Why a session lifecycle began; seeded creates are `startup`, while persisted loads are `resume`. */
 type SessionStartSource = 'startup' | 'resume' | 'clear' | 'compact'
 ```
 
-## Sessions
+## セッション
 
-A `Session` is an **append-only log** of typed `SessionEvent`s — the single source of truth. The LLM message history is *derived* from the log (`deriveMessages()`), not stored separately. Every entry carries a monotonic `seq`, a `time`, and a `type`-discriminated `data` payload; surface variants may also list cited earlier events in `sourceEventSeqs` and carry a `surfaceOp`.
+`Session` は型付き `SessionEvent` の**追記専用ログ**であり、単一の真実の源である。LLM メッセージ履歴はログから*導出*され (`deriveMessages()`)、別に保存されることはない。各エントリーは単調な `seq`、`time`、`type` 判別付き `data` ペイロードを運ぶ; サーフェス変種は引用した過去イベントを `sourceEventSeqs` に列挙し、`surfaceOp` を運ぶことがある。
 
-The `SessionEvent` envelope's exact conditional fields, the thirteen core event variants (`turn/start`, `turn/end`, `step/start`, `step/end`, `user/message`, `system/message`, `assistant/message`, `assistant/attempt`, `tool/call`, `tool/result`, `request/header`, `request/context`, `session/end-seed`), the `deriveMessages()` projection rules, the `TurnEndReason` reasons, and the execution-enclosure and standalone-event rules are on **[session.md](session.md)**. How the log is made durable — the `SessionPersistence` interface, JSONL provider, `session/flush` checkpoint, crash recovery, and `SessionHeader` — is on **[persistence.md](persistence.md)**.
+`SessionEvent` エンベロープの正確な条件付きフィールド、13 種のコアイベント変種 (`turn/start`、`turn/end`、`step/start`、`step/end`、`user/message`、`system/message`、`assistant/message`、`assistant/attempt`、`tool/call`、`tool/result`、`request/header`、`request/context`、`session/end-seed`)、`deriveMessages()` プロジェクション規則、`TurnEndReason` の理由、実行囲いとスタンドアロンイベントの規則は **[session.md](session.md)** にある。ログの耐久化方法 — `SessionPersistence` インターフェース、JSONL プロバイダー、`session/flush` チェックポイント、クラッシュリカバリー、`SessionHeader` — は **[persistence.md](persistence.md)** にある。
 
 ## `ToolDefinition`
 
-The one pipeline-authoring type that is core: what every registered tool *is* — a model-facing `ToolSchema` plus an `execute` function and optional final-content and UI callbacks. A tool author rarely constructs it by hand (the `defineTool` DSL builds it with typed arguments), but it is the contract the registry holds and the loop dispatches through.
+パイプライン作成の型として中核にあるもの: 登録済みツールが何であるか — モデル向け `ToolSchema` に `execute` 関数と任意の最終コンテンツ・UI コールバックを加えたもの。ツール作者が手で構築することは稀であり (通常は `defineTool` DSL が型付き引数で組み立てる)、レジストリーが保持しループがディスパッチするコントラクトである。
 
-Its full fields, the `defineTool`/`ValueSchemaSpec`/`ParameterSchemaSpec` typed schema DSL, the `ToolExecution`/`ToolExecutionResult` waterfall types, and the tool-presentation UI types are on **[tools.md](tools.md)**.
+その完全なフィールド、`defineTool`/`ValueSchemaSpec`/`ParameterSchemaSpec` 型付きスキーマ DSL、`ToolExecution`/`ToolExecutionResult` ウォーターフォール型、ツール提示 UI 型は **[tools.md](tools.md)** にある。
 
-## Repo-wide type patterns
+## リポジトリ横断の型パターン
 
-Two patterns recur across every subsystem and are documented once, here.
+すべてのサブシステムに現れる 2 つのパターンをここで一度だけ文書化する。
 
 <a id="the-map--derived-union-pattern"></a>
 
-### The `…Map → derived-union` pattern
+### `…Map → derived-union` パターン
 
-Almost every extensible sum type in the harness follows one pattern: an interface keyed by a discriminant tag (the `…Map`), from which the union is derived with `keyof`. Plugins add variants by **declaration merging** — no edit to the owning package.
+ハーネス内のほぼすべての拡張可能な合計型は 1 つのパターンに従う: 判別タグでキー付けされたインターフェース (`…Map`) から `keyof` で和集合を導出する。プラグインは所有パッケージを編集せず**宣言マージ**で変種を追加する。
 
 ```ts ignore-check
 // The pattern, schematically:
@@ -382,9 +382,9 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 ```
 
-Five canonical maps use this pattern; a plugin author extends these:
+5 つの正規マップがこのパターンを使い、プラグイン作者はこれらを拡張する:
 
-| Map | Package | Derives | Catalog |
+| マップ | パッケージ | 導出先 | カタログ |
 |---|---|---|---|
 | `ContentBlockMap` | dsh-llm | `ContentBlock` | [llm-streaming.md](llm-streaming.md#content-blocks-and-messages) |
 | `MessageSourceMap` | dsh-llm | `MessageSource` | [llm-streaming.md](llm-streaming.md#content-blocks-and-messages) |
@@ -392,13 +392,13 @@ Five canonical maps use this pattern; a plugin author extends these:
 | `TurnEndReasonMap` | dsh-session | `TurnEndReason` | [session.md](session.md) |
 | `SessionEventMap` | dsh-session | `SessionEvent` | [session.md](session.md) |
 
-Two large discriminated unions are the ones consumers `switch` over most: **`StreamChunk`** (the streaming protocol) and **`SessionEvent`** (the log entry). Per the repo convention, `switch` on the tag — don't chain `if`s — so each arm narrows and a typo'd tag fails to compile.
+コンシューマーが `switch` する 2 つの大きな判別和集合は **`StreamChunk`** (ストリーミングプロトコル) と **`SessionEvent`** (ログエントリー) である。リポジトリの慣習に従い、タグで `switch` し — `if` 連鎖は使わない — 各アームで絞り込み、タグの綴り誤りはコンパイル失敗にする。
 
-### Branded IDs
+### ブランド付き ID
 
-IDs passed between packages are **branded** — structurally strings, but non-interchangeable at the type level (a `SessionId` cannot be passed where a `ToolCallId` is expected). Construction uses the shared `brandString<T>()` helper or an owner-defined validating factory; comparison, logging, and JSON behave as ordinary strings.
+パッケージ間で渡される ID は**ブランド付き**である — 構造的には文字列だが、型レベルでは相互交換できない (`SessionId` を `ToolCallId` が求められるところに渡せない)。構築は共有の `brandString<T>()` ヘルパーまたは所有者定義の検証ファクトリーを使う; 比較、ログ、JSON は通常の文字列として振る舞う。
 
-The `Branded<B>` primitive and stateless constructor live in [dsh-brand](../../packages/util/brand), which has no harness capability dependency. `brandString<T>()` applies a compile-time-only string brand.
+`Branded<B>` プリミティブとステートレスなコンストラクターは [dsh-brand](../../packages/util/brand) にあり、ハーネスケイパビリティ依存を持たない。`brandString<T>()` はコンパイル時のみの文字列ブランドを適用する。
 
 Source: [`packages/util/brand/src/index.ts`](../../packages/util/brand/src/index.ts)
 
@@ -407,7 +407,7 @@ Source: [`packages/util/brand/src/index.ts`](../../packages/util/brand/src/index
 type Branded<B extends string> = string & { readonly [BRAND]: B }
 ```
 
-The two core IDs are `ToolCallId` (correlates a tool call with its result; dsh-llm) and `SessionId` (the shared live agent and durable session identity; dsh-session). Capability packages brand their own ids too, such as `JobId` in [jobs.md](jobs.md).
+2 つのコア ID は `ToolCallId` (ツール呼び出しと結果を相関付ける; dsh-llm) と `SessionId` (共有のライブエージェントと耐久セッションの同一性; dsh-session) である。ケイパビリティパッケージも独自の id をブランド化する。たとえば [jobs.md](jobs.md) の `JobId` である。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -415,13 +415,13 @@ The two core IDs are `ToolCallId` (correlates a tool call with its result; dsh-l
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` から生成 (doc-sync 内の `pnpm run verify-cordis-catalog` で鮮度を検証; 再生成は `pnpm run gen-cordis-catalog`) — 言語側の違いはロケール固有のペア文書パスのみである。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する; ディスパッチモードは[入門書](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxagentdefaultmodel--agentdefaultmodelconfig"></a>
 
 ### `ctx.agentDefaultModel` — `AgentDefaultModelConfig`
 
-Owns the default model selection independently of any Host or transport. Each operation reads the owning Config references.
+Host やトランスポートとは独立に既定モデル選択を所有する。各操作は所有する Config 参照を読み取る。
 
 ```ts cordis-catalog
 /**
@@ -446,7 +446,7 @@ Source: [`packages/core/agent-default-model/src/index.ts`](../../packages/core/a
 
 ### `ctx.agentLoop` — `AgentLoop`
 
-Concrete agent factory and driver service.
+具体的なエージェントファクトリー兼ドライバーサービス。
 
 ```ts cordis-catalog
 /**
@@ -486,7 +486,7 @@ Source: [`packages/core/agent-loop/src/index.ts`](../../packages/core/agent-loop
 
 ### `ctx.agentPresets` — `AgentPresetRegistry`
 
-Registry of YAML-declared presets and the revisions live Agents retain.
+YAML 宣言プリセットとライブエージェントが保持するリビジョンのレジストリー。
 
 ```ts cordis-catalog
 /** Register and eagerly load a definition; activation failure remains visible in the roster.
@@ -586,9 +586,9 @@ Source: [`packages/preset/agent-preset-registry/src/index.ts`](../../packages/pr
 
 ### `ctx.agents` — `AgentRegistry`
 
-Agent service (`ctx.agents`): tracks live agents and carries the initiating Agent through one process-local asynchronous driver chain. Agent *creation* is provided by whichever plugin implements the AgentFactory (`@deepseek-ai/dsh-agent-loop`), registered via setFactory.
+エージェントサービス (`ctx.agents`): ライブエージェントを追跡し、1 つのプロセス好き非同期ドライバーチェーンを通じて起動元エージェントを運ぶ。エージェントの*作成*は AgentFactory を実装するプラグイン (`@deepseek-ai/dsh-agent-loop`) が提供し、setFactory 経由で登録される。
 
-Initiator methods provide same-process causal attribution only. Ambient presence is neither liveness proof nor authorization; subjects and owners remain explicit, as does identity at worker, process, persistence, and wire boundaries. Returned Promise boundaries drain during teardown, except a nested lineage that starts an owning-fiber unload is excluded from its own drain.
+イニシエーターメソッドは同一プロセス内の因果帰属のみを提供する。常駐は生存証明でも認可でもない; 主語と所有者は明示のままであり、ワーカー・プロセス・永続化・ワイヤー境界での同一性も同様である。返された Promise 境界は破棄中に排出されるが、所有ファイバーのアンロードを開始するネストした系譜は自身の排出から除外される。
 
 ```ts cordis-catalog
 /**
@@ -767,7 +767,7 @@ Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index
 
 #### `agent/assistant-stream` — emit
 
-Process-local assistant-stream publication. Chunk frames are transient; the loop appends one final v2 `assistant/message` or `assistant/attempt` with the same stream before a committed end frame.
+プロセス好きアシスタントストリームの公開。チャンクフレームは一時的であり、ループはコミット済み終了フレームの前に同じストリームを持つ最終の v2 `assistant/message` または `assistant/attempt` を 1 件追記する。
 
 ```ts cordis-catalog
 /**
@@ -790,7 +790,7 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent/created` — serial
 
-An entered agent is ready for per-agent initialization after factory setup. Listeners run in order and are awaited before creation resolves. AgentLoop holds queued input until all listeners finish. A throw or rejection fails creation and skips later listeners. Disposal retains the scope and session until dispatch settles; listeners must not await agent.whenIdle() or their own owner's disposal.
+投入済みエージェントはファクトリー setup 後にエージェントごとの初期化の準備ができる。リスナーは順に実行され、作成解決前に待機される。AgentLoop はすべてのリスナーが終わるまでキュー入力を保持する。throw または拒否は作成を失敗させ、後のリスナーを飛ばす。破棄はディスパッチ確定までスコープとセッションを保持する; リスナーは agent.whenIdle() や自身の所有者の破棄を待ってはならない。
 
 ```ts cordis-catalog
 /**
@@ -817,7 +817,7 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent/disposed` — emit
 
-An agent left the registry; AgentLoop emits this after driver quiescence and scoped-registration unwind, but before session detachment. Custom registry users own their driver-ordering contract.
+エージェントがレジストリーを離れた; AgentLoop はドライバー静止とスコープ登録巻き戻しの後、セッション切り離しの前にこれを送出する。カスタムレジストリーユーザーはドライバー順序コントラクトを所有する。
 
 ```ts cordis-catalog
 /**
@@ -839,7 +839,7 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent/error` — emit
 
-A step or turn errored. The machine reports a failure here even when the error has no in-turn position for a durable record.
+ステップまたはターンがエラーになった。ターン内の位置を持たない耐久レコードに対してもマシンはここで失敗を報告する。
 
 ```ts cordis-catalog
 /**
@@ -863,7 +863,7 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent/inbox/claimed` — emit
 
-One message left the inbox inside its open turn. If the proposed step is rejected, the claimed message ends here: it is neither discarded nor re-emitted as a user/message, and the turn closes without a step.
+1 件のメッセージが開いたターン内でインボックスを離れた。提案ステップが拒否された場合、取得済みメッセージはここで終わる: 破棄としても `user/message` としても再送出されず、ターンはステップなしに閉じる。
 
 ```ts cordis-catalog
 /**
@@ -887,7 +887,7 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent/inbox/discarded` — emit
 
-One message was discarded from the live inbox.
+1 件のメッセージがライブインボックスから破棄された。
 
 ```ts cordis-catalog
 /**
@@ -908,7 +908,7 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent/inbox/inserted` — emit
 
-One message entered the live inbox.
+1 件のメッセージがライブインボックスに入った。
 
 ```ts cordis-catalog
 /**
@@ -929,7 +929,7 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent/pre-step` — waterfall
 
-Reject a proposed step or replace the messages that enter it. Calling `next()` preserves the current messages.
+提案ステップを拒否するか、それに入るメッセージを置換する。`next()` の呼び出しは現在のメッセージを保持する。
 
 ```ts cordis-catalog
 /**
@@ -954,7 +954,7 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent/request` — waterfall
 
-Replace the frozen call configuration. `await next()` yields the config the machine would use (agent options on the first request, the logged header afterwards); return a replacement to switch. On step admission, this runs after assembly and `step/start`, before the system prompt and accepted user batch are committed. Cancellation here or during subsequent `prepareCall()` resolution commits neither. The prepared call capability governs prompt admission. Model-visible content must use logged channels; this waterfall cannot mutate messages.
+凍結された呼び出し構成を置換する。`await next()` はマシンが使う構成 (最初のリクエストではエージェントオプション、以降はログされたヘッダー) を与える; 置換するには戻り値で差し替える。ステップ受入時、これは組み立てと `step/start` の後、システムプロンプトと受け入れ済みユーザーバッチのコミット前に実行される。ここや後続の `prepareCall()` 解決中のキャンセルは何もコミットしない。準備済み呼び出しケイパビリティがプロンプト受入を統治する。モデル可視コンテンツはログ済みチャネルを使わなければならず、このウォーターフォールはメッセージを変更できない。
 
 ```ts cordis-catalog
 /**
@@ -984,7 +984,7 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent/request-error` — waterfall
 
-Handle one failed model-request attempt before the loop retries or closes its step. A listener returns `{ kind: 'retry' }` without calling `next()` when it owns recovery, or calls `next()` to delegate. The default `undefined` leaves the failure terminal.
+失敗した 1 回のモデルリクエスト試行をループが再試行またはステップ終了する前に処理する。回復を所有するリスナーは `next()` を呼ばずに `{ kind: 'retry' }` を返し、委譲するには `next()` を呼ぶ。既定の `undefined` は失敗を終端のままにする。
 
 ```ts cordis-catalog
 /**
@@ -1013,7 +1013,7 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent/status` — emit
 
-Agent status changed (`idle` ⇄ `running`). A waking delivery enters `running` synchronously after reserving cancellation; `idle` means no driver remains scheduled or active.
+エージェント状態が変わった (`idle` ⇄ `running`)。ウェイクを伴う配送はキャンセル予約後に同期的に `running` に入る; `idle` は残るドライバーも予定もないことを意味する。
 
 ```ts cordis-catalog
 /**
@@ -1036,7 +1036,7 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent/turn-stopping` — serial
 
-The turn is about to close: the model owes no response (no live tool calls, no fresh steering). Awaited before the boundary commits — a listener that objects steers (`agent.steer(...)`) and the machine re-reads its inbox: fresh steering runs another step, none closes the turn. Data decides, so listener order cannot change the outcome. The inverse control (stop a tool loop early) is data too: a tool result carrying `concludesTurn` ends the turn at its step. The conclusion never short-circuits already-submitted next-step work: same-step `additionalContexts` or racing steering still runs, and the turn closes only when that inbox drains.
+ターンは閉じようとしている: モデルは応答の義務がない (ライブツール呼び出しも新しいステアリングもない)。境界コミット前に待機される — 異議のあるリスナーはステア (`agent.steer(...)`) し、マシンはインボックスを読み直す: 新しいステアリングがあれば別のステップを実行し、なければターンを閉じる。データが決めるため、リスナー順序は結果を変えない。逆方向の制御 (ツールループの早期停止) もデータである: `concludesTurn` を持つツール結果はそのステップでターンを終える。結論は既に提出された next-step 作業を短絡しない: 同ステップの `additionalContexts` や競合するステアリングは依然実行され、そのインボックスが排出されたときにのみターンが閉じる。
 
 ```ts cordis-catalog
 /**
@@ -1071,7 +1071,7 @@ Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/s
 
 #### `agent-loop/config-start-failed` — emit
 
-A declarative agent entry failed before it could publish a live agent. Consumers that buffer work for the configured identity use this transient signal to reject that work instead of waiting forever. Normal factory teardown suppresses failures from the cancelled startup attempt.
+宣言エージェントエントリーがライブエージェント公開前に失敗した。設定済み同一性向け作業を緩衝するコンシューマーは、無限に待つ代わりにこの一時的シグナルでその作業を拒否する。通常のファクトリー破棄はキャンセルされた起動試行の失敗を抑止する。
 
 ```ts cordis-catalog
 /**
@@ -1096,7 +1096,7 @@ Source: [`packages/core/agent-loop/src/index.ts`](../../packages/core/agent-loop
 
 #### `agent-preset/selected` — emit
 
-One session committed a different agent preset to its durable log. Consumers invalidate only state derived from that session's composition.
+1 つのセッションが異なるエージェントプリセットを耐久ログにコミットした。コンシューマーはそのセッションの構成から導出した状態のみを無効化する。
 
 ```ts cordis-catalog
 /**

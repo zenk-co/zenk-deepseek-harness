@@ -1,39 +1,39 @@
 ---
-description: "The spill storage service: save oversized tool text or captured session references and return a retrievable locator."
+description: "spill ストレージサービス: 過大なツールテキストまたはキャプチャされたセッション参照を保存し、取得可能なロケーターを返す。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-spill
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-spill` lets plugins and tools save oversized text through the public `ctx.spillStore` API and receive an opaque locator, exact byte count, and retrieval guidance. Choose it when full results must remain retrievable without filling model context. Configure `dsh-spill-local` for local persistence, and add `dsh-spill-policy` when oversized tool results should become bounded previews. The API does not offer retention, replacement, retrieval, or search operations. A save rejects on storage failure, leaving the caller to keep the content inline or fail.
+`dsh-spill` は、プラグインとツールが公開 `ctx.spillStore` API を通じて過大なテキストを保存し、不透明なロケーター、正確なバイト数、取得ガイダンスを受け取れるようにする。完全な結果がモデルコンテキストを埋めずに取得可能なままでなければならない場合に選ぶ。ローカル永続化には `dsh-spill-local` を構成し、過大なツール結果を上限付きプレビューにすべき場合は `dsh-spill-policy` を追加する。API は保持、置き換え、取得、検索の操作を提供しない。保存はストレージ失敗で拒否し、呼び出し元はコンテンツをインラインに保つか失敗するかを選ぶ。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-A composition that saves spill artifacts mounts one backend — this package alone stores nothing. `dsh-spill-policy` decides when tool results spill; `dsh-session-reference` directly saves truncated reference transcripts without requiring that policy. Callers use `ctx.spillStore.saveText()` with an explicit owner; optional consumers discover the backend with `ctx.get("spillStore")`.
+spill 成果物を保存する構成は 1 つのバックエンドをマウントする — このパッケージ単体は何も保存しない。`dsh-spill-policy` がツール結果をいつ spill するかを決め、`dsh-session-reference` はそのポリシーを必要とせずに切り詰められた参照トランスクリプトを直接保存する。呼び出し元は明示的な owner を付けて `ctx.spillStore.saveText()` を使う。オプションのコンシューマーは `ctx.get("spillStore")` でバックエンドを発見する。
 
-### When to choose it
+### いつ選ぶか
 
-Choose spill storage when a deployment needs to keep full text retrievable after the model sees a bounded preview, such as a fetched page body or a captured session-reference transcript. A backend whose locator and retrieval hint are usable in the deployment is a prerequisite; local filesystem access is not a service requirement.
+フェッチされたページボディやキャプチャされたセッション参照トランスクリプトのように、モデルが上限付きプレビューを見た後も完全なテキストを取得可能に保つ必要があるデプロイでは、spill ストレージを選ぶ。ロケーターと取得ヒントがデプロイで使用可能なバックエンドが前提条件である。ローカルファイルシステムアクセスはサービスの要件ではない。
 
-### Smallest working composition
+### 最小の動作構成
 
-Mount a backend and the policy together; with `maxInlineTokens` set, an oversized text/image tool result becomes a preview plus a locator automatically.
+バックエンドとポリシーを一緒にマウントする。`maxInlineTokens` を設定すると、過大なテキスト/画像ツール結果は自動的にプレビューとロケーターになる。
 
 ```yaml
 - name: '@deepseek-ai/dsh-spill-local'
@@ -42,9 +42,9 @@ Mount a backend and the policy together; with `maxInlineTokens` set, an oversize
     maxInlineTokens: 12500
 ```
 
-### Saving text
+### テキストの保存
 
-With a backend mounted, call `ctx.spillStore.saveText()` with the owning session, a source description, a suggested file name, and the full text:
+バックエンドをマウントした状態で、所有セッション、ソース記述、推奨ファイル名、完全なテキストを付けて `ctx.spillStore.saveText()` を呼ぶ:
 
 ```text
 const ref = await ctx.spillStore.saveText({
@@ -55,100 +55,100 @@ const ref = await ctx.spillStore.saveText({
 })
 ```
 
-The returned `SpillRef` carries three fields: `locator`, an opaque model-facing handle the backend produces (a local file path for `dsh-spill-local`, possibly a URI or key for another backend); `bytes`, the exact UTF-8 byte count written; and `retrievalHint`, the guidance a consumer shows the model — for the local backend, read or grep the path. Consumers render the locator with the hint and never parse the locator itself.
+返される `SpillRef` は 3 つのフィールドを運ぶ: `locator` はバックエンドが生成する不透明なモデル向けハンドル（`dsh-spill-local` ではローカルファイルパス、他のバックエンドではおそらく URI やキー）、`bytes` は書き込まれた正確な UTF-8 バイト数、`retrievalHint` はコンシューマーがモデルに見せるガイダンス（ローカルバックエンドでは、そのパスを読むか grep する）。コンシューマーはロケーターをヒントとともにレンダリングし、ロケーター自体を解析することは決してない。
 
-### Ownership and boundaries
+### 所有権と境界
 
-Storage is grouped by the owning session: forked sessions inherit existing locators from the seeded log without copying or re-owning them, and new spills after a fork use the child session id. A session-reference artifact belongs to the target session receiving the context, not the referenced source session. `suggestedName` is only a hint — backends sanitize it to one safe segment and never trust it as a path. Consumers own preview and spill decisions; the backend owns storage and artifact expiry.
+ストレージは所有セッションによってグループ化される: fork されたセッションは、シードされたログから既存のロケーターをコピーや再所有なしに継承し、fork 後の新しい spill は子セッション ID を使う。セッション参照成果物は、参照されたソースセッションではなく、コンテキストを受け取るターゲットセッションに属する。`suggestedName` は単なるヒントである — バックエンドはそれを 1 つの安全なセグメントに無害化し、パスとして信頼することは決してない。プレビューと spill の判断はコンシューマーが所有し、ストレージと成果物の期限はバックエンドが所有する。
 
-### Failures and recovery
+### 失敗と回復
 
-`saveText` rejects only on a real storage failure — permissions, no space left, or a backend that is down. The caller decides how to degrade: the shipped policy treats a rejection as best-effort, logs a warning, and keeps the original inline result, so a spill failure never turns a successful tool call into an error or hides content. If no backend is mounted, there is nothing to save; load `dsh-spill-local` or another backend in the composition.
+`saveText` が拒否するのは実際のストレージ失敗のみである — 権限、空き容量不足、またはバックエンドの停止。劣化の仕方は呼び出し元が決める: 出荷済みポリシーは拒否をベストエフォートとして扱い、警告をログに記録し、元のインライン結果を保つため、spill の失敗が成功したツール呼び出しをエラーにしたりコンテンツを隠したりすることは決してない。バックエンドがマウントされていない場合は保存するものが何もない。構成で `dsh-spill-local` または別のバックエンドをロードする。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the service; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではサービスの背後にある設計判断を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計思想
 
-The package is built on one separation and a deliberate minimum:
+このパッケージは 1 つの分離と意図的な最小限の上に築かれている:
 
-- **Contract, implementation, and policy stay separate.** This package defines what a backend does (`saveText`); `dsh-spill-local` implements it; `dsh-spill-policy` decides when. Each concern evolves and swaps independently.
-- **One method, nothing else.** The seam owns no retention policy, no result replacement, and no retrieval or search API — those have owning packages.
-- **Reject, never silently degrade at the seam.** The caller owns degradation; the seam reports real storage failures.
+- **契約、実装、ポリシーは分離したまま。** このパッケージはバックエンドが何をするか（`saveText`）を定義し、`dsh-spill-local` がそれを実装し、`dsh-spill-policy` がいつするかを決める。各関心事は独立に進化して交換される。
+- **1 つのメソッド、それだけ。** このシームは保持ポリシー、結果の置き換え、取得または検索 API を所有しない — それらには所有するパッケージがある。
+- **拒否し、シームで暗黙に劣化しない。** 劣化は呼び出し元が所有し、シームは実際のストレージ失敗を報告する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: the abstract `SpillStore` service and its `saveText` contract |
-| [`src/types.ts`](src/types.ts) | Vocabulary: `SaveTextSpill`, `SpillRef`, branded `SpillLocator`, `SpillOwner`, `SpillSource` |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: 抽象 `SpillStore` サービスとその `saveText` 契約 |
+| [`src/types.ts`](src/types.ts) | 語彙: `SaveTextSpill`、`SpillRef`、ブランド付き `SpillLocator`、`SpillOwner`、`SpillSource` |
 
-### Data model
+### データモデル
 
-`SaveTextSpill` separates storage ownership from its source description. `SpillSource` accepts either the tool source `{ kind: "tool", toolName, callId, label }` or `{ kind: "session-reference", sessionId, label }`, whose id names the captured source session. Session references never fabricate tool call ids. Neither the source descriptor nor the owner namespace grants read access. Consumers treat the returned locator as opaque and present it with its retrieval hint.
+`SaveTextSpill` はストレージの所有権とソース記述を分離する。`SpillSource` はツールソース `{ kind: "tool", toolName, callId, label }` または `{ kind: "session-reference", sessionId, label }` のいずれかを受け付け、後者の ID はキャプチャされたソースセッションを名指しする。セッション参照はツール呼び出し ID を捏造することは決してない。ソース記述子も owner 名前空間も読み取りアクセスを与えない。コンシューマーは返されたロケーターを不透明として扱い、取得ヒントとともに提示する。
 
-### Lifecycle
+### ライフサイクル
 
-A backend subclasses `SpillStore` and loads as a plugin, registering as `ctx.spillStore`; one implementation per context, and a second load fails. Disposal releases the service. The abstract class itself registers nothing — this package contributes the contract and vocabulary only.
+バックエンドは `SpillStore` をサブクラス化してプラグインとしてロードし、`ctx.spillStore` として登録する。コンテキストごとに実装は 1 つで、2 つ目のロードは失敗する。破棄はサービスを解放する。抽象クラス自体は何も登録しない — このパッケージは契約と語彙のみを提供する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the package-level contract is not enough. They move from the shared vocabulary to the shipped backend, the policy, and the design rationale.
+パッケージレベルの契約では足りないときにこれらのページを読む。共有語彙から、出荷済みバックエンド、ポリシー、設計根拠へと進む。
 
-- [Spill subsystem](../../../docs/subsystems/spill.md) — the exhaustive vocabulary, ownership, and backend relationships.
-- [Spill package map](../README.md) — the three-package family and each role.
-- [dsh-spill-local](../spill-local/README.md) — the shipped local filesystem backend.
-- [dsh-spill-policy](../spill-policy/README.md) — the policy that decides when a final result is too large.
-- [dsh-output-retention](../../util/output-retention/README.md) — the preview mechanics behind the policy.
-- [Tool output spill decision](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md) — the capability boundary and design rationale.
+- [Spill サブシステム](../../../docs/subsystems/spill.md) — 網羅的な語彙、所有権、バックエンドの関係。
+- [Spill パッケージマップ](../README.md) — 3 パッケージファミリーと各役割。
+- [dsh-spill-local](../spill-local/README.md) — 出荷済みローカルファイルシステムバックエンド。
+- [dsh-spill-policy](../spill-policy/README.md) — 最終結果が大きすぎるかを決めるポリシー。
+- [dsh-output-retention](../../util/output-retention/README.md) — ポリシーの背後にあるプレビューの仕組み。
+- [ツール出力 spill の決定](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md) — ケイパビリティ境界と設計根拠。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through spill consumers, which render the backend's locator and retrieval guidance to the model.
+間接的に、spill コンシューマーを通じて。それらがバックエンドのロケーターと取得ガイダンスをモデルにレンダリングする。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+直接の無効化はない。名前付きのコンシューマーがリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the spill storage service is incomplete on its own. They are current package constraints.
+これらの制限は、spill ストレージサービスが単体では不完全な場合を定義する。これらは現在のパッケージ制約である。
 
-- **No retrieval or deletion API** — consumers can only render the backend's locator and guidance; lifecycle and access semantics remain backend-specific.
-- **Storage is not access control** — the owner session namespaces writes but does not authorize reads of a locator; each backend and retrieval consumer must enforce its own boundary.
+- **取得または削除 API はない** — コンシューマーはバックエンドのロケーターとガイダンスをレンダリングすることしかできない。ライフサイクルとアクセスのセマンティクスはバックエンド固有のままである。
+- **ストレージはアクセス制御ではない** — owner セッションは書き込みを名前空間化するが、ロケーターの読み取りを認可しない。各バックエンドと取得コンシューマーが自身の境界を執行しなければならない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: undecided directions and open questions. It is explicitly non-authoritative.
+この開発メモはメンテナー向けの作業コンテキストである: 未決定の方向性と未解決の疑問。明示的に非権威である。
 
-#### Future: executor spill-file integration
+#### 将来: 実行者 spill ファイル統合
 
-The seam has only `saveText`; a save-file or link/copy path for existing executor spill files (for example normalizing bash temp files) and tool-owned spill for subagent rollouts remain deferred, per the [tool output spill decision](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md).
+このシームには `saveText` しかない。既存の実行者 spill ファイル（たとえば bash の一時ファイルの正規化）のための save-file または link/copy パスと、サブエージェントのロールアウト用のツール所有 spill は、[ツール出力 spill の決定](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md)に従い延期されたままである。
 
-#### Future: non-local backends and cleanup
+#### 将来: 非ローカルバックエンドとクリーンアップ
 
-Remote or database backends remain open. The local backend applies its [startup-cleanup policy](../spill-local/README.md#startup-cleanup); the service defines no per-session cleanup or locator-refresh API.
+リモートまたはデータベースのバックエンドは未解決のままである。ローカルバックエンドは自身の[起動クリーンアップポリシー](../spill-local/README.md#startup-cleanup)を適用し、このサービスはセッションごとのクリーンアップやロケーター更新 API を定義しない。
 
 </details>

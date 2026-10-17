@@ -1,94 +1,94 @@
 ---
-description: "Permission preset surfaces for the Web GUI: the General settings default row and the /permission picker for the current session; for users and maintainers of permission policy."
+description: "Web GUI 向け権限プリセット表面: 一般設定の既定行と現在セッション向け /permission ピッカー。権限ポリシーのユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-permission-presets
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Choose permission presets for the current Web session or future sessions. General settings changes only the future default; the composer and `/permission` pickers switch the current session. Default Web offers Read Only, Workspace Write, and Full access. Explicitly loading the experimental Auto integration adds Auto review with an `EXP` badge to current-session pickers. Visible Full access and Auto selections require their own risk acknowledgement; a complete `/permission <preset>` command executes directly. The host confirms each change through the Session projection.
+現在の Web セッションまたは将来セッション向けの権限プリセットを選ぶ。一般設定の変更は将来の既定のみ変える。コンポーザーと `/permission` ピッカーは現在セッションを切り替える。既定の Web は Read Only、Workspace Write、Full access を提供する。実験的 Auto 統合を明示的に読み込むと現在セッションピッカーに `EXP` バッジ付き Auto review が加わる。表示される Full access と Auto の選択はそれぞれのリスク承認を要する。完全な `/permission <preset>` コマンドは直接実行される。ホストはセッション投影経由で各変更を確認する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin alongside the settings, commands, and conversation packages. General settings receives the future-default row; the composer receives the `conversation.input.permission` control, and bare `/permission` opens the slash picker. Current-session controls require both the Session projection and a complete catalog snapshot. A permission-less composition exposes neither current-session controls nor the Settings row.
+設定、コマンド、会話パッケージの隣にこのプラグインをマウントする。一般設定は将来既定行を受け取る。コンポーザーは `conversation.input.permission` コントロールを受け取り、素の `/permission` はスラッシュピッカーを開く。現在セッション制御はセッション投影と完全なカタログスナップショットの両方を要する。権限のない構成は現在セッション制御も設定行も公開しない。
 
-### The picker
+### ピッカー
 
-A pick submits the `/permission <preset>` command line. The argument-bearing form (`/permission <preset>` typed directly) still switches directly; the decoration replaces only the bare invocation. The built-in labels are `Read Only`, `Workspace Write`, `Full access`, and `Auto review` in English and `仅可查看`, `工作区内修改`, `完全权限`, and `自动审查` in Chinese. Explicit host labels remain unchanged, unknown kebab-case names render in title case, and `auto` carries an `EXP` badge in menu options plus an experimental-risk confirmation. The selected composer control shows the mode without the badge. `custom` is display state, never a target.
+選択は `/permission <preset>` コマンド行を投入する。引数付き形 (直接 typed された `/permission <preset>`) は依然直接切り替わる。装飾は素の呼び出しのみ置き換える。組み込みラベルは英語で `Read Only`、`Workspace Write`、`Full access`、`Auto review`、中国語で `仅可查看`、`工作区内修改`、`完全权限`、`自动审查` である。明示的なホストラベルは unchanged のままである。未知 kebab-case 名はタイトルケースで描画され、`auto` はメニュー選択肢に `EXP` バッジと実験リスク確認を運ぶ。選択済みコンポーザー制御はバッジなしにモードを示す。`custom` は表示状態であり、対象になることは決してない。
 
-When the live catalog withdraws a preset, the composer closes its pending confirmation and shows the Session's current value instead of an unavailable optimistic pick. Every catalog invalidation — the payload-free notification or a connection-generation change — closes an open slash picker or its confirmation without consuming the draft, while publishing the result of a read the picker waits for leaves it open with its failure and retry state; reopening reads the current catalog. A submitted command remains busy until its response settles.
+ライブカタログがプリセットを取り下げると、コンポーザーは保留確認を閉じ、利用不可な楽観選択の代わりにセッションの現在値を示す。すべてのカタログ無効化 — ペイロードなし通知または接続世代変更 — は下書きを消費せずに開いたスラッシュピッカーまたはその確認を閉じる。一方、ピッカーが待つ読み取りの結果の公開はそれを失敗と再試行状態付きで開いたままにする。再度開くと現在のカタログを読む。投入済みコマンドは応答確定まで busy のままである。
 
-### The Settings row
+### 設定行
 
-The row derives its options from the host's dynamic `defaultPreset` enum, uses the same localized built-in labels as the current-session picker, and writes one settings mutation. Current-session-only contributions such as `auto` are absent. The value applies only when a later session is created; changing it never switches or rewrites the current session.
+行はホストの動的 `defaultPreset` enum から選択肢を導出し、現在セッションピッカーと同じローカライズ組み込みラベルを使い、設定変更を 1 件書く。`auto` 等の現在セッション専用寄与はない。値は後のセッション作成時にのみ適用される。それを変えても現在セッションを切り替えず書き換えない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The General row reads the explicitly exposed `permission` Settings descriptor through `ctx.configForms` and writes one `settings.mutate` path operation with the descriptor revision; its observable rides the slot system's `hooks` compartment, so the renderer owns React hook binding, and a push invalidation refetches the descriptor. The value is read only when a later session is created. The current-session surface is a popupSelect decoration hung on the host `/permission` command (`ctx.commandUi.decorate`): the host command keeps its slash-menu row, argument-bearing form, and durable lifecycle logging, while the decoration replaces only the bare invocation with the picker. One process-scoped directory subscribes to the payload-free catalog notification before its first Remote read and publishes only the latest complete success for the active connection generation. A winning failure or connection reset clears the old snapshot, which hides the composer seat until a later existing trigger retries, while the slash picker stays available and shows the failure with its retry; stale-generation and disposed settlements are ignored. Its public observables are `{ value }` and `invalidations`, one tick per catalog notification or connection-generation change; failures remain internal to imperative loading. Both the slash popup and composer seat consume that shared catalog, while the Session `permissions` projection supplies only `currentValue`. Full access and Auto review each carry localized confirmation copy; Auto also carries the badge rendered by the shared popup shell.
+一般行は `ctx.configForms` 経由で明示公開された `permission` 設定記述子を読み、記述子リビジョン付き `settings.mutate` パス操作を 1 件書く。その観測対象はスロットシステムの `hooks` コンパートメントに載るため、レンダラーが React フック束縛を所有し、push 無効化は記述子を再取得する。値は後のセッション作成時にのみ読まれる。現在セッション表面はホスト `/permission` コマンドに掛かる popupSelect 装飾 (`ctx.commandUi.decorate`) である。ホストコマンドはスラッシュメニュー行、引数付き形、耐久ライフサイクル記録を保ち、装飾は素の呼び出しのみピッカーで置き換える。1 件のプロセス範囲ディレクトリが最初のリモート読み取りの前にペイロードなしカタログ通知を購読し、アクティブ接続世代向けの最新の完全成功のみ公開する。勝利した失敗または接続リセットは古いスナップショットを消去し、後の既存トリガーが再試行するまでコンポーザー席を隠す。一方スラッシュピッカーは利用可能なまま失敗を再試行付きで示す。古世代と破棄済み確定は無視される。その公開観測対象は `{ value }` と `invalidations` であり、カタログ通知または接続世代変更ごとに 1 tick である。失敗は命令的読み込みの内部に残る。スラッシュポップアップとコンポーザー席は共にその共有カタログを消費し、セッション `permissions` 投影は `currentValue` のみ供給する。Full access と Auto review はそれぞれローカライズ確認文言を運ぶ。Auto は共有ポップアップシェルが描画するバッジも運ぶ。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the permission surface is not enough. They move from the browser surfaces to the host policy and the command shell.
+権限表面では足りないときにこれらを読むこと。ブラウザー表面からホストポリシーとコマンドシェルへ進む。
 
-- [dsh-permission-presets](../../interaction/permission-presets/README.md) — the host-side permission preset policy these surfaces write.
-- [ui-commands](../ui-commands/README.md) — the popupSelect shell the `/permission` decoration registers into.
-- [ui-conversation](../ui-conversation/README.md) — the composer seat that joins this shared catalog with the Session's current value.
-- [Client package map](../README.md) — adjacent browser UI packages.
+- [dsh-permission-presets](../../interaction/permission-presets/README.md) — これらの表面が書くホスト側権限プリセットポリシー。
+- [ui-commands](../ui-commands/README.md) — `/permission` 装飾が登録される popupSelect シェル。
+- [ui-conversation](../ui-conversation/README.md) — この共有カタログをセッションの現在値と結合するコンポーザー席。
+- [クライアントパッケージマップ](../README.md) — 隣接するブラウザー UI パッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the permission facts its two surfaces write: the Settings row causes a future session to start with whole-value knob events, while the `/permission` picker appends the selected current-session preset. Sandbox and approval consumers resolve their own knob events; selecting `auto` additionally activates the host Auto integration's independent per-call reviewer.
+その 2 表面が書く権限事実経由で間接的に関わる。設定行は将来セッションを全値 knob イベント付きで開始させ、`/permission` ピッカーは選択された現在セッションプリセットを追加する。サンドボックスと承認コンシューマーは自身の knob イベントを解決する。`auto` 選択はホスト Auto 統合の独立した呼び出しごとレビュアーも追加で活性化する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the knob consumers own any request-prefix changes.
+直接の無効化なし。要求プレフィックス変更は knob コンシューマーが所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the current permission surfaces. They are current package constraints, not a general policy comparison or a task backlog.
+これらの制限は現在の権限表面を定める。現在のパッケージ制約であり、一般的ポリシー比較でもタスクバックログでもない。
 
-- **The Settings row is Web-only** — non-Web clients may still switch the current session through `/permission`, but do not receive this browser contribution.
-- **Auto review is current-session-only** — the General-settings row intentionally omits it, and only visible picker selection receives the experimental confirmation; an explicitly typed `/permission auto` is already explicit consent.
-- **Preset descriptions come from the host** — localized built-in labels may therefore appear beside a description written in another language.
+- **設定行は Web 専用** — 非 Web クライアントは `/permission` で現在セッションを切り替えられるが、このブラウザー寄与は受け取らない。
+- **Auto review は現在セッション専用** — 一般設定行は意図的にそれを省き、表示ピッカー選択のみが実験確認を受ける。明示 typed された `/permission auto` は既に明示同意である。
+- **プリセット記述はホスト由来** — ローカライズ組み込みラベルが別言語で書かれた記述の脇に現れ得る。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

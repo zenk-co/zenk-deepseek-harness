@@ -1,14 +1,14 @@
-# User Interaction
+# ユーザーインタラクション
 
-English | [中文](user-questions.zh.md)
+日本語 | [English](user-questions.en.md) | [中文](user-questions.zh.md)
 
-The user-questions seam of [dsh-user-questions](../../packages/interaction/user-questions). It is the provider-neutral vocabulary a tool or permission plugin uses when it needs the human to answer before the agent can continue. Agent-scoped waterfall listeners compose the available UI surfaces, including listeners relayed to a connected client.
+[dsh-user-questions](../../packages/interaction/user-questions) の user-questions シーム。エージェントが続行する前に人間の回答を必要とするとき、ツールまたはパーミッションプラグインが使用するプロバイダー中立な語彙である。エージェントスコープの waterfall リスナーが利用可能な UI サーフェスを構成し、接続されたクライアントへ中継されるリスナーも含む。
 
-Source: [`packages/interaction/user-questions/src/index.ts`](../../packages/interaction/user-questions/src/index.ts)
+ソース: [`packages/interaction/user-questions/src/index.ts`](../../packages/interaction/user-questions/src/index.ts)
 
-## Question options
+## 質問オプション
 
-`AskUserQuestionOption` contains one selectable choice. `label` is the user-facing option text and also the model-facing selected value; `description` is optional UI help text.
+`AskUserQuestionOption` は 1 つの選択可能な選択肢を表す。`label` はユーザー向けの選択肢テキストであり、モデル向けの選択値でもある。`description` はオプションの UI ヘルプテキストである。
 
 ```ts type-equiv
 /** One selectable answer offered to the user. */
@@ -20,9 +20,9 @@ interface AskUserQuestionOption {
 }
 ```
 
-## Presentation intent
+## 表示意図
 
-`AskUserQuestionIntent` optionally declares a known decision kind. It is tagged on `kind` so intents can be added; a UI that does not recognise a tag renders the generic option list. An intent changes presentation only — a UI honouring it answers with the same option labels a generic UI would send, so the caller reads the same answer fields either way. `approve` names the affirmative option instead of relying on option order. `ask()` rejects the two assertions no type can carry: an `approve` naming none of its own question's options, and an intent on a question with no `detail`.
+`AskUserQuestionIntent` は既知の決定種別をオプションで宣言する。意図を追加できるように `kind` でタグ付けされる。タグを認識しない UI は汎用の選択肢リストを描画する。意図は表示のみを変える。意図を尊重する UI は汎用 UI が送るのと同じ選択肢ラベルで回答するため、呼び出し元はどちらでも同じ回答フィールドを読む。`approve` は選択肢の順序に頼るのではなく、肯定の選択肢を名指しする。`ask()` は型では表現できない 2 つの主張を拒否する。すなわち、自身の質問のどの選択肢も名指ししない `approve` と、`detail` のない質問に対する意図である。
 
 ```ts type-equiv
 /**
@@ -46,9 +46,9 @@ type AskUserQuestionIntent = {
 }
 ```
 
-## Question item
+## 質問項目
 
-`AskUserQuestionItem` is one question in a request. The caller supplies a stable `id`, which is echoed back with the answer so batched questions remain routable. Optional `detail` carries supporting text that providers render with the question but keep out of selectable option labels.
+`AskUserQuestionItem` はリクエスト内の 1 つの質問である。呼び出し元は安定した `id` を供給し、それは回答と共にエコーバックされるため、バッチ化された質問はルーティング可能なままである。オプションの `detail` は、プロバイダーが質問と共に描画するが選択可能な選択肢ラベルには含めない補足テキストを運ぶ。
 
 ```ts type-equiv
 /** One question in a user-questions request. */
@@ -70,18 +70,18 @@ interface AskUserQuestionItem {
 }
 ```
 
-## Ask request
+## 質問リクエスト
 
-`AskUserQuestionRequest` is the cross-package request. `questions` is an array so a UI can present related prompts in one flow while preserving a stable id per answer. When present, `agent` is the exact live caller; the interaction seam admits it only while the live registry identifies that instance as a runtime root.
+`AskUserQuestionRequest` はパッケージをまたぐリクエストである。`questions` は配列なので、UI は関連するプロンプトを 1 つのフローで提示しつつ、回答ごとに安定した id を保てる。存在する場合、`agent` は正確なライブの呼び出し元である。interaction シームは、ライブレジストリがそのインスタンスをランタイムルートとして識別する間のみそれを受け入れる。
 
 ```ts type-equiv
 /** Request for a human answer. */
 interface AskUserQuestionRequest extends AskUserQuestionRequestEvent {}
 ```
 
-## Answer
+## 回答
 
-Providers return one answer item per question id. `selected` contains selected option labels, and `custom` carries a free-form "Other" answer when the user typed one. For a single-select question, `custom` overrides the selected choice and `selected` is empty. For a multi-select question, `custom` may supplement the labels in `selected`. A UI may also use an item with empty `selected` and no `custom` to preserve a skipped question in an otherwise completed batch.
+プロバイダーは質問 id ごとに 1 つの回答項目を返す。`selected` は選択された選択肢ラベルを含み、`custom` はユーザーが自由記述の「その他」回答を入力した場合にそれを運ぶ。単一選択の質問では、`custom` は選択された選択肢を上書きし、`selected` は空である。複数選択の質問では、`custom` は `selected` のラベルを補足し得る。UI は、それ以外は完了したバッチの中でスキップされた質問を保持するために、`selected` が空で `custom` のない項目を使うこともできる。
 
 ```ts type-equiv
 /** Answer to one question. */
@@ -103,7 +103,7 @@ interface AskUserQuestionAnswer {
 }
 ```
 
-Timed answerers receive `wait: { callId, timed: true }`. The call id identifies the card and the foreground wait. The Client calls `attachWait` to claim the wait and obtain its remaining duration; transport forwards the original event without inspecting or rewriting these fields. A `wait` without `timed` identifies an indefinite card-keyed request. An absent `wait` identifies a blocking request without a card key.
+時間制限付き回答者は `wait: { callId, timed: true }` を受け取る。call id はカードとフォアグラウンド待機を識別する。Client は `attachWait` を呼び出して待機をクレームし、その残り時間を取得する。transport はこれらのフィールドを検査も書き換えもせずに元のイベントを転送する。`timed` のない `wait` は、カードキー付きの無期限リクエストを識別する。`wait` がない場合は、カードキーのないブロッキングリクエストを識別する。
 
 ```ts type-equiv
 /** Client-safe payload declared for the user-question answerer waterfall. */
@@ -127,18 +127,18 @@ interface AskUserQuestionRequestEvent {
 }
 ```
 
-## Timed questions and late replies
+## 時間制限付き質問と遅延返信
 
-A timed question waits for a bounded foreground window and then lets the agent continue independent work. If the user answers inside the window, the tool returns the answer batch; otherwise `TimedUserQuestionResult` is `{ pending: true, callId }`. Pending means the question is still answerable; it is not an empty answer, a refusal, a confirmation, or permission.
+時間制限付き質問は、有限のフォアグラウンドウィンドウを待ってから、エージェントに独立した作業を続行させる。ユーザーがウィンドウ内で回答すると、ツールは回答バッチを返す。そうでない場合、`TimedUserQuestionResult` は `{ pending: true, callId }` になる。pending はその質問がまだ回答可能であることを意味し、空の回答、拒否、確認、または許可ではない。
 
 ```ts type-equiv
 /** Timed ask result returned when the foreground answer window closes. */
 type TimedUserQuestionResult = AskUserQuestionAnswer | { pending: true; callId: ToolCallId }
 ```
 
-A Client claim is a business Remote stream, not a Gateway delivery. `TimedQuestionWait` holds the original Host deadline and runs its timer only while no claim exists. Its `attachWait` stream yields the current remaining duration, and the Client counts down with its own clock. Focus, editing, and Take time stay local. Stream cancellation releases that claim; after the last claim leaves, the Host resumes the original deadline. An unattended timeout aborts the foreground waterfall's private signal and returns pending without cancelling the Turn. Gateway and `api-remotes` contain no question-specific timing policy.
+Client のクレームはビジネス Remote ストリームであり、Gateway の配信ではない。`TimedQuestionWait` は元の Host 期限を保持し、クレームが存在しない間のみタイマーを動かす。その `attachWait` ストリームは現在の残り時間を yield し、Client は自身のクロックでカウントダウンする。フォーカス、編集、および Take 時間はローカルに留まる。ストリームのキャンセルはそのクレームを解放し、最後のクレームが去った後、Host は元の期限を再開する。無人のタイムアウトはフォアグラウンド waterfall のプライベートシグナルを中断し、Turn をキャンセルせずに pending を返す。Gateway と `api-remotes` に質問固有のタイミングポリシーはない。
 
-The `userQuestions` Session projection folds existing events into the answerable question set and the settled one; no wait state, focus state, or deadline is logged. Each `request/header` records the exact tool schemas the model saw. Native calls are tracked only when that header declares the timed `ask_user_question` schema with a `timeout` parameter; the blocking legacy tool never declares it. A native `tool/call` opens a question. A `tool/result` marks it `continued` only when it carries the pending payload or is the synthetic `TOOL_OUTCOME_UNKNOWN` result Session resume repair appends; an answer batch moves it into `settled` with that batch, and any failure drops it. A `run_code` PTC sub-call enters the projection when its `tool/ptc-dispatch` result is pending, even though the request header exposes only `run_code`. A late reply moves a continued question into `settled` when its message is admitted as `user/message`, together with the answer batch read out of that message: the timed call's own result recorded the timeout, so a transcript row has nowhere else to read what the user finally chose. A queued reply can be canceled before admission and leaves the question answerable. A reply whose text carries no readable batch settles the call with no answers; one naming a call that is not active changes nothing.
+`userQuestions` Session 射影は、既存のイベントを回答可能な質問セットと確定済みセットに畳み込む。待機状態、フォーカス状態、または期限はログに記録されない。各 `request/header` はモデルが見た正確なツールスキーマを記録する。ネイティブ呼び出しが追跡されるのは、そのヘッダーが `timeout` パラメーター付きの時間制限付き `ask_user_question` スキーマを宣言している場合のみである。ブロッキングのレガシーツールはそれを決して宣言しない。ネイティブ `tool/call` が質問を開く。`tool/result` がそれを `continued` とマークするのは、pending ペイロードを運ぶか、Session 再開修復が追記する合成 `TOOL_OUTCOME_UNKNOWN` 結果である場合のみである。回答バッチはそれをそのバッチと共に `settled` へ移し、失敗はそれを落とす。`run_code` PTC サブコールは、その `tool/ptc-dispatch` 結果が pending のとき射影に入る。リクエストヘッダーが公開するのは `run_code` のみであるにもかかわらず、である。遅延返信は、そのメッセージが `user/message` として受け入れられるときに、継続中の質問をそのメッセージから読み出した回答バッチと共に `settled` へ移す。時間制限付き呼び出し自身の結果がタイムアウトを記録しているため、トランスクリプト行がユーザーが最終的に選んだものを他に読む場所はない。キュー済みの返信は受け入れ前にキャンセルでき、質問は回答可能なままになる。テキストに可読なバッチを運ばない返信は、その呼び出しを回答なしで確定させる。アクティブでない呼び出しを名指しする返信は何も変えない。
 
 ```ts type-equiv
 /** `open` while the tool call may still return the answer; `continued` once the answer can only arrive as a new turn. */
@@ -184,15 +184,15 @@ interface UserQuestionProjectionView {
 }
 ```
 
-An open question accepts answers only through the waterfall. Once it is `continued`, the `answer` Remote method queues a user message for the owning agent and wakes it if idle. The message has source `user-question-reply`, outcome `answered`, and an `answer_to_pending_question` payload. The method returns `false` for an open or unknown call, rejects a second queued reply with `REPLY_QUEUED` even after a Host restart, and rejects incomplete or duplicate answer batches with `BAD_ANSWER`.
+open の質問は waterfall を通じてのみ回答を受け付ける。`continued` になると、`answer` Remote メソッドが所有エージェント用のユーザーメッセージをキューに入れ、アイドルであれば起こす。メッセージはソース `user-question-reply`、結果 `answered`、および `answer_to_pending_question` ペイロードを持つ。このメソッドは open または未知の呼び出しに対して `false` を返し、Host 再起動後でも 2 度目のキュー済み返信を `REPLY_QUEUED` で拒否し、不完全または重複した回答バッチを `BAD_ANSWER` で拒否する。
 
-Closing the Client panel sends nothing. A foreground timeout ends only the tool wait. Continued questions have no deadline; they stay answerable until a reply is admitted.
+Client パネルを閉じても何も送信されない。フォアグラウンドのタイムアウトはツールの待機のみを終了する。継続中の質問に期限はなく、返信が受け入れられるまで回答可能なままである。
 
-After a Host restart, the Remote layer resumes the root agent when the Session reopens. A late reply then enters a new turn.
+Host 再起動後、Remote 層は Session が再び開かれるときにルートエージェントを再開する。遅延返信はその後、新しいターンに入る。
 
-## Errors
+## エラー
 
-`UserQuestionError` extends `HarnessError`, so `ctx.tools.execute()` preserves `{ name, code }` for model-facing tool failures such as `EMPTY_QUESTIONS`, `BAD_INTENT`, `NO_PROVIDER`, `ASK_ABORTED`, or UI-side cancellation.
+`UserQuestionError` は `HarnessError` を拡張するため、`ctx.tools.execute()` は `EMPTY_QUESTIONS`、`BAD_INTENT`、`NO_PROVIDER`、`ASK_ABORTED`、または UI 側のキャンセルのようなモデル向けツール失敗に対して `{ name, code }` を保持する。
 
 ```ts type-equiv
 /** Stable error taxonomy for user-questions failures. */
@@ -210,13 +210,13 @@ class UserQuestionError extends HarnessError {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxuserquestions--userquestionservice"></a>
 
 ### `ctx.userQuestions` — `UserQuestionService`
 
-`ctx.userQuestions`: validation plus the scoped answerer waterfall.
+`ctx.userQuestions`: 検証とスコープ付き回答者 waterfall。
 
 ```ts cordis-catalog
 /**
@@ -276,9 +276,9 @@ async askTimed( request: AskUserQuestionRequest & { agent: Agent }, callId: Tool
 async ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>
 ```
 
-Types: [Agent](core.md) · [ToolCallId](core.md)
+型: [Agent](core.md) · [ToolCallId](core.md)
 
-Source: [`packages/interaction/user-questions/src/index.ts`](../../packages/interaction/user-questions/src/index.ts)
+ソース: [`packages/interaction/user-questions/src/index.ts`](../../packages/interaction/user-questions/src/index.ts)
 
 <a id="user-questions-events"></a>
 
@@ -288,7 +288,7 @@ Source: [`packages/interaction/user-questions/src/index.ts`](../../packages/inte
 
 #### `user-questions/request` — waterfall
 
-Ask composed answerers for structured user input. Return an answer to claim the request or call `next()` to delegate. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+構成された回答者に構造化ユーザー入力を求める。回答を返してリクエストをクレームするか、`next()` を呼んで委譲する。スコープフィルターディスパッチ (`@deepseek-ai/dsh-scope`): エージェントスコープのリスナーはそのエージェントのみを受け取る。
 
 ```ts cordis-catalog
 /**
@@ -301,7 +301,7 @@ Ask composed answerers for structured user input. Return an answer to claim the 
 'user-questions/request'( this: Scoped<Agent>, request: AskUserQuestionRequestEvent, next: () => Promise<AskUserQuestionAnswer>, ): Promise<AskUserQuestionAnswer>
 ```
 
-Types: [Agent](core.md) · [Scoped](scope.md)
+型: [Agent](core.md) · [Scoped](scope.md)
 
-Source: [`packages/interaction/user-questions/src/types.ts`](../../packages/interaction/user-questions/src/types.ts)
+ソース: [`packages/interaction/user-questions/src/types.ts`](../../packages/interaction/user-questions/src/types.ts)
 <!-- END GENERATED cordis-surface -->

@@ -1,46 +1,46 @@
-# Plugin markets
+# プラグインマーケット
 
-English | [中文](plugin-market.zh.md)
+日本語 | [English](plugin-market.en.md) | [中文](plugin-market.zh.md)
 
-## Summary
+## 概要
 
-A plugin market is one JSON index file that lists installable DSH bundles with their titles, icons, authors, and versions. Turn on the experimental **Custom plugin markets** bundle to browse markets in a **Discover** tab on the Plugins page and install a listed version after a confirmation. To publish a market, write or generate an index file and serve it, together with its icon files, from any static host.
+プラグインマーケットとは、インストール可能な DSH バンドルをタイトル、アイコン、作者、バージョンとともに一覧する 1 つの JSON インデックスファイルである。実験的な **Custom plugin markets** バンドルを有効にすると、Plugins ページの **Discover** タブでマーケットを閲覧し、確認後に一覧のバージョンをインストールできる。マーケットを公開するには、インデックスファイルを作成または生成し、そのアイコンファイルとともに任意の静的ホストから配信する。
 
-## Table of Contents
+## 目次
 
-- [Turn on Discover](#turn-on)
-- [Browse and install](#browse-and-install)
-- [Publish an index](#publish-an-index)
-- [Generate an index with the reference generator](#generate-an-index)
-- [Index format reference](#index-format)
-- [Further Exploration](#further-exploration)
+- [Discover を有効にする](#turn-on)
+- [閲覧とインストール](#browse-and-install)
+- [インデックスの公開](#publish-an-index)
+- [リファレンスジェネレーターでインデックスを生成する](#generate-an-index)
+- [インデックス形式リファレンス](#index-format)
+- [さらに調べる](#further-exploration)
 
 <a id="turn-on"></a>
-## Turn on Discover
+## Discover を有効にする
 
-Open **Plugins**, select **More** beside **Experimental plugins**, find **Custom plugin markets**, and switch it on. A **Discover** tab appears next to **Installed**, and Creator mode gains the read-only `plugin_market` tool. Switching the bundle off removes both again.
+**Plugins** を開き、**Experimental plugins** の横の **More** を選択し、**Custom plugin markets** を見つけて有効にする。**Installed** の隣に **Discover** タブが現れ、Creator モードに読み取り専用の `plugin_market` ツールが追加される。バンドルを無効にすると、両方とも再び削除される。
 
-DSH ships no index source. Select **Discover**, choose **Add index source**, and enter the URL of an index file. A URL must use `http:` or `https:` and must not contain a user name, password, or `#` fragment. Anyone on the network path can change an `http:` index, including the install specs it lists, so use `https:` for a market reached over a network you do not control. Each source belongs to the current profile.
+DSH はインデックスソースを同梱していない。**Discover** を選択し、**Add index source** を選び、インデックスファイルの URL を入力する。URL は `http:` または `https:` を使用する必要があり、ユーザー名、パスワード、`#` フラグメントを含んではならない。ネットワーク経路上の誰もが `http:` インデックスを変更できる(それが一覧するインストールスペックも含む)ため、管理下にないネットワーク経由で到達するマーケットには `https:` を使用する。各ソースは現在のプロファイルに属する。
 
 <a id="browse-and-install"></a>
-## Browse and install
+## 閲覧とインストール
 
-The market menu at the left of the toolbar switches between sources and opens **Manage index sources…**, where each source shows its last error. Search matches names, authors, keywords, and titles, descriptions, categories, and labels in every language, and tolerates typos; results come in best-match order until you choose another. The **Labels** menu, category pills, and **Sort** menu use the categories, labels, and sort keys that the market declares, and **Publish date** sorts by each plugin's latest version.
+ツールバー左側のマーケットメニューでソースを切り替えられ、**Manage index sources…** を開くと、各ソースの最後のエラーが表示される。検索は名前、作者、キーワード、およびあらゆる言語のタイトル、説明、カテゴリ、ラベルに一致し、タイプミスを許容する。結果は別の並び順を選ぶまで最良一致順で表示される。**Labels** メニュー、カテゴリピル、**Sort** メニューは、マーケットが宣言するカテゴリ、ラベル、ソートキーを使用し、**Publish date** は各プラグインの最新バージョンで並べ替える。
 
-Each card shows the plugin's recommended version: the highest version compatible with the running DSH that is not a prerelease, or the highest compatible prerelease when the plugin lists no version without a prerelease tag. **Install** opens a confirmation with that version's source: the npm package and registry, or the Git repository, commit, and directory. Confirming starts the normal plugin installation, including its compatibility and registry checks; nothing is installed without that confirmation.
+各カードはプラグインの推奨バージョンを表示する: 実行中の DSH と互換性があり、プレリリースでない最高バージョン、またはプラグインがプレリリースタグのないバージョンを一覧していない場合は互換性のある最高のプレリリースである。**Install** はそのバージョンのソース(npm パッケージとレジストリ、または Git リポジトリ、コミット、ディレクトリ)を含む確認を開く。確認すると通常のプラグインインストールが開始され、互換性チェックとレジストリチェックも含まれる。この確認なしにインストールされるものはない。
 
-Select a card to open its page. The **Versions** list shows every listed version with its compatibility and offers **Install** for any version DSH accepts, including older releases and prereleases. A card that shows **Installed**, **Update available**, or **Provided by DSH** opens the installed bundle instead.
+カードを選択するとそのページが開く。**Versions** リストは一覧されたすべてのバージョンを互換性とともに表示し、DSH が受け入れる任意のバージョン(古いリリースやプレリリースを含む)に **Install** を提供する。**Installed**、**Update available**、**Provided by DSH** と表示されたカードは、代わりにインストール済みバンドルを開く。
 
-Markets are third-party content. A market chooses each plugin's title, description, icon, author, and source; DSH checks the file format but not those claims. Add only sources you trust, and check the source in the confirmation before installing.
+マーケットはサードパーティのコンテンツである。各プラグインのタイトル、説明、アイコン、作者、ソースはマーケットが選ぶ。DSH はファイル形式をチェックするが、それらの主張はチェックしない。信頼できるソースのみを追加し、インストール前に確認画面でソースを確認する。
 
 <a id="publish-an-index"></a>
-## Publish an index
+## インデックスの公開
 
-An index is a UTF-8 JSON file, at most 128 MiB by default, served with a 2xx status and without redirects. Put it on any static host, for example GitLab Pages, GitHub Pages, or an object store behind https.
+インデックスは UTF-8 の JSON ファイルで、デフォルトで最大 128 MiB であり、2xx ステータスでリダイレクトなしに配信される。GitLab Pages、GitHub Pages、https 背後のオブジェクトストアなど、任意の静的ホストに置く。
 
-Icons can be inline or separate files. An inline icon is a base64 `data:` URL in the index; it needs no extra request but makes the index larger. A separate icon is a URL. A relative icon resolves against the index URL, the way an image in a web page resolves against the page: for an index at `https://market.example/dsh/index.json`, `"icon": "icons/foo.svg"` loads `https://market.example/dsh/icons/foo.svg`. Publishing the index and an `icons/` directory side by side therefore works on any host without editing the file. An absolute icon URL on another origin (scheme, host, and port) must use `https:`.
+アイコンはインラインまたは別ファイルにできる。インラインアイコンはインデックス内の base64 `data:` URL である。追加のリクエストは不要だが、インデックスが大きくなる。別ファイルのアイコンは URL である。相対アイコンは、Web ページの画像がページに対して解決されるのと同じように、インデックス URL に対して解決される。`https://market.example/dsh/index.json` のインデックスでは、`"icon": "icons/foo.svg"` は `https://market.example/dsh/icons/foo.svg` をロードする。したがって、インデックスと `icons/` ディレクトリを並べて公開すれば、ファイルを編集せずに任意のホストで機能する。別オリジン(スキーム、ホスト、ポート)の絶対アイコン URL は `https:` を使用しなければならない。
 
-This is a minimal index with one npm plugin and one plugin from a Git monorepo:
+以下は、npm プラグイン 1 つと Git モノレポのプラグイン 1 つを含む最小のインデックスである:
 
 ```json
 {
@@ -79,70 +79,70 @@ This is a minimal index with one npm plugin and one plugin from a Git monorepo:
 }
 ```
 
-DSH rejects the whole index when any rule below is violated and shows the reason, with the JSON path of the offending value, under the source in **Manage index sources…**.
+DSH は以下のいずれかのルールに違反するとインデックス全体を拒否し、**Manage index sources…** のソースの下に、違反した値の JSON パスとともに理由を表示する。
 
 <a id="generate-an-index"></a>
-## Generate an index with the reference generator
+## リファレンスジェネレーターでインデックスを生成する
 
-The repository includes a [reference generator](../../../apps/plugin-market-generator/README.md) that builds an index from a plain list. Write one npm package name or https Git repository URL per line; blank lines and lines starting with `#` are ignored:
+リポジトリには、プレーンなリストからインデックスを構築する[リファレンスジェネレーター](../../../apps/plugin-market-generator/README.md)が含まれている。1 行につき 1 つの npm パッケージ名または https の Git リポジトリ URL を書く。空白行と `#` で始まる行は無視される:
 
 ```text
 @team/dsh-foo
 https://gitlab.example.com/team/dsh-plugins
 ```
 
-Run it from a DSH checkout:
+DSH のチェックアウトから実行する:
 
 ```sh
 pnpm --filter @deepseek-ai/dsh-plugin-market-generator start --input plugins.txt --output site/index.json --title "Team plugins"
 ```
 
-For an npm package, the index lists every version that is not deprecated and declares `dsh.bundle`. For a Git repository, it finds the bundle packages on the default branch and lists their versions at `vX.Y.Z`, `X.Y.Z`, and `<name>@X.Y.Z` tags, plus each package's version on the default branch. Titles, descriptions, icons, authors, and homepages come from each plugin's highest version. Paths are relative to the directory where you run pnpm.
+npm パッケージの場合、インデックスは非推奨でなく `dsh.bundle` を宣言するすべてのバージョンを一覧する。Git リポジトリの場合、デフォルトブランチでバンドルパッケージを見つけ、`vX.Y.Z`、`X.Y.Z`、`<name>@X.Y.Z` タグのバージョン、およびデフォルトブランチ上の各パッケージのバージョンを一覧する。タイトル、説明、アイコン、作者、ホームページは各プラグインの最高バージョンから取得する。パスは pnpm を実行したディレクトリからの相対である。
 
-The generator only downloads and reads files; it never installs packages or runs their code. It keeps a cache in `.plugin-market-cache` next to the list, so a repeated run downloads only new versions and commits. Publish the output directory, `index.json` together with its `icons/` directory, as described above.
+ジェネレーターはファイルをダウンロードして読むだけであり、パッケージをインストールしたりそのコードを実行したりすることは決してない。リストの隣の `.plugin-market-cache` にキャッシュを保持するため、繰り返し実行では新しいバージョンとコミットのみがダウンロードされる。上記のとおり、出力ディレクトリ(`index.json` とその `icons/` ディレクトリ)を公開する。
 
 <a id="index-format"></a>
-## Index format reference
+## インデックス形式リファレンス
 
-Text fields marked `LocalizedText` are a string or an object of strings keyed by lowercase language ids, such as `{ "en": "Foo", "zh": "甲" }`; an object must contain `en`. Members DSH does not know are ignored.
+`LocalizedText` と記されたテキストフィールドは文字列か、小文字の言語 ID をキーとする文字列のオブジェクト(例: `{ "en": "Foo", "zh": "甲" }`)である。オブジェクトは `en` を含まなければならない。DSH が知らないメンバーは無視される。
 
-| Index field | Required | Meaning |
+| インデックスフィールド | 必須 | 意味 |
 |---|---|---|
-| `format` | yes | `1`. |
-| `title`, `description` | `title` only | Market name and description, `LocalizedText`. |
-| `metadata.categories`, `metadata.labels` | no | Objects mapping an id to `{ "title": LocalizedText }`. |
-| `metadata.sortKeys` | no | Object mapping an id to `{ "title": LocalizedText, "order": "asc" \| "desc" }`; `order` is the initial direction. |
-| `plugins` | yes | Plugins in the market's default order. |
+| `format` | はい | `1`。 |
+| `title`, `description` | `title` のみ | マーケットの名前と説明。`LocalizedText`。 |
+| `metadata.categories`, `metadata.labels` | いいえ | id を `{ "title": LocalizedText }` にマッピングするオブジェクト。 |
+| `metadata.sortKeys` | いいえ | id を `{ "title": LocalizedText, "order": "asc" \| "desc" }` にマッピングするオブジェクト。`order` は初期の並び方向。 |
+| `plugins` | はい | マーケットのデフォルト順のプラグイン。 |
 
-| Plugin field | Required | Meaning |
+| プラグインフィールド | 必須 | 意味 |
 |---|---|---|
-| `name` | yes | npm package name, unique in the index. |
-| `title`, `description` | no | `LocalizedText`; the card shows `name` without a title. |
-| `icon` | no | Inline `data:` URL (SVG, PNG, JPEG, or WebP, at most 32 KiB) or URL, as described above. |
-| `author` | no | Display text. |
-| `homepage` | no | Absolute `https:` or `http:` URL of a page about the plugin; the plugin page links it. |
-| `repository` | no | `{ "url": string, "directory"?: string }`: the source repository's web page, and the package directory inside it. The plugin page links it as **Source code**. |
-| `metadata.category` | no | One declared category id. |
-| `metadata.labels` | no | Declared label ids. |
-| `metadata.sortKeys` | no | Object mapping declared sort-key ids to numbers, such as downloads or ratings. |
-| `versions` | yes | At least one version, in any order. |
+| `name` | はい | インデックス内で一意の npm パッケージ名。 |
+| `title`, `description` | いいえ | `LocalizedText`。タイトルがない場合、カードは `name` を表示する。 |
+| `icon` | いいえ | 上記のとおり、インラインの `data:` URL(SVG、PNG、JPEG、または WebP、最大 32 KiB)または URL。 |
+| `author` | いいえ | 表示テキスト。 |
+| `homepage` | いいえ | プラグインに関するページの絶対 `https:` または `http:` URL。プラグインページがリンクする。 |
+| `repository` | いいえ | `{ "url": string, "directory"?: string }`: ソースリポジトリの Web ページと、その中のパッケージディレクトリ。プラグインページはそれを **Source code** としてリンクする。 |
+| `metadata.category` | いいえ | 宣言された 1 つのカテゴリ ID。 |
+| `metadata.labels` | いいえ | 宣言されたラベル ID。 |
+| `metadata.sortKeys` | いいえ | 宣言されたソートキー ID(ダウンロード数や評価など)を数値にマッピングするオブジェクト。 |
+| `versions` | はい | 任意の順序で少なくとも 1 つのバージョン。 |
 
-| Version field | Required | Meaning |
+| バージョンフィールド | 必須 | 意味 |
 |---|---|---|
-| `version` | yes | Exact SemVer version, unique within the plugin. |
-| `publishTimestamp` | yes | Publish time in Unix seconds. |
-| `source` | yes | `{ "type": "npm", "registry"?: url }`, or `{ "type": "git", "url": https-url, "commit": 40-hex-sha, "path"?: directory }`. |
-| `engines.dsh` | no | SemVer range of DSH versions this version runs on; absent means any. |
+| `version` | はい | 正確な SemVer バージョン。プラグイン内で一意。 |
+| `publishTimestamp` | はい | Unix 秒での公開時刻。 |
+| `source` | はい | `{ "type": "npm", "registry"?: url }`、または `{ "type": "git", "url": https-url, "commit": 40-hex-sha, "path"?: directory }`。 |
+| `engines.dsh` | いいえ | このバージョンが動作する DSH バージョンの SemVer 範囲。省略時は任意を意味する。 |
 
-DSH installs an npm version as `name@version`, asking `registry` first when present, and a Git version as `git+<url>.git#<commit>` with `&path:/<path>` for a package in a subdirectory. `engines.dsh` should match the package's own `engines.dsh`, which DSH checks again at installation; a package without one is checked against its `@deepseek-ai/dsh*` peer dependencies instead. The [format note](../../../.agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md) defines every rule.
+DSH は npm バージョンを `name@version` としてインストールし、`registry` が存在する場合はそれを最初に尋ねる。Git バージョンは `git+<url>.git#<commit>` としてインストールし、サブディレクトリ内のパッケージには `&path:/<path>` を付ける。`engines.dsh` はパッケージ自身の `engines.dsh` と一致するべきであり、DSH はインストール時にそれを再チェックする。それを持たないパッケージは、代わりにその `@deepseek-ai/dsh*` ピア依存関係に対してチェックされる。[形式ノート](../../../.agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md)がすべてのルールを定義する。
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Discover tab reference](../../../packages/client/ui-plugin-market/README.md) describes the tab's controls and states.
-- [Plugin market service](../../../packages/boot/plugin-market/README.md) covers fetch limits, caching, and the `plugin_market` tool.
-- [Index validator](../../../packages/util/plugin-market-index/README.md) is the library generators can use to check an index before publishing it.
+- [Discover タブリファレンス](../../../packages/client/ui-plugin-market/README.md)は、タブのコントロールと状態を説明する。
+- [プラグインマーケットサービス](../../../packages/boot/plugin-market/README.md)は、フェッチ制限、キャッシュ、`plugin_market` ツールを扱う。
+- [インデックスバリデータ](../../../packages/util/plugin-market-index/README.md)は、公開前にインデックスをチェックするためにジェネレーターが使用できるライブラリである。
 
 ## Dev Note
 
-None.
+なし。

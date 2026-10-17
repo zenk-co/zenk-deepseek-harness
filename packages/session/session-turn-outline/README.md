@@ -1,33 +1,33 @@
 ---
-description: "Whole-log turn outline for clients and maintainers composing or debugging the turnOutline projection unit behind full-session turn navigation."
+description: "完全セッションターン移動の背後にある turnOutline 投影ユニットを構成またはデバッグするクライアントとメンテナー向けの、全ログターン概要。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-turn-outline
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package gives history clients a whole-session outline of every started turn, including bounded prompt and settled-response previews. Clients can navigate turns that are not yet loaded and page backward from the exact event sequence needed to load a selected turn. It fits assemblies that provide session projections; elsewhere, clients continue using loaded-window navigation. Previews exclude injected context and tool results, and a response appears only after its turn settles.
+このパッケージは履歴クライアントに開始済み全ターンのセッション全体概要を与え、制限付きプロンプトと確定応答のプレビューを含む。クライアントはまだ読み込んでいないターンを移動でき、選択ターンの読み込みに必要な正確なイベントシーケンスから後方ページングできる。セッション投影を提供するアセンブリに合う。他所ではクライアントは引き続き読み込み済みウィンドウ移動を使う。プレビューは注入コンテキストとツール結果を除外し、応答はそのターン確定後にのみ現れる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the plugin beside the session store and the projection registry when clients should navigate every turn of a session without holding its complete event log. The unit registers only when the registry is present.
+クライアントが完全なイベントログを保持せずにセッションの全ターンを移動できるべきときにセッションストアと投影レジストリの隣にプラグインをマウントする。ユニットはレジストリがあるときにのみ登録する。
 
-### Composition
+### 構成
 
 ```yaml
 - name: '@deepseek-ai/dsh-session'
@@ -35,91 +35,91 @@ Mount the plugin beside the session store and the projection registry when clien
 - name: '@deepseek-ai/dsh-session-turn-outline'
 ```
 
-### What an entry means
+### エントリーの意味
 
-| Field | Meaning |
+| フィールド | 意味 |
 |---|---|
-| `turn` | Host-assigned turn number from the `turn/start` payload |
-| `seq` | The turn's `turn/start` event seq — paging a window back through this seq loads the whole turn |
-| `prompt` | Preview of the turn's first human prompt (space-joined text blocks, collapsed whitespace, 50-character cap with a trailing ellipsis when clipped — one rail-card line); `''` until an eligible prompt lands |
-| `response` | Preview of the turn's final text-bearing assistant message (same normalization, 120-character cap — up to three rail-card lines); `''` until the turn ends with assistant text |
+| `turn` | `turn/start` ペイロード由来のホスト割り当てターン番号 |
+| `seq` | ターンの `turn/start` イベント seq — この seq 経由でウィンドウを後方ページングするとターン全体を読み込む |
+| `prompt` | ターン最初の人的プロンプトのプレビュー (空白連結テキストブロック、折りたたまれた空白、切り詰め時に末尾省略記号付き 50 文字上限 — レールカード 1 行分)。対象プロンプトが着地するまで `''` |
+| `response` | ターン最終テキスト持ちアシスタントメッセージのプレビュー (同じ正規化、120 文字上限 — レールカード最大 3 行分)。アシスタントテキスト付きでターンが終わるまで `''` |
 
-The wire value is the complete entry array, strictly increasing by `turn` (whole-value rule): consumers replace, never merge. Prompts fill only from `user/message` events with the human `user` source, so injected context and tool results never leak into navigation; a turn whose prompt is images-only keeps `''` and consumers label it by number. The response buffers as a draft while its turn streams and commits at `turn/end`; the change feed's raw-view identity gate keeps draft-only changes quiet, so the outline pushes at most three times per turn — boundary, prompt, settled response. Preview budgets match the chat rail's loaded-turn previews, so a turn shows the same words before and after its events load.
+ワイヤー値は完全なエントリー配列であり、`turn` で厳密に増加する (全値規則)。コンシューマーは置換し、決してマージしない。プロンプトは人的 `user` ソースを持つ `user/message` イベントからのみ埋まるため、注入コンテキストとツール結果は決して移動に漏れない。プロンプトが画像のみのターンは `''` のまま残り、コンシューマーは番号でラベル付けする。応答はターンがストリーム中は下書きとして緩衝し、`turn/end` でコミットする。変更フィードの raw ビュー同一性ゲートは下書きのみの変更を静かに保つため、概要はターンごとに最大 3 回 (境界、プロンプト、確定応答) だけ push する。プレビュー予算はチャットレールの読み込み済みターンプレビューと一致するため、ターンはイベント読み込み前後で同じ文言を示す。
 
-### Failures and recovery
+### 失敗と回復
 
-The unit is inert without the projection registry: `inject` keeps the fiber pending and nothing registers, so other assemblies lack the `turnOutline` key. Unmounting the plugin removes the key, because registrations are effects on the mounting fiber. Persisted-cache rows are schema-validated on restore — including the strictly-increasing turn order — so a corrupt row is discarded instead of seeding a broken fold.
+ユニットは投影レジストリなしでは不活性である。`inject` はファイバーを保留に保ち、何も登録されないため、他のアセンブリは `turnOutline` キーを欠く。プラグインのアンマウントはキーを取り除く。登録はマウントファイバー上のエフェクトだからである。永続キャッシュ行は復元時にスキーマ検証される — 厳密増加ターン順序を含む — ため、壊れた行は壊れた fold を seed せずに破棄される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains the fold behind the outline; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節は概要背後の fold を説明する。観測可能な動作は[このパッケージを使う](#use-this-package)で完全にカバーされる。
 
-### Design concept
+### 設計コンセプト
 
-The unit is a pure fold over committed session events. `turn/start` — not the prompt `user/message` — anchors each entry because its seq is the load-through target for a jump: the agent loop logs `turn/start` before the turn's prompt and steps, so a window paged back through that seq contains the whole turn. The prompt fills from the first human `user/message`, and only while the newest entry is still empty — later human messages in the same turn (steering) keep the first preview. The response cannot fill the same way (`turn/end` carries no text), so each text-bearing `assistant/message` overwrites a state draft and `turn/end` commits the survivor — the newest text, which is the loaded rail's `findLast` semantic.
+ユニットはコミット済みセッションイベント上の純粋 fold である。各エントリーを固定するのはプロンプト `user/message` ではなく `turn/start` である。その seq がジャンプ向け読み込み貫通対象だからである。エージェントループはターンのプロンプトとステップの前に `turn/start` を記録するため、その seq 経由で後方ページングされたウィンドウはターン全体を含む。プロンプトは最初の人的 `user/message` から埋まり、最新エントリーがまだ空の間のみである — 同ターンの後の人的メッセージ (誘導) は最初のプレビューを保つ。応答は同じようには埋まらない (`turn/end` はテキストを運ばない) ため、各テキスト持ち `assistant/message` は状態下書きを上書きし、`turn/end` が生き残り — 最新テキスト、すなわち読み込み済みレールの `findLast` 意味 — をコミットする。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `inject`, unit registration on the mounting fiber |
-| [`src/projection.ts`](src/projection.ts) | The fold: entry append, preview fill, wire view |
-| [`src/types.ts`](src/types.ts) | One home of the `turnOutline` projection-key declaration and entry types |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: マウントファイバー上の `inject`、ユニット登録 |
+| [`src/projection.ts`](src/projection.ts) | fold: エントリー追加、プレビュー埋め、ワイヤービュー |
+| [`src/types.ts`](src/types.ts) | `turnOutline` 投影キー宣言とエントリー型の 1 ホーム |
 
-### Fold rules
+### Fold 規則
 
-- Uninteresting events return the same state reference, and draft-only changes keep the `turns` array's identity; the registry's two `Object.is` gates then hold the feed to at most three pushes per turn.
-- A `turn/start` that does not advance the turn number is skipped, keeping the outline sorted; a retried boundary's previews then land on the standing entry.
-- The wire view projects `state.turns`; the persisted-cache state schema wraps the wire schema with the draft field.
+- 無関心イベントは同じ状態参照を返し、下書きのみの変更は `turns` 配列のアイデンティティを保つ。レジストリの 2 件の `Object.is` ゲートはフィードをターンごとに最大 3 push に保つ。
+- ターン番号を進めない `turn/start` はスキップされ、概要は整列を保つ。再試行境界のプレビューは常設エントリーに着地する。
+- ワイヤービューは `state.turns` を投影する。永続キャッシュ状態スキーマはワイヤースキーマを下書きフィールド付きで包む。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the unit's contract is not enough. They move from the registry that drives units to adjacent session packages.
+ユニットの契約では足りないときにこれらを読むこと。ユニットを駆動するレジストリから隣接セッションパッケージへ進む。
 
-- [Session projection subsystem](../../../docs/subsystems/session-projection.md) — the registry that drives units and serves snapshot and change-feed values.
-- [Session projection registry package](../session-projection/README.md) — the registry contract units register against.
-- [Session package map](../README.md) — adjacent persistence, projection, title, and telemetry packages.
+- [セッション投影サブシステム](../../../docs/subsystems/session-projection.md) — ユニットを駆動し、スナップショットと変更フィード値を提供するレジストリ。
+- [セッション投影レジストリパッケージ](../session-projection/README.md) — ユニットが登録対象とするレジストリ契約。
+- [セッションパッケージマップ](../README.md) — 隣接する永続化、投影、タイトル、テレメトリーパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the turnOutline unit folds already-logged turn boundaries into a client-facing read model and registers nothing model-facing.
+なし。turnOutline ユニットは既記録のターン境界をクライアント向け読み取りモデルに折りたたみ、モデル向けに何も登録しないためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; the package never assembles or sends provider requests.
+なし。パッケージはプロバイダーリクエストを組み立てず送らない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the outline describes and when the unit is absent. They are current package constraints.
+これらの制限は概要が記述するものとユニットが存在しない場合を定める。現在のパッケージ制約である。
 
-- **The wire value grows with the session** — every push carries the complete outline (whole-value rule), up to ~600 bytes per turn at full CJK budgets and typically far less; splitting previews into an on-demand read is deferred until sessions with many thousands of turns need it.
-- **The response previews only settled turns** — it commits at `turn/end`, so an open turn (or one whose end never logged) shows a prompt-only preview until the boundary lands.
-- **A turn without eligible text keeps `''`** — images-only and command-only turns are navigable but labeled by number, and a turn whose steps emit no text gets no response preview.
-- **Mounted only where the projection registry is composed** — other assemblies serve no `turnOutline` key, and their consumers fall back to loaded-window navigation.
+- **ワイヤー値はセッションと共に育つ** — すべての push が完全な概要を運ぶ (全値規則)。完全 CJK 予算でターンごとに最大約 600 バイト、通常はずっと少ない。数千ターンのセッションが必要になるまでプレビューのオンデマンド読み取りへの分割は先送りする。
+- **応答は確定ターンのみプレビューする** — `turn/end` でコミットするため、開いたターン (または end が記録されなかったもの) は境界が着地するまでプロンプトのみプレビューを示す。
+- **対象テキストのないターンは `''` を保つ** — 画像のみとコマンドのみのターンは移動できるが番号でラベル付けされ、ステップがテキストを出さないターンは応答プレビューを得ない。
+- **投影レジストリを構成した所にのみマウントされる** — 他のアセンブリは `turnOutline` キーを提供せず、そのコンシューマーは読み込み済みウィンドウ移動にフォールバックする。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

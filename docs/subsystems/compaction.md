@@ -1,31 +1,31 @@
-# Compaction
+# コンパクション
 
-English | [中文](compaction.zh.md)
+日本語 | [English](compaction.en.md) | [中文](compaction.zh.md)
 
-The compaction seam — a [capability seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md) split like bash: Service Definition ([dsh-compaction](../../packages/compaction/compaction), `ctx.compaction`), Service Provider (a backend such as [dsh-compaction-basic](../../packages/compaction/compaction-basic)), and human Consumer ([dsh-command-compact](../../packages/compaction/command-compact)). Compaction is **one optional capability**, not part of the agent-loop spine — so its vocabulary lives here, not in [core.md](core.md). A tokenizer- or template-based backend is a sibling package implementing the same interface. Unlike bash, the interface necessarily depends on `dsh-session` and `dsh-llm`: its verbs act on an agent-owned `Session`, and its durable summary event uses the `ContentBlock` vocabulary (see the [compaction capability-seam reference](../../packages/compaction/compaction/README.md)).
+コンパクションシーム — bash と同様に分割された[ケイパビリティシーム](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md): サービス定義 ([dsh-compaction](../../packages/compaction/compaction)、`ctx.compaction`)、サービスプロバイダー ([dsh-compaction-basic](../../packages/compaction/compaction-basic) などのバックエンド)、人間のコンシューマー ([dsh-command-compact](../../packages/compaction/command-compact))。コンパクションは**1 つのオプションのケイパビリティ**であり、エージェントループの背骨の一部ではない。そのためその語彙は [core.md](core.md) ではなくここにある。トークナイザーまたはテンプレートベースのバックエンドは、同じインターフェースを実装する兄弟パッケージである。bash と異なり、このインターフェースは必然的に `dsh-session` と `dsh-llm` に依存する。その動詞はエージェント所有の `Session` に作用し、永続サマリーイベントは `ContentBlock` 語彙を使う ([コンパクションのケイパビリティシームリファレンス](../../packages/compaction/compaction/README.md)を参照)。
 
-Source: [`packages/compaction/compaction/src/types.ts`](../../packages/compaction/compaction/src/types.ts)
+ソース: [`packages/compaction/compaction/src/types.ts`](../../packages/compaction/compaction/src/types.ts)
 
-## The `compaction/*` session events
+## `compaction/*` セッションイベント
 
-Compaction extends [`SessionEventMap`](session.md) with three event types via declaration merging. All three are **log-only** — they record the lock, summary, selected range, shadowed event seqs, token count, and model call without joining the surface. `SurfaceEventType` is deliberately NOT extended (only message-producing events reach the model), so the summary itself rides on a separate `user/message` with `surfaceOp: { op: 'replace', startSeq, endSeq }` — the only surface mutation performed by summary compaction. The [historical Agent Note](../../.agents/notes/archived/feature/2026-06-18-compaction-capability-seam.md) records the rationale for reusing `user/message`.
+コンパクションは宣言マージを通じて [`SessionEventMap`](session.md) を 3 つのイベント型で拡張する。3 つとも**ログのみ**である — ロック、サマリー、選択された範囲、影に隠されたイベント seq、トークン数、モデル呼び出しを記録し、サーフェスには参加しない。`SurfaceEventType` は意図的に拡張されない (モデルに届くのはメッセージを生成するイベントのみである)。そのためサマリー自体は `surfaceOp: { op: 'replace', startSeq, endSeq }` を伴う別個の `user/message` に乗る — サマリーコンパクションが行う唯一のサーフェスミューテーションである。[歴史的 Agent Note](../../.agents/notes/archived/feature/2026-06-18-compaction-capability-seam.md)が `user/message` を再利用する根拠を記録している。
 
-| Event | Payload | Role |
+| イベント | ペイロード | 役割 |
 |---|---|---|
-| `compaction/start` | `{ turn }` | acquires the log-recorded lock; a number identifies the open automatic turn, while `null` identifies a standalone manual attempt |
-| `compaction/summary` | `{ summary, rawOutput?, llmStreamCall?, shadowedRange, shadowedSeqs, shadowedTokenCount, provider, model, maxTokens?, usage? }` | the safe summary projection, optional complete provider output and usage, an `llmStreamCall: true` marker when producing the result consumed exactly one call through this context's `ctx.llm.stream()` (which requires complete `rawOutput`), the shadowed surface-boundary pair (`start`/`end` seqs — a position span, not a numeric interval), the shadowed seqs in surface order, the estimated token count, and the summarize call's envelope (`provider`, `model`, plus its generation cap when one applied) — logged so the one-shot request is reconstructable from log + code (the reconstructability Agent Note); unmarked `rawOutput` does not identify the call path |
-| `compaction/end` | `{ turn, error? }` | releases the lock with the same numeric-or-null owner (`error` records an unsuccessful attempt) |
+| `compaction/start` | `{ turn }` | ログに記録されるロックを取得する。数値は開いている自動ターンを識別し、`null` は単独の手動試行を識別する |
+| `compaction/summary` | `{ summary, rawOutput?, llmStreamCall?, shadowedRange, shadowedSeqs, shadowedTokenCount, provider, model, maxTokens?, usage? }` | 安全なサマリープロジェクション、オプションの完全なプロバイダー出力と usage、このコンテキストの `ctx.llm.stream()` を通じた正確に 1 回の呼び出しで結果を生成した場合の `llmStreamCall: true` マーカー (完全な `rawOutput` を要求する)、影に隠されたサーフェス境界ペア (`start`/`end` seq — 数値区間ではなく位置スパン)、サーフェス順の影に隠された seq、推定トークン数、要約呼び出しのエンベロープ (`provider`、`model`、適用された場合はその生成上限) — ワンショットリクエストがログ + コードから再構築できるように記録される (再構築可能性の Agent Note)。マーカーのない `rawOutput` は呼び出し経路を識別しない |
+| `compaction/end` | `{ turn, error? }` | 同じ数値または null のオーナーでロックを解放する (`error` は失敗した試行を記録する) |
 
-The lock brackets the **whole** operation: `compaction/start` is appended first, then summarization, the `compaction/summary` record, and the `user/message` replacement all land, and only then `compaction/end`. Releasing the lock last turns a crash mid-operation into a detectable orphaned lock (a `compaction/start` with no matching `compaction/end`) rather than a `compaction/end` that falsely claims compaction finished.
+ロックは**操作全体**を囲む。最初に `compaction/start` が追記され、次に要約、`compaction/summary` レコード、`user/message` 置換がすべて着地し、その後にだけ `compaction/end` が来る。最後にロックを解放することで、操作途中のクラッシュは、コンパクションが完了したと偽って主張する `compaction/end` ではなく、検出可能な孤立ロック (対応する `compaction/end` のない `compaction/start`) になる。
 
-The markers are lock time points, not an exclusive container. An unrelated idle injection can appear between a standalone manual start and end while summarization is pending. The manual path revalidates only its selected positional span, so that injected context survives after the replacement checkpoint. A live unmatched start blocks every entry point; an unmatched start before a newer `session/end-seed` is stale evidence from a prior lifecycle and is ignored.
+マーカーはロックの時点であり、排他的なコンテナではない。要約が保留中の間に、無関係なアイドル注入が単独の手動 start と end の間に現れることがある。手動経路は選択された位置スパンのみを再検証するので、注入されたコンテキストは置換チェックポイントの後も生き残る。ライブの未対応 start はすべての入り口をブロックする。より新しい `session/end-seed` より前の未対応 start は以前のライフサイクルからの古い証拠であり、無視される。
 
-These variants are merged inside a `declare module '@deepseek-ai/dsh-session/types'` block, so — unlike the top-level types on the other subsystem pages — they are not pasted as a drift-checked ` ```ts type-equiv ` block (the `verify-type-equiv` extractor matches only top-level declarations by name). The payload table above is the catalog entry; follow the source link for the authoritative fields.
+これらのバリアントは `declare module '@deepseek-ai/dsh-session/types'` ブロックの内部でマージされるため — 他のサブシステムページのトップレベル型とは異なり — ドリフトチェックされる ` ```ts type-equiv ` ブロックとしては貼り付けられない (`verify-type-equiv` の抽出器はトップレベル宣言を名前でしか照合しない)。上のペイロード表がカタログエントリーであり、権威あるフィールドについてはソースリンクをたどる。
 
 <a id="image-offload"></a>
-## Image offload
+## 画像オフロード
 
-`compaction-image-offload` owns the `image/offload` declaration and its pure message projection. Each target identifies a current input node and exact depth-first image occurrences. The event preserves node and message identities and carries no `surfaceOp`. The [package README](../../packages/compaction/compaction-image-offload/README.md) owns recovery policy, registration, and detached replay.
+`compaction-image-offload` は `image/offload` 宣言とその純粋なメッセージプロジェクションを所有する。各ターゲットは現在の入力ノードと正確な深さ優先の画像出現を識別する。イベントはノードとメッセージの同一性を保持し、`surfaceOp` を運ばない。[パッケージ README](../../packages/compaction/compaction-image-offload/README.md)が復旧ポリシー、登録、デタッチされたリプレイを所有する。
 
 ```ts type-equiv
 /** Exact input-image occurrences selected by one durable offload decision. */
@@ -39,7 +39,7 @@ interface ImageOffloadTarget {
 
 ## `CompactionResult`
 
-What a successful compaction returns to its caller: the bookkeeping-event seqs, safe summary projection, shadowed range and seqs, and estimated token count.
+成功したコンパクションが呼び出し元に返すもの: 簿記イベントの seq、安全なサマリープロジェクション、影に隠された範囲と seq、推定トークン数。
 
 ```ts type-equiv
 /** Result of a successful compaction operation. */
@@ -72,18 +72,18 @@ interface CompactionResult {
 }
 ```
 
-## The service
+## サービス
 
-Automatic callers state why policy is running; implementations may treat confirmed overflow more aggressively than ordinary pressure.
+自動呼び出し元はポリシーが実行される理由を明示する。実装は確認されたオーバーフローを通常のプレッシャーより積極的に扱ってよい。
 
 ```ts type-equiv
 /** Why automatic policy is asking a backend to consider compaction. */
 type CompactionTrigger = 'pressure' | 'context-overflow'
 ```
 
-`CompactionEngine` exposes `compactIfNeeded(agent, trigger, signal)` for automatic `pressure` or `context-overflow` policy, `compactNow(agent, signal)` for one useful idle-session reduction even below pressure, and `compactRegion(...)` for an explicit inclusive surface range. `compactNow()` runs as agent maintenance between turns, returns `null` without writing when no useful range exists, records a standalone `turn: null` bracket before summarization, and flushes a closed attempt before later queued prompts may derive from the new surface. Every backend creates its replacement `user/message` source with `compactCheckpointSource(compactionId, sourceCommandId?)`; client and wire consumers import that constructor, `CompactionCheckpointSource`, and `isCompactCheckpointSource()` from the cordis-free `@deepseek-ai/dsh-compaction/checkpoint` subpath, while the package root re-exports them for host consumers. The required transaction identity correlates the replacement checkpoint, while the predicate keeps recognition independent of any one backend. Implementations must forward the supplied signal to summarization. The seam owns no pricing API: the singleton [`ctx.tokenMeter`](token-meter.md) directly owns estimation and replay, while `dsh-compaction-basic` owns retention, event sequencing, routed summarization calls, and their configuration.
+`CompactionEngine` は、自動の `pressure` または `context-overflow` ポリシーのために `compactIfNeeded(agent, trigger, signal)` を、プレッシャー未満でも有用なアイドルセッションの削減 1 回のために `compactNow(agent, signal)` を、明示的な包含的サーフェス範囲のために `compactRegion(...)` を公開する。`compactNow()` はターン間のエージェントメンテナンスとして実行され、有用な範囲が存在しない場合は何も書かずに `null` を返し、要約の前に単独の `turn: null` ブラケットを記録し、後のキュー済みプロンプトが新しいサーフェスから導出される前に閉じた試行をフラッシュする。すべてのバックエンドは置換 `user/message` ソースを `compactCheckpointSource(compactionId, sourceCommandId?)` で作成する。クライアントと wire のコンシューマーはそのコンストラクター、`CompactionCheckpointSource`、`isCompactCheckpointSource()` を Cordis 非依存の `@deepseek-ai/dsh-compaction/checkpoint` サブパスからインポートし、パッケージルートは Host コンシューマーのためにそれらを再エクスポートする。必須のトランザクション同一性が置換チェックポイントを相関させ、述語は認識をどのバックエンドからも独立に保つ。実装は供給されたシグナルを要約へ転送しなければならない。シームは価格 API を所有しない。シングルトン [`ctx.tokenMeter`](token-meter.md) が推定とリプレイを直接所有し、`dsh-compaction-basic` が保持、イベント順序付け、ルーティングされた要約呼び出し、それらの設定を所有する。
 
-Expected manual failures use `ManualCompactionErrorCode`:
+想定される手動失敗は `ManualCompactionErrorCode` を使う:
 
 ```ts type-equiv
 /** Expected failure classes for an explicit idle-session compaction request. */
@@ -96,15 +96,15 @@ type ManualCompactionErrorCode =
   | 'persistence'
 ```
 
-`changed` and `summary` close and persist the failed attempt without a summary replacement; image omissions recorded during recovery remain effective. `commit` may follow partial mutation; `persistence` means the in-memory bracket closed but its flush failed. Cancellation remains separate and throws the exact abort reason after required cleanup.
+`changed` と `summary` はサマリー置換なしで失敗した試行を閉じて永続化する。復旧中に記録された画像の省略は有効なままである。`commit` は部分的なミューテーションの後に続くことがある。`persistence` は、インメモリブラケットが閉じたがフラッシュが失敗したことを意味する。キャンセルは別個のままで、必要なクリーンアップの後に正確なアボート理由を throw する。
 
-Pressure compaction runs at the `agent/pre-step` waterfall before request derivation. Once pressure or canonical overflow qualifies, compaction-basic invokes optional [`ctx.toolResultPruner`](../../packages/compaction/compaction-tool-result-pruner/README.md) before range selection, remeasures through `ctx.tokenMeter`, and can advance the surface without a summary. Failed-request recovery runs through `agent/request-error` after the failed step closes and returns a retry action only when the surface replacement generation advances, even if later summary work throws after pruning; cancellation still wins. Region boundaries preserve tool-call/result pairing but not whole turns, allowing early closed steps of one oversized turn to compact. `dsh-compaction-basic` owns thresholds, retained-tail policy, overflow caps, and failure handling.
+プレッシャーコンパクションはリクエスト導出の前に `agent/pre-step` waterfall で実行される。プレッシャーまたは正規オーバーフローが該当すると、compaction-basic は範囲選択の前にオプションの [`ctx.toolResultPruner`](../../packages/compaction/compaction-tool-result-pruner/README.md) を呼び出し、`ctx.tokenMeter` を通じて再計測し、サマリーなしでサーフェスを進めることができる。失敗リクエストの復旧は、失敗したステップが閉じた後に `agent/request-error` を通じて実行され、たとえプルーニング後に後続のサマリー作業が throw しても、サーフェス置換の世代が進んだときにのみ再試行アクションを返す。キャンセルは依然として優先される。リージョン境界はツール呼び出し/結果のペアリングを保つが、ターン全体は保たないので、1 つのサイズ超過ターンの早くに閉じたステップをコンパクトできる。しきい値、保持末尾ポリシー、オーバーフロー上限、失敗処理は `dsh-compaction-basic` が所有する。
 
-The Service Definition exports `toolPairingBalancedBefore(session, seq)` and `toolPairingBalancedAfter(session, seq)` for the tool-call/result pairing checks before and after a seq. Both validate current surface membership and reject missing seqs and orphan results; the [package contract](../../packages/compaction/compaction/README.md#tool-pairing-boundaries) defines their cache behavior.
+サービス定義は、seq の前後でのツール呼び出し/結果ペアリングチェックのために `toolPairingBalancedBefore(session, seq)` と `toolPairingBalancedAfter(session, seq)` をエクスポートする。どちらも現在のサーフェスメンバーシップを検証し、欠落した seq と孤立した結果を拒否する。[パッケージ契約](../../packages/compaction/compaction/README.md#tool-pairing-boundaries)がそれらのキャッシュ挙動を定義する。
 
-## Tool-result pruning outcomes
+## ツール結果プルーニングの結果
 
-The optional tool-result pruning service reports each durable content replacement and the aggregate Unicode-code-point reduction. Its public result types live in [`compaction-tool-result-pruner/src/types.ts`](../../packages/compaction/compaction-tool-result-pruner/src/types.ts).
+オプションのツール結果プルーニングサービスは、各永続的なコンテンツ置換と、集約された Unicode コードポイント削減量を報告する。その公開結果型は [`compaction-tool-result-pruner/src/types.ts`](../../packages/compaction/compaction-tool-result-pruner/src/types.ts) にある。
 
 ```ts type-equiv
 /** Cited source event and size accounting for one landed surface replacement. */

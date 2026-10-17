@@ -1,39 +1,39 @@
 ---
-description: "Opt-in per-turn tmux location context for users and maintainers enabling or tuning the agent's session, window, and pane awareness."
+description: "エージェントのセッション、ウィンドウ、ペイン認識を有効化・調整するユーザーとメンテナー向けの、オプトインのターンごと tmux 位置コンテキスト。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tmux-context
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-tmux-context` lets the model identify the tmux session, window, pane, and pane-tree layout containing its agent process. It adds a durable, source-attributed reading on the first step of a turn only when that location changed. Terminals that merely inherit tmux environment variables without running in the named pane add nothing; failed queries also add nothing and do not fail the turn. This package is opt-in and is not included in the shipped Web or headless profiles.
+`dsh-tmux-context` によりモデルはエージェントプロセスを含む tmux セッション、ウィンドウ、ペイン、ペインツリーレイアウトを識別できる。位置が変わったときにターンの最初のステップでのみ耐久性のあるソース付き読み値を 1 件加える。名前付きペインで動作せずに tmux 環境変数を継承しただけのターミナルは何も加えない。失敗したクエリも何も加えず、ターンを失敗させない。このパッケージはオプトインであり、出荷 Web プロファイルにも headless プロファイルにも含まれない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin when the agent process runs inside tmux and the model benefits from knowing its window and pane location. Each reading is one additional user-role message in durable history; an unchanged location adds nothing, so long-running sessions accumulate little.
+エージェントプロセスが tmux 内で動き、モデルがそのウィンドウとペイン位置を知ると役立つときにこのプラグインをマウントする。各読み値は耐久履歴中のユーザー役割メッセージ 1 件追加である。位置が変わっていなければ何も加えないため、長時間セッションでも蓄積はわずかである。
 
-### What the model gets
+### モデルが得るもの
 
-On each turn whose tmux state changed, the model receives one source-tagged context message with the session name, window index and name, pane index and id, active flags, and the compact pane-tree layout. Readings happen on the first step of a turn only; a pane moved or resized mid-turn is reflected on the next turn. Pixel sizes are intentionally excluded, and the visible contents of sibling panes are never captured.
+tmux 状態が変わった各ターンに、モデルはセッション名、ウィンドウ番号と名前、ペイン番号と id、アクティブフラグ、コンパクトなペインツリーレイアウトを持つソースタグ付きコンテキストメッセージ 1 件を受け取る。読み取りはターンの最初のステップでのみ行われる。ターン途中で移動またはリサイズされたペインは次のターンに反映される。ピクセルサイズは意図的に除外され、兄弟ペインの可視内容は決して取得されない。
 
-### Configuration
+### 構成
 
-The minimal mount needs no configuration. A positive `refreshIntervalMs` additionally suppresses injections that fall within that many milliseconds of the latest one; omission or `0` injects whenever the tmux state changed since the last injection.
+最小マウントは設定不要である。正の `refreshIntervalMs` は直近の注入からそのミリ秒以内の注入を追加で抑止する。省略または `0` は tmux 状態が前回注入から変わるたびに注入する。
 
 ```yaml
 - name: '@deepseek-ai/dsh-tmux-context'
@@ -41,66 +41,66 @@ The minimal mount needs no configuration. A positive `refreshIntervalMs` additio
     refreshIntervalMs: 60000
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `refreshIntervalMs` | `0` (every changed turn) | Minimum milliseconds between durable injections in one session |
+| `refreshIntervalMs` | `0` (変わったターンは毎回) | 1 セッション中の耐久注入の最小間隔ミリ秒 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tmux-context) is the exhaustive source for every accepted field and its JSDoc.
+生成済み[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tmux-context)が受け付ける全フィールドとその JSDoc の網羅的な情報源である。
 
-### When the location is known
+### 位置が既知になるとき
 
-The process counts as in tmux only when its controlling terminal matches the pane's `#{pane_tty}`; a terminal launched from a tmux shell (a VS Code integrated terminal, a desktop launcher) inherits the variables but not the pane, so it reads as not in tmux. A missing `ctx.shell`, an absent environment, or a malformed reading is a no-op, and an executor rejection is contained and logged as a warning rather than failing the turn.
+プロセスはその制御端末がペインの `#{pane_tty}` と一致するときにのみ tmux 内と数える。tmux シェルから起動された端末 (VS Code 統合ターミナル、デスクトップランチャー) は変数を継承するがペインは継承しないため、tmux 外と読まれる。`ctx.shell` の欠落、環境の不在、不正な読み値はノーオプであり、executor の拒否はターンを失敗させずに封じ込めて警告として記録される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains the design of the plugin; the observable behavior is covered in [Use this package](#use-this-package).
+この節はプラグインの設計を説明する。観測可能な動作は[このパッケージを使う](#use-this-package)でカバーされる。
 
-### Design concept
+### 設計コンセプト
 
-The plugin prepends an `agent/pre-step` listener that runs only on the first step of each turn. When due, it runs one read-only command through the `ctx.shell` executor service — the deployment's sandbox and policy apply, and the plugin owns no subprocess code. The command compares `$TMUX_PANE`'s `#{pane_tty}` with this process's own controlling terminal before emitting tab-separated fields, so an inherited environment reads as not in tmux. The plugin re-injects only when the rendered state differs from its last injection.
+このプラグインは各ターンの最初のステップでのみ走る `agent/pre-step` リスナーを前置する。時期が来たら `ctx.shell` executor サービス経由で読み取り専用コマンドを 1 件実行する。デプロイメントのサンドボックスとポリシーが適用され、プラグインはサブプロセスコードを持たない。コマンドはこのプロセス自身の制御端末と `$TMUX_PANE` の `#{pane_tty}` を比較してからタブ区切りフィールドを送出するため、継承環境は tmux 外と読まれる。プラグインは描画済み状態が直近注入と異なるときにのみ再注入する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: first-step listener, shell query, change suppression, scheduling |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: 初回ステップリスナー、シェルクエリ、変更抑止、スケジューリング |
 
-### Main flow
+### 主フロー
 
-At the first step of a turn, the listener checks whether an injection is due, queries the location through `ctx.shell`, and compares the rendered state with the latest durable injection of this source. Change suppression and interval scheduling scan the raw durable session events, so the schedule survives compaction and resumed processes without process-local cache state; sessions schedule independently. A downstream pre-step listener that rejects or fails prevents the reading from being recorded.
+ターンの最初のステップで、リスナーは注入時期かを確認し、`ctx.shell` 経由で位置を問い合わせ、描画済み状態をこのソースの直近耐久注入と比較する。変更抑止と間隔スケジューリングは生の耐久セッションイベントを走査するため、スケジュールはプロセスローカルキャッシュ状態なしにコンパクションと再開プロセスを生き延びる。セッションごとに独立にスケジュールする。下流の pre-step リスナーが拒否または失敗すると読み取りは記録されない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the design decision to the executor the query runs through and the exhaustive configuration.
+パッケージレベルの契約では足りないときにこれらを読むこと。設計決定からクエリが走る executor と網羅的な構成へ進む。
 
-- [tmux location context decision record](../../../.agents/notes/archived/feature/2026-07-27-tmux-location-context.md) — design rationale for the tty-based detection and reading shape.
-- [Shell subsystem](../../../docs/subsystems/shell.md) — the executor service the read-only query runs through.
-- [Context group map](../README.md) — sibling request-context packages.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tmux-context) — every accepted config field and its source declaration.
+- [tmux 位置コンテキスト決定記録](../../../.agents/notes/archived/feature/2026-07-27-tmux-location-context.md) — tty ベース検出と読み値形状の設計根拠。
+- [シェルサブシステム](../../../docs/subsystems/shell.md) — 読み取り専用クエリが走る executor サービス。
+- [コンテキストグループマップ](../README.md) — 兄弟リクエストコンテキストパッケージ。
+- [生成済み設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tmux-context) — 受け付ける全設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Preparation-time tmux location
+### 準備時 tmux 位置
 
-#### What the model sees
+#### モデルが見るもの
 
-On each turn whose tmux state changed, one source-tagged context message with the three lines below. `<window-layout>` is tmux's compact pane-tree description; pane and window pixel sizes are intentionally excluded, and the contents of sibling panes are never captured.
+tmux 状態が変わった各ターンに、下記 3 行のソースタグ付きコンテキストメッセージ 1 件。`<window-layout>` は tmux のコンパクトなペインツリー記述である。ペインとウィンドウのピクセルサイズは意図的に除外され、兄弟ペインの内容は決して取得されない。
 
-##### Changed-turn reading
+##### 変更ターン読み値
 
 ```markdown
 tmux location (turn <turn>):
@@ -108,33 +108,33 @@ session <session>, window <index> "<name>", pane <index> <pane-id>
 window active=<0|1>, pane active=<0|1>, layout <window-layout>
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Each three-line reading accumulates until compaction shadows it. Unchanged locations and interval suppression add nothing.
+3 行読み値がコンパクションで隠されるまで蓄積する。変わらない位置と間隔抑止は何も加えない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
+追加専用。新しく見える内容は再利用可能なリクエストプレフィックスの後に続き、既存 KV キャッシュエントリーを無効にしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when tmux location context is a poor fit. They are current package constraints.
+これらの制限は tmux 位置コンテキストが不向きな場合を定める。現在のパッケージ制約である。
 
-- **First step only** — a pane moved or resized mid-turn is reflected on the next turn, not between steps.
-- **Own location only** — the plugin never captures the visible text of sibling panes.
-- **Layout, not size** — pane/window pixel dimensions are omitted; only the layout tree and active flags are reported.
-- **Tab-delimited fields** — a tmux window name containing the literal two-character sequence `\t` would mis-split the reading and be skipped as malformed; ordinary names are unaffected.
-- **tty-based pane detection** — the process is considered "in tmux" only when its controlling terminal matches `$TMUX_PANE`'s `#{pane_tty}`. This deliberately excludes terminals that inherited `$TMUX`/`$TMUX_PANE` from a tmux ancestor (e.g. a VS Code integrated terminal). `ps -o tty=` is POSIX; the check is a no-op wherever it or `#{pane_tty}` is unavailable.
+- **最初のステップのみ** — ターン途中で移動またはリサイズされたペインはステップ間ではなく次のターンに反映される。
+- **自身の位置のみ** — プラグインは兄弟ペインの可視テキストを決して取得しない。
+- **サイズではなくレイアウト** — ペイン/ウィンドウのピクセル寸法は省く。レイアウトツリーとアクティブフラグのみ報告する。
+- **タブ区切りフィールド** — リテラル 2 文字シーケンス `\t` を含む tmux ウィンドウ名は読み値を誤分割し、不正としてスキップされる。通常の名前は影響を受けない。
+- **tty ベースのペイン検出** — プロセスはその制御端末が `$TMUX_PANE` の `#{pane_tty}` と一致するときにのみ「tmux 内」とみなされる。これは tmux 祖先から `$TMUX`/`$TMUX_PANE` を継承した端末 (例: VS Code 統合ターミナル) を意図的に除外する。`ps -o tty=` は POSIX であり、それまたは `#{pane_tty}` が利用できない所ではノーオプである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

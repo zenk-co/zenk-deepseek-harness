@@ -1,12 +1,12 @@
-# DeepSeek Harness Brand Asset Usage Guidelines
+# DeepSeek Harness ブランドアセット利用ガイドライン
 
-English | [中文](BRAND_GUIDELINES.zh.md)
+日本語 | [English](BRAND_GUIDELINES.en.md) | [中文](BRAND_GUIDELINES.zh.md)
 
-To maintain the long\-term healthy development of the DeepSeek Harness ecosystem, avoid user confusion, and facilitate the retrieval and identification of related resources, we have established these specifications and hope that everyone will adhere to them:
+DeepSeek Harness エコシステムの長期的な健全な発展を維持し、ユーザーの混乱を避け、関連リソースの検索と識別を容易にするため、次の仕様を定めた。皆様の遵守を希望する。
 
-- In your project's descriptive text, you may use "DeepSeek Harness" to truthfully and accurately describe your project's relationship with DeepSeek Harness, for example, "built on DeepSeek Harness" or "compatible with DeepSeek Harness\." Such descriptions comply with license requirements and help users understand your project's positioning\.
-- If you wish your project name to reflect its association with the DeepSeek Harness ecosystem, we recommend using the abbreviated "DSH" designation for naming, which is both clear and facilitates communication within the community\.
-- When naming your project, please avoid using the full "DeepSeek Harness" trademark directly\. "DeepSeek Harness" is a registered trademark of DeepSeek\. Unauthorized use in project names can easily lead to user misunderstanding and confusion, thereby affecting the clarity of the entire ecosystem\. It may also involve trademark infringement\.
-- Additionally, please avoid using official brand materials in your promotions or presentations in a way that could cause misunderstanding, so as not to give users the false impression of official endorsement, cooperation, or authorization\.
+- プロジェクトの説明文では、「DeepSeek Harness」を用いてプロジェクトと DeepSeek Harness の関係を真実かつ正確に説明できる。たとえば「built on DeepSeek Harness」や「compatible with DeepSeek Harness」である。このような説明はライセンス要件に適合し、ユーザーがプロジェクトの位置付けを理解する助けとなる。
+- プロジェクト名に DeepSeek Harness エコシステムとの関連を反映したい場合は、略称「DSH」による命名を推奨する。明確であり、コミュニティ内の意思疎通を容易にする。
+- プロジェクトの命名にあたっては、完全な「DeepSeek Harness」商標を直接使わないこと。「DeepSeek Harness」は DeepSeek の登録商標である。プロジェクト名での無断使用はユーザーの誤解と混乱を招きやすく、エコシステム全体の明確さに影響する。商標侵害に関わる場合もある。
+- また、公式ブランド素材をプロモーションや発表で誤解を招く形で使わないこと。公式の推奨、提携、承認があるとの誤った印象をユーザーに与えないためである。
 
-We believe that a clear and orderly community environment will make every developer's efforts more visible and more readily recognized\. For the few cases that do not comply with the above specifications, we may contact the relevant parties to make appropriate adjustments in order to maintain the overall order of the ecosystem\. Thank you for your understanding and support—let us work together to build a more friendly and sustainable open\-source community\.
+明確で秩序あるコミュニティ環境は、すべての開発者の取り組みをいっそう可視化し、認識されやすくすると信じている。上記仕様に従わない少数の事例については、エコシステム全体の秩序維持のため、関係者に連絡して適切な調整を求める場合がある。理解と支援に感謝する。いっそう友好的で持続可能なオープンソースコミュニティをともに築こう。

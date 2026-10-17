@@ -5,7 +5,7 @@ kind: "package-group"
 
 # settings/——插件配置表单
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

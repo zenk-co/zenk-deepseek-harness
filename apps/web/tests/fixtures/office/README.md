@@ -1,7 +1,7 @@
-# Binary Office fixtures
+# バイナリー Office フィクスチャ
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-`preview.doc`, `preview.xls`, and `preview.ppt` contain `Office preview 中文文档`. They are the `one-page.doc`, `one-sheet.xls`, and `one-slide.ppt` fixtures from [LibreOffice Kit](https://github.com/deepseek-ai/dsh-libreoffice-kit), exported from Harness-authored OOXML with LibreOffice 26.8.0.3 using the Word, Excel, and PowerPoint 97 filters. The source documents retain the Harness MIT license.
+`preview.doc`、`preview.xls`、`preview.ppt` は `Office preview 中文文档` を含む。これらは [LibreOffice Kit](https://github.com/deepseek-ai/dsh-libreoffice-kit) の `one-page.doc`、`one-sheet.xls`、`one-slide.ppt` フィクスチャであり、Harness 作成の OOXML から LibreOffice 26.8.0.3 の Word・Excel・PowerPoint 97 フィルターでエクスポートされたものである。ソースドキュメントは Harness MIT ライセンスを保持する。
 
-The browser regression reads these committed OLE files and verifies actual conversion and selectable PDF text. They contain no user documents and require no Office application or fixture generator during tests. They cover simple legacy imports, not complex-document fidelity.
+ブラウザーリグレッションはこれらのコミット済み OLE ファイルを読み、実際の変換と選択可能な PDF テキストを検証する。ユーザードキュメントを含まず、テスト中に Office アプリケーションやフィクスチャ生成器を必要としない。対象は単純なレガシーインポートであり、複雑なドキュメントの忠実度ではない。

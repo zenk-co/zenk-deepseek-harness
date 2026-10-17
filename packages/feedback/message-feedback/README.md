@@ -1,101 +1,101 @@
 ---
-description: "Canonical Session-log ratings, categories, and notes for finalized assistant messages."
+description: "確定済みアシスタントメッセージに対する正規のセッションログ評価、カテゴリ、メモ。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-message-feedback
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This service records positive or negative ratings, an optional category from the fixed feedback taxonomy, and optional verbatim notes for finalized assistant messages. The canonical Session log owns every creation, edit, and deletion; `list`, `put`, and `delete` expose current feedback without constructing or waking an Agent. Feedback is log-only and does not enter model history.
+このサービスは確定済みアシスタントメッセージに対する肯定/否定の評価、固定フィードバック分類からの任意カテゴリ、任意の逐語メモを記録する。正規のセッションログがすべての作成、編集、削除を所有する。`list`、`put`、`delete` はエージェントを構築したり起動したりせずに現在のフィードバックを公開する。フィードバックはログ専用であり、モデル履歴には入らない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount `dsh-message-feedback` alongside `sessions` and `sessionPersistence`. It needs no storage-domain service. The Web bundle supplies the browser consumer and a note limit of 8192 bytes.
+`sessions` と `sessionPersistence` の隣に `dsh-message-feedback` をマウントする。ストレージドメインのサービスは不要である。Web バンドルがブラウザーコンシューマーと 8192 バイトのメモ上限を提供する。
 
-### Configuration
+### 構成
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `maxNoteBytes` | required | Positive safe integer specifying the maximum UTF-8 byte length of one optional note. |
+| `maxNoteBytes` | 必須 | 任意メモ 1 件の最大 UTF-8 バイト長を指定する正の安全整数。 |
 
-A supplied note must contain a non-whitespace character and fit the configured byte limit. Blank notes return `note-blank`; oversized notes return `note-too-large`. Accepted text is preserved exactly, including surrounding whitespace. Omitting a note clears it. Note validation precedes Session lookup. A supplied category must be one of the [fixed feedback categories](../command-feedback/README.md#the-web-feedback-dialog); the Remote schema rejects any other value, and omitting the category clears it.
+指定されたメモは非空白文字を含み、設定されたバイト上限に収まらなければならない。空白のみのメモは `note-blank` を返し、大きすぎるメモは `note-too-large` を返す。受け入れられたテキストは前後の空白を含めて正確に保存される。メモを省略すると消去される。メモ検証はセッション照会より先に行われる。指定されたカテゴリは[固定フィードバックカテゴリ](../command-feedback/README.md#the-web-feedback-dialog)のいずれかでなければならず、リモートスキーマは他の値を拒否し、カテゴリを省略すると消去される。
 
-### Reading and changing feedback
+### フィードバックの読み取りと変更
 
-| Operation | Request | Success | Business failures |
+| 操作 | リクエスト | 成功 | ビジネス失敗 |
 |---|---|---|---|
-| `list` | Session id | Current items in creation order | Session not found |
-| `put` | Session, message, rating, optional note, optional category, expected version | Current item | Session or target not found, version conflict, invalid note |
-| `delete` | Session, message, expected version | Item absent | Session not found, version conflict |
+| `list` | セッション id | 作成順の現在の項目 | セッションが見つからない |
+| `put` | セッション、メッセージ、評価、任意メモ、任意カテゴリ、期待バージョン | 現在の項目 | セッションまたは対象が見つからない、バージョン競合、無効なメモ |
+| `delete` | セッション、メッセージ、期待バージョン | 項目が存在しないこと | セッションが見つからない、バージョン競合 |
 
-Create with `ifVersion: null`; edit or delete with the returned version. Stale mutations return `version-conflict` and the current item. Each material put mints a fresh token and preserves the original creation time. A put that repeats the stored rating, note, and category is a no-op: it returns the same item without appending an event. Deleting an absent item succeeds regardless of the supplied version, without appending an event. Recreating a deleted item starts a new creation time and ordering position.
+`ifVersion: null` で作成し、返されたバージョンで編集または削除する。古いミューテーションは `version-conflict` と現在の項目を返す。実質的な put は毎回新しいトークンを発行し、元の作成時刻を保つ。保存済み評価、メモ、カテゴリを繰り返す put はノーオプであり、イベントを追加せずに同じ項目を返す。存在しない項目の削除は指定バージョンにかかわらず成功し、イベントを追加しない。削除済み項目の再作成は新しい作成時刻と順序位置で始まる。
 
-Targets must be non-empty assistant messages produced by append-origin events. User messages, empty assistant placeholders, and replacement-origin messages return `target-not-found`. Feedback survives restart; a fork starts without owned feedback even when its inherited prefix contains parent feedback.
+対象は追加起点イベントが生んだ空でないアシスタントメッセージでなければならない。ユーザーメッセージ、空のアシスタントプレースホルダー、置換起点メッセージは `target-not-found` を返す。フィードバックは再起動後も残る。フォークは継承したプレフィックスに親フィードバックを含んでいても、所有フィードバックなしで始まる。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-### Canonical log and durability
+### 正規ログと耐久性
 
-`feedback/message-put` stores the owning Session id and complete item, including its version and timestamps. `feedback/message-delete` stores the owner and message id. Current state is derived from these events, ignoring other Session owners. Durable payloads are validated before use. No second feedback store or cache exists.
+`feedback/message-put` は所有セッション id とバージョン・タイムスタンプを含む完全な項目を格納する。`feedback/message-delete` は所有者とメッセージ id を格納する。現在の状態はこれらのイベントから導出され、他のセッション所有者は無視される。永続ペイロードは使用前に検証される。第二のフィードバックストアもキャッシュも存在しない。
 
-Live operations append through `Session.append` and await `sessions.flush`, then verify the captured log endpoint and Session header through a persistence read handle before reporting success. Cold mutations hold a persistence write handle across read, validation, comparison, append, flush, and close. Cold reads use a read handle. Neither path constructs a Session or appends lifecycle events.
+ライブ操作は `Session.append` で追加し、`sessions.flush` を待ってから、永続読み取りハンドルで取得したログ終端とセッションヘッダーを検証して成功を報告する。コールドミューテーションは読み取り、検証、比較、追加、フラッシュ、クローズにわたって永続書き込みハンドルを保持する。コールド読み取りは読み取りハンドルを使う。どちらのパスもセッションを構築せず、ライフサイクルイベントも追加しない。
 
-A per-Session queue serializes operations within one service instance; the persistence write handle excludes competing cold writers. Disposal stops admission and drains admitted operations before releasing the service. Persistence failures reject instead of becoming business failures. A failed flush does not roll back an accepted event; callers can list and retry with its version. Successful no-op mutations also flush the current prefix.
+セッションごとのキューは 1 サービスインスタンス内の操作を直列化する。永続書き込みハンドルは競合するコールドライターを排除する。破棄は受け付けを止め、受け入れ済み操作を draining してからサービスを解放する。永続化の失敗はビジネス失敗にならず拒否される。フラッシュ失敗は受け入れ済みイベントをロールバックしない。呼び出し元は一覧表示してそのバージョンで再試行できる。成功したノーオプのミューテーションも現在のプレフィックスをフラッシュする。
 
-Cold material mutations emit `feedback/committed` after flush with a borrowed read-only canonical prefix; observers must deep-clone it before transferring ownership. Observers finish before write ownership is released, must not await another feedback operation for that Session, and cannot reject an already committed mutation. Live consumers observe `session/event`.
+コールドの実質ミューテーションはフラッシュ後に借用読み取り専用正規プレフィックス付きで `feedback/committed` を送出する。オブザーバーは所有権を移す前にディープクローンしなければならない。オブザーバーは書き込み所有権の解放前に完了し、そのセッションの別のフィードバック操作を待ってはならず、コミット済みミューテーションを拒否できない。ライブコンシューマーは `session/event` を観測する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Remote service, payload validation, event projection, and persistence ownership |
-| [`src/types.ts`](src/types.ts) | Requests, results, and Session event declarations; types only |
+| [`src/index.ts`](src/index.ts) | リモートサービス、ペイロード検証、イベント投影、永続化所有権 |
+| [`src/types.ts`](src/types.ts) | リクエスト、結果、セッションイベント宣言。型のみ |
 
-See the [feedback subsystem](../../../docs/subsystems/feedback.md), [Session persistence](../../../docs/subsystems/persistence.md), and [browser consumer](../../client/ui-message-feedback/README.md) for their respective APIs.
+それぞれの API については[フィードバックサブシステム](../../../docs/subsystems/feedback.md)、[セッション永続化](../../../docs/subsystems/persistence.md)、[ブラウザーコンシューマー](../../client/ui-message-feedback/README.md)を参照すること。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Message feedback
+### メッセージフィードバック
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing. `feedback/message-put` and `feedback/message-delete` carry no surface placement, tool, prompt section, or model-facing context. Log export and delivery policies belong to their consumers.
+何もない。`feedback/message-put` と `feedback/message-delete` は表面配置、ツール、プロンプト区分、モデル向けコンテキストを持たない。ログ出力と配信ポリシーはそのコンシューマーに属する。
 
-#### Token effect
+#### トークンへの影響
 
-Zero. Ratings, notes, and service results do not enter model requests.
+ゼロ。評価、メモ、サービス結果はモデルリクエストに入らない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Independent. Feedback does not change the model request prefix.
+独立。フィードバックはモデルリクエストのプレフィックスを変えない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Log-only authority:** existing `message_feedback` sidecar data is neither read nor migrated. Those files remain untouched, but their feedback is unavailable through this service.
-- **Deletion retains history:** delete removes current feedback, not earlier ratings or notes from the append-only log; it is not a privacy-erasure operation.
-- **Writer ownership:** another process holding a Session write handle causes cold mutations to reject. The service does not wake that owner or coordinate Remote calls across processes.
-- **Trusted callers:** requests contain no authenticated actor or audit identity. Deployments must protect the Host gateway.
-- **Telemetry export:** for all users and providers, including `deepseek-official`, the shipped OTel backend in `FEEDBACK_ONLY` releases the complete canonical prefix only after new explicit text feedback, rating, note, or category edits, or withdrawal. The prefix includes context and verbatim notes; later records wait for the next feedback, and `DISABLED` prevents capture. Deployments own redaction; see the [OTel export policy](../../session/session-telemetry-otel/README.md).
-- **Scan cost:** each `list`, `put`, or `delete` that reaches an existing Session scans its full event log to derive current feedback; cold operations also read the full log from persistence. Work grows with total Session history, not just the number of feedback items.
-- **Retention:** `maxNoteBytes` limits one note, not aggregate log size or mutation count.
+- **ログ専用の権威:** 既存の `message_feedback` サイドカーデータは読み取らず、移行もしない。それらのファイルは untouched のままだが、そのフィードバックはこのサービスからは利用できない。
+- **削除は履歴を残す:** 削除は現在のフィードバックを消し、追加専用ログ中の以前の評価やメモは消さない。プライバシー消去操作ではない。
+- **ライター所有権:** 別のプロセスがセッション書き込みハンドルを保持しているとコールドミューテーションは拒否される。このサービスはその所有者を起動せず、プロセスをまたぐリモート呼び出しを調整しない。
+- **信頼された呼び出し元:** リクエストは認証済みアクターも監査アイデンティティも含まない。デプロイメントはホストゲートウェイを保護しなければならない。
+- **テレメトリ出力:** すべてのユーザーとプロバイダー (`deepseek-official` を含む) について、`FEEDBACK_ONLY` の出荷 OTel バックエンドは新しい明示的テキストフィードバック、評価、メモ、カテゴリ編集、撤回の後にのみ完全な正規プレフィックスを解放する。プレフィックスはコンテキストと逐語メモを含み、後のレコードは次のフィードバックを待つ。`DISABLED` は取得を防ぐ。編集はデプロイメントが所有する。[OTel 出力ポリシー](../../session/session-telemetry-otel/README.md)を参照すること。
+- **走査コスト:** 既存セッションに届く各 `list`、`put`、`delete` は現在のフィードバックを導出するために全イベントログを走査する。コールド操作は永続化から全ログも読む。作業量はフィードバック件数ではなくセッション履歴全体で増える。
+- **保持:** `maxNoteBytes` はメモ 1 件を制限し、集計ログサイズやミューテーション回数を制限しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
-The [package tests](tests/message-feedback.spec.ts) cover current-state and durable-history semantics; the [Loader composition](tests/loader-composition.spec.ts) verifies live and cold JSONL operations across restart.
+[パッケージテスト](tests/message-feedback.spec.ts)は現在状態と耐久履歴のセマンティクスをカバーする。[ローダー構成](tests/loader-composition.spec.ts)は再起動をまたぐライブとコールドの JSONL 操作を検証する。

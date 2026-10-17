@@ -1,6 +1,6 @@
 # 插件市场
 
-[English](plugin-market.md) | 中文
+[日本語](plugin-market.md) | [English](plugin-market.en.md) | 中文
 
 ## 概述
 

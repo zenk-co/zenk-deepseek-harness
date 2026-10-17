@@ -1,187 +1,187 @@
 ---
-description: "The model-facing background-job controls for users and maintainers choosing, configuring, or debugging job_output, job_list, job_kill, and completion notices."
+description: "job_output、job_list、job_kill、および完了通知の選択、設定、デバッグを行うユーザーとメンテナー向けの、モデルに公開されるバックグラウンドジョブ制御。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-jobs
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-tool-jobs` to inspect and control background commands and PTY work through `job_output`, `job_list`, and `job_kill`. Reads can wait within a configured timeout, list results identify each job's kind and status, and cancellation settles only after the work stops. When owned work finishes, the agent receives an in-session notice: busy agents receive it in their next step, while idle agents are woken by a follow-up turn. Configuration controls wait limits, completion delivery, and an optional cap on consecutive wakeups. Stream output is consumed by one reader, and pending notices do not survive owner disposal.
+`dsh-tool-jobs` を使って、`job_output`、`job_list`、`job_kill` を通じてバックグラウンドコマンドと PTY 作業を検査・制御する。読み取りは設定されたタイムアウト内で待機でき、リスト結果は各ジョブの種別とステータスを識別し、キャンセルは作業が停止した後にのみ決着する。所有された作業が終了すると、エージェントはセッション内通知を受け取る: ビジーなエージェントは次のステップで受け取り、アイドルのエージェントはフォローアップターンで起こされる。設定は待機制限、完了の配送、連続起こしの任意の上限を制御する。ストリーム出力は 1 人のリーダーが消費し、保留中の通知はオーナーの破棄を生き延びない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Load this plugin in any composition where the agent should start, observe, and stop background jobs: it registers the three tools, attaches the controller producers need, and delivers completion notices. It requires the `ctx.tools`, `ctx.jobs`, and `ctx.systemPrompt` services from the composed harness; completion notices resolve their destination through `ctx.agents`, which every composition with owned jobs already provides.
+エージェントがバックグラウンドジョブを開始、観測、停止すべきあらゆるコンポジションでこのプラグインをロードする: 3 つのツールを登録し、プロデューサーが必要とするコントローラーを取り付け、完了通知を配送する。コンポーズされたハーネスから `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` サービスを必要とする。完了通知は `ctx.agents` を通じて宛先を解決するが、これは所有ジョブを持つすべてのコンポジションがすでに提供している。
 
-### The three tools
+### 3 つのツール
 
-- `job_output(job_id, wait?, timeout_ms?)` — Read a job's output. Stream jobs return only the output since the previous read; final-output jobs return their result after settlement. Every response ends with `[status: ...]`. Reads are non-blocking unless `wait: true`, which waits up to the configured cap and leaves a still-running job alive on timeout. A read renders stdout first and stderr in one `[stderr]` section, notes output that left memory before the read, and carries a job's result (a subagent's answer) exactly once, on the first read after settlement.
-- `job_list()` — List your background jobs with their ids, kinds, and statuses, one per line: `<id> [<kind>] <status> — <label>`.
-- `job_kill(job_id, reason?)` — Request cancellation of a running job immediately; the job settles as `killed` once its work actually stops. A terminal job returns its current snapshot, and the optional reason is recorded and forwarded to the job.
+- `job_output(job_id, wait?, timeout_ms?)` — ジョブの出力を読み取る。ストリームジョブは前回の読み取り以降の出力のみを返し、最終出力ジョブは決着後に結果を返す。すべての応答は `[status: ...]` で終わる。読み取りは `wait: true` でない限りノンブロッキングであり、`wait: true` は設定された上限まで待機し、タイムアウト時にはまだ実行中のジョブを生かしたままにする。読み取りは stdout を先に描画し stderr を 1 つの `[stderr]` セクションに描画し、読み取り前にメモリを離れた出力を注記し、ジョブの結果 (サブエージェントの回答) を決着後の最初の読み取りで正確に 1 回運ぶ。
+- `job_list()` — 自身のバックグラウンドジョブを id、種別、ステータスとともに 1 行ずつ列挙する: `<id> [<kind>] <status> — <label>`。
+- `job_kill(job_id, reason?)` — 実行中のジョブのキャンセルを即座にリクエストする。ジョブは作業が実際に停止した時点で `killed` として決着する。終端ジョブは現在のスナップショットを返し、任意の理由は記録されてジョブに転送される。
 
-The three tools return `{ text, job }`, `PublicJobSnapshot[]`, and `{ outcome: 'cancellation-requested' | 'already-finished', job }` respectively. A public snapshot carries id, kind, label, status with the live progress line or the terminal detail, and start/finish times, and omits ownership and ring offsets. All three render through generic UI cards: `read` for output and list, `execute` for kill.
+3 つのツールはそれぞれ `{ text, job }`、`PublicJobSnapshot[]`、`{ outcome: 'cancellation-requested' | 'already-finished', job }` を返す。公開スナップショットは id、種別、ラベル、ライブ進捗行または終端詳細を伴うステータス、開始/終了時刻を運び、所有権とリングオフセットは省く。3 つとも汎用 UI カードでレンダリングされる: 出力とリストは `read`、kill は `execute`。
 
-### Completion notices
+### 完了通知
 
-When a job finishes, the owning agent receives `background job <id> (<kind>: <label>) finished [status: ...]. Read its output with job_output.` as an in-session message. A busy agent has the notice injected into its next step — the turn cannot close while the inbox holds it, so several jobs settling together cost one step rather than one turn each. An idle agent is instead woken with a follow-up turn, because an unclaimed notice is a completion the model never learns about. Completions the model already collected get no notice: the registry reports a settlement that released a live `wait` as `awaited` — whether a `job_output` wait or a shell tool waiting on its own foreground command — and the plugin remembers the kills the model requested through `job_kill`; a settlement caused by owner or service teardown is skipped because nobody is left to read it.
+ジョブが終了すると、所有エージェントは `background job <id> (<kind>: <label>) finished [status: ...]. Read its output with job_output.` をセッション内メッセージとして受け取る。ビジーなエージェントは次のステップに通知が注入される — インボックスが保持している間はターンを閉じられないため、複数のジョブが同時に決着してもターンごとではなく 1 ステップ分のコストで済む。アイドルのエージェントは代わりにフォローアップターンで起こされる。未回収の通知はモデルが知ることのない完了だからである。モデルがすでに回収した完了には通知が出ない: レジストリは、生きた `wait` を解放した決着を `awaited` として報告し (`job_output` の待機でも、自身のフォアグラウンドコマンドを待つシェルツールでも)、プラグインはモデルが `job_kill` を通じて要求した kill を記憶している。オーナーまたはサービスのティアダウンによる決着は、読む者が誰も残っていないためスキップされる。
 
-Waking is unbounded by default: an unattended agent that chains background commands and one-shot subagents is woken for every completion. `maxConsecutiveWakes` caps that: each owner may be woken that many times before further notices degrade to injection, and claiming any user-authored message restores the budget. The cap bounds the self-exciting chain — a woken turn may start the background job whose completion wakes it again — but a notice past it waits silently until the next user input, so a session that relies on wakes to finish its work stalls there. `completionDelivery: quiet` keeps even idle owners on the injection lane, which deterministic transcripts need.
+起こしはデフォルトでは無制限である: バックグラウンドコマンドとワンショットサブエージェントを連鎖させる無人エージェントは、完了ごとに起こされる。`maxConsecutiveWakes` がそれに上限を課す: 各オーナーは、以降の通知が注入に降格するまでその回数だけ起こされてよく、ユーザーが書いたメッセージを回収するとバジェットが回復する。上限は自己励起連鎖 — 起こされたターンが、その完了で再び自分を起こすバックグラウンドジョブを開始しうる — を制限するが、上限を越えた通知は次のユーザー入力まで静かに待つため、作業の完了を起こしに頼るセッションはそこで停滞する。`completionDelivery: quiet` はアイドルのオーナーさえも注入レーンに留め、決定論的なトランスクリプトが必要とする。
 
-### Minimal configuration
+### 最小構成
 
-Loading the plugin with no config is the common path; a `waitTimeoutMs` above `maxWaitTimeoutMs` fails at load.
+設定なしでプラグインをロードするのが一般的な経路である。`maxWaitTimeoutMs` を超える `waitTimeoutMs` はロード時に失敗する。
 
 ```yaml
 - name: '@deepseek-ai/dsh-tool-jobs'
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `waitTimeoutMs` | `30,000` | Wait used when `wait: true` omits `timeout_ms` |
-| `maxWaitTimeoutMs` | `600,000` | Cap for model-supplied waits; larger values clamp down to it |
-| `completionDelivery` | `wakeup` | `wakeup` opens a turn on an idle owner; `quiet` leaves the notice pending |
-| `maxConsecutiveWakes` | unset | Turns one owner may open by wake before notices degrade to injection; unset means no cap |
+| `waitTimeoutMs` | `30,000` | `wait: true` が `timeout_ms` を省略したときに使われる待機 |
+| `maxWaitTimeoutMs` | `600,000` | モデル供給の待機に対する上限。より大きい値はこれにクランプダウンされる |
+| `completionDelivery` | `wakeup` | `wakeup` はアイドルのオーナーにターンを開く。`quiet` は通知を保留のままにする |
+| `maxConsecutiveWakes` | unset | 通知が注入に降格するまでに 1 人のオーナーが起こしで開けるターン数。unset は上限なし |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-jobs) is the exhaustive source for every accepted field and its JSDoc.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-jobs)が、受け入れられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### What can go wrong
+### うまくいかない場合
 
-An agent whose composition loads no `tool-jobs` cannot start background work: this plugin's controller is what arms producers' `ctx.jobs.start()`. A model-supplied wait longer than `maxWaitTimeoutMs` is clamped down to the cap, and a timed-out wait returns `[status: running]` and leaves the job alive rather than failing. A completion notice pending on an idle owner does not survive that owner's disposal.
+コンポジションが `tool-jobs` をロードしていないエージェントはバックグラウンド作業を開始できない。プロデューサーの `ctx.jobs.start()` を武装させるのはこのプラグインのコントローラーだからである。`maxWaitTimeoutMs` より長いモデル供給の待機は上限にクランプダウンされ、タイムアウトした待機は失敗ではなく `[status: running]` を返してジョブを生かしたままにする。アイドルのオーナーに保留中の完了通知は、そのオーナーの破棄を生き延びない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the tools and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節はツールの背後にある設計上の決定を説明し、それを実現するコードを示す。観測可能な振る舞いは[このパッケージを使う](#use-this-package)で完全にカバーされている。
 
-### Design philosophy
+### 設計思想
 
-- **Kind-independent controls.** The same three tools read, list, and cancel jobs of every producer kind — bash, PTY — because all of them register through the generic `ctx.jobs` runtime.
-- **Delivery is owned here; recipients are the registry's.** The plugin decides how an unreported completion reaches the owner — injected into a busy step, or a woken turn on an idle owner — while the registry routes each settlement to the listeners its owner's scope chain reaches, so a mount under one preset never sees another preset's agents, and an agent reads exactly one notice per completion however many presets are mounted.
-- **Producer-owned output bounds.** When a producer supplies `outputLimitBytes`, the complete model-facing result — output read, terminal kill snapshot, or completion notice — is capped after status and notice metadata are added; producers that omit it keep unbounded behavior.
+- **種別に依存しない制御。** 同じ 3 つのツールがすべてのプロデューサー種別 — bash、PTY — のジョブを読み取り、列挙、キャンセルする。すべてが汎用の `ctx.jobs` ランタイムを通じて登録されるためである。
+- **配送はここが所有し、受信者はレジストリのものである。** プラグインは、未報告の完了がオーナーにどのように届くか — ビジーなステップへの注入か、アイドルのオーナーへの起こしターンか — を決め、レジストリは各決着をオーナーのスコープチェーンが到達するリスナーにルーティングする。そのためある preset の下のマウントが別の preset のエージェントを見ることはなく、何個の preset がマウントされていても、エージェントは完了ごとに正確に 1 つの通知を読む。
+- **プロデューサー所有の出力境界。** プロデューサーが `outputLimitBytes` を供給する場合、完全なモデル向け結果 — 出力読み取り、終端 kill スナップショット、または完了通知 — は、ステータスと通知メタデータが追加された後に上限が適用される。省略するプロデューサーは無制限の振る舞いを保つ。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: tool registrations, the settlement subscription and model-kill set, prompt section, output capping |
-| [`src/render.ts`](src/render.ts) | Model-facing rendering: the public projection, status lines, and the consuming delta (stdout, `[stderr]` section, dropped-output notice) |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: ツール登録、決着サブスクリプションとモデル kill セット、プロンプトセクション、出力上限 |
+| [`src/render.ts`](src/render.ts) | モデル向けレンダリング: 公開プロジェクション、ステータス行、消費デルタ (stdout、`[stderr]` セクション、ドロップ出力通知) |
 
-### Output capping
+### 出力の上限
 
-`job_output` and `job_kill` capture the caller-visible job in a prepended pre-execute listener before policy runs, so the producer's cap applies to the complete rendered result. `job_output` preserves its output/status split when policy left the default rendering intact, bounding the output tail and the `[status: ...]` suffix; other single-text results — denials, short-circuits, normalized tool or pipeline failures, replacements, and blocks — are bounded as one text, while structured multi-block policy results keep their shape. A bounded completion notice retains the full job id and `job_output` action when both fit. Otherwise it directs the model to `job_list` when at least eight bytes fit; a smaller cap can carry only a prefix. The PTY's supported 64-byte minimum fits the complete `job_list` instruction. Existing producer truncation markers are reused.
+`job_output` と `job_kill` は、ポリシーが走る前に前置された pre-execute リスナーで呼び出し元可視のジョブを捕捉するため、プロデューサーの上限が完全なレンダリング結果に適用される。`job_output` はポリシーがデフォルトのレンダリングを無傷で残した場合に output/status の分割を保ち、出力末尾と `[status: ...]` サフィックスに上限を課す。他の単一テキスト結果 — 拒否、ショートサーキット、正規化されたツールまたはパイプラインの失敗、置き換え、ブロック — は 1 つのテキストとして上限が課され、構造化されたマルチブロックのポリシー結果はその形を保つ。上限付きの完了通知は、両方が収まる場合は完全なジョブ id と `job_output` アクションを保持する。そうでない場合、少なくとも 8 バイト収まるときはモデルを `job_list` に誘導し、より小さい上限ではプレフィックスのみを運べる。PTY がサポートする 64 バイトの最小値には `job_list` 指示全体が収まる。既存のプロデューサー切り詰めマーカーが再利用される。
 
-### Notice delivery lanes
+### 通知配送レーン
 
-The settlement subscription (`{ owners: 'scope' }`) skips settlements the registry reports as `awaited`, jobs the model killed through `job_kill`, unowned jobs, and teardown settlements, then resolves the agent registered for the owner session. A `wakeup` delivery opens a turn on an idle owner; with `maxConsecutiveWakes` set, only while the budget lasts, tracked per exact `Agent` in a `WeakMap`, and claiming a user-authored message (`agent/inbox/claimed`) resets that owner's budget. A busy owner — or any notice past a configured budget, or `quiet` delivery — is injected into the next-step inbox instead. The registry counts only a wait still owed the projection at settlement, so a wait that timed out or was aborted leaves a later settlement to notify as usual; a removal drops the job from the model-kill set, which only ever holds live jobs the model killed.
+決着サブスクリプション (`{ owners: 'scope' }`) は、レジストリが `awaited` として報告する決着、モデルが `job_kill` で殺したジョブ、オーナーのいないジョブ、ティアダウンの決着をスキップし、その後オーナーセッションに登録されたエージェントを解決する。`wakeup` 配送はアイドルのオーナーにターンを開く。`maxConsecutiveWakes` が設定されている場合はバジェットが続く間のみで、正確な `Agent` ごとに `WeakMap` で追跡され、ユーザーが書いたメッセージ (`agent/inbox/claimed`) を回収するとそのオーナーのバジェットがリセットされる。ビジーなオーナー — または設定されたバジェットを越えた通知、あるいは `quiet` 配送 — は代わりに次ステップのインボックスに注入される。レジストリは決着時にまだプロジェクションに負われている待機のみを数えるため、タイムアウトまたは abort された待機は、後の決着が通常どおり通知されるに任せる。除去はジョブをモデル kill セットから落とす。このセットはモデルが殺した生きたジョブのみを決して保持する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the job types to the registry contract and the generated schemas.
+パッケージレベルの契約では足りないときにこれらのページを読む。ジョブ種別からレジストリ契約と生成スキーマへと進む。
 
-- [Background task runtime subsystem](../../../docs/subsystems/jobs.md) — the job types, snapshot fields, and `ctx.jobs` Cordis surface.
-- [jobs group map](../README.md) — the sibling group page and its package table.
-- [Registry contract](../jobs/README.md) — the abstract `ctx.jobs` service behind the tools.
-- [Process-local registry](../jobs-local/README.md) — where jobs run in this process.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-jobs) — the exact `job_output`, `job_list`, and `job_kill` schemas.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-jobs) — every accepted config field and its source declaration.
-- [job-registry seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-job-registry-seam.md) — the owner-fenced registry contract and its rationale.
+- [バックグラウンドタスクランタイムサブシステム](../../../docs/subsystems/jobs.md) — ジョブ種別、スナップショットフィールド、`ctx.jobs` の Cordis サーフェス。
+- [jobs グループマップ](../README.md) — 兄弟グループページとそのパッケージ表。
+- [レジストリ契約](../jobs/README.md) — ツールの背後にある抽象 `ctx.jobs` サービス。
+- [プロセスローカルレジストリ](../jobs-local/README.md) — このプロセスでジョブが走る場所。
+- [生成されるツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-jobs) — 正確な `job_output`、`job_list`、`job_kill` スキーマ。
+- [生成される設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-jobs) — 受け入れられるすべての設定フィールドとそのソース宣言。
+- [job-registry シームの Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-job-registry-seam.md) — オーナーフェンスされたレジストリ契約とその根拠。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-Every request in this plugin's registration scope contains this guidance. Agent-scoped tool filtering may hide the tools without removing the independently registered prompt section.
+このプラグインの登録スコープ内のすべてのリクエストがこのガイダンスを含む。エージェントスコープのツールフィルタリングは、独立に登録されたプロンプトセクションを除去せずにツールを隠しうる。
 
-##### Background-job guidance
+##### バックグラウンドジョブのガイダンス
 
 ```markdown
 Track every background job id you start. You are notified in-session when a job finishes — do not busy-poll or sleep on one; keep working on independent steps and do not duplicate a running job's work. Before giving a final answer, collect every still-relevant job with job_output (set wait: true only when you are genuinely blocked on it), and job_kill jobs that stopped mattering.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Small fixed input cost per request while active.
+アクティブな間、リクエストあたり小さな固定の入力コスト。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the plugin scope and guidance text are unchanged. Activation or disposal may invalidate reuse from this prompt section.
+プラグインスコープとガイダンステキストが不変の間はプレフィックス安定である。アクティベーションまたは破棄は、このプロンプトセクションからの再利用を無効化しうる。
 
-### Tool schemas
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The generated [`job_output`, `job_list`, and `job_kill` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-jobs) while this tool set is visible.
+このツールセットが可視の間、生成される [`job_output`、`job_list`、`job_kill` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-jobs)。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost on each request where the tools are visible.
+ツールが可視の各リクエストに固定のスキーマコスト。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while tool definitions and visibility are unchanged. Registration lifecycle or scoped restrictions may invalidate reuse from the first changed schema token.
+ツール定義と可視性が不変の間はプレフィックス安定である。登録ライフサイクルまたはスコープ制限は、最初に変化したスキーマトークンからの再利用を無効化しうる。
 
-### Results and notices
+### 結果と通知
 
-#### What the model sees
+#### モデルが見るもの
 
-Reads return output or `(no new output)` followed by `[status: <status>]` and optional detail. An empty list returns `(no background jobs)`. Kill returns `requested cancellation of job <id>` or the existing terminal status. An owned completion the model has not already collected uses the notice above.
+読み取りは、出力または `(no new output)` に続けて `[status: <status>]` と任意の詳細を返す。空のリストは `(no background jobs)` を返す。kill は `requested cancellation of job <id>` または既存の終端ステータスを返す。モデルがまだ回収していない所有された完了は、上記の通知を使う。
 
-#### Token effect
+#### トークンへの影響
 
-Results and notices remain in parent history until compaction. Stream reads do not repeat consumed output; a producer-supplied `outputLimitBytes` bounds each complete read or notice. Under `wakeup`, a notice reaching an idle owner also buys a model request the user did not ask for, capped per owner only when `maxConsecutiveWakes` is set; a notice reaching a busy owner adds a step to the turn it is already paying for.
+結果と通知はコンパクションまで親履歴に留まる。ストリーム読み取りは消費済みの出力を繰り返さない。プロデューサーが供給する `outputLimitBytes` が各完全な読み取りまたは通知に上限を課す。`wakeup` の下では、アイドルのオーナーに届く通知は、ユーザーが求めていないモデルリクエストも購入する。`maxConsecutiveWakes` が設定されている場合にのみオーナーごとに上限が課される。ビジーなオーナーに届く通知は、すでに支払っているターンに 1 ステップを追加する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
+追記のみ。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the tools are a poor fit. They are current package constraints, not a task backlog.
+これらの制限は、ツールが不向きになる場合を定義する。現在のパッケージ制約であり、タスクバックログではない。
 
-- **A settlement inside the driver's retirement window still strands its notice** — between the turn loop's last inbox check and the driver committing its idle phase the owner still reads as busy, so the notice is injected and nothing wakes. Steering has the same hole; closing it belongs to `agent-loop`.
-- **A spent wake budget is not restored by time** — with `maxConsecutiveWakes` set, only user-authored input refills it, so an unattended agent whose budget ran out collects its remaining notices on the next turn something else opens, and nothing in the client shows that a notice is waiting.
-- **A notice pending on an idle owner does not survive that owner's disposal** — the disposal cancel clears the unclaimed inbox, and the log keeps the insert/cancel pair as the record.
-- **Model reads are single-consumer** — independent observers use the registry's non-consuming `readAt` (the Web client's `job.follow`), not these tools.
-- **Unowned jobs have no session fence** — external callers must supply policy or avoid them.
+- **ドライバーの引退ウィンドウ内の決着は依然として通知を座礁させる** — ターンループの最後のインボックスチェックとドライバーがアイドルフェーズをコミットするまでの間、オーナーはまだビジーとして読まれるため、通知は注入され何も起こさない。ステアリングにも同じ穴があり、それを閉じるのは `agent-loop` の責務である。
+- **使い切った起こしバジェットは時間では回復しない** — `maxConsecutiveWakes` が設定されている場合、ユーザーが書いた入力のみがそれを補充するため、バジェットを使い切った無人エージェントは、他の何かが開く次のターンで残りの通知を回収する。クライアントには通知が待っていることを示すものがない。
+- **アイドルのオーナーに保留中の通知は、そのオーナーの破棄を生き延びない** — 破棄キャンセルが未回収のインボックスをクリアし、ログは insert/cancel のペアを記録として保持する。
+- **モデルの読み取りは単一コンシューマーである** — 独立したオブザーバーは、これらのツールではなく、レジストリの非消費 `readAt` (Web クライアントの `job.follow`) を使う。
+- **オーナーのいないジョブにはセッションフェンスがない** — 外部の呼び出し元はポリシーを供給するか、それらを避けなければならない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

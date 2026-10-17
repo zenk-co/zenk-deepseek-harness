@@ -1,51 +1,51 @@
 ---
-description: "The lsp group map: language-server code navigation through the LSP seam, its stdio provider, and the model-facing lsp tool, for users and maintainers navigating the group."
+description: "lsp グループマップ: LSP シーム経由の言語サーバーによるコードナビゲーション、その stdio プロバイダー、モデル対面の lsp ツール。グループを行き来するユーザーとメンテナー向け。"
 kind: "package-group"
 ---
 
-# lsp/ — Language-server code navigation
+# lsp/ — 言語サーバーによるコードナビゲーション
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The lsp group lets agents navigate code through configured language servers: go to definitions, find references and implementations, and read hover documentation. Use `lsp-stdio` to connect local stdio language-server commands and extension mappings, and `tool-lsp` to make those operations available to the model. The shared `lsp` package keeps provider choice and normalized results consistent, so changing servers does not change model requests. Deployments must supply and configure their language servers; this group ships none.
+lsp グループでは、設定済み言語サーバー経由でエージェントがコードをたどれる。定義への移動、参照と実装の検索、ホバードキュメントの読み取りである。ローカル stdio 言語サーバーコマンドと拡張子マッピングの接続には `lsp-stdio` を使い、それらの操作をモデルに提供するには `tool-lsp` を使う。共有 `lsp` パッケージがプロバイダー選択と正規化済み結果の一貫性を保つため、サーバーを変えてもモデル要求は変わらない。配備では言語サーバーを用意して設定しなければならない。このグループはサーバーを同梱しない。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`lsp/`](lsp/README.md) | Defines the code-navigation service: provider selection by file extension, four normalized read-only operations, and structured errors | `ctx.lsp` |
-| [`lsp-stdio/`](lsp-stdio/README.md) | Drives configured stdio language-server commands as providers over `ctx.fs` and `ctx.subprocess` | registers on `ctx.lsp` |
-| [`tool-lsp/`](tool-lsp/README.md) | Exposes precise code navigation to the model through the `lsp` tool | registers on `ctx.tools` |
+| [`lsp/`](lsp/README.md) | コードナビゲーションサービスを定義する: 拡張子によるプロバイダー選択、4 つの正規化済み読み取り専用操作、構造化エラー | `ctx.lsp` |
+| [`lsp-stdio/`](lsp-stdio/README.md) | `ctx.fs` と `ctx.subprocess` 上で設定済み stdio 言語サーバーコマンドをプロバイダーとして駆動する | `ctx.lsp` に登録 |
+| [`tool-lsp/`](tool-lsp/README.md) | `lsp` ツール経由でモデルに精密なコードナビゲーションを公開する | `ctx.tools` に登録 |
 
-Providers register capabilities, not tools: `tool-lsp` is the only owner of the model-facing name, schema, prompt guidance, and presentation, so swapping a provider never changes how the model asks for navigation.
+プロバイダーが登録するのはケイパビリティであり、ツールではない。モデル対面の名前、スキーマ、プロンプトガイダンス、表示の唯一の所有者は `tool-lsp` であり、プロバイダーを交換してもモデルがナビゲーションを求める方法は変わらない。
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [LSP navigation subsystem](../../docs/subsystems/lsp.md) — operations, coordinates, requests and results, and `LspError` codes.
-- [Generated tool catalog](../../docs/tool-catalog.md#deepseek-aidsh-tool-lsp) — the `lsp` schema the model receives.
+- [LSP ナビゲーションサブシステム](../../docs/subsystems/lsp.md) — 操作、座標、要求と結果、`LspError` コード。
+- [生成ツールカタログ](../../docs/tool-catalog.md#deepseek-aidsh-tool-lsp) — モデルが受け取る `lsp` スキーマ。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

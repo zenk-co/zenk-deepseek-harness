@@ -1,32 +1,32 @@
-# Responding to review across a stacked PR chain
+# 積み重ね PR 連鎖にまたがる査読対応
 
-English | [中文](responding-to-pr-review-on-a-stack.zh.md)
+日本語 | [English](responding-to-pr-review-on-a-stack.en.md) | [中文](responding-to-pr-review-on-a-stack.zh.md)
 
-Review comments may target several PRs in a dependent stack (`A ← B ← C …`). Keep that chain linked through GitHub's official stacked-PR feature. This guide owns review-fix placement and propagation; the [dsh-merging-stacked-prs](../../.agents/skills/dsh-merging-stacked-prs/SKILL.md) skill owns linkage checks and landing.
+査読注記は依存積み (`A ← B ← C …`) 内の複数 PR を指すことがある。GitHub 公式の積み重ね PR 機能でその連鎖を結び続けよ。この手引きは査読修正の配置と伝搬を所有し、[dsh-merging-stacked-prs](../../.agents/skills/dsh-merging-stacked-prs/SKILL.md) スキルは連結検査と着陸を所有する。
 
-## Ground rules
+## 基本規則
 
-1. **One worktree per PR branch.** Each PR's fixes happen in that PR's own worktree; parallel fixes never share a checkout.
-2. **GitHub's stack object is authoritative.** Base branches establish the expected dependency order, while `PullRequest.stack` and `stackEntry.position` prove that GitHub recognizes it. Do not treat a matching branch chain as an official stack without checking those fields.
-3. **A fix lands on the PR that INTRODUCED the issue, then flows up-stack.** When a comment on PR `B` points at code `B` introduced, fix it on `B` and propagate `B` into `C` — even if `C` also carries the file. Originating the fix downstream leaves `B` shipping the unfixed code and hides the fix from `B`'s reviewer.
-4. **Each review fix remains a distinct commit.** A later rebase may change its OID, but do not amend a reviewed fix out of the branch history. Amend only your own not-yet-pushed, not-yet-reviewed work.
-5. **Choose merge-forward or rebase deliberately.** Both histories are allowed after review. A rewritten push must be lease-protected and must abort rather than overwrite a concurrently advanced remote head; raw `--force` is forbidden.
+1. **PR 分岐ごとに作業木 1 つ。** 各 PR の修正はその PR 自身の作業木で行い、並行修正が複製を共有しない。
+2. **GitHub の積み対象が権威である。** 基底分岐が期待依存順を定める一方、`PullRequest.stack` と `stackEntry.position` が GitHub の認識を証する。それらの項目を確かめずに一致分岐連鎖を公式積みと扱わないこと。
+3. **修正は課題を導入した PR に着陸し、上積みへ流す。** PR `B` への注記が `B` の導入符号を指す場合、`B` で直して `B` を `C` へ伝搬する — `C` もそのファイルを運んでいても同様である。修正を下流起点にすると `B` は未修正符号を出荷し、`B` の査読者から修正を隠す。
+4. **各査読修正は個別確定のままにする。** 後の rebase で OID が変わりうるが、査読済み修正を分岐履歴から amend で消さないこと。amend は未 push 未査読の自身作業のみに行う。
+5. **merge-forward と rebase を意識して選ぶ。** 査読後どちらの履歴も許される。書き換え push は lease 保護しなければならず、並行に進んだ遠隔先端の上書きではなく中止しなければならない。生 `--force` は禁じられる。
 
-## Resolve comments through the stack
+## 積みを通じた注記解決
 
-1. Triage every comment on the merits before acting: verify the claim against the code — a reviewer flagging the right symptom can still misdiagnose the cause.
-2. Map each accepted finding to its originating PR and fix it there.
-3. Propagate the fixed layer through every affected child in order:
-   - **Merge-forward:** merge the fixed parent branch into its child, validate the child, and continue upward. Preserve each in-progress checkpoint.
-   - **Native cascading rebase:** use `gh stack rebase`, validate the rewritten layers, then publish with `gh stack push`; or use `gh stack sync`, which may publish first and therefore requires immediate post-sync validation under [dsh-pre-push-checks](../../.agents/skills/dsh-pre-push-checks/SKILL.md).
-4. Treat delegated fixes as trust-but-verify: a sub-agent's report describes intent, not necessarily what landed. Re-run the gates yourself on the actual tree, and for a regression guard, prove it FAILS on the unfixed code (introduce the regression, watch red, revert) — a guard that passes both ways guards nothing. A sub-agent that reframes a problem as already handled is a signal to dig in personally.
-5. Reply in the review thread (`gh api repos/{owner}/{repo}/pulls/{pr}/comments/{id}/replies`), not as a top-level comment, stating the fix and the current commit or head that carries it.
-6. After any rewritten push, re-read unresolved threads, approvals, mergeability, and checks. A force-pushed commit OID or outdated inline anchor is not current evidence that the finding remains resolved.
-7. Land only through the official stack procedure. If the PRs are not yet linked, the landing skill automatically links a same-author chain, asks before linking mixed authors, and hard-stops when native stack support is unavailable.
+1. 動く前に各注記を内容で選別する。符号に対する主張を確かめる — 正しい症候を指す査読者が原因を誤診しうる。
+2. 受け付けた各所見を起点 PR に写像し、そこで直す。
+3. 修正済み層を影響する各子へ順に伝搬する。
+   - **Merge-forward:** 修正済み親分岐をその子へ併合し、子を検証して上方へ続ける。各進行中検査点を保つ。
+   - **本来連鎖 rebase:** `gh stack rebase` を使い、書き換え層を検証してから `gh stack push` で公開するか、`gh stack sync` を使う。これは先に公開しうるため [dsh-pre-push-checks](../../.agents/skills/dsh-pre-push-checks/SKILL.md) 下での同期直後検証を要する。
+4. 委任修正は信じつつ確かめる。副応答者の報告は着陸内容ではなく意図を述べる。実際の木で門限を自分で再走させ、退行防護には未修正符号で失敗を証する (退行を入れて赤を見て戻す) — 両方向で通る防護は何も防がない。問題を既処置と枠付け直す副応答者は自ら掘る合図である。
+5. 査読筋 (`gh api repos/{owner}/{repo}/pulls/{pr}/comments/{id}/replies`) で返信し、最上位注記ではなく、修正とそれを運ぶ現在確定または先端を述べる。
+6. 書き換え push の後は未解決筋、承認、併合可能性、検査を読み直す。強制 push された確定 OID や古い行内錨は所見が解決済みのままである現在証拠ではない。
+7. 公式積み手順でのみ着陸する。PR がまだ結ばれていなければ、着陸スキルは同作者連鎖を自動連結し、混合作者では連結前に問い、原生成積み対応が利用できなければ強停止する。
 
-## Verify
+## 検証
 
-- Every fixed PR's current diff contains the intended correction at the layer that introduced the issue.
-- GraphQL reports one official stack in the expected order, and each child diff against its parent shows only that child's changes.
-- Unresolved threads, approvals, mergeability, and checks were re-audited after every rewritten push.
-- The relevant gates pass on every affected PR in the stack, not just the top.
+- 修正済み各 PR の現在差分が、課題を導入した層に意図修正を含む。
+- GraphQL が期待順の公式積み 1 つを報告し、親に対する各子差分がその子変更のみを示す。
+- 未解決筋、承認、併合可能性、検査は各書き換え push 後に再監査された。
+- 関係門限は最上位だけでなく積み内の影響各 PR で通る。

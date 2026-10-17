@@ -1,62 +1,62 @@
 ---
-description: "The one-shot Codex subagent provider for users and maintainers choosing a product backend, installing a Profile bundle, or configuring an unattended Codex delegation."
+description: "プロダクトバックエンドの選択、プロファイルバンドルのインストール、または無人 Codex 委譲の設定を行うユーザーとメンテナー向けの、ワンショット Codex サブエージェントプロバイダー。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-subagent-codex
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Install `@deepseek-ai/dsh-subagent-codex` into a Profile when delegated work should run in a genuine, unattended Codex session in the parent Session's workspace. Each delegation uses a fresh isolated Codex thread for one self-contained text task and returns only the selected answer or a safe failure diagnostic. Native Codex configuration and authentication remain authoritative, while `permissionMode` selects the non-interactive approval and sandbox behavior. The Bundle supplies a compatible native Codex payload and adds its delegation tool as a global tool.
+委譲された作業を、親 Session のワークスペース内の本物の無人 Codex セッションで実行したいときに、`@deepseek-ai/dsh-subagent-codex` をプロファイルにインストールする。各委譲は、1 つの自己完結したテキストタスクのために新しい分離された Codex スレッドを使い、選択された回答または安全な失敗診断のみを返す。ネイティブの Codex 設定と認証が権威のままであり、`permissionMode` が非対話の承認とサンドボックスの振る舞いを選択する。バンドルは互換のネイティブ Codex ペイロードを供給し、委譲ツールをグローバルツールとして追加する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Enable **Codex subagent** in the Web or Desktop Plugins page when a task needs a fresh native Codex session in the parent workspace.
+タスクが親ワークスペース内の新しいネイティブ Codex セッションを必要とするとき、Web またはデスクトップの Plugins ページで **Codex subagent** を有効にする。
 
-### Installing the Bundle
+### バンドルのインストール
 
-The Official entry is visible offline. Enabling it installs the [target for the running DSH installation](../../boot/plugin-manager/README.md#use-this-package) through the ordinary bundle installer and selects its profile layer. The layer registers the provider and adds `subagent_codex` to every Agent as a global tool; it starts no native process until delegation. Restart when the installer reports that one is required.
+Official エントリーはオフラインでも表示される。有効にすると、通常のバンドルインストーラーを通じて[実行中の DSH インストール向けのターゲット](../../boot/plugin-manager/README.md#use-this-package)がインストールされ、そのプロファイルレイヤーが選択される。レイヤーはプロバイダーを登録し、`subagent_codex` をグローバルツールとしてすべてのエージェントに追加する。委譲までネイティブプロセスは起動しない。インストーラーが再起動が必要と報告したら再起動する。
 
-Switching Off deselects the layer and leaves the package installed. Remove is a separate package operation. Enabling or switching Off registers or removes the global tool in the running Host, so live Agents see the change on their next request.
+オフへの切り替えはレイヤーを選択解除し、パッケージはインストールされたままにする。削除は別個のパッケージ操作である。有効化またはオフへの切り替えは、実行中の Host でグローバルツールを登録または除去するため、ライブのエージェントは次のリクエストで変更を見る。
 
-The layer inserts Host rows only, so any profile can select it, including the shipped headless, SDK, and ACP profiles. Existing provider-only consumers follow the [upgrade guide](../../../docs/upgrade-guide/v0.2.1-alpha.1/native-subagent-bundle-tools/guide.md).
+このレイヤーは Host 行のみを挿入するため、同梱の headless、SDK、ACP プロファイルを含むどのプロファイルでも選択できる。プロバイダーのみの既存コンシューマーは[アップグレードガイド](../../../docs/upgrade-guide/v0.2.1-alpha.1/native-subagent-bundle-tools/guide.md)に従う。
 
-### Configuration
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `providerName` | `codex` | Non-empty registry name on `ctx.subagents`; each mounted instance needs a unique value |
-| `model` | native Codex settings | Optional non-empty model name fixed for every thread from this provider instance; omission sends no app-server override |
-| `env` | `{}` | Explicit child environment layered over the credential-scrubbed parent environment |
-| `permissionMode` | `never` | Native non-interactive approval and sandbox mode fixed for every thread from this provider instance |
-| `disposeGraceMs` | `3000` | Grace between the shared managed-range owner's termination tiers |
+| `providerName` | `codex` | `ctx.subagents` 上の空でないレジストリ名。マウントされる各インスタンスには一意の値が必要 |
+| `model` | native Codex 設定 | このプロバイダーインスタンスからのすべてのスレッドに固定される、任意の空でないモデル名。省略時は app-server 上書きを送らない |
+| `env` | `{}` | クレデンシャルを除去した親環境の上に重ねられる明示的な子環境 |
+| `permissionMode` | `never` | このプロバイダーインスタンスからのすべてのスレッドに固定されるネイティブの非対話承認とサンドボックスモード |
+| `disposeGraceMs` | `3000` | 共有マネージドレンジオーナーの終了段階間の猶予 |
 
-| `permissionMode` value | `thread/start` fields | Native behavior |
+| `permissionMode` の値 | `thread/start` フィールド | ネイティブの振る舞い |
 |---|---|---|
-| `never` | `approvalPolicy: never`; sandbox omitted | Never ask for approval; execution failures return to the model under the native sandbox |
-| `approve-for-me` | `approvalPolicy: on-request`, `approvalsReviewer: auto_review`, `sandbox: workspace-write` | Route permission requests through Codex automatic review without a human |
-| `dangerously-bypass-approvals-and-sandbox` | `approvalPolicy: never`, `sandbox: danger-full-access` | Skip approval and sandbox enforcement; this value must be selected explicitly |
+| `never` | `approvalPolicy: never`、sandbox 省略 | 承認を決して求めない。実行失敗はネイティブサンドボックスの下でモデルに返る |
+| `approve-for-me` | `approvalPolicy: on-request`, `approvalsReviewer: auto_review`, `sandbox: workspace-write` | 権限リクエストを人間なしの Codex 自動レビューに回す |
+| `dangerously-bypass-approvals-and-sandbox` | `approvalPolicy: never`, `sandbox: danger-full-access` | 承認とサンドボックスのエンフォースメントをスキップする。この値は明示的に選択しなければならない |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-codex) is the exhaustive source for every accepted field and its JSDoc. A configured `model` passes unchanged on each ephemeral `thread/start`; omission leaves native model selection in force. The provider does not discover models, rewrite aliases, select `modelProvider` or `serviceTier`, or set a fallback. Credential-shaped ambient variables are removed before the explicit `env` overlay, so an API key intended for the child must be supplied there.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-subagent-codex)が、受け入れられるすべてのフィールドとその JSDoc の網羅的な情報源である。設定された `model` は各エフェメラルな `thread/start` で変更なく渡され、省略時はネイティブのモデル選択が有効なままである。プロバイダーはモデルをディスカバリーせず、エイリアスを書き換えず、`modelProvider` や `serviceTier` を選択せず、フォールバックを設定しない。クレデンシャル形のアンビエント変数は明示的な `env` オーバーレイの前に除去されるため、子向けの API キーはそこで供給しなければならない。
 
 <a id="exposing-the-tool"></a>
-### Exposing the tool
+### ツールの公開
 
-The bundle inserts `tool-subagent-codex` as a Host row, so `subagent_codex` is a global tool visible to every preset, including minimal. Later user patches can configure or disable that row by id. A preset that registers its own tool with the same name shadows the global tool for its Agents. To mount the provider and tool without selecting the bundle layer, insert the same rows in `cordis.patch.yml`:
+バンドルは `tool-subagent-codex` を Host 行として挿入するため、`subagent_codex` は minimal を含むすべての preset に見えるグローバルツールである。後からのユーザーパッチは id でその行を構成または無効化できる。同じ名前で自身のツールを登録する preset は、そのエージェントにとってグローバルツールをシャドウする。バンドルレイヤーを選択せずにプロバイダーとツールをマウントするには、`cordis.patch.yml` に同じ行を挿入する:
 
 ```yaml
 - insert:
@@ -70,119 +70,119 @@ The bundle inserts `tool-subagent-codex` as a Host row, so `subagent_codex` is a
         maxDepth: provider-managed
 ```
 
-The tool returns a child id after accepting the task and sends its result to the parent Agent on completion. Each external activation executes once and accepts no follow-up input or resume.
+ツールはタスクを受け入れた後に子 id を返し、完了時にその結果を親エージェントへ送る。各外部アクティベーションは 1 回だけ実行され、追加入力や再開を受け付けない。
 
-### What you get
+### 得られるもの
 
-The completion notice contains the selected Codex answer, or the stop reason and optional safe diagnostic. The parent Session also retains the external task identity and complete terminal result independently of the notice; no local child Session is created. Product reasoning, tool activity, raw stderr, and workspace diffs do not enter the parent Session.
+完了通知には、選択された Codex 回答、または停止理由と任意の安全な診断が含まれる。親 Session は通知とは独立に、外部タスクのアイデンティティと完全な終端結果も保持する。ローカルの子 Session は作成されない。プロダクトの推論、ツールアクティビティ、生の stderr、ワークスペースの差分は親 Session に入らない。
 
-### Failure and recovery
+### 失敗とリカバリー
 
-An install that omits optional dependencies, uses an unsupported platform, or loses the selected payload leaves the provider dormant and fails the first delegation at `initialize` with a safe `unknown` category and any observed process outcome; there is no host-CLI fallback. Raw wrapper text stays on Host stderr. A cancelled run settles as `aborted`.
+任意の依存関係を省いたインストール、サポートされないプラットフォーム、または選択されたペイロードの喪失は、プロバイダーを休眠させ、最初の委譲を `initialize` で安全な `unknown` カテゴリーと観測されたプロセス結果で失敗させる。host-CLI フォールバックはない。生のラッパーテキストは Host の stderr に留まる。キャンセルされた実行は `aborted` として決着する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the provider drives a real Codex app-server and where the observable behavior comes from; the full contract lives in [Use this package](#use-this-package).
+この節は、プロバイダーが本物の Codex app-server をどのように駆動し、観測可能な振る舞いがどこから来るかを説明する。完全な契約は[このパッケージを使う](#use-this-package)にある。
 
-### Design concept
+### 設計概念
 
-- **One fresh process, thread, and turn per run.** Every run spawns a fresh app-server, creates one ephemeral thread, and executes exactly one turn; there is no continuation, resume, or pooling.
-- **Native configuration is authoritative.** Codex configuration and authentication stay native through the parent cwd, `HOME`, and `CODEX_HOME`; the provider overrides only the optional model and the thread's approval, reviewer, and sandbox fields.
-- **Unattended by design.** Approval, user-input, and MCP requests are answered or declined without a human; unknown server requests fail the run.
+- **実行ごとに新しいプロセス、スレッド、ターンを 1 つずつ。** すべての実行は新しい app-server をスポーンし、1 つのエフェメラルスレッドを作成し、正確に 1 ターンを実行する。継続、再開、プーリングはない。
+- **ネイティブ設定が権威である。** Codex の設定と認証は、親の cwd、`HOME`、`CODEX_HOME` を通じてネイティブのままである。プロバイダーが上書きするのは、任意のモデルとスレッドの approval、reviewer、sandbox フィールドのみである。
+- **設計上無人である。** approval、user-input、MCP リクエストは人間なしで回答または拒否される。未知のサーバーリクエストは実行を失敗させる。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config schema, provider registration |
-| [`src/run.ts`](src/run.ts) | The run lifecycle, turn execution, result selection, and diagnostics |
-| [`src/wire.ts`](src/wire.ts) | The minimal app-server JSON-RPC wire implementation |
-| [`cordis.patch.yml`](cordis.patch.yml) | The Profile layer that registers the provider and contributes preset delegation tools |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: 設定スキーマ、プロバイダー登録 |
+| [`src/run.ts`](src/run.ts) | 実行ライフサイクル、ターン実行、結果選択、診断 |
+| [`src/wire.ts`](src/wire.ts) | 最小の app-server JSON-RPC wire 実装 |
+| [`cordis.patch.yml`](cordis.patch.yml) | プロバイダーを登録し preset 委譲ツールを提供するプロファイルレイヤー |
 
-### Run flow
+### 実行フロー
 
-A start accepts only a non-empty sequence of text blocks and uses the child cwd selected by the subagent service. It spawns the fixed command through the subprocess seam, performs the `initialize` → `initialized` handshake, maps the Profile-selected mode and optional model into official `thread/start` fields beside `{ cwd, ephemeral: true }`, and publishes the run only after Codex returns a valid ephemeral thread. The published result starts exactly one turn, accepts only notifications for that run's thread and turn, and waits for the authoritative `turn/completed` terminal. The latest `agentMessage` with `phase: "final_answer"` wins; without one, the latest `phase: "partial_answer"` message (stable answer text that later assistant output or tool calls may follow) is selected; when Codex emits neither explicit answer phase, the latest message with `phase: null` is the compatibility fallback. `commentary` messages are never selected, and any other phase fails the run. A successful turn with no nonblank answer settles as an error. Failed turns use the coarse categories `limit`, `access-policy`, `service`, `transport`, `product-error`, `invalid-result`, or `unknown`; an early app-server exit uses `process`, and applicable connection and stream failures retain a numeric `httpStatusCode`.
+start は空でないテキストブロックのシーケンスのみを受け付け、subagent サービスが選択した子 cwd を使う。subprocess シームを通じて固定コマンドをスポーンし、`initialize` → `initialized` ハンドシェイクを行い、プロファイルが選択したモードと任意のモデルを `{ cwd, ephemeral: true }` の隣の公式 `thread/start` フィールドにマップし、Codex が有効なエフェメラルスレッドを返した後にのみ実行を公開する。公開された結果は正確に 1 ターンを開始し、その実行のスレッドとターンの通知のみを受け付け、権威ある `turn/completed` 終端を待つ。`phase: "final_answer"` を持つ最新の `agentMessage` が勝つ。それがなければ、最新の `phase: "partial_answer"` メッセージ (その後に assistant 出力やツール呼び出しが続きうる安定した回答テキスト) が選択される。Codex が明示的な回答フェーズをどちらも出さない場合、`phase: null` を持つ最新メッセージが互換フォールバックである。`commentary` メッセージは決して選択されず、他のフェーズは実行を失敗させる。空でない回答のない成功ターンはエラーとして決着する。失敗ターンは粗いカテゴリー `limit`、`access-policy`、`service`、`transport`、`product-error`、`invalid-result`、または `unknown` を使う。早期の app-server 終了は `process` を使い、該当する接続とストリームの失敗は数値の `httpStatusCode` を保持する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from this provider to the seam it plugs into and the sibling product provider.
+パッケージレベルの契約では足りないときにこれらのページを読む。このプロバイダーから、それが接続するシームと兄弟プロダクトプロバイダーへと進む。
 
-- [Subagent subsystem](../../../docs/subsystems/subagent.md) — the service contract, provider contract, and terminal result semantics.
-- [dsh-subagent seam](../subagent/README.md) — the registry and start API this provider registers on.
-- [Claude Code subagent provider](../subagent-claude-code/README.md) — the sibling product backend over the official Agent SDK.
-- [historical Claude Code and Codex backends](../../../.agents/notes/archived/feature/2026-08-04-claude-code-and-codex-subagent-backends.md) — the design record for the product providers.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-codex) — every accepted config field and its source declaration.
+- [Subagent サブシステム](../../../docs/subsystems/subagent.md) — サービス契約、プロバイダー契約、終端結果の意味論。
+- [dsh-subagent シーム](../subagent/README.md) — このプロバイダーが登録するレジストリと start API。
+- [Claude Code サブエージェントプロバイダー](../subagent-claude-code/README.md) — 公式 Agent SDK 上の兄弟プロダクトバックエンド。
+- [歴史的な Claude Code と Codex バックエンド](../../../.agents/notes/archived/feature/2026-08-04-claude-code-and-codex-subagent-backends.md) — プロダクトプロバイダーの設計記録。
+- [生成される設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-subagent-codex) — 受け入れられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Child request
+### 子リクエスト
 
-#### What the model sees
+#### モデルが見るもの
 
-The Codex child receives the standalone text blocks as one turn in a fresh ephemeral thread. Its workspace is the selected child working directory; the selected Provider instance fixes any configured model, environment, non-interactive approval policy, and sandbox mode, while an omitted model and every other product setting come from native Codex configuration. The executable version comes from the Bundle's pinned platform payload.
+Codex の子は、新しいエフェメラルスレッド内の 1 ターンとしてスタンドアロンのテキストブロックを受け取る。そのワークスペースは選択された子作業ディレクトリである。選択されたプロバイダーインスタンスが、設定されたモデル、環境、非対話承認ポリシー、サンドボックスモードを固定する。省略されたモデルとその他のすべてのプロダクト設定は、ネイティブの Codex 設定から来る。実行可能ファイルのバージョンは、バンドルの固定されたプラットフォームペイロードから来る。
 
-#### Token effect
+#### トークンへの影響
 
-The child pays for an independent Codex context and turn. Child tokens do not enter the parent's context.
+子は独立した Codex コンテキストとターンのコストを支払う。子のトークンは親のコンテキストに入らない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Independent of the parent request cache. Reuse depends only on Codex's own provider, model, instructions, tools, and ephemeral-thread request.
+親リクエストのキャッシュとは独立である。再利用は Codex 自身のプロバイダー、モデル、指示、ツール、エフェメラルスレッドリクエストにのみ依存する。
 
-### Parent scheduling and results, indirectly
+### 親のスケジューリングと結果 (間接的)
 
-#### What the model sees
+#### モデルが見るもの
 
-Through `dsh-tool-subagent`, the parent model first receives a child id, then the selected Codex answer (final, partial, or unphased, in that order of precedence) or a failure notice with its stop reason and safe diagnostic. Diagnostics contain only fixed stage, category, and observed protocol or process facts. Product reasoning, intermediate messages, tool activity, stderr, usage, product identifiers, commands, paths, and raw protocol payloads are not copied into the parent Session.
+`dsh-tool-subagent` を通じて、親モデルはまず子 id を受け取り、次に選択された Codex 回答 (final、partial、または unphased。この優先順) か、停止理由と安全な診断を伴う失敗通知を受け取る。診断は、固定のステージ、カテゴリー、および観測されたプロトコルまたはプロセスのファクトのみを含む。プロダクトの推論、中間メッセージ、ツールアクティビティ、stderr、使用量、プロダクト識別子、コマンド、パス、生のプロトコルペイロードは親 Session にコピーされない。
 
-#### Token effect
+#### トークンへの影響
 
-Parent input grows by the start acknowledgement and completion notice, including the selected answer or failure detail. Child tokens do not enter the parent context. This provider adds no parent tool schema by itself.
+親入力は、選択された回答または失敗詳細を含む開始確認と完了通知の分だけ増える。子のトークンは親のコンテキストに入らない。このプロバイダー自体は親ツールスキーマを追加しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Start acknowledgements and completion notices append after the reusable parent request prefix. A notice may wake another turn without rewriting the existing prefix.
+開始確認と完了通知は、再利用可能な親リクエストプレフィックスの後に追記される。通知は既存のプレフィックスを書き換えることなく別のターンを起こしうる。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this provider is a poor fit or needs special operational care. They are current package constraints, not a general Codex comparison or a task backlog.
+これらの制限は、このプロバイダーが不向きになる場合や特別な運用上の注意を要する場合を定義する。現在のパッケージ制約であり、一般的な Codex 比較やタスクバックログではない。
 
-- **One fresh process, thread, and turn per run** — there is no continuation, resume, pooling, progress stream, or product-session persistence.
-- **Static instance selection** — Profile rows fix provider names, optional models, and tool bindings; calls cannot choose or change either a provider or model dynamically, and every exposed tool needs a unique `toolName`.
-- **Authentication and account state remain native** — the Bundle supplies the CLI but does not create an account, log in, trust a project, or rewrite Codex settings; configuration and authentication failures surface with their lifecycle stage and the safe `unknown` fallback rather than a separate public taxonomy.
-- **The native platform payload is required at delegation time** — installs that omit optional dependencies, unsupported platforms, and missing or damaged payloads fail at the first run; there is no host-CLI fallback.
-- **Compatibility is pinned by development evidence** — upgrading from the verified 0.153.4 protocol baseline requires regenerating upstream schema evidence and rerunning handshake, answer-selection, approval, cancellation, keyless real-product, and credentialed DeepSeek nonce tests.
-- **No human approval path** — known unattended approval requests are denied and unknown server requests fail closed; the three Profile modes never create a DSH interaction channel or per-call allow policy.
-- **Assistant payload is the selected answer text only** — failed runs can also expose a separate safe diagnostic; reasoning, intermediate messages, tool traffic, usage, stderr, and workspace diffs remain outside the parent Session. Task identity and terminal results are retained in the parent log.
-- **No optional shared capabilities** — `agentPreset`, `agentOptions`, output schemas, and harness depth enforcement are rejected by the shared service for this provider.
-- **No wall-clock timeout or side-effect rollback** — the caller cancels long work, and files or external systems changed before cancellation are not restored.
+- **実行ごとに新しいプロセス、スレッド、ターンを 1 つずつ** — 継続、再開、プーリング、進捗ストリーム、プロダクトセッションの永続化はない。
+- **静的なインスタンス選択** — プロファイル行がプロバイダー名、任意のモデル、ツールバインディングを固定する。呼び出しはプロバイダーやモデルを動的に選択または変更できず、公開されるすべてのツールには一意の `toolName` が必要である。
+- **認証とアカウント状態はネイティブのままである** — バンドルは CLI を供給するが、アカウント作成、ログイン、プロジェクトの信頼、Codex 設定の書き換えは行わない。設定と認証の失敗は、別個の公開分類体系ではなく、そのライフサイクルステージと安全な `unknown` フォールバックとして現れる。
+- **委譲時にネイティブプラットフォームペイロードが必要である** — 任意の依存関係を省いたインストール、サポートされないプラットフォーム、欠落または破損したペイロードは最初の実行で失敗する。host-CLI フォールバックはない。
+- **互換性は開発時の証拠によって固定されている** — 検証済みの 0.153.4 プロトコルベースラインからアップグレードするには、上流スキーマ証拠の再生成と、ハンドシェイク、回答選択、承認、キャンセル、キーなし実プロダクト、およびクレデンシャル付き DeepSeek nonce テストの再実行が必要である。
+- **人間の承認経路はない** — 既知の無人承認リクエストは拒否され、未知のサーバーリクエストはフェイルクローズする。3 つのプロファイルモードは DSH インタラクションチャネルや呼び出しごとの許可ポリシーを決して作成しない。
+- **assistant ペイロードは選択された回答テキストのみである** — 失敗した実行は別個の安全な診断も公開しうる。推論、中間メッセージ、ツールトラフィック、使用量、stderr、ワークスペース差分は親 Session の外に留まる。タスクのアイデンティティと終端結果は親ログに保持される。
+- **オプションの共有ケイパビリティはない** — `agentPreset`、`agentOptions`、出力スキーマ、harness の深さエンフォースメントは、このプロバイダーに対して共有サービスによって拒否される。
+- **ウォールクロックタイムアウトや副作用ロールバックはない** — 長時間の作業をキャンセルするのは呼び出し元であり、キャンセル前に変更されたファイルや外部システムは復元されない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
+この開発者ノートはメンテナー向けの作業コンテキストである: 未解決の問いと未決定の方針。これは明示的に権威を持たない — 出荷済みの振る舞いと制限は、上記の節とパッケージコードにある。
 
-- **Payload size disclosure** — the current darwin-arm64 platform payload packs to about 114 MB and unpacks to about 282 MB; these are disclosure numbers, not installation thresholds.
-- **Version-pinned protocol** — the runtime dependency is pinned to `@openai/codex@0.153.4`; upgrading requires regenerating the upstream schema evidence and rerunning the credentialed nonce tests.
+- **ペイロードサイズの開示** — 現在の darwin-arm64 プラットフォームペイロードは約 114 MB にパックされ、約 282 MB に展開される。これらは開示の数値であり、インストールの閾値ではない。
+- **バージョン固定のプロトコル** — ランタイム依存関係は `@openai/codex@0.153.4` に固定されている。アップグレードには上流スキーマ証拠の再生成とクレデンシャル付き nonce テストの再実行が必要である。
 
 </details>

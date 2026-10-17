@@ -4,7 +4,7 @@ description: "将完整 Desktop 安装包与更新清单发布到选定下载服
 
 # Desktop 发布
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

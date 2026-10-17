@@ -1,18 +1,18 @@
 ---
 kind: upgrade-guide
-description: "AccountBonusNotification exposes unvalidated optional metadata and permits notices without an expiry."
+description: "AccountBonusNotification は未検証の任意メタデータを公開し、有効期限なしの通知を許可する。"
 ---
 
-# Update account notification consumers
+# アカウント通知コンシューマーを更新する
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-The public `AccountBonusNotification` returned by `DeepSeekAccount.getUnnotifiedBonuses()` and `account/getUnnotifiedBonuses` preserves `campaign`, `amount`, `currency`, and `grantedAt` as optional, unvalidated metadata typed as `JsonValue`. Notifications retain `orderId`, `message`, and `expiresAt`, and add an optional `title`. An empty `expiresAt` means the notification never expires. `orderId` accepts arbitrary strings rather than requiring UUIDs.
+公開 `AccountBonusNotification`（`DeepSeekAccount.getUnnotifiedBonuses()` と `account/getUnnotifiedBonuses` が返す）は `campaign`、`amount`、`currency`、`grantedAt` を `JsonValue` 型の任意・未検証メタデータとして保持する。通知は `orderId`、`message`、`expiresAt` を保持し、任意の `title` を追加する。空の `expiresAt` は通知が期限切れにならないことを意味する。`orderId` は UUID を要求せず任意の文字列を受け付ける。
 
-## Migration
+## 移行
 
-1. Narrow the optional metadata values before using them; their presence and format are no longer guaranteed. Display `message` and use the client's default title when `title` is absent.
-2. Treat an empty `expiresAt` as no expiry before parsing timestamps. Keep `orderId` unchanged when acknowledging a notification.
-3. Update provider fixtures to use the current fields. Confirm that a notification with a non-UUID ID and empty expiry displays and can be acknowledged.
+1. 任意メタデータ値は使う前に絞り込む。その存在と形式はもはや保証されない。`message` を表示し、`title` がない場合はクライアントのデフォルトタイトルを使う。
+2. タイムスタンプをパースする前に空の `expiresAt` を期限なしとして扱う。通知を確認応答する際は `orderId` を変更しない。
+3. プロバイダーフィクスチャを現在のフィールドに更新する。非 UUID ID で有効期限が空の通知が表示され、確認応答できることを確かめる。

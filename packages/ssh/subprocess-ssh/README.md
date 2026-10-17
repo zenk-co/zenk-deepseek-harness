@@ -1,87 +1,87 @@
 ---
-description: "Managed SSH subprocess and terminal behavior for Bash, LSP and Node runtime consumers."
+description: "Bash・LSP・Node ランタイム利用者向けの管理 SSH サブプロセスとターミナル動作。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-subprocess-ssh
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-subprocess-ssh` implements `ctx.subprocess` using the shared SSH helper. Executable lookup, ordinary processes, fd 7 control traffic and terminal sessions run beside the SSH filesystem. Remote native process owners govern termination and quiescence; consumers continue to own command semantics, output limits and execution deadlines.
+`dsh-subprocess-ssh` は共有 SSH ヘルパーを使って `ctx.subprocess` を実装する。実行可能ファイル探索・通常プロセス・fd 7 制御通信・ターミナルセッションは SSH ファイルシステムと並んで動作する。リモートのネイティブプロセス所有者が終了と静止を統治し、利用者はコマンド意味・出力上限・実行期限を引き続き所有する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this provider with [`dsh-ssh`](../ssh/README.md) and its filesystem provider. It has no deployment configuration of its own. `resolveExecutable()` checks the remote executable namespace; fully specified spawn requests supply the remote cwd, environment, stream dispositions and cleanup grace.
+[`dsh-ssh`](../ssh/README.md) とそのファイルシステムプロバイダーと共にこのプロバイダーをマウントする。独自のデプロイ設定はない。`resolveExecutable()` はリモート実行可能ファイル名前空間を確認し、完全指定の生成要求はリモート cwd・環境・ストリーム配置・クリーンアップ猶予を供給する。
 
-Ordinary spawn returns a handle while remote allocation proceeds. Piped stdin and the optional duplex control endpoint accept writes during allocation. Terminal allocation, writes, foreground inspection, signals and termination retain their asynchronous interfaces.
+通常生成はリモート割り当てが進む間にハンドルを返す。パイプ stdin と任意の二重制御エンドポイントは割り当て中も書き込みを受け付ける。ターミナル割り当て・書き込み・前面検査・シグナル・終了は非同期インターフェースのままである。
 
-Terminal requests forward `shellActivity` to the execution provider, and `inspectActivity()` returns its validated state and revision. Opted-in terminals remain addressable after root exit until their owner explicitly terminates them; the SSH helper lease still governs connection-level cleanup.
+ターミナル要求は `shellActivity` を実行プロバイダーへ転送し、`inspectActivity()` は検証済み状態とリビジョンを返す。参加したターミナルはルート終了後も所有者が明示的に終了するまでアドレス指定可能であり続け、SSH ヘルパーリースは依然として接続レベルのクリーンアップを統治する。
 
-A direct exit reported by `done` does not prove managed-range quiescence; `waitForExit()` observes that separately. Its optional signal bounds the entire observation, including pending allocation and termination, and cancellation returns `false` without stopping the process. An already confirmed empty range returns `true`; genuine observation failures reject. `terminate()` targets the same remote owner. Connection loss rejects unconfirmed work, and automatic replay never follows an ambiguous launch or mutation.
+`done` が報告する直接終了は管理範囲の静止を証明しない。`waitForExit()` がそれを別に観測する。任意のシグナルは保留中の割り当てと終了を含む観測全体を区切り、取り消しはプロセスを止めず `false` を返す。既に確認済みの空範囲は `true` を返し、真の観測失敗は拒否する。`terminate()` は同じリモート所有者を対象とする。接続喪失は未確認の作業を拒否し、自動リプレイは曖昧な起動や変更の後には決して続行しない。
 
 -----
 
-Terminal shell facts and executable verification come from the remote helper. Lookup misses remain distinct from SSH failures. PTY creation forwards the caller's `terminalType`, and `resize()` updates the remote terminal without replacing its process.
+ターミナルシェルの事実と実行可能ファイル検証はリモートヘルパー由来である。探索ミスは SSH 失敗と区別されたままである。PTY 作成は呼び出し側の `terminalType` を転送し、`resize()` はプロセスを置換せずリモートターミナルを更新する。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-The helper reserves and authenticates all required streams before launch. Stdout, stderr, stdin and fd 7 use separate SSH channels. Collected output publishes a final bounded raw-tail snapshot with whole-stream byte offsets, so network lag cannot change the completed observation. Optional spill files use the local provider’s private retained-output directory on the remote host.
+ヘルパーは起動前に必要なすべてのストリームを予約・認証する。stdout・stderr・stdin・fd 7 は別々の SSH チャネルを使う。収集済み出力は最終的な上限付き raw 末尾スナップショットを全ストリームバイトオフセット付きで公開するため、ネットワーク遅延が完了観測を変えることはない。任意のスピルファイルはリモートホスト上のローカルプロバイダーの非公開保持出力ディレクトリを使う。
 
-Remote execution delegates to [`subprocess-local`](../../subprocess/subprocess-local/README.md). Native process ownership and platform fallbacks therefore have the same meaning as local execution on that remote OS. SSH carries requests and observations; it does not itself confine the payload.
+リモート実行は [`subprocess-local`](../../subprocess/subprocess-local/README.md) に委譲する。したがってネイティブプロセス所有権とプラットフォームフォールバックは、そのリモート OS 上でのローカル実行と同じ意味である。SSH は要求と観測を運ぶだけであり、ペイロード自体を閉じ込めない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Subprocess subsystem](../../../docs/subsystems/subprocess.md) — spawn, collection, terminal and lifetime APIs.
-- [SSH sandbox provider](../sandbox-ssh/README.md) — remote file-effect confinement.
+- [サブプロセスサブシステム](../../../docs/subsystems/subprocess.md) — 生成・収集・ターミナル・ライフタイム API。
+- [SSH サンドボックスプロバイダー](../sandbox-ssh/README.md) — リモートファイル効果の閉じ込め。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through Bash, terminal, LSP and ptc-runtime consumers, which present their existing results and remote paths.
+間接的に、Bash・ターミナル・LSP・ptc-runtime の利用者を通じて関わり、それらが既存の結果とリモートパスを提示する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-This provider contributes no request-prefix content. Its consumers own model-visible tools and results.
+このプロバイダーは要求接頭辞内容に寄与しない。その利用者がモデル可視のツールと結果を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Completed spill files survive connection disposal and remain available until external temporary-file cleanup.
-- Callers must consume or close raw output streams. Destroying public stdout or stderr closes its matching transport, including when destruction precedes remote allocation. Independent channels allow control progress when stdout is paused, but do not remove per-stream backpressure or shared-network congestion.
-- Loss of the SSH connection leaves remote termination unconfirmed from the client; lease cleanup is a remote action, not a successful client acknowledgement.
+- 完了したスピルファイルは接続破棄後も残り、外部の一時ファイルクリーンアップまで利用可能である。
+- 呼び出し側は raw 出力ストリームを消費または終了しなければならない。公開 stdout・stderr の破棄は、破棄がリモート割り当てより前であっても対応する転送を閉じる。独立チャネルは stdout 停止時も制御を進められるが、ストリームごとの背圧や共有ネットワーク輻輳をなくすものではない。
+- SSH 接続の喪失はリモート終了をクライアント側で未確認のままにする。リースクリーンアップはリモート動作であり、クライアントの成功承認ではない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

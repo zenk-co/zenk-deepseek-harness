@@ -3,23 +3,23 @@ kind: upgrade-guide
 description: "Session working directories replace built-in cwd configuration, and tool presentation metadata also runs for nested PTC calls."
 ---
 
-# Migrate working-directory configuration and tool presentation
+# 作業ディレクトリ設定とツール表示の移行
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更内容
 
-The next release removes the loop's built-in `{{cwd}}` prompt variable and the `cwd` configuration key from `@deepseek-ai/dsh-subagent-acp` and `@deepseek-ai/dsh-subagent-dsh-sdk`. Custom prompt templates that retain an unresolved `{{cwd}}` fail before a model request. A Session's current execution directory is supplied as required user context and is persisted separately from its original `Session.header.cwd`.
+次リリースでは、ループ内蔵の `{{cwd}}` プロンプト変数と、`@deepseek-ai/dsh-subagent-acp` および `@deepseek-ai/dsh-subagent-dsh-sdk` の `cwd` 設定キーを除去する。未解決の `{{cwd}}` を残したカスタムプロンプトテンプレートはモデルリクエスト前に失敗する。セッションの現在の実行ディレクトリは必須ユーザーコンテキストとして提供され、元の `Session.header.cwd` とは別に永続化される。
 
-New subagents use their start request's `cwd` when provided, otherwise they capture the parent's current directory. Existing processes keep their own directories. Changing the execution directory does not change the original project or grant additional write permissions.
+新規サブエージェントは、開始要求の `cwd` が指定されていればそれを使用し、なければ親のカレントディレクトリを取り込む。既存プロセスは自身のディレクトリを保持する。実行ディレクトリの変更は元のプロジェクトを変更せず、追加の書き込み権限も付与しない。
 
-Tool `output.presentationMeta` also runs for successful nested PTC calls. Authors whose projection assumes only native top-level calls are affected. A projection error fails that nested call with `ToolOutputError`; canonical program values and model content remain unchanged.
+ツール `output.presentationMeta` は、成功したネスト PTC 呼び出しに対しても実行されるようになる。ネイティブのトップレベル呼び出しのみを想定した投影を書いた作成者が影響を受ける。投影エラーはそのネスト呼び出しを `ToolOutputError` で失敗させる。正規プログラム値とモデル内容は変わらない。
 
-## Migration
+## 移行手順
 
-1. In home, profile, or invocation `personaSuffix` configuration and preset `suffix` fields, remove the directory clause that references `{{cwd}}`, retaining unrelated text. Omit or clear a suffix that becomes empty. The [working-directory service](../../../../packages/session/working-directory/README.md) supplies the directory context.
-2. Remove `config.cwd` from ACP and DSH-SDK subagent provider rows in your profile patches. To select a directory for one child, pass `cwd` in its [start request](../../../subsystems/subagent.md). To change the parent's execution directory, use `working_directory({ cd: "/absolute/project" })` before starting the child.
-3. Run `working_directory({})` in the affected Session and confirm the reported directory. Start a child without an override and check its execution directory; use an explicit start `cwd` when the child must use another checkout. Read `Session.header.cwd` only for original project identity or permission roots, rather than current-directory operations.
-4. Keep custom `output.presentationMeta` projections pure and return JSON-safe metadata from their arguments and canonical result. Exercise both a native call and a nested PTC call, and confirm the recorded metadata identifies the operation's actual target without changing its result.
+1. ホーム、プロファイル、呼び出し `personaSuffix` 設定およびプリセット `suffix` フィールドで、`{{cwd}}` を参照するディレクトリ節を除去し、無関係のテキストは残す。空になったサフィックスは省略またはクリアする。ディレクトリコンテキストは[作業ディレクトリサービス](../../../../packages/session/working-directory/README.md)が提供する。
+2. プロファイルパッチ内の ACP および DSH-SDK サブエージェントプロバイダー行から `config.cwd` を除去する。1 つの子にディレクトリを選択するには、その[開始要求](../../../subsystems/subagent.md)に `cwd` を渡す。親の実行ディレクトリを変更するには、子を開始する前に `working_directory({ cd: "/absolute/project" })` を使用する。
+3. 影響を受けるセッションで `working_directory({})` を実行し、報告されたディレクトリを確認する。オーバーライドなしで子を開始し、その実行ディレクトリを検査する。子が別のチェックアウトを使用しなければならない場合は明示的な開始 `cwd` を使用する。`Session.header.cwd` はカレントディレクトリ操作ではなく、元のプロジェクト識別や権限ルート用にのみ読む。
+4. カスタム `output.presentationMeta` 投影は純粋に保ち、引数と正規結果から JSON 安全なメタデータを返す。ネイティブ呼び出しとネスト PTC 呼び出しの両方を実行し、結果を変更せずに記録メタデータが操作の実際の対象を識別することを確認する。
 
-Dynamic context providers are evaluated again at request admission, after pre-step listeners and route preparation. Return current state without relying on one evaluation per step. Transform registered context inside its provider; admission refresh replaces its cached text while preserving assembly-only context contributions and the accepted system prompt, tool schemas, and variables.
+動的コンテキストプロバイダーは、事前ステップリスナーとルート準備の後に、リクエスト受理時に再評価される。1 ステップ 1 回の評価に依存せず、現在の状態を返す。登録済みコンテキストの変換はそのプロバイダー内で行う。受理時更新はキャッシュされたテキストを置換する一方、アセンブリ専用コンテキスト提供物と、受理されたシステムプロンプト、ツールスキーマ、変数は保持される。

@@ -1,6 +1,6 @@
 # Claude Code 模组：兼容性
 
-[English](claude-code-mods.md) | 中文
+[日本語](claude-code-mods.md) | [English](claude-code-mods.en.md) | 中文
 
 模组经本桥接运行时与在 Claude Code 下行为不同的每一处，基准为 Claude Code 2.1.287（[模组参考](https://code.claude.com/docs/en/plugins/mods/reference)及其 `claude-code.d.ts`）与 2026-10-01 的 [Getting started with Claude Code mods](https://claude.dev/blog/getting-started-with-claude-code-mods/) 一文。每行给出 Claude Code 的行为、本桥接的做法，以及原因或后续工作。未列出的一切均按参考文档描述的方式运行；对本宿主永不触发的事件注册钩子会在模组加载时以警告点名，服务表之外的 `$` 调用以 `no implementation for <namespace>.<method>` 拒绝。
 

@@ -1,84 +1,84 @@
 ---
-description: "Inspect and edit live plugin configuration through Config-derived forms."
+description: "Config 由来フォームでライブのプラグイン設定を閲覧・編集する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-settings
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Edit fields that plugins declare with `.volatile()` and inspect their effective values. Forms identify each plugin by its profile entry id, preserve secret values, and refuse stale writes. Changes persist through the active profile’s Cordis patch.
+プラグインが `.volatile()` で宣言した項目を編集し、その実効値を閲覧する。フォームは各プラグインをプロファイル項目 id で識別し、秘密値を保持し、古い書き込みを拒む。変更は有効プロファイルの Cordis パッチを通じて持続する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに探る](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しの作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin with Loader and [config-editor](../../boot/config-editor/README.md). The base bundle provides this composition.
+このプラグインを Loader と[設定エディター](../../boot/config-editor/README.md)でマウントする。基本バンドルがこの組み立てを提供する。
 
 ```yaml
 - id: settings
   name: '@deepseek-ai/dsh-settings'
 ```
 
-This plugin has no configuration fields. Forms expose only volatile fields from active, uniquely addressed profile entries. Ordinary configuration remains editable through Cordis configuration files.
+このプラグインに設定項目はない。フォームは有効で一意に宛名付けされたプロファイル項目由来の揮発性項目のみを表す。通常設定は Cordis 設定ファイル経由で編集可能なままである。
 
-Once the Loader has settled every entry after Settings starts, a `settings.yaml` left in the harness home by earlier releases is imported once: each section is written into the entry of the same id (`ui-developer-tools` → `ui-settings`, `ui-onboarding` → `ui-settings-general`, `shell` → the platform's shell executor entry), the file is renamed to `settings.yaml.imported` before the first write, and a section the running composition rejects is logged and stays only in the renamed file.
+Settings 開始後に Loader が全項目を落ち着かせると、旧リリースが harness ホームに残した `settings.yaml` は一度だけ取り込まれる。各節は同 id の項目に書き込まれ (`ui-developer-tools` → `ui-settings`、`ui-onboarding` → `ui-settings-general`、`shell` → プラットフォームのシェル実行子項目)、最初の書き込み前にファイルは `settings.yaml.imported` に改名され、動作中の組み立てが拒む節は記録されて改名後のファイルにのみ残る。
 
-Reset restores the value beneath the profile override, including schema defaults. Home patches and command-line overlays take precedence; a form write that they would override is refused.
+リセットはプロファイル上書きの下の値を復元し、スキーマ既定を含む。ホームパッチとコマンドラインオーバーレイが優先し、それらに上書きされるフォーム書き込みは拒まれる。
 
-Each form reports `autoGenerate`, enabled by default, for clients that build pages from the schema; no shipped client does so yet. A plugin that ships its own page registers `configure({ auto: false }, ctx.fiber)` as an effect inside an optional `ctx.inject(['settings'], ...)` child from `apply`: the child names the plugin fiber the policy belongs to, a late-loading or replaced Settings service picks the policy up, and the business plugin runs without Settings. The policy does not remove configuration reads or writes.
+各フォームはスキーマから頁を組み立てるクライアント向けに `autoGenerate` を報告し、既定で有効だが、出荷クライアントでそうするものはまだない。独自頁を出荷するプラグインは `apply` 内の任意 `ctx.inject(['settings'], ...)` 子からエフェクトとして `configure({ auto: false }, ctx.fiber)` を登録する。子は方針が属するプラグインファイバーを名指しし、遅れて読み込まれたり置換されたりした Settings サービスが方針を取り込み、業務プラグインは Settings なしで動作する。方針は設定の読み書きを取り除かない。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The [form projection](src/schema.ts) strips runtime references and ordinary fields. The [service](src/index.ts) supplies revisioned descriptors and validates edits against the full plugin Config before delegating persistence. Business plugins read their Config references directly.
+[フォーム投影](src/schema.ts)はランタイム参照と通常項目を取り除く。[サービス](src/index.ts)は改訂付き記述子を供給し、全プラグイン Config に対して編集を検証してから持続化に委ねる。業務プラグインは Config 参照を直接読む。
 
-Secret roles are redacted from values, inherited values, profile overrides, and schema defaults; clients receive presence markers. Path edits preserve fields a client did not receive.
+秘密ロールは値、継承値、プロファイル上書き、スキーマ既定から編集され、クライアントは存在標識を受け取る。パス編集はクライアントが受け取らなかった項目を保持する。
 
 </details>
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに探る
 
-- [Settings reference](../../../docs/subsystems/settings.md) — form values and mutations.
-- [Volatile configuration](../../../vendor/loader/README.md) — reference lifetime and notifications.
-- [Configuration editor](../../boot/config-editor/README.md) — persistence and reload ordering.
+- [設定リファレンス](../../../docs/subsystems/settings.md) — フォーム値と変異。
+- [揮発性設定](../../../vendor/loader/README.md) — 参照寿命と通知。
+- [設定エディター](../../boot/config-editor/README.md) — 持続化と再読み込み順序。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through configuration values consumed by model-facing plugins.
+モデル対面プラグインが消費する設定値を通じて間接的に関わる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Consumers that change request prefixes determine cache effects.
+リクエスト接頭辞を変える利用者がキャッシュ影響を定める。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しの作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Nested Includes own separate configurations and are not editable through the active profile’s form.
-- Field-level resets restore inherited values; they cannot delete a value supplied by a lower configuration layer. Unsetting an array index removes that element.
+- 入れ子の Include は個別設定を所有し、有効プロファイルのフォームでは編集できない。
+- 項目単位のリセットは継承値を復元し、下位設定層が供給した値を削除できない。配列添字の解除はその要素を取り除く。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業背景 — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

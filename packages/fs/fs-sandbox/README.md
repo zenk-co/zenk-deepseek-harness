@@ -1,35 +1,35 @@
 ---
-description: "The sandbox-enforcing ctx.fs backend for deployments and maintainers confining model file mutations to a session workspace."
+description: "セッションワークスペースにモデルのファイル変更を閉じ込めるデプロイとメンテナー向けのサンドボックス強制 ctx.fs バックエンド。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-fs-sandbox
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-fs-sandbox` confines model file writes and edits according to each session's sandbox mode while preserving the local filesystem's read behavior. In `read-only`, it rejects every mutation; in `workspace-write`, it permits targets only inside the session workspace or a platform temporary root; in `danger-full-access`, it does not restrict mutations. Use it instead of `fs-local` with `ctx.sandboxPolicy` when sessions need workspace-confined file changes. Denied operations return `FS_SANDBOX_DENIED`, which filesystem tools present with the active mode and a same-turn escalation hint.
+`dsh-fs-sandbox` は、各セッションのサンドボックスモードに従ってモデルのファイル書き込みと編集を閉じ込め、ローカルファイルシステムの読み取り動作を保つ。`read-only` ではすべての変更を拒み、`workspace-write` ではセッションワークスペース内またはプラットフォーム一時ルート内の対象だけを許し、`danger-full-access` では変更を制限しない。セッションにワークスペース閉じ込めファイル変更が必要な場合、`ctx.sandboxPolicy` と共に `fs-local` の代わりに使う。拒否された操作は `FS_SANDBOX_DENIED` を返し、ファイルシステムツールは有効モードと同ターンエスカレーションヒントと共に提示する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this backend instead of `fs-local` when the model's file writes and edits must be confined by the session's sandbox mode, while reads stay unconfined. The fence applies per call: the tool layer resolves the calling session's mode and workspace root into the same policy the bash runner receives, so the filesystem and shell families never confine to different roots.
+モデルのファイル書き込みと編集をセッションのサンドボックスモードで閉じ込めなければならず、読み取りは閉じ込めないままにする場合に、このバックエンドを `fs-local` の代わりにマウントする。柵は呼び出しごとに適用される。ツール層は呼び出しセッションのモードとワークスペースルートを bash ランナーが受け取るものと同じポリシーへ解決するため、ファイルシステムとシェルファミリーが異なるルートに閉じ込めることはない。
 
-### Minimal composition
+### 最小構成
 
-Load the shared policy service, then this backend, then the tools; the read-before-edit policy plugin stays optional.
+共有ポリシーサービス、次にこのバックエンド、次にツールを読み込む。編集前読み取りポリシープラグインは任意のままである。
 
 ```yaml
 - name: '@deepseek-ai/dsh-sandbox-policy'
@@ -39,97 +39,97 @@ Load the shared policy service, then this backend, then the tools; the read-befo
 - name: '@deepseek-ai/dsh-tool-fs'
 ```
 
-The backend's config is unchanged from the local backend's (`cwd` resolution default and `diffBasisMaxBytes` overwrite bound); the [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-fs-sandbox) is the exhaustive source.
+バックエンド構成はローカルバックエンドから不変である（`cwd` 解決既定と `diffBasisMaxBytes` 上書き上限）。[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-fs-sandbox)が網羅的ソースである。
 
-### How the fence behaves
+### 柵の振る舞い
 
-The effective mode comes from the calling session's override or escalation grant, falling back to the deployment default when neither is in force. `read-only` denies every mutation with the structured `FS_SANDBOX_DENIED`. `workspace-write` allows a mutation only when the target canonicalizes under the workspace root or a platform temp area (`/tmp`, `os.tmpdir()`) — the same writable set the Seatbelt profile grants. `danger-full-access` delegates unfenced.
+実効モードは呼び出しセッションの上書きまたはエスカレーション付与から得られ、いずれも有効でない場合はデプロイ既定にフォールバックする。`read-only` は構造化 `FS_SANDBOX_DENIED` ですべての変更を拒む。`workspace-write` は対象がワークスペースルートまたはプラットフォーム一時領域（`/tmp`、`os.tmpdir()`）下に正規化される場合にのみ変更を許す。これは Seatbelt プロファイルが付与するものと同じ書き込み可能集合である。`danger-full-access` は柵なしに委譲する。
 
-### Observable success and failures
+### 観察可能な成功と失敗
 
-Reads, listings, metadata, and read-only watches work exactly as with `fs-local`; the mutation fence does not restrict observation. A denied mutation returns an `FS_SANDBOX_DENIED` error carrying the effective mode; through the tools the model sees `[sandbox: file access denied under <mode> mode]` plus the one-approved-wider retry hint, identical to bash's denials. A session with an approved escalation may retry the same operation at a strictly wider mode for that one call.
+読み取り、一覧、メタデータ、読み取り専用 watch は `fs-local` とまったく同じく動く。変更柵は観察を制限しない。拒否された変更は実効モードを運ぶ `FS_SANDBOX_DENIED` エラーを返す。ツール経由ではモデルに `[sandbox: file access denied under <mode> mode]` と 1 回承認広域再試行ヒントが見え、bash 拒否と同一である。承認済みエスカレーションを持つセッションは同じ操作をその 1 呼び出しに限り厳密に広いモードで再試行できる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the sandbox backend and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではサンドボックスバックエンドの背後にある設計判断を説明し、それを実現するコードを示す。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design concept
+### 設計概念
 
-The fence is a policy check in trusted code over a model-controlled path — not a kernel boundary. The operations are the seam's own (open, rename); only the target path is untrusted, so canonicalize-then-contain is the complete answer to this surface. Kernel-grade isolation of untrusted code stays `ctx.shell`'s job.
+柵はモデル制御パスに対する信頼コード内のポリシーチェックであり、カーネル境界ではない。操作はシーム自身のもの（open、rename）であり、信頼できないのは対象パスだけなので、正規化して閉じ込めることがこの面への完全な答えである。信頼できないコードのカーネル級隔離は `ctx.shell` の仕事であり続ける。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `SandboxedFileSystem`: mode fence on `writeText`/`editText`, `sandboxMode` fact |
-| [`src/containment.ts`](src/containment.ts) | Ancestor containment check with lexical fast path and identity-based fallback |
+| [`src/index.ts`](src/index.ts) | `SandboxedFileSystem`: `writeText`/`editText` 上のモード柵、`sandboxMode` ファクト |
+| [`src/containment.ts`](src/containment.ts) | 字句高速パスと identity ベースフォールバックによる祖先包含検査 |
 
-### How a mutation is fenced
+### 変更が柵付けされる仕組み
 
-Each mutation resolves the per-call policy (`danger-full-access` returns the caller's target untouched; `read-only` throws `FS_SANDBOX_DENIED`), then for `workspace-write` re-canonicalizes the target immediately and requires containment under one of the writable roots derived from the single `writableRoots` function — the same set the Seatbelt profile grants, so the fs fence and the bash runner cannot drift. The fresh target is the one mutated, so a symlink ancestor swapped since the tool resolved it is caught.
+各変更は呼び出しごとのポリシーを解決する（`danger-full-access` は呼び出し元対象をそのまま返し、`read-only` は `FS_SANDBOX_DENIED` を throw する）。次に `workspace-write` 向けに対象をただちに再正規化し、単一 `writableRoots` 関数から導出された書き込み可能ルートのいずれか下への包含を要求する。これは Seatbelt プロファイルが付与するものと同じ集合であり、fs 柵と bash ランナーは乖離できない。変更されるのは新しい対象であり、ツールが解決してから交換された symlink 祖先は捕捉される。
 
-### Threat model
+### 脅威モデル
 
-The residual resolve-to-syscall TOCTOU is narrowed by re-canonicalizing immediately before the write and is accepted for this threat model; a kernel-tight boundary would need `openat2`-class primitives whose portability cost is not worth it here. A denial is a structured `FsError`, not stderr inference — an in-process fence knows exactly what it refused.
+解決から syscall までの残存 TOCTOU は書き込み直前の再正規化により狭められ、この脅威モデルでは受容される。カーネルタイトな境界には移植コストに見合わない `openat2` 級プリミティブが必要になる。拒否は stderr 推論ではなく構造化 `FsError` であり、インプロセス柵は何を拒んだか正確に知っている。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from this backend to the shared policy home and the confinement decisions behind it.
+パッケージレベルの契約では足りないときに、これらのページを読む。このバックエンドから共有ポリシーの home と閉じ込め決定の背後へと進む。
 
-- [Filesystem subsystem](../../../docs/subsystems/filesystem.md) — exhaustive provider contract, policy events, and error taxonomy.
-- [dsh-fs](../fs/README.md) — the `ctx.fs` contract this backend implements.
-- [fs-local](../fs-local/README.md) — the local backend this one extends.
-- [sandbox-policy](../../sandbox/sandbox-policy/README.md) — the shared per-session policy resolver this backend requires.
-- [Process sandbox subsystem](../../../docs/subsystems/sandbox.md) — modes, per-call policy, and fail-closed errors.
-- [Cross-family fs sandbox reference](../../sandbox/sandbox-policy/README.md) — the shared mode fence and its escalation choreography.
+- [ファイルシステムサブシステム](../../../docs/subsystems/filesystem.md) — 網羅的プロバイダー契約、ポリシーイベント、エラー分類。
+- [dsh-fs](../fs/README.md) — このバックエンドが実装する `ctx.fs` 契約。
+- [fs-local](../fs-local/README.md) — これが拡張するローカルバックエンド。
+- [sandbox-policy](../../sandbox/sandbox-policy/README.md) — このバックエンドが要求する共有セッションごとポリシー解決。
+- [プロセスサンドボックスサブシステム](../../../docs/subsystems/sandbox.md) — モード、呼び出しごとポリシー、fail-closed エラー。
+- [横断ファミリー fs サンドボックスリファレンス](../../sandbox/sandbox-policy/README.md) — 共有モード柵とそのエスカレーション振付。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Filesystem policy and refusals
+### ファイルシステムポリシーと拒否
 
-#### What the model sees
+#### モデルが見るもの
 
-The policy owner contributes capability-neutral `sandbox:policy` context. Indirectly, `dsh-tool-fs` renders this backend's `FS_SANDBOX_DENIED` refusals as the `[sandbox: file access denied under <mode> mode]` marker plus the same-turn escalation hint.
+ポリシー所有者はケイパビリティ中立の `sandbox:policy` コンテキストを寄与する。間接的に、`dsh-tool-fs` はこのバックエンドの `FS_SANDBOX_DENIED` 拒否を `[sandbox: file access denied under <mode> mode]` 印と同ターンエスカレーションヒント付きで描画する。
 
-#### Token effect
+#### トークンへの影響
 
-The current-policy clause adds a small runtime-context message while this backend is mounted; a denial adds the bounded marker and escalation hint to conversation history.
+このバックエンドのマウント中、現ポリシー節が小さなランタイムコンテキストメッセージを追加する。拒否は境界付き印とエスカレーションヒントを会話履歴に追加する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-A standing-policy change appends an owner-rendered superseding runtime-context snapshot after retained history; operation results remain append-only.
+常設ポリシー変更は、保持履歴の後に所有者描画の置換ランタイムコンテキストスナップショットを追記する。操作結果は追記のみのままである。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the sandbox backend is a poor fit or needs special operational care. They are current package constraints, not a general sandbox comparison or a task backlog.
+サンドボックスバックエンドが不向きな場合や特別な運用注意が必要な場合を定める。これらは現在のパッケージ制約であり、一般サンドボックス比較やタスク backlog ではない。
 
-- **A policy fence, not a kernel boundary** — the check is trusted code over a model-controlled path, so the residual resolve-to-syscall TOCTOU is narrowed (by the in-place re-canonicalization) but not eliminated; adversarial host processes are out of scope. Kernel-grade isolation of untrusted code stays `ctx.shell`'s.
-- **Fence-vs-runner parity is derived from one owner** — the writable set comes from `writableRoots`, shared with the Seatbelt profile; a runner profile that defines its writable set elsewhere would drift.
-- **Requires `ctx.sandboxPolicy`** — tools use it to resolve each session policy and the backend uses it for agentless-call fallbacks; the backend does not confine without it composed.
+- **カーネル境界ではなくポリシー柵** — 検査はモデル制御パスに対する信頼コードであり、解決から syscall までの残存 TOCTOU は（その場の再正規化により）狭められるが除去されない。敵対 host プロセスは範囲外である。信頼できないコードのカーネル級隔離は `ctx.shell` のままである。
+- **柵対ランナー等価は 1 所有者から導出される** — 書き込み可能集合は Seatbelt プロファイルと共有の `writableRoots` から得られる。他所で自身の書き込み可能集合を定義するランナープロファイルは乖離する。
+- **`ctx.sandboxPolicy` を要求する** — ツールは各セッション方針解決に使い、バックエンドはエージェントレス呼び出しフォールバックに使う。それが構成されていないとバックエンドは閉じ込めない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

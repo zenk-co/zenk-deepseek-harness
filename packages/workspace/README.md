@@ -1,49 +1,49 @@
 ---
-description: "The workspace group map: the persistent workspace entity family, durable directory records, and header-validated session membership, for users and maintainers navigating the group."
+description: "workspace グループマップ: 永続ワークスペースエンティティ群、耐久ディレクトリ記録、ヘッダー検証済みセッションメンバーシップ。グループを行き来するユーザーとメンテナー向け。"
 kind: "package-group"
 ---
 
 # packages/workspace
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The workspace family lets a host product keep an ordered list of named projects and group each project's sessions by directory. Users can browse those projects and sessions, hide a session from the grouping without deleting it, and remove a project without deleting its folder or session history. Hidden or removed sessions remain available as ungrouped history. Choose this family for a persistent project surface; it requires session storage and a persistence backend, and it does not expose tools, prompts, or session events to the model.
+ワークスペース群では、ホスト製品が名前付きプロジェクトの順序付き一覧を保持し、各プロジェクトのセッションをディレクトリごとに束ねられる。ユーザーはそれらのプロジェクトとセッションを閲覧し、セッションを削除せずに束ねから隠し、フォルダーやセッション履歴を削除せずにプロジェクトを削除できる。隠したセッションや削除したセッションは束ねなし履歴として引き続き利用できる。永続的なプロジェクト面にはこの群を選ぶこと。セッションストレージと永続化バックエンドが必要であり、モデル向けにツール、プロンプト、セッションイベントは公開しない。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`workspace`](workspace/README.md) | Provides named, ordered projects with the sessions that ran in each directory | `ctx.workspaceRegistry` |
+| [`workspace`](workspace/README.md) | 各ディレクトリで実行したセッションを伴う名前付き順序付きプロジェクトを提供する | `ctx.workspaceRegistry` |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Workspace subsystem](../../docs/subsystems/workspace.md) — the authoritative feature contract for projects and their sessions.
-- [domain KV storage Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — the storage design behind project records.
-- [Workspace UI product-flow Agent Note](../../.agents/notes/archived/feature/2026-07-25-workspace-ui-product-flow.md) — how the first start builds projects from session history and how the GUI orders them.
-- [historical Workspace registration deletion decision](../../.agents/notes/archived/feature/2026-07-27-workspace-registration-deletion.md) — why removing a project never deletes its folder or sessions.
+- [ワークスペースサブシステム](../../docs/subsystems/workspace.md) — プロジェクトとそのセッションの権威ある機能契約。
+- [ドメイン KV ストレージ Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — プロジェクト記録の背後にあるストレージ設計。
+- [ワークスペース UI 製品フロー Agent Note](../../.agents/notes/archived/feature/2026-07-25-workspace-ui-product-flow.md) — 初回起動がセッション履歴からプロジェクトを構築する方法と GUI の順序付け。
+- [歴史的なワークスペース登録削除決定](../../.agents/notes/archived/feature/2026-07-27-workspace-registration-deletion.md) — プロジェクトの削除がフォルダーやセッションを決して削除しない理由。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

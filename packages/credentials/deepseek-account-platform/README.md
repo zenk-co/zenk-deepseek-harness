@@ -1,52 +1,52 @@
 ---
-description: "Sign in through the system browser and keep the account credential in the existing local credential store. Local cancellation prevents late callbacks and exchange responses from signing the user in."
+description: "システムブラウザーを通じてサインインし、アカウント資格情報を既存のローカル資格情報ストアに保つ。ローカルのキャンセルは、遅れて届くコールバックと exchange レスポンスがユーザーをサインインさせることを防ぐ。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-deepseek-account-platform
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Every operation that reaches Platform takes the caller's `AccountClientMetadata`: the client version, the active UI language, and the UTC offset in seconds. The provider derives the five Platform client headers from that metadata and the composition's platform, so each request reports the UI that made it instead of the last caller the Host saw. A new sign-in attempt captures the metadata for its initialization, exchange, and cancellation, and a joining caller never replaces it; sign-out captures the metadata for the revocation retries that outlive the request.
+Platform に到達するすべての操作は、呼び出し元の `AccountClientMetadata` を受け取る: クライアントバージョン、アクティブな UI 言語、UTC オフセット (秒)。プロバイダーはそのメタデータと構成のプラットフォームから 5 つの Platform クライアントヘッダーを導出するので、各リクエストは Host が見た最後の呼び出し元ではなく、それを行った UI を報告する。新しいサインイン試行はその初期化、exchange、キャンセルのためのメタデータをキャプチャし、途中から参加する呼び出し元がそれを置き換えることはない。サインアウトは、リクエストより長生きする失効リトライのためにメタデータをキャプチャする。
 
-getPlatformSession exports the stored grant only when its issuer matches platformOrigin. This Host-only operation supports native Platform embedding without widening the model/file origin configured for resolveToken. Its userId repeats the stable account ID from the most recent successful getProfile, and is null until one succeeds or when that profile carries no ID; the snapshot issues no profile request of its own, so a slow or failed profile request never delays it, and an unknown ID leaves userId null, which consumers treat as temporary-storage mode. A credential change during the grant read discards the snapshot.
+getPlatformSession は、保存されたグラントをその発行者が platformOrigin と一致する場合にのみエクスポートする。この Host 専用の操作は、resolveToken に設定されたモデル/ファイルオリジンを広げることなく、ネイティブの Platform 埋め込みを支える。その userId は最も最近成功した getProfile の安定したアカウント ID を繰り返し、成功するまでは、またはそのプロファイルが ID を運ばないときは null である。スナップショットは自身でプロファイルリクエストを発行しないので、遅いまたは失敗したプロファイルリクエストがそれを遅延させることはなく、未知の ID は userId を null のままにし、コンシューマーはそれを一時ストレージモードとして扱う。グラントの読み取り中の資格情報変更はスナップショットを破棄する。
 
-`desktopPlatform` defaults to `null`, which sends `x-client-platform: web`; the Desktop profile supplies `darwin` or `win32`, becoming `desktop-mac` or `desktop-win`. The provider owns all five headers, so deployment configuration cannot override them; `x-client-bundle-id` is intentionally empty, and `x-client-locale` reduces the caller's language to `zh_CN` or `en_US`. PlatformSession carries deployment headers only, and the embedding client composes the same five headers for the Platform documents and API requests it opens, only at the configured origin.
+`desktopPlatform` のデフォルトは `null` で、これは `x-client-platform: web` を送る。Desktop プロファイルは `darwin` または `win32` を供給し、`desktop-mac` または `desktop-win` になる。プロバイダーが 5 つのヘッダーすべてを所有するので、デプロイメント構成がそれらを上書きすることはできない。`x-client-bundle-id` は意図的に空であり、`x-client-locale` は呼び出し元の言語を `zh_CN` または `en_US` に縮小する。PlatformSession はデプロイメントヘッダーのみを運び、埋め込みクライアントは、それが開く Platform ドキュメントと API リクエストのために同じ 5 つのヘッダーを、設定されたオリジンでのみ合成する。
 
-Profile and balance HTTP 401 responses or top-level response code `40003` (invalid authorization) clear the rejected local grant and emit the live `deepseek-account/session-expired` notification. Concurrent responses share one removal; responses from an invalidated credential generation cannot clear its replacement. Other HTTP failures retain the grant. Host inference consumers can report a rejected request token through `rejectToken`; removal requires that it still matches the stored login.
+プロファイルと残高の HTTP 401 レスポンス、またはトップレベルのレスポンスコード `40003` (無効な認可) は、拒否されたローカルグラントをクリアし、ライブの `deepseek-account/session-expired` 通知を発行する。同時並行のレスポンスは 1 つの除去を共有する。無効化された資格情報世代からのレスポンスがその代替をクリアすることはできない。他の HTTP 失敗はグラントを保持する。Host の推論コンシューマーは、拒否されたリクエストトークンを `rejectToken` で報告できる。除去には、それが保存されたログインとまだ一致していることが必要である。
 
-## Summary
+## 概要
 
-Sign in through the system browser and keep the account credential in the existing local credential store. Local cancellation prevents late callbacks and exchange responses from signing the user in.
+システムブラウザーを通じてサインインし、アカウント資格情報を既存のローカル資格情報ストアに保つ。ローカルのキャンセルは、遅れて届くコールバックと exchange レスポンスがユーザーをサインインさせることを防ぐ。
 
-Platform requests report `no-response` when fetch rejects before returning a Response, including request timeouts. HTTP errors and response-body failures do not use this code; authorization-attempt expiry retains `expired`.
+Platform リクエストは、fetch が Response を返す前に拒否したとき — リクエストタイムアウトを含む — `no-response` を報告する。HTTP エラーとレスポンスボディの失敗はこのコードを使わない。認可試行の期限切れは `expired` を保つ。
 
-Device identity reads validate the existing login device record and expose only its ID, the current account ID, and the shared login OS version string.
+デバイスアイデンティティの読み取りは、既存のログインデバイスレコードを検証し、その ID、現在のアカウント ID、共有ログイン OS バージョン文字列のみを公開する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージを使う](#use-this-package)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The profile projection maps `id_profile.picture` to `avatarUrl`, using null when no picture is configured.
+プロファイルの投影は `id_profile.picture` を `avatarUrl` にマップし、画像が設定されていないときは null を使う。
 
-Token resolution refuses requests while local sign-out is in progress. Successful local removal publishes `deepseek-account/signed-out` before returning the signed-out snapshot; remote revocation remains independent.
+トークン解決は、ローカルのサインアウトが進行中の間はリクエストを拒否する。ローカルでの除去が成功すると、サインアウト済みスナップショットを返す前に `deepseek-account/signed-out` を発行する。リモートの失効は独立のままである。
 
-getProfile / getBalance sends the stored grant in the x-dsh-auth-token header to GET /auth-api/v0/users/current and GET /api/v0/users/get_user_summary on platformOrigin. The grant issuer must match that origin. Host projects only the account UID, profile name, avatar URL, phone or email exactly as masked by Platform, and normal_wallets / bonus_wallets currency/balance strings; response tokens and other fields are discarded. A balance or bonus-amount string is accepted when it matches the numeric grammar Platform's Web client already passes to big.js, which allows an omitted integer or fraction part and a decimal exponent, so values such as 0E-16 and 5.0000000000000000 stay valid; the original string is retained and NaN, Infinity and malformed text are rejected. Bonus wallets remain separate from recharge balances. Credential changes and disposal invalidate in-flight queries.
+getProfile / getBalance は、保存されたグラントを x-dsh-auth-token ヘッダーに載せて、platformOrigin 上の GET /auth-api/v0/users/current と GET /api/v0/users/get_user_summary に送る。グラントの発行者はそのオリジンと一致しなければならない。Host はアカウント UID、プロファイル名、アバター URL、Platform によってマスクされたままの電話番号またはメール、および normal_wallets / bonus_wallets の通貨/残高文字列のみを投影する。レスポンスのトークンとその他のフィールドは破棄される。残高またはボーナス額の文字列は、Platform の Web クライアントがすでに big.js に渡している数値文法 — 整数部または小数部の省略と 10 進指数を許す — に一致するときに受理されるので、0E-16 や 5.0000000000000000 のような値も有効であり続ける。元の文字列が保持され、NaN、Infinity、不正なテキストは拒否される。ボーナスウォレットはリチャージ残高とは別個のままである。資格情報の変更と破棄は進行中のクエリを無効化する。
 
-getUnnotifiedBonuses reads GET /api/v0/users/get_unnotified_bonuses and ackBonusNotified posts POST /api/v0/users/ack_bonus_notified with a JSON body naming the order on the same origin, each sending the five client headers built from the caller's metadata. Both resolve the account identity for the captured grant first, so a signed-out or switched account yields null or false instead of acknowledging another account's bonus, and a read publishes only after the whole query settled under one credential lifetime. The Host forwards the bonus list in Platform order, retains the string fields order_id, expires_at and msg, and maps them to orderId, expiresAt and message. An optional string title is forwarded unchanged; null or absent titles use the client default. An empty, null or absent expires_at becomes an empty expiresAt and means the notice never expires. Order IDs need not be UUIDs; campaign, amount, currency and granted_at are optional, unvalidated metadata forwarded as campaign, amount, currency and grantedAt; malformed payloads, other HTTP failures and other business failures throw, while a credential rejection (HTTP 401 or response code `40003`) invalidates the current grant and yields null or false.
+getUnnotifiedBonuses は同じオリジン上の GET /api/v0/users/get_unnotified_bonuses を読み、ackBonusNotified は注文を名指す JSON ボディで POST /api/v0/users/ack_bonus_notified をポストし、それぞれが呼び出し元のメタデータから構築された 5 つのクライアントヘッダーを送る。どちらもまずキャプチャされたグラントのアカウントアイデンティティを解決するので、サインアウト済みまたは切り替え済みのアカウントは別のアカウントのボーナスを承認する代わりに null または false を生み、読み取りは 1 つの資格情報ライフタイムの下でクエリ全体が決着した後にのみ発行する。Host は Platform の順序でボーナスリストを転送し、文字列フィールド order_id、expires_at、msg を保持して orderId、expiresAt、message にマップする。オプションの文字列 title はそのまま転送され、null または不在の title はクライアントのデフォルトを使う。空、null、または不在の expires_at は空の expiresAt になり、通知が決して期限切れにならないことを意味する。注文 ID は UUID である必要はない。campaign、amount、currency、granted_at はオプションの未検証メタデータで、campaign、amount、currency、grantedAt として転送される。不正なペイロード、その他の HTTP 失敗、その他のビジネス失敗は throw し、資格情報の拒否 (HTTP 401 またはレスポンスコード `40003`) は現在のグラントを無効化し、null または false を生む。
 
-Balance requests use balanceTimeoutMs (30,000ms by default); timeout returns a failed outcome without clearing the account or manufacturing a zero balance. Configure platformOrigin, allowLoopbackHttp, requestTimeoutMs, balanceTimeoutMs, and attemptTimeoutMs in the plugin row. HTTP is accepted only for explicitly enabled loopback development. The provider registers /oauth/callback on the existing Host webServer before auth_init, validates state, exchanges an S256 PKCE code once, and commits a grant before redirecting to auth_exchange.biz_data.authorized_url. Browser destinations default to the configured platform origin and always require the fixed /dsh/authorize or /dsh/authorized path. The completion URL sets `login_source` to the initiating client (`web` or `desktop`) and preserves other Platform-supplied query parameters. Device identity is a separate random UUID record shared by processes using the same credential store; device_model reports OS and architecture.
+残高リクエストは balanceTimeoutMs (デフォルト 30,000ms) を使う。タイムアウトは、アカウントをクリアしたりゼロ残高を捏造したりせずに、失敗した結果を返す。platformOrigin、allowLoopbackHttp、requestTimeoutMs、balanceTimeoutMs、attemptTimeoutMs はプラグイン行で設定する。HTTP は明示的に有効化されたループバック開発でのみ受理される。プロバイダーは auth_init より前に既存の Host webServer に /oauth/callback を登録し、state を検証し、S256 PKCE コードを 1 回交換し、auth_exchange.biz_data.authorized_url へリダイレクトする前にグラントをコミットする。ブラウザーの宛先はデフォルトで設定された Platform オリジンになり、常に固定の /dsh/authorize または /dsh/authorized パスを必要とする。完了 URL は `login_source` を開始したクライアント (`web` または `desktop`) に設定し、Platform が供給した他のクエリパラメーターを保持する。デバイスアイデンティティは、同じ資格情報ストアを使うプロセス間で共有される別個のランダム UUID レコードであり、device_model は OS とアーキテクチャを報告する。
 
-Platform URLs have one configuration owner: `platformOrigin`. Authorization requests, browser validation, completion redirects, usage, and top-up destinations all use that origin. Set it in a private `$DSH_HOME/cordis.patch.yml`; deployment addresses do not belong in source control. HTTPS is required except for loopback HTTP with `allowLoopbackHttp: true`. Model and file token destinations use the separate `inferenceOrigin` configuration.
+Platform URL には 1 つの設定オーナーがある: `platformOrigin`。認可リクエスト、ブラウザー検証、完了リダイレクト、usage、トップアップの宛先はすべてそのオリジンを使う。プライベートな `$DSH_HOME/cordis.patch.yml` で設定する。デプロイメントアドレスはソース管理に属さない。HTTPS が必須であり、`allowLoopbackHttp: true` によるループバック HTTP のみ例外である。モデルとファイルのトークン宛先は別個の `inferenceOrigin` 設定を使う。
 
-`requestHeaders` adds Host-only headers to authorization, profile, balance, and logout requests on `platformOrigin`. Header values are secret configuration; they are excluded from account UI state. Authorization, X-DSH-Auth-Token, Host, Content-Type and connection/framing headers are reserved. Client identity headers override same-named deployment headers. Redirects fail without forwarding headers. Store deployment cookies in private configuration or environment variables; browser cookies are not collected automatically.
+`requestHeaders` は `platformOrigin` 上の認可、プロファイル、残高、ログアウトリクエストに Host 専用のヘッダーを追加する。ヘッダー値はシークレット設定であり、アカウント UI 状態から除外される。Authorization、X-DSH-Auth-Token、Host、Content-Type、および接続/フレーミングヘッダーは予約されている。クライアントアイデンティティヘッダーは同名のデプロイメントヘッダーを上書きする。リダイレクトはヘッダーを転送せずに失敗する。デプロイメント Cookie はプライベート設定または環境変数に格納する。ブラウザー Cookie は自動的に収集されない。
 
-A private patch can read environment variables through Cordis expressions:
+プライベートパッチは Cordis 式を通じて環境変数を読める:
 
 ```yaml
 - id: deepseek-account
@@ -57,52 +57,52 @@ A private patch can read environment variables through Cordis expressions:
       process.env.DSH_PLATFORM_COOKIE ? { Cookie: process.env.DSH_PLATFORM_COOKIE } : {}
 ```
 
-The authenticated client supplies its browser-accessible callback origin, including the local SSH forwarding port, and its UI kind. The provider fixes the callback path and binds the resulting redirect_uri to both initialization and exchange. Callback requests use state and PKCE validation rather than RPC authentication. Completion, cancellation and disposal remove only the attempt route. Exchange failures publish failed state without retrying: Web closes its authorization tab and keeps the failure dialog in the original tab; the callback page attempts to close itself and offers a manual-close message. Desktop receives HTTP 204 and focuses its existing login UI through the account stream.
+認証されたクライアントは、ローカル SSH 転送ポートを含むブラウザーから到達可能なコールバックオリジンと、その UI 種別を供給する。プロバイダーはコールバックパスを固定し、結果として得られる redirect_uri を初期化と交換の両方に束縛する。コールバックリクエストは RPC 認証ではなく state と PKCE の検証を使う。完了、キャンセル、破棄は試行ルートのみを除去する。交換の失敗はリトライせずに失敗状態を発行する: Web は認可タブを閉じ、失敗ダイアログを元のタブに保つ。コールバックページは自身を閉じようとし、手動クローズのメッセージを提示する。Desktop は HTTP 204 を受け取り、アカウントストリームを通じて既存のログイン UI にフォーカスする。
 
-Host diagnostics use `console.error` with the `[deepseek-account]` prefix on standard error and in the Host inspector Console, only for request, response-validation, or sign-in failures. Successful requests, caller cancellation, and normal account state changes are silent; request timeouts remain failures. Failure diagnostics include endpoint paths, HTTP status, numeric response codes, failure stages, invalid field paths, received types and validation codes, and browser URL rejection rules; headers, request and response bodies, authorization URLs, and raw exceptions are excluded.
+Host の診断は、標準エラーと Host インスペクターの Console に `[deepseek-account]` プレフィックス付きの `console.error` を使い、リクエスト、レスポンス検証、またはサインインの失敗に限る。成功したリクエスト、呼び出し元のキャンセル、通常のアカウント状態変更は無音である。リクエストタイムアウトは失敗のままである。失敗診断にはエンドポイントパス、HTTP ステータス、数値レスポンスコード、失敗ステージ、無効なフィールドパス、受信した型と検証コード、ブラウザー URL の拒否ルールが含まれ、ヘッダー、リクエストボディとレスポンスボディ、認可 URL、生の例外は除外される。
 
-`rewriteBrowserOrigin` defaults to `false`, requiring same-origin browser URLs. A private development patch may set it to `true` to map authorization and completion URLs to `platformOrigin`, preserving their fixed paths and query strings. Source URLs must use HTTPS or already match the configured origin; user information, fragments and unexpected paths remain rejected. Shipped profiles retain strict same-origin validation.
+`rewriteBrowserOrigin` のデフォルトは `false` で、同一オリジンのブラウザー URL を要求する。プライベートな開発パッチはこれを `true` に設定して、認可 URL と完了 URL を `platformOrigin` にマップし、それらの固定パスとクエリ文字列を保つことができる。ソース URL は HTTPS を使うか、すでに設定されたオリジンに一致していなければならない。ユーザー情報、フラグメント、予期しないパスは引き続き拒否される。出荷されるプロファイルは厳格な同一オリジン検証を保つ。
 
-inferenceOrigin defaults to `https://api.deepseek.com`. A private deployment patch may replace it with one exact HTTP(S) origin, including its port, for inference and file authentication through x-dsh-auth-token. Paths, URL credentials, queries and fragments are invalid configuration. Alternate origins require a grant issued by the configured platformOrigin; mock tokens remain excluded. Loopback grants cannot authenticate the official production API. Deployment addresses belong in private patches, not shipped configuration.
+inferenceOrigin のデフォルトは `https://api.deepseek.com`。プライベートなデプロイメントパッチはそれを、ポートを含む 1 つの正確な HTTP(S) オリジンに置き換え、x-dsh-auth-token を通じた推論とファイル認証に使える。パス、URL 資格情報、クエリ、フラグメントは無効な設定である。代替オリジンには、設定された platformOrigin が発行したグラントが必要であり、モックトークンは引き続き除外される。ループバックのグラントは公式プロダクション API を認証できない。デプロイメントアドレスはプライベートパッチに属し、出荷される設定には属さない。
 
-At provider initialization, a valid stored grant whose issuer differs from platformOrigin is deleted locally before consumers read account state. Startup continues signed out without a remote logout request; API keys and device identity remain stored. Storage failures remain explicit, and account HTTP or response-validation failures do not delete a matching grant.
+プロバイダーの初期化時、発行者が platformOrigin と異なる有効な保存済みグラントは、コンシューマーがアカウント状態を読む前にローカルで削除される。起動はリモートログアウトリクエストなしでサインアウト状態のまま続行し、API キーとデバイスアイデンティティは保存されたままである。ストレージの失敗は明示的なままであり、アカウントの HTTP またはレスポンス検証の失敗が一致するグラントを削除することはない。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-Account presence reads the credential store, and attempt state projects private state directly. Behavior tests verify asynchronous cancellation and commit ordering.
+アカウントの存在は資格情報ストアを読み、試行状態はプライベート状態を直接投影する。動作テストは非同期キャンセルとコミット順序を検証する。
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-The [credentials subsystem](../../../docs/subsystems/credentials.md) owns storage APIs; the [architecture](../../../docs/architecture.md) explains application composition.
+[資格情報サブシステム](../../../docs/subsystems/credentials.md)がストレージ API を所有し、[アーキテクチャ](../../../docs/architecture.md)がアプリケーション構成を説明する。
 
-The attemptTimeoutMs limit includes initialization, browser waiting, and exchange. Initialization does not extend its absolute deadline; the server TTL may only shorten the remaining time. Credential persistence admitted before expiry completes without cancellation.
+attemptTimeoutMs の制限は初期化、ブラウザー待機、交換を含む。初期化はその絶対期限を延長しない。サーバーの TTL は残り時間を短縮することしかできない。期限前に受理された資格情報の永続化は、キャンセルなしで完了する。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as account credentials affect HTTP authentication and never enter model prompts, Session logs, or tool results.
+なし。アカウント資格情報は HTTP 認証に影響し、モデルプロンプト、Session ログ、ツール結果に決して入らない。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-No model request prefix changes.
+モデルリクエストプレフィックスは変化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Browser sign-in requires the Host webServer. Only local access and SSH local forwarding through HTTP localhost, 127.0.0.1, or [::1] with an explicit port are supported; non-loopback reverse proxies are unsupported. Account tokens have no expiry or refresh flow; explicit DSH sign-out removes the local grant before calling POST /auth-api/v0/users/logout in the background. Remote failures never restore local login. The captured old token receives at most five additional attempts with exponential delays of 1, 2, 4, 8, and 16 seconds by default; logoutMaxRetries (0–5) and logoutRetryDelayMs configure that policy. Each request uses requestTimeoutMs. Provider shutdown aborts requests and waits, and pending revocations are not persisted. Local credential deletion failures remain visible to the caller. Authorization-attempt deadlines still apply before a token is issued. Cancellation or timeout after initialization sends one background POST /auth-api/v0/dsh/auth_cancel with the authorize_id from auth_init.biz_data and the original code_verifier, without account authorization. Local cancellation never waits for this request or reverses on failure; requestTimeoutMs bounds it, and provider shutdown aborts it. TODO(product-error-ui): Product must define localized copy and UI behavior for the supplied biz_code values. Until then, business failures use the existing generic retry message; other codes and HTTP errors use the same fallback. Development grants never authenticate production requests.
+- ブラウザーサインインには Host webServer が必要である。サポートされるのはローカルアクセスと、HTTP localhost、127.0.0.1、または明示的なポート付きの [::1] を通じた SSH ローカル転送のみであり、非ループバックのリバースプロキシはサポートされない。アカウントトークンに有効期限やリフレッシュフローはない。明示的な DSH サインアウトは、バックグラウンドで POST /auth-api/v0/users/logout を呼ぶ前にローカルグラントを除去する。リモートの失敗がローカルログインを復元することは決してない。キャプチャされた古いトークンは、デフォルトで 1、2、4、8、16 秒の指数遅延を伴う最大 5 回の追加試行を受ける。logoutMaxRetries (0–5) と logoutRetryDelayMs がそのポリシーを設定する。各リクエストは requestTimeoutMs を使う。プロバイダーのシャットダウンはリクエストを中断して待機し、保留中の失効は永続化されない。ローカルの資格情報削除の失敗は呼び出し元に見えるままである。認可試行の期限はトークンが発行される前には依然として適用される。初期化後のキャンセルまたはタイムアウトは、アカウント認可なしで、auth_init.biz_data の authorize_id と元の code_verifier を伴う 1 回のバックグラウンド POST /auth-api/v0/dsh/auth_cancel を送る。ローカルのキャンセルはこのリクエストを待つことも失敗で覆すことも決してなく、requestTimeoutMs がそれを制限し、プロバイダーのシャットダウンがそれを中断する。TODO(product-error-ui): プロダクトは、供給される biz_code 値に対するローカライズされたコピーと UI の動作を定義する必要がある。それまでは、ビジネス失敗は既存の汎用リトライメッセージを使い、他のコードと HTTP エラーも同じフォールバックを使う。開発用グラントはプロダクションリクエストを決して認証しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
-The [desktop login decision](../../../.agents/notes/implemented/architecture/2026-09-14-deepseek-account-login.md) records cancellation and storage ownership.
+[デスクトップログインの決定](../../../.agents/notes/implemented/architecture/2026-09-14-deepseek-account-login.md)がキャンセルとストレージの所有権を記録している。
 
-The first profile read after sign-in uses the sanitized user returned by auth_exchange. A null or malformed user falls back to current; subsequent refreshes and Host restarts also query current. Failed current requests retain the latest successful profile for the same credential in Host memory; credential changes and disposal clear it. A ready current response whose stable account ID first becomes available or changes notifies only Host subscribers using `watch(signal, true)`, so identity consumers re-read getPlatformSession; refreshes that repeat the same ID stay silent. Exchange registers the submitted device information.
+サインイン後の最初のプロファイル読み取りは、auth_exchange が返すサニタイズ済みユーザーを使う。null または不正なユーザーは current にフォールバックし、その後のリフレッシュと Host の再起動も current を問い合わせる。失敗した current リクエストは、同じ資格情報の最後に成功したプロファイルを Host メモリに保持する。資格情報の変更と破棄がそれをクリアする。準備完了の current レスポンスで安定したアカウント ID が初めて利用可能になった、または変化した場合、`watch(signal, true)` を使う Host サブスクライバーにのみ通知するので、アイデンティティコンシューマーは getPlatformSession を読み直す。同じ ID を繰り返すリフレッシュは無音のままである。交換は送信されたデバイス情報を登録する。
 
-accountRequestHeaders overlays requestHeaders for current, balance and embedded Platform page/API requests. Cookie pairs merge by name so routing overrides retain other deployment cookies. Authorization initialization, exchange, cancellation and logout keep requestHeaders. Both maps remain private to Host and Electron main; the session's userId stays Host-only too, and renderer bootstrap receives only origin and token.
+accountRequestHeaders は current、残高、および埋め込み Platform ページ/API リクエストのために requestHeaders を上書き合成する。Cookie ペアは名前でマージされるので、ルーティングの上書きは他のデプロイメント Cookie を保つ。認可の初期化、交換、キャンセル、ログアウトは requestHeaders を保つ。両方のマップは Host と Electron メインにプライベートのままであり、セッションの userId も Host 専用のままで、レンダラーのブートストラップは origin と token のみを受け取る。
 
-The account provider’s `embeddedPageDist` configuration adds a `dist` query parameter to embedded Usage and Top-up URLs. Its default is empty; private frontend branch selectors belong in the local profile patch. It does not change API URLs or credential delivery.
+アカウントプロバイダーの `embeddedPageDist` 設定は、埋め込みの Usage とトップアップの URL に `dist` クエリパラメーターを追加する。デフォルトは空であり、プライベートなフロントエンドブランチセレクターはローカルプロファイルパッチに属する。API URL や資格情報の配信は変更しない。
 
-Platform wallet balances accept decimal strings with optional scientific notation (including `0E-16`); the provider preserves the original string for consumers.
+Platform のウォレット残高は、オプションの科学的記数法付きの 10 進文字列を受け入れる (`0E-16` を含む)。プロバイダーはコンシューマーのために元の文字列を保持する。

@@ -1,33 +1,33 @@
 ---
-description: "Host half of dynamic Cordis packages for agents and maintainers choosing, composing, or debugging the registry, sandbox, and run round trip."
+description: "動的 Cordis パッケージの Host ハーフ。レジストリ、サンドボックス、実行のラウンドトリップを選択・コンポーズ・デバッグするエージェントとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-cordis-host-runner
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-cordis-host-runner` exposes runtime inspection and keeps process-local dynamic definitions available to programmatic callers and browser controls. Host halves run in a `node:vm` realm; browser halves use the Client runner and approval UI. Definitions disappear on restart. Agents discover APIs through `tool-cordis` and install persistent bundles through Plugin Manager; no model tool creates dynamic definitions.
+`dsh-cordis-host-runner` は実行時の検査を公開し、プロセスローカルの動的定義をプログラマティックな呼び出し元とブラウザーコントロールから利用可能に保つ。Host ハーフは `node:vm` レルムで実行され、ブラウザーハーフは Client ランナーと承認 UI を使う。定義は再起動で消える。エージェントは `tool-cordis` を通じて API を発見し、Plugin Manager を通じて永続バンドルをインストールする。動的定義を作成するモデルツールは存在しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin for the inspection registry or programmatic dynamic-package lifecycle. Browser lifecycle consumers also require the Client runner and UI package. The shipped Creator workflow uses installed bundles instead of this definition registry.
+検査レジストリまたはプログラマティックな動的パッケージのライフサイクルのためにこのプラグインをマウントする。ブラウザーライフサイクルのコンシューマーは Client ランナーと UI パッケージも必要とする。出荷される Creator ワークフローは、この定義レジストリではなくインストール済みバンドルを使う。
 
-### Minimal configuration
+### 最小構成
 
 ```yaml
 - name: '@deepseek-ai/dsh-cordis-host-runner'
@@ -35,118 +35,118 @@ Mount this plugin for the inspection registry or programmatic dynamic-package li
     vmTimeoutMs: 5000
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `vmTimeoutMs` | `5000` | Milliseconds the synchronous portion of a host half may run in the vm before evaluation is aborted |
-| `clientInspectTimeoutMs` | `10000` | Maximum wait for a valid Client inspect response; an integer from 1 to 2147483647 milliseconds |
+| `vmTimeoutMs` | `5000` | 評価が中止される前に Host ハーフの同期部分が vm 内で実行できるミリ秒数 |
+| `clientInspectTimeoutMs` | `10000` | 有効な Client 検査応答の最大待機時間。1 から 2147483647 ミリ秒の整数 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-cordis-host-runner) is the exhaustive source for every accepted field.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-cordis-host-runner)が、受け付けられるすべてのフィールドの網羅的な情報源である。
 
 <a id="client-inspection"></a>
-### Client inspection
+### クライアント検査
 
-When Gateway is mounted, a Client query with no live event stream fails before dispatch. This check does not subscribe to disconnections: queries already dispatched retain their original deadline. Standalone event transports without Gateway retain the same timeout behavior.
+Gateway がマウントされている場合、ライブイベントストリームを持たない Client クエリはディスパッチ前に失敗する。このチェックは切断を購読しない: すでにディスパッチされたクエリは元のデッドラインを保持する。Gateway のないスタンドアロンのイベントトランスポートも同じタイムアウト動作を保持する。
 
-Client queries accept the first valid page response within `clientInspectTimeoutMs`. A failed page does not prevent another page from answering successfully. If no valid result arrives, the query rejects with the first Client failure or output-validation diagnostic; when no page answers, it asks the caller to open or reconnect the Harness page and retry. Cancellation and registry disposal also end pending queries. Reconnecting a page does not replay a missed request, so retry after the connection is restored. Host queries are unaffected by this timeout.
+Client クエリは `clientInspectTimeoutMs` 以内の最初の有効なページ応答を受け入れる。失敗したページは別のページが正常に応答することを妨げない。有効な結果が届かない場合、クエリは最初の Client 失敗または出力検証の診断で拒否する。どのページも応答しない場合は、呼び出し元に Harness ページを開くか再接続して再試行するよう求める。キャンセルとレジストリの破棄も保留中のクエリを終了させる。ページの再接続は取り逃したリクエストをリプレイしないため、接続が復元された後に再試行すること。Host クエリはこのタイムアウトの影響を受けない。
 
-### What a run does
+### 実行が行うこと
 
-Programmatic callers use `define`, `run`, `stop`, and `undefine`; the browser panel operates existing definitions. Host-only packages activate in this process. A package with a browser half waits for approval or cancellation, then loads Host before Client. `mode: "run"` starts the current version; `mode: "update"` replaces it. Stop disposes the live effects and retains the definition; undefine also forgets it.
+プログラマティックな呼び出し元は `define`、`run`、`stop`、`undefine` を使い、ブラウザーパネルは既存の定義を操作する。Host のみのパッケージはこのプロセスでアクティブ化する。ブラウザーハーフを持つパッケージは承認またはキャンセルを待ち、その後 Client の前に Host をロードする。`mode: "run"` は現在のバージョンを開始し、`mode: "update"` はそれを置き換える。stop はライブエフェクトを破棄して定義を保持し、undefine はそれを忘れる。
 
-### What happens to definitions
+### 定義はどうなるか
 
-Definitions are session-scoped and process-local: other sessions read them as absent, and restart clears them. Historical logs retain tool arguments and receipts but do not restore the registry. Reloading a browser page requires another explicit run to load its Client half.
+定義はセッションスコープでプロセスローカルである: 他のセッションはそれらを不在として読み取り、再起動はそれらをクリアする。履歴ログはツール引数とレシートを保持するが、レジストリは復元しない。ブラウザーページのリロードは、その Client ハーフをロードするための別の明示的な実行を必要とする。
 
-### Trust stance
+### 信頼の立場
 
-The sandbox isolates globals but is not a security boundary: Node globals are absent or redirect to Cordis services (`ctx.fs`, `ctx.web`, `ctx.bash`, the timer helpers), and a host half receives a façade without framework internals, yet the services it declares reach the live runtime. Treat a dynamic package like bash access — see the [self-referential toolset reference](README.md).
+サンドボックスはグローバルを隔離するが、セキュリティ境界ではない: Node のグローバルは存在しないか Cordis サービス（`ctx.fs`、`ctx.web`、`ctx.bash`、タイマーヘルパー）へリダイレクトされ、Host ハーフはフレームワーク内部のないファサードを受け取るが、それが宣言するサービスはライブランタイムに到達する。動的パッケージを bash アクセスと同様に扱うこと — [自己参照ツールセットのリファレンス](README.md)を参照。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design behind the runner; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではランナーの背後にある設計を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計哲学
 
-The runner is built on two separations. **Registry and sandbox are one service.** The `DynamicCordisRunnerService` owns the definition registry, the vm sandbox, the host-half fiber lifecycle, and the invoke handler table, so a definition's whole life has one owner. **Versions are immutable packages.** A plugin holds packages that never change after `define`; `currentPackageId` and `nextPackageId` point at the running and target versions, and `mode: "run"` versus `"update"` encodes whether the target equals the current version. The browser round trip exists because a browser half can only be carried out by a page: the service emits a request, suspends, and is settled by the page's verdict, with the caller's `AbortSignal` as the only other exit.
+ランナーは 2 つの分離の上に築かれている。**レジストリとサンドボックスは 1 つのサービスである。** `DynamicCordisRunnerService` が定義レジストリ、vm サンドボックス、Host ハーフのファイバーライフサイクル、invoke ハンドラーテーブルを所有するため、定義の生涯全体に 1 つのオーナーがいる。**バージョンは不変のパッケージである。** プラグインは `define` の後で決して変わらないパッケージを保持し、`currentPackageId` と `nextPackageId` が実行中バージョンとターゲットバージョンを指し、`mode: "run"` と `"update"` がターゲットが現在のバージョンと等しいかどうかをエンコードする。ブラウザーのラウンドトリップが存在するのは、ブラウザーハーフを実行できるのがページだけだからである: サービスはリクエストを emit し、サスペンドし、ページの判定によって決着する。呼び出し元の `AbortSignal` が唯一のもう 1 つの出口である。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service entry: `Config`, registry wiring, lifecycle verbs, steer messages |
-| [`src/registry.ts`](src/registry.ts) | Definition store: plugin and package identities, run attempts, approval requests |
-| [`src/sandbox.ts`](src/sandbox.ts) | `node:vm` evaluation: globals, Node-API traps, define-time syntax precheck |
-| [`src/guard.ts`](src/guard.ts) | Registration boundary: schema normalization, the sandbox `ctx` façade, plugin-shape checks |
-| [`src/lifecycle.ts`](src/lifecycle.ts) | Starting a host half under the `cordis-dynamic` fiber group |
-| [`src/inspect-registry.ts`](src/inspect-registry.ts) | The `ctx.cordisInspect` registry: host providers plus the mirrored client manifest |
-| [`src/types.ts`](src/types.ts) | Client-safe payload shapes for the `dynamicCordisRunner` remote namespace and forwarded events |
+| [`src/index.ts`](src/index.ts) | サービスエントリー: `Config`、レジストリ配線、ライフサイクル動詞、ステアメッセージ |
+| [`src/registry.ts`](src/registry.ts) | 定義ストア: プラグインとパッケージのアイデンティティ、実行試行、承認リクエスト |
+| [`src/sandbox.ts`](src/sandbox.ts) | `node:vm` 評価: グローバル、Node API トラップ、define 時の構文プリチェック |
+| [`src/guard.ts`](src/guard.ts) | 登録境界: スキーマ正規化、サンドボックスの `ctx` ファサード、プラグイン形状チェック |
+| [`src/lifecycle.ts`](src/lifecycle.ts) | `cordis-dynamic` ファイバーグループの下で Host ハーフを開始する |
+| [`src/inspect-registry.ts`](src/inspect-registry.ts) | `ctx.cordisInspect` レジストリ: Host プロバイダーとミラーされたクライアントマニフェスト |
+| [`src/types.ts`](src/types.ts) | `dynamicCordisRunner` Remote 名前空間と転送イベントのクライアント安全なペイロード形状 |
 
-### How a run flows
+### 実行の流れ
 
-`define` trims and requires the metadata, prechecks each half's syntax by compiling it (running nothing), mints the plugin and package ids, and records the definition against the session that asked. `run` resolves the target against `currentPackageId` and `nextPackageId`; a host-only package evaluates in the sandbox and commits immediately, while a browser-half package arms an approval request, emits `cordis/request-run`, and suspends. The answering page walks `runHostHalf`, `getClientCode`, then `resolveRequestRun`; a success naming the live revision commits the activation and sets `currentPackageId`, and `cordis/request-run-resolved` drops the pending affordance on every other page. `stop` retracts the live dispatch — handler disposers, fiber dispose, and the `cordis/dynamic-retract` broadcast — and leaves the definition runnable. Four forwarded events (`cordis/request-run`, `cordis/request-run-resolved`, `cordis/dynamic-package`, `cordis/dynamic-retract`) are declared on the client-safe `./types` subpath and allowlisted for delivery by `@deepseek-ai/dsh-api-remotes`, which is what lets a browser reach them through `ctx.remote.$on`.
+`define` はメタデータをトリムして必須とし、各ハーフの構文をコンパイルで（何も実行せずに）プリチェックし、プラグインとパッケージの id を発行し、要求したセッションに対して定義を記録する。`run` はターゲットを `currentPackageId` と `nextPackageId` に対して解決する。Host のみのパッケージはサンドボックスで評価され即座にコミットする一方、ブラウザーハーフのパッケージは承認リクエストをアームし、`cordis/request-run` を emit してサスペンドする。応答するページは `runHostHalf`、`getClientCode`、`resolveRequestRun` の順にたどる。ライブリビジョンを名指しする成功はアクティベーションをコミットして `currentPackageId` を設定し、`cordis/request-run-resolved` が他のすべてのページの保留中のアフォーダンスを除去する。`stop` はライブディスパッチ — ハンドラーディスポーザー、ファイバー dispose、`cordis/dynamic-retract` のブロードキャスト — を取り下げ、定義は実行可能なまま残す。4 つの転送イベント（`cordis/request-run`、`cordis/request-run-resolved`、`cordis/dynamic-package`、`cordis/dynamic-retract`）はクライアント安全な `./types` サブパスで宣言され、`@deepseek-ai/dsh-api-remotes` による配送の許可リストに入っている。これによりブラウザーが `ctx.remote.$on` を通じてそれらに到達できる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the runner to the tools that call it, the browser half that answers it, and the generated surface.
+パッケージレベルの契約では不十分なときにこれらのページを読む。ランナーから、それを呼び出すツール、それに応答するブラウザーハーフ、生成されるサーフェスへと進む。
 
-- [Tool package](../tool-cordis/README.md) — the read-only tools that use its inspection registry.
-- [Client runner](../cordis-client-runner/README.md) — the browser half that answers run requests and loads browser-half code.
-- [UI package](../ui-cordis/README.md) — the panel users approve and operate runs with.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-cordis-host-runner) — every accepted config field.
-- [Extensions subsystem](../../../docs/subsystems/extensions.md) — the generated `ctx.cordisInspect` and `ctx.dynamicCordisRunner` API and `cordis/*` events.
-- [historical Self-referential Cordis toolset Agent Note](../../../.agents/notes/archived/feature/2026-07-08-self-referential-cordis-toolset.md) — sandbox semantics, lifecycle, and composition rationale.
+- [ツールパッケージ](../tool-cordis/README.md) — その検査レジストリを使う読み取り専用ツール。
+- [Client ランナー](../cordis-client-runner/README.md) — 実行リクエストに応答しブラウザーハーフのコードをロードするブラウザーハーフ。
+- [UI パッケージ](../ui-cordis/README.md) — ユーザーが実行を承認・操作するパネル。
+- [生成される設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-cordis-host-runner) — 受け付けられるすべての設定フィールド。
+- [拡張サブシステム](../../../docs/subsystems/extensions.md) — 生成される `ctx.cordisInspect` と `ctx.dynamicCordisRunner` の API および `cordis/*` イベント。
+- [歴史的な自己参照 Cordis ツールセット Agent Note](../../../.agents/notes/archived/feature/2026-07-08-self-referential-cordis-toolset.md) — サンドボックスのセマンティクス、ライフサイクル、コンポジションの根拠。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Run outcomes, refusals, and diagnostics relayed to the owning session
+### 所有セッションへ中継される実行結果、拒否、診断
 
-#### What the model sees
+#### モデルが見るもの
 
-This package registers no tool or prompt. Programmatic `run` calls and browser controls can steer the owning session with outcomes and diagnostics; stop and remove gestures inject a user message. Shipped model tools cannot create or update dynamic definitions.
+このパッケージはツールもプロンプトも登録しない。プログラマティックな `run` 呼び出しとブラウザーコントロールは、結果と診断で所有セッションをステアできる。stop と remove のジェスチャーはユーザーメッセージを注入する。出荷されるモデルツールは動的定義を作成・更新できない。
 
-#### Token effect
+#### トークンへの影響
 
-Conditional and data-dependent: messages arrive only when an event occurs, and each carries a bounded description of what happened; there is no fixed per-request cost.
+条件付きでデータ依存である: メッセージはイベントが発生したときにのみ到着し、それぞれが何が起きたかの境界付きの記述を運ぶ。リクエストごとの固定コストはない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None of its own. A host half that registers tools changes the next request's tool view, which invalidates prefix reuse from the first changed schema token; running or stopping a package with no tool registrations is prefix-neutral.
+それ自体にはない。ツールを登録する Host ハーフは次のリクエストのツールビューを変え、変更された最初のスキーマトークンからプレフィックスの再利用を無効化する。ツール登録のないパッケージの実行や停止はプレフィックスに中立である。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the runner needs special care. They are current package constraints, not a task backlog.
+これらの制限は、ランナーが特別な注意を要する状況を定義する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **A successful run does not mean the UI rendered** — React renders after the load receipt; failures reach the owning session through steering and appear in the browser panel.
-- **A browser-half package suspends where no page is connected** — headless and ACP deployments hold the run until the asking turn is cancelled; host-only packages are unaffected.
-- **A suspended run request has no timeout** — it waits for a person until the asking turn is cancelled, so unattended automation cannot use packages with a browser half.
-- **`vmTimeoutMs` bounds only synchronous evaluation** — an async host-half body escapes it, matching the toolset's cooperative trust stance.
-- **A stale-success refusal leaves the request suspended** — when the answering page names a revision the registry has moved past, the resolution is refused (`accepted: false`) and the request stays answerable until another page answers or the caller cancels; the browser half does not read the acknowledgement.
-- **The run announcement carries no service declarations** — a browser half's declared `inject` is read from the plugin it returns in the page, so `cordis/request-run` carries metadata only, never code or service lists.
-- **`zod` is a runtime dependency of the generated Typert faces, not of `src`** — `./typert` and `./remote` resolve to unbundled `lib` files with a bare `import { z } from 'zod'`, so the package declares it even though nothing in `src` imports zod.
+- **実行の成功は UI がレンダリングされたことを意味しない** — React はロードレシートの後にレンダリングする。失敗はステアリングを通じて所有セッションに到達し、ブラウザーパネルに現れる。
+- **ブラウザーハーフのパッケージはページが接続されていない場所でサスペンドする** — headless と ACP のデプロイは、要求したターンがキャンセルされるまで実行を保持する。Host のみのパッケージは影響を受けない。
+- **サスペンドされた実行リクエストにタイムアウトはない** — 要求したターンがキャンセルされるまで人を待つため、無人自動化はブラウザーハーフを持つパッケージを使えない。
+- **`vmTimeoutMs` は同期評価のみを制限する** — 非同期の Host ハーフ本体はそれをすり抜け、ツールセットの協調的信頼の立場と一致する。
+- **stale-success の拒否はリクエストをサスペンドしたままにする** — 応答するページがレジストリがすでに越えたリビジョンを名指しすると、解決は拒否され（`accepted: false`）、リクエストは別のページが応答するか呼び出し元がキャンセルするまで回答可能なまま残る。ブラウザーハーフはその確認応答を読まない。
+- **実行の告知はサービス宣言を運ばない** — ブラウザーハーフが宣言する `inject` はページ内で返すプラグインから読み取られるため、`cordis/request-run` はメタデータのみを運び、コードやサービスリストは決して運ばない。
+- **`zod` は生成される Typert フェイスのランタイム依存であり、`src` のものではない** — `./typert` と `./remote` はバンドルされていない `lib` ファイルに解決され、素の `import { z } from 'zod'` を持つ。そのため `src` の何も zod をインポートしなくても、このパッケージはそれを宣言する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

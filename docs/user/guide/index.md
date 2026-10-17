@@ -1,31 +1,31 @@
-# Use the Web UI
+# Web UI を使う
 
-English | [中文](index.zh.md)
+日本語 | [English](index.en.md) | [中文](index.zh.md)
 
-Start the Web UI through the [root README](../../../README.md#run); the command prints its URL. This guide begins after that server is running. The `dsh` process uses its invoking directory as the default filesystem location, but a fresh Web UI has no selected workspace until you add one.
+Web UI は [ルート README](../../../README.md#run) の手順で起動する。コマンドが URL を出力する。このガイドはサーバー起動後から始まる。`dsh` プロセスは起動ディレクトリをデフォルトのファイルシステム位置として使うが、新しい Web UI ではワークスペースを追加するまで選択されたワークスペースがない。
 
-## Configure a model
+## モデルを設定する
 
-Open **Settings → Models**, enter a [DeepSeek API key](https://platform.deepseek.com/), and save it. The model route becomes usable immediately without restarting the server.
+**Settings → Models** を開き、[DeepSeek API キー](https://platform.deepseek.com/) を入力して保存する。サーバーを再起動せずにモデルルートがすぐ使えるようになる。
 
-The [model configuration guide](./providers.md) covers other providers and custom OpenAI-compatible endpoints.
+[モデル設定ガイド](./providers.md) では他のプロバイダーやカスタム OpenAI 互換エンドポイントを扱う。
 
-## Choose a workspace
+## ワークスペースを選ぶ
 
-Click **Choose workspace**, add the project directory where you started `dsh`, and select it. The session composer remains unavailable until a workspace is selected.
+**Choose workspace** をクリックし、`dsh` を起動したプロジェクトディレクトリを追加して選択する。ワークスペースを選択するまでセッションコンポーザーは利用できない。
 
-## Run a task
+## タスクを実行する
 
-Start a session and send:
+セッションを開始して送信する:
 
-> Summarize this repository and identify its main packages.
+> このリポジトリを要約し、主要パッケージを特定して。
 
-The agent can read and edit workspace files, run commands, delegate work, and maintain a plan. The Web UI asks before operations that require approval under the active permission policy.
+エージェントはワークスペースのファイルを読み書きし、コマンドを実行し、作業を委任し、プランを維持できる。Web UI はアクティブな許可ポリシーで承認が必要な操作の前に確認する。
 
-## Continue
+## 次に進む
 
-- [Configure models](./providers.md)
-- [Use the Python SDK](./python-sdk.md)
-- [Publish the Web UI behind a reverse proxy](./public-deployments.md)
-- [Use other CLI modes](../../../apps/cli/README.md)
-- [Develop a plugin](../develop/basic/index.md)
+- [モデルを設定する](./providers.md)
+- [Python SDK を使う](./python-sdk.md)
+- [リバースプロキシーの背後で Web UI を公開する](./public-deployments.md)
+- [他の CLI モードを使う](../../../apps/cli/README.md)
+- [プラグインを開発する](../develop/basic/index.md)

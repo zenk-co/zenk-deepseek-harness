@@ -1,14 +1,14 @@
-# Session Persistence
+# セッション永続化
 
-English | [中文](persistence.zh.md)
+日本語 | [English](persistence.en.md) | [中文](persistence.zh.md)
 
-The **durability seam** for the event log. [session.md](session.md) describes the in-memory `Session` — the append-only `SessionEvent` log that is the source of truth. This page describes how that log is made durable: the abstract `SessionPersistence` service, its provider model and shipped JSONL backend, the flush checkpoint, crash recovery, and the metadata header that travels alongside the log. The event vocabulary the log carries is enumerated, member by member, in the generated [persistence log event catalog](../persistence-catalog.md).
+イベントログのための**耐久性シーム**。[session.md](session.md) は、信頼できる唯一の情報源である追記専用の `SessionEvent` ログ、すなわちインメモリの `Session` について説明している。本ページでは、そのログをどのように永続化するかを説明する: 抽象的な `SessionPersistence` サービス、そのプロバイダーモデルと同梱の JSONL バックエンド、フラッシュチェックポイント、クラッシュ復旧、そしてログと併走するメタデータヘッダーである。ログが運ぶイベント語彙は、生成された[永続化ログイベントカタログ](../persistence-catalog.md)にメンバーごとに列挙されている。
 
-The seam is a [capability seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md): one abstract service ([dsh-session-persistence](../../packages/session/session-persistence), `ctx.sessionPersistence`) exposing `create`/`open`/`stat`/`list` over the existing `SessionEvent` — **no parallel persisted event type** — where `create` and `open` return a per-session `SessionHandle` (`read`/`append`/`flush`/`close`) that carries all log access and single-writer ownership. The repository ships [dsh-session-persistence-jsonl](../../packages/session/session-persistence-jsonl) as its provider; out-of-tree providers may implement the same service contract. See the [handle-based persistence Agent Note](../../.agents/notes/implemented/architecture/2026-08-27-handle-based-session-persistence.md) and the [session-persistence reference](../../packages/session/session-persistence/README.md).
+このシームは[ケイパビリティシーム](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md)である。単一の抽象サービス（[dsh-session-persistence](../../packages/session/session-persistence)、`ctx.sessionPersistence`）が、既存の `SessionEvent` の上で `create`/`open`/`stat`/`list` を公開し（**並行する永続化イベント型は存在しない**）、`create` と `open` はセッションごとの `SessionHandle`（`read`/`append`/`flush`/`close`）を返す。このハンドルがすべてのログアクセスと単一ライター所有権を担う。リポジトリは [dsh-session-persistence-jsonl](../../packages/session/session-persistence-jsonl) をプロバイダーとして同梱する。ツリー外のプロバイダーが同じサービス契約を実装してもよい。[ハンドルベース永続化の Agent Note](../../.agents/notes/implemented/architecture/2026-08-27-handle-based-session-persistence.md)と [session-persistence リファレンス](../../packages/session/session-persistence/README.md)を参照。
 
-## `SessionHandle` — one open channel onto a stored session
+## `SessionHandle` — 保存済みセッションへの 1 本の開かれたチャネル
 
-Every log read and write flows through a handle, never through id-addressed service methods: the handle is the single door the cross-process write lease guards. A read returns a caller-owned outer slice and the producer-established aliasing state of its event values. One handle type serves both accesses — a mutation on a `read` handle is a runtime `SessionReadOnlyError` rather than a typed split — and in-process single-writer ownership makes a second `open(id, 'write')` reject with `SessionAlreadyOwnedError` while an owner is active.
+すべてのログ読み書きはハンドルを通じて流れ、id でアドレス指定されるサービスのメソッドを経由することは決してない。ハンドルは、プロセス間の書き込みリースが守る唯一の入口である。読み取りは、呼び出し側が所有する外側のスライスと、プロデューサーが確立したイベント値のエイリアシング状態を返す。1 つのハンドル型が両方のアクセスに使われる — `read` ハンドルに対する変更は、型による分割ではなく実行時の `SessionReadOnlyError` になる — また、プロセス内の単一ライター所有権により、所有者がアクティブな間の 2 回目の `open(id, 'write')` は `SessionAlreadyOwnedError` で拒否される。
 
 ```ts type-equiv
 /** One persistence event slice returned by {@link SessionHandle.read}. */
@@ -99,23 +99,23 @@ interface SessionHandle extends AsyncDisposable {
 }
 ```
 
-A created session is observable in this process from the moment `create` resolves, while a backend may defer physical materialization (a pure optimization) until the first `append` or `flush`; other processes see only materialized sessions, and a session that never materialized before a crash never existed.
+作成されたセッションは `create` が解決した瞬間からこのプロセス内で観測可能である。一方、バックエンドは物理的な実体化（純粋な最適化）を最初の `append` または `flush` まで遅延させてもよい。他のプロセスには実体化済みのセッションだけが見え、クラッシュ前に実体化されなかったセッションは存在しなかったことになる。
 
-## The flush checkpoint
+## フラッシュチェックポイント
 
-`session/event` is a *synchronous* notification; the mounted backend routes it by session id into the active write handle's bounded write-behind window without blocking the producer (the backend installs these listeners once, because persistence already enforces one active write handle per id). The first pending event starts a fixed internal batching window, and later events join without resetting its deadline. Expiry starts one durable `append` through the session's write handle; events admitted during that write receive their own deadline and form a follow-up batch. `session/flush` cancels the wait and drains through quiescence, so the loop still uses it as the ordering and error-observation checkpoint before claiming the next ordinary turn. A rejected background write retains its events in order, pauses the automatic path, and is reported through the logger; the next explicit flush retries and rejects loudly to its caller. `session/disposed` performs the same final drain and closes the handle, and `close()` itself drains the routed buffer through the still-open storage, so backend teardown's close sweep loses nothing. The window bounds only intentional batching wait, not event-loop scheduling or backend durability latency.
+`session/event` は*同期*通知である。マウントされたバックエンドは、プロデューサーをブロックすることなく、セッション id でそれをアクティブな書き込みハンドルの有界なライトビハインドウィンドウへルーティングする（バックエンドはこれらのリスナーを一度だけ設置する。永続化がすでに id ごとに 1 つのアクティブな書き込みハンドルを強制しているためである）。最初の保留イベントが固定の内部バッチウィンドウを開始し、後続のイベントはその期限をリセットせずに加わる。期限切れになると、セッションの書き込みハンドルを通じて 1 回の永続的な `append` が開始され、その書き込み中に受け入れられたイベントは独自の期限を受け取って後続バッチを形成する。`session/flush` は待機をキャンセルし、静止状態までドレインする。そのためループは今も、次の通常ターンを取得する前の順序とエラー観測のチェックポイントとしてこれを使う。拒否されたバックグラウンド書き込みはイベントを順序どおり保持し、自動経路を一時停止し、ロガーを通じて報告される。次の明示的なフラッシュが再試行し、呼び出し元に明示的に拒否を返す。`session/disposed` は同じ最終ドレインを実行してハンドルを閉じ、`close()` 自体もルーティング済みバッファをまだ開いているストレージを通じてドレインするので、バックエンド破棄時のクローズスイープが何かを失うことはない。このウィンドウが制限するのは意図的なバッチ待機だけであり、イベントループのスケジューリングやバックエンドの耐久性レイテンシーではない。
 
-## Crash recovery preserves an interrupted turn
+## クラッシュ復旧は中断されたターンを保持する
 
-A log crashed mid-turn ends with an open `turn/start` and no `turn/end`. Persistence does **not** truncate or repair it — a single turn can be huge in a long-horizon task (many steps, large tool output), and those events were durably appended before the crash. It returns the physically valid contiguous log; only the incomplete fragment of a torn physical tail, belonging to an append that never resolved, is discarded — complete records recovered from it (the JSONL backend partially decodes a torn Zstandard frame) are durably rewritten by the write path before the handle's first new append. Repair is the reader's job: resume (agent-loop) reads the stored log through its write handle, computes `interruptedTurnClosers` — missing tool errors, any open `step/end`, and a synthetic `turn/end { reason: { kind: 'interrupted' } }` — and appends them through the same handle as an ordinary batch before publishing the Session. `interrupted` is the one `TurnEndReason` no loop emits (see [session.md](session.md#why-a-turn-ended-turnendreasonmap)).
+ターンの途中でクラッシュしたログは、開いたままの `turn/start` を持ち `turn/end` を持たない状態で終わる。永続化はそれを切り詰めたり修復したり**しない** — 長期的なタスクでは 1 つのターンが巨大になり得る（多数のステップ、大きなツール出力）が、それらのイベントはクラッシュ前に永続的に追記済みである。永続化は物理的に有効な連続ログを返す。破棄されるのは、解決されなかった append に属する破断した物理テールの不完全な断片だけであり、そこから回収された完全なレコード（JSONL バックエンドは破断した Zstandard フレームを部分的にデコードする）は、ハンドルの最初の新しい append の前に書き込み経路によって永続的に書き直される。修復はリーダーの仕事である。レジューム（agent-loop）は書き込みハンドルを通じて保存済みログを読み、`interruptedTurnClosers` — 欠落したツールエラー、開いているすべての `step/end`、および合成の `turn/end { reason: { kind: 'interrupted' } }` — を計算し、Session を公開する前に、通常のバッチとして同じハンドルを通じてそれらを追記する。`interrupted` はどのループも発行しない唯一の `TurnEndReason` である（[session.md](session.md#why-a-turn-ended-turnendreasonmap) を参照）。
 
-Repair therefore writes only under write ownership: a live session's write handle is held by its lifecycle owner, so a concurrent `open(id, 'write')` rejects with `SessionAlreadyOwnedError` instead of racing repair against a live turn. Read-only observers (session-query) balance an interrupted cold log with the same closers in memory only, writing nothing back.
+したがって修復は書き込み所有権の下でのみ書き込む。ライブセッションの書き込みハンドルはそのライフサイクル所有者が保持しているので、並行する `open(id, 'write')` は、修復をライブのターンと競合させる代わりに `SessionAlreadyOwnedError` で拒否される。読み取り専用のオブザーバー（session-query）は、中断されたコールドログを同じクローザーでメモリ内のみで釣り合わせ、何も書き戻さない。
 
-Read-only observation is `open(id, 'read')`: the handle serves validated contiguous prefix slices, never a torn tail, and repeated reads on one handle never observe an older state than a prior read. There is no persistence-side prepared-Session cache: session-query owns its cold-read cache, keying one balanced cold Session per id on the `stat().revision` change token and re-reading only when the token changes. The [handle-based persistence Agent Note](../../.agents/notes/implemented/architecture/2026-08-27-handle-based-session-persistence.md) owns this lifecycle; the archived [Session preparation record](../../.agents/notes/archived/architecture/2026-08-05-session-preparation.md) documents the original publication-boundary `SessionPreparation` decision.
+読み取り専用の観測は `open(id, 'read')` である。ハンドルは検証済みの連続したプレフィックススライスを提供し、破断したテールを決して返さない。また 1 つのハンドル上の繰り返し読み取りは、以前の読み取りより古い状態を決して観測しない。永続化側に prepared-Session キャッシュは存在しない。session-query が自身のコールドリードキャッシュを所有し、id ごとに 1 つの釣り合ったコールド Session を `stat().revision` 変更トークンに紐づけ、トークンが変わったときだけ読み直す。[ハンドルベース永続化の Agent Note](../../.agents/notes/implemented/architecture/2026-08-27-handle-based-session-persistence.md)がこのライフサイクルを所有し、アーカイブ済みの [Session 準備の記録](../../.agents/notes/archived/architecture/2026-08-05-session-preparation.md)が、当初の公開境界 `SessionPreparation` の決定を記録している。
 
-## `SessionLocation` — refusal-diagnostics artifact target
+## `SessionLocation` — 拒否診断のアーティファクトターゲット
 
-`SessionLocation` is not a consumer-facing query: log access goes through a session handle's `read`. It survives only as refusal diagnostics, letting a `SessionFormatUnsupportedError` name the raw log a build refused to interpret. JSONL supplies the absolute transcript path inside its project/session directory; a backend without one artifact per session supplies nothing.
+`SessionLocation` はコンシューマー向けのクエリではない。ログアクセスはセッションハンドルの `read` を通じて行われる。これは拒否診断としてのみ存続し、`SessionFormatUnsupportedError` が、あるビルドが解釈を拒否した生のログを名指しできるようにする。JSONL はプロジェクト/セッションディレクトリ内のトランスクリプトの絶対パスを提供する。セッションごとに 1 つのアーティファクトを持たないバックエンドは何も提供しない。
 
 ```ts type-equiv
 /**
@@ -134,11 +134,11 @@ interface SessionLocation {
 
 <a id="sessionheader--metadata-beside-the-log"></a>
 
-## `SessionHeader` — metadata beside the log
+## `SessionHeader` — ログの傍らのメタデータ
 
-Per-session metadata travels **separately** from the event log: the header carries format version, cwd, and the `isSeeded` lineage bit, while body-bearing storage values carry the exact inherited cut beside it. Neither belongs to `SessionEventMap` or reaches `deriveMessages()`. The logical header is attached through `session.header`; the Session exposes its cut as `inheritedEventCount`.
+セッションごとのメタデータはイベントログとは**別個に**格納される。ヘッダーはフォーマットバージョン、cwd、`isSeeded` 系統ビットを運び、本体を持つストレージ値はその傍らに正確な継承カットを運ぶ。どちらも `SessionEventMap` に属さず、`deriveMessages()` に到達しない。論理ヘッダーは `session.header` を通じて付与され、Session はそのカットを `inheritedEventCount` として公開する。
 
-Source: [`packages/core/session/src/types.ts`](../../packages/core/session/src/types.ts)
+ソース: [`packages/core/session/src/types.ts`](../../packages/core/session/src/types.ts)
 
 ```ts type-equiv
 /**
@@ -184,13 +184,13 @@ interface SessionHeader {
 }
 ```
 
-## Format refusal — logs a build cannot faithfully read
+## フォーマット拒否 — あるビルドが忠実に読み取れないログ
 
-A backend refuses a log it cannot faithfully interpret with `SessionFormatUnsupportedError`, distinct from `SessionPersistenceCorruptionError` because nothing is damaged. `stat` and `list` classify the highest canonical generation and translate a supported historical header without reading or mutating its body. Historical `open` calls share one per-session migration preparation before returning current logical values and leave every source path, byte, and inode unchanged. The JSONL provider returns a read handle from that in-memory result without publishing; a write open holds its single-writer claim and file lease while it reuses the preparation, exclusively publishes the final current generation, and only then returns the writable handle. A future highest generation refuses even when an older readable generation remains. Current-format restoration retains installed extensions and unknown events carrying `ignorable: true`; historical v0/v1/v2 migration refuses an unknown type even when marked ignorable. The message appends the selected raw log path when the backend keeps one artifact per session. An out-of-tree backend must enforce equivalent current-only handle values and direction-aware refusals at its physical-format entry. The [released-format migration decision](../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md) owns the chain and immutable-publication rules.
+バックエンドは、忠実に解釈できないログを `SessionFormatUnsupportedError` で拒否する。何も破損していないため、これは `SessionPersistenceCorruptionError` とは区別される。`stat` と `list` は最も高い正規世代を分類し、サポートされる歴史的ヘッダーを、その本体を読んだり変更したりせずに変換する。歴史的な `open` 呼び出しは、セッションごとの単一の移行準備を共有してから現行の論理値を返し、すべてのソースパス、バイト、inode を変更しない。JSONL プロバイダーはそのインメモリ結果から読み取りハンドルを返し、公開は行わない。書き込み open は、単一ライターのクレームとファイルリースを保持したままその準備を再利用し、最終的な現行世代を排他的に公開してから、書き込み可能なハンドルを返す。将来の最も高い世代は、古い読み取り可能な世代が残っていても拒否する。現行フォーマットの復元では、インストール済み拡張と `ignorable: true` を持つ未知のイベントが保持される。歴史的な v0/v1/v2 移行は、無視可能とマークされていても未知の型を拒否する。このメッセージは、バックエンドがセッションごとに 1 つのアーティファクトを保持している場合、選択された生のログパスを追記する。ツリー外のバックエンドは、その物理フォーマットのエントリーで、同等の現行のみのハンドル値と方向を考慮した拒否を強制しなければならない。[リリース済みフォーマット移行の決定](../../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md)が、この連鎖と不変公開のルールを所有する。
 
-## `CreateSessionOptions` — seeding and metadata
+## `CreateSessionOptions` — シードとメタデータ
 
-Creating a `Session` through the store takes a `seed` (initial replay or fork history), an optional exact `inheritedEventCount`, and `meta` (the storage-level fields the store folds into a `SessionHeader`). The store fills in `version`/`id` and defaults `createdAt`; the caller may supply the validated absolute `cwd`, `parentSession` lineage, `isSeeded` lineage bit, optional coarse `origin`, `delegationDepth`, `agentPreset`, and an existing `createdAt`. A seeded creation requires an explicit seed equal to its inherited prefix and an exact cut; the constructor appends the child-owned tagged end-seed marker at that cut before setup adds child-owned events. `origin: 'subagent'` lets product navigation hide duplicate child rows; it does not prove that a descriptor is valid or that the child can resume.
+ストアを通じて `Session` を作成するときは、`seed`（初期リプレイまたはフォーク履歴）、任意の正確な `inheritedEventCount`、および `meta`（ストアが `SessionHeader` に畳み込むストレージレベルのフィールド）を取る。ストアは `version`/`id` を埋めて `createdAt` をデフォルト化する。呼び出し側は、検証済みの絶対 `cwd`、`parentSession` 系統、`isSeeded` 系統ビット、任意の粗い `origin`、`delegationDepth`、`agentPreset`、および既存の `createdAt` を指定できる。シード付き作成には、継承プレフィックスに等しい明示的なシードと正確なカットが必要である。コンストラクターは、セットアップが子所有のイベントを追加する前に、そのカットに子所有のタグ付きエンドシードマーカーを追記する。`origin: 'subagent'` は、製品のナビゲーションが重複する子行を隠せるようにするが、記述子が有効であることや子がレジュームできることを証明するものではない。
 
 ```ts type-equiv
 /**
@@ -223,11 +223,11 @@ interface CreateSessionOptions {
 }
 ```
 
-Replay/fork is therefore `ctx.agents.create({ sessionId, seed, meta })` — a fork additionally supplies `inheritedEventCount` with `meta.isSeeded: true`, and only agent-loop-published sessions persist, and the loop stores the seed through the new session's write handle before publication; resuming a *persisted* session into a live agent is `ctx.agents.resume({ resumeSessionId })`.
+したがってリプレイ/フォークは `ctx.agents.create({ sessionId, seed, meta })` である — フォークはさらに `meta.isSeeded: true` とともに `inheritedEventCount` を渡す — そして永続化されるのは agent-loop が公開したセッションだけであり、ループは公開前に新しいセッションの書き込みハンドルを通じてシードを格納する。*永続化済み*のセッションをライブエージェントへレジュームするのは `ctx.agents.resume({ resumeSessionId })` である。
 
-## Preparation and restoration ownership
+## 準備と復元の所有権
 
-`SessionStore.prepare()` accepts ordinary creation options or an adoptable seed through `RestoredSessionOptions`. Its `eventState` says whether event values are independently owned or shared only after deep freezing; the producer establishes that state, and slicing does not infer a different state from result length. Restoration validates and adopts those values without another copy or freeze pass. `SessionPreparation` then owns the exact unpublished Session until publication or rollback; disposal is synchronous and idempotent. agent-loop's resume reads this result through the session's write handle and appends independently owned `interruptedTurnClosers` before preparation.
+`SessionStore.prepare()` は、通常の作成オプションまたは `RestoredSessionOptions` を通じた採用可能なシードを受け入れる。その `eventState` は、イベント値が独立して所有されているのか、深い凍結の後にのみ共有されるのかを表す。この状態を確立するのはプロデューサーであり、スライスは結果の長さから別の状態を推測しない。復元は、別のコピーや凍結パスなしでそれらの値を検証して採用する。その後 `SessionPreparation` が、公開またはロールバックまで、その未公開の Session を正確に所有する。破棄は同期的かつ冪等である。agent-loop のレジュームは、セッションの書き込みハンドルを通じてこの結果を読み、準備の前に独立して所有される `interruptedTurnClosers` を追記する。
 
 ```ts type-equiv
 /**
@@ -291,9 +291,9 @@ declare class SessionPreparation implements Disposable {
 }
 ```
 
-## Lightweight source revisions
+## 軽量なソースリビジョン
 
-Consumers of derived read models compare a cheap opaque revision before loading a full event log. The revision is a per-backend-instance change token from `stat`/`list`: equal revisions may be treated as an unchanged log; unequal revisions promise nothing, and write-ownership churn never changes one. session-query keys its cold-read cache on it; the token plays no part in open, read, or resume.
+派生読み取りモデルの消費者は、完全なイベントログをロードする前に、安価で不透明なリビジョンを比較する。リビジョンは `stat`/`list` から得られるバックエンドインスタンスごとの変更トークンである。等しいリビジョンは変更されていないログとして扱ってよく、等しくないリビジョンは何も約束しない。また書き込み所有権の入れ替わりがリビジョンを変えることはない。session-query は自身のコールドリードキャッシュをこれに紐づける。このトークンは open、read、レジュームには関与しない。
 
 ```ts type-equiv
 /**
@@ -322,13 +322,13 @@ interface SessionPersistenceSnapshot {
 }
 ```
 
-The optional `eventCount`/`sizeBytes` fields remain cheap backend observations for consumers that explicitly need them. Session listing does not use either field to open cold logs: it reads headers plus identity-checked projection-cache hints only, so a cache or Session-format upgrade never turns startup into a body scan.
+任意の `eventCount`/`sizeBytes` フィールドは、それらを明示的に必要とする消費者のための、安価なバックエンド観測値として残る。セッション一覧表示はどちらのフィールドもコールドログを開くのに使わない。ヘッダーと、同一性を検査済みのプロジェクションキャッシュヒントだけを読むので、キャッシュや Session フォーマットのアップグレードが起動を本文スキャンに変えることは決してない。
 
-## The backend
+## バックエンド
 
-The shipped provider implements the abstract `SessionPersistence` contract (`create`/`open`/`stat`/`list`, with per-session `SessionHandle`s carrying `read`/`append`/`flush`/`close` and optional cancellation throughout) and passes the shared persistence contract suite:
+同梱のプロバイダーは、抽象 `SessionPersistence` 契約（`create`/`open`/`stat`/`list`、および `read`/`append`/`flush`/`close` を担い全体に任意のキャンセルを備えるセッションごとの `SessionHandle`）を実装し、共有の永続化契約スイートを通過する:
 
-- **[dsh-session-persistence-jsonl](../../packages/session/session-persistence-jsonl)** — an append-only logical JSONL log per session, stored as checksummed concatenated Zstandard frames by default or raw lines by configuration, with crash-safe atomic materialization, per-batch `fsync` appends, and torn-tail truncation before the first new append. `stat`/`list` carry `sizeBytes` and a best-effort `fs.stat`-derived revision.
+- **[dsh-session-persistence-jsonl](../../packages/session/session-persistence-jsonl)** — セッションごとの追記専用論理 JSONL ログ。デフォルトではチェックサム付きの連結 Zstandard フレームとして、設定により生の行として格納され、クラッシュ安全な原子的実体化、バッチごとの `fsync` 追記、最初の新しい append の前の破断テール切り詰めを備える。`stat`/`list` は `sizeBytes` と、`fs.stat` 由来のベストエフォートのリビジョンを運ぶ。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -336,19 +336,19 @@ The shipped provider implements the abstract `SessionPersistence` contract (`cre
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxsessionpersistence--sessionpersistence-abstract-seam"></a>
 
-### `ctx.sessionPersistence` — `SessionPersistence` (abstract seam)
+### `ctx.sessionPersistence` — `SessionPersistence`（抽象シーム）
 
-Durable append-only session storage addressed through per-session handles.
+セッションごとのハンドルを通じてアドレス指定される、永続的な追記専用セッションストレージ。
 
-Storage semantics shared by every backend: events are contiguous from seq 0 and never rewritten; a torn physical tail is never returned to a reader and is truncated by the write path before its first append; reads validate current-format records only and refuse unknown vocabulary fail-closed. `append` persists best-effort; `flush` — per handle or service-wide — is the durability barrier.
+すべてのバックエンドが共有するストレージセマンティクス: イベントは seq 0 から連続し、決して書き換えられない。破断した物理テールはリーダーに返されることはなく、書き込み経路が最初の append の前にそれを切り詰める。読み取りは現行フォーマットのレコードのみを検証し、未知の語彙を fail-closed で拒否する。`append` はベストエフォートで永続化し、`flush` — ハンドル単位またはサービス全体 — が耐久性バリアである。
 
-Visibility: a created session is observable through `stat`/`list`/`open` in this process from the moment `create` resolves, even while a backend defers physical materialization (a pure optimization); other processes see the session only once it materializes, and a session that never materialized before a crash never existed. `SessionHandle.flush` forces materialization.
+可視性: 作成されたセッションは、`create` が解決した瞬間からこのプロセス内で `stat`/`list`/`open` を通じて観測可能であり、バックエンドが物理的な実体化を遅延させている間もそうである（純粋な最適化）。他のプロセスには、セッションは実体化されて初めて見える。クラッシュ前に実体化されなかったセッションは存在しなかったことになる。`SessionHandle.flush` は実体化を強制する。
 
-Freshness: once an `append` or `flush` resolves, reads started afterwards on this backend instance observe at least that prefix.
+鮮度: いったん `append` または `flush` が解決すると、その後このバックエンドインスタンスで開始された読み取りは、少なくともそのプレフィックスを観測する。
 
 ```ts cordis-catalog
 /**
@@ -412,7 +412,7 @@ abstract stat(id: SessionId, options?: SessionPersistenceStatOptions): Promise<S
 abstract list(options?: SessionPersistenceListOptions): Promise<readonly SessionPersistenceSnapshot[]>
 ```
 
-Types: [SessionId](core.md)
+型: [SessionId](core.md)
 
-Source: [`packages/session/session-persistence/src/index.ts`](../../packages/session/session-persistence/src/index.ts)
+ソース: [`packages/session/session-persistence/src/index.ts`](../../packages/session/session-persistence/src/index.ts)
 <!-- END GENERATED cordis-surface -->

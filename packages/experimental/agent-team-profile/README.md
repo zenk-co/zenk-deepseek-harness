@@ -5,60 +5,60 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-agent-team-profile
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-experimental-agent-team-profile` enables [Agent Teams](../agent-team/README.md) collaboration, tools, and Web UI with one bundle. Delegate work to teammates and view members, shared tasks, and teammate sessions in Web. Ordinary subagent delegation and overlapping global child controls are disabled; Workflow can still create fresh children. The bundle ships with dsh switched off. Enable it from the Plugins page or add it to an initialized profile.
+`dsh-experimental-agent-team-profile` は 1 つのバンドルで [Agent Teams](../agent-team/README.md) 協調、ツール、Web UI を有効化します。チームメイトに作業を委譲し、Web でメンバー、共有タスク、チームメイトセッションを表示します。通常サブエージェント委譲と重複グローバル子制御は無効です。Workflow は新規子をまだ作成できます。バンドルは dsh 無効で出荷されます。Plugins ページから有効化するか、初期化済みプロファイルに追加してください。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-### Install into a profile
+### プロファイルへのインストール
 
-Add the package to an initialized profile, then run a task that asks the Lead to delegate work:
+初期化済みプロファイルにパッケージを追加し、リードに作業委譲を求めるタスクを実行します:
 
 ```sh
 dsh plugin --profile headless add @deepseek-ai/dsh-experimental-agent-team-profile
 dsh --profile headless "Use Agent Teams to split this task between two teammates, wait, and summarize."
 ```
 
-The profile must already contain `@deepseek-ai/dsh-base`, whose Subagent services and provider rows this layer consumes. Removing the package with `dsh plugin --profile <name> remove @deepseek-ai/dsh-experimental-agent-team-profile` removes the bundle from the profile's ordered layer list.
+プロファイルは `@deepseek-ai/dsh-base` を既に含まなければなりません。この層はその Subagent サービスとプロバイダー行を消費します。`dsh plugin --profile <name> remove @deepseek-ai/dsh-experimental-agent-team-profile` でパッケージを除去すると、プロファイルの順序付き層一覧からバンドルが除去されます。
 
-Enable Agent Teams on the Web or Desktop Plugins page to activate both tools and UI. For a CLI Web profile, use:
+Web または Desktop の Plugins ページで Agent Teams を有効化するとツールと UI の両方が有効化されます。CLI Web プロファイルには次を使います:
 
 ```sh
 dsh plugin --profile web add @deepseek-ai/dsh-experimental-agent-team-profile
 ```
 
-In an existing profile’s `package.json`, keep `@deepseek-ai/dsh-experimental-agent-team-profile` in `dsh.profile.bundles` and remove the separate `@deepseek-ai/dsh-experimental-agent-team-web-profile` entry. User patches targeting `ui-agent-team` still apply.
+既存プロファイルの `package.json` では、`dsh.profile.bundles` に `@deepseek-ai/dsh-experimental-agent-team-profile` を残し、別の `@deepseek-ai/dsh-experimental-agent-team-web-profile` エントリーを除去します。`ui-agent-team` を対象とするユーザーパッチは引き続き適用されます。
 
-### What you get
+### 得られるもの
 
-The layer adds the Agent Teams domain and its scoped creation, roster, messaging, interruption, waiting, and task-board tools. Direct delegation uses `spawn_teammate`, which supports fresh and fork context. The `subagent` and `subagent_fork` tools and overlapping global child controls are disabled. Workflow retains the base profile’s `spawn` provider, while the underlying Subagent services and both providers remain available to teammates and workflow.
+層は Agent Teams ドメインとそのスコープ付き作成、名簿、メッセージング、中断、待機、タスクボードツールを追加します。直接委譲は新規およびフォークコンテキストに対応する `spawn_teammate` を使います。`subagent` と `subagent_fork` ツールおよび重複グローバル子制御は無効です。Workflow はベースプロファイルの `spawn` プロバイダーを保持し、基盤 Subagent サービスと両プロバイダーはチームメイトと workflow から利用可能です。
 
-In Web and Desktop conversations, the [Team UI](../client-ui-agent-team/README.md) displays the member roster and shared task board and opens teammate sessions. The same bundle switch controls the tools and browser UI. The Plugins page reads the bundle's [icon](icon.svg) from its `package.json.icon` declaration, including while the bundle is disabled.
+Web と Desktop 会話では [Team UI](../client-ui-agent-team/README.md) がメンバー名簿と共有タスクボードを表示し、チームメイトセッションを開きます。同じバンドルスイッチがツールとブラウザー UI を制御します。Plugins ページは無効中も含め、バンドルの [icon](icon.svg) を `package.json.icon` 宣言から読みます。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The package's runtime content is [`cordis.patch.yml`](cordis.patch.yml). Applied after `dsh-base`, the patch disables `tool-subagent-control`, `tool-subagent-list-agents`, `tool-subagent`, and `tool-subagent-fork`, and inserts the Team service, tools, and UI with explicit providers and limits. The UI plugin has an inert Host entry; only the Web Client loader mounts its browser entry, so headless needs no Web server.
+パッケージのランタイム内容は [`cordis.patch.yml`](cordis.patch.yml) です。`dsh-base` 適用後にパッチが `tool-subagent-control`、`tool-subagent-list-agents`、`tool-subagent`、`tool-subagent-fork` を無効化し、Team サービス、ツール、UI を明示プロバイダーと制限付きで挿入します。UI プラグインは不活性ホストエントリーを持ちます。Web Client ローダーのみブラウザーエントリーをマウントするため、headless に Web サーバーは不要です。
 
 | File | Role |
 |---|---|
@@ -81,34 +81,34 @@ The package's runtime content is [`cordis.patch.yml`](cordis.patch.yml). Applied
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Team policy and tools
+### チームポリシーとツール
 
-#### What the model sees
+#### モデルが見るもの
 
-The Team policy and schemas belong to [`@deepseek-ai/dsh-experimental-tool-agent-team`](../tool-agent-team/README.md). This bundle changes composition only: Team-scoped `list_agents`, `send_message`, and `interrupt_agent` replace the disabled global continuable-child controls. `spawn_teammate` is the direct delegation tool. Workflow’s `agent()` calls create fresh one-shot children; their prompts must contain the context needed for their tasks.
+Team ポリシーとスキーマは [`@deepseek-ai/dsh-experimental-tool-agent-team`](../tool-agent-team/README.md) に属します。このバンドルは構成のみ変更します。Team スコープの `list_agents`、`send_message`、`interrupt_agent` が無効化グローバル継続可能子制御を置換します。`spawn_teammate` は直接委譲ツールです。Workflow の `agent()` 呼び出しは新規ワンショット子を作成します。そのプロンプトはタスクに必要なコンテキストを含まなければなりません。
 
-#### Token effect
+#### トークン効果
 
-The bundle adds the Team policy and tool schemas described by `@deepseek-ai/dsh-experimental-tool-agent-team`; it adds no prompt text of its own.
+バンドルは `@deepseek-ai/dsh-experimental-tool-agent-team` が記述する Team ポリシーとツールスキーマを追加します。独自のプロンプトテキストは加えません。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-The shared system prompt and tool schemas remain prefix-stable while the bundle patch and configured tool schemas remain unchanged. Team identity is appended through runtime-context snapshots; [Team tools](../tool-agent-team/README.md#model-experience) define snapshot reuse.
+バンドルパッチと設定ツールスキーマが不変の間、共有システムプロンプトとツールスキーマはプレフィックス stable を保ちます。Team 同一性はランタイムコンテキストスナップショット経由で追記されます。[Team ツール](../tool-agent-team/README.md#model-experience)はスナップショット再利用を定めます。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Opt-in only** — the package ships with the installation switched off; no shipped CLI, Web, SDK, ACP, or Python profile enables it.
-- **Workflow child tools** — the [Team tool visibility limitation](../tool-agent-team/README.md#known-limitations-and-deferred-work) also applies to workflow children.
-- **Shared checkout** — every teammate observes the same working directory; this bundle adds no worktree isolation or filesystem locking.
-- **Preset-scoped child controls** — Web presets can still mount continuable Subagent controls in their own scope; this top-level bundle does not replace those registrations.
-- **Base profile required** — the patch depends on row ids and Subagent providers supplied by `dsh-base`; it is not a standalone profile.
+- **Opt-in only** — パッケージはインストール無効で出荷されます。出荷 CLI、Web、SDK、ACP、Python プロファイルはいずれも有効化しません。
+- **Workflow child tools** — [Team ツール可視性制限](../tool-agent-team/README.md#known-limitations-and-deferred-work)は workflow 子にも適用されます。
+- **Shared checkout** — すべてのチームメイトは同じ作業ディレクトリーを観測します。このバンドルは worktree 分離もファイルシステムロックも加えません。
+- **Preset-scoped child controls** — Web プリセットは独自スコープに継続可能 Subagent 制御をまだマウントできます。このトップレベルバンドルはそれらの登録を置換しません。
+- **Base profile required** — パッチは `dsh-base` 提供の行 ID と Subagent プロバイダーに依存します。単独プロファイルではありません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

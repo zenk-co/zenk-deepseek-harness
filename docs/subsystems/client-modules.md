@@ -1,14 +1,14 @@
-# Client Modules
+# Client モジュール
 
-English | [中文](client-modules.zh.md)
+日本語 | [English](client-modules.en.md) | [中文](client-modules.zh.md)
 
-The web plugin table: the Node half of the client module system in [dsh-client-modules](../../packages/client/modules), provided as `ctx.clientModules` (`ClientModuleRegistry`). It scans the host Loader's entries for packages declaring `dsh.client`, composes the `window.__DSH_BOOT__` entry graph, serves versioned one-or-more-resource combo scripts under `/plugins`, and answers every index-injection collection with the boot protocol rows — the four faces of one service. It is an optional capability of the web GUI stack, not part of the agent-loop spine, and it is a consumer of [dsh-host-webserver](../../packages/host/webserver): the carrier described in [web-server.md](web-server.md) supplies the prefix route and the `webserver/index-inject` event this service answers. The same package's browser half (`ctx.modules`, the lazy-CJS module table that fetches and materializes these bundles) is kernel machinery documented in the [package README](../../packages/client/modules/README.md), not here.
+Web プラグインテーブル: [dsh-client-modules](../../packages/client/modules) にあるクライアントモジュールシステムの Node 半であり、`ctx.clientModules` (`ClientModuleRegistry`) として提供される。Host Loader のエントリーから `dsh.client` を宣言するパッケージを走査し、`window.__DSH_BOOT__` エントリーグラフを組み立て、`/plugins` の下でバージョン付きの 1 つ以上のリソースからなるコンボスクリプトを提供し、すべてのインデックス注入の収集に起動プロトコルの行で応答する — 1 つのサービスの 4 つの面である。Web GUI スタックのオプションのケイパビリティであり、エージェントループの背骨の一部ではなく、[dsh-host-webserver](../../packages/host/webserver) のコンシューマーである: [web-server.md](web-server.md) に記載されたキャリアが、このサービスが応答するプレフィックスルートと `webserver/index-inject` イベントを提供する。同じパッケージのブラウザー半 (`ctx.modules`、これらのバンドルを取得して実体化する lazy-CJS モジュールテーブル) は、[パッケージ README](../../packages/client/modules/README.md) に記載されたカーネル機構であり、本ページではない。
 
-Source: [`packages/client/modules/src/client/manifest.ts`](../../packages/client/modules/src/client/manifest.ts)
+ソース: [`packages/client/modules/src/client/manifest.ts`](../../packages/client/modules/src/client/manifest.ts)
 
-## The wire
+## ワイヤ
 
-The graph is the wire single source between the Node and browser halves. The host composes `WebBootEntry` rows and `WebBootBatch` descriptors from scanned packages, then contributes the registration facade, application preloads, bootstrap scripts, and graph global to the structured index-injection table before the Vite entry. The `global` row renders as `globalThis["__DSH_BOOT__"]` with `<` escaped so plugin-controlled strings cannot break out of the script element. A page without a valid manifest cannot boot: the browser parser rejects malformed rows or batches, unknown members, and entries without exactly one initial combo descriptor.
+グラフは Node 半とブラウザー半の間のワイヤの唯一の情報源である。Host は走査したパッケージから `WebBootEntry` 行と `WebBootBatch` 記述子を組み立て、次に Vite エントリーの前に、登録ファサード、アプリケーションのプリロード、ブートストラップスクリプト、グラフグローバルを構造化インデックス注入テーブルにコントリビュートする。`global` 行は `globalThis["__DSH_BOOT__"]` としてレンダリングされ、`<` がエスケープされるので、プラグインが制御する文字列が script 要素から抜け出すことはできない。有効なマニフェストのないページは起動できない: ブラウザーパーサーは不正な行またはバッチ、未知のメンバー、ちょうど 1 つの初期コンボ記述子を持たないエントリーを拒否する。
 
 ```ts type-equiv
 /**
@@ -85,23 +85,23 @@ interface WebBootGraph {
 }
 ```
 
-Initial publication and HMR derive each row's `rev` from the entry's mtime, ctime, and size, without hashing executable bytes. The same artifacts retain their revisions across Host restarts. The initial descriptors partition rows into bootstrap and application scheduling phases, and either phase may contain several descriptors. Their URLs contain only the ordered package-resource list and a revision derived from those row revisions; phase names do not enter the route. Graph composition preserves row order while greedily splitting before the map-form URL exceeds 3 KiB, without concatenating scripts or reading maps. The graph revision hashes the entry and batch descriptors. `immediately` marks the stage-one registration barrier; rows within one combo share its script transport, while separate combos load independently.
+初期発行と HMR は、実行可能バイトをハッシュせずに、各エントリーの mtime、ctime、size から各行の `rev` を導出する。同じアーティファクトは Host の再起動をまたいでリビジョンを保持する。初期記述子は行をブートストラップとアプリケーションのスケジューリングフェーズに分割し、どちらのフェーズも複数の記述子を含んでよい。それらの URL は順序付きのパッケージリソースリストと、それらの行リビジョンから導出されたリビジョンだけを含み、フェーズ名はルートに入らない。グラフの合成は行順を保ちつつ、map 形式の URL が 3 KiB を超える前に貪欲に分割し、スクリプトを連結したり map を読んだりしない。グラフリビジョンはエントリーとバッチの記述子をハッシュする。`immediately` はステージ 1 の登録バリアを印付けする。1 つのコンボ内の行はそのスクリプトの転送を共有し、別々のコンボは独立にロードされる。
 
-`release` pairs this package's version with the source commit the client build fixes into the built Host artifact, and stays outside the graph revision. A page applies graphs and rebuilt frames only while the Host serves the page's boot release; another release waits for a page reload ([Host release changes](../../packages/client/modules/README.md#host-release-changes)).
+`release` はこのパッケージのバージョンと、クライアントビルドがビルド済み Host アーティファクトに固定したソースコミットを対にするもので、グラフリビジョンの外側にとどまる。ページがグラフと再構築されたフレームを適用するのは、Host がそのページの起動リリースを提供している間だけであり、別のリリースはページのリロードを待つ ([Host リリースの変更](../../packages/client/modules/README.md#host-release-changes))。
 
-## The scan
+## スキャン
 
-A package joins the table by declaring `dsh.client` (`platform: 'web'`, optional `inject` edges, optional `immediately`) in its package.json and exporting its built bundle at `exports["./client"]`. Each live row resolves from its own Loader specifier and owning-tree `baseUrl`, through the same `loader.internal.resolveSync` implementation that imports its Host face when available. The nearest owning package manifest supplies the browser module id, so relative source and built overlays retain the package identity. Distinct active Loader sources resolving to one package name fail composition; after one source unloads, the surviving source supplies the row without a fiber restart.
+パッケージは package.json で `dsh.client` (`platform: 'web'`、オプションの `inject` エッジ、オプションの `immediately`) を宣言し、ビルド済みバンドルを `exports["./client"]` で公開することでテーブルに参加する。各ライブ行は自身の Loader 指定子と所有ツリーの `baseUrl` から、利用可能なときにその Host フェイスをインポートするのと同じ `loader.internal.resolveSync` 実装を通じて解決される。最も近い所有パッケージのマニフェストがブラウザーモジュール id を供給するので、相対ソースとビルド済みオーバーレイはパッケージアイデンティティを保つ。1 つのパッケージ名に解決される別個のアクティブ Loader ソースは合成に失敗する。1 つのソースがアンロードされると、残ったソースがファイバー再起動なしで行を供給する。
 
-Scanning is incremental per package; there is no full-rescan code path. Every cordis `internal/plugin` emission (fiber construction or disposal) marks the fiber's entry name dirty, and a microtask flush reconciles each dirty name against the live loader entries. The activation pass seeds the same dirty set with all current entries and flushes synchronously, so first scan and steady state share one implementation — with opposite failure postures. At activation, a malformed declaration or missing bundle among the already-loaded entries aggregates into one loud `AggregateError` listing every broken package: the fiber FAILS and the boot's fail-loud sweep reports it. In steady state, a broken package logs a warning and must not poison the others.
+走査はパッケージごとにインクリメンタルである。全再走査のコードパスは存在しない。すべての cordis `internal/plugin` 発行 (ファイバーの構築または破棄) がそのファイバーのエントリー名をダーティにし、マイクロタスクのフラッシュが各ダーティ名をライブの loader エントリーと突き合わせて調整する。アクティベーションパスはすべての現在のエントリーで同じダーティ集合をシードして同期的にフラッシュするので、最初の走査と定常状態は 1 つの実装を共有する — 失敗時の姿勢は正反対である。アクティベーション時、すでにロード済みのエントリーの中の不正な宣言または欠落したバンドルは、壊れたパッケージをすべて列挙した 1 つの大きな `AggregateError` に集約される: ファイバーは FAILED になり、起動の fail-loud スイープがそれを報告する。定常状態では、壊れたパッケージは警告をログし、他のパッケージを汚染してはならない。
 
-Package metadata — including the negative "not a client package" verdict — is cached per Loader specifier and owning-tree base URL until restart. A fiber restart from the same source reuses its row and rev untouched; bundle content changes reach the graph only through `rebuilt()`.
+パッケージメタデータ — 「クライアントパッケージではない」という否定的な判定を含む — は Loader 指定子と所有ツリーのベース URL ごとに再起動までキャッシュされる。同じソースからのファイバー再起動はその行と rev をそのまま再利用し、バンドル内容の変更は `rebuilt()` を通じてのみグラフに到達する。
 
-## The bundle route and index injection
+## バンドルルートとインデックス注入
 
-`GET`/`HEAD /plugins/??<package-a>/client.js,<package-b>/client.js&rev=<rev>` addresses one generated combo script; a one-resource request uses the same form and is the HMR path. The script is concatenated once on its first `GET` and ends with a `sourceMappingURL` that carries the combo query alone — `??<package-a>/client.js.map,<package-b>/client.js.map&rev=<rev>`, resolved against the script's own directory rather than the document. The map files are not read by startup, index rendering, script `GET`, or `HEAD`; the first map `GET` reads and validates them, composes one Indexed Source Map v3, and caches that body. An authored component map supplies its section; a component without one receives an identity section whose `sourcesContent` is the captured bundle and whose source name is its packaged `sourceURL` or plugin route. Every startup request URL is at most 3 KiB measured as UTF-8 bytes; partitioning uses the longer map form. All application URLs are preloaded, and all bootstrap URLs execute before the graph global and Vite entry. Materialized responses use long-lived immutable caching. Unknown or altered resource lists, missing revisions, and stale revisions answer 404 rather than serving different bytes or letting the SPA fallback return HTML as JavaScript; other methods are 405. The injection rows carry the current graph on every index render, so a reload always boots against the live composition.
+`GET`/`HEAD /plugins/??<package-a>/client.js,<package-b>/client.js&rev=<rev>` は生成された 1 つのコンボスクリプトをアドレス指定する。1 リソースのリクエストも同じ形式を使い、それが HMR パスである。スクリプトは最初の `GET` で 1 回だけ連結され、末尾にコンボクエリだけを運ぶ `sourceMappingURL` を付ける — `??<package-a>/client.js.map,<package-b>/client.js.map&rev=<rev>` で、これはドキュメントではなくスクリプト自身のディレクトリを基準に解決される。map ファイルは起動、インデックスレンダリング、スクリプトの `GET`、`HEAD` では読まれない。最初の map の `GET` がそれらを読んで検証し、1 つの Indexed Source Map v3 を合成し、そのボディをキャッシュする。作者によるコンポーネント map は自身のセクションを供給し、それを持たないコンポーネントは、`sourcesContent` が取り込まれたバンドルでありソース名がパッケージ化された `sourceURL` またはプラグインルートである identity セクションを受け取る。すべての起動リクエスト URL は UTF-8 バイトで測って最大 3 KiB であり、分割にはより長い map 形式が使われる。すべてのアプリケーション URL はプリロードされ、すべてのブートストラップ URL はグラフグローバルと Vite エントリーより前に実行される。実体化されたレスポンスは長寿命のイミュータブルキャッシュを使う。未知または改変されたリソースリスト、欠落したリビジョン、陳腐化したリビジョンは、異なるバイトを提供したり SPA フォールバックに HTML を JavaScript として返させたりするのではなく 404 を返す。他のメソッドは 405 である。注入行はすべてのインデックスレンダリングで現在のグラフを運ぶので、リロードは常にライブの合成に対して起動する。
 
-## The service
+## サービス
 
 ```ts type-equiv
 /** Filesystem baseline captured before a client artifact snapshot is read. */
@@ -117,9 +117,9 @@ interface ClientArtifactBaseline {
 }
 ```
 
-`ClientModuleRegistry` (`ctx.clientModules`, defined in [`packages/client/modules/src/index.ts`](../../packages/client/modules/src/index.ts)) exposes reads and the rebuild face; signatures are in the generated [service catalog](#ctxclientmodules--clientmoduleregistry). `graph()` returns the current composed graph (a stable object between changes), `clientPath(id)` returns the bundle's absolute path, and `artifactBaseline(id)` returns the bundle stat values captured before the current snapshot was read. `fetchBundle()` resolves the same lazy response used by the HTTP route. `rebuilt(id)` is the only entry point through which changed bundle content reaches the graph: it derives the revision from filesystem metadata, and only a revision change reads the new bytes, recomposes the graph, and notifies. `onRebuilt` fires per changed bundle with the new revision; `onGraphChanged` fires after any flush that recomposed the graph (row added or removed, or a rebuilt revision change) and is pull-model — listeners re-read `graph()`. Both notification paths contain listener exceptions so one throwing subscriber cannot skip later subscribers or kill whatever triggered the flush.
+`ClientModuleRegistry` (`ctx.clientModules`、[`packages/client/modules/src/index.ts`](../../packages/client/modules/src/index.ts) で定義) は読み取りと再構築の面を公開する。シグネチャーは生成された[サービスカタログ](#ctxclientmodules--clientmoduleregistry)にある。`graph()` は現在の合成済みグラフ (変更間で安定したオブジェクト) を返し、`clientPath(id)` はバンドルの絶対パスを返し、`artifactBaseline(id)` は現在のスナップショットが読まれる前に取得したバンドル stat 値を返す。`fetchBundle()` は HTTP ルートが使うのと同じ遅延レスポンスを解決する。`rebuilt(id)` は変化したバンドル内容がグラフに到達する唯一の入口である: ファイルシステムメタデータからリビジョンを導出し、リビジョンが変わったときだけ新しいバイトを読んでグラフを再合成し、通知する。`onRebuilt` は変化したバンドルごとに新しいリビジョンを伴って発火し、`onGraphChanged` はグラフを再合成したあらゆるフラッシュの後 (行の追加もしくは削除、または rebuilt によるリビジョン変化) に発火し、プルモデルである — リスナーは `graph()` を読み直す。両方の通知パスはリスナーの例外を内包するので、例外を投げる購読者が後続の購読者をスキップさせたり、フラッシュを引き起こしたものを殺したりすることはできない。
 
-[`dsh-client-hmr`](../../packages/client/hmr/README.md) delivers live graph snapshots in the shipped Web composition. The Host forwards existing graph-change notifications immediately, and reconnect sends the current full graph. A graph describes desired browser entries without asserting that Host cleanup has completed. Its artifact poll separately reports rebuilt revisions. Source-map changes alone do not trigger a reload; a new combo-map URL appears only after a bundle revision changes, and each map body is fixed by its first `GET`. Client Modules validates snapshots and serializes reconciliation with those rebuilds; it owns the boot-created entry map, single-resource arrivals, asynchronous removal, unused-module/style cleanup and page-local retry status. Static platform modules and the bootstrap retain their page lifetime; Electron installation is a separate flow.
+[`dsh-client-hmr`](../../packages/client/hmr/README.md) は、出荷される Web 構成でライブグラフのスナップショットを届ける。Host は既存のグラフ変更通知を即座に転送し、再接続は現在の完全なグラフを送る。グラフは Host のクリーンアップが完了したことを主張せずに、望ましいブラウザーエントリーを記述する。そのアーティファクトポーリングは再構築されたリビジョンを別途報告する。ソースマップの変更だけではリロードはトリガーされない。新しいコンボ map URL はバンドルのリビジョンが変わって初めて現れ、各 map ボディは最初の `GET` で固定される。Client Modules はスナップショットを検証し、調整をそれらの再構築と直列化する。起動時に作成されるエントリーマップ、単一リソースの到着、非同期削除、未使用モジュール/スタイルのクリーンアップ、ページローカルのリトライ状態を所有する。静的プラットフォームモジュールとブートストラップはページ寿命を保つ。Electron のインストールは別のフローである。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -127,13 +127,13 @@ interface ClientArtifactBaseline {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxclientmodules--clientmoduleregistry"></a>
 
 ### `ctx.clientModules` — `ClientModuleRegistry`
 
-The web plugin table service: incremental `dsh.client` scan + wire composition + bundle route + index injection rows. Construction runs the activation scan synchronously — a malformed declaration or missing bundle among the already-loaded entries aggregates into one loud throw (FAILED fiber; the boot activation audit reports it).
+Web プラグインテーブルサービス: インクリメンタルな `dsh.client` 走査 + ワイヤ合成 + バンドルルート + インデックス注入行。構築はアクティベーション走査を同期的に実行する — すでにロード済みのエントリーの中の不正な宣言または欠落したバンドルは、1 つの大きな throw に集約される (FAILED ファイバー。起動のアクティベーション監査がそれを報告する)。
 
 ```ts cordis-catalog
 /**
@@ -194,5 +194,5 @@ onRebuilt(listener: (id: string, rev: string) => void): () => void
 onGraphChanged(listener: () => void): () => void
 ```
 
-Source: [`packages/client/modules/src/index.ts`](../../packages/client/modules/src/index.ts)
+ソース: [`packages/client/modules/src/index.ts`](../../packages/client/modules/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -5,13 +5,13 @@ kind: persistence-change
 
 # 2026-09-30-job-session-lifecycle
 
-English | [中文](2026-09-30-job-session-lifecycle.zh.md)
+日本語 | [English](2026-09-30-job-session-lifecycle.en.md) | [中文](2026-09-30-job-session-lifecycle.zh.md)
 
-## Summary
+## 概要
 
-Records owned job registration and settlement with one unique JobId, original timestamps, creating tool calls, and producer completion reports.
+所有されたジョブ登録と確定を、一意の JobId、本来のタイムスタンプ、作成したツール呼び出し、プロデューサーの完了報告とともに記録する。
 
-## Table of Contents
+## 目次
 
 - [Declaration](#declaration)
 - [Compatibility](#compatibility)
@@ -19,7 +19,7 @@ Records owned job registration and settlement with one unique JobId, original ti
 - [Dev Note](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -37,16 +37,16 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-Adds required job event kinds without changing the Session envelope. New JobIds use a kind-prefixed UUID for both live controls and durable pairing; historical sessions receive no fabricated job history. Older builds reject unknown required events. producerReported describes completion-promise fulfillment, not verified resource release.
+セッションエンベロープを変更せずに必須ジョブイベント種別を追加する。新しい JobId はライブ制御と durable なペアリングの両方に種別接頭辞付き UUID を使う。履歴セッションには作り物のジョブ履歴を付与しない。古いビルドは未知の必須イベントを拒否する。producerReported は検証済みリソース解放ではなく完了プロミスの履行を表す。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Registry and snapshot-normalizer tests cover causal order and unique JobIds. CLI and SDK snapshots verify registration, settlement, and notices during execution; the [job lifecycle contract](../subsystems/jobs.md#session-lifecycle-records) allows incomplete terminal history during application teardown.
+レジストリとスナップショット正規化テストが因果順序と一意な JobId をカバーする。CLI と SDK のスナップショットが実行中の登録、確定、通知を検証する。アプリケーション終了中の不完全な終端履歴は [ジョブライフサイクル契約](../subsystems/jobs.md#session-lifecycle-records) が許容する。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 None.

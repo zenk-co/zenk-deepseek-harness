@@ -1,46 +1,46 @@
 ---
-description: "Six model-facing persistent terminal tools with owner isolation, bounded results, and optional background sends for agents that need cross-call terminal state."
+description: "呼び出しをまたぐターミナル状態を必要とするエージェント向けの、所有者分離・境界付き結果・任意のバックグラウンド送信を備えたモデル向け永続ターミナルツール 6 種。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-terminal
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-tool-terminal` when an agent needs persistent terminal state or interactive input across calls. It can open, send to, read, signal, close, and list terminal sessions while preventing one agent from operating another agent's sessions. Sends may wait for bounded foreground output or return a background job id for later collection or interruption. `maxResultBytes` caps each result, which remains in session history until compaction. The model is guided to prefer one-shot tools for bounded work.
+エージェントが呼び出しをまたいで永続的なターミナル状態や対話的な入力を必要とする場合は `dsh-tool-terminal` を使用します。ターミナルセッションを開き、送信し、読み取り、シグナルを送り、閉じ、一覧表示することができ、あるエージェントが別のエージェントのセッションを操作することを防ぎます。送信は境界付きのフォアグラウンド出力を待つか、後で収集または中断するためのバックグラウンドジョブ ID を返すことができます。`maxResultBytes` は各結果に上限を課し、結果はコンパクションまでセッション履歴に残ります。モデルは、境界付きの作業にはワンショットツールを優先するよう誘導されます。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と保留作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-`terminal_open` defaults to the Session's current working directory and resolves relative `cwd` overrides from it. Open terminals keep their own directory after the Session changes directory.
+`terminal_open` はデフォルトでセッションの現在の作業ディレクトリを使い、相対的な `cwd` オーバーライドはそこから解決します。開いたターミナルは、セッションがディレクトリを変更した後も独自のディレクトリを保ちます。
 
-Enable these tools when the composition mounts a terminal backend and the model should be able to use terminal state across calls — stepping a debugger, exploring in a REPL, or returning to a shell after interrupting a foreground command. The guidance section steers the model toward the one-shot bash, read, write, and edit tools for bounded operations.
+コンポジションがターミナルバックエンドをマウントしており、モデルが呼び出しをまたいでターミナル状態を使えるべき場合にこれらのツールを有効にします — デバッガーをステップ実行する、REPL で探索する、フォアグラウンドコマンドを中断した後にシェルへ戻る、といった場合です。ガイダンスセクションは、境界付きの操作にはワンショットの bash、read、write、edit ツールを優先するようモデルを誘導します。
 
-### The six tools
+### 6 つのツール
 
-| Tool | What it does | Result |
+| ツール | 動作 | 結果 |
 |---|---|---|
-| `terminal_open` | Creates an owner-scoped session from a backend type | Session id, name, type, pid, status, and bounded startup output |
-| `terminal_send` | Writes text, optionally submitting Enter, and waits for readiness — or starts a background job | Bounded output plus wait and session status, or a job id |
-| `terminal_read` | Reads a bounded page of retained output without sending input | Text with line pagination metadata |
-| `terminal_signal` | Delivers one allowed signal to the foreground process group | `delivered` plus the target process group id |
-| `terminal_close` | Closes a session and waits for its process tree to end | Closed or already-closing outcome |
-| `terminal_list` | Lists the caller's live sessions | Owner-scoped session summaries |
+| `terminal_open` | バックエンド種別から所有者スコープのセッションを作成する | セッション ID、名前、種別、pid、状態、および境界付きの起動出力 |
+| `terminal_send` | テキストを書き込み、任意で Enter を送信し、準備完了を待つ — またはバックグラウンドジョブを開始する | 境界付き出力と待機理由・セッション状態、またはジョブ ID |
+| `terminal_read` | 入力を送らずに保持された出力の境界付きページを読み取る | 行ページネーションメタデータ付きのテキスト |
+| `terminal_signal` | 許可されたシグナルを 1 つフォアグラウンドプロセスグループへ配信する | `delivered` と対象プロセスグループ ID |
+| `terminal_close` | セッションを閉じ、そのプロセスツリーの終了を待つ | 閉鎖済みまたは閉鎖中という結果 |
+| `terminal_list` | 呼び出し元のライブセッションを一覧表示する | 所有者スコープのセッションサマリー |
 
-### Composition
+### コンポジション
 
 ```yaml
 - name: '@deepseek-ai/dsh-terminal'
@@ -48,139 +48,139 @@ Enable these tools when the composition mounts a terminal backend and the model 
 - name: '@deepseek-ai/dsh-tool-terminal'
 ```
 
-The tools need `ctx.terminals` — a backend must be mounted — and the system-prompt service for the guidance section. Background sends additionally require the jobs service and its model-facing controller (`@deepseek-ai/dsh-tool-jobs`).
+ツールには `ctx.terminals` — バックエンドがマウントされている必要があります — と、ガイダンスセクション用のシステムプロンプトサービスが必要です。バックグラウンド送信にはさらに jobs サービスとそのモデル向けコントローラー (`@deepseek-ai/dsh-tool-jobs`) が必要です。
 
-### Configuration
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `enableRunInBackground` | `true` | Expose and accept `run_in_background`; `false` removes the schema field and rejects the argument |
-| `maxResultBytes` | `262144` | UTF-8 cap (minimum `64`) for each complete terminal result after wait, session, pagination, truncation, and job-status metadata |
+| `enableRunInBackground` | `true` | `run_in_background` を公開して受理する。`false` はスキーマフィールドを削除し、引数を拒否する |
+| `maxResultBytes` | `262144` | 待機・セッション・ページネーション・切り捨て・ジョブ状態メタデータの適用後における、各完全なターミナル結果の UTF-8 上限 (最小 `64`) |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-terminal) and [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-terminal) are the exhaustive sources for config fields and schemas.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-terminal)と[ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-terminal)が、設定フィールドとスキーマの網羅的な情報源です。
 
-### Background sends
+### バックグラウンド送信
 
-`terminal_send(run_in_background: true)` returns a job id immediately instead of waiting. The job is collected with `job_output`, which waits and reads incremental output, and stopped with `job_kill`, which delivers a real `SIGINT` to the foreground process group. Background mode fails before writing input when the jobs surface is absent.
+`terminal_send(run_in_background: true)` は待機せずに直ちにジョブ ID を返します。ジョブは `job_output` で収集し (待機して増分出力を読み取ります)、`job_kill` で停止します (`SIGINT` をフォアグラウンドプロセスグループへ実際に配信します)。バックグラウンドモードは、jobs サーフェスが存在しない場合、入力を書き込む前に失敗します。
 
-### Observable outcomes and failures
+### 観察可能な結果と失敗
 
-A foreground send returns the terminal's new output plus `wait: <reason>` and the session status; `session_exit` means the top-level shell exited, while `inferred_idle` or `timeout` never proves the foreground command exited. Opening a session with an unregistered backend type fails. Results larger than `maxResultBytes` are truncated at a UTF-8 boundary with a marker.
+フォアグラウンド送信は、ターミナルの新しい出力に加えて `wait: <reason>` とセッション状態を返します。`session_exit` はトップレベルシェルが終了したことを意味し、`inferred_idle` や `timeout` はフォアグラウンドコマンドが終了したことを決して証明しません。未登録のバックエンド種別でセッションを開くと失敗します。`maxResultBytes` より大きい結果は、UTF-8 境界でマーカー付きの切り捨てが行われます。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains the design behind the tools and points at the code that realizes it; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションではツール背後の設計を説明し、それを実現するコードを示します。観察可能な動作は[このパッケージを使う](#use-this-package)で扱います。
 
-### Design concept
+### 設計概念
 
-The package is a thin adapter: the six tools forward to `ctx.terminals` with the executing agent as the owner, and the presentation layer renders bounded results. Background sends register the in-flight operation on `ctx.jobs` so the generic job surface owns waiting, incremental reads, and `SIGINT` delivery.
+このパッケージは薄いアダプターです。6 つのツールは実行中のエージェントを所有者として `ctx.terminals` へ転送し、プレゼンテーション層が境界付きの結果をレンダリングします。バックグラウンド送信は進行中の操作を `ctx.jobs` に登録するため、汎用のジョブサーフェスが待機、増分読み取り、`SIGINT` 配信を所有します。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Six tool definitions, schemas, guidance section, background-job integration |
-| [`src/render.ts`](src/render.ts) | Result rendering and the complete-result UTF-8 cap |
+| [`src/index.ts`](src/index.ts) | 6 つのツール定義、スキーマ、ガイダンスセクション、バックグラウンドジョブ統合 |
+| [`src/render.ts`](src/render.ts) | 結果レンダリングと完全結果の UTF-8 上限 |
 
-### Result bounding
+### 結果の境界付け
 
-Every terminal-owned single-text result is capped by `maxResultBytes` after normalized tool or pipeline errors, policy denials and short-circuits, replacements and blocks, and generic job-status text; cuts preserve UTF-8 boundaries and reserve room for a truncation marker. Structured multi-block policy results retain their shape. The minimum cap of 64 bytes keeps every registry-issued session or job id visible in its creation acknowledgement.
+ターミナルが所有する単一テキスト結果はすべて、正規化されたツールまたはパイプラインのエラー、ポリシー拒否とショートサーキット、置換とブロック、汎用ジョブ状態テキストの後に `maxResultBytes` で上限が適用されます。切り詰めは UTF-8 境界を保ち、切り捨てマーカー用の余地を確保します。構造化されたマルチブロックのポリシー結果はその形を保ちます。最小上限 64 バイトにより、レジストリが発行するすべてのセッション ID またはジョブ ID が、その作成確認応答の中で可視のまま保たれます。
 
-### UI render intents
+### UI レンダーインテント
 
-Foreground sends use terminal call and result cards; background sends and the other five tools use generic `execute`, `read`, or `delete` cards. None of the tools emits source locations.
+フォアグラウンド送信はターミナル呼び出しカードと結果カードを使い、バックグラウンド送信と残り 5 つのツールは汎用の `execute`、`read`、`delete` カードを使います。どのツールもソース位置を出力しません。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the generated schemas to the service contract, the backend, and the background-job surface.
+パッケージレベルの契約では足りないときに、これらのページを読んでください。生成スキーマからサービス契約、バックエンド、バックグラウンドジョブサーフェスへと進みます。
 
-- [Tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-terminal) — the six generated schemas and result shapes.
-- [Terminal subsystem reference](../../../docs/subsystems/terminal.md) — the service contract and shared types behind the tools.
-- [terminal service](../../terminal/terminal/README.md) — session operations, owner fencing, and cleanup semantics.
-- [terminal-bash backend](../../terminal/terminal-bash/README.md) — the shipped shell backend that provides sessions.
-- [jobs package map](../../jobs/README.md) — the background-job surface that collects and kills background sends.
-- [Persistent PTY Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — the capability design and deferred boundaries.
+- [ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-terminal) — 6 つの生成スキーマと結果の形。
+- [ターミナルサブシステムリファレンス](../../../docs/subsystems/terminal.md) — ツール背後のサービス契約と共有型。
+- [terminal サービス](../../terminal/terminal/README.md) — セッション操作、所有者フェンシング、クリーンアップのセマンティクス。
+- [terminal-bash バックエンド](../../terminal/terminal-bash/README.md) — セッションを提供する出荷済みシェルバックエンド。
+- [jobs パッケージマップ](../../jobs/README.md) — バックグラウンド送信を収集・停止するバックグラウンドジョブサーフェス。
+- [永続 PTY Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — ケイパビリティ設計と保留された境界。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-The plugin contributes this fixed guidance section:
+プラグインはこの固定ガイダンスセクションを提供します:
 
-##### Terminal guidance
+##### ターミナルガイダンス
 
 ```markdown
 Use a terminal session only when work needs persistent terminal state or interactive stdin; prefer shell/read/write/edit for bounded one-shot operations. Track every terminal session id and close sessions that no longer matter. An inferred_idle or timeout result does not prove the foreground command exited.
 ```
 
-#### Token effect
+#### トークン効果
 
-Small fixed input cost on every request while the plugin is active.
+プラグインが有効な間、毎リクエストに小さな固定の入力コストがかかります。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Prefix-stable while the registration scope and guidance text are unchanged.
+登録スコープとガイダンステキストが変わらない限り、プレフィックスは安定します。
 
-### Tool schemas
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The six generated schemas are listed in the [`dsh-tool-terminal` catalog section](../../../docs/tool-catalog.md#deepseek-aidsh-tool-terminal). Their fixed schema tokens are present whenever this plugin is active; agent-scoped tool filtering may hide them.
+6 つの生成スキーマは [`dsh-tool-terminal` カタログセクション](../../../docs/tool-catalog.md#deepseek-aidsh-tool-terminal)に一覧されています。それらの固定スキーマトークンは、このプラグインが有効なときは常に存在します。エージェントスコープのツールフィルタリングがそれらを隠すことがあります。
 
-#### Token effect
+#### トークン効果
 
-Fixed schema cost on requests where the tools are visible.
+ツールが可視のリクエストにおける固定スキーマコスト。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Prefix-stable while tool visibility and definitions are unchanged.
+ツールの可視性と定義が変わらない限り、プレフィックスは安定します。
 
-### Tool results and task context
+### ツール結果とタスクコンテキスト
 
-#### What the model sees
+#### モデルが見るもの
 
-Spawn returns the id and bounded startup output. Send and read return bounded terminal text plus readiness and history markers. Background mode returns a generic job id. Every terminal-owned single-text result is capped by `maxResultBytes`; results remain in session history until compaction, and incremental task reads do not repeat consumed output.
+spawn は ID と境界付きの起動出力を返します。send と read は境界付きのターミナルテキストに加えて準備完了と履歴のマーカーを返します。バックグラウンドモードは汎用のジョブ ID を返します。ターミナルが所有する単一テキスト結果はすべて `maxResultBytes` で上限が適用されます。結果はコンパクションまでセッション履歴に残り、増分タスク読み取りは消費済みの出力を繰り返しません。
 
-#### Token effect
+#### トークン効果
 
-Terminal-owned results are data-dependent and bounded by `maxResultBytes`; each returned result stays in history until compaction.
+ターミナル所有の結果はデータ依存で、`maxResultBytes` によって境界付けられます。返された各結果はコンパクションまで履歴に残ります。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Append-only; new results follow the reusable request prefix.
+追記専用です。新しい結果は再利用可能なリクエストプレフィックスに続きます。
 
-## Known Limitations and Deferred Work
+## 既知の制限と保留作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the model-facing surface that is absent. They are current package constraints, not a task backlog.
+これらの制限は、欠けているモデル向けサーフェスを定義します。これらは現在のパッケージ制約であり、タスクバックログではありません。
 
-- **No TUI or key-sequence surface** — named key sequences, full-screen TUI interaction, BEL, resize, and auto-start are not exposed in any schema.
-- **Background mode requires the jobs surface** — `run_in_background` needs both `@deepseek-ai/dsh-jobs` and its model-facing controller (`@deepseek-ai/dsh-tool-jobs`); without them the argument is rejected.
+- **TUI やキーシーケンスのサーフェスはない** — 名前付きキーシーケンス、全画面 TUI 操作、BEL、リサイズ、自動起動はどのスキーマにも公開されていません。
+- **バックグラウンドモードには jobs サーフェスが必要** — `run_in_background` には `@deepseek-ai/dsh-jobs` とそのモデル向けコントローラー (`@deepseek-ai/dsh-tool-jobs`) の両方が必要です。それらがなければ引数は拒否されます。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

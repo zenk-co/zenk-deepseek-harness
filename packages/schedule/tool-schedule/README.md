@@ -1,130 +1,130 @@
 ---
-description: "Preset-scoped reminder management tools (schedule_create, schedule_list, schedule_update, schedule_delete) over the Host ctx.schedule service, for deployments choosing which agents may keep durable reminders."
+description: "Host ctx.schedule サービス上のプリセットスコープリマインダー管理ツール (schedule_create、schedule_list、schedule_update、schedule_delete)。どのエージェントが耐久リマインダーを保持できるか選ぶデプロイ向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-schedule
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-tool-schedule` to let an agent create, list, edit, and delete durable Host reminders through `schedule_create`, `schedule_list`, `schedule_update`, and `schedule_delete`. The package registers the four tools in the preset or Agent scope that mounts it, so the composition decides which agents receive them; `minimal` keeps none. Each call acts on the calling Agent's Session and only manages stored reminders — the Host `@deepseek-ai/dsh-schedule` service owns storage, scheduling, and delivery. Failures return one structured error code instead of storage details.
+`dsh-tool-schedule` を使い、エージェントが `schedule_create`、`schedule_list`、`schedule_update`、`schedule_delete` で耐久 Host リマインダーを作成・列挙・編集・削除できるようにする。パッケージはそれをマウントするプリセットまたは Agent スコープに 4 ツールを登録するため、どのエージェントが受け取るかは合成が決める。`minimal` は保持しない。各呼び出しは呼び出し Agent の Session に作用し、格納済みリマインダーのみ管理する — 記憶域・スケジューリング・配送は Host `@deepseek-ai/dsh-schedule` サービスが所有する。失敗は記憶域詳細ではなく 1 つの構造化エラーコードを返す。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Add the row below to a preset's plugin list when that preset's agents should manage durable reminders. The shipped Web `standard`, `cordis`, and `ptc` presets mount it; `minimal` does not.
+そのプリセットのエージェントが耐久リマインダーを管理すべき場合、プリセットのプラグイン一覧に下の行を追加する。出荷 Web `standard`、`cordis`、`ptc` プリセットはマウントし、`minimal` はしない。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it for any preset whose agents need to schedule future work in their own Session, and load `@deepseek-ai/dsh-schedule` in the same process: this package is only the model-facing consumer of that service. A preset that should stay capability-poor — `minimal` is the shipped example — omits the row, and its agents see no reminder tool at all.
+自身 Session で将来作業を予定すべきプリセットのエージェントには選ぶ。同じプロセスに `@deepseek-ai/dsh-schedule` をロードする。このパッケージはそのサービスのモデルに面したコンシューマーにすぎない。ケイパビリティ貧弱のままにすべきプリセット — 出荷例は `minimal` — は行を省き、そのエージェントはリマインダーツールをまったく見ない。
 
-### The four tools
+### 4 つのツール
 
-- `schedule_create(prompt, title, <one selector>)` — Create one reminder. Supply a non-empty prompt, a title of at most 120 characters, and exactly one of `after_seconds`, `at`, `every_seconds`, `daily`, `weekly`, or `cron`. Returns the canonical reminder view.
-- `schedule_list()` — List every active reminder of the calling Session with its id, title, UTC target, state, and delivery mode.
-- `schedule_update(id, <title|prompt|one selector>)` — Replace the name, instruction, or timing in place, or a combination of them. An unknown or ended reminder returns `updated: false` with the reason code; `after_seconds` is create-only.
-- `schedule_delete(id)` — Remove one retained reminder, active or ended. Unknown or already-deleted ids return `deleted: false`.
+- `schedule_create(prompt, title, <one selector>)` — リマインダー 1 件を作成する。非空 prompt、最大 120 文字の title、`after_seconds`、`at`、`every_seconds`、`daily`、`weekly`、`cron` のちょうど 1 つを提供する。正準リマインダービューを返す。
+- `schedule_list()` — 呼び出し Session の全有効リマインダーをその id・タイトル・UTC 目標・状態・配送モード付きで列挙する。
+- `schedule_update(id, <title|prompt|one selector>)` — 名前・指示・タイミングをその場で置換する、またはそれらの組み合わせ。未知または終了済みリマインダーは理由コード付き `updated: false` を返す。`after_seconds` は作成専用である。
+- `schedule_delete(id)` — 保持リマインダー 1 件を除去する。有効・終了済みを問わない。未知または削除済み id は `deleted: false` を返す。
 
-### Minimal configuration
+### 最小構成
 
 ```yaml
 - name: '@deepseek-ai/dsh-tool-schedule'
 ```
 
-The package declares no `Config` fields. It injects `ctx.tools` and registers the four tools once the scope resolves the Host `ctx.schedule` service, so a composition that keeps that service off mounts no reminder tool. Each call acts on the Session of the Agent that dispatched it.
+パッケージは `Config` フィールドを宣言しない。`ctx.tools` を注入し、スコープが Host `ctx.schedule` サービスを解決したら 4 ツールを登録するため、そのサービスを切った合成はリマインダーツールをマウントしない。各呼び出しはそれをディスパッチした Agent の Session に作用する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The plugin registers four `defineTool` definitions through the context that loads it, so a preset mount decides visibility and Cordis effect ownership disposes them with the mount. Execution reads `exec.agent` for the Session binding and the injected `ctx.schedule` service for storage; the delegation-depth guard runs before selector and identity checks, all before the service call, and any failure the service raises that is not a `ScheduleInputError` collapses to `internal_error` so storage details never reach the model. Model content is the canonical JSON of the returned value, and the Host service owns persistence, scheduling, Session restoration, and delivery.
+プラグインはそれをロードするコンテキスト経由で 4 つの `defineTool` 定義を登録するため、プリセットマウントが可視性と Cordis effect 所有権を決め、マウントと共に破棄される。実行は Session 束縛に `exec.agent` を、記憶域に注入 `ctx.schedule` サービスを読む。委任深度ガードはセレクターと識別子検査より先に動き、すべてサービス呼び出しより前であり、サービスが上げる失敗のうち `ScheduleInputError` でないものは `internal_error` に畳まれるため、記憶域詳細は決してモデルに届かない。モデル内容は返値の正準 JSON であり、Host サービスが永続化・スケジューリング・Session 復元・配送を所有する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: the four registrations, selector validation, and the render/present helpers |
+| [`src/index.ts`](src/index.ts) | プラグイン入口。4 登録、セレクター検証、描画/表示ヘルパー |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Schedule service](../schedule/README.md) — the Host task store, runtime, and delivery behavior these tools manage.
-- [Schedule group map](../README.md) — the sibling packages in this group.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-schedule) — the exact four schemas the model receives.
-- [Schedule subsystem](../../../docs/subsystems/schedule.md) — the `ctx.schedule` Cordis surface and stored types.
-- [Schedule user guide](../../../docs/user/guide/schedule.md) — the user-facing reminder workflow.
+- [Schedule サービス](../schedule/README.md) — これらツールが管理する Host タスク蓄積・ランタイム・配送動作。
+- [Schedule グループマップ](../README.md) — このグループの兄弟パッケージ。
+- [生成されるツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-schedule) — モデルが受け取る正確な 4 スキーマ。
+- [Schedule サブシステム](../../../docs/subsystems/schedule.md) — `ctx.schedule` Cordis 面と格納型。
+- [Schedule ユーザーガイド](../../../docs/user/guide/schedule.md) — ユーザーに面したリマインダーワークフロー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Tool schemas
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The generated [`schedule_create`, `schedule_list`, `schedule_update`, and `schedule_delete` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-schedule) whenever this package is visible in the calling Agent's scope. Title guidance does not rewrite stored titles or add validation beyond the existing non-empty and length checks.
+呼び出し Agent のスコープでこのパッケージが見える場合の、生成される [`schedule_create`、`schedule_list`、`schedule_update`、`schedule_delete` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-schedule)。タイトル案内は格納タイトルを書き換えず、既存の非空・長さ検査を超える検証を追加しない。
 
-#### Token effect
+#### トークンへの影響
 
-A fixed schema cost on every request from an Agent whose preset mounts the package. Agents under a preset that omits the row pay nothing.
+パッケージをマウントするプリセットの Agent からの全リクエストに固定スキーマコストがかかる。行を省くプリセット配下のエージェントは支払わない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while tool definitions and visibility are unchanged. Mounting, disposal, or a scope change may invalidate reuse from the first changed schema token.
+ツール定義と可視性不変の間は接頭辞安定である。マウント・破棄・スコープ変更は最初の変更スキーマトークンから再利用を無効化しうる。
 
-### Reminder results
+### リマインダー結果
 
-#### What the model sees
+#### モデルが見るもの
 
-One lossless JSON text block per call: a reminder view for `schedule_create`, an array of views for `schedule_list`, `{ id, deleted }` for `schedule_delete`, and a reminder view or `{ id, updated: false, code }` for `schedule_update`. A rejected call returns `{ code, message }` carrying one published error code.
+呼び出しごとに 1 つの非損失 JSON テキストブロック。`schedule_create` にはリマインダービュー、`schedule_list` にはビュー配列、`schedule_delete` には `{ id, deleted }`、`schedule_update` にはリマインダービューまたは `{ id, updated: false, code }`。拒否呼び出しは公開エラーコード 1 件を運ぶ `{ code, message }` を返す。
 
-#### Token effect
+#### トークンへの影響
 
-Results remain in the calling Session's history until compaction and repeat the stored reminder fields; a long reminder list costs its full rendered length on every later request.
+結果は圧縮まで呼び出し Session の履歴に残り、格納リマインダーフィールドを繰り返す。長いリマインダー一覧は後の全リクエストでその完全描画長を費やす。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
+追記のみ。新規可視内容は再利用可能なリクエスト接頭辞の後に続き、既存 KV キャッシュエントリを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **No tools without the Host service** — a composition that mounts this package without `ctx.schedule` leaves the plugin pending, so none of the four tools register.
-- **Every call needs a calling Agent** — a call dispatched without one returns `internal_error` rather than guessing a Session.
-- **Deletion does not retract a queued message** — a reminder the Host already delivered stays in the Session inbox after `schedule_delete`.
-- **Reminder timing belongs to the Host** — the tools expose no target-time correction, clock source, or delivery retry; those limits are the service's.
-- **Every tool refuses a delegated caller** — each of `schedule_create`, `schedule_list`, `schedule_update`, and `schedule_delete` reads the calling Agent's delegation depth before dispatch and returns `{ code: 'subagent_session', message: 'A delegated subagent cannot use reminders.' }` when that depth is above zero. The guard lives in this package and reads `delegationDepthOf` from `@deepseek-ai/dsh-subagent`, the same accounting the delegation cap enforces, so it holds under any preset that mounts the tools.
-- **A Session a delegated child owns cannot arm a reminder** — `ScheduleService.create` throws `ScheduleInputError` with code `subagent_session`, and `ScheduleService.update` returns the non-mutating `subagent_session` result, when the Session's Agent has a delegation depth above zero. The delegation depth is the accounting the delegation cap itself reads, and the persisted session header carries it across a cold resume. The rule sits in the service, not in these tools, so other in-process consumers reach it too: the Automation surface included. `schedule_list` and `schedule_delete` still serve that Session, so a reminder stored before this rule stays removable.
+- **Host サービスなしではツールなし** — `ctx.schedule` なしでこのパッケージをマウントする合成はプラグインを待ちのままにし、4 ツールはどれも登録されない。
+- **すべての呼び出しは呼び出し Agent を要する** — なしでディスパッチされた呼び出しは Session 推測ではなく `internal_error` を返す。
+- **削除はキュー済みメッセージを引っ込めない** — Host が既に配送したリマインダーは `schedule_delete` 後も Session inbox に残る。
+- **リマインダータイミングは Host に属する** — ツールは目標時刻補正・時刻源・配送再試行を公開しない。それらの制限はサービスのものである。
+- **すべてのツールは委任呼び出し元を拒否する** — `schedule_create`、`schedule_list`、`schedule_update`、`schedule_delete` の各々はディスパッチ前に呼び出し Agent の委任深度を読み、ゼロ超過で `{ code: 'subagent_session', message: 'A delegated subagent cannot use reminders.' }` を返す。ガードはこのパッケージにあり、委任上限が強制するのと同じ計算 `delegationDepthOf` を `@deepseek-ai/dsh-subagent` から読むため、ツールをマウントする任意プリセットで保たれる。
+- **委任子が所有する Session はリマインダーを仕掛けられない** — Session の Agent 委任深度がゼロ超過の場合、`ScheduleService.create` はコード `subagent_session` の `ScheduleInputError` を投げ、`ScheduleService.update` は非変更 `subagent_session` 結果を返す。委任深度は委任上限自体が読む計算であり、永続セッションヘッダーがコールド再開をまたいで運ぶ。規則はこれらツールではなくサービスにあり、他のインプロセス消費者にも届く。Automation 面を含む。`schedule_list` と `schedule_delete` はその Session に引き続き仕えるため、この規則以前に格納されたリマインダーは除去可能なままである。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

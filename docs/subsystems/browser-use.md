@@ -1,42 +1,42 @@
-# Browser use
+# ブラウザー利用
 
-English | [中文](browser-use.zh.md)
+日本語 | [English](browser-use.en.md) | [中文](browser-use.zh.md)
 
-Browser use lets a model inspect and operate web pages through a configured backend. DSH owns the task loop; the provider supplies browser operations and keeps browser state across turns of one live Session.
+ブラウザー利用により、モデルは設定済みバックエンドを通じて Web ページを検査し操作できる。DSH はタスクループを所有する。プロバイダーはブラウザー操作を提供し、1 つのライブセッションのターンにわたってブラウザー状態を保持する。
 
-## Choose a provider
+## プロバイダーの選択
 
-Mount [`dsh-browser-use`](../../packages/browser-use/browser-use/README.md) and one provider in the same composition. The providers are experimental public npm packages and require explicit activation. Their initial browser engine is Chromium.
+[`dsh-browser-use`](../../packages/browser-use/browser-use/README.md) と 1 つのプロバイダーを同じ構成にマウントする。プロバイダーは実験的な公開 npm パッケージであり、明示的な有効化が必要である。それらの初期ブラウザーエンジンは Chromium である。
 
-| Provider | Integration |
+| プロバイダー | 統合 |
 |---|---|
-| [Playwright MCP](../../packages/experimental/browser-use-playwright-mcp/README.md) | Playwright's browser-control MCP tools |
-| [Chrome DevTools MCP](../../packages/experimental/browser-use-chrome-devtools-mcp/README.md) | Chrome DevTools inspection and control through MCP |
-| [Stagehand](../../packages/experimental/browser-use-stagehand-native/README.md) | Native browser operations with AI-assisted actions, observation, and extraction |
+| [Playwright MCP](../../packages/experimental/browser-use-playwright-mcp/README.md) | Playwright のブラウザー制御 MCP ツール |
+| [Chrome DevTools MCP](../../packages/experimental/browser-use-chrome-devtools-mcp/README.md) | MCP を通じた Chrome DevTools 検査と制御 |
+| [Stagehand](../../packages/experimental/browser-use-stagehand-native/README.md) | AI 支援アクション、観察、抽出を備えたネイティブブラウザー操作 |
 
-The shared service registers only a name and rejects any second provider, including another instance with the same name. It has no common browser-operation methods, browser resources, or model-controlled selector. Provider configuration in a profile or preset selects launch or attachment for that activation.
+共有サービスは名前のみを登録し、同名の別インスタンスを含む 2 つ目のプロバイダーを拒否する。共通ブラウザー操作メソッド、ブラウザーリソース、モデル制御セレクターは持たない。プロファイルやプリセットでのプロバイダー設定は、その有効化のための起動または接続を選択する。
 
-## Session ownership
+## セッション所有
 
-A launched browser belongs to the exact live Agent and Session that uses it. Calls across turns reuse that browser. Disposing the Session runtime closes its launched resources; reloading or forking a Session starts fresh browser state. Browser profiles and login state are not restored from the Session log.
+起動されたブラウザーはそれを使う正確なライブエージェントとセッションに属する。ターンをまたぐ呼び出しはそのブラウザーを再利用する。セッションランタイムの破棄は起動したリソースを閉じる。セッションのリロードやフォークは新しいブラウザー状態で開始する。ブラウザープロファイルとログイン状態はセッションログから復元されない。
 
-An attached browser remains externally owned. The provider reserves it for one Session within that provider instance, preserves its existing browser state, and rejects simultaneous attachment by another Session. Teardown disconnects and leaves the external browser running. Separate DSH processes and other clients remain outside this reservation.
+接続されたブラウザーは外部所有のままである。プロバイダーはそのプロバイダーインスタンス内で 1 つのセッションのためにそれを確保し、既存のブラウザー状態を保ち、別のセッションによる同時接続を拒否する。テアダウンは切断し、外部ブラウザーを実行中のままにする。別の DSH プロセスと他のクライアントはこの確保の範囲外である。
 
-Provider shutdown stops tool admission and waits for owned work and resource cleanup before releasing the shared provider registration. Cancellation cannot undo a browser action already delivered.
+プロバイダー停止はツール受付を止め、所有作業とリソース片付けを待ってから共有プロバイダー登録を解放する。すでに配送されたブラウザーアクションはキャンセルで取り消せない。
 
-## MCP initialization
+## MCP 初期化
 
-An MCP provider initializes one client for each live Agent created after the provider loads. The existing serial `agent/created` event awaits connection and discovery before creation or resume completes and queued input runs. The client remains with the Session across turns. Startup failure or cancellation rejects creation or resume and triggers client cleanup.
+MCP プロバイダーはプロバイダー読み込み後に作成されるライブエージェントごとに 1 つのクライアントを初期化する。既存の直列 `agent/created` イベントは、作成や再開の完了前およびキュー済み入力の実行前に接続と検出を待機する。クライアントはターンをまたいでセッションと共に残る。起動失敗やキャンセルは作成や再開を拒否し、クライアント片付けを引き起こす。
 
-If an attachment is busy, that activation continues without the browser and does not retry on later turns. After release, a newly created or resumed activation can acquire it. Loading or reloading the provider does not adopt already active Sessions; the [shared runtime](../../packages/experimental/browser-use-runtime/README.md) owns these initialization rules.
+接続先が使用中の場合、その有効化はブラウザーなしで継続し、後のターンに再試行しない。解放後、新たに作成または再開された有効化はそれを取得できる。プロバイダーの読み込みや再読み込みはすでに有効なセッションを引き継がない。これらの初期化規則は[共有ランタイム](../../packages/experimental/browser-use-runtime/README.md)が所有する。
 
-## Tools and recorded results
+## ツールと記録済み結果
 
-Provider tools use the normal DSH execution pipeline and Session log. The providers own their tool schemas, result rendering, image support, configuration, and upstream limitations; the shared service adds no model-visible content. Stagehand's AI-assisted operations use its explicitly configured native model while DSH retains the task loop. DSH model routing, credential reuse, underlying inference request/response capture, and integration into Session usage accounting are deferred; returned SDK data and metadata remain ordinary logged tool results.
+プロバイダーツールは通常の DSH 実行パイプラインとセッションログを使う。プロバイダーはツールスキーマ、結果描画、画像対応、設定、上流制限を所有する。共有サービスはモデル可視コンテンツを追加しない。Stagehand の AI 支援操作は明示的に設定されたネイティブモデルを使う一方、DSH はタスクループを保持する。DSH モデル経路指定、認証情報再利用、基盤推論要求・応答捕捉、セッション使用量集計への統合は先送りである。返される SDK データとメタデータは通常のログ済みツール結果のままである。
 
-Browser MCP connections also expose [resources and server instructions](mcp.md). Resource calls addressed to a browser server use its Session queue and reject other Sessions; server instructions are assembled only for its owning Session.
+ブラウザー MCP 接続は[リソースとサーバー指示](mcp.md)も公開する。ブラウザーサーバー宛てのリソース呼び出しはそのセッションキューを使い、他のセッションを拒否する。サーバー指示は所有セッションのためだけに組み立てられる。
 
-The [decision record](../../.agents/notes/implemented/architecture/2026-09-12-browser-use-provider-registration.md) explains the registration-only service and per-Session ownership.
+[決定記録](../../.agents/notes/implemented/architecture/2026-09-12-browser-use-provider-registration.md)は登録専用サービスとセッションごとの所有を説明する。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -44,13 +44,13 @@ The [decision record](../../.agents/notes/implemented/architecture/2026-09-12-br
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される(doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。再生成は `pnpm run gen-cordis-catalog`)。言語版の違いは、ロケール固有のペアドキュメントパスのみである。シグネチャブロックは `ts cordis-catalog` フェンスを使用し、元のソース JSDoc を保持する。ディスパッチモードは [primer](../cordis-primer.md#dispatch-modes) で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxbrowseruse--browseruseregistry"></a>
 
 ### `ctx.browserUse` — `BrowserUseRegistry`
 
-Owns one optional provider registration in the shared browser-use service.
+共有 browser-use サービス内の任意の単一プロバイダー登録を所有する。
 
 ```ts cordis-catalog
 /**
@@ -63,5 +63,5 @@ Owns one optional provider registration in the shared browser-use service.
 register(name: BrowserUseProviderName): () => Promise<void>
 ```
 
-Source: [`packages/browser-use/browser-use/src/index.ts`](../../packages/browser-use/browser-use/src/index.ts)
+ソース: [`packages/browser-use/browser-use/src/index.ts`](../../packages/browser-use/browser-use/src/index.ts)
 <!-- END GENERATED cordis-surface -->

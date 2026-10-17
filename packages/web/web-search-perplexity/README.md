@@ -1,39 +1,39 @@
 ---
-description: "The Perplexity-backed search provider for ctx.web: how deployments mount OpenAI-compatible Perplexity search with generated answers and citations."
+description: "ctx.web 用の Perplexity ベースの検索プロバイダー: 生成回答と引用を伴う OpenAI 互換の Perplexity 検索をデプロイがどのようにマウントするか。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-web-search-perplexity
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-With `dsh-web-search-perplexity`, the harness searches the web through Perplexity and gets a model-generated answer plus citeable sources in one call. Choose it when a deployment has a Perplexity API key and wants a generated answer. Perplexity has no result-count control, so the returned sources are truncated to the requested bound after the fact. When Perplexity omits structured result metadata, sources fall back to URL-only citations. The model-facing `web_search` tool lives in `dsh-tool-web`.
+`dsh-web-search-perplexity` を使用すると、harness は Perplexity を通じて Web を検索し、1 回の呼び出しでモデル生成の回答と引用可能なソースを取得する。デプロイが Perplexity API キーを持ち、生成された回答を求める場合に選択する。Perplexity には結果件数の制御がないため、返されたソースは事後に要求された上限まで切り詰められる。Perplexity が構造化された結果メタデータを省略した場合、ソースは URL のみの引用にフォールバックする。モデルに面する `web_search` ツールは `dsh-tool-web` にある。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Mount the provider in a composition that already loads the web service; it registers as the `perplexity` search provider, so `ctx.web.search()` resolves it automatically when it is the only usable search backend — or pin it with `searchProvider: perplexity`.
+すでに Web サービスをロードしている構成にこのプロバイダーをマウントする。`perplexity` 検索プロバイダーとして登録されるため、唯一の使用可能な検索バックエンドである場合は `ctx.web.search()` が自動的に解決する。または `searchProvider: perplexity` で固定する。
 
-### When to choose it
+### いつ選択するか
 
-Choose this backend when a deployment holds a Perplexity API key and wants a model-generated answer plus citeable sources in one search. The provider is unavailable — and every search call fails with a structured error — when the key is empty or the endpoint base does not parse.
+デプロイが Perplexity API キーを保持し、1 回の検索でモデル生成の回答と引用可能なソースを求める場合にこのバックエンドを選択する。キーが空であるか、エンドポイントベースがパースできない場合、プロバイダーは利用不可となり、すべての検索呼び出しが構造化エラーで失敗する。
 
-### Minimal configuration
+### 最小構成
 
-Load the web service and the provider; the API key falls back to `$PERPLEXITY_API_KEY` from the launch environment, and all other settings have safe defaults.
+Web サービスとプロバイダーをロードする。API キーは起動環境の `$PERPLEXITY_API_KEY` にフォールバックし、他のすべての設定には安全なデフォルトがある。
 
 ```yaml
 - name: '@deepseek-ai/dsh-web'
@@ -42,124 +42,124 @@ Load the web service and the provider; the API key falls back to `$PERPLEXITY_AP
     apiKey: !!js process.env.PERPLEXITY_API_KEY
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `apiKey` | `$PERPLEXITY_API_KEY` | Perplexity API key; empty or absent makes the provider unavailable |
-| `baseURL` | `https://api.perplexity.ai` | Endpoint base; `/chat/completions` is appended. An unparseable value makes the provider unavailable |
-| `model` | `sonar` | Search model name |
-| `maxTokens` | `1024` | Upper bound on generated answer tokens (`max_tokens`); must be a positive integer |
-| `searchRecency` | (unset) | Recency window sent as `search_recency_filter`: `day`, `week`, `month`, or `year`. Unset sends no filter |
+| `apiKey` | `$PERPLEXITY_API_KEY` | Perplexity API キー。空または不在の場合はプロバイダーが利用不可になる |
+| `baseURL` | `https://api.perplexity.ai` | エンドポイントベース。`/chat/completions` が付加される。パースできない値はプロバイダーを利用不可にする |
+| `model` | `sonar` | 検索モデル名 |
+| `maxTokens` | `1024` | 生成される回答トークンの上限(`max_tokens`)。正の整数でなければならない |
+| `searchRecency` | (未設定) | `search_recency_filter` として送信される新しさのウィンドウ: `day`、`week`、`month`、`year`。未設定の場合はフィルターを送信しない |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web-search-perplexity) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-web-search-perplexity)が、受け付けられるすべてのフィールドとその JSDoc の完全な情報源である。
 
-### What a search returns
+### 検索が返すもの
 
-`content` carries Perplexity's generated answer. `sources[]` prefers the structured `search_results[]` (`url`, `title`, `snippet`, `publishedAt` from `date`) and falls back to the URL-only `citations[]` array only when `search_results` is absent — which is why `title`/`snippet`/`publishedAt` are optional on the service. Perplexity exposes no result-count control, so the service enforces `maxResults` by truncating and flagging.
+`content` は Perplexity の生成した回答を運ぶ。`sources[]` は構造化された `search_results[]`(`url`、`title`、`snippet`、`date` からの `publishedAt`)を優先し、`search_results` がない場合にのみ URL のみの `citations[]` 配列にフォールバックする。これが `title`/`snippet`/`publishedAt` がサービス上でオプションである理由である。Perplexity は結果件数の制御を公開しないため、サービスは切り詰めとフラグ付けによって `maxResults` を強制する。
 
-### Failures and recovery
+### 失敗と回復
 
-Provider failures — HTTP errors, network failures, unparseable or wrong-shape bodies — surface as `WebError` `WEB_PROVIDER_ERROR`; an aborted request surfaces as `WEB_ABORTED`. HTTP redirects are rejected before the `Location` target is contacted and surface as `WEB_PROVIDER_ERROR`. Callers route on the code; the model-facing `web_search` tool surfaces failures to the model under its own error wrapper.
+プロバイダーの失敗(HTTP エラー、ネットワーク障害、パースできない、または形の合わないボディ)は `WebError` の `WEB_PROVIDER_ERROR` として表面化する。中断されたリクエストは `WEB_ABORTED` として表面化する。HTTP リダイレクトは `Location` ターゲットに接触する前に拒否され、`WEB_PROVIDER_ERROR` として表面化する。呼び出し元はコードでルーティングする。モデルに面する `web_search` ツールは、独自のエラーラッパーの下で失敗をモデルに提示する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the provider; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、プロバイダーの背後の設計判断を説明する。観察可能な動作は[このパッケージの使い方](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計哲学
 
-The provider is a thin adapter over Perplexity's chat-completions endpoint with two deliberate rules:
+このプロバイダーは、Perplexity の chat-completions エンドポイント上の薄いアダプターであり、2 つの意図的なルールを持つ:
 
-- **The generated answer is trusted as `content`.** Unlike the other search backends, Perplexity returns a model-generated answer, and this provider passes it through as the normalized `content` field.
-- **Structured sources win; URL-only citations are the fallback.** `search_results[]` carries the portable fields; `citations[]` carries only URLs, and the service vocabulary makes those fields optional precisely for this case.
+- **生成された回答は `content` として信頼される。** 他の検索バックエンドと異なり、Perplexity はモデル生成の回答を返し、このプロバイダーはそれを正規化された `content` フィールドとしてそのまま通す。
+- **構造化ソースが優先し、URL のみの引用はフォールバックである。** `search_results[]` は移植可能なフィールドを運び、`citations[]` は URL のみを運ぶ。サービスの語彙がこれらのフィールドをオプションにしているのは、まさにこのケースのためである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config schema, environment fallback, provider registration |
-| [`src/provider.ts`](src/provider.ts) | The `PerplexitySearchProvider`: request dispatch, abort classification, answer and source mapping |
-| [`src/types.ts`](src/types.ts) | Perplexity wire types for the chat-completions response |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: 設定スキーマ、環境フォールバック、プロバイダー登録 |
+| [`src/provider.ts`](src/provider.ts) | `PerplexitySearchProvider`: リクエストのディスパッチ、abort の分類、回答とソースのマッピング |
+| [`src/types.ts`](src/types.ts) | chat-completions レスポンスの Perplexity ワイヤ型 |
 
-### Request and mapping flow
+### リクエストとマッピングの流れ
 
-`search()` posts the query with the model, token cap, and optional recency filter to `{baseURL}/chat/completions` with `redirect: 'error'`. The response's `content` becomes `content`; `search_results[]` becomes `sources[]` when present, otherwise each `citations[]` entry becomes a URL-only source; and the service applies the final `maxResults` bound on the way back. An abort — a `DOMException` named `AbortError` — becomes `WEB_ABORTED`; anything else becomes `WEB_PROVIDER_ERROR`.
+`search()` はクエリをモデル、トークン上限、オプションの新しさフィルターとともに `redirect: 'error'` で `{baseURL}/chat/completions` に POST する。レスポンスの `content` が `content` になり、存在する場合は `search_results[]` が `sources[]` になり、そうでなければ各 `citations[]` エントリが URL のみのソースになる。サービスは戻り道で最終的な `maxResults` の上限を適用する。abort(`AbortError` という名前の `DOMException`)は `WEB_ABORTED` になり、それ以外は `WEB_PROVIDER_ERROR` になる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared vocabulary to the service, the model-facing tools, and the design rationale.
+パッケージレベルのコントラクトでは足りない場合にこれらのページを読む。共有の語彙から、サービス、モデルに面するツール、設計の根拠へと進む。
 
-- [Web subsystem](../../../docs/subsystems/web.md) — the exhaustive search request/result vocabulary and error codes.
-- [Web package map](../README.md) — the six-package family and each role.
-- [dsh-web](../web/README.md) — the web service this provider registers into.
-- [dsh-tool-web](../tool-web/README.md) — the model-facing `web_search` tool that renders this provider's sources.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web-search-perplexity) — every accepted config field and its source declaration.
-- [Web capability seam decision](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) — why search and fetch share one provider-selection service.
+- [Web サブシステム](../../../docs/subsystems/web.md) — 完全な検索リクエスト/結果の語彙とエラーコード。
+- [Web パッケージマップ](../README.md) — 6 パッケージのファミリーと各役割。
+- [dsh-web](../web/README.md) — このプロバイダーが登録する Web サービス。
+- [dsh-tool-web](../tool-web/README.md) — このプロバイダーのソースをレンダリングする、モデルに面する `web_search` ツール。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-web-search-perplexity) — 受け付けられるすべての設定フィールドとそのソース宣言。
+- [Web ケイパビリティシームの決定](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) — 検索とフェッチが 1 つのプロバイダー選択サービスを共有する理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Auxiliary Perplexity request
+### 補助的な Perplexity リクエスト
 
-#### What the model sees
+#### モデルに見えるもの
 
-A separate Perplexity model receives `<query>` verbatim as its sole user message through the chat-completions endpoint. This request is not part of the conversation model's context.
+別個の Perplexity モデルが、chat-completions エンドポイントを通じて `<query>` をそのまま唯一のユーザーメッセージとして受け取る。このリクエストは会話モデルのコンテキストの一部ではない。
 
-#### Token effect
+#### トークンへの影響
 
-Separate provider tokens are incurred per search; `maxTokens` caps the generated answer.
+検索ごとに別個のプロバイダートークンが発生する。`maxTokens` が生成される回答を制限する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Independent of the conversation request cache. An identical query under the same model route may reuse provider cache; a changed query or route establishes a different prefix.
+会話リクエストのキャッシュとは独立している。同じモデルルートの下での同一のクエリはプロバイダーキャッシュを再利用する可能性がある。クエリやルートが変わると、異なるプレフィックスが確立される。
 
-### Conversation tool result, indirectly
+### 会話ツールの結果(間接的)
 
-#### What the model sees
+#### モデルに見えるもの
 
-Through `dsh-tool-web`, the conversation model sees the generated answer plus structured result metadata or URL-only citations. This provider's exact failures are `Perplexity search aborted`, `Perplexity search request failed: <error>`, and `Perplexity returned an unprocessable response body: <error>`; HTTP failures preserve the provider message. The consumer owns the error wrapper.
+`dsh-tool-web` を通じて、会話モデルは生成された回答と、構造化された結果メタデータまたは URL のみの引用を見る。このプロバイダーの正確な失敗は `Perplexity search aborted`、`Perplexity search request failed: <error>`、`Perplexity returned an unprocessable response body: <error>` である。HTTP の失敗はプロバイダーのメッセージを保持する。エラーラッパーはコンシューマーが所有する。
 
-#### Token effect
+#### トークンへの影響
 
-Zero direct conversation tokens from registration. Answer and source tokens are data-dependent, source count is service-bounded, and the retained result or error is resent until compaction.
+登録による直接の会話トークンはゼロ。回答とソースのトークンはデータ依存であり、ソース数はサービスによって制限され、保持された結果またはエラーはコンパクションまで再送信される。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに従い、既存の KV キャッシュエントリを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the provider is a poor fit. They are current package constraints.
+これらの制限は、プロバイダーが適さない状況を定義する。現在のパッケージの制約である。
 
-- **Citation-fallback sources are URL-only** — when Perplexity omits structured `search_results[]`, sources carry no `title`/`snippet`/`publishedAt`, so the tool renders bare hostname labels.
-- **Over-returned sources still cost tokens and latency** — with no result-count control on the wire, `maxResults` is enforced only post-hoc by service truncation.
-- **Only `model`/`maxTokens`/`searchRecency` are exposed** — Perplexity's other search controls (domain filters, `web_search_options` context size, images) wait on provider-neutral service fields ([seam Agent Note](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md)).
-- **Abort classification is error-shape-based** — only a `DOMException` named `AbortError` maps to `WEB_ABORTED`; an abort carrying a custom reason (such as `dsh-timeout`'s `TimeoutReason`) surfaces as `WEB_PROVIDER_ERROR`.
+- **引用フォールバックのソースは URL のみ** — Perplexity が構造化された `search_results[]` を省略した場合、ソースは `title`/`snippet`/`publishedAt` を持たないため、ツールはホスト名のみのラベルをレンダリングする。
+- **過剰に返されたソースは依然としてトークンとレイテンシを消費する** — ワイヤ上に結果件数の制御がないため、`maxResults` はサービスの切り詰めによる事後的な強制のみである。
+- **公開されるのは `model`/`maxTokens`/`searchRecency` のみ** — Perplexity の他の検索制御(ドメインフィルター、`web_search_options` のコンテキストサイズ、画像)は、プロバイダー中立のサービスフィールドを待っている([シーム Agent Note](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md))。
+- **abort の分類はエラーの形に基づく** — `AbortError` という名前の `DOMException` のみが `WEB_ABORTED` にマッピングされる。カスタム理由(`dsh-timeout` の `TimeoutReason` など)を運ぶ abort は `WEB_PROVIDER_ERROR` として表面化する。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior, limits, and rationale live in the sections above and the linked Agent Notes.
+この Dev Note はメンテナー向けの作業コンテキストであり、未解決の質問と未決定の方向性を示す。明示的に権威を持たない。出荷された動作、制限、根拠は、上記のセクションとリンクされた Agent Note にある。
 
-#### Future: wider Perplexity control surface
+#### 将来: より広い Perplexity 制御サーフェス
 
-Perplexity's domain filters, `web_search_options` context size, and image support stay unexposed. Exposing them needs provider-neutral service fields first, so the family adds one coordinated control rather than a vendor-specific argument.
+Perplexity のドメインフィルター、`web_search_options` のコンテキストサイズ、画像サポートは非公開のままである。それらを公開するにはまずプロバイダー中立のサービスフィールドが必要であり、ファミリーはベンダー固有の引数ではなく、調整された 1 つの制御を追加する。
 
 </details>

@@ -1,28 +1,28 @@
-# Create review Sessions from GitHub webhooks
+# GitHub Webhook からレビューセッションを作成する
 
-English | [中文](github-review.zh.md)
+日本語 | [English](github-review.en.md) | [中文](github-review.zh.md)
 
-This opt-in overlay adds a signed GitHub endpoint to `dsh web`. When a pull request in the configured repository changes from draft to ready for review, the rule creates a titled root Session under the repository's Web Workspace and starts a read-only review prompt.
+このオプトインのオーバーレイは、署名付き GitHub エンドポイントを `dsh web` に追加する。設定されたリポジトリのプルリクエストがドラフトからレビュー待ちに変わると、ルールはリポジトリの Web ワークスペース配下にタイトル付きルートセッションを作成し、読み取り専用のレビュープロンプトを開始する。
 
-## Prerequisites
+## 前提条件
 
-- A local checkout that DSH may register as a Web Workspace.
-- A high-entropy GitHub webhook secret available through the `DSH_GITHUB_WEBHOOK_SECRET` credential reference.
-- A TLS reverse proxy or tunnel that can forward one public URL to the loopback listener.
-- GitHub webhook subscription to the Pull requests event with content type `application/json`.
+- DSH が Web ワークスペースとして登録できるローカルチェックアウト。
+- `DSH_GITHUB_WEBHOOK_SECRET` 資格情報参照経由で利用できる高エントロピーの GitHub Webhook シークレット。
+- 1 つの公開 URL をループバックリスナーに転送できる TLS リバースプロキシまたはトンネル。
+- Pull requests イベントへの GitHub Webhook 購読（コンテンツタイプ `application/json`）。
 
-The overlay defaults the Workspace to the launch directory and the listener to `127.0.0.1:3081`. Override them with `DSH_GITHUB_REVIEW_WORKSPACE` and `DSH_GITHUB_WEBHOOK_PORT`.
+オーバーレイはワークスペースの既定値を起動ディレクトリ、リスナーの既定値を `127.0.0.1:3081` とする。`DSH_GITHUB_REVIEW_WORKSPACE` と `DSH_GITHUB_WEBHOOK_PORT` で上書きできる。
 
-## Start DSH
+## DSH を起動する
 
-Generate a secret and retain the same value across restarts:
+シークレットを生成し、再起動をまたいで同じ値を保持する:
 
 ```sh
 export DSH_GITHUB_WEBHOOK_SECRET="$(openssl rand -hex 32)"
 printf '%s\n' "$DSH_GITHUB_WEBHOOK_SECRET"
 ```
 
-Install both experimental packages into the Web profile first. Profiles do not install peers automatically; the GitHub adapter needs the webhook runtime explicitly:
+まず両方の experimental パッケージを Web プロファイルにインストールする。プロファイルはピアを自動インストールしないため、GitHub アダプターには webhook ランタイムを明示的に指定する必要がある:
 
 ```sh
 dsh plugin --profile web add @deepseek-ai/dsh-webhook @deepseek-ai/dsh-webhook-github
@@ -30,15 +30,15 @@ export DSH_GITHUB_REVIEW_WORKSPACE=/path/to/deepseek-harness
 dsh web --patch "${DSH_HOME:-$HOME/.dsh}/profiles/web/node_modules/@deepseek-ai/dsh-webhook-github/examples/github-review/cordis.yml"
 ```
 
-The adapter distributes the example, which loads from the profile's installation directory so its rule module can resolve profile-installed peers. Do not run the rule from an arbitrary directory outside the profile. To customize it, copy both example files to `$DSH_HOME/profiles/web/github-review/`, edit the configuration, and point `--patch` at that copy of `cordis.yml`; use `~/.dsh` when `DSH_HOME` is unset.
+アダプターはサンプルを配布し、プロファイルのインストールディレクトリから読み込むため、ルールモジュールはプロファイルにインストールされたピアを解決できる。プロファイル外の任意のディレクトリからルールを実行してはならない。カスタマイズするには、2 つのサンプルファイルを `$DSH_HOME/profiles/web/github-review/` にコピーし、設定を編集して、そのコピーの `cordis.yml` を `--patch` に指定する。`DSH_HOME` が未設定の場合は `~/.dsh` を使う。
 
-The repository example lives under `packages/experimental/webhook-github/examples/github-review/`. The CLI does not install webhook packages or list them as Official plugins; installing the packages and supplying the overlay are separate steps.
+リポジトリのサンプルは `packages/experimental/webhook-github/examples/github-review/` にある。CLI は webhook パッケージをインストールもせず、Official プラグインとしても一覧表示しない。パッケージのインストールとオーバーレイの指定は別の手順である。
 
-## Expose the dedicated endpoint
+## 専用エンドポイントを公開する
 
-The main Web UI and `/api` remain on port 3080. The overlay mounts a second WebServer in an isolated realm; only `POST /github` is registered there, and every other path returns `404`.
+メインの Web UI と `/api` はポート 3080 のままである。オーバーレイは隔離されたレルムに 2 つ目の WebServer をマウントする。そこに登録されるのは `POST /github` のみであり、それ以外のパスはすべて `404` を返す。
 
-A Caddy configuration can expose only that listener:
+Caddy 設定でそのリスナーのみを公開できる:
 
 ```caddyfile
 hooks.example.com {
@@ -50,7 +50,7 @@ hooks.example.com {
 }
 ```
 
-Configure GitHub with:
+GitHub 側は次のように設定する:
 
 ```text
 Payload URL:  https://hooks.example.com/github
@@ -60,17 +60,17 @@ Events:       Pull requests
 Active:       yes
 ```
 
-## Rule behavior
+## ルールの動作
 
-The rule accepts only source `primary-github`, repository `deepseek-ai/deepseek-harness`, event `pull_request`, and action `ready_for_review`. It passes the exact head SHA plus selected PR fields to the review prompt, labeling the JSON as untrusted metadata and forbidding file, branch, PR, or GitHub mutation.
+ルールが受け付けるのは、ソース `primary-github`、リポジトリ `deepseek-ai/deepseek-harness`、イベント `pull_request`、アクション `ready_for_review` のみである。正確な head SHA と選択した PR フィールドをレビュープロンプトに渡し、その JSON を信頼できないメタデータとして表示し、ファイル・ブランチ・PR・GitHub の変更を禁じる。
 
-The Session request selects the `standard` agent preset and `read-only` permission preset. `workspacePath` is canonicalized through `WorkspaceRegistry.create()`, so the first matching delivery creates the Web Workspace when absent and later deliveries reuse it.
+セッション要求は `standard` エージェントプリセットと `read-only` 権限プリセットを選択する。`workspacePath` は `WorkspaceRegistry.create()` 経由で正規化されるため、最初の一致する配送で存在しない Web ワークスペースが作成され、以降の配送はそれを再利用する。
 
-The HTTP response is intentionally weaker than the Agent outcome: `202` means the signature and JSON were accepted and rule calls were scheduled in memory. It does not mean this rule matched or that a Session was created.
+HTTP 応答は意図的にエージェントの結果より弱い。`202` は署名と JSON を受け付け、ルール呼び出しをメモリ内で予定したことを意味する。このルールが一致したことやセッションが作成されたことを意味しない。
 
-## Programmatic extensions
+## プログラムによる拡張
 
-`run()` is ordinary trusted JavaScript. A deployment can query an internal policy service before returning a Session request:
+`run()` は通常の信頼された JavaScript である。デプロイはセッション要求を返す前に内部ポリシーサービスに問い合わせできる:
 
 ```js
 const response = await fetch('https://policy.internal/pr-review', {
@@ -82,7 +82,7 @@ const response = await fetch('https://policy.internal/pr-review', {
 if (!response.ok || (await response.json()).automaticReview !== true) return null
 ```
 
-It can also map repositories to different local paths:
+リポジトリを異なるローカルパスに対応付けることもできる:
 
 ```js
 const workspacePath = {
@@ -92,8 +92,8 @@ const workspacePath = {
 if (workspacePath === undefined) return null
 ```
 
-## Delivery semantics
+## 配送セマンティクス
 
-The webhook runtime stores no delivery or execution state. Repeated delivery runs the rule and may create another Session. A crash loses rule calls that have not admitted their prompt. After prompt admission, the ordinary Session log, persistence, Workspace, and Agent lifecycle own the work.
+webhook ランタイムは配送状態も実行状態も保存しない。配送が繰り返されるとルールが再実行され、別のセッションが作成される場合がある。クラッシュするとプロンプト承認前のルール呼び出しは失われる。プロンプト承認後は、通常のセッションログ・永続化・ワークスペース・エージェントライフサイクルが作業を引き継ぐ。
 
-The webhook secret authenticates inbound GitHub data only. It grants neither rule code nor the created Agent outbound GitHub access; configure that authority separately when a rule or Agent needs it.
+webhook シークレットは受信 GitHub データを認証するだけである。ルールコードにも作成されたエージェントにも送信側の GitHub アクセス権を与えない。ルールやエージェントがそれを必要とする場合は、その権限を別途設定する。

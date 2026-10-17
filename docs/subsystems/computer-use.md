@@ -1,34 +1,34 @@
-# Computer use
+# 計算機利用
 
-English | [中文](computer-use.zh.md)
+日本語 | [English](computer-use.en.md) | [中文](computer-use.zh.md)
 
-Computer use lets a model observe and operate the local desktop through a configured provider. The shared DSH capability is called **computer use**; **Cua Driver** names the upstream implementation.
+計算機利用は設定済み提供子を通じて模型に地域卓面を観測操作させる。共有 DSH ケイパビリティは**計算機利用**と呼ばれ、**Cua Driver** は上流実装を名指す。
 
 
-The [`macOS CUA provider`](../../packages/experimental/cua-macos/README.md) uses the [shared CUA objects and executor](../../packages/experimental/cua/README.md), which enforce application consent through User Questions and profile configuration.
+[`macOS CUA 提供子`](../../packages/experimental/cua-macos/README.md)は[共有 CUA 対象と実行子](../../packages/experimental/cua/README.md)を使い、利用者質問とプロファイル設定を通じて応用承諾を強制する。
 
-## Choose a provider
+## 提供子を選ぶ
 
-Mount [`dsh-computer-use`](../../packages/computer-use/computer-use/README.md) and one provider in the same composition. Both Cua Driver providers are experimental public npm packages and require explicit activation.
+同一組み立てに [`dsh-computer-use`](../../packages/computer-use/computer-use/README.md) と提供子 1 つを載せる。両 Cua Driver 提供子は試験公開 npm パッケージであり、明示的参加を要する。
 
-| Provider | Runtime |
+| 提供子 | 実行時 |
 |---|---|
-| [Cua Driver MCP](../../packages/experimental/computer-use-cua-driver-mcp/README.md) | An already installed `cua-driver` executable connected through MCP |
-| [Cua Driver native](../../packages/experimental/computer-use-cua-driver-native/README.md) | The platform-native runtime installed with the npm dependency |
+| [Cua Driver MCP](../../packages/experimental/computer-use-cua-driver-mcp/README.md) | MCP 経由で接続された導入済み `cua-driver` 実行物 |
+| [Cua Driver 本来](../../packages/experimental/computer-use-cua-driver-native/README.md) | npm 依存で導入される台本来実行時 |
 
-Each provider supplies its upstream tool catalog. The shared service registers only a name and rejects any second provider, including another instance with the same name. It has no common desktop-operation methods or model-controlled selector.
+各提供子は上流道具目録を供給する。共有サービスは名のみを登録し、同名の別実体を含む 2 件目の提供子を拒む。共通卓面操作法も模型制御選択子も持たない。
 
-## Lifetime and desktop sharing
+## 寿命と卓面共有
 
-A provider retains its registration while it shuts down its tools and owned resources. Startup failure releases the attempted registration. The MCP provider keeps its registration during reconnects.
+提供子は道具と所有資源を閉じつつ登録を保つ。起動失敗は試みた登録を放す。MCP 提供子は再接続中に登録を保つ。
 
-One registered provider does not reserve a desktop for a Session. Callers coordinate complete observe, act, and verify workflows across Sessions and separate DSH processes. A cancelled call cannot undo input that the desktop already received.
+登録済み提供子 1 つはセッション用に卓面を確保しない。呼び出し側はセッション群と分離 DSH 過程にまたがり完全な観測、動作、検証作業流を調整する。取り消された呼び出しは卓面が既に受けた入力を取り消せない。
 
-## Results and platform requirements
+## 結果と台要件
 
-Tools use the normal execution pipeline and Session log. Image-capable model routes with an attachment store receive durable screenshots; unsupported image routes receive the existing MCP image diagnostic. Provider READMEs own installation, permission, and platform limitations.
+道具は通常実行管路とセッション記録を使う。付属貯蔵付き画像対応模型経路は durable 截図を受け、未対応画像経路は既存 MCP 画像診断を受ける。提供子 README が導入、許可、台制限を所有する。
 
-The [decision record](../../.agents/notes/implemented/architecture/2026-09-12-computer-use-provider-registration.md) explains the registration-only service and the two Cua Driver integrations.
+[決定記録](../../.agents/notes/implemented/architecture/2026-09-12-computer-use-provider-registration.md)は登録のみサービスと 2 つの Cua Driver 統合を述べる。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -36,13 +36,13 @@ The [decision record](../../.agents/notes/implemented/architecture/2026-09-12-co
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によりソースから生成 (doc-sync 内の `pnpm run verify-cordis-catalog` で鮮度を検証。`pnpm run gen-cordis-catalog` で再生成) — 言語面は地域固有の対訳文書経路のみが異なる。署名ブロックは `ts cordis-catalog` フェンスを使い元のソース JSDoc を保つ。送出様式は[入門](../cordis-primer.md#dispatch-modes)で定義し、継承 `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxcomputeruse--computeruseregistry"></a>
 
 ### `ctx.computerUse` — `ComputerUseRegistry`
 
-Owns one optional provider registration in the shared computer-use service.
+共有計算機利用サービス内の任意提供子登録 1 件を所有する。
 
 ```ts cordis-catalog
 /**
@@ -55,5 +55,5 @@ Owns one optional provider registration in the shared computer-use service.
 register(name: ComputerUseProviderName): () => Promise<void>
 ```
 
-Source: [`packages/computer-use/computer-use/src/index.ts`](../../packages/computer-use/computer-use/src/index.ts)
+ソース: [`packages/computer-use/computer-use/src/index.ts`](../../packages/computer-use/computer-use/src/index.ts)
 <!-- END GENERATED cordis-surface -->

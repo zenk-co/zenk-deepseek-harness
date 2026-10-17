@@ -1,12 +1,12 @@
-# 1. Your first plugin
+# 1. はじめてのプラグイン
 
-English | [中文](01-first-plugin.zh.md)
+日本語 | [English](01-first-plugin.en.md) | [中文](01-first-plugin.zh.md)
 
-In the loader configuration used here, a Cordis plugin module named-exports an `apply` function. When Cordis loads it, it calls `apply` with a **context** — the `ctx` object through which the plugin registers everything it contributes.
+ここで使用するローダー構成では、Cordis プラグインモジュールは `apply` 関数を名前付きエクスポートする。Cordis が読み込む際、プラグインが提供するものをすべて登録するための **コンテキスト** である `ctx` オブジェクトを渡して `apply` を呼び出す。
 
-## Write the plugin
+## プラグインを書く
 
-In your `tmp/cordis-tutorial` directory (see [setup](index.md#setup)), create `hello.ts`:
+`tmp/cordis-tutorial` ディレクトリ内（[セットアップ](index.md#setup)を参照）に `hello.ts` を作成する:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -18,41 +18,41 @@ export function apply(ctx: Context) {
 }
 ```
 
-The `name` export is optional display metadata; it labels the plugin in diagnostics.
+`name` エクスポートは任意の表示用メタデータであり、診断出力でプラグインにラベルを付ける。
 
-## Compose the app
+## アプリケーションを組み立てる
 
-This tutorial's launcher assembles the application from configuration. Create `cordis.yml`:
+このチュートリアルのランチャーは設定からアプリケーションを組み立てる。`cordis.yml` を作成する:
 
 ```yaml
 - name: './hello.ts'
 ```
 
-The file is a list of plugin entries. `name` is a module specifier — a relative path or an npm package name — and the loader mounts every entry. Entries start concurrently, so list position guarantees nothing about which plugin loads first; ordering comes from service dependencies (`inject`, [chapter 3](03-services.md)), not from position in the file.
+このファイルはプラグインエントリのリストである。`name` はモジュール指定子（相対パスまたは npm パッケージ名）であり、ローダーはすべてのエントリをマウントする。エントリは並行に開始するため、リスト内の位置によってどのプラグインが先に読み込まれるかは決まらない。順序はファイル内の位置ではなくサービス依存関係（`inject`、[第 3 章](03-services.md)）によって決まる。
 
-## Run it
+## 実行する
 
 ```sh
 node --import tsx ../../vendor/cordis/bin.js
 ```
 
-Expected output:
+期待される出力:
 
 ```
 hello from my first plugin
 ```
 
-The process exits on its own once nothing is left running. What happened:
+実行中のものがなくなるとプロセスは自動的に終了する。起こったことは次のとおり:
 
-1. The launcher created a root `Context` and mounted the **Loader** plugin.
-2. The Loader read `cordis.yml`, resolved `./hello.ts`, and mounted it as a child plugin.
-3. Cordis called your `apply(ctx)`.
+1. ランチャーがルート `Context` を作成し、**Loader** プラグインをマウントした。
+2. Loader が `cordis.yml` を読み込み、`./hello.ts` を解決して子プラグインとしてマウントした。
+3. Cordis があなたの `apply(ctx)` を呼び出した。
 
-There is no framework bootstrap code in your file: a plugin describes what it contributes, and `cordis.yml` composes the application. The [`dsh` base](../../packages/bundle/base/cordis.patch.yml), for example, is a longer plugin composition that deployment overlays patch.
+あなたのファイルにフレームワークのブートストラップコードはない。プラグインは提供するものを記述し、`cordis.yml` がアプリケーションを組み立てる。たとえば [`dsh` ベース](../../packages/bundle/base/cordis.patch.yml)は、デプロイオーバーレイがパッチする長いプラグイン構成である。
 
-## The two other plugin shapes
+## 他の 2 つのプラグイン形式
 
-A function is the most common form, but Cordis accepts three:
+関数が最も一般的な形式だが、Cordis は 3 つを受け付ける:
 
 ```ts
 import { Service, type Context } from '@deepseek-ai/cordis'
@@ -74,11 +74,11 @@ export class MyService extends Service {
 }
 ```
 
-Use the function form until you need to expose a service; [chapter 3](03-services.md) covers when the class form earns its place.
+サービスを公開する必要が生じるまでは関数形式を使う。[第 3 章](03-services.md)ではクラス形式がふさわしい場合を説明する。
 
-## Try breaking it
+## 壊してみる
 
-Make `apply` throw:
+`apply` が例外を投げるようにする:
 
 ```ts ignore-check
 export function apply(ctx: Context) {
@@ -86,10 +86,10 @@ export function apply(ctx: Context) {
 }
 ```
 
-Run again: the process dies with your error. A plugin that fails to load is a loud failure, not a skipped entry.
+もう一度実行すると、プロセスはあなたのエラーで終了する。読み込みに失敗したプラグインはスキップされるのではなく、大きな失敗として扱われる。
 
-One caveat worth knowing early: a config entry whose module cannot be **resolved** — a typo'd path or package name — is reported through the Cordis logger service instead of crashing the process, and at boot that report can be lost before a console exporter is watching. If a freshly added entry seems to do nothing, check the spelling first.
+早めに知っておくべき注意点が 1 つある。モジュールを **解決** できない設定エントリ（パスやパッケージ名のタイプミス）はプロセスをクラッシュさせる代わりに Cordis ロガーサービス経由で報告され、起動時にはコンソールエクスポーターが監視を始める前にその報告が失われることがある。追加したばかりのエントリが何もしないように見える場合は、まず綴りを確認すること。
 
-Next: [Lifecycle and effects](02-lifecycle-and-effects.md) — what happens when a plugin unloads.
+次へ: [ライフサイクルとエフェクト](02-lifecycle-and-effects.md) — プラグインのアンロード時に起こること。
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)

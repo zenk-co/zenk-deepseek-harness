@@ -5,55 +5,55 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-api-account-controller
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Account screens use authenticated Remote commands and a snapshot stream. The controller exposes login state without returning tokens or PKCE secrets.
+アカウント画面は認証済み Remote コマンドとスナップショットストリームを使用する。コントローラーはトークンや PKCE シークレットを返さずにログイン状態を公開する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージを使う](#use-this-package)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The account namespace exposes getState, getProfile / getBalance, getUnnotifiedBonuses, ackBonusNotified, startSignIn, cancelSignIn, signOut, and watch. watch emits an initial complete state and subsequent complete states; disconnecting stops observation, not the login attempt. Cancellation names the attempt ID so a stale screen cannot cancel a newer login. getUnnotifiedBonuses returns null and ackBonusNotified returns false while the account is absent or has changed; failures the caller should retry arrive as thrown Remote errors.
+アカウント名前空間は getState、getProfile / getBalance、getUnnotifiedBonuses、ackBonusNotified、startSignIn、cancelSignIn、signOut、watch を公開する。watch は初期の完全な状態と、その後の完全な状態を送出する。切断はログイン試行ではなく観測を停止する。取り消しは試行 ID を指定するため、古い画面が新しいログインを取り消すことはない。アカウントが存在しないか変更されている間、getUnnotifiedBonuses は null を返し、ackBonusNotified は false を返す。呼び出し元が再試行すべき失敗は、投げられた Remote エラーとして届く。
 
-Every operation that reaches Platform takes the calling UI's `AccountClientMetadata` — client version, active language, and UTC offset in seconds — so the Host reports the requesting UI rather than the last caller it saw. Cancellation and watch remain identity-free because they never reach Platform.
+Platform に到達するすべての操作は、呼び出し元 UI の `AccountClientMetadata`（クライアントバージョン、アクティブ言語、秒単位 UTC オフセット）を受け取る。これにより Host は最後に見た呼び出し元ではなく、要求した UI を報告する。取り消しと watch は Platform に到達しないため ID を持たない。
 
-`watchExpiry` delivers live credential-expiry notifications without an initial item or replay. Desktop uses this stream to hand off a one-shot toast when switching to Welcome.
+`watchExpiry` は、初期アイテムやリプレイなしにライブのクレデンシャル有効期限通知を配信する。Desktop は Welcome への切り替え時にワンショットトーストを受け渡すためにこのストリームを使用する。
 
-`hasRunningAccountTasks` checks running Agents through the account-owned predicate over their latest logged request context, including tools and retries. Idle Agents and API-key contexts are excluded. The account provider independently cancels matching tasks when credentials are removed.
+`hasRunningAccountTasks` は、アカウント所有の述語により実行中のエージェントを検査する。対象はツールと再試行を含む最新のログ済みリクエストコンテキストである。アイドル状態のエージェントと API キーコンテキストは除外される。アカウントプロバイダーはクレデンシャル除去時、一致するタスクを独自に取り消す。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-The controller forwards operations to the account service and maintains no independent account state.
+コントローラーは操作をアカウントサービスに転送し、独自のアカウント状態を保持しない。
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-The [credentials subsystem](../../../docs/subsystems/credentials.md) owns storage APIs; the [architecture](../../../docs/architecture.md) explains application composition.
+[クレデンシャルサブシステム](../../../docs/subsystems/credentials.md)がストレージ API を所有し、[アーキテクチャ](../../../docs/architecture.md)がアプリケーション構成を説明する。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as account credentials affect HTTP authentication and never enter model prompts, Session logs, or tool results.
+なし。アカウントクレデンシャルは HTTP 認証に影響し、モデルプロンプト、セッションログ、ツール結果には入らない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No model request prefix changes.
+モデルリクエストプレフィックスの変更はない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- A disconnected UI can recover account state through watch, but cannot resume an attempt after the Host exits. Credentials and request-token resolution are not Remote operations.
+- 切断された UI は watch 経由でアカウント状態を回復できるが、Host 終了後に試行を再開できない。クレデンシャルとリクエストトークン解決は Remote 操作ではない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
-The [desktop login decision](../../../.agents/notes/implemented/architecture/2026-09-14-deepseek-account-login.md) records cancellation and storage ownership.
+[デスクトップログイン決定](../../../.agents/notes/implemented/architecture/2026-09-14-deepseek-account-login.md)は取り消しとストレージ所有権を記録している。

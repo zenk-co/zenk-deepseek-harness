@@ -1,23 +1,23 @@
 # Contributing
 
-English | [中文](CONTRIBUTING.zh.md)
+日本語 | [English](CONTRIBUTING.en.md) | [中文](CONTRIBUTING.zh.md)
 
-Thank you for your interest in contributing to DeepSeek Harness!
+DeepSeek Harness への貢献に興味を持っていただきありがとうございます!
 
-We deeply believe in the power of open source communities, and that belief has shaped this project from the very beginning.
+私たちはオープンソースコミュニティの力を深く信じており、その信念はプロジェクト開始当初からこのプロジェクトを形作ってきました。
 
-DeepSeek Harness is still at an early stage and under active development. We are sorry that we cannot accept external pull requests at the moment. However, contributing code to this repository is far from the only way to help. There are many other ways to get involved:
+DeepSeek Harness はまだ初期段階にあり、活発に開発中です。現時点では外部プルリクエストを受け付けできないことをお詫びします。ただし、このリポジトリへのコード貢献は助ける唯一の方法にはほど遠いものです。参加する方法は他にも多くあります:
 
-- Identify and report issues or bugs in GitHub Discussions:
-  - Upvote discussions that you would like to bring to the team's attention. We are a very small team and may not be able to reply to every post, but we monitor them and consider them when allocating resources.
-- Contribute to the ecosystem:
-  - Create a plugin that excites you and share it with others:
-    - Associate your GitHub project with the `dsh-plugin` topic to help others discover your plugin.
-  - Write blog posts and how-to guides about DeepSeek Harness.
-  - Answer questions and help other members of the community.
+- GitHub Discussions で issue やバグを見つけて報告する:
+  - チームの注意を向けてほしいディスカッションに upvote する。私たちはとても小さなチームであり、すべての投稿に返信できないかもしれませんが、監視し、リソース配分時に検討します。
+- エコシステムに貢献する:
+  - ワクワクするプラグインを作って他の人と共有する:
+    - GitHub プロジェクトに `dsh-plugin` トピックを関連付けて、他の人がプラグインを見つけやすくする。
+  - DeepSeek Harness についてのブログ記事や how-to ガイドを書く。
+  - 質問に答えてコミュニティの他のメンバーを助ける。
 
-DeepSeek Harness is designed to be deeply customizable. We do not believe that packages in the official repository are inherently more important than packages created by the community. You may consider this repository an idea, an official showcase, and a source of inspiration, but not a mandate from us.
+DeepSeek Harness は深くカスタマイズ可能に設計されています。公式リポジトリのパッケージがコミュニティ製パッケージより本質的に重要だとは考えていません。このリポジトリを一つの着想、公式ショーケース、着想の源と捉えてください。私たちからの命令ではありません。
 
-We have already seen exciting projects emerge from the community, and we hope to see the ecosystem continue to grow in its own directions.
+コミュニティから刺激的なプロジェクトが既に生まれているのを見てきましたし、エコシステムが独自の方向に成長し続けることを願っています。
 
-Into the unknown.
+未知へ。

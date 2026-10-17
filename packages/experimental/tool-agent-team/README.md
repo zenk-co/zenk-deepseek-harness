@@ -1,39 +1,39 @@
 ---
-description: "Nine tools that let the model create, message, and coordinate teammates, for compositions mounting the experimental Team plugins."
+description: "モデルがチームメイトの作成、メッセージ送信、調整を行えるようにする 9 つのツール。experimental の Team プラグインをマウントする構成向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-experimental-tool-agent-team
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package lets the model create named teammates, send them messages, inspect availability, wait for progress, interrupt stuck work, and coordinate through a shared task board. Every team member receives the same nine tools and guidance for coordinating in a shared workspace. It replaces legacy subagent controls with the same tool names, so compositions that need both must disable the legacy definitions. The package is published under its experimental name and provides no stability guarantee.
+このパッケージは、モデルが名前付きチームメイトを作成し、メッセージを送り、可用性を検査し、進行を待ち、行き詰まった作業を中断し、共有タスクボードを通じて調整できるようにする。すべてのチームメンバーは同じ 9 つのツールと、共有ワークスペースで調整するためのガイダンスを受け取る。レガシーの subagent コントロールは同じツール名で置き換えられるため、両方を必要とする構成はレガシー定義を無効にしなければならない。このパッケージは experimental 名で公開されており、安定性の保証は提供しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Add this package on top of `@deepseek-ai/dsh-experimental-agent-team` when the model should run a team through tools. Once mounted, every team member — the Lead and each teammate — gets the same nine tools plus the same coordination policy. Each member receives its current role and name through required runtime context; `spawn_teammate` sends the initial task unchanged.
+モデルがツールを通じてチームを実行すべきときは、`@deepseek-ai/dsh-experimental-agent-team` の上にこのパッケージを追加する。マウントすると、すべてのチームメンバー — リードと各チームメイト — が同じ 9 つのツールと同じ調整ポリシーを受け取る。各メンバーは必須のランタイムコンテキストを通じて自身の現在の役割と名前を受け取り、`spawn_teammate` は初期タスクをそのまま送る。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it when the model should create and coordinate teammates by itself rather than a human driving subagent controls. Avoid it when the legacy global subagent tools with the same names must stay available: the team tools replace them for team members, so a composition that wants both must disable the legacy definitions.
+人間が subagent コントロールを操作するのではなく、モデル自身がチームメイトを作成・調整すべきときに選ぶ。同名のレガシーのグローバル subagent ツールを利用可能なまま保つ必要がある場合は避けること: チームツールはチームメンバーに対してそれらを置き換えるため、両方を求める構成はレガシー定義を無効にしなければならない。
 
-### Smallest working example
+### 最小の動作例
 
-The smallest addition to an existing composition is the two-package fragment from the [agent-team README](../agent-team/README.md#smallest-working-setup): durable session storage, the team domain package, and this package. The plugin itself takes two optional settings:
+既存の構成への最小の追加は、[agent-team README](../agent-team/README.md#smallest-working-setup)の 2 パッケージの断片である: 耐久性のあるセッションストレージ、Team ドメインパッケージ、そしてこのパッケージである。プラグイン自体は 2 つのオプション設定を取る:
 
 ```yaml
 - id: tool-agent-team
@@ -43,113 +43,113 @@ The smallest addition to an existing composition is the two-package fragment fro
     forkProvider: fork
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `freshProvider` | `spawn` | Provider that starts fresh teammates |
-| `forkProvider` | `fork` | Provider that starts fork teammates |
+| `freshProvider` | `spawn` | 新規チームメイトを開始するプロバイダー |
+| `forkProvider` | `fork` | フォークチームメイトを開始するプロバイダー |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-tool-agent-team) is the exhaustive source for every accepted field and its JSDoc.
+生成された[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-experimental-tool-agent-team)が、受理されるすべてのフィールドとその JSDoc の網羅的なソースである。
 
-Try it by asking the Lead model: "create a teammate named reviewer to check the diff, then send reviewer the change summary". The model calls the creation tool and then the messaging tool.
+試すにはリードモデルに「diff を確認する reviewer という名前のチームメイトを作成して、次に reviewer に変更サマリーを送って」と依頼する。モデルは作成ツールを呼び、次にメッセージングツールを呼ぶ。
 
-### What the model can do
+### モデルにできること
 
-The nine tools group into four capabilities:
+9 つのツールは 4 つのケイパビリティにグループ化される:
 
-- **Create a teammate** — `spawn_teammate` takes a name, a description, and the initial task; only the Lead can call it.
-- **Send messages** — `send_message` steers a running member at its nearest step boundary, starts or resumes an inactive member.
-- **See and wait** — `list_agents` returns each member’s `target` and availability; `wait_agent` waits for the next team change; `interrupt_agent` stops a teammate's current turn (Lead only).
-- **Manage the task board** — `team_task_create`, `team_task_list`, `team_task_get`, and `team_task_update` add, browse, read, and update shared tasks.
+- **チームメイトの作成** — `spawn_teammate` は名前、説明、初期タスクを取り、呼べるのはリードだけである。
+- **メッセージの送信** — `send_message` は実行中のメンバーを最も近いステップ境界でステアし、非アクティブなメンバーを開始または再開する。
+- **確認と待機** — `list_agents` は各メンバーの `target` と可用性を返し、`wait_agent` は次のチーム変更を待ち、`interrupt_agent` はチームメイトの現在のターンを停止する（リードのみ）。
+- **タスクボードの管理** — `team_task_create`、`team_task_list`、`team_task_get`、`team_task_update` が共有タスクを追加、閲覧、読み取り、更新する。
 
-Creation and listing results identify members by `target`, with no member Session ID. Use that value in message and interrupt calls or the task tools’ `owner` parameter; task `ownerName` uses the same value. `inactive` means no turn is executing, whether the member is loaded or must be resumed; it does not describe task completion or outcome. `provisioning` and `failed` describe member creation. Any member can message any other member and use the task board; only the Lead creates and interrupts teammates. Task updates keep the domain's owner and revision checks, so an outdated edit is rejected instead of overwriting newer work.
+作成と一覧の結果はメンバーを `target` で識別し、メンバーの Session ID は含まない。メッセージと中断の呼び出し、またはタスクツールの `owner` パラメーターにはその値を使う。タスクの `ownerName` も同じ値を使う。`inactive` はメンバーがロード済みでも再開が必要でも、実行中のターンがないことを意味し、タスクの完了や結果を表すものではない。`provisioning` と `failed` はメンバー作成を表す。どのメンバーも他の任意のメンバーにメッセージを送り、タスクボードを使える。チームメイトを作成・中断できるのはリードだけである。タスク更新はドメインのオーナーとリビジョンのチェックを保つので、古い編集はより新しい作業を上書きする代わりに拒否される。
 
-### What success and failure look like
+### 成功と失敗の見え方
 
-`send_message` returns `{ "sent": true }` after inbox acceptance, without exposing the message ID. Success does not confirm recipient processing or a synchronous storage flush; send failures are reported as tool errors. `wait_agent` returns `noProgress` right away when no other member is running or provisioning, telling the caller to wake a teammate first; otherwise it waits for the next change and the caller re-reads state afterward. Task edits based on an outdated revision are rejected rather than overwriting newer work.
+`send_message` はインボックスの受け入れ後に `{ "sent": true }` を返し、メッセージ ID は公開しない。成功は受信者による処理や同期ストレージフラッシュを確認しない。送信失敗はツールエラーとして報告される。`wait_agent` は他のメンバーが実行中でもプロビジョニング中でもないとき、すぐに `noProgress` を返し、呼び出し元にまずチームメイトを起こすよう伝える。それ以外の場合は次の変更を待ち、呼び出し元はその後で状態を読み直す。古いリビジョンに基づくタスク編集は、より新しい作業を上書きする代わりに拒否される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the adapter and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではアダプターの背後の設計判断を説明し、それを実現するコードを指し示す。観察可能な挙動は[このパッケージを使う](#use-this-package)で網羅されている。
 
-### Design philosophy
+### 設計哲学
 
-The adapter is built on three commitments:
+アダプターは 3 つのコミットメントの上に成り立つ:
 
-- **Scoped, not global.** Every registration lives on the member Agent's own `ctx`; installation uses the member identity available when the Agent is published.
-- **Declared results, compact JSON.** Every tool declares its complete result schema and renders that value as compact JSON, so the compiler checks `execute` against what the model is promised and no result spends tokens on indentation.
-- **The domain owns authority.** Tools delegate to `ctx.agentTeams`, which enforces Lead authority and revision checks; the adapter adds no weaker path.
+- **グローバルではなくスコープ付き。** すべての登録はメンバー Agent 自身の `ctx` 上に存在し、インストールは Agent が公開されたときに利用可能なメンバーアイデンティティを使う。
+- **宣言された結果、コンパクトな JSON。** すべてのツールは完全な結果スキーマを宣言し、その値をコンパクトな JSON としてレンダリングするので、コンパイラーが `execute` をモデルに約束されたものと照合し、どの結果もインデントにトークンを使わない。
+- **権威はドメインが所有する。** ツールは `ctx.agentTeams` に委譲し、これがリード権限とリビジョンチェックを強制する。アダプターはより弱い経路を追加しない。
 
-The [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md) owns the model-facing and scoping decisions.
+[Agent Teams の Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md)がモデル向けとスコープの決定を所有する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config, the fixed policy text, and the nine scoped tool registrations |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: 設定、固定ポリシーテキスト、9 つのスコープ付きツール登録 |
 
-### Policy and tools
+### ポリシーとツール
 
-One `team:policy` section on the member scope states the shared coordination rules; the fixed text and the nine tool registrations are declared in [`src/index.ts`](src/index.ts). The nine tool schemas are registered in scopes recognized as Team members at publication. Scoped registrations with the same names as the legacy global continuable-subagent controls shadow those globals for team members only.
+メンバースコープ上の 1 つの `team:policy` セクションが共有の調整ルールを述べる。固定テキストと 9 つのツール登録は [`src/index.ts`](src/index.ts) で宣言される。9 つのツールスキーマは、公開時に Team メンバーとして認識されたスコープに登録される。レガシーのグローバルな継続可能 subagent コントロールと同じ名前のスコープ付き登録は、チームメンバーに対してのみそれらのグローバルをシャドウする。
 
-### Scoped registration and teardown
+### スコープ付き登録と解体
 
-`maybeInstall` runs for every live Agent and subscribes to `agent/created`; it skips Agents without Team membership. Disposal of an Agent runs the installed disposer, and plugin HMR disposes every installed scope before reinstall. Each disposer unwinds registrations in reverse order, so a failed install cannot leave a partial scope.
+`maybeInstall` はすべてのライブ Agent について実行され、`agent/created` を購読する。Team メンバーシップを持たない Agent はスキップする。Agent の破棄はインストールされたディスポーザーを実行し、プラグイン HMR は再インストール前にインストール済みのすべてのスコープを破棄する。各ディスポーザーは登録を逆順に巻き戻すので、失敗したインストールが部分的なスコープを残すことはない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the package-level contract is not enough. They move from the domain service to the exact schemas and the decisions behind the design.
+パッケージレベルの契約では足りないときにこれらのページを読むこと。ドメインサービスから、正確なスキーマと設計の背後の決定へと進む。
 
-- [agent-team package](../agent-team/README.md) — the `ctx.agentTeams` domain service behind these tools.
-- [Agent Teams subsystem](../../../docs/subsystems/agent-team.md) — durable Team types and service API.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-agent-team) — every tool schema the model receives.
-- [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md) — model-facing, scoping, and isolation decisions.
+- [agent-team パッケージ](../agent-team/README.md) — これらのツールの背後の `ctx.agentTeams` ドメインサービス。
+- [Agent Teams サブシステム](../../../docs/subsystems/agent-team.md) — 耐久性のある Team 型とサービス API。
+- [生成されたツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-agent-team) — モデルが受け取るすべてのツールスキーマ。
+- [Agent Teams の Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md) — モデル向け、スコープ、分離の決定。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Team policy and tools
+### Team ポリシーとツール
 
-#### What the model sees
+#### モデルが見るもの
 
-One shared system policy covers Team availability, shared-cwd safety, task coordination, Steer delivery, inbox acceptance, and the Lead’s duty to wait. All nine schemas are identical for Leads and teammates; execution enforces Lead-only operations. Required runtime context states `You are the Team Lead named "lead".` or `You are teammate "<name>".` with `Your Team Lead is named "lead".`, plus roster and messaging instructions. Identity comes from current Team membership, survives optional-context suppression, and is restored when compaction removes its snapshot. An ordinary fork from a teammate receives its current Lead identity.
+1 つの共有システムポリシーが、Team の可用性、共有 cwd の安全性、タスク調整、Steer 配信、インボックス受け入れ、待機するリードの義務を扱う。9 つのスキーマはすべてリードとチームメイトで同一であり、実行がリード専用操作を強制する。必須のランタイムコンテキストは `You are the Team Lead named "lead".` または `You are teammate "<name>".` と `Your Team Lead is named "lead".`、およびロスターとメッセージングの指示を述べる。アイデンティティは現在の Team メンバーシップから来て、オプションのコンテキスト抑制を生き延び、compaction がそのスナップショットを削除すると復元される。チームメイトからの通常のフォークは現在のリードアイデンティティを受け取る。
 
-#### Token effect
+#### トークン効果
 
-Fixed policy and schema cost on every Team member request. Identity is part of the complete runtime-context snapshot. An unchanged retained snapshot adds no message; changed or removed context causes the loop to append a complete snapshot, including identity. Tool calls add compact JSON roster, task, wait, or receipt results. Peer content is retained by the Team domain in the target's history.
+すべての Team メンバーのリクエストに固定のポリシーとスキーマのコストがかかる。アイデンティティは完全なランタイムコンテキストスナップショットの一部である。変更されていない保持済みスナップショットはメッセージを追加せず、変更または削除されたコンテキストはループにアイデンティティを含む完全なスナップショットを追記させる。ツール呼び出しはコンパクトな JSON のロスター、タスク、待機、受領の結果を追加する。ピアのコンテンツは Team ドメインによってターゲットの履歴に保持される。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-With the same provider/model, shared system policy, and tool schemas, a fork retains the parent request prefix and appends its task and current runtime context. Tool results and peer messages append after the reusable request prefix. Sessions recorded with identity inside the system prompt can change that prefix on their first request under this layout; actual provider cache hits remain best-effort.
+同じプロバイダー/モデル、共有システムポリシー、ツールスキーマであれば、フォークは親のリクエストプレフィックスを保持し、そのタスクと現在のランタイムコンテキストを追記する。ツール結果とピアメッセージは再利用可能なリクエストプレフィックスの後に追記される。アイデンティティをシステムプロンプト内に記録した Session は、このレイアウトでの最初のリクエストでそのプレフィックスが変わることがある。実際のプロバイダーキャッシュヒットはベストエフォートのままである。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits describe what the policy and tools cannot guarantee for a team. They are current package constraints, not a comparison with other collaboration surfaces.
+これらの制限は、ポリシーとツールがチームに対して保証できないものを述べる。これらは現在のパッケージ制約であり、他のコラボレーションサーフェスとの比較ではない。
 
-- **Prompt policy is coordination, not confinement** — it cannot stop Bash or external processes from writing overlapping files.
-- **No Web controls** — browser roster and task-board presentation is outside this runtime package.
-- **Experimental prototype with no stability promise** — the package is public, but its schemas can change freely while it incubates.
+- **プロンプトポリシーは調整であり、閉じ込めではない** — Bash や外部プロセスが重複するファイルに書き込むことを止めることはできない。
+- **Web コントロールなし** — ブラウザでのロスターとタスクボードの表示はこのランタイムパッケージの外にある。
+- **安定性の約束のない experimental プロトタイプ** — このパッケージは公開されているが、インキュベーション中はそのスキーマが自由に変わることがある。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

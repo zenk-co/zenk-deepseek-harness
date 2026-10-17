@@ -5,79 +5,79 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-session-log-deepseek
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Incremental canonical session-log upload for official DeepSeek LLM API requests. This function plugin injects `ctx.sessions` and `ctx.deepseekLlmApiExtensions`, then owns the `dsh_session_log` request field and the durable `session-log-deepseek/delivery-accepted` event from which it derives the acceptance watermark. Disable it only when the official API must not receive a Session-log suffix.
+公式 DeepSeek LLM API 要求向けの増分正規セッションログアップロードです。この function プラグインは `ctx.sessions` と `ctx.deepseekLlmApiExtensions` を注入し、`dsh_session_log` 要求フィールドと、受諾ウォーターマークを導出する durable `session-log-deepseek/delivery-accepted` イベントを所有します。公式 API がセッションログ接尾辞を受け取ってはならない場合のみ無効化します。
 
-## Table of Contents
+## 目次
 
-- [Configuration](#configuration)
-- [Request field](#request-field)
-- [Acceptance and retry](#acceptance-and-retry)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [設定](#configuration)
+- [要求フィールド](#request-field)
+- [受諾と再試行](#acceptance-and-retry)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="configuration"></a>
-## Configuration
+## 設定
 
 | Key | Default | Meaning |
-|---|---:|---|
+|---|---|---|
 | `enabled` | `true` | Send the `dsh_session_log` contribution. Changes apply to the next request; `false` stops Session-log upload. |
 | `maxBytes` | 8 MiB | Largest serialized `dsh_session_log` field, in UTF-8 bytes, that one request carries. |
 
-Shipped profiles mount the plugin, so the default configuration registers the request field and appends the acceptance watermark; `enabled: false` stops the contribution. The Web switch can override bundle defaults through the active profile; home patches and command-line overlays retain precedence and reject conflicting form writes.
+出荷プロファイルはプラグインをマウントするため、既定設定は要求フィールドを登録し、受諾ウォーターマークを追記します。`enabled: false` は寄与を停止します。Web スイッチは有効プロファイル経由でバンドル既定を上書きできます。ホームパッチとコマンドラインオーバーレイは優先を保持し、競合する形式書込みを拒否します。
 
-The Web **Settings → General → Upload Session Log when using the official model API** switch persists `enabled` through the Host configuration. In-flight requests keep their prepared payload. Re-enabling resumes the unaccepted suffix, including events recorded while disabled. OpenTelemetry feedback uploads have a separate setting.
+Web **Settings → General → Upload Session Log when using the official model API** スイッチはホスト設定経由で `enabled` を永続化します。飛行中要求は準備済みペイロードを保持します。再有効化は無効中に記録されたイベントも含め未受諾接尾辞を再開します。OpenTelemetry フィードバックアップロードは別設定です。
 
 <a id="request-field"></a>
-## Request field
+## 要求フィールド
 
-For a request carrying a live `sessionId`, the plugin folds the greatest accepted watermark for that exact Session format generation, snapshots `Session.events`, and sends the longest contiguous run after the watermark that fits `maxBytes`. A process-local fold scans each event once and consumes later appends incrementally; restart and HMR rebuild it from the durable log. The version-1 field contains `sessionFormatVersion`, a raw session header (`seedLength` is present only for a seeded Session), numeric `afterSeq` and `throughSeq`, and every complete canonical event translated to raw-number envelope fields. Forked sessions ignore inherited parent watermarks because both the recorded Session id and format generation must match the request source. Surface events require `surfaceOp`, with numeric `startSeq` and `endSeq` for replacements; only system, user, and tool events may carry `sourceEventSeqs`. Assistant provider metadata stays in the embedded stream, and log-only events carry neither metadata field.
+ライブ `sessionId` を運ぶ要求では、プラグインはその正確なセッション形式世代の最大受諾ウォーターマークを畳み込み、`Session.events` をスナップショットし、ウォーターマーク後に `maxBytes` に収まる最長連続範囲を送ります。プロセス局所畳み込みは各イベントを一度だけ走査し、以降の追記を増分消費します。再起動と HMR は durable ログから再構築します。バージョン 1 フィールドは `sessionFormatVersion`、生セッションヘッダー (`seedLength` はシード済みセッションのみ存在)、数値 `afterSeq` と `throughSeq`、正規イベントごとに生数値エンベロープフィールドへ変換した完全イベントを含みます。フォークセッションは継承親ウォーターマークを無視します。記録セッション ID と形式世代の両方が要求元と一致しなければなりません。サーフェスイベントは `surfaceOp` を要求し、置換には数値 `startSeq` と `endSeq` を付けます。system、user、tool イベントのみ `sourceEventSeqs` を運べます。アシスタントプロバイダーメタデータは埋込ストリームに留まり、ログ限定イベントはいずれのメタデータフィールドも運びません。
 
-`maxBytes` bounds the complete serialized field in UTF-8 bytes, including the header and numeric envelope fields. A backlog above the limit drains across consecutive accepted requests, each continuing after the previous `throughSeq`. When the first pending event alone exceeds the limit, the request omits `dsh_session_log`, the plugin logs one warning per blocking event, and the watermark stays before that event until `maxBytes` admits it. An event too large for the runtime to serialize at all is handled the same way, and no `maxBytes` value admits it.
+`maxBytes` はヘッダーと数値エンベロープフィールドを含めた完全直列化フィールドを UTF-8 バイトで制限します。制限超過の滞留は連続する受諾要求またぎに排出され、各回は prior `throughSeq` の後から続けます。最初の保留イベント単独で制限を超える場合、要求は `dsh_session_log` を省略し、プラグインはブロックイベントごとに警告を 1 件記録し、`maxBytes` が許すまでウォーターマークはそのイベント手前に留まります。ランタイムが直列化自体できないほど巨大なイベントも同様に扱われ、どの `maxBytes` 値も許容しません。
 
 <a id="acceptance-and-retry"></a>
-## Acceptance and retry
+## 受諾と再試行
 
-The DeepSeek adapter calls the prepared contribution's `accept()` after HTTP 2xx, before it consumes the SSE body. Acceptance appends `session-log-deepseek/delivery-accepted` with the uploaded `throughSeq` and `sessionFormatVersion`; a record that omits the format field denotes v0. The next request uploads that event as part of its new suffix. Transport failures, non-2xx failures, and requests that the DeepSeek adapter sends without extension fields after they fail to serialize append no acceptance record, so later requests resend the uncertain range. Concurrent deliveries may be accepted out of order; folding the maximum matching `throughSeq` prevents cursor regression.
+DeepSeek アダプターは HTTP 2xx 後に、SSE 本体消費前に、準備済み寄与の `accept()` を呼びます。受諾はアップロード済み `throughSeq` と `sessionFormatVersion` で `session-log-deepseek/delivery-accepted` を追記します。形式フィールドを省く記録は v0 を表します。次の要求はそのイベントを新規接尾辞の一部としてアップロードします。転送失敗、非 2xx 失敗、直列化失敗後に DeepSeek アダプターが拡張フィールドなしに送る要求は受諾記録を追記しないため、以降の要求は不確定範囲を再送します。同時配送は順不同で受諾されることがあります。一致 `throughSeq` の最大値畳み込みはカーソル後退を防ぎます。
 
-A crash after server acceptance but before the watermark reaches persistence can replay an accepted range after restart. This is the at-least-once failure direction: uncertainty creates duplicates, never a skipped sequence. The ordinary session checkpoint policy persists the watermark at the next semantic checkpoint; this plugin performs no independent I/O.
+サーバー受諾後、ウォーターマークの永続化前にクラッシュすると、再起動後に受諾済み範囲を再送することがあります。これは at-least-once 失敗方向です。不確定性は重複を生み、列飛ばしは生みません。通常セッションチェックポイントポリシーは次の意味チェックポイントでウォーターマークを永続化します。このプラグインは独立 I/O しません。
 
-Direct requests without a live Session omit `dsh_session_log`. Normal agent, compaction, and session-title calls carry their live Session id.
+ライブセッションなしの直接要求は `dsh_session_log` を省略します。通常エージェント、コンパクション、セッションタイトル呼び出しはライブセッション ID を運びます。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Session-log metadata
+### セッションログメタデータ
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing. `dsh_session_log` is a sibling of the DeepSeek request's model-input fields and is not inserted into `messages`, the system prompt, or tool schemas.
+なし。`dsh_session_log` は DeepSeek 要求のモデル入力フィールドの兄弟であり、`messages`、システムプロンプト、ツールスキーマには挿入されません。
 
-#### Token effect
+#### トークン効果
 
-Zero model-input tokens; the field only increases HTTP request bytes, bounded by `maxBytes`.
+モデル入力トークンゼロです。フィールドは `maxBytes` 制限内で HTTP 要求バイトのみ増やします。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; the model-visible request prefix remains unchanged.
+なし。モデル可視要求プレフィックスは不変のままです。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Crash-window duplicates** — a 2xx followed by process loss before the acceptance watermark persists causes conservative replay on resume.
-- **No live Session means no field** — direct or stale-session calls have no canonical log to snapshot; explicit absence semantics remain deferred.
-- **An oversized event stalls upload** — an event whose field alone exceeds `maxBytes` is not sent, and later events wait behind it until the limit increases; an event too large to serialize at all stays blocked.
-- **Provider rejection fails the request** — a provider that rejects the request because of this field fails the model request and leaves the cursor unchanged instead of truncating the log.
+- **Crash-window duplicates** — 受諾ウォーターマーク永続化前の 2xx 後のプロセス喪失は、再開時に保守的再送を引き起こします。
+- **No live Session means no field** — 直接または stale セッション呼び出しにはスナップショットすべき正規ログがありません。明示不在意味は deferred のままです。
+- **An oversized event stalls upload** — フィールド単独で `maxBytes` を超えるイベントは送信されず、制限引上げまで以降イベントは後ろで待ちます。直列化自体できないイベントはブロックしたままです。
+- **Provider rejection fails the request** — このフィールドが原因でプロバイダーが要求を拒否すると、ログ切詰めではなくモデル要求が失敗し、カーソルは不変のままです。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

@@ -5,31 +5,31 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-session-format-catalog
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-session-format-catalog` gives persistence one deterministic Session format reader without consulting mounted plugins. It assembles codecs and adjacent edges from the earliest supported format through the [current writer format](../../../docs/session-format-status.md), checks the complete gap-free chain at module initialization, and exposes physical dispatch, header-only classification, single-pass row restoration, and current record encoding through `sessionFormatCatalog`.
+`dsh-session-format-catalog` はマウント済みプラグインに相談せず、永続化に 1 つの決定論的セッション形式リーダーを与えます。最古対応形式から[現行ライター形式](../../../docs/session-format-status.md)までのコーデックと隣接エッジを組み立て、モジュール初期化時に完全な無間隙チェーンを確認し、`sessionFormatCatalog` 経由で物理発送、ヘッダー限定分類、単一パス行復元、現行記録符号化を公開します。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-### When to use it
+### 利用すべき場面
 
-Import this library from persistence and test-support readers that need the complete first-party released-format inventory before any feature plugin mounts. Feature compositions do not register or reorder its entries.
+機能プラグインのマウント前に完全なファーストパーティーリリース形式目録を必要とする永続化および test-support リーダーからこのライブラリーをインポートします。機能構成はそのエントリーを登録も並替えもしません。
 
-### Entry point
+### エントリーポイント
 
 ```text
 const descriptor = sessionFormatCatalog.readHeader(physicalHeader)
@@ -41,23 +41,23 @@ const headerRecord = sessionFormatCatalog.encodeCurrentHeader(current.header, cu
 const eventRecords = current.events.map(sessionFormatCatalog.encodeCurrentEvent)
 ```
 
-Import `sessionFormatCatalog` from the package root. JSONL and fixture readers create one restore, push each parsed physical row through `decodeRow()`, and call `finish()` once. Writers serialize the returned current artifact through `encodeCurrentHeader()` and `encodeCurrentEvent()`. Listing calls `readHeader()` and never opens event bodies.
+パッケージルートから `sessionFormatCatalog` をインポートします。JSONL およびフィクスチャーリーダーは 1 つの restore を作成し、解析済み物理行を `decodeRow()` に送り、最後に一度 `finish()` を呼びます。ライターは返却現行成果物を `encodeCurrentHeader()` と `encodeCurrentEvent()` で直列化します。一覧は `readHeader()` を呼び、イベント本体を開きません。
 
-Production historical reads select `{ recovery: 'recoverable', validation: 'transformed' }`. Worker and fixture verification select `{ recovery: 'strict', validation: 'current' }`. Transformed validation runs the released-current rules after migration but deliberately skips installed semantic validation for input that is already current.
+製品履歴読取は `{ recovery: 'recoverable', validation: 'transformed' }` を選択します。ワーカーおよびフィクスチャー検証は `{ recovery: 'strict', validation: 'current' }` を選択します。変換検証は移行後に release-current 規則を実行しますが、既に現行の入力には導入済み意味検証を意図的に飛ばします。
 
-The catalog contains all supported historical readers directly. A profile cannot add, remove, or reorder an edge by mounting a feature plugin. Its peer dependency on `dsh-session` supplies the installed current event vocabulary and current restoration rules, while historical edge validators remain frozen. The browser-safe `./message-projections` export assembles current plugin-owned interpreters for detached constructors and surface folds; it does not mount recovery listeners.
+カタログは対応履歴リーダーをすべて直接含みます。プロファイルは機能プラグインのマウントでエッジの追加、除去、並替えはできません。`dsh-session` への peer 依存は導入済み現行イベント語彙と現行復元規則を提供し、履歴エッジ検証器は凍結のままです。ブラウザー安全 `./message-projections` 公開は分離コンストラクターとサーフェス畳み込み向けに現行プラグイン所有インタープリターを組み立てます。回復リスナーはマウントしません。
 
-`createSessionFormatCatalogWithChildren(childFacts)` binds explicit child evidence to V3→V4 during assembly; see the [catalog-completion specification](../session-format-v3-to-v4/README.md). `historicalSessionFormatCatalog` restores V0–V3 using the fixed released-V3 event vocabulary to collect child prerequisites without recursively completing their catalogs. An ignorable V3 extension remains opaque even when the installed writer knows its name. Isolated transcript replay explicitly supplies an empty array; persistence must collect the complete available direct-child set. Keep the supplied evidence unchanged for the catalog’s lifetime. Each restore owns independent stage state. The static `sessionFormatCatalog` supports header and native current-format reads; historical body reads require the child-bound catalog.
+`createSessionFormatCatalogWithChildren(childFacts)` は組立て時に明示子証拠を V3→V4 に束縛します。[catalog-completion 仕様](../session-format-v3-to-v4/README.md) を見てください。`historicalSessionFormatCatalog` は固定 release-V3 イベント語彙で V0〜V3 を復元し、子前提条件をそのカタログ再帰完了なしに収集します。無視可能 V3 拡張は導入済みライターが名前を知っていても不透明のままです。分離 transcript 再送は明示的に空配列を提供します。永続化は利用可能な完全直接子集合を収集しなければなりません。提供証拠はカタログ存続期間不変に保ちます。各 restore は独立ステージ状態を所有します。静的 `sessionFormatCatalog` はヘッダーとネイティブ現行形式読取を対応します。履歴本体読取は子束縛カタログが必要です。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-[`src/generated.ts`](src/generated.ts) is the static owner of codec and edge ordering. [`src/current.ts`](src/current.ts) delegates final header, envelope, message, surface, seed, and current request-header validation to the installed Session semantics. The low-level constructor rejects duplicate codecs, duplicate edges, gaps, and entries beyond the current version before any Session read can begin.
+[`src/generated.ts`](src/generated.ts) はコーデックとエッジ順序の静的所有者です。[`src/current.ts`](src/current.ts) は最終ヘッダー、エンベロープ、メッセージ、サーフェス、シード、現行要求ヘッダー検証を導入済みセッション意味に委譲します。低レベルコンストラクターはセッション読取開始前に重複コーデック、重複エッジ、間隙、現行バージョン超過エントリーを拒否します。
 
 </details>
 
@@ -76,31 +76,31 @@ The catalog contains all supported historical readers directly. A profile cannot
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Catalog dispatch
+### カタログ発送
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing directly. The catalog only restores the `SessionEvent` history consumed by request reconstruction.
+直接なし。カタログは要求再構築が消費する `SessionEvent` 履歴のみ復元します。
 
-#### Token effect
+#### トークン効果
 
-Zero direct tokens.
+直接トークンゼロ。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-No direct effect; restored history determines cache identity in its consumer.
+直接効果なし。復元履歴はそのコンシューマーでキャッシュ同一性を決定します。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **First-party build inventory only** — external migration ownership and distribution are not supported.
-- **Generated ordering is closed** — runtime plugin registration cannot supply a missing historical edge.
+- **First-party build inventory only** — 外部移行所有と配布は未対応です。
+- **Generated ordering is closed** — ランタイムプラグイン登録は欠落履歴エッジを提供できません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

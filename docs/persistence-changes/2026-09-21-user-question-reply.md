@@ -1,25 +1,25 @@
 ---
-description: "Records a persistence type transition and its compatibility acknowledgement."
+description: "永続化型遷移とその互換性承認を記録する。"
 kind: persistence-change
 ---
 
 # 2026-09-21-user-question-reply
 
-English | [中文](2026-09-21-user-question-reply.zh.md)
+日本語 | [English](2026-09-21-user-question-reply.en.md) | [中文](2026-09-21-user-question-reply.zh.md)
 
-## Summary
+## 概要
 
-Adds a qualified user-question-reply message source for a late answer to a continued ask_user_question call.
+継続中の ask_user_question 呼び出しに対する遅い回答のための、修飾付き user-question-reply メッセージソースを追加する。
 
-## Table of Contents
+## 目次
 
-- [Declaration](#declaration)
-- [Compatibility](#compatibility)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [宣言](#declaration)
+- [互換性](#compatibility)
+- [検証](#verification)
+- [開発ノート](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -36,25 +36,25 @@ changes:
     decision: same-version
   - root: "event:session/title-llm-request"
     previous: "2026-09-16-session-format-v4"
-    after: "ae84c5e493f94acc63cfb70389073ba616ed7ae7aa4fadde048bdcc64d49bb46"
+    after: "ae84c5e493f94acc63cfb70389073ba616ed7aa4fadde048bd64d49bb46"
     decision: same-version
   - root: "event:user/message"
     previous: "2026-09-16-session-format-v4"
-    after: "b83ed1b1cfffbd7bd5cca06ea72e44be57beb68b39e5a96660ce42a9e21aa411"
+    after: "b83ed1b1cfffbd7bd5cca06ea72be57beb68b39e5a96660ceb42a9e21aa411"
     decision: same-version
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-Existing logs contain no such source and remain valid. The new source is qualified attribution on an ordinary user message; readers without dsh-user-questions preserve the message and derive history from its content. Only the userQuestions projection reads this source to close the named question and record its answers. The answer RPC is its only producer and writes outcome answered; closing the Client panel persists no reply. No event type or Session header changes.
+既存ログはそのようなソースを含まず、有効なままである。新ソースは通常のユーザーメッセージ上の修飾付き帰属であり、dsh-user-questions を持たないリーダーはメッセージを保持し、その内容から履歴を導出する。userQuestions 投影のみがこのソースを読んで対象質問を閉じ、その回答を記録する。回答 RPC は唯一の生成元であり、結果 answered を書き込む。クライアントパネルを閉じても返信は永続化されない。イベント型やセッションヘッダーの変更はない。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-pnpm exec vitest run packages/interaction/user-questions/tests packages/interaction/tool-ask-user/tests: 81 tests passed. The focused projection, reply, view, and process-group suite passed 70 tests. pnpm run typecheck passed. pnpm run doc-sync passed all 42 gates, including persistence history and translation pairing.
+pnpm exec vitest run packages/interaction/user-questions/tests packages/interaction/tool-ask-user/tests: 81テスト通過。対象を絞った投影、返信、ビュー、プロセスグループスイートは70テスト通過。pnpm run typecheck 通過。pnpm run doc-sync は42ゲートすべて通過（永続化履歴と翻訳ペアリングを含む）。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
-None.
+なし。

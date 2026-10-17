@@ -1,40 +1,40 @@
 ---
-description: "Browser-use capability packages for selecting and registering one browser backend."
+description: "ブラウザーバックエンドを 1 つ選択・登録するための browser-use ケイパビリティーパッケージ。"
 kind: "package-group"
 ---
 
 # packages/browser-use
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Browser-use providers let models inspect and operate web pages. This group owns exclusive provider registration. Experimental providers supply browser tools and manage each Session's browser resources.
+browser-use プロバイダーによりモデルは Web ページを検査・操作できる。このグループは排他的プロバイダー登録を所有する。実験的プロバイダーがブラウザーツールを提供し、各セッションのブラウザーリソースを管理する。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-Choose one provider and mount the shared registration service.
+プロバイダーを 1 つ選択し、共有登録サービスをマウントする。
 
 | Package | Role | ctx key |
 |---|---|---|
 | [`browser-use`](browser-use/README.md) | Exclusive named provider registration | `ctx.browserUse` |
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Browser use](../../docs/subsystems/browser-use.md) — capability ownership and provider choices.
-- [Experimental packages](../experimental/README.md) — Playwright MCP, Chrome DevTools MCP, and Stagehand providers.
+- [ブラウザー利用](../../docs/subsystems/browser-use.md) — capability ownership and provider choices.
+- [実験的パッケージ](../experimental/README.md) — Playwright MCP, Chrome DevTools MCP, and Stagehand providers.
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 None.

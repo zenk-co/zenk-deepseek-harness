@@ -1,14 +1,14 @@
-# Human Commands
+# ヒューマンコマンド
 
-English | [中文](commands.zh.md)
+日本語 | [English](commands.en.md) | [中文](commands.zh.md)
 
-The human-command registry service from [`dsh-commands`](../../packages/interaction/commands). Interactive adapters use it to discover and directly execute plugin-owned commands for an exact agent without creating a model message. The [historical command Agent Note](../../.agents/notes/archived/feature/2026-07-19-plugin-command-registration.md) records dispatch and lifecycle rationale; the [package README](../../packages/interaction/commands/README.md) owns composition and limitations.
+[`dsh-commands`](../../packages/interaction/commands) のヒューマンコマンドレジストリサービス。対話型アダプターはこれを使って、正確なエージェントに対してプラグイン所有のコマンドを、モデルメッセージを作成せずに発見し直接実行する。[歴史的な command の Agent Note](../../.agents/notes/archived/feature/2026-07-19-plugin-command-registration.md) がディスパッチとライフサイクルの根拠を記録し、[パッケージ README](../../packages/interaction/commands/README.md) がコンポジションと制限を所有する。
 
-Source: [`packages/interaction/commands/src/index.ts`](../../packages/interaction/commands/src/index.ts)
+ソース: [`packages/interaction/commands/src/index.ts`](../../packages/interaction/commands/src/index.ts)
 
-## Input metadata
+## 入力メタデータ
 
-The service exposes one optional unstructured-input descriptor: a hint plus an attachment-acceptance flag. Command availability follows plugin composition: every adapter consuming the registry sees every effective definition.
+このサービスは 1 つの省略可能な非構造化入力記述子を公開する: ヒントと添付受理フラグである。コマンドの可用性はプラグインコンポジションに従う: レジストリを消費するすべてのアダプターがすべての有効な定義を見る。
 
 ```ts type-equiv
 /** Immutable metadata for a command's optional unstructured input. */
@@ -26,9 +26,9 @@ interface CommandInputDescriptor {
 }
 ```
 
-## Definition
+## 定義
 
-`CommandDefinition` is the plugin-authored registration. The registry validates and freezes a detached effective definition.
+`CommandDefinition` はプラグインが作成する登録である。レジストリは切り離された有効定義を検証して凍結する。
 
 ```ts type-equiv
 /** Plugin-owned command registration. */
@@ -52,9 +52,9 @@ interface CommandDefinition {
 }
 ```
 
-## Invocation and result
+## 呼び出しと結果
 
-The adapter owns cancellation and passes the exact target agent. `rawInput` begins immediately after the parsed name and retains the adapter-delivered separator and suffix. Results are direct UI outcomes, not tool results or session events.
+アダプターはキャンセルを所有し、正確なターゲットエージェントを渡す。`rawInput` は解析された名前の直後から始まり、アダプターが渡した区切りとサフィックスを保持する。結果は直接の UI 成果であり、ツール結果やセッションイベントではない。
 
 ```ts type-equiv
 /** Invocation passed to one registered command handler. */
@@ -90,11 +90,11 @@ type CommandResult =
   | { readonly kind: 'error'; readonly text: string }
 ```
 
-`sourceEventSeq` is optional and success-only. When present, it names an earlier non-command event in the receiving session log; `command/done` persists the same reference so a client can combine the command lifecycle with that domain projection without parsing `text` or relying on adjacent rows.
+`sourceEventSeq` は省略可能で成功時のみである。存在する場合、受信側セッションログ内のそれ以前の非コマンドイベントを名指す。`command/done` は同じ参照を永続化するので、クライアントは `text` を解析したり隣接行に依拠したりせずに、コマンドライフサイクルとそのドメイン投影を組み合わせられる。
 
-## Discovery and parsing views
+## ディスカバリーと解析ビュー
 
-Adapters receive handler-free immutable descriptors after scope resolution. `parseCommand()` returns `ParsedCommand` before registry resolution; syntax-valid input can still name an unavailable command.
+アダプターはスコープ解決後にハンドラーなしの不変記述子を受け取る。`parseCommand()` はレジストリ解決の前に `ParsedCommand` を返す。構文的に有効な入力でも利用できないコマンドを名指すことがある。
 
 ```ts type-equiv
 /** Handler-free immutable command view returned to UI adapters. */
@@ -126,13 +126,13 @@ interface ParsedCommand {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxcommands--commandruntime"></a>
 
 ### `ctx.commands` — `CommandRuntime`
 
-Human-command registry. Plain-context definitions are global; definitions registered through a command-injected child of an agent context shadow globals for that agent.
+ヒューマンコマンドレジストリ。プレーンコンテキストの定義はグローバルであり、エージェントコンテキストのコマンド注入された子を通じて登録された定義は、そのエージェントに対してグローバルをシャドウする。
 
 ```ts cordis-catalog
 /**
@@ -195,9 +195,9 @@ find(agent: Agent, name: string): CommandDefinition | undefined
 @Remote async execute( agent: Agent, line: string, submittedAttachments: readonly CommandSubmitAttachment[], signal: AbortSignal, ): Promise<CommandExecution | undefined>
 ```
 
-Types: [Agent](core.md)
+型: [Agent](core.md)
 
-Source: [`packages/interaction/commands/src/index.ts`](../../packages/interaction/commands/src/index.ts)
+ソース: [`packages/interaction/commands/src/index.ts`](../../packages/interaction/commands/src/index.ts)
 
 <a id="commands-events"></a>
 
@@ -207,7 +207,7 @@ Source: [`packages/interaction/commands/src/index.ts`](../../packages/interactio
 
 #### `commands/change` — emit
 
-A command was registered or unregistered. This is an unfiltered registry notification because a global or scoped change may affect any UI view. Observer failures are contained and cannot veto the registry mutation.
+コマンドが登録または登録解除された。グローバルまたはスコープ付きの変更が任意の UI ビューに影響しうるため、これはフィルタリングされないレジストリ通知である。オブザーバーの失敗は封じ込められ、レジストリの変更を拒否できない。
 
 ```ts cordis-catalog
 /**
@@ -219,5 +219,5 @@ A command was registered or unregistered. This is an unfiltered registry notific
 'commands/change'(): void
 ```
 
-Source: [`packages/interaction/commands/src/types.ts`](../../packages/interaction/commands/src/types.ts)
+ソース: [`packages/interaction/commands/src/types.ts`](../../packages/interaction/commands/src/types.ts)
 <!-- END GENERATED cordis-surface -->

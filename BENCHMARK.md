@@ -1,3 +1,3 @@
-# Running benchmarks
+# ベンチマークの実行
 
-Follow [Get started with the Python SDK](docs/user/guide/python-sdk.md) to install the SDK and run the `jsonrpc-agent` minimal variant. Use separate workspaces and session IDs for independent benchmark tasks.
+[Python SDK を使い始める](docs/user/guide/python-sdk.md)に従って SDK をインストールし、`jsonrpc-agent` の最小バリアントを実行する。独立したベンチマークタスクには別々のワークスペースとセッション ID を使う。

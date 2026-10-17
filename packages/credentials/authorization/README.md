@@ -1,39 +1,39 @@
 ---
-description: "The authorization flow registry for users and maintainers who obtain credentials that configuration cannot supply, because getting one means a conversation with a human."
+description: "設定では供給できない資格情報を取得するユーザーとメンテナーのための認可フローレジストリ。取得には人間との対話が必要になるため。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-authorization
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-authorization` lets a configuration UI or another caller obtain credentials through a human-guided sign-in, code entry, or question. Each attempt sends notices and prompts only to the surface that started it. It reports `authorized` only after the new credential has been stored; a refusal or withdrawal reports `cancelled`, while failures remain errors. Choose it for credentials that cannot be supplied through configuration. It requires the credential store and an integration that defines the available authorization methods; the package provides no provider-specific methods itself.
+`dsh-authorization` を使うと、設定 UI やその他の呼び出し元が、人間が案内するサインイン、コード入力、または質問を通じて資格情報を取得できる。各試行は、通知とプロンプトをそれを開始したサーフェスにのみ送る。新しい資格情報が保存された後にのみ `authorized` を報告し、拒否または撤回は `cancelled` を報告し、その他の失敗はエラーのままである。設定では供給できない資格情報に選ぶ。これには資格情報ストアと、利用可能な認可メソッドを定義するインテグレーションが必要である。本パッケージ自体はプロバイダー固有のメソッドを提供しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-This package is the part of the product that obtains credentials a human must hand over: a plugin registers the flow that knows how to get its own credential, and any surface can run an attempt and show the human what to do. The common path is explicit — register a flow for each credential your plugin holds, then start attempts from the surface the human is looking at.
+本パッケージは、人間が手渡さなければならない資格情報を製品が取得する部分である。プラグインが自分の資格情報の取得方法を知るフローを登録し、任意のサーフェスが試行を実行して人間に何をすべきかを示せる。一般的な手順は明示的である。プラグインが保持する資格情報ごとにフローを登録し、人間が見ているサーフェスから試行を開始する。
 
-### When to use it
+### いつ使うか
 
-Use it whenever a credential can only be obtained by talking to a human — an OAuth-style sign-in, a one-time code, an account pick — and cannot be stored in configuration. If a credential is a fixed key a deployment can supply, store it with the credential seam instead. A headless or ACP composition can mount this package safely: it offers no flows of its own, so nothing asks a human to sign in unless a plugin registered a flow.
+資格情報が人間との対話でしか取得できず——OAuth 形式のサインイン、ワンタイムコード、アカウントの選択——設定に保存できない場合はいつでも使う。デプロイが供給できる固定キーの資格情報であれば、代わりに credential seam に保存する。ヘッドレスまたは ACP のコンポジションでも本パッケージは安全にマウントできる。独自のフローを提供しないため、プラグインがフローを登録しない限り人間にサインインを求めるものはない。
 
-### Registering a flow
+### フローの登録
 
-Your plugin declares one flow per credential it holds, keyed by the `<scope>/<id>` credential record the flow writes — the scope names your plugin, the id names one credential it owns:
+プラグインは保持する資格情報ごとに 1 つのフローを宣言し、フローが書き込む `<scope>/<id>` 資格情報レコードでキー付けする。scope はプラグインを名指し、id はプラグインが所有する 1 つの資格情報を名指す:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -62,103 +62,102 @@ ctx.authorization.describe(key)   // the entry above, or undefined
 dispose()                         // unregister; withdraws any running attempt
 ```
 
-A flow declares the credential record it writes, a user-facing label, and the sign-in methods it offers, most preferred first. `run()` talks to the human through the session — one-way notices and questions the flow cannot answer for itself — and must commit the record through `ctx.credentials` before resolving: the seam refuses a flow that resolved without committing. `list()` and `describe()` let a surface show what can be authorized and whether an attempt is running; `dispose()` unregisters the flow and withdraws any attempt still running.
+フローは、書き込む資格情報レコード、ユーザー向けラベル、および提供するサインインメソッドを優先順に宣言する。`run()` はセッションを通じて人間と対話し——フロー自身では答えられない一方向の通知と質問——解決する前に `ctx.credentials` を通じてレコードをコミットしなければならない。seam はコミットせずに解決したフローを拒否する。`list()` と `describe()` は、何を認可できるか、試行が実行中かどうかをサーフェスに表示させる。`dispose()` はフローを登録解除し、まだ実行中の試行を撤回する。
 
-### Running an attempt
+### 試行の実行
 
-A surface runs one attempt per credential at a time. The interaction travels with the request rather than living in a registry, so prompts reach exactly the page that asked; a headless caller supplies an interaction that declines. `begin()` reports `{ status: 'authorized' }` when the record was committed and observed during the attempt, and `{ status: 'cancelled' }` when the human declined or the caller withdrew. `cancel(key)` withdraws the running attempt from a second call, for the request/response transport that answers a Cancel button without holding the first call's signal.
+サーフェスは資格情報ごとに同時に 1 つの試行を実行する。インタラクションはレジストリに住むのではなくリクエストとともに移動するため、プロンプトはそれを要求したページに正確に届く。ヘッドレス呼び出し元は辞退するインタラクションを供給する。`begin()` は、試行中にレコードがコミットされ観測された場合に `{ status: 'authorized' }` を報告し、人間が辞退したか呼び出し元が撤回した場合に `{ status: 'cancelled' }` を報告する。`cancel(key)` は 2 回目の呼び出しから実行中の試行を撤回する。これは、1 回目の呼び出しのシグナルを保持せずにキャンセルボタンに応答するリクエスト/レスポンストランスポートのためである。
 
-### What can go wrong
+### 何がうまくいかないことがあるか
 
-- **A credential with no flow is inert** — `begin()` on a key no flow claims throws `NO_FLOW`; a record left by an uninstalled plugin can be deleted but not re-authorized.
-- **One attempt at a time per credential** — a second `begin()` while one is running throws `ALREADY_IN_FLIGHT`; `inFlight` on the entry lets a UI disable the button up front.
-- **A flow that resolves without committing is refused** — `NOT_COMMITTED`, so `authorized` always means the record is really stored.
-- **Naming a method the flow does not offer throws `UNKNOWN_METHOD`** — naming none runs the flow's first method.
-- **"No" is an outcome, not a breakage** — a declined prompt settles the attempt as `cancelled`, the same as a withdrawn signal; any other failure reaches the caller as a thrown error.
+- **フローのない資格情報は不活性である** — どのフローも主張しないキーへの `begin()` は `NO_FLOW` を投げる。アンインストールされたプラグインが残したレコードは削除できるが、再認可はできない。
+- **資格情報ごとに同時に 1 試行** — 実行中に 2 回目の `begin()` を呼ぶと `ALREADY_IN_FLIGHT` を投げる。エントリの `inFlight` により UI はボタンを事前に無効化できる。
+- **コミットせずに解決したフローは拒否される** — `NOT_COMMITTED`。したがって `authorized` は常にレコードが実際に保存されたことを意味する。
+- **フローが提供しないメソッドを名指すと `UNKNOWN_METHOD` を投げる** — 何も名指さない場合はフローの最初のメソッドが実行される。
+- **「いいえ」は結果であり、故障ではない** — 辞退されたプロンプトは、撤回されたシグナルと同じく試行を `cancelled` として決着させる。その他の失敗は投げられたエラーとして呼び出し元に届く。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the seam and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションは seam の背後にある設計判断を説明し、それを実現するコードを指し示す。観測可能な挙動は[このパッケージを使う](#use-this-package)で完全にカバーされている。
 
-### Design philosophy
+### 設計方針
 
-- **The seam owns the conversation, never the protocol.** A plugin that knows how to obtain its own credential registers a flow keyed by the record it writes; a second authorization protocol arrives as another flow rather than another seam, and a surface that renders one flow renders all of them.
-- **The flow owns the write.** `run()` resolving means the record is already committed through `ctx.credentials`; the seam confirms a commit it observed during the attempt — presence alone would let a re-authorization pass a stale record off as fresh — and refuses a flow that resolved without one. Committing inside the flow is what lets a library that persists through its own store adapter stay the single writer instead of being copied back out and written twice.
-- **The interaction travels with the request, not a registry.** Whoever starts an authorization is the one who can talk to the human about it, so prompts reach exactly the surface that asked, and a headless caller supplies an interaction that declines. There is no ambient provider to be absent, and no question about which of two open pages a prompt belongs to.
-- **A human's "no" is an outcome, not a breakage.** An interaction that declines rejects its prompt with `AuthorizationDeclinedError`, and the attempt settles as `cancelled`, exactly as a withdrawn signal does; any other prompt rejection stays a flow failure that reaches the caller.
+- **seam が所有するのは会話であり、プロトコルには決してならない。** 自分の資格情報の取得方法を知るプラグインが、書き込むレコードでキー付けされたフローを登録する。2 つ目の認可プロトコルは別の seam ではなく別のフローとして届き、1 つのフローをレンダリングするサーフェスはすべてのフローをレンダリングする。
+- **書き込みを所有するのはフローである。** `run()` の解決は、レコードが `ctx.credentials` を通じてすでにコミットされたことを意味する。seam は試行中に観測したコミットを確認し——存在だけでは再認可が古いレコードを新鮮なものとして通してしまう——コミットなしに解決したフローを拒否する。フロー内でコミットすることにより、独自のストアアダプターで永続化するライブラリが、書き戻されて二重に書かれるのではなく、単一のライターのままでいられる。
+- **インタラクションはレジストリではなくリクエストとともに移動する。** 認可を開始した者こそが人間とそれについて対話できる者であるため、プロンプトはそれを要求したサーフェスに正確に届き、ヘッドレス呼び出し元は辞退するインタラクションを供給する。存在しないことにできるアンビエントプロバイダーはなく、開いている 2 つのページのどちらにプロンプトが属するかという問いもない。
+- **人間の「いいえ」は結果であり、故障ではない。** 辞退するインタラクションはそのプロンプトを `AuthorizationDeclinedError` で拒否し、試行は撤回されたシグナルとまったく同じく `cancelled` として決着する。その他のプロンプト拒否は呼び出し元に届くフロー失敗のままである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service Definition: flow registry, one-attempt-per-key lifecycle, interaction routing, commit confirmation |
-| [`src/types.ts`](src/types.ts) | Wire-safe vocabulary: methods, notices, prompts, outcomes, entries |
+| [`src/index.ts`](src/index.ts) | Service Definition: フローレジストリ、キーごとに 1 試行のライフサイクル、インタラクションのルーティング、コミットの確認 |
+| [`src/types.ts`](src/types.ts) | ワイヤセーフな語彙: メソッド、通知、プロンプト、結果、エントリ |
 
-### Lifecycle
+### ライフサイクル
 
-One attempt per key at a time. `begin()` validates the key and method, refuses a second attempt for a busy key, and runs the flow with an `AuthorizationSession` that carries the chosen method, a cancellation signal, and the `notify`/`prompt` callbacks routed to the request's interaction. A withdrawn attempt settles immediately even when the flow never reacts to its signal — the orphaned run is left to finish on its own, and a record it still manages to commit is a record the human did authorize. The key is released before `authorization/settled` fires, so a listener that reacts by starting the next attempt is not refused; listener failures are contained on the credentials seam's terms.
+キーごとに同時に 1 つの試行。`begin()` はキーとメソッドを検証し、ビジーなキーへの 2 回目の試行を拒否し、選択されたメソッド、キャンセルシグナル、リクエストのインタラクションへルーティングされた `notify`/`prompt` コールバックを運ぶ `AuthorizationSession` でフローを実行する。撤回された試行は、フローがそのシグナルに決して反応しなくても即座に決着する。孤立した実行は自力で完了するに任され、それでもコミットに成功したレコードは人間が確かに認可したレコードである。キーは `authorization/settled` が発火する前に解放されるため、次の試行を開始することで反応するリスナーは拒否されない。リスナーの失敗は credential seam の条件の下で封じ込められる。
 
-### The interaction vocabulary
+### インタラクションの語彙
 
-A notice is one-way and never carries a secret: a message, optionally the page the human must open and the code they must enter there. A prompt is a question the flow cannot answer for itself — `text`, `secret`, or `select` — where `secret` differs from `text` only in presentation. A prompt carries its own signal so a flow that races a typed code against a browser callback can withdraw the losing question while the attempt continues; the request's signal withdraws the whole attempt instead. The vocabulary is deliberately smaller than any one provider's: it describes what a surface must render, so a surface that renders one flow renders all of them.
+通知は一方向であり、秘密を決して運ばない。メッセージと、任意で人間が開くべきページ、そこで入力すべきコードである。プロンプトはフロー自身では答えられない質問であり——`text`、`secret`、または `select`——`secret` は提示の仕方だけが `text` と異なる。プロンプトは自身のシグナルを運ぶため、入力されたコードとブラウザーのコールバックを競わせるフローは、試行を続けたまま負けた側の質問を撤回できる。リクエストのシグナルは代わりに試行全体を撤回する。この語彙はどの単一プロバイダーのものよりも意図的に小さい。サーフェスがレンダリングしなければならないものを記述するので、1 つのフローをレンダリングするサーフェスはすべてのフローをレンダリングする。
 
-### Commit confirmation
+### コミットの確認
 
-During the attempt the seam watches `credentials/record-updated` for the flow's key, then after `run()` resolves it re-reads `describeRecord` — confirming the commit happened now, because on a re-auth the record already exists and presence alone would let a stale credential pass as freshly authorized. A flow that resolves without committing, or that deleted its record instead of committing one, throws `NOT_COMMITTED`.
+試行中、seam はフローのキーの `credentials/record-updated` を監視し、`run()` が解決した後に `describeRecord` を再読する——コミットが今起きたことを確認するためである。再認可ではレコードがすでに存在し、存在だけでは古い資格情報が新たに認可されたものとして通ってしまう。コミットせずに解決したフロー、またはコミットの代わりにレコードを削除したフローは `NOT_COMMITTED` を投げる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared credential vocabulary to the record store the flows write through and the decision evidence behind the seam.
+パッケージレベルの契約で足りない場合はこれらのページを読む。共有の資格情報語彙から、フローが書き込むレコードストアと seam の背後の決定証拠へと進む。
 
-- [Credentials subsystem reference](../../../docs/subsystems/credentials.md) — the two key spaces and the generated cordis surface for both seams.
-- [Credentials package map](../README.md) — the credential-reference, local-store, and authorization packages.
-- [Credential-reference seam](../credentials/README.md) — the record store every flow commits through.
-- [Capability seams](../../../docs/capability-seams.md) — the Service Definition / Service Provider / Consumer split this seam follows.
-- [Credential records and authorization flows](../../../.agents/notes/implemented/architecture/2026-08-13-credential-records-and-authorization-flows.md) — the rationale and decisions behind the record half and this seam.
+- [Credentials サブシステムリファレンス](../../../docs/subsystems/credentials.md) — 2 つのキー空間と、両方の seam の生成された cordis サーフェス。
+- [Credentials パッケージマップ](../README.md) — credential-reference、local-store、authorization の各パッケージ。
+- [Credential-reference seam](../credentials/README.md) — すべてのフローがコミットするレコードストア。
+- [ケイパビリティシーム](../../../docs/capability-seams.md) — この seam が従う Service Definition / Service Provider / Consumer の分担。
+- [資格情報レコードと認可フロー](../../../.agents/notes/implemented/architecture/2026-08-13-credential-records-and-authorization-flows.md) — レコードの半分とこの seam の背後の根拠と決定。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as authorization is a configuration-time conversation with a human and no flow, notice, or prompt reaches a model request.
+なし。認可は構成時の人間との会話であり、フロー、通知、プロンプトのいずれもモデルリクエストに届かない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No invalidation; no authorization state enters a request prefix.
+無効化なし。認可の状態がリクエストプレフィックスに入ることはない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
+これらの制限は、このパッケージが不向きになる、または特別な注意を要する状況を定義する。タスクバックログではなく、現在のパッケージの制約である。
 
-These limits define when this package is a poor fit or needs special care. They are current package constraints, not a task backlog.
-
-- **No flow is resumable** — an attempt lives in the process that started it, so a browser reload during a login abandons it and the human starts over; durable attempts need a store this seam does not have.
-- **Nothing revokes** — signing out is `ctx.credentials.deleteRecord(key)`, which forgets the local record without telling the issuer; a provider that needs a server-side revoke has no place to declare it.
-- **A key with no flow is inert** — the seam reports what is registered, so a record left by an uninstalled plugin can be deleted but not re-authorized; recognizing that orphan is the caller's job, as it is for `listRecords()`.
+- **どのフローも再開できない** — 試行はそれを開始したプロセスに住むため、ログイン中のブラウザーリロードは試行を放棄させ、人間は最初からやり直す。耐久的な試行にはこの seam が持たないストアが必要である。
+- **何も失効させない** — サインアウトは `ctx.credentials.deleteRecord(key)` であり、発行者に伝えることなくローカルレコードを忘れる。サーバー側の失効が必要なプロバイダーにはそれを宣言する場所がない。
+- **フローのないキーは不活性である** — seam は登録されているものを報告するので、アンインストールされたプラグインが残したレコードは削除できるが再認可はできない。その孤児を認識するのは呼び出し元の仕事であり、`listRecords()` と同じである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Note.
+この開発者ノートはメンテナー向けの作業コンテキストであり、未解決の問いと未決定の方向性を示す。明示的に非権威である。出荷済みの挙動、制限、受け入れ済みの根拠は、上記のセクション、パッケージのコード、およびリンクされた Agent Note にある。
 
-The limitations above name the open directions — resumable attempts, server-side revocation, orphaned-record discovery — each needing its own design and store before landing.
+上記の制限は未解決の方向性——再開可能な試行、サーバー側の失効、孤児レコードの発見——を名指ししており、いずれも着地の前に独自の設計とストアを必要とする。
 
 </details>
 
-A flow can use session.commit(record) to refuse writes after cancellation. Once commit is admitted, cancel() leaves it running until persistence and flow settlement complete. Flows that write through their own credential adapter remain responsible for their own cancellation ordering.
+フローはキャンセル後の書き込みを拒否するために session.commit(record) を使える。commit が受理されると、cancel() は永続化とフローの決着が完了するまでそれを実行したままにする。独自の資格情報アダプターを通じて書き込むフローは、自らのキャンセル順序に引き続き責任を負う。

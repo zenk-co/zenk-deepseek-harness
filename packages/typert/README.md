@@ -1,52 +1,52 @@
 ---
-description: "The Typert group map: the build-time type-graph generator, runtime registry, Loader integration, and shared Remote protocol that enable typed Host-to-Client calls."
+description: "Typert グループマップ: 型付き Host から Client への呼び出しを可能にするビルド時型グラフ生成器、ランタイムレジストリー、Loader 統合、共有 Remote プロトコル。"
 kind: "package-group"
 ---
 
 # packages/typert
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-With the Typert group, Client environments can call Host capabilities as typed methods and share generated schemas and reflection without hand-written wire code. A build-time generator turns source type declarations into compiler-independent models and runtime artifacts, a runtime registry stores those artifacts, and a Loader integration registers them automatically in Loader compositions. A shared protocol package supplies the Remote-call declarations — decorators, wire descriptors, codecs, and provider contracts — that business packages, generated artifacts, the Host Gateway, and the Client API all consume. This page maps the four packages; each package README owns its configuration, usage, and limits.
+Typert グループにより、Client 環境は手書きのワイヤーコードなしに Host ケイパビリティを型付きメソッドとして呼び出し、生成済みスキーマとリフレクションを共有できる。ビルド時生成器はソースの型宣言からコンパイラー非依存のモデルとランタイム成果物を生成し、ランタイムレジストリーはそれらの成果物を格納し、Loader 統合は Loader 構成内でそれらを自動登録する。共有プロトコルパッケージは Remote 呼び出し宣言（デコレーター、ワイヤー記述子、コーデック、プロバイダー契約）を供給し、ビジネスパッケージ、生成成果物、Host Gateway、Client API がすべて消費する。このページは4つのパッケージを対応付ける。各パッケージの設定、使い方、制限は各パッケージ README が所有する。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`generator/`](generator/README.md) | Analyzes source types at build time and generates the reflection, schemas, and Remote descriptors that runtimes load | — |
-| [`loader/`](loader/README.md) | Auto-registers generated Typert artifacts from Loader compositions into the runtime registry | consumes `ctx.loader` and `ctx.typert` |
-| [`protocol/`](protocol/README.md) | Declares the Remote decorators, wire descriptors, codecs, and provider contracts shared by Host and Client | — |
-| [`registry/`](registry/README.md) | Stores generated package reflection and live Zod schemas at runtime, plus lookup and Context provider registries | `ctx.typert` |
+| [`generator/`](generator/README.md) | ソースの型をビルド時に解析し、ランタイムが読み込むリフレクション、スキーマ、Remote 記述子を生成する | — |
+| [`loader/`](loader/README.md) | Loader 構成から生成済み Typert 成果物をランタイムレジストリーに自動登録する | `ctx.loader` と `ctx.typert` を消費する |
+| [`protocol/`](protocol/README.md) | Host と Client が共有する Remote デコレーター、ワイヤー記述子、コーデック、プロバイダー契約を宣言する | — |
+| [`registry/`](registry/README.md) | 生成済みパッケージリフレクションとライブ Zod スキーマをランタイムに格納し、lookup と Context プロバイダーレジストリーを提供する | `ctx.typert` |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Typert subsystem reference](../../docs/subsystems/typert.md) — the literal public contracts recorded from protocol and registry types.
-- [API Gateway reference](../../docs/api-gateway.md) — how the generated Remote descriptors become running Host-to-Client calls.
-- [Remote-call Agent Note](../../.agents/notes/implemented/architecture/2026-08-02-typert-remote-method-calls.md) — the architecture and transport decisions behind Remote calls.
-- [Package workspace map](../README.md) — every group in the workspace and what each owns.
+- [Typert サブシステムリファレンス](../../docs/subsystems/typert.md) — protocol と registry の型から記録された文字通りの公開契約。
+- [API Gateway リファレンス](../../docs/api-gateway.md) — 生成済み Remote 記述子が動作中の Host から Client への呼び出しになる仕組み。
+- [Remote 呼び出し Agent Note](../../.agents/notes/implemented/architecture/2026-08-02-typert-remote-method-calls.md) — Remote 呼び出しの背後にあるアーキテクチャとトランスポートの決定。
+- [パッケージワークスペースマップ](../README.md) — ワークスペース内のすべてのグループとそれぞれの所有範囲。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

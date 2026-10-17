@@ -1,39 +1,39 @@
 ---
-description: "JSON storage backend for hosts and maintainers choosing, configuring, or debugging whole-unit and per-record files under a configured root."
+description: "ホストとメンテナ向け JSON 記憶域バックエンド。設定ルート配下の全体単位・レコード単位ファイルの選択・設定・デバッグ用。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-storage-json
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-storage-json` stores domain data as readable JSON under a configured root and registers as backend `json`. Its default `single` layout keeps one complete `<unit>.json` file per unit; its `per-record` layout keeps one version-stamped document per record. Both layouts publish each changed file atomically, while the domain layer orders calls. Choose it when operators need inspectable files and the selected layout fits the write volume; choose SQLite for larger or highly concurrent data. The backend is host-side only and contributes no prompt, tool, or schema.
+`dsh-storage-json` はドメインデータを設定ルート配下の可読 JSON として格納し、バックエンド `json` として登録する。既定 `single` 配置は単位ごとに完全 `<unit>.json` ファイル 1 件を保持し、`per-record` 配置はレコードごとにバージョン刻印文書 1 件を保持する。両配置とも各変更ファイルをアトミックに公開し、ドメイン層が呼び出しを順序付ける。運用者が検査可能ファイルを必要とし、選択配置が書き込み量に合う場合に選ぶ。より大きい、または高同時実行データには SQLite を選ぶ。バックエンドはホスト側のみであり、プロンプト・ツール・スキーマに寄与しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Use this package when a composition needs readable, editable JSON storage. Route the relevant domains to backend `json`; each domain specification selects the `single` or `per-record` layout.
+合成が可読・編集可能 JSON 記憶域を必要とする場合にこのパッケージを使う。関連ドメインをバックエンド `json` に振り、各ドメイン仕様が `single` または `per-record` 配置を選ぶ。
 
-### When to choose it
+### いつ選ぶか
 
-Choose the default `single` layout for small units that benefit from one complete, pretty-printed file. Choose `per-record` when point writes should replace only one record document. Choose the SQLite backend when data is large, writes are frequent, or multiple records need transactional updates.
+1 つの完全整形済みファイルがうれしい小規模単位には既定 `single` 配置を選ぶ。点書き込みで 1 レコード文書だけ置換すべき場合は `per-record` を選ぶ。データが大きい、書き込みが頻繁、複数レコードのトランザクション更新が必要な場合は SQLite バックエンドを選ぶ。
 
-### Configuration
+### 構成
 
-The only plugin field is `root`, which holds the unit files and directories. It is required because the backend does not fall back to `process.cwd()`. The backend creates the root with mode `0o700` on demand. A domain specification selects its layout; this plugin has no layout override.
+唯一のプラグインフィールドは単位ファイルとディレクトリを保持する `root` である。バックエンドは `process.cwd()` にフォールバックしないため必須である。バックエンドはルートをモード `0o700` で必要時に作成する。ドメイン仕様が配置を選ぶ。このプラグインに配置上書きはない。
 
 ```yaml
 - name: '@deepseek-ai/dsh-storage'
@@ -45,37 +45,37 @@ The only plugin field is `root`, which holds the unit files and directories. It 
     backend: json
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `root` | required | Directory holding `<unit>.json` files and `<unit>/` trees; created `0o700` on demand |
+| `root` | 必須 | `<unit>.json` ファイルと `<unit>/` ツリーを保持するディレクトリ。必要時に `0o700` で作成 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-storage-json) is the exhaustive source for every accepted field and its JSDoc.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-storage-json)が、受け入れられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### Observable behavior
+### 観測可能な動作
 
-A missing `single` file or `per-record` directory opens as an empty unit and materializes on the first write. In `single`, malformed content rejects with `malformed-medium`, and a different stored version rejects with `version-mismatch`. In `per-record`, each malformed or unreadable document, and each document whose version is outside the descriptor's current and compatible versions, reads as an absent record, so one bad document does not reject the unit. Record keys must match `[a-zA-Z0-9_-]+`; an unsafe key rejects before any file operation. Every resolved write is durable, and operations after close reject with `closed`.
+欠落 `single` ファイルや `per-record` ディレクトリは空単位として開き、初回書き込みで実体化する。`single` では、不正内容は `malformed-medium` で拒否され、異なる格納バージョンは `version-mismatch` で拒否される。`per-record` では、各不正・読み取り不可文書、各文書バージョンが記述子の現行・互換バージョン外の文書は不在レコードとして読まれるため、1 件の不良文書が単位を拒否しない。レコードキーは `[a-zA-Z0-9_-]+` に一致しなければならず、安全でないキーはファイル操作前に拒否される。すべての解決済み書き込みは耐久性があり、close 後操作は `closed` で拒否される。
 
-An empty `per-record` tree can initialize its declared tables from a valid `<root>/<unit>.json` whole-unit document only when the source unit name matches and its version is current or declared compatible. The backend leaves that source file unchanged and stamps migrated records with the current version. A source version outside the accepted set leaves the new tree empty. Any document path in a declared table, or a declared `global.json`, suppresses this initialization for the complete unit, even if that document is unreadable or stale.
+空 `per-record` ツリーは、有効 `<root>/<unit>.json` 全体単位文書から宣言テーブルを初期化できる。ソース単位名一致かつバージョンが現行または宣言互換の場合のみである。バックエンドはそのソースファイルを不変のままにし、移行レコードに現行バージョンを刻印する。受け入れ集合外のソースバージョンは新規ツリーを空のままにする。宣言テーブル内の任意文書パス、または宣言 `global.json` は、その文書が読み取り不可や古くても単位全体のこの初期化を抑止する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The two layouts share atomic publication but assign state ownership differently. `single` owns an in-memory unit projection; `per-record` treats its directory tree as authoritative.
+2 配置はアトミック公開を共有するが、状態所有権の割り当てが異なる。`single` はインメモリ単位投影を所有し、`per-record` はディレクトリツリーを権威とする。
 
-### Design concept
+### 設計構想
 
-- **`single` keeps memory authoritative.** Each write changes the in-memory unit, serializes its complete state, and atomically replaces `<unit>.json`. A failed publish restores the prior in-memory value.
-- **`per-record` keeps the directory authoritative.** Each put or delete changes one `<unit>/<table>/<key>.json` document, and `loadAll()` rereads the tree. Each document stamps the unit version and carries one record value.
-- **Publication is durable per call.** A write uses a temporary file, fsync, atomic `rename()` replacement, and a parent-directory fsync on POSIX. The domain layer's write chain supplies ordering across calls.
+- **`single` はメモリを権威にする。**各書き込みはインメモリ単位を変更し、その完全状態を直列化し、`<unit>.json` をアトミックに置換する。公開失敗は直前のインメモリ値を復元する。
+- **`per-record` はディレクトリを権威にする。**各 put や delete は 1 つの `<unit>/<table>/<key>.json` 文書を変更し、`loadAll()` はツリーを読み直す。各文書は単位バージョンを刻印し、1 レコード値を運ぶ。
+- **公開は呼び出しごとに耐久性がある。**書き込みは一時ファイル、fsync、アトミック `rename()` 置換、POSIX 上の親ディレクトリ fsync を使う。ドメイン層の書き込み連鎖が呼び出し横断の順序を提供する。
 
-### File formats
+### ファイル形式
 
-A `single` document carries the unit identity, global singleton, and all tables:
+`single` 文書は単位識別子、全体シングルトン、全テーブルを運ぶ:
 
 ```json
 {
@@ -85,68 +85,68 @@ A `single` document carries the unit identity, global singleton, and all tables:
 }
 ```
 
-A `per-record` table document at `<root>/<unit>/<table>/<key>.json` has the form `{ "version": 1, "record": <value> }`; the optional global value uses `<root>/<unit>/global.json`. The format version comes from the domain specification.
+`<root>/<unit>/<table>/<key>.json` の `per-record` テーブル文書は `{ "version": 1, "record": <value> }` 形式であり、任意全体値は `<root>/<unit>/global.json` を使う。形式バージョンはドメイン仕様由来である。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: backend registration, `root` config, unit open/close table |
-| [`src/single-unit.ts`](src/single-unit.ts) | One `single` unit: authoritative memory, write primitives, publish rollback |
-| [`src/per-record-unit.ts`](src/per-record-unit.ts) | One `per-record` unit: tree reads, path-safe records, and one-document writes |
-| [`src/format.ts`](src/format.ts) | Whole-unit and record serialization with version validation |
-| [`src/atomic.ts`](src/atomic.ts) | Atomic file replacement: temp write, fsync, rename, directory fsync |
+| [`src/index.ts`](src/index.ts) | プラグイン入口。バックエンド登録、`root` 設定、単位開閉テーブル |
+| [`src/single-unit.ts`](src/single-unit.ts) | 1 つの `single` 単位。権威メモリ、書き込みプリミティブ、公開ロールバック |
+| [`src/per-record-unit.ts`](src/per-record-unit.ts) | 1 つの `per-record` 単位。ツリー読み取り、パス安全レコード、1 文書書き込み |
+| [`src/format.ts`](src/format.ts) | バージョン検証付き全体単位・レコード直列化 |
+| [`src/atomic.ts`](src/atomic.ts) | アトミックファイル置換。一時書き込み、fsync、rename、ディレクトリ fsync |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when this backend's view is not enough: the subsystem reference is the authoritative contract, and the sibling backend shows the alternative medium.
+このバックエンドの見方では足りない場合にこれらのページを読むとよい。サブシステムリファレンスが権威契約であり、兄弟バックエンドが代替媒体を示す。
 
-- [Storage subsystem](../../../docs/subsystems/storage.md) — the backend contract, domain semantics, and generated API.
-- [Storage package map](../README.md) — the family's packages and their repository position.
-- [SQLite storage backend](../storage-sqlite/README.md) — the point-update medium for high-frequency data.
-- [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — the design behind the backend family and its deferred work.
+- [Storage サブシステム](../../../docs/subsystems/storage.md) — バックエンド契約、ドメイン意味、生成 API。
+- [Storage パッケージマップ](../README.md) — ファミリーのパッケージとリポジトリ位置。
+- [SQLite 記憶域バックエンド](../storage-sqlite/README.md) — 高頻度データ向け点更新媒体。
+- [domain KV 記憶域 Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — バックエンドファミリーの背後にある設計と先送り作業。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Stored domain records
+### 格納ドメインレコード
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing. This backend contributes no prompt, tool, or schema; it persists non-session domain data behind `ctx.storage` for host-side consumers only.
+なし。このバックエンドはプロンプト・ツール・スキーマに寄与しない。`ctx.storage` 背後でホスト側コンシューマー向けに非セッションドメインデータを永続化する。
 
-#### Token effect
+#### トークンへの影響
 
-Zero live-request tokens.
+ライブリクエストトークンはゼロである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None — the backend never touches live request prefixes.
+なし — バックエンドはライブリクエスト接頭辞に決して触れない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this backend is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+これらの制限は、このバックエンドが不向きな場合や特別な運用上の注意を要する場合を定義する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **`single` rewrites the whole unit** — each write republishes the complete unit file; use `per-record` or route the domain to SQLite when this cost is too high.
-- **No cross-process write locking** — two processes writing the same unit can interleave replacements; writes to the same file use last-completion wins.
-- **Windows rename without explicit write-through** — durability relies on libuv's `rename()` (`MoveFileExW` with replacement); the stricter Win32 write-through publish helper from the session-log backend is planned to move down here when the `log` facet lands.
+- **`single` は単位全体を書き直す** — 各書き込みは完全単位ファイルを再公開する。このコストが高すぎる場合は `per-record` を使うか、ドメインを SQLite に振る。
+- **プロセス横断書き込みロックなし** — 同じ単位への 2 プロセス書き込みは置換が交互に挟まりうる。同じファイルへの書き込みは最終完了勝ちである。
+- **明示ライトスルーなしの Windows rename** — 耐久性は libuv の `rename()` (置換付き `MoveFileExW`) に依存する。セッションログバックエンド由来の厳格 Win32 ライトスルー公開ヘルパーは、`log` ファセット着地時にここへ降ろす予定である。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-The Agent Note flags the whole-unit rewrite scale premise as a risk: if a second consumer lands on this backend at thousand-record scale before being routed to SQLite, rewrite cost surfaces earlier than expected. The mitigation is configuration — point `routes` at the SQLite backend — not a change to this package.
+Agent Note は全体単位書き直し規模前提をリスクとして挙げる。2 件目のコンシューマーが千レコード規模で SQLite に振られる前にこのバックエンドに着地すると、想定より早く書き直しコストが現れる。緩和は設定であり、このパッケージ変更ではない — `routes` を SQLite バックエンドに向ける。
 
 </details>

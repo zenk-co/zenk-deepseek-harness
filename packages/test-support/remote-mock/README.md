@@ -1,37 +1,37 @@
 ---
-description: "Endpoint-named mock for Typert Remote traffic: a table of unary answers and stream scripts, live stream control, a log, and the Connection carrier face, for test authors booting a real browser client without a Host."
+description: "Typert Remote トラフィックのエンドポイント名付きモック: 単項回答とストリームスクリプトの表、ライブストリーム制御、ログ、および Connection キャリアフェイス。Host なしで実ブラウザークライアントを起動するテスト作成者向け。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-remote-mock
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-remote-mock` lets tests configure Host responses through `mock.remote.<namespace>.<method>` using native Vitest mock methods. The same functions answer direct calls and real Connection traffic; reusable tables supply default responses, and explicitly declared streams support test-driven frames and cancellation. Missing responses fail the call and are reported again by `assertNoUnmatched()` at teardown. The package runs without a business Host in Node or a browser page, imports no DOM, React, or Node modules, and is consumed from `devDependencies` only.
+`dsh-remote-mock` は、ネイティブ Vitest モックメソッドを使ってテストが `mock.remote.<namespace>.<method>` を通じて Host 応答を構成できるようにする。同じ関数群が直接呼び出しと実際の Connection トラフィックに応答する。再利用可能な表がデフォルト応答を供給し、明示的に宣言されたストリームがテスト駆動のフレームとキャンセルをサポートする。欠落した応答は呼び出しを失敗させ、teardown で `assertNoUnmatched()` によって再び報告される。このパッケージは Node またはブラウザーページでビジネス Host なしで実行され、DOM、React、Node モジュールをインポートせず、`devDependencies` からのみ消費される。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-### When to use it
+### いつ使うか
 
-Use it when a spec boots real client plugins that talk to `ctx.remote` and wants to script the Host side by endpoint name: whole-client specs bind `mock.rpc` to their Connection instance, while unit specs may call `mock.remote`, `dispatch`, or `open` directly. Endpoints are the Gateway's wire names (`session/page`, `settings/describe`); `args` is the caller's positional argument list with a trailing `AbortSignal` removed; a value is whatever the test registers and is answered unchanged. The only declaration is whether an endpoint is unary (`unary`) or a stream (`stream`).
+spec が `ctx.remote` と対話する実際のクライアントプラグインを起動し、Host 側をエンドポイント名でスクリプト化したいときにこれを使う: クライアント全体の spec は `mock.rpc` を自身の Connection インスタンスに束縛し、ユニット spec は `mock.remote`、`dispatch`、`open` を直接呼んでよい。エンドポイントは Gateway のワイヤ名 (`session/page`、`settings/describe`) である。`args` は呼び出し側の位置引数リストで、末尾の `AbortSignal` が除去されたものである。値はテストが登録したものは何でもよく、そのまま応答される。唯一の宣言はエンドポイントが単項 (`unary`) かストリーム (`stream`) かである。
 
 <a id="remote-proxy"></a>
-### Use the Remote proxy
+### リモートプロキシを使う
 
-`mock.remote` exposes every namespace and method without a method list or a domain-specific helper. Each accessed endpoint uses a cached native Vitest mock; `@vitest/spy.fn` is the implementation behind `vi.fn` and also works in a browser page without the Vitest runner. The same mock answers direct calls and Connection traffic, so return overrides and call assertions observe the functions the client actually invokes:
+`mock.remote` はメソッドリストやドメイン固有ヘルパーなしで、すべての名前空間とメソッドを公開する。アクセスされた各エンドポイントはキャッシュされたネイティブ Vitest モックを使用する。`@vitest/spy.fn` は `vi.fn` の背後にある実装であり、Vitest ランナーなしのブラウザーページでも動作する。同じモックが直接呼び出しと Connection トラフィックに応答するので、戻り値の上書きと呼び出しアサーションは、クライアントが実際に呼び出す関数を観察する:
 
 ```text
 const mock = RemoteMock.create().load(remoteDefaultResponses)
@@ -43,15 +43,15 @@ mock.remote.settings.mutate.mockResolvedValueOnce(ok(updatedNamespace))
 expect(mock.remote.settings.mutate).toHaveBeenCalledWith('locale', operations, revision)
 ```
 
-Use `mockResolvedValue` for a persistent response, `mockResolvedValueOnce` or `mockReturnValueOnce` for queued responses, and `mockImplementation` for argument-dependent behavior. Native queued responses run in registration order, then the mock's current implementation answers. Its initial implementation reads the registered default. `mockClear()` preserves responses and queues; `mockReset()` clears overrides and restores that initial implementation, which reads the latest default. Missing defaults still fail after queued responses are exhausted, including direct calls, which can throw synchronously.
+永続的な応答には `mockResolvedValue`、キューされた応答には `mockResolvedValueOnce` または `mockReturnValueOnce`、引数依存の動作には `mockImplementation` を使う。ネイティブのキューされた応答は登録順に実行され、その後モックの現在の実装が応答する。その初期実装は登録されたデフォルトを読む。`mockClear()` は応答とキューを保持する。`mockReset()` は上書きをクリアし、最新のデフォルトを読むその初期実装を復元する。デフォルトが欠落している場合、キューされた応答を使い果たした後も依然として失敗する。直接呼び出しも含み、同期的に throw することがある。
 
-Only explicit `stream()` or table stream declarations select stream methods; everything else uses unary mocks. Accessing a method does not fabricate a successful business result. Declare stream mode before retaining a method reference: each endpoint/mode owns its own mock. Namespace and method `then` probes and symbol reads are inert.
+明示的な `stream()` または表のストリーム宣言のみがストリームメソッドを選択する。それ以外はすべて単項モックを使用する。メソッドへのアクセスが成功するビジネス結果を捏造することはない。メソッド参照を保持する前にストリームモードを宣言する: 各エンドポイント/モードは自身のモックを所有する。名前空間とメソッドの `then` プローブおよびシンボル読み取りは不活性である。
 
-`MockedRemote` uses Vitest's deep mock transformation over the entire generated `TypertRemoteNamespaceMap`. A non-empty map preserves its namespace and method names, parameters, results, and native spy types. An empty map makes only this test proxy `any`, allowing arbitrary namespaces and methods; it does not augment or weaken production Remote declarations. No copied method signatures, optional generated-module suppressions, or compiler-wide flags are needed. Before handing off Remote/mock changes, run `pnpm run typecheck` to generate and check the real Client types; missing, stale, or partial declarations require rebuilding first. Unbuilt test success or `any` inference is not strict type evidence.
+`MockedRemote` は生成された `TypertRemoteNamespaceMap` 全体に対して Vitest の deep mock 変換を使用する。空でないマップはその名前空間とメソッド名、パラメーター、結果、ネイティブ spy 型を保持する。空のマップはこのテストプロキシのみを `any` にし、任意の名前空間とメソッドを許可する。本番の Remote 宣言を拡張または弱体化することはない。コピーしたメソッドシグネチャ、オプションの生成モジュール抑制、コンパイラー全体のフラグは不要である。Remote/mock の変更を引き渡す前に、`pnpm run typecheck` を実行して実際の Client 型を生成・チェックする。欠落、stale、部分的な宣言はまず再ビルドが必要である。未ビルドのテスト成功や `any` 推論は strict な型証拠ではない。
 
-### Register default responses
+### デフォルト応答を登録する
 
-`load(table)` installs reusable `unary` values or handlers, `stream` scripts, and scriptless `streams` declarations. `unary(endpoint, value)` and `unary(endpoint, fn)` register individual defaults; handlers receive the caller's positional arguments and use existing request types. Each endpoint holds only its latest default, including an explicit `undefined`; updating defaults does not discard native overrides. `ok(value)` builds `{ ok: true, value }`; failures use `{ ok: false, error: { code, message, details } }`. Keep stateful handlers, promises, and native queues local to each test:
+`load(table)` は再利用可能な `unary` 値またはハンドラー、`stream` スクリプト、スクリプトなしの `streams` 宣言をインストールする。`unary(endpoint, value)` と `unary(endpoint, fn)` は個別のデフォルトを登録する。ハンドラーは呼び出し側の位置引数を受け取り、既存のリクエスト型を使用する。各エンドポイントは最新のデフォルトのみを保持し、明示的な `undefined` も含む。デフォルトの更新はネイティブの上書きを破棄しない。`ok(value)` は `{ ok: true, value }` を構築する。失敗は `{ ok: false, error: { code, message, details } }` を使う。状態を持つハンドラー、promise、ネイティブキューはテストごとにローカルに保つ:
 
 ```text
 const initial = { writable: true, hasDocument: false, namespaces: [] }
@@ -61,9 +61,9 @@ const mock = RemoteMock.create().load({
 mock.remote.settings.describe.mockResolvedValueOnce(ok({ ...initial, hasDocument: true }))
 ```
 
-### Drive streams
+### ストリームを駆動する
 
-A stream script is a function of the open `args` and a `StreamHandle` (`push`, `end`, `fail(error)`, `signal`); the stream stays open after the script returns until the handle ends or fails it. `frames(items)` builds a script that yields the items and ends; `openStream(initial)` one that yields them and stays open. `mock.streams` controls streams the client currently holds open, filtered by the args they were opened with; `opened(endpoint, count)` resolves once the endpoint has been opened that many times, and `drained(endpoint)` once the consumer of every matching stream has pulled everything pushed so far, an open stream's consumer waiting for more and a settled stream's queue empty (pulled from the queue; that equals processed only for a consumer that handles items inside its read loop):
+ストリームスクリプトは開かれた `args` と `StreamHandle` (`push`、`end`、`fail(error)`、`signal`) の関数である。ストリームはスクリプトが戻った後も、ハンドルがそれを終了または失敗させるまで開いたままである。`frames(items)` は項目を yield して終了するスクリプトを構築し、`openStream(initial)` はそれらを yield して開いたままにする。`mock.streams` はクライアントが現在開いているストリームを、それが開かれた args でフィルターして制御する。`opened(endpoint, count)` はエンドポイントがその回数開かれると解決し、`drained(endpoint)` は一致するすべてのストリームのコンシューマーがこれまで push されたすべてを取り出したときに解決する。開いたストリームのコンシューマーはさらなる項目を待っており、確定したストリームのキューは空である (キューから取り出した時点。それが処理済みと等しいのは、読み取りループ内で項目を処理するコンシューマーについてのみである):
 
 ```text
 mock.stream('session/follow', openStream([snapshotFrame]))
@@ -73,75 +73,75 @@ mock.streams.fail('session/follow', new Error('gone'))
 await mock.streams.drained('session/follow')
 ```
 
-A failed stream rejects the consumer's next read with the given `Error`. Consumer cancellation (the opening signal or an early iterator `return()`) aborts `StreamHandle.signal`, ends the iteration without throwing, and logs the stream as `cancelled`. `StreamHandle.uplink` is what the script reads as the Client's uplink: through `rpc.open` it is the carrier's iterable; for a direct `mock.remote.<namespace>.<method>(...)` call it is fed by the returned handle, which is the `RemoteStreamHandle` a generated method returns (iterate it for the downlink, `send()` and `end()` feed the uplink, `dispose()` cancels the stream); `send()` rejects a non-lossless JSON item as the real handle does, and the uplink it owns closes once the stream settles, is cancelled, or the consumer leaves, so a later `send()` throws. The mock function is called with the method's own arguments only, so the uplink never appears in call assertions or logged args.
+失敗したストリームはコンシューマーの次の読み取りを指定された `Error` で拒否する。コンシューマーのキャンセル (開始シグナルまたは早期のイテレーター `return()`) は `StreamHandle.signal` を abort し、throw せずにイテレーションを終了し、ストリームを `cancelled` としてログする。`StreamHandle.uplink` はスクリプトが Client の uplink として読むものである: `rpc.open` を通じた場合はキャリアのイテラブルであり、直接の `mock.remote.<namespace>.<method>(...)` 呼び出しでは戻り値のハンドル — 生成されたメソッドが返す `RemoteStreamHandle` — がそれを供給する (ダウンリンクにはそれをイテレートし、`send()` と `end()` が uplink を供給し、`dispose()` がストリームをキャンセルする)。`send()` は実ハンドルと同様に非 lossless な JSON 項目を拒否し、それが所有する uplink はストリームが確定するか、キャンセルされるか、コンシューマーが離れると閉じるので、その後の `send()` は throw する。モック関数はメソッド自身の引数のみで呼ばれるので、uplink が呼び出しアサーションやログの引数に現れることは決してない。
 
-A fake that stands in for a generated stream method returns the `RemoteStreamHandle` the generated method does. `streamHandle(source)` types an `AsyncIterable` as that handle with inert `send`, `end`, and `dispose`; `streamMethod<M>(generator)` lifts an async generator function written for the method's arguments into the method's own signature, for `vi.fn<M>()` and `mockImplementation`.
+生成されたストリームメソッドの代役を務めるフェイクは、生成されたメソッドが返すものと同じ `RemoteStreamHandle` を返す。`streamHandle(source)` は `AsyncIterable` を不活性な `send`、`end`、`dispose` を持つそのハンドルとして型付けする。`streamMethod<M>(generator)` はメソッドの引数用に書かれた async ジェネレーター関数をメソッド自身のシグネチャに持ち上げ、`vi.fn<M>()` と `mockImplementation` 用にする。
 
-### Connect a client
+### クライアントを接続する
 
-`mock.rpc` is the `ClientConnectionRpc` face. Pass it as `{ transport: { rpc: mock.rpc } }` to the Connection installer, or let `TestClient` bind it to its instance, so every Remote call reaches `dispatch` and every stream reaches `open` with no envelopes in between. Payloads carry `{ args }` as the whole-client proxies send them (an array) or as the Gateway's own endpoints send them (one object, delivered as one positional arg); a call whose signal aborts rejects with the abort reason. `RemoteMock.create()` registers one stream, `$events`, that answers the Gateway client's opening with `{ type: 'ready', clientId, host: { home } }` (host from `RemoteMockOptions.host`, default `/home/mock`) and stays open, which is what lets the assembled client reach `connected`; a spec overrides or fails it like any other stream.
+`mock.rpc` は `ClientConnectionRpc` フェイスである。Connection インストーラーに `{ transport: { rpc: mock.rpc } }` として渡すか、`TestClient` にそのインスタンスへ束縛させる。そうすればすべての Remote 呼び出しが `dispatch` に到達し、すべてのストリームが間にエンベロープなしで `open` に到達する。ペイロードはクライアント全体のプロキシが送るとおりに (配列として) `{ args }` を運ぶか、Gateway 自身のエンドポイントが送るとおりに (1 つのオブジェクト、1 つの位置引数として届けられる) 運ぶ。シグナルが abort する呼び出しは abort 理由で拒否する。`RemoteMock.create()` は 1 つのストリーム `$events` を登録し、それが Gateway クライアントのオープンに `{ type: 'ready', clientId, host: { home } }` で応答し (`host` は `RemoteMockOptions.host` から、デフォルトは `/home/mock`)、開いたままになる。これがアセンブルされたクライアントを `connected` に到達させる。spec は他のストリームと同様にそれを上書きまたは失敗させることができる。
 
-### Observe and assert
+### 観察とアサート
 
-`mock.log.calls(endpoint?)` lists unary calls through `dispatch` or `rpc.call` (`args`, `seq`, a live `state` of `pending` / `answered` / `failed`, and the answer or thrown error as `result`), `streams(endpoint?)` lists scripted opens with their live `state` and `pushed` count, `requests(endpoint?)` lists the first positional arg of calls and opens in order (without an endpoint, excluding the Gateway's own `$`-prefixed endpoints), and `unmatched()` lists requests that found no rule. Native `.mock.calls` additionally includes direct proxy calls; carrier stream mocks receive their final cancellation signal. `assertNoUnmatched()` reports misses at teardown. `modeOf(endpoint)` reports explicit registrations; `endpoints()` also includes accessed proxy methods so assembly can provide their namespaces.
+`mock.log.calls(endpoint?)` は `dispatch` または `rpc.call` を通じた単項呼び出しをリストする (`args`、`seq`、`pending` / `answered` / `failed` のライブ `state`、および `result` としての回答または throw されたエラー)。`streams(endpoint?)` はスクリプト化されたオープンをそのライブ `state` と `pushed` カウントとともにリストする。`requests(endpoint?)` は呼び出しとオープンの最初の位置引数を順にリストする (エンドポイントなしでは、Gateway 自身の `$` 前置きエンドポイントを除く)。`unmatched()` はルールが見つからなかったリクエストをリストする。ネイティブの `.mock.calls` はさらに直接プロキシ呼び出しを含み、キャリアストリームモックは最終的なキャンセルシグナルを受け取る。`assertNoUnmatched()` は teardown でミスを報告する。`modeOf(endpoint)` は明示的な登録を報告する。`endpoints()` はアクセスされたプロキシメソッドも含むので、アセンブリがその名前空間を提供できる。
 
-### What can go wrong
+### 起こりうる問題
 
-- **A request has no rule** — `dispatch` rejects and `open` throws `remote-mock: no rule for <endpoint>; registered: …`, and the log records the miss; register the endpoint.
-- **A payload is not `{ args: unknown[] | object }`** — `rpc.call` rejects and `rpc.open` throws a `TypeError`; the whole-client proxies send the array form and the Gateway's own endpoints the object form, so a hand-written call is at fault.
-- **A second concurrent read on one stream** — the read rejects; the Gateway reads streams sequentially, so this names a test-side misuse.
+- **リクエストにルールがない** — `dispatch` は拒否し、`open` は `remote-mock: no rule for <endpoint>; registered: …` を throw し、ログがミスを記録する。エンドポイントを登録する。
+- **ペイロードが `{ args: unknown[] | object }` でない** — `rpc.call` は拒否し、`rpc.open` は `TypeError` を throw する。クライアント全体のプロキシは配列形式を、Gateway 自身のエンドポイントはオブジェクト形式を送るので、手書きの呼び出しに責任がある。
+- **1 つのストリームへの 2 つ目の並行読み取り** — 読み取りは拒否される。Gateway はストリームを順次読むので、これはテスト側の誤用を名指しする。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-### Design
+### 設計
 
-`dispatch` and `open` take the endpoint and positional args; `rpc` exposes the same core through Connection's decoded carrier interface. Each mock owns its native functions and queued overrides; shared tables supply defaults without copying handlers or answer objects. Each scripted stream owns its queue, its single pending read, and its log entry; the first of `end`, `fail`, or consumer cancellation settles it.
+`dispatch` と `open` はエンドポイントと位置引数を取る。`rpc` は Connection のデコード済みキャリアインターフェースを通して同じコアを公開する。各モックは自身のネイティブ関数とキューされた上書きを所有する。共有表はハンドラーや回答オブジェクトをコピーせずにデフォルトを供給する。各スクリプト化ストリームは自身のキュー、単一の保留中読み取り、およびそのログエントリーを所有し、`end`、`fail`、またはコンシューマーキャンセルの最初のものがそれを確定する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Public face re-exports |
-| [`src/remote-mock.ts`](src/remote-mock.ts) | `RemoteMock`: default responses, native mocks, Connection dispatch, controlled streams and missing-response checks; `ok` |
-| [`src/remote-proxy.ts`](src/remote-proxy.ts) | Namespace/method lookup and generated-map mock types |
-| [`src/streams.ts`](src/streams.ts) | `frames` / `openStream` scripts, `streamHandle` / `streamMethod` fake typing, and `MockStream` (handle + `AsyncIterable`) |
-| [`src/log.ts`](src/log.ts) | Log store with the shared `seq` counter |
+| [`src/index.ts`](src/index.ts) | 公開フェイスの再エクスポート |
+| [`src/remote-mock.ts`](src/remote-mock.ts) | `RemoteMock`: デフォルト応答、ネイティブモック、Connection ディスパッチ、制御されたストリームと欠落応答チェック。`ok` |
+| [`src/remote-proxy.ts`](src/remote-proxy.ts) | 名前空間/メソッドルックアップと生成マップのモック型 |
+| [`src/streams.ts`](src/streams.ts) | `frames` / `openStream` スクリプト、`streamHandle` / `streamMethod` フェイク型付け、および `MockStream` (ハンドル + `AsyncIterable`) |
+| [`src/log.ts`](src/log.ts) | 共有 `seq` カウンター付きのログストア |
 
 </details>
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package is browser-side test infrastructure; nothing here reaches a model request.
+なし。このパッケージはブラウザー側のテストインフラストラクチャであり、ここにあるものはモデルリクエストに到達しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **In-process carrier only** — `rpc` serves a Connection instance in the same realm; no HTTP or WebSocket carrier for browser-lane specs is provided.
-- **Values cross by reference** — answers and downlink items reach the client unserialized, so a non-JSON downlink value that the real wire would reject passes through unchanged; only the handle's `send()` applies the real uplink check.
-- **Values are not checked** — a unary answer must be the result the caller reads (`{ ok, value }` or `{ ok: false, error }`); the mock passes it through unchanged and does not check those fields.
-- **No payload matching** — rules match on endpoint only; discriminate on business arguments inside a handler.
-- **Native stream overrides own their iterable** — an override returning its own iterable bypasses scripted-stream logs, `requests`, `opened`, `drained`, and `push` / `end` / `fail`; the caller also owns cancellation. Native call assertions still work. Use a registered stream script when a scenario needs those controls.
+- **インプロセスキャリアのみ** — `rpc` は同じレルムの Connection インスタンスにサービスする。ブラウザーレーンの spec 用の HTTP または WebSocket キャリアは提供されない。
+- **値は参照で渡る** — 回答とダウンリンク項目はシリアライズされずにクライアントに到達するので、実際のワイヤなら拒否する非 JSON のダウンリンク値がそのまま通過する。実 uplink チェックを適用するのはハンドルの `send()` のみである。
+- **値はチェックされない** — 単項回答は呼び出し側が読む結果 (`{ ok, value }` または `{ ok: false, error }`) でなければならない。モックはそれをそのまま通過させ、それらのフィールドをチェックしない。
+- **ペイロードマッチングなし** — ルールはエンドポイントのみでマッチする。ハンドラー内でビジネス引数によって判別する。
+- **ネイティブストリーム上書きは自身のイテラブルを所有する** — 自身のイテラブルを返す上書きはスクリプト化ストリームのログ、`requests`、`opened`、`drained`、および `push` / `end` / `fail` をバイパスする。キャンセルも呼び出し側が所有する。ネイティブ呼び出しアサーションは依然として機能する。シナリオがそれらの制御を必要とする場合は登録済みストリームスクリプトを使う。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

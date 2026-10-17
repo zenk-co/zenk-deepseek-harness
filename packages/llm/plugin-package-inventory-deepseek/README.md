@@ -1,78 +1,78 @@
 ---
-description: "Active Loader package inventory metadata for deployments sending official DeepSeek requests."
+description: "公式 DeepSeek 要求を送るデプロイ向けの、稼働 Loader ベースのアクティブプラグインパッケージインベントリメタデータ。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-plugin-package-inventory-deepseek
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Best-effort active Loader-backed plugin package inventory for official DeepSeek LLM API requests. This function plugin injects the Loader, live Agent registry, and `ctx.deepseekLlmApiExtensions`, then owns the `dsh_plugin_packages` field. Enable it when the official API needs the active package list for request diagnostics.
+公式 DeepSeek LLM API 要求向けのベストエフォートな稼働 Loader ベースのアクティブプラグインパッケージインベントリ。このファンクションプラグインは Loader・稼働エージェントレジストリ・`ctx.deepseekLlmApiExtensions` を注入し、`dsh_plugin_packages` フィールドを所有する。公式 API が要求診断向けにアクティブパッケージ一覧を必要とするときに有効にする。
 
-## Table of Contents
+## 目次
 
-- [Configuration](#configuration)
-- [Collection](#collection)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [設定](#configuration)
+- [収集](#collection)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="configuration"></a>
-## Configuration
+## 設定
 
-| Key | Default | Meaning |
+| キー | 既定値 | 意味 |
 |---|---:|---|
-| `enabled` | `true` | Register the `dsh_plugin_packages` contribution. Set it to `false` to omit package metadata. |
+| `enabled` | `true` | `dsh_plugin_packages` 寄与を登録する。パッケージメタデータを省くには `false` にする。 |
 
-Shipped profiles use the default, so every official DeepSeek request carries the package inventory when preparation succeeds.
+出荷プロファイルは既定値を使うため、準備が成功すればすべての公式 DeepSeek 要求がパッケージインベントリを運ぶ。
 
 <a id="collection"></a>
-## Collection
+## 収集
 
-Every request re-reads active non-group entries from the host Loader tree. When optional `ctx.agentPresets` is present and `sessionId` resolves to a live Agent joined to a standing preset, that preset's separate Loader tree joins the same collection; deployments without the service report the host tree only. Entries are included only while their root fiber is `ACTIVE` and their effective Loader state is enabled.
+すべての要求はホスト Loader ツリーからアクティブな非グループエントリーを読み直す。任意の `ctx.agentPresets` が存在し、`sessionId` が常設プリセットに参加する稼働エージェントに解決される場合、そのプリセットの別 Loader ツリーが同じ収集に加わる。そのサービスがないデプロイはホストツリーのみを報告する。エントリーはルートファイバーが `ACTIVE` で、かつ実効 Loader 状態が有効な間のみ含まれる。
 
-At activation, the plugin samples the optional `ctx.pluginPackages` service. Shipped app boot mounts that service before profile Loader entries, so bare package and package-subpath identities use the same authoritative runtime resolution as their imports, including its misses, without requiring a `./package.json` export. If the service is absent, the plugin retains native Node package-search lookup for its lifetime and does not switch an existing inventory when a resolver mounts later. A low-level embedder that wants runtime resolution identities must therefore mount `PluginPackages` before both the Loader entries and this plugin.
+有効化時、プラグインは任意の `ctx.pluginPackages` サービスを抽出する。出荷アプリ起動はプロファイル Loader エントリーより前にそのサービスをマウントするため、素のパッケージ識別子とパッケージサブパス識別子はインポートと同じ権威ある実行時解決を使う。ミスを含み、`./package.json` 出力を要求しない。サービスがなければ、プラグインは存続期間中ネイティブ Node パッケージ探索の検索を保持し、後からリゾルバーがマウントされても既存インベントリを切り替えない。実行時解決の識別子が欲しい低水準組み込み側は、したがって Loader エントリーとこのプラグインの両方より前に `PluginPackages` をマウントしなければならない。
 
-Each ordinary entry uses its owning Loader tree base. A standing preset's root entries use the harness base, matching the preset Loader's deliberate bare-package override; nested includes retain their own bases. Relative and absolute modules walk to their nearest manifest; manifests without a non-blank string `name` are omitted. A missing or invalid `version` produces a name-only entry, regardless of `private`. A nested directory with its own manifest does not inherit its parent's identity. Package resolution, manifest reading, and JSON parsing failures omit only that entry and log one warning per module; inventory metadata does not block model requests. Entries are deduplicated by name and optional version and sorted with a locale-independent comparison; name-only entries sort before same-name versioned entries, and different versions remain separate.
+各通常エントリーは所有 Loader ツリーのベースを使う。常設プリセットのルートエントリーはハーネスベースを使い、プリセット Loader の意図的な素パッケージ上書きと一致する。入れ子のインクルードは自身のベースを保持する。相対・絶対モジュールは最も近いマニフェストまで歩き、非空白文字列 `name` のないマニフェストは省かれる。欠落・不正な `version` は `private` に関わらず名前のみのエントリーになる。独自マニフェストを持つ入れ子ディレクトリは親の識別子を継承しない。パッケージ解決・マニフェスト読み取り・JSON 構文解析の失敗はそのエントリーのみを省き、モジュールごとに警告を 1 件記録する。インベントリメタデータはモデル要求を止めない。エントリーは名前と任意バージョンで重複除去され、ロケール非依存の比較で整列する。名前のみのエントリーは同名のバージョン付きエントリーより前に整列し、異なるバージョンは別物のままである。
 
-The version-1 `dsh_plugin_packages` field contains `{ name, version }` or `{ name }` entries; `version` is included only when it is a non-blank string. Disabled, pending, failed, disposed, unloading, structural `cordis:` rows, ordinary dependencies, loose files without an owning package identity, programmatically mounted child fibers, and in-memory dynamic plugins are excluded.
+バージョン 1 の `dsh_plugin_packages` フィールドは `{ name, version }` または `{ name }` エントリーを含む。`version` は非空白文字列の場合のみ含まれる。無効・保留・失敗・破棄済み・アンロード中・構造 `cordis:` 行・通常依存・所有パッケージ識別子のない素ファイル・プログラム的にマウントされた子ファイバー・メモリ内動的プラグインは除外される。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Package inventory metadata
+### パッケージインベントリメタデータ
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing. `dsh_plugin_packages` is provider metadata outside the model's messages, system prompt, and tool schemas.
+何もない。`dsh_plugin_packages` はモデルのメッセージ・システムプロンプト・ツールスキーマの外にあるプロバイダーメタデータである。
 
-#### Token effect
+#### トークン効果
 
-Zero model-input tokens; the complete inventory adds only HTTP request bytes.
+モデル入力トークンはゼロであり、完全なインベントリは HTTP 要求バイトを増やすだけである。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; package lifecycle changes do not alter the model-visible prefix.
+なし。パッケージライフサイクルの変化はモデル可視の接頭辞を変えない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Loader package identity only** — programmatic child fibers and in-memory dynamic plugins do not have authoritative npm names and versions and remain outside this inventory.
-- **Unavailable identities are omitted** — the inventory can be partial when package metadata is unavailable.
-- **In-place package replacement requires restart** — manifest identities are cached for the process lifetime. Loader enable, disable, mount, unmount, and ordinary source HMR still refresh the active entry set, but replacing a mounted package's manifest with another version in the same process is not a supported upgrade path.
+- **Loader パッケージ識別子のみ** — プログラム的子ファイバーとメモリ内動的プラグインには権威ある npm 名とバージョンがなく、このインベントリの外のままである。
+- **利用できない識別子は省かれる** — パッケージメタデータが利用できない場合、インベントリは部分的になりうる。
+- **インプレースのパッケージ置換には再起動が必要** — マニフェスト識別子はプロセス存続期間キャッシュされる。Loader の有効化・無効化・マウント・破棄・通常のソース HMR はアクティブエントリー集合を更新するが、同じプロセス内でマウント済みパッケージのマニフェストを別バージョンに置換することは支援される更新経路ではない。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

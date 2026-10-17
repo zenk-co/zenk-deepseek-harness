@@ -1,96 +1,96 @@
 ---
-description: "Model tool that creates a new local Git worktree and changes the current Session directory."
+description: "新しいローカル Git ワークツリーを作成し、現在のセッションディレクトリを変更するモデルツール。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-experimental-tool-worktree
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Add Git Worktrees from the GUI plugin manager to let a model create and enter a new Git worktree with one call. This optional bundle is installed with Harness and stays off until selected. Native tool calls and PTC programs receive the same typed result, and the existing file policy governs creation.
+GUI プラグインマネージャーから Git ワークツリーを追加し、モデルが 1 呼び出しで新しい Git ワークツリーを作成・入室できるようにする。この任意バンドルはハーネスと共にインストールされ、選択されるまで無効のままである。ネイティブツール呼び出しと PTC プログラムは同じ型付き結果を受け取り、既存ファイル方針が作成を統治する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-In the GUI, open **Plugins → Official → Git Worktrees** and turn on the switch. The bundle loads the [worktree runtime](../worktree/README.md) and this tool together; it is off in every shipped profile. Turning it off removes `create_worktree` without deleting existing checkouts or branches. The built-in `working_directory` tool remains available.
+GUI で**プラグイン → Official → Git ワークツリー**を開き、スイッチを入れる。バンドルは [worktree ランタイム](../worktree/README.md) とこのツールを一緒に読み込む。出荷プロファイルではすべて無効である。切ると既存チェックアウトやブランチを削除せずに `create_worktree` が消える。組み込み `working_directory` ツールは引き続き利用できる。
 
-For an explicit composition, mount this function plugin after the worktree runtime and tool registry.
+明示的コンポジションでは、worktree ランタイムとツールレジストリの後にこのファンクションプラグインをマウントする。
 
 ```yaml
 - name: '@deepseek-ai/dsh-experimental-worktree'
 - name: '@deepseek-ai/dsh-experimental-tool-worktree'
 ```
 
-Call `create_worktree({ name?: string, from?: string })`. Success returns the canonical checkout `path`, new `branch`, pinned `baseCommit`, and source `repositoryRoot`, and changes the calling Session's current working directory. To leave, call `working_directory({ cd: path })`; the checkout and branch remain. The [generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-worktree) owns the exact schema and model-facing description.
+`create_worktree({ name?: string, from?: string })` を呼ぶ。成功は正規チェックアウト `path`・新規 `branch`・固定 `baseCommit`・由来 `repositoryRoot` を返し、呼び出しセッションの現在作業ディレクトリを変更する。離れるには `working_directory({ cd: path })` を呼ぶ。チェックアウトとブランチは残る。正確なスキーマとモデル向き説明は[生成ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-worktree)が所有する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) inserts the `worktree` runtime row and the `tool-worktree` consumer row. [`src/index.ts`](src/index.ts) registers one typed tool. Runtime creation owns Git behavior, cancellation, and the working-directory change. The tool returns the runtime record as its canonical value and renders that record as JSON; its Host presentation uses the generic card. Disposal unregisters the tool.
+[`cordis.patch.yml`](cordis.patch.yml) は `worktree` ランタイム行と `tool-worktree` 利用者行を挿入する。[`src/index.ts`](src/index.ts) は 1 つの型付きツールを登録する。ランタイム作成が Git 動作・取り消し・作業ディレクトリ変更を所有する。ツールはランタイム記録を正規値として返し、その記録を JSON として描画する。そのホスト提示は汎用カードを使う。破棄でツールの登録が外れる。
 
-No runtime invariant companion is published because the tool retains no state independently of the worktree runtime.
+ツールが worktree ランタイムと独立に状態を保持しないため、実行時不変条件の伴走文書は公開しない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Worktree runtime](../worktree/README.md) — configuration, creation semantics, and write permissions.
-- [Working directory](../../session/working-directory/README.md) — Session context and exit operation.
-- [Tool authoring](../../../docs/cookbook/adding-a-tool.md) — canonical results and pure presentation.
+- [Worktree ランタイム](../worktree/README.md) — 設定・作成意味・書き込み権限。
+- [作業ディレクトリ](../../session/working-directory/README.md) — セッションコンテキストと退出操作。
+- [ツール作成](../../../docs/cookbook/adding-a-tool.md) — 正規結果と純粋提示。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Creation tool
+### 作成ツール
 
-#### What the model sees
+#### モデルが見るもの
 
-The [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-worktree) defines `create_worktree`. Each successful result contains the created checkout's canonical path, branch, base commit, and source checkout’s top-level directory. Failed calls report the operation error.
+[ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-worktree)は `create_worktree` を定義する。各成功結果は作成チェックアウトの正規パス・ブランチ・基準コミット・由来チェックアウトの最上位ディレクトリを含む。失敗呼び出しは操作エラーを報告する。
 
-#### Token effect
+#### トークン効果
 
-The schema has a fixed per-request cost while mounted. Each call appends its arguments and bounded creation result or error to ordinary tool history.
+スキーマはマウント中に要求ごとの固定費を持つ。各呼び出しは引数と上限付き作成結果またはエラーを通常ツール履歴に追記する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Unchanged tool schemas retain their existing prefix. Calls append after prior history; the working-directory service separately records the successful directory change for later requests.
+変更のないツールスキーマは既存接頭辞を保持する。呼び出しは従来履歴の後に追記され、作業ディレクトリサービスは成功ディレクトリ変更を後続要求向けに別途記録する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Calling Agent required** — the tool changes a Session directory and rejects calls without an Agent.
-- **Creation only** — inspection, merging, and checkout or branch removal are outside this tool; the [runtime limitations](../worktree/README.md#known-limitations-and-deferred-work) also apply.
+- **呼び出しエージェントが必須** — ツールはセッションディレクトリを変更するため、エージェントなしの呼び出しを拒否する。
+- **作成のみ** — 検査・マージ・チェックアウトやブランチの削除はこのツールの外であり、[ランタイム制限](../worktree/README.md#known-limitations-and-deferred-work)も適用される。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

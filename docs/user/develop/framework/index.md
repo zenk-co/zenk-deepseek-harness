@@ -1,12 +1,12 @@
-# Plugins and lifecycle
+# プラグインとライフサイクル
 
-English | [中文](index.zh.md)
+日本語 | [English](index.en.md) | [中文](index.zh.md)
 
-This page describes the Cordis plugin model and lifecycle state machine.
+この頁は Cordis プラグイン模型とライフサイクル状態機械を述べる。
 
-## Fiber state machine
+## ファイバー状態機械
 
-Every loaded plugin owns a **Fiber** scope with the following states:
+読み込まれた各プラグインは次の状態を持つ **Fiber** 適用範囲を所有する。
 
 ```
 PENDING → LOADING → ACTIVE
@@ -14,18 +14,18 @@ PENDING → LOADING → ACTIVE
 ACTIVE → UNLOADING → DISPOSED
 ```
 
-| State | Meaning |
+| 状態 | 意味 |
 |------|------|
-| PENDING | Declared, but required dependencies are not ready |
-| LOADING | Dependencies are ready and `apply` is running |
-| ACTIVE | The plugin is running |
-| FAILED | `apply` threw an error |
-| UNLOADING | The plugin is unloading and disposing resources |
-| DISPOSED | The plugin is fully unloaded |
+| PENDING | 宣言済みだが必須依存が未整 |
+| LOADING | 依存が整い `apply` が実行中 |
+| ACTIVE | プラグインが動作中 |
+| FAILED | `apply` が誤りを送出した |
+| UNLOADING | プラグインが解体中で資源を破棄中 |
+| DISPOSED | プラグインが完全に解体済み |
 
-## Dependency-driven loading
+## 依存駆動読み込み
 
-A plugin with `inject` waits for every required service before loading:
+`inject` 付きプラグインは読み込み前に必須サービスすべてを待つ。
 
 ```ts ignore-check
 export const inject = ['tools', 'llm']
@@ -35,11 +35,11 @@ export function apply(ctx: Context) {
 }
 ```
 
-If a required service disappears, for example during provider replacement, the plugin unloads automatically (ACTIVE → DISPOSED) and loads again when the service returns.
+必須サービスが消える場合、例えば提供子置換中は、プラグインは自動的に解体し (ACTIVE → DISPOSED)、サービス復帰時に再び読み込む。
 
-## Automatic cleanup
+## 自動片付け
 
-Every registration made through `ctx` is undone when the plugin unloads:
+`ctx` 経由の各登録はプラグイン解体時に解かれる。
 
 ```ts ignore-check
 export function apply(ctx: Context) {
@@ -54,17 +54,17 @@ export function apply(ctx: Context) {
 }
 ```
 
-The framework tracks and disposes all of these operations:
-- `ctx.on(event, handler)` — event listener
-- `ctx.tools.register(tool)` — tool registration
-- `ctx.llm.registerAdapter(names, adapter)` — LLM adapter registration
-- `ctx.effect(() => cleanup)` — custom resource
+枠組みはこれらの操作すべてを追跡して破棄する。
+- `ctx.on(event, handler)` — イベント待ち受け
+- `ctx.tools.register(tool)` — ツール登録
+- `ctx.llm.registerAdapter(names, adapter)` — LLM アダプター登録
+- `ctx.effect(() => cleanup)` — 任意資源
 
-During unload, disposer invocation starts in reverse registration order, but multiple async disposers run concurrently and have no serial completion guarantee. Put order-dependent cleanup in one disposer returned from a single `ctx.effect()` and await its steps serially there.
+解体中、破棄子呼び出しは登録の逆順に始まるが、複数の非同期破棄子は並行に走り連続完了保証はない。順序依存の片付けは単一 `ctx.effect()` から返す 1 つの破棄子に入れ、そこで段階を連続待機する。
 
-## Nested contexts
+## 入れ子文脈
 
-`ctx.plugin()` creates a child Fiber that inherits the parent context but has an independent lifecycle:
+`ctx.plugin()` は親文脈を継承するが独立寿命を持つ子 Fiber を作る。
 
 ```ts ignore-check
 export function apply(ctx: Context) {
@@ -75,9 +75,9 @@ export function apply(ctx: Context) {
 }
 ```
 
-## Dispose semantics
+## 破棄意味論
 
-To stop a plugin instance early:
+プラグイン実体を早く止めるには。
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -91,22 +91,22 @@ const fiber = ctx.plugin(myPlugin)
 await fiber.dispose()
 ```
 
-`dispose` guarantees:
-1. All registrations owned by the plugin are removed.
-2. Child plugins are recursively unloaded.
-3. The returned promise resolves after all asynchronous cleanup finishes.
+`dispose` は次を保証する。
+1. プラグイン所有の全登録が外される。
+2. 子プラグインは再帰的に解体される。
+3. 返す約束は全非同期片付け完了後に解決する。
 
-## Hot replacement (HMR)
+## 熱置換 (HMR)
 
-With `@deepseek-ai/dsh-hmr` loaded from `cordis.yml`, editing a plugin source file triggers:
+`cordis.yml` から `@deepseek-ai/dsh-hmr` を読み込むと、プラグイン源文件の編集が次を発動する。
 
-1. Unload the old plugin and clean up its registrations.
-2. Load the new code.
-3. Run the new `apply`.
+1. 旧プラグインを解体し、その登録を片付ける。
+2. 新符号を読み込む。
+3. 新 `apply` を走らせる。
 
-Because plugin registrations clean themselves up, hot replacement does not retain registrations from the old instance.
+プラグイン登録は自ら片付くため、熱置換は旧実体の登録を残さない。
 
-## Example lifecycle
+## 寿命例
 
 ```ts ignore-check
 export function apply(ctx: Context) {
@@ -119,19 +119,19 @@ export function apply(ctx: Context) {
 }
 ```
 
-Loading prints:
+読み込み表示。
 ```
 plugin loading
 effect registered
 ```
 
-Unloading prints:
+解体表示。
 ```
 effect cleaned up
 ```
 
-## Next steps
+## 次の手順
 
-- [Services and dependencies](./service.md) — expose a capability to other plugins
-- [Event system](./events.md) — communicate between plugins
-- [Cordis tutorial](../../../cordis-tutorial/index.md) — the same lifecycle, services, and events built step by step against the Cordis runtime
+- [サービスと依存](./service.md) — 他プラグインへケイパビリティを表す
+- [イベント機構](./events.md) — プラグイン間で連絡する
+- [Cordis 手引き](../../../cordis-tutorial/index.md) — Cordis 実行時に対する同寿命、サービス、イベントを段階的に組み立てる

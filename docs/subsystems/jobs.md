@@ -1,12 +1,12 @@
-# Background Job Runtime
+# バックグラウンドジョブランタイム
 
-English | [中文](jobs.zh.md)
+日本語 | [English](jobs.en.md) | [中文](jobs.zh.md)
 
-Types shared by long-running producers, `ctx.jobs`, and job controls. The [seam consolidation Agent Note](../../.agents/notes/implemented/architecture/2026-09-03-jobs-seam-consolidation.md) owns the current design and the [runtime reference](../../packages/jobs/jobs/README.md) its origin; this page records the exact fields and variants from [`packages/jobs/jobs/src/types.ts`](../../packages/jobs/jobs/src/types.ts) and the client-safe [`view.ts`](../../packages/jobs/jobs/src/view.ts) leaf.
+長時間実行されるプロデューサー、`ctx.jobs`、およびジョブコントロールが共有する型。現在の設計は [シーム統合の Agent Note](../../.agents/notes/implemented/architecture/2026-09-03-jobs-seam-consolidation.md) が所有し、その起源は [ランタイムリファレンス](../../packages/jobs/jobs/README.md) にある。このページは [`packages/jobs/jobs/src/types.ts`](../../packages/jobs/jobs/src/types.ts) とクライアントセーフな [`view.ts`](../../packages/jobs/jobs/src/view.ts) リーフから、正確なフィールドとバリアントを記録する。
 
-## Ids and status
+## Id とステータス
 
-`JobId` is a [branded id](core.md#branded-ids) generated as `<kind>-<short-uuid>` with 16 lowercase UUID hex characters after the kind. Access control relies on owner authorization, not id secrecy. `JobKind` derives from a merge-extensible map; the registry treats kinds as opaque id namespaces.
+`JobId` は [ブランド付き id](core.md#branded-ids) であり、`<kind>-<short-uuid>` として生成され、kind の後に 16 文字の小文字 UUID 16 進文字が続く。アクセス制御は id の秘匿ではなく、オーナーの認可に依存する。`JobKind` はマージ拡張可能なマップから派生し、レジストリは kind を不透明な id 名前空間として扱う。
 
 ```ts type-equiv
 /**
@@ -18,17 +18,17 @@ interface JobKindMap {
 }
 ```
 
-`JobStatus` is `'running' | 'stopping' | 'completed' | 'killed' | 'failed'`; producer-specific facts belong in `JobView.progress` while the job runs and in `JobView.detail` once it settled.
+`JobStatus` は `'running' | 'stopping' | 'completed' | 'killed' | 'failed'` である。プロデューサー固有の事実は、ジョブの実行中は `JobView.progress` に、確定後は `JobView.detail` に属する。
 
 <a id="session-lifecycle-records"></a>
 
-## Session lifecycle records
+## Session ライフサイクルレコード
 
-Owned jobs publish `job/registered` and `job/settled` in their original owner Session. The globally unique `jobId` pairs those records and controls the live job. The SDK forwards these log-only records through `session.event`, independently of output reads. Timestamps describe registry commits, not CPU time or exact OS process boundaries; a missing settlement remains incomplete. `producerReported` means the producer fulfilled `done` with a terminal outcome; it is false for forced teardown or rejection and does not independently certify resource release.
+所有ジョブは、元のオーナー Session に `job/registered` と `job/settled` を発行する。グローバルに一意な `jobId` がそれらのレコードを対にし、ライブジョブを制御する。SDK はこれらのログ専用レコードを出力読み取りとは独立に `session.event` を通じて転送する。タイムスタンプはレジストリのコミットを表し、CPU 時間や正確な OS プロセス境界ではない。確定レコードの欠落は不完全のままである。`producerReported` はプロデューサーが `done` を終端結果で満たしたことを意味する。強制テイアダウンや拒否では false であり、リソース解放を独立に証明するものではない。
 
-`job/settled` may follow `turn/end`. An SDK run result covers only its own observation window; consumers needing later settlements retain a Session subscription or read persisted history. Turn completion does not imply that every owned job stopped.
+`job/settled` は `turn/end` の後に続くことがある。SDK の実行結果は自身の観測ウィンドウのみを対象とする。後の確定を必要とする消費者は、Session 購読を保持するか、永続化された履歴を読む。ターンの完了は、すべての所有ジョブが停止したことを意味しない。
 
-Application teardown can stop Session event routing or close its writer before an owned job's final settlement reaches storage. This includes normal one-shot completion and signal shutdown, as well as hard process loss. A missing `job/settled` remains incomplete even if the live registry reported termination; consumers must not invent a finish timestamp.
+アプリケーションのテアダウンは、所有ジョブの最終確定がストレージに到達する前に、Session イベントルーティングを停止したりライターを閉じたりすることがある。これには通常のワンショット完了とシグナルシャットダウン、およびハードなプロセス消失が含まれる。`job/settled` の欠落は、ライブレジストリが終了を報告していても不完全のままである。消費者は終了タイムスタンプを捏造してはならない。
 
 ```ts type-equiv
 /** Durable identity and registration time of one owned job execution. */
@@ -64,9 +64,9 @@ interface JobSettledData extends JobRegisteredData {
 }
 ```
 
-## Producer contract
+## プロデューサー契約
 
-A `JobSpec` declares identity, the owning session, optional pull `output` sources, and a starter. The runtime finishes preflight before calling `run()` with the job's `JobHandle` and commits without a later failable step. Producers own execution resources; the runtime owns identity, access, lifecycle state, and the output ring.
+`JobSpec` は同一性、所有セッション、オプションの pull `output` ソース、およびスターターを宣言する。ランタイムは、ジョブの `JobHandle` を渡して `run()` を呼ぶ前にプリフライトを完了し、その後に失敗しうるステップなしでコミットする。プロデューサーは実行リソースを所有し、ランタイムは同一性、アクセス、ライフサイクル状態、出力リングを所有する。
 
 ```ts type-equiv
 /** Tool dispatch that created a job; nested calls retain their root invocation. */
@@ -150,7 +150,7 @@ interface JobHandle {
 }
 ```
 
-`JobHooks.done` resolves after the producer releases its resources, not merely when work finishes. A job whose result is a value rather than a stream — a workflow's rendered result — returns it as `JobOutcome.result`; the model's first read after settlement carries it once.
+`JobHooks.done` は、作業が終わったときだけでなく、プロデューサーがリソースを解放した後に解決する。結果がストリームではなく値であるジョブ（ワークフローのレンダリング結果）は、それを `JobOutcome.result` として返す。確定後のモデルの最初の読み取りがそれを一度だけ運ぶ。
 
 ```ts type-equiv
 /** Hooks through which the runtime controls and observes producer work. */
@@ -190,7 +190,7 @@ interface JobOutcome {
 }
 ```
 
-A pull source hands the registry a non-consuming offset reader — the subprocess `readFrom` family. The registry pumps every source at its own cadence (`pumpPollMs` on `dsh-jobs-local`) and drains it once more before settlement closes the ring, so producers fold nothing into `done`.
+pull ソースはレジストリに非消費型のオフセットリーダー（サブプロセスの `readFrom` ファミリー）を渡す。レジストリは各ソースを自身のケイデンス（`dsh-jobs-local` の `pumpPollMs`）でポンプし、確定がリングを閉じる前にもう一度ドレインするため、プロデューサーは何も `done` に畳み込まない。
 
 ```ts type-equiv
 /**
@@ -229,9 +229,9 @@ interface JobSourceRead {
 }
 ```
 
-## The output ring
+## 出力リング
 
-Every job owns one bounded ring. Pull sources are pumped into it and `JobHandle.append` pushes land whole; the model consumes the ring through a registry-kept cursor (`JobRegistry.read`), any number of observers read it at absolute byte offsets (`JobRegistry.readAt`), and neither disturbs the other. `JobChannel` labels `stdout`, `stderr`, and `log`; `log` is producer narration that reaches observers only, never the model's consuming read. Settlement ends the stream and trims retention to the settled cap — the ring has no separate lifecycle. The spill file a pull source keeps is job metadata (`JobView.output.spillPaths`, refreshed by every pump read), not per-chunk metadata, so the model's dropped-output notice names it after the ring evicted the bytes and even after the gap chunk itself is gone. Browsers reach the roster and the ring through `job.list` and `job.follow`, the Remote streams of [`dsh-api-job-controller`](../../packages/api/job-controller/README.md), whose frames are listed under its Cordis API section below.
+すべてのジョブは 1 つの上限付きリングを所有する。pull ソースはそこにポンプされ、`JobHandle.append` のプッシュは丸ごと着地する。モデルはレジストリが保持するカーソル (`JobRegistry.read`) を通じてリングを消費し、任意の数のオブザーバーが絶対バイトオフセット (`JobRegistry.readAt`) で読み取り、どちらも他方を妨げない。`JobChannel` は `stdout`、`stderr`、`log` にラベルを付ける。`log` はオブザーバーのみに届くプロデューサーのナレーションであり、モデルの消費読み取りには決して届かない。確定はストリームを終わらせ、保持を確定済み上限に切り詰める。リングに別個のライフサイクルはない。pull ソースが保持するスピルファイルはジョブメタデータ (`JobView.output.spillPaths`、ポンプ読み取りごとに更新) であり、チャンク単位のメタデータではない。そのため、モデルのドロップ出力通知は、リングがバイトを追い出した後、さらにギャップチャンク自体が消えた後でもそれを名指しできる。ブラウザーは `job.list` と `job.follow` を通じてロスターとリングに到達する。これらは [`dsh-api-job-controller`](../../packages/api/job-controller/README.md) の Remote ストリームであり、そのフレームは以下のその Cordis API セクションに列挙される。
 
 ```ts type-equiv
 /** One chunk of a job's output ring: absolute offset, text, channel, and loss marker. */
@@ -264,9 +264,9 @@ interface JobOutputRead {
 }
 ```
 
-## Consumer views
+## コンシューマービュー
 
-`JobView` is the one projection every reader consumes: the model tools, the browser roster, and the observation stream. `owner` carries the session id that fences access; the registry resolves the live `Agent` behind it for lifecycle cleanup and never hands the object out. `progress` is the producer's live line and is cleared at settlement; `detail` is the terminal reason, with a recorded kill reason merged in.
+`JobView` は、すべてのリーダー（モデルツール、ブラウザーロスター、観測ストリーム）が消費する唯一のプロジェクションである。`owner` はアクセスをフェンスするセッション id を運ぶ。レジストリはライフサイクルクリーンアップのためにその背後のライブ `Agent` を解決し、オブジェクトを外に渡すことはない。`progress` はプロデューサーのライブ行であり、確定時にクリアされる。`detail` は終端理由であり、記録された kill 理由がマージされる。
 
 ```ts type-equiv
 /**
@@ -312,7 +312,7 @@ interface JobView {
 }
 ```
 
-`JobRegistry.list`, `get`, `read`, `readAt`, `kill`, and `wait` each accept the caller’s `SessionId`; omitting it permits only unowned jobs, while a session may also access its own jobs.
+`JobRegistry.list`、`get`、`read`、`readAt`、`kill`、`wait` はそれぞれ呼び出し元の `SessionId` を受け付ける。省略すると所有なしのジョブのみが許可され、セッションは自身のジョブにもアクセスできる。
 
 ```ts type-equiv
 /** Output and post-read state returned by the consuming {@link JobRegistry.read}. */
@@ -328,9 +328,9 @@ interface JobRead {
 }
 ```
 
-## Events
+## イベント
 
-The registry announces every commit through one filtered stream. Lifecycle events carry the projection after the commit they announce; `settled` names its cause so a completion reporter can skip a teardown; `output` carries only the id and the new total, so observers read from their own cursor and the registry never pushes payloads.
+レジストリはすべてのコミットを 1 つのフィルター済みストリームで告知する。ライフサイクルイベントは、告知するコミット後のプロジェクションを運ぶ。`settled` はその原因を名指しするため、完了レポーターはテイアダウンをスキップできる。`output` は id と新しい total のみを運ぶため、オブザーバーは自身のカーソルから読み取り、レジストリはペイロードを決してプッシュしない。
 
 ```ts type-equiv
 /**
@@ -381,9 +381,9 @@ type JobEventFilter =
   | { readonly owners: 'all' | 'scope' }
 ```
 
-## Service behavior
+## サービス挙動
 
-The abstract [`JobRegistry`](../../packages/jobs/jobs/src/index.ts) Service Definition specifies atomic `start`, caller-scoped `list`, `get`, consuming `read`, non-consuming `readAt`, `kill`, and bounded `wait`, the filtered `events` stream, and `attachController`; [`LocalJobRegistry`](../../packages/jobs/jobs-local/src/index.ts) is the process-local Service Provider. Authorization compares owner sessions; owner cleanup and admission use the live `Agent` registered under the owner session when the job starts. The local provider's positive-safe-integer `maxConcurrentJobsPerOwner` config defaults to `10` and counts `running` plus `stopping` records per exact owner, with one shared bucket for unowned jobs; terminal producer settlement releases capacity; `retainBytes` (default 262144) and `settledRetainBytes` (default 16384) bound each ring's live and settled retention, and `pumpPollMs` (default 150) is the pull cadence. See [`dsh-jobs`](../../packages/jobs/jobs/README.md) for the Service Definition contract, [`dsh-jobs-local`](../../packages/jobs/jobs-local/README.md) for the registry lifecycle and admission policy, and [`dsh-tool-jobs`](../../packages/jobs/tool-jobs/README.md) for the model-facing Consumer.
+抽象 [`JobRegistry`](../../packages/jobs/jobs/src/index.ts) Service Definition は、アトミックな `start`、呼び出し元スコープの `list`、`get`、消費型 `read`、非消費型 `readAt`、`kill`、上限付き `wait`、フィルター済み `events` ストリーム、`attachController` を規定する。[`LocalJobRegistry`](../../packages/jobs/jobs-local/src/index.ts) はプロセスローカルの Service Provider である。認可はオーナーセッションを比較する。オーナーのクリーンアップと受付は、ジョブ開始時にオーナーセッションの下に登録されているライブ `Agent` を使う。ローカルプロバイダーの正の安全整数 `maxConcurrentJobsPerOwner` 設定はデフォルト `10` で、正確なオーナーごとに `running` と `stopping` のレコードを数え、所有なしジョブには 1 つの共有バケットを使う。プロデューサーの終端確定が容量を解放する。`retainBytes`（デフォルト 262144）と `settledRetainBytes`（デフォルト 16384）が各リングのライブ保持と確定済み保持を制限し、`pumpPollMs`（デフォルト 150）が pull ケイデンスである。Service Definition の契約は [`dsh-jobs`](../../packages/jobs/jobs/README.md)、レジストリのライフサイクルと受付ポリシーは [`dsh-jobs-local`](../../packages/jobs/jobs-local/README.md)、モデル向けコンシューマーは [`dsh-tool-jobs`](../../packages/jobs/tool-jobs/README.md) を参照。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -391,13 +391,13 @@ The abstract [`JobRegistry`](../../packages/jobs/jobs/src/index.ts) Service Defi
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によりソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語側の違いは、ロケール固有のペア文書パスのみである。シグネチャブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは [primer](../cordis-primer.md#dispatch-modes) で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxjobcontroller--jobcontroller"></a>
 
 ### `ctx.jobController` — `JobController`
 
-Host service backing the generated `ctx.remote.job` namespace.
+生成された `ctx.remote.job` 名前空間を支える Host サービス。
 
 ```ts cordis-catalog
 /**
@@ -436,23 +436,23 @@ Host service backing the generated `ctx.remote.job` namespace.
 @Remote('kill') kill(request: JobKillRequest): JobKillValue
 ```
 
-Source: [`packages/api/job-controller/src/index.ts`](../../packages/api/job-controller/src/index.ts)
+ソース: [`packages/api/job-controller/src/index.ts`](../../packages/api/job-controller/src/index.ts)
 
 <a id="ctxjobs--jobregistry-abstract-seam"></a>
 
-### `ctx.jobs` — `JobRegistry` (abstract seam)
+### `ctx.jobs` — `JobRegistry` (抽象シーム)
 
-Abstract background job registry. Subclass, implement the abstract members, and load the subclass as a plugin — it registers as `ctx.jobs` (one implementation per context; loading a second throws, which is cordis' standard duplicate-service behavior).
+抽象バックグラウンドジョブレジストリ。サブクラス化し、抽象メンバーを実装し、そのサブクラスをプラグインとしてロードする。これは `ctx.jobs` として登録される（コンテキストごとに 1 実装。2 つ目のロードは throw する。これは cordis の標準的な重複サービス挙動である）。
 
-Implementations must honor these semantics:
+実装は次のセマンティクスを守らなければならない。
 
-- Registrations outlive producer and controller fibers. Owner and service disposal cancel live work and await compliant producers; a throwing teardown cancel force-fails only the record. Such settlements announce `cause: 'teardown'`, because a job whose owner is being destroyed has no reader left.
-- Owned-job access is fenced by the owner's session id. Ids are predictable, so authorization — not secrecy — is the boundary.
-- Settlement is first-wins: one terminal record, released waiters, then one round of contained event delivery, even against a late producer outcome. The `settled` event follows every released waiter and reports whether it released one (`awaited`), so a completion reporter can skip settlements a waiting caller already collected.
-- A settled record stays listed until its owner's disposal, service disposal, or an explicit remove by a caller that collected the terminal state itself and never handed the id out.
-- start refuses work while no attached job controller serves the spec's owner, so a producer cannot start work that owner cannot collect or stop. One registry serves every composition in the process, so this question — and event delivery under `{ owners: 'scope' }` — is owner-relative rather than process-wide: registrations made from an unscoped context serve every owner, and registrations made under an agent composition's scope serve exactly the agents composed under it.
-- Every job owns one output ring. Pull sources named by the spec are pumped by the registry and drained once more before settlement; pushed appends land whole. The model's consuming cursor and observers' absolute offsets read the same bytes and never disturb each other.
-- Ring retention is bounded. Appends past the live cap drop the oldest retained bytes; a reader below the retained window gets a lossy read, never an error. Settlement trims retention to the settled cap and ends the stream; the ring has no separate lifecycle.
+- 登録はプロデューサーとコントローラーのファイバーより長生きする。オーナーとサービスの破棄は、ライブ作業をキャンセルし、準拠するプロデューサーを待つ。テイアダウンキャンセルが throw した場合、強制的に失敗するのはレコードのみである。そのような確定は `cause: 'teardown'` を告知する。オーナーが破棄されつつあるジョブには読者が残っていないためである。
+- 所有ジョブへのアクセスはオーナーのセッション id でフェンスされる。id は予測可能であるため、境界は秘匿ではなく認可である。
+- 確定は先勝ちである。1 つの終端レコード、解放された waiter、次に 1 ラウンドの封じ込められたイベント配信が、遅れて届くプロデューサーの結果に対しても行われる。`settled` イベントはすべての解放された waiter に続き、waiter を解放したか (`awaited`) を報告する。そのため完了レポーターは、待機中の呼び出し元がすでに収集した確定をスキップできる。
+- 確定したレコードは、オーナーの破棄、サービスの破棄、または、終端状態を自身で収集し id を外に渡さなかった呼び出し元による明示的な remove まで、リストに残る。
+- start は、アタッチされたジョブコントローラーが spec のオーナーにサービスしていない間は作業を拒否する。そのためプロデューサーは、そのオーナーが収集も停止もできない作業を開始できない。1 つのレジストリがプロセス内のすべての構成にサービスするため、この問い（および `{ owners: 'scope' }` 下のイベント配信）はプロセス全体ではなくオーナー相対である。スコープ外のコンテキストからされた登録はすべてのオーナーにサービスし、エージェント構成のスコープ下でされた登録は、その下に構成されたエージェントにちょうどサービスする。
+- すべてのジョブは 1 つの出力リングを所有する。spec が名指しする pull ソースはレジストリがポンプし、確定前にもう一度ドレインされる。プッシュされた append は丸ごと着地する。モデルの消費カーソルとオブザーバーの絶対オフセットは同じバイトを読み、互いを決して妨げない。
+- リングの保持は上限付きである。ライブ上限を超える append は最も古い保持バイトを落とす。保持ウィンドウより下を読むリーダーは損失ありの読み取りを得るが、エラーにはならない。確定は保持を確定済み上限に切り詰めてストリームを終了する。リングに別個のライフサイクルはない。
 
 ```ts cordis-catalog
 /**
@@ -548,7 +548,7 @@ abstract remove(id: JobId, caller?: SessionId): void
 abstract attachController(name: string): () => void
 ```
 
-Types: [SessionId](core.md)
+型: [SessionId](core.md)
 
-Source: [`packages/jobs/jobs/src/index.ts`](../../packages/jobs/jobs/src/index.ts)
+ソース: [`packages/jobs/jobs/src/index.ts`](../../packages/jobs/jobs/src/index.ts)
 <!-- END GENERATED cordis-surface -->

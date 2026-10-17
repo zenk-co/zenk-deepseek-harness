@@ -1,108 +1,108 @@
 ---
-description: "The DeepSeek Harness package workspace: how the npm packages under packages/ are grouped, what each group owns, and the conventions that bind them."
+description: "DeepSeek Harness パッケージワークスペース。packages/ 配下の npm パッケージのグルーピング、各グループの所有範囲、それらを束ねる規約。"
 kind: "package-group"
 ---
 
 # Packages
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The harness is assembled from npm packages under `packages/`, grouped by capability family: sessions and the agent loop, model-facing tools, shell and filesystem execution, web access, subagents, and the rest. Use this page as the top-level map: find the owning group, then open its README for the package list. Every package is scoped `@deepseek-ai/dsh-*` and lives in exactly one group; each group README is the authoritative package map for its family.
+ハーネスは `packages/` 配下の npm パッケージから組み立てられ、ケイパビリティファミリーごとにグループ化される。セッションとエージェントループ、モデルに面したツール、シェルとファイルシステム実行、Web アクセス、サブエージェント、その他である。このページを最上位マップとして使う。所有グループを見つけてから、その README を開いてパッケージ一覧を見る。各パッケージは `@deepseek-ai/dsh-*` スコープであり、ちょうど 1 つのグループに属する。各グループ README はそのファミリーの信頼できるパッケージマップである。
 
-## Table of Contents
+## 目次
 
-- [Package groups](#package-groups)
-- [Release expectations](#release-expectations)
-- [Dependencies](#dependencies)
-- [Package README contracts](#package-readme-contracts)
+- [パッケージグループ](#package-groups)
+- [リリース期待](#release-expectations)
+- [依存関係](#dependencies)
+- [パッケージ README 契約](#package-readme-contracts)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="package-groups"></a>
-## Package groups
+## パッケージグループ
 
-Every package lives in exactly one group; new packages join existing groups, and a new group updates its own README and this table.
+各パッケージはちょうど 1 つのグループに属する。新規パッケージは既存グループに参加し、新規グループは独自 README とこの表を更新する。
 
-| Group | Role |
+| グループ | 役割 |
 |---|---|
-| [`core/`](core/README.md) | Product API spine: sessions, prompts, tools, agent services, and the concrete loop |
-| [`api/`](api/README.md) | Remote BFF assembly and Typert RPC gateway |
-| [`typert/`](typert/README.md) | Type graph generation, artifact loading, and runtime registry |
-| [`goal/`](goal/README.md) | Same-session goal persistence and lifecycle |
-| [`schedule/`](schedule/README.md) | Host-owned scheduled follow-ups |
-| [`feedback/`](feedback/README.md) | Human feedback capture and command |
-| [`telemetry/`](telemetry/README.md) | Shared Cordis OTel reporting channels |
-| [`identity/`](identity/README.md) | Shared anonymous identity |
-| [`llm/`](llm/README.md) | LLM capability family: abstract service + provider adapters |
-| [`subprocess/`](subprocess/README.md) | Subprocess capability family: Service Definition + local process-tree provider |
-| [`ssh/`](ssh/README.md) | POSIX remote connection with paired filesystem, subprocess and sandbox providers |
-| [`shell/`](shell/README.md) | Bash capability family: executor seam, local impl, model-facing tools |
-| [`terminal/`](terminal/README.md) | Persistent PTY service with owner-scoped sessions and a local shell backend |
-| [`ptc-runtime/`](ptc-runtime/README.md) | PTC execution capability family: Service Definition + sandboxed Node provider + PTC mode Consumer |
-| [`computer-use/`](computer-use/README.md) | Exclusive named desktop-provider registration |
-| [`browser-use/`](browser-use/README.md) | Exclusive named browser-provider registration |
-| [`sandbox/`](sandbox/README.md) | Process-confinement seam; bwrap/Landlock/Seatbelt backends |
-| [`deliverables/`](deliverables/README.md) | Turn deliverables: explicit file delivery and recorded workspace changes |
-| [`fs/`](fs/README.md) | Filesystem capability family: seam, local impl, model-facing file tools, discovery tools |
-| [`lsp/`](lsp/README.md) | LSP capability family: seam, generic stdio provider, and the `lsp` tool |
-| [`skill/`](skill/README.md) | Skill capability family: provider registry, local provider, model-facing catalog/loader |
-| [`compaction/`](compaction/README.md) | Compaction capability family: Service Definition + basic provider + command Consumer |
-| [`context/`](context/README.md) | Model-visible request context: workspace instructions, time context, references |
-| [`subagent/`](subagent/README.md) | Subagent capability family: provider-registry contract and model-facing delegation tools |
-| [`jobs/`](jobs/README.md) | Generic background-job runtime and model-facing job control tools |
-| [`experimental/`](experimental/README.md) | Capabilities under evaluation; [status and support policy](experimental/README.md#status) |
-| [`workflow/`](workflow/README.md) | Workflow seam, PTC process engine, and the model-facing `workflow` tool |
-| [`web/`](web/README.md) | Web capability family: seam, search/fetch providers, model-facing web tools |
-| [`document/`](document/README.md) | Shared Host Office-to-PDF conversion |
-| [`attachment/`](attachment/README.md) | Durable attachment identity, validation, local content-addressed storage |
-| [`spill/`](spill/README.md) | Spill capability family: storage seam, local impl, tool-result spill policy |
-| [`todo/`](todo/README.md) | The model-facing `todo_write` tool |
-| [`plan/`](plan/README.md) | Plan collaboration state with a direct entry command and reviewed exit |
-| [`preset/`](preset/README.md) | Per-session agent composition from preset `cordis.yml` files |
-| [`guard/`](guard/README.md) | Loop-hygiene guards: advisory repeat-call reminders + the `tools/execute` deadline enforcer |
-| [`bundle/`](bundle/README.md) | Installable `dsh --profile` patch layers |
-| [`extensions/`](extensions/README.md) | Agent runtime self-modification: live plugin/service inspection and model-written mount/unmount |
-| [`mcp/`](mcp/README.md) | External Model Context Protocol servers exposed as native tools |
-| [`session/`](session/README.md) | Durable session data plane: persistence seam + backends, projection seam, log-backed titles, session reporting |
-| [`session-query/`](session-query/README.md) | Session retrieval family: logical corpus, bounded reads, lineage, semantic filtering, SQLite full-text search |
-| [`settings/`](settings/README.md) | User-settings seam + file-backed provider |
-| [`credentials/`](credentials/README.md) | Credential-reference and credential-record seam + env-over-`.env` provider + authorization flows that ask a human |
-| [`storage/`](storage/README.md) | Non-session storage hub + backends + domain form |
-| [`workspace/`](workspace/README.md) | Workspace entity |
-| [`sdk/`](sdk/README.md) | Out-of-process SDK: JSON-RPC protocol and TypeScript client/server |
-| [`acp/`](acp/README.md) | Automation-only Agent Client Protocol server |
-| [`interaction/`](interaction/README.md) | Human-collaboration plane: approval/interaction seams, permission preset, commands, ask-user tool |
-| [`boot/`](boot/README.md) | Shared app-bin boot glue |
-| [`host/`](host/README.md) | Web GUI host services, directory picking, application launch, plugin inventory, and product telemetry |
-| [`client/`](client/README.md) | Web-GUI browser half: shell, wire, object services, slots, `ui-*` plugins |
-| [`test-support/`](test-support/README.md) | Test infrastructure (testkits, replay, Loader smokes) |
-| [`util/`](util/README.md) | Low-level zero-dependency utilities shared across groups (`Branded<B>`, home/path helpers, timeout, retention) |
+| [`core/`](core/README.md) | 製品 API 脊柱。セッション、プロンプト、ツール、エージェントサービス、具体ループ |
+| [`api/`](api/README.md) | リモート BFF 組み立てと Typert RPC ゲートウェイ |
+| [`typert/`](typert/README.md) | 型グラフ生成、成果物ロード、ランタイムレジストリ |
+| [`goal/`](goal/README.md) | 同一セッションのゴール永続化とライフサイクル |
+| [`schedule/`](schedule/README.md) | Host 所有のスケジュール済みフォローアップ |
+| [`feedback/`](feedback/README.md) | ヒューマンフィードバック取得とコマンド |
+| [`telemetry/`](telemetry/README.md) | 共有 Cordis OTel 報告チャネル |
+| [`identity/`](identity/README.md) | 共有匿名アイデンティティ |
+| [`llm/`](llm/README.md) | LLM ケイパビリティファミリー。抽象サービス + プロバイダーアダプター |
+| [`subprocess/`](subprocess/README.md) | サブプロセスケイパビリティファミリー。サービス定義 + ローカルプロセストリープロバイダー |
+| [`ssh/`](ssh/README.md) | POSIX リモート接続。ペアのファイルシステム・サブプロセス・サンドボックスプロバイダー付き |
+| [`shell/`](shell/README.md) | Bash ケイパビリティファミリー。実行器シーム、ローカル実装、モデルに面したツール |
+| [`terminal/`](terminal/README.md) | 永続 PTY サービス。所有者スコープセッションとローカルシェルバックエンド付き |
+| [`ptc-runtime/`](ptc-runtime/README.md) | PTC 実行ケイパビリティファミリー。サービス定義 + サンドボックス Node プロバイダー + PTC モードコンシューマー |
+| [`computer-use/`](computer-use/README.md) | 排他的名前付きデスクトッププロバイダー登録 |
+| [`browser-use/`](browser-use/README.md) | 排他的名前付きブラウザープロバイダー登録 |
+| [`sandbox/`](sandbox/README.md) | プロセス隔離シーム。bwrap/Landlock/Seatbelt バックエンド |
+| [`deliverables/`](deliverables/README.md) | ターン成果物。明示ファイル配送と記録済みワークスペース変更 |
+| [`fs/`](fs/README.md) | ファイルシステムケイパビリティファミリー。シーム、ローカル実装、モデルに面したファイルツール、探索ツール |
+| [`lsp/`](lsp/README.md) | LSP ケイパビリティファミリー。シーム、汎用 stdio プロバイダー、`lsp` ツール |
+| [`skill/`](skill/README.md) | スキルケイパビリティファミリー。プロバイダーレジストリ、ローカルプロバイダー、モデルに面したカタログ/ローダー |
+| [`compaction/`](compaction/README.md) | コンパクションケイパビリティファミリー。サービス定義 + 基本プロバイダー + コマンドコンシューマー |
+| [`context/`](context/README.md) | モデル可視リクエストコンテキスト。ワークスペース指示、時刻コンテキスト、参照 |
+| [`subagent/`](subagent/README.md) | サブエージェントケイパビリティファミリー。プロバイダーレジストリ契約とモデルに面した委任ツール |
+| [`jobs/`](jobs/README.md) | 汎用バックグラウンドジョブランタイムとモデルに面したジョブ制御ツール |
+| [`experimental/`](experimental/README.md) | 評価中のケイパビリティ。[状態とサポートポリシー](experimental/README.md#status) |
+| [`workflow/`](workflow/README.md) | ワークフローシーム、PTC プロセスエンジン、モデルに面した `workflow` ツール |
+| [`web/`](web/README.md) | Web ケイパビリティファミリー。シーム、検索/取得プロバイダー、モデルに面した Web ツール |
+| [`document/`](document/README.md) | 共有 Host Office-to-PDF 変換 |
+| [`attachment/`](attachment/README.md) | 耐久添付アイデンティティ、検証、ローカル内容アドレス記憶域 |
+| [`spill/`](spill/README.md) | Spill ケイパビリティファミリー。記憶域シーム、ローカル実装、ツール結果 spill ポリシー |
+| [`todo/`](todo/README.md) | モデルに面した `todo_write` ツール |
+| [`plan/`](plan/README.md) | プラン協働状態。直接エントリコマンドとレビュー済み出口付き |
+| [`preset/`](preset/README.md) | プリセット `cordis.yml` ファイルからのセッション単位エージェント合成 |
+| [`guard/`](guard/README.md) | ループ衛生ガード。助言的繰り返し呼び出しリマインダー + `tools/execute` デッドライン強制 |
+| [`bundle/`](bundle/README.md) | インストール可能な `dsh --profile` パッチ層 |
+| [`extensions/`](extensions/README.md) | エージェントランタイム自己改変。ライブプラグイン/サービス検査とモデル記述マウント/アンマウント |
+| [`mcp/`](mcp/README.md) | ネイティブツールとして公開される外部 Model Context Protocol サーバー |
+| [`session/`](session/README.md) | 耐久セッションデータプレーン。永続化シーム + バックエンド、投影シーム、ログ支援タイトル、セッションレポート |
+| [`session-query/`](session-query/README.md) | セッション取得ファミリー。論理コーパス、境界付き読み取り、系統、意味フィルタ、SQLite 全文検索 |
+| [`settings/`](settings/README.md) | ユーザー設定シーム + ファイル支援プロバイダー |
+| [`credentials/`](credentials/README.md) | 資格情報参照・資格情報記録シーム + env-over-`.env` プロバイダー + ヒューマンに尋ねる認可フロー |
+| [`storage/`](storage/README.md) | 非セッション記憶域ハブ + バックエンド + ドメイン形式 |
+| [`workspace/`](workspace/README.md) | ワークスペースエンティティ |
+| [`sdk/`](sdk/README.md) | プロセス外 SDK。JSON-RPC プロトコルと TypeScript クライアント/サーバー |
+| [`acp/`](acp/README.md) | 自動化専用 Agent Client Protocol サーバー |
+| [`interaction/`](interaction/README.md) | ヒューマン協働プレーン。承認/対話シーム、権限プリセット、コマンド、ask-user ツール |
+| [`boot/`](boot/README.md) | 共有アプリ bin ブート接着剤 |
+| [`host/`](host/README.md) | Web GUI ホストサービス、ディレクトリ選択、アプリケーション起動、プラグイン目録、製品テレメトリー |
+| [`client/`](client/README.md) | Web-GUI ブラウザー半分。シェル、wire、オブジェクトサービス、スロット、`ui-*` プラグイン |
+| [`test-support/`](test-support/README.md) | テスト基盤 (テストキット、リプレイ、Loader スモーク) |
+| [`util/`](util/README.md) | グループ横断で共有される低レベル無依存ユーティリティ (`Branded<B>`、home/パスヘルパー、タイムアウト、保持) |
 
 -----
 
 <a id="release-expectations"></a>
-## Release expectations
+## リリース期待
 
-Product groups have maintained product roles, while their public APIs remain pre-stable. [Experimental status](experimental/README.md#status) is independent of publication, installation, and optional delivery. Nonexperimental runtime packages must have product use or an explicit [package classification](../scripts/product-package-policy.ts); SDK, build, test, and declaration infrastructure have separate classifications.
+製品グループは保守される製品役割を持つ一方、公開 API はプレ安定のままである。[Experimental 状態](experimental/README.md#status)は公開・インストール・任意配送とは独立である。非 experimental ランタイムパッケージは製品利用または明示の[パッケージ分類](../scripts/product-package-policy.ts)を持たなければならない。SDK・ビルド・テスト・宣言基盤は別の分類を持つ。
 
 -----
 
 <a id="dependencies"></a>
-## Dependencies
+## 依存関係
 
-The dependency graph is generated: [docs/module-graph.md](../docs/module-graph.md) (`pnpm run gen-module-graph`, freshness-gated in CI).
+依存グラフは生成される。[docs/module-graph.md](../docs/module-graph.md) (`pnpm run gen-module-graph`、CI で鮮度ゲート)。
 
-**Extension plugins depend on Service Definitions, never concrete providers.** `dsh-agent-loop` is swappable; UI, hook, and tool plugins use `dsh-agent`. Composition bundles may depend on spine plugins. Capabilities separate Service Definition / Service Provider / Consumer roles when they evolve independently; see [capability seams](../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md).
+**拡張プラグインはサービス定義に依存し、具体プロバイダーには決して依存しない。**`dsh-agent-loop` は交換可能である。UI・フック・ツールプラグインは `dsh-agent` を使う。合成バンドルは脊柱プラグインに依存しうる。ケイパビリティは、独立に進化する場合にサービス定義 / サービスプロバイダー / コンシューマー役割を分離する。[ケイパビリティシーム](../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md) を見る。
 
 -----
 
 <a id="package-readme-contracts"></a>
-## Package README contracts
+## パッケージ README 契約
 
-Every package README covers purpose, configuration, extension points, and [Model Experience](../docs/cookbook/adding-a-package.md#4-write-the-package-readme) unless the model-agnostic [omission allowlist](../scripts/verify-package-readme-model-experience.ts) exempts it. It also carries `## Known Limitations and Deferred Work` or uses its [allowlist](../scripts/verify-package-readme-limitations.ts). Package conventions — exports, service access, tests — live in [packages/AGENTS.md](AGENTS.md).
+各パッケージ README は、モデル非依存の[省略許可リスト](../scripts/verify-package-readme-model-experience.ts)が免除しない限り、目的・設定・拡張点・[モデル体験](../docs/cookbook/adding-a-package.md#4-write-the-package-readme)を扱う。また `## Known Limitations and Deferred Work` を備えるか、その[許可リスト](../scripts/verify-package-readme-limitations.ts)を使う。パッケージ規約 — エクスポート、サービスアクセス、テスト — は [packages/AGENTS.md](AGENTS.md) にある。
 
 -----
 
@@ -110,8 +110,8 @@ Every package README covers purpose, configuration, extension points, and [Model
 ## Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

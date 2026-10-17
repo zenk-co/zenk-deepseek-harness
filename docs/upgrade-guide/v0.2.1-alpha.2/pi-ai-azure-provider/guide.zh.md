@@ -5,7 +5,7 @@ description: "pi-ai 的 Azure 提供方路由从 azure-openai-responses 更名�
 
 # Azure 提供方路由更名
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

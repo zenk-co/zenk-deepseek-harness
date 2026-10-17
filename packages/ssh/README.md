@@ -1,45 +1,45 @@
 ---
-description: "The POSIX SSH provider family: shared connection, remote filesystem, managed subprocesses and file-effect sandbox."
+description: "POSIX SSH プロバイダー群: 共有接続、リモートファイルシステム、管理サブプロセス、ファイル作用サンドボックス。"
 kind: "package-group"
 ---
 
-# ssh/ — POSIX remote execution providers
+# ssh/ — POSIX リモート実行プロバイダー
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This family runs files, ordinary processes, terminals and sandbox enforcement on one POSIX SSH host while the Harness stays local. A shared OpenSSH connection and installed helper support the existing filesystem, subprocess and sandbox interfaces. Use it in headless or custom profiles whose consumers honor provider-owned paths.
+この群は、Harness をローカルに置いたまま、1 つの POSIX SSH ホスト上でファイル、通常プロセス、ターミナル、サンドボックス強制を実行する。共有 OpenSSH 接続とインストール済みヘルパーが既存のファイルシステム、サブプロセス、サンドボックスの各インターフェースを支える。プロバイダー所有パスを尊重する利用者を持つ headless またはカスタムプロファイルで使うこと。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
 | Package | Responsibility | Service |
 |---|---|---|
-| [`ssh`](ssh/README.md) | Connection, helper identity and transport lifecycle | `ctx.ssh` |
-| [`ssh-helper-runtime`](ssh-helper-runtime/README.md) | Private Node-free executable distribution | — |
-| [`fs-ssh`](fs-ssh/README.md) | Remote file identity, reads and guarded atomic mutations | `ctx.fs` |
-| [`subprocess-ssh`](subprocess-ssh/README.md) | Executable lookup, processes, control streams and terminals | `ctx.subprocess` |
-| [`sandbox-ssh`](sandbox-ssh/README.md) | Remote file-effect confinement and enforcement facts | `ctx.sandbox` |
+| [`ssh`](ssh/README.md) | 接続、ヘルパー識別、転送ライフサイクル | `ctx.ssh` |
+| [`ssh-helper-runtime`](ssh-helper-runtime/README.md) | プライベートな Node 不要実行形式ディストリビューション | — |
+| [`fs-ssh`](fs-ssh/README.md) | リモートファイル識別、読み取り、保護付き不可分変異 | `ctx.fs` |
+| [`subprocess-ssh`](subprocess-ssh/README.md) | 実行形式探索、プロセス、制御ストリーム、ターミナル | `ctx.subprocess` |
+| [`sandbox-ssh`](sandbox-ssh/README.md) | リモートファイル作用の閉じ込めと強制ファクト | `ctx.sandbox` |
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [SSH subsystem](../../docs/subsystems/ssh.md) — shared execution coordinates and transport ownership.
-- [POSIX SSH decision](../../.agents/notes/implemented/architecture/2026-09-11-posix-ssh-runtime.md) — alternatives, consequences and verification requirements.
+- [SSH サブシステム](../../docs/subsystems/ssh.md) — 共有実行座標と転送所有権。
+- [POSIX SSH 決定](../../.agents/notes/implemented/architecture/2026-09-11-posix-ssh-runtime.md) — 代替案、帰結、検証要件。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-Remote capability implementations retain the shared asynchronous terminal and cancellation interfaces. Local path access must never be inferred from a remote path string.
+リモートケイパビリティ実装は共有の非同期ターミナル・キャンセルインターフェースを保持する。リモートパス文字列からローカルパスアクセスを推測してはならない。
 
 </details>

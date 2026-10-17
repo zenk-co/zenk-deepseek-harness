@@ -1,17 +1,17 @@
 ---
 kind: upgrade-guide
-description: "pi-ai routes that name a credential hide their models until the credential is configured."
+description: "資格情報を名指しする pi-ai ルートは、資格情報が構成されるまでそのモデルを隠す。"
 ---
 
-# pi-ai model visibility without a credential
+# 資格情報なしの pi-ai モデル可視性
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-A pi-ai route that names a credential through `apiKeyEnv` previously listed its configured models while that credential was missing, and requests then failed with `MISSING_CREDENTIAL`. Model discovery now returns an empty catalog for such a route until the credential resolves, so Desktop and Web hide its group. Other credential errors, such as a malformed key, still fail model discovery. Routes that use the provider's native authentication or name no credential keep their configured catalog. A saved or default selection absent from the catalog displays “Select model” without changing the stored selection.
+`apiKeyEnv` を通じて資格情報を名指しする pi-ai ルートは以前、その資格情報が欠けている間も構成済みモデルを一覧表示し、その後リクエストは `MISSING_CREDENTIAL` で失敗していた。モデル探索は、資格情報が解決するまでそのようなルートに対して空のカタログを返すようになり、Desktop と Web はそのグループを隠す。不正な形式のキーのようなその他の資格情報エラーは、依然としてモデル探索を失敗させる。プロバイダーのネイティブ認証を使うルート、または資格情報を名指ししないルートは、構成済みカタログを保つ。カタログに存在しない保存済みまたは既定の選択は、保存された選択を変えずに「Select model」を表示する。
 
-## Migration
+## 移行
 
-1. To use such a route, configure its key in Settings → Models, or supply the reference its `apiKeyEnv` names through the launch environment.
-2. Reopen the model selector and confirm that the route's group appears. Custom model discovery consumers must handle an empty catalog before the credential is configured; a listed catalog does not mean that the remote API accepts the key.
+1. そのようなルートを使うには、Settings → Models でそのキーを構成するか、その `apiKeyEnv` が名指しする参照を起動環境を通じて供給する。
+2. モデルセレクターを開き直し、そのルートのグループが現れることを確認する。カスタムのモデル探索コンシューマーは、資格情報が構成される前の空のカタログを処理しなければならない。一覧表示されたカタログは、リモート API がそのキーを受け入れることを意味しない。

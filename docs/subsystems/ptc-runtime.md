@@ -1,14 +1,14 @@
-# PTC runtime
+# PTC ランタイム
 
-English | [中文](ptc-runtime.zh.md)
+日本語 | [English](ptc-runtime.en.md) | [中文](ptc-runtime.zh.md)
 
-The PTC execution [capability seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md) supplies `ctx.ptcRuntime` through [dsh-ptc-runtime](../../packages/ptc-runtime/ptc-runtime). It runs one program against host bindings and reports output, failure and applicable sandbox facts. PTC execution is optional rather than part of [the agent-loop spine](core.md). The [PTC foundation](../../.agents/notes/implemented/feature/2026-06-15-ptc.md) owns registry presentation, the [typed-return contract](../../.agents/notes/implemented/feature/2026-07-20-ptc-typed-tool-returns.md) owns binding values, and the [sandboxed Node decision](../../.agents/notes/implemented/architecture/2026-09-11-sandboxed-node-ptc-runtime.md) owns the shipped execution provider.
+PTC 実行の[ケイパビリティシーム](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md)は [dsh-ptc-runtime](../../packages/ptc-runtime/ptc-runtime) を通じて `ctx.ptcRuntime` を供給する。これはホストバインディングに対して 1 つのプログラムを実行し、出力、失敗、該当するサンドボックスのファクトを報告する。PTC 実行は[エージェントループの中核](core.md)の一部ではなくオプションである。[PTC 基盤](../../.agents/notes/implemented/feature/2026-06-15-ptc.md)がレジストリ表示を所有し、[型付きリターン契約](../../.agents/notes/implemented/feature/2026-07-20-ptc-typed-tool-returns.md)がバインディング値を所有し、[サンドボックス Node の決定](../../.agents/notes/implemented/architecture/2026-09-11-sandboxed-node-ptc-runtime.md)が出荷される実行プロバイダーを所有する。
 
-Source: [`packages/ptc-runtime/ptc-runtime/src/types.ts`](../../packages/ptc-runtime/ptc-runtime/src/types.ts)
+ソース: [`packages/ptc-runtime/ptc-runtime/src/types.ts`](../../packages/ptc-runtime/ptc-runtime/src/types.ts)
 
-## The run: request in, result out
+## run: リクエスト入力、結果出力
 
-`PtcRunRequest` contains the program, bindings, cancellation and optional execution choices. The provider's `resolve` validates supported choices and applies its deployment defaults; `run` receives a `PtcRunSpec` with an explicit directory and deadline choice. An omitted timeout uses provider defaults, a number requests a capped elapsed budget, and `null` requests no elapsed deadline. Providers reject unsupported choices before execution:
+`PtcRunRequest` はプログラム、バインディング、キャンセル、および任意の実行選択を含む。プロバイダーの `resolve` はサポートされる選択を検証し、自身のデプロイメントデフォルトを適用する。`run` は明示的なディレクトリと期限の選択を持つ `PtcRunSpec` を受け取る。省略された timeout はプロバイダーのデフォルトを使い、数値は上限付きの経過時間予算を要求し、`null` は経過期限なしを要求する。プロバイダーは実行前にサポートされない選択を拒否する:
 
 ```ts type-equiv
 /**
@@ -72,7 +72,7 @@ interface PtcRunSandbox {
 }
 ```
 
-Program failures resolve through `PtcRunResult.error`; invalid caller inputs may reject before execution. Sandbox mode, observed denial and enforcement completeness are separate facts, so a successful program does not by itself prove that every requested restriction was enforced:
+プログラムの失敗は `PtcRunResult.error` を通じて解決される。不正な呼び出し元入力は実行前に棄却されることがある。サンドボックスモード、観測された拒否、エンフォースメントの完全性は別々のファクトであるため、プログラムの成功は、要求されたすべての制限がエンフォースされたことをそれ自体では証明しない:
 
 ```ts type-equiv
 /**
@@ -101,11 +101,11 @@ interface PtcRunResult {
 }
 ```
 
-`programFormat` distinguishes async function bodies from REPL statements. `stateOwner` is an in-process object identity for optional retained memory; distinct objects remain isolated. Consumers await `release(owner)` when that owner ends; cleanup failures reject that call. Omitted owners are one-shot, and stateless providers ignore ownership. The [persistent Node provider](../../packages/ptc-runtime/ptc-runtime-node/README.md#persistent-repl) defines reset and recovery behavior; no retained object enters the durable Session format.
+`programFormat` は async 関数本体と REPL ステートメントを区別する。`stateOwner` は任意の保持メモリのためのプロセス内オブジェクトアイデンティティであり、異なるオブジェクトは分離されたままである。コンシューマーはそのオーナーが終了するときに `release(owner)` を await する。クリーンアップの失敗はその呼び出しを棄却する。省略されたオーナーは一発であり、ステートレスプロバイダーは所有権を無視する。[永続 Node プロバイダー](../../packages/ptc-runtime/ptc-runtime-node/README.md#persistent-repl)がリセットとリカバリーの振る舞いを定義する。保持されたオブジェクトは永続 Session フォーマットに入らない。
 
-## Bindings: host functions as program globals
+## バインディング: プログラムグローバルとしてのホスト関数
 
-Each `PtcBindingNamespace` becomes a global object of async callables; PTC passes `tools`. Arguments and resolutions must be lossless JSON. Providers enforce their own transport caps; the seam sets no uniform binding-byte limit. An optional error-class descriptor creates program-visible typed rejections without naming a consumer inside the runtime. Binding names are own properties, so `__proto__` cannot traverse a prototype:
+各 `PtcBindingNamespace` は async 呼び出し可能オブジェクトのグローバルオブジェクトになる。PTC は `tools` を渡す。引数と解決値はロスレス JSON でなければならない。プロバイダーは自身のトランスポート上限をエンフォースする。シームは一律のバインディングバイト上限を設けない。任意のエラークラス記述子は、ランタイム内部でコンシューマーを名指すことなく、プログラム可視の型付き棄却を作成する。バインディング名は own プロパティであるため、`__proto__` がプロトタイプを辿ることはできない:
 
 ```ts type-equiv
 /**
@@ -173,11 +173,11 @@ type PtcJsonValue = null | boolean | number | string | PtcJsonValue[] | { [key: 
 type PtcBindingFunction = (args: unknown) => Promise<PtcJsonValue>
 ```
 
-## Captured output and the failure taxonomy
+## キャプチャされる出力と失敗の分類体系
 
-Logs are plain strings. Each source channel preserves emission order, while interleaving across independent channels is backend-dependent because channel metadata is not part of the seam. The runtime captures the program's console and stream output, and consumers render only the text. Implementations cap the serialized outer log-array plus completion-value or failure-message payload; fixed result-envelope syntax and consumer presentation whitespace are not part of that variable-payload ledger. Overflow is an explicit failure rather than in-band value substitution.
+ログはプレーンな文字列である。各ソースチャネルは出力順を保つが、独立したチャネル間のインターリーブはバックエンド依存である。チャネルのメタデータはシームの一部ではないためである。ランタイムはプログラムのコンソールとストリーム出力をキャプチャし、コンシューマーはテキストのみをレンダリングする。実装は、シリアライズされた外側のログ配列と完了値または失敗メッセージのペイロードを上限する。固定の結果エンベロープ構文とコンシューマー表示の空白は、その可変ペイロードの台帳には含まれない。オーバーフローは帯域内の値置換ではなく明示的な失敗である。
 
-Failure kinds are **orthogonal outcomes reported independently** (per [defensive-patterns](../defensive-patterns/general.md)): a budget expiry is not an exception, an abort is not a timeout, and a substrate death (e.g. OOM) is neither:
+失敗種別は**独立に報告される直交する結果**である ([defensive-patterns](../defensive-patterns/general.md) に従う): 予算の期限切れは例外ではなく、abort はタイムアウトではなく、基盤の死 (例: OOM) はどちらでもない:
 
 ```ts type-equiv
 /**
@@ -202,9 +202,9 @@ interface PtcRunFailure {
 }
 ```
 
-## The service
+## サービス
 
-`PtcRuntime` is defined in [`src/index.ts`](../../packages/ptc-runtime/ptc-runtime/src/index.ts). `resolve(request)` returns complete execution inputs, and `run(spec)` executes them. `executionInstructions` supplies provider-owned usage guidance for consumer presentation. `timeout` reports the configured elapsed-time default and maximum when per-call overrides are supported; `resolve` still validates and caps each request. `language` selects supported program presentation; `isolation` describes the substrate without claiming security. `sandboxMode` advertises file-policy support, with `undefined` for a provider that does not supply confinement. Each implementation keeps program state separate between runs and terminates and awaits active executions during disposal.
+`PtcRuntime` は [`src/index.ts`](../../packages/ptc-runtime/ptc-runtime/src/index.ts) で定義される。`resolve(request)` は完全な実行入力を返し、`run(spec)` がそれらを実行する。`executionInstructions` はコンシューマー表示のためのプロバイダー所有の使用ガイダンスを供給する。`timeout` は、呼び出しごとの上書きがサポートされる場合に、設定された経過時間のデフォルトと最大値を報告する。`resolve` は依然として各リクエストを検証して上限する。`language` はサポートされるプログラム表現を選択し、`isolation` はセキュリティを主張することなく基盤を記述する。`sandboxMode` はファイルポリシーのサポートを広告し、閉じ込めを供給しないプロバイダーでは `undefined` である。各実装は実行間でプログラム状態を分離し、破棄中にアクティブな実行を終了して await する。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

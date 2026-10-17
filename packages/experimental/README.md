@@ -1,109 +1,109 @@
 ---
-description: "The experimental group map: publicly installable pre-stable prototypes."
+description: "experimental グループのマップ: 公開インストール可能な pre-stable プロトタイプ群。"
 kind: "package-group"
 ---
 
 # packages/experimental
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Install and compose experimental capabilities explicitly, without a product-support commitment. Package naming and publication follow the [experimental package policy](../../scripts/experimental-package-policy.ts). The [optional-bundle rule](../../.agents/notes/implemented/architecture/2026-09-21-experimental-capabilities-as-optional-bundles.md) determines which capabilities ship switched off with the installation for explicit selection in the GUI plugin manager’s Official group.
+experimental ケイパビリティは、製品サポートのコミットメントなしに、明示的にインストールして構成する。パッケージの命名と公開は [experimental パッケージポリシー](../../scripts/experimental-package-policy.ts)に従う。[オプションバンドルのルール](../../.agents/notes/implemented/architecture/2026-09-21-experimental-capabilities-as-optional-bundles.md)は、どのケイパビリティがインストール時にオフのまま出荷され、GUI プラグインマネージャーの Official グループで明示的に選択されるかを決める。
 
-## Table of Contents
+## 目次
 
-- [Experimental, optional, and Official](#status)
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [Experimental、オプショナル、Official](#status)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="status"></a>
-## Experimental, optional, and Official
+## Experimental、オプショナル、Official
 
-**Experimental** means the complete public capability remains under evaluation and is not a product-support commitment. Its behavior or API may change, and the capability may be withdrawn; engineering, security, documentation, testing, and released-data obligations still apply. A package belongs here only when its entire public contract is experimental or internal-only; an experimental option inside a product package stays with that product role.
+**Experimental** とは、公開ケイパビリティの全体が評価中であり、製品サポートのコミットメントではないことを意味する。その挙動や API は変更される可能性があり、ケイパビリティが撤回されることもある。ただし、エンジニアリング、セキュリティ、ドキュメント、テスト、およびリリース済みデータに関する義務は引き続き適用される。パッケージがここに属するのは、その公開契約の全体が experimental または内部専用である場合のみである。製品パッケージ内の experimental オプションは、その製品ロールとともに留まる。
 
-**Optional** means a user explicitly selects the capability. **Official** means the project maintains and lists the package in the Plugins page. Neither describes maturity; publication, default installation, and GUI visibility do not determine maturity either. Product packages outside this group have maintained product roles, while their public APIs still follow the repository's pre-stable policy.
+**Optional** とは、ユーザーがケイパビリティを明示的に選択することを意味する。**Official** とは、プロジェクトがパッケージを維持し、Plugins ページに掲載していることを意味する。どちらも成熟度を表さず、公開、デフォルトインストール、GUI での可視性も成熟度を決めない。このグループ外の製品パッケージは維持された製品ロールを持ち、その公開 API は依然としてリポジトリの pre-stable ポリシーに従う。
 
-Promotion requires a named product role, documented public behavior and limitations, current consumers, release contents, and test evidence. Move the package to its product group, apply that group's naming rules, and update affected consumers together. The [subtree rules](AGENTS.md) govern dependency isolation and publication.
+昇格には、名前付きの製品ロール、文書化された公開挙動と制限、現在のコンシューマー、リリース内容、およびテストエビデンスが必要である。パッケージをその製品グループに移動し、そのグループの命名規則を適用し、影響を受けるコンシューマーを同時に更新する。[サブツリーのルール](AGENTS.md)が依存関係の分離と公開を規定する。
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`tool-session-query`](tool-session-query/README.md) | Workspace-authorized model session search, trace, and event reads | — |
-| [`session-search`](session-search/README.md) | Optional experimental global session search tools | — |
-| [`ralph-bundle`](ralph-bundle/README.md) | Optional repeated delegation with an isolated workflow engine | — |
-| [`terminal-bundle`](terminal-bundle/README.md) | Optional global persistent terminal tools | — |
-| [`badge-skill-bundle`](badge-skill-bundle/README.md) | Optional powered-by-dsh badge skill | — |
-| [`session-titles-bundle`](session-titles-bundle/README.md) | Optional titles following human prompts in a conversation | — |
-| [`hook-protocol`](hook-protocol/README.md) | Hook bridge wire types and durable events | — |
-| [`hooks-claude-code`](hooks-claude-code/README.md) | Claude Code hook bridge | — |
-| [`hooks-codex`](hooks-codex/README.md) | Codex hook bridge | — |
-| [`webhook`](webhook/README.md) | Authenticated delivery dispatch and Workspace Session creation | `ctx.webhookRuntime` |
-| [`webhook-github`](webhook-github/README.md) | Signed GitHub webhook ingress | — |
-| [`session-title-all-prompts-llm`](session-title-all-prompts-llm/README.md) | Session titles from all human prompts | — |
-| [`tool-terminal`](tool-terminal/README.md) | Persistent terminal tools | — |
-| [`tool-ralph`](tool-ralph/README.md) | Bounded repeated delegated tasks | — |
-| [`skill-badge`](skill-badge/README.md) | The powered-by-dsh badge skill | — |
-| [`translator`](translator/README.md) | Anonymous Google and Bing text translation | `ctx.translator` |
-| [`client-ui-cot-translation`](client-ui-cot-translation/README.md) | Expanded reasoning translation and original-text controls | `ctx.cotTranslation` |
-| [`cot-translation-bundle`](cot-translation-bundle/README.md) | Default-disabled reasoning translation composition | — |
-| [`speech-to-text`](speech-to-text/README.md) | Named speech recognition providers | `ctx.speechToText` |
-| [`speech-to-text-sensevoice`](speech-to-text-sensevoice/README.md) | Managed local SenseVoice inference | — |
-| [`api-speech-to-text`](api-speech-to-text/README.md) | Authenticated transient transcription Remote | `ctx.speechController` |
-| [`client-ui-voice-input`](client-ui-voice-input/README.md) | Microphone capture and guarded draft insertion | — |
-| [`plugin-market-bundle`](plugin-market-bundle/README.md) | Default-disabled optional custom plugin markets: the market service and the Discover tab | — |
-| [`voice-input-bundle`](voice-input-bundle/README.md) | Default-disabled optional voice input composition | — |
-| [`agent-team-profile`](agent-team-profile/README.md) | Agent Teams collaboration, tools, and Web UI bundle | — |
-| [`agent-team`](agent-team/README.md) | Named teammates with direct messages and a durable shared task board | `ctx.agentTeams` |
-| [`client-ui-agent-team`](client-ui-agent-team/README.md) | Team roster, task board, and teammate navigation for Web | — |
-| [`auto-review`](auto-review/README.md) | Explicit Web layer for same-model review before each native or PTC inner tool call | — |
-| [`claude-code-mods`](claude-code-mods/README.md) | Run Claude Code mods as plugins: their hook chains on harness extension points and a band above the prompt | `ctx.claudeCodeMods` |
-| [`client-ui-claude-code-mods`](client-ui-claude-code-mods/README.md) | The Web band that draws a mod's tree above the prompt and sends button clicks back | — |
-| [`ptc-runtime-python`](ptc-runtime-python/README.md) | CPython subprocess backend for the PTC execution seam | `ctx.ptcRuntime` |
-| [CUA](cua/README.md) | Shared application/window objects, consent, and logged execution. | Library |
-| [macOS CUA](cua-macos/README.md) | Swift native execution and platform preparation. | `ctx.computerUse` |
-| [`computer-use-cua-driver-mcp`](computer-use-cua-driver-mcp/README.md) | Use an installed Cua Driver through MCP | `ctx.computerUse` |
-| [`computer-use-cua-driver-native`](computer-use-cua-driver-native/README.md) | Embed the Cua Driver native npm runtime | `ctx.computerUse` |
-| [`browser-use-playwright-mcp`](browser-use-playwright-mcp/README.md) | Playwright browser tools over MCP | `ctx.browserUse` |
-| [`browser-use-chrome-devtools-mcp`](browser-use-chrome-devtools-mcp/README.md) | Chrome DevTools inspection and browser control over MCP | `ctx.browserUse` |
-| [`browser-use-stagehand-native`](browser-use-stagehand-native/README.md) | Stagehand browser operations with explicitly configured native models | `ctx.browserUse` |
-| [`browser-use-runtime`](browser-use-runtime/README.md) | Session-owned browser resources shared by experimental providers | — |
-| [`inspector`](inspector/README.md) | Cross-realm CDP hub for Host debugging, Client Runtime inspection, network capture, and Cordis trees | `ctx.inspector` |
-| [`session-inspector`](session-inspector/README.md) | Sidebar tables for raw Session logs and Chat nodes | — |
-| [`inspector-profile`](inspector-profile/README.md) | Optional Web bundle for Session log and Chat node inspection | — |
-| [`tool-agent-team`](tool-agent-team/README.md) | Nine tools that let the model create, message, and coordinate teammates | registers scoped tools on `ctx.tools` |
-| [`tool-worktree`](tool-worktree/README.md) | Optional bundle and model tool for creating and entering worktrees | `ctx.tools` |
-| [`webworker-packer`](webworker-packer/README.md) | Builds the gzip-compressed VFS image consumed by the browser worker preview | library and CLI — no ctx key |
-| [`webworker-runtime`](webworker-runtime/README.md) | Runs the harness plugin tree inside a dedicated browser worker | library and worker entry — no ctx key |
-| [`worktree`](worktree/README.md) | Creates a named Git worktree and changes the calling Session directory | `ctx.worktrees` |
+| [`tool-session-query`](tool-session-query/README.md) | ワークスペース認可付きのモデルセッション検索、トレース、イベント読み取り | — |
+| [`session-search`](session-search/README.md) | オプションの experimental グローバルセッション検索ツール | — |
+| [`ralph-bundle`](ralph-bundle/README.md) | 分離されたワークフローエンジンによるオプションの反復委任 | — |
+| [`terminal-bundle`](terminal-bundle/README.md) | オプションのグローバル永続ターミナルツール | — |
+| [`badge-skill-bundle`](badge-skill-bundle/README.md) | オプションの powered-by-dsh バッジスキル | — |
+| [`session-titles-bundle`](session-titles-bundle/README.md) | 会話内の人間のプロンプトに追従するオプションのタイトル | — |
+| [`hook-protocol`](hook-protocol/README.md) | フックブリッジのワイヤ型と永続イベント | — |
+| [`hooks-claude-code`](hooks-claude-code/README.md) | Claude Code フックブリッジ | — |
+| [`hooks-codex`](hooks-codex/README.md) | Codex フックブリッジ | — |
+| [`webhook`](webhook/README.md) | 認証付き配信ディスパッチとワークスペースセッション作成 | `ctx.webhookRuntime` |
+| [`webhook-github`](webhook-github/README.md) | 署名検証付き GitHub webhook イングレス | — |
+| [`session-title-all-prompts-llm`](session-title-all-prompts-llm/README.md) | すべての人間プロンプトからのセッションタイトル | — |
+| [`tool-terminal`](tool-terminal/README.md) | 永続ターミナルツール | — |
+| [`tool-ralph`](tool-ralph/README.md) | 上限付きの反復委任タスク | — |
+| [`skill-badge`](skill-badge/README.md) | powered-by-dsh バッジスキル | — |
+| [`translator`](translator/README.md) | 匿名の Google および Bing テキスト翻訳 | `ctx.translator` |
+| [`client-ui-cot-translation`](client-ui-cot-translation/README.md) | 拡張された推論翻訳と原文テキストコントロール | `ctx.cotTranslation` |
+| [`cot-translation-bundle`](cot-translation-bundle/README.md) | デフォルト無効の推論翻訳構成 | — |
+| [`speech-to-text`](speech-to-text/README.md) | 名前付き音声認識プロバイダー | `ctx.speechToText` |
+| [`speech-to-text-sensevoice`](speech-to-text-sensevoice/README.md) | 管理されたローカル SenseVoice 推論 | — |
+| [`api-speech-to-text`](api-speech-to-text/README.md) | 認証付きの一時的な文字起こし Remote | `ctx.speechController` |
+| [`client-ui-voice-input`](client-ui-voice-input/README.md) | マイク取り込みとガード付きドラフト挿入 | — |
+| [`plugin-market-bundle`](plugin-market-bundle/README.md) | デフォルト無効のオプションカスタムプラグインマーケット: マーケットサービスと Discover タブ | — |
+| [`voice-input-bundle`](voice-input-bundle/README.md) | デフォルト無効のオプション音声入力構成 | — |
+| [`agent-team-profile`](agent-team-profile/README.md) | Agent Teams のコラボレーション、ツール、Web UI バンドル | — |
+| [`agent-team`](agent-team/README.md) | ダイレクトメッセージと永続的な共有タスクボードを備えた名前付きチームメイト | `ctx.agentTeams` |
+| [`client-ui-agent-team`](client-ui-agent-team/README.md) | Web 向けのチーム名簿、タスクボード、チームメイトナビゲーション | — |
+| [`auto-review`](auto-review/README.md) | 各ネイティブまたは PTC 内部ツール呼び出しの前に同一モデルレビューを行う明示的 Web レイヤー | — |
+| [`claude-code-mods`](claude-code-mods/README.md) | Claude Code mod をプラグインとして実行: ハーネス拡張ポイント上のフックチェーンとプロンプト上のバンド | `ctx.claudeCodeMods` |
+| [`client-ui-claude-code-mods`](client-ui-claude-code-mods/README.md) | プロンプト上に mod のツリーを描画し、ボタンクリックを送り返す Web バンド | — |
+| [`ptc-runtime-python`](ptc-runtime-python/README.md) | PTC 実行シームの CPython サブプロセスバックエンド | `ctx.ptcRuntime` |
+| [CUA](cua/README.md) | 共有アプリケーション/ウィンドウオブジェクト、同意、ログ記録された実行。 | ライブラリ |
+| [macOS CUA](cua-macos/README.md) | Swift ネイティブ実行とプラットフォーム準備。 | `ctx.computerUse` |
+| [`computer-use-cua-driver-mcp`](computer-use-cua-driver-mcp/README.md) | インストール済み Cua Driver を MCP 経由で使用 | `ctx.computerUse` |
+| [`computer-use-cua-driver-native`](computer-use-cua-driver-native/README.md) | Cua Driver ネイティブ npm ランタイムを埋め込む | `ctx.computerUse` |
+| [`browser-use-playwright-mcp`](browser-use-playwright-mcp/README.md) | MCP 経由の Playwright ブラウザーツール | `ctx.browserUse` |
+| [`browser-use-chrome-devtools-mcp`](browser-use-chrome-devtools-mcp/README.md) | MCP 経由の Chrome DevTools 検査とブラウザー制御 | `ctx.browserUse` |
+| [`browser-use-stagehand-native`](browser-use-stagehand-native/README.md) | 明示的に設定されたネイティブモデルによる Stagehand ブラウザー操作 | `ctx.browserUse` |
+| [`browser-use-runtime`](browser-use-runtime/README.md) | experimental プロバイダーが共有するセッション所有のブラウザーリソース | — |
+| [`inspector`](inspector/README.md) | Host デバッグ、Client Runtime 検査、ネットワークキャプチャ、Cordis ツリーのためのクロスレルム CDP ハブ | `ctx.inspector` |
+| [`session-inspector`](session-inspector/README.md) | 生のセッションログと Chat ノードのサイドバーテーブル | — |
+| [`inspector-profile`](inspector-profile/README.md) | セッションログと Chat ノード検査のためのオプション Web バンドル | — |
+| [`tool-agent-team`](tool-agent-team/README.md) | モデルがチームメイトを作成、メッセージ送信、調整できる 9 つのツール | `ctx.tools` にスコープ付きツールを登録 |
+| [`tool-worktree`](tool-worktree/README.md) | worktree を作成して入るためのオプションバンドルとモデルツール | `ctx.tools` |
+| [`webworker-packer`](webworker-packer/README.md) | ブラウザーワーカープレビューが消費する gzip 圧縮 VFS イメージをビルド | ライブラリと CLI — ctx キーなし |
+| [`webworker-runtime`](webworker-runtime/README.md) | 専用ブラウザーワーカー内でハーネスプラグインツリーを実行 | ライブラリとワーカーエントリ — ctx キーなし |
+| [`worktree`](worktree/README.md) | 名前付き Git worktree を作成し、呼び出し元セッションのディレクトリを変更 | `ctx.worktrees` |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Experimental publication reference](../../scripts/experimental-package-policy.ts) — public defaults and private exceptions.
-- [Worktrees](../../docs/subsystems/worktrees.md) — explicit branch and checkout creation.
-- [Computer use](../../docs/subsystems/computer-use.md) — desktop provider choices.
-- [Browser use](../../docs/subsystems/browser-use.md) — browser provider choices and Session ownership.
-- [Agent Teams subsystem](../../docs/subsystems/agent-team.md) — durable Team types and the `ctx.agentTeams` service API.
-- [Experimental subtree rules](AGENTS.md) — what experimental status does and does not relax.
+- [experimental 公開リファレンス](../../scripts/experimental-package-policy.ts) — 公開デフォルトとプライベート例外。
+- [Worktrees](../../docs/subsystems/worktrees.md) — 明示的なブランチとチェックアウトの作成。
+- [Computer use](../../docs/subsystems/computer-use.md) — デスクトッププロバイダーの選択肢。
+- [Browser use](../../docs/subsystems/browser-use.md) — ブラウザープロバイダーの選択肢とセッション所有権。
+- [Agent Teams サブシステム](../../docs/subsystems/agent-team.md) — 永続的な Team 型と `ctx.agentTeams` サービス API。
+- [experimental サブツリーのルール](AGENTS.md) — experimental ステータスが緩和するものとしないもの。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

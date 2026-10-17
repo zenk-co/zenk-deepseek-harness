@@ -1,37 +1,37 @@
 ---
-description: "The retry executor for users and maintainers configuring provider-routed model-request recovery at durable agent-step boundaries."
+description: "耐久性のある agent-step 境界でプロバイダー経由のモデルリクエスト回復を設定するユーザーとメンテナー向けのリトライエグゼキューター。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-llm-retry
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Mount `@deepseek-ai/dsh-llm-retry` to retry failed model requests at durable agent-step boundaries. Provider `retryPolicy` settings choose bounded normal-mode retries or unlimited always-mode retries; scheduled attempts reach the session log before backoff, and cancellation leaves consistent history. Retries re-run the failed step in the same open turn, while direct `ctx.llm.stream()` calls remain single-attempt. Each retry is another billed provider request, and always mode continues until success, cancellation, or disposal.
+耐久性のある agent-step 境界で失敗したモデルリクエストをリトライするには `@deepseek-ai/dsh-llm-retry` をマウントする。プロバイダーの `retryPolicy` 設定が、上限付きの normal モードリトライまたは無制限の always モードリトライを選ぶ。スケジュールされた試行はバックオフの前にセッションログに到達し、キャンセルは一貫した履歴を残す。リトライは開いている同じターン内で失敗したステップを再実行し、`ctx.llm.stream()` の直接呼び出しは単一試行のままである。各リトライはもう 1 回の課金対象のプロバイダーリクエストであり、always モードは成功、キャンセル、破棄まで続く。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin when agent runs should recover from transient model-request failures — rate limits, server errors, timeouts, transport errors — instead of ending the turn. It is the executor: the retry policy itself lives on each provider adapter's configuration, and this package has no configuration of its own.
+一時的なモデルリクエスト失敗 — レート制限、サーバーエラー、タイムアウト、トランスポートエラー — からターンを終了させるのではなくエージェント実行が回復すべきときに、このプラグインをマウントする。これはエグゼキューターであり、リトライポリシー自体は各プロバイダーアダプターの構成に住み、このパッケージは独自の構成を持たない。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it when a composition runs the agent loop and wants durable request recovery. The plugin is a function plugin with no config; provider adapters such as `dsh-llm-deepseek` and `dsh-llm-pi-ai` own the `retryPolicy` for their routes, and multi-provider adapters place it inside each provider profile. Skip it when calls go through `ctx.llm.stream()` directly without the agent loop: those consumers remain single-attempt because a raw stream cannot separate already-emitted chunks durably.
+構成が agent-loop を実行し、耐久性のあるリクエスト回復を望むときに選ぶ。このプラグインは設定を持たない関数プラグインである。`dsh-llm-deepseek` や `dsh-llm-pi-ai` などのプロバイダーアダプターがそのルートの `retryPolicy` を所有し、マルチプロバイダーアダプターはそれを各プロバイダープロファイル内に置く。呼び出しが agent-loop を経ずに `ctx.llm.stream()` を直接通る場合は使わないこと: 生のストリームはすでに emit されたチャンクを耐久性をもって分離できないため、それらのコンシューマーは単一試行のままである。
 
-### Minimal configuration
+### 最小構成
 
 ```yaml
 - name: '@deepseek-ai/dsh-llm-deepseek-api-key'
@@ -47,101 +47,101 @@ Choose it when a composition runs the agent loop and wants durable request recov
 - name: '@deepseek-ai/dsh-llm-retry'
 ```
 
-Omission of `retryPolicy` uses normal mode: five retries for `EMPTY_RESPONSE`, `RATE_LIMIT`, `SERVER`, `TIMEOUT`, and `TRANSPORT`, with bounded exponential backoff from 500 ms to 10 seconds and 10 percent jitter. Normal mode can change its finite budget, eligible codes, and backoff; always mode asks downstream recovery first, then retries every model-request failure without an attempt limit, stopping only on success, cancellation, or plugin disposal.
+`retryPolicy` を省略すると normal モードを使う: `EMPTY_RESPONSE`、`RATE_LIMIT`、`SERVER`、`TIMEOUT`、`TRANSPORT` に対して 5 回のリトライで、500 ms から 10 秒までの上限付き指数バックオフと 10% のジッターを伴う。normal モードはその有限予算、対象コード、バックオフを変更でき、always モードはまず下流の回復を求め、次に試行制限なしですべてのモデルリクエスト失敗をリトライし、成功、キャンセル、プラグイン破棄のときだけ停止する。
 
-### What you can observe
+### 観察できるもの
 
-Each scheduled retry is durable before its wait: the plugin appends a non-surface `llm/retry` event carrying the retry id, provider, mode, policy key, failure, and scheduled delay, then a `llm/retry-started` event immediately before the retry begins. A valid `Retry-After` from the provider replaces local backoff when it fits the policy bounds. When the wait completes, the loop re-runs the failed step inside the same open turn over the same durable history, so the retried request is reconstructable from the session log exactly like the original. Cancellation or plugin disposal aborts active backoff, drains active delegated recovery, and makes a callback captured before disposal fail closed.
+スケジュールされた各リトライは待機の前に耐久化される: プラグインはリトライ id、プロバイダー、モード、ポリシーキー、失敗、スケジュールされた遅延を運ぶ非サーフェスの `llm/retry` イベントを追記し、リトライが始まる直前に `llm/retry-started` イベントを追記する。プロバイダーからの有効な `Retry-After` は、ポリシーの境界に収まるときローカルバックオフを置き換える。待機が完了すると、ループは開いている同じターン内で、同じ耐久履歴上で失敗したステップを再実行するので、リトライされたリクエストは元のリクエストとまったく同様にセッションログから再構成可能である。キャンセルまたはプラグイン破棄はアクティブなバックオフを abort し、アクティブな委譲回復をドレインし、破棄前に捕捉されたコールバックをフェイルクローズさせる。
 
-### Failures and recovery
+### 失敗と回復
 
-A failure before any final adapter is selected has no provider policy and delegates downstream unchanged. In normal mode, a failure code outside the eligible set, or an exhausted budget, delegates; in always mode, an over-cap provider delay uses the configured local backoff so the policy cannot terminate on that instruction. Nothing here is model-visible: no retry event, delay, provider error, or failed partial output reaches the model or derived messages.
+最終アダプターが選択される前の失敗はプロバイダーポリシーを持たず、変更されずに下流へ委譲する。normal モードでは、対象セット外の失敗コードまたは枯渇した予算は委譲する。always モードでは、上限超過のプロバイダー遅延は設定されたローカルバックオフを使うので、ポリシーがその指示で終了することはできない。ここにあるものはモデル可視ではない: リトライイベント、遅延、プロバイダーエラー、失敗した部分出力のいずれもモデルや派生メッセージに到達しない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design behind the executor; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではエグゼキューターの背後の設計を説明する。観察可能な挙動は[このパッケージを使う](#use-this-package)で網羅されている。
 
-### Design philosophy
+### 設計哲学
 
-The executor is built on one rule: **durable before wait, open-step boundaries.** A retry is scheduled through the session log before any timer starts, so a crash or cancellation never leaves an invisible pending retry. Recovery runs on the agent loop's `agent/request-error` waterfall, the open-step extension point, rather than wrapping `ctx.llm.stream()` — a raw stream cannot separate already-emitted chunks durably, while the loop can re-run the failed step inside the same open turn.
+エグゼキューターは 1 つのルールの上に成り立つ: **待機の前に耐久化し、開いているステップ境界で。** リトライはタイマーが始まる前にセッションログを通じてスケジュールされるので、クラッシュやキャンセルが不可視の保留リトライを残すことは決してない。回復は `ctx.llm.stream()` をラップするのではなく、agent-loop の `agent/request-error` ウォーターフォール（開いているステップの拡張ポイント）で実行される — 生のストリームはすでに emit されたチャンクを耐久性をもって分離できないが、ループは開いている同じターン内で失敗したステップを再実行できる。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | The function plugin: waterfall listener, policy lookup, backoff, durable event appends |
-| [`src/types.ts`](src/types.ts) | Browser-safe `llm/retry` and `llm/retry-started` event payload types |
-| [`src/brand.ts`](src/brand.ts) | The `RetryId` brand shared by the event payloads |
+| [`src/index.ts`](src/index.ts) | 関数プラグイン: ウォーターフォールリスナー、ポリシー参照、バックオフ、耐久イベント追記 |
+| [`src/types.ts`](src/types.ts) | ブラウザセーフな `llm/retry` と `llm/retry-started` のイベントペイロード型 |
+| [`src/brand.ts`](src/brand.ts) | イベントペイロードが共有する `RetryId` ブランド |
 
-### Recovery flow
+### 回復フロー
 
-A failed step arrives on the waterfall with its provider and resolved policy. Always mode settles downstream recovery first and honors a downstream `retry` decision; normal mode first checks that the failure code is eligible and the budget is not exhausted. The plugin computes the delay — provider `Retry-After` when valid and within bounds, otherwise local bounded exponential backoff with symmetric jitter — appends the `llm/retry` event, waits on a cancellable timer, appends `llm/retry-started`, and returns `{ kind: 'retry' }`. The loop then re-runs the failed step inside the same open turn over the same durable history.
+失敗したステップはそのプロバイダーと解決済みポリシーを伴ってウォーターフォールに到着する。always モードはまず下流の回復を決着させ、下流の `retry` 決定を尊重する。normal モードはまず失敗コードが対象であり予算が枯渇していないことを確認する。プラグインは遅延を計算し — プロバイダーの `Retry-After` が有効で境界内ならそれを使い、そうでなければ対称ジッター付きのローカルな上限付き指数バックオフ — `llm/retry` イベントを追記し、キャンセル可能なタイマーで待ち、`llm/retry-started` を追記して、`{ kind: 'retry' }` を返す。その後ループは開いている同じターン内で、同じ耐久履歴上で失敗したステップを再実行する。
 
-### Waterfall composition
+### ウォーターフォールの構成
 
-The plugin is one listener in the `agent/request-error` waterfall. Always mode's "downstream first" posture means a later policy that ignores cancellation and never settles also prevents fallback, turn quiescence, and plugin disposal from completing; success, cancellation, or disposal stops always mode after active delegated recovery reaches quiescence.
+このプラグインは `agent/request-error` ウォーターフォールの 1 つのリスナーである。always モードの「下流が先」の姿勢は、キャンセルを無視して決して決着しない後続のポリシーが、フォールバック、ターンの静止、プラグイン破棄の完了も妨げることを意味する。成功、キャンセル、破棄は、アクティブな委譲回復が静止に達した後に always モードを停止する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the package-level contract is not enough. They move from the service contract to the adapters that own retry policies.
+パッケージレベルの契約では足りないときにこれらのページを読むこと。サービス契約から、リトライポリシーを所有するアダプターへと進む。
 
-- [dsh-llm service](../llm/README.md) — the provider-neutral service whose adapters own `retryPolicy`.
-- [llm-deepseek adapter](../llm-deepseek/README.md) — a provider adapter with a route-level `retryPolicy`.
-- [llm-pi-ai adapter](../llm-pi-ai/README.md) — a multi-provider adapter with per-profile `retryPolicy`.
-- [Terminal LLM stream failures](../../../.agents/notes/implemented/architecture/2026-07-29-terminal-llm-stream-failures.md) — how failures reach the service boundary as terminal chunks.
-- [LLM streaming subsystem](../../../docs/subsystems/llm-streaming.md) — the `StreamChunk` protocol and adapter contract.
+- [dsh-llm サービス](../llm/README.md) — アダプターが `retryPolicy` を所有するプロバイダー中立サービス。
+- [llm-deepseek アダプター](../llm-deepseek/README.md) — ルートレベルの `retryPolicy` を持つプロバイダーアダプター。
+- [llm-pi-ai アダプター](../llm-pi-ai/README.md) — プロファイルごとの `retryPolicy` を持つマルチプロバイダーアダプター。
+- [終端 LLM ストリーム失敗](../../../.agents/notes/implemented/architecture/2026-07-29-terminal-llm-stream-failures.md) — 失敗が終端チャンクとしてサービス境界にどう到達するか。
+- [LLM ストリーミングサブシステム](../../../docs/subsystems/llm-streaming.md) — `StreamChunk` プロトコルとアダプター契約。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Model-request recovery
+### モデルリクエストの回復
 
-#### What the model sees
+#### モデルが見るもの
 
-No retry event, delay, provider error, or failed partial output is model-visible. The retried step reconstructs the same explicit provider/model request from durable surface history unless a downstream recovery policy deliberately changes that surface; failed chunks never enter derived messages.
+リトライイベント、遅延、プロバイダーエラー、失敗した部分出力のいずれもモデル可視ではない。下流の回復ポリシーが意図的にそのサーフェスを変えない限り、リトライされたステップは耐久サーフェス履歴から同じ明示的なプロバイダー/モデルリクエストを再構成する。失敗したチャンクは派生メッセージに決して入らない。
 
-#### Token effect
+#### トークン効果
 
-Each retry is a new provider request and may repeat input-token billing. Normal mode has a finite budget; always mode can consume unbounded requests until success or cancellation. `llm/retry` itself contributes no tokens.
+各リトライは新しいプロバイダーリクエストであり、入力トークンの課金を繰り返すことがある。normal モードは有限の予算を持ち、always モードは成功またはキャンセルまで無制限のリクエストを消費しうる。`llm/retry` 自体はトークンを寄与しない。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-The reconstructed request preserves the prior prefix and is eligible for provider cache reuse under that provider's rules. The non-surface retry event does not change cache identity.
+再構成されたリクエストは以前のプレフィックスを保持し、そのプロバイダーのルールの下でプロバイダーキャッシュ再利用の対象になる。非サーフェスのリトライイベントはキャッシュアイデンティティを変えない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the executor stops and future work begins. They are current package constraints, not a general retry comparison or a task backlog.
+これらの制限は、エグゼキューターが止まる場所と将来の作業が始まる場所を定義する。これらは現在のパッケージ制約であり、一般的なリトライ比較やタスクバックログではない。
 
-- **Agent turns are the only retry boundary** — direct `ctx.llm.stream()` consumers remain single-attempt because a raw stream cannot separate already-emitted chunks durably.
-- **Always mode retries permanent failures** — authentication, quota, invalid-request, protocol, and unrecoverable context errors continue until success, cancellation, or disposal; deployments own provider-specific cost and latency controls.
-- **Finite plugin budgets add** — normal mode counts only its configured codes and exact provider policy, while context-overflow compaction owns a separate budget. Any overlapping policy must define registration-order behavior.
-- **Recovery policies compose by waterfall order** — always mode accepts a downstream retry before applying its fallback. A later policy that ignores cancellation and never settles also prevents fallback, turn quiescence, and plugin disposal from completing.
-- **`llm/retry` records scheduling, not completion** — later step and turn events establish success, exhaustion, or cancellation.
+- **エージェントターンが唯一のリトライ境界** — `ctx.llm.stream()` の直接コンシューマーは単一試行のままである。生のストリームはすでに emit されたチャンクを耐久性をもって分離できないためである。
+- **always モードは永続的な失敗もリトライする** — 認証、クォータ、無効リクエスト、プロトコル、回復不能なコンテキストエラーが成功、キャンセル、破棄まで続く。プロバイダー固有のコストとレイテンシの制御はデプロイメントが所有する。
+- **有限のプラグイン予算は加算される** — normal モードは設定されたコードと正確なプロバイダーポリシーのみを数え、コンテキストオーバーフローの compaction は別の予算を所有する。重複するポリシーは登録順の挙動を定義しなければならない。
+- **回復ポリシーはウォーターフォール順で構成される** — always モードはフォールバックを適用する前に下流のリトライを受け付ける。キャンセルを無視して決して決着しない後続のポリシーは、フォールバック、ターンの静止、プラグイン破棄の完了も妨げる。
+- **`llm/retry` はスケジューリングを記録し、完了を記録しない** — 成功、枯渇、キャンセルは後続のステップとターンのイベントが確定する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is non-authoritative working context: notes for maintainers and open questions. Shipped behavior and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発メモは非権威の作業コンテキストである: メンテナー向けのノートと未解決の問い。出荷済みの挙動と受理された根拠は、上記のセクション、パッケージコード、リンクされた Agent Note にある。
 
-- Retry numbers continue only across events with the same provider and complete policy key, so a route replacement with different limits, code membership, or backoff starts its own history; the key includes every behavior-affecting field and sorts normal-mode codes because eligibility uses set membership.
+- リトライ番号は、同じプロバイダーと完全なポリシーキーを持つイベント間でのみ継続するので、異なる制限、コードメンバーシップ、バックオフを持つルート置換は独自の履歴を開始する。キーは挙動に影響するすべてのフィールドを含み、normal モードのコードは対象判定が集合メンバーシップを使うためソートされる。
 
 </details>

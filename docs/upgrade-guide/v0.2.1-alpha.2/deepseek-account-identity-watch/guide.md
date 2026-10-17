@@ -1,18 +1,18 @@
 ---
 kind: upgrade-guide
-description: "DeepSeekAccount.watch no longer includes Platform identity changes unless explicitly requested."
+description: "DeepSeekAccount.watch は、明示的に要求されない限り Platform アイデンティティの変更を含まない。"
 ---
 
-# Explicitly subscribe to account identity changes
+# アカウントアイデンティティ変更を明示的に購読する
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-The public `DeepSeekAccount.watch(signal)` method previously emitted a snapshot when a profile read first supplied or changed the cached Platform user ID. It now emits account-state changes only by default. Plugins that use this stream to refresh `getPlatformSession()` must opt into identity changes. Credential replacement and sign-in state changes still notify every subscriber.
+公開 `DeepSeekAccount.watch(signal)` メソッドは以前、プロファイル読み取りがキャッシュされた Platform ユーザー ID を最初に提供または変更したときにスナップショットを発行していた。現在はデフォルトでアカウント状態の変更のみを発行する。このストリームを使用して `getPlatformSession()` をリフレッシュするプラグインは、アイデンティティ変更をオプトインしなければならない。資格情報の置き換えとサインイン状態の変更は、依然としてすべてのサブスクライバーに通知される。
 
-## Migration
+## 移行
 
-1. Find calls to `deepseekAccount.watch(signal)` in plugins that refresh the Platform session or synchronize its user ID.
-2. Change those calls to `deepseekAccount.watch(signal, true)`. Leave account UI subscriptions that only need sign-in and credential state unchanged.
-3. Confirm that a ready `getProfile()` result whose user ID first appears or changes wakes the subscription and causes it to re-read `getPlatformSession()`. Repeated reads with the same ID do not emit another identity notification.
+1. Platform セッションをリフレッシュする、またはそのユーザー ID を同期するプラグインで `deepseekAccount.watch(signal)` の呼び出しを見つける。
+2. それらの呼び出しを `deepseekAccount.watch(signal, true)` に変更する。サインインと資格情報の状態のみを必要とするアカウント UI のサブスクリプションは変更しない。
+3. ユーザー ID が最初に現れるか変更された準備完了の `getProfile()` 結果が、サブスクリプションを起床させ、`getPlatformSession()` を再読み取りさせることを確認する。同じ ID での繰り返しの読み取りは、別のアイデンティティ通知を発行しない。

@@ -1,51 +1,51 @@
 ---
-description: "The out-of-process ACP subagent backend for users and maintainers choosing a delegation provider, configuring a child ACP agent command, or debugging remote child runs."
+description: "委譲プロバイダーの選択、子 ACP エージェントコマンドの設定、またはリモート子実行のデバッグを行うユーザーとメンテナーのための、プロセス外 ACP subagent バックエンド。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-subagent-acp
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to delegate a task to an ACP-compatible agent running in a fresh subprocess with its own runtime, session, model, and tools. Each run shares only the selected working directory, sends the task over ACP, and returns the child's final answer or a safe error; intermediate messages and tool traffic stay outside the parent conversation. Permission prompts are answered by configured policy without human interaction. Choose it when delegation needs process isolation or a non-Harness ACP agent, and choose an in-process backend when the child must share parent capabilities.
+このパッケージは、独自のランタイム、セッション、モデル、ツールを持つ新しいサブプロセスで実行される ACP 互換エージェントへタスクを委譲するために使う。各実行は選択された作業ディレクトリだけを共有し、ACP 経由でタスクを送り、子の最終回答または安全なエラーを返す; 中間メッセージとツールトラフィックは親の会話の外にとどまる。権限プロンプトは人間の介入なしに設定されたポリシーによって応答される。委譲にプロセス分離や非 Harness の ACP エージェントが必要な場合はこれを選び、子が親のケイパビリティを共有しなければならない場合はプロセス内バックエンドを選ぶ。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [本パッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 本パッケージを使う
 
-Mount this provider when a composition needs a fully isolated, out-of-process child that speaks the Agent Client Protocol. The common path is explicit: mount the seam, mount this provider, and give it a command that starts an ACP agent.
+コンポジションが Agent Client Protocol を話す完全に分離されたプロセス外の子を必要とする場合にこのプロバイダーをマウントする。一般的な道筋は明示的である: シームをマウントし、このプロバイダーをマウントし、ACP エージェントを起動するコマンドを与える。
 
-### When to choose it
+### いつ選ぶか
 
-Choose this backend when the child must run with its own runtime, model, and tools in a separate process — for example an ACP agent from another project — or when you want delegation that cannot touch the parent harness. Choose an in-process backend when the child must share the parent's composition or honor parent-enforced capabilities: this provider advertises no optional start-time capabilities, so the seam rejects requests for `agentPreset`, `agentOptions`, structured output, or depth caps rather than silently omitting them.
+子が別プロセスで独自のランタイム、モデル、ツールを持って実行されなければならない場合 — たとえば別プロジェクトの ACP エージェント — や、親 Harness に触れられない委譲を望む場合にこのバックエンドを選ぶ。子が親のコンポジションを共有しなければならない場合や、親が強制するケイパビリティを尊重しなければならない場合はプロセス内バックエンドを選ぶ: このプロバイダーは省略可能な開始時ケイパビリティを何も広告しないため、シームは `agentPreset`、`agentOptions`、構造化出力、または深さ上限のリクエストを暗黙に省略するのではなく拒否する。
 
-### Configuration
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `providerName` | `acp` | Registry name on `ctx.subagents` |
-| `command` | required | Executable spawned for each run (the child ACP agent) |
-| `args` | `[]` | Command arguments |
-| `permission` | `reject` | Auto-answer permission requests by rejecting, or choosing the first `allow_once` or `allow_always` option (`allow`) |
-| `env` | `{}` | Explicit child environment layered over the credential-scrubbed parent environment |
-| `disposeEofGraceMs` | `6000` | Grace after stdin EOF before platform termination |
-| `disposeGraceMs` | `3000` | Bound for observing structured process facts after failure and, on POSIX, the SIGTERM-to-SIGKILL grace |
+| `providerName` | `acp` | `ctx.subagents` 上のレジストリ名 |
+| `command` | 必須 | 実行ごとに spawn される実行ファイル (子 ACP エージェント) |
+| `args` | `[]` | コマンド引数 |
+| `permission` | `reject` | 権限リクエストを自動応答する: 拒否、または最初の `allow_once` か `allow_always` オプションを選ぶ (`allow`) |
+| `env` | `{}` | クレデンシャル洗浄済みの親環境の上に重ねる明示的な子環境 |
+| `disposeEofGraceMs` | `6000` | stdin EOF の後、プラットフォーム終了までの猶予 |
+| `disposeGraceMs` | `3000` | 失敗後に構造化されたプロセス事実を観察するための制限、および POSIX での SIGTERM から SIGKILL への猶予 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-acp) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-subagent-acp)が、受け入れられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-A DeepSeek Harness child uses the product launcher and an explicit absolute `DSH_HOME`. The isolated home prevents a nested runtime from discovering the launching person's profiles or credentials; the generic ACP provider does not impose this requirement on non-DSH agents.
+DeepSeek Harness の子はプロダクトランチャーと明示的な絶対 `DSH_HOME` を使う。分離されたホームは、ネストされたランタイムが起動者のプロファイルやクレデンシャルを発見することを防ぐ; 汎用 ACP プロバイダーは非 DSH エージェントにこの要件を課さない。
 
 ```yaml
 - id: subagent-acp
@@ -60,117 +60,117 @@ A DeepSeek Harness child uses the product launcher and an explicit absolute `DSH
       DEEPSEEK_API_KEY: !!js process.env.DEEPSEEK_API_KEY
 ```
 
-### What you get
+### 得られるもの
 
-A successful run returns the child's final streamed assistant text as the result output. The child's session, model, and tools come from the child process itself — the parent supplies only the task and the working directory. The stop reason maps `end_turn` to `completed`, `max_tokens` to `max-tokens`, `refusal` to `refusal`, `cancelled` to `aborted`, and every other value to `error`. A failed published run preserves partial assistant text in `output` and returns safe structured detail separately in `diagnostic`.
+成功した実行は、子の最後にストリーミングされた assistant テキストを結果出力として返す。子のセッション、モデル、ツールは子プロセス自身から来る — 親はタスクと作業ディレクトリだけを供給する。stop reason は `end_turn` を `completed` に、`max_tokens` を `max-tokens` に、`refusal` を `refusal` に、`cancelled` を `aborted` に、その他すべての値を `error` にマップする。公開済みの実行が失敗した場合、部分的な assistant テキストを `output` に保ち、安全な構造化詳細を別途 `diagnostic` で返す。
 
-### Failure and recovery
+### 失敗と復旧
 
-A spawn, initialization, or new-session failure rejects before publication, ordinarily after the managed range is proven quiescent. If cleanup also fails, the rejection preserves ordered safe startup and teardown facts without claiming whole-range quiescence. Non-cancellation errors expose only fixed provider, stage, and category facts; the original failure stays on the internal cause chain and in Host diagnostics. After publication, a prompt, transport, or early-process failure resolves as `error` with a safe diagnostic, while local cancellation resolves as `aborted` without failure detail.
+spawn、初期化、または新規セッションの失敗は、通常は管理レンジが静止したと証明された後に、公開前に拒否する。クリーンアップも失敗した場合、拒否は順序付きの安全な起動とティアダウンの事実を保ち、レンジ全体の静止を主張しない。キャンセル以外のエラーは、固定のプロバイダー、ステージ、カテゴリの事実だけを公開する; 元の失敗は内部の原因チェーンと Host 診断にとどまる。公開後のプロンプト、トランスポート、または初期プロセスの失敗は安全な診断とともに `error` として解決し、ローカルキャンセルは失敗詳細なしで `aborted` として解決する。
 
-### Safe diagnostics
+### 安全な診断
 
-A generic diagnostic uses one fixed line: `Subagent failure (provider: ACP; stage: <stage>; category: <category>; ...)`. Optional stop reason, exit code, and signal come only from closed protocol or managed-process facts. Stderr, exception text, task content, tool input, paths, environment values, credentials, and protocol payloads never enter the diagnostic; the shared result boundary limits it to 4096 UTF-8 bytes. A non-completed run that requested permission can add one fixed policy, tool-kind, and decision line. Successful runs and local cancellation omit it.
+汎用診断は 1 つの固定行を使う: `Subagent failure (provider: ACP; stage: <stage>; category: <category>; ...)`。省略可能な stop reason、終了コード、シグナルは、クローズドなプロトコルまたは管理プロセスの事実からのみ来る。stderr、例外テキスト、タスク内容、ツール入力、パス、環境値、クレデンシャル、プロトコルペイロードが診断に入ることは決してない; 共有の結果境界がそれを 4096 UTF-8 バイトに制限する。権限を要求した非完了の実行は、固定のポリシー、ツール kind、および決定の行を 1 つ追加してよい。成功した実行とローカルキャンセルはそれを省略する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the backend drives a child over ACP and where the observable behavior comes from; the full contract lives in [Use this package](#use-this-package).
+このセクションは、バックエンドが ACP 経由で子をどのように駆動し、観察可能な挙動がどこから来るかを説明する; 完全な契約は[本パッケージを使う](#use-this-package)にある。
 
-### Design concept
+### 設計概念
 
-- **Full process isolation.** Each child runs in a fresh subprocess with its own session, model, and tools; only the resolved working directory crosses from the parent.
-- **One process per run.** Every run spawns a new process; there is no process pooling.
-- **The ACP wire is the serialization boundary.** Same-process subagent values are not defensively cloned; the protocol is where hostile input is validated.
+- **完全なプロセス分離。** 各子は独自のセッション、モデル、ツールを持つ新しいサブプロセスで実行される; 解決された作業ディレクトリだけが親から渡る。
+- **実行ごとに 1 プロセス。** すべての実行が新しいプロセスを spawn する; プロセスプーリングはない。
+- **ACP wire がシリアライゼーション境界である。** 同一プロセスの subagent 値は防御的にクローンされない; 敵対的入力が検証されるのはプロトコルにおいてである。
 
-### Start and ownership flow
+### 開始と所有権のフロー
 
-Startup uses the manager-resolved child directory (the request override, else the parent's current effective directory), spawns the command through the subprocess seam, performs the ACP `initialize` and `newSession` handshake, and only then publishes the run. Fulfillment transfers the external run to the activation manager. The startup signal detaches after acceptance; the activation receipt cancels execution and awaits cleanup. Each activation runs one task and cannot receive follow-up input. Disposal is idempotent: it closes stdin and waits a configured grace for cooperative quiescence, then escalates through SIGTERM to SIGKILL and awaits whole-range exit. Cleanup failures remain observable as ordered safe facts and never claim quiescence.
+起動は、マネージャーが解決した子ディレクトリ (リクエストの上書き、なければ親の現在の有効ディレクトリ) を使い、subprocess シームを通じてコマンドを spawn し、ACP の `initialize` と `newSession` のハンドシェイクを実行し、その後で初めて実行を公開する。フルフィルメントは外部実行をアクティベーションマネージャーへ移す。起動シグナルは受け入れ後にデタッチする; アクティベーションレシートは実行をキャンセルし、クリーンアップを待つ。各アクティベーションは 1 つのタスクを実行し、追加入力を受け取ることはできない。破棄は冪等である: stdin を閉じ、協調的な静止のために設定された猶予を待ち、次に SIGTERM から SIGKILL へエスカレートし、レンジ全体の終了を待つ。クリーンアップの失敗は順序付きの安全な事実として観察可能なままであり、静止を主張することは決してない。
 
-### Stop-reason mapping
+### Stop-reason マッピング
 
-The run outcome maps the ACP terminal into the shared stop-reason vocabulary (`completed`, `max-tokens`, `refusal`, `aborted`, or `error`) in [`src/run.ts`](src/run.ts).
+実行結果は、[`src/run.ts`](src/run.ts) で ACP の終端を共有の stop-reason 語彙 (`completed`、`max-tokens`、`refusal`、`aborted`、または `error`) にマップする。
 
-### Process boundary
+### プロセス境界
 
-The child spawns through the subprocess seam: credential-shaped ambient variables are scrubbed, then explicit `config.env` values merge after the scrub. Stderr is inherited to the parent's stream, and disposal applies this provider's EOF window before the shared termination escalation.
+子は subprocess シームを通じて spawn される: クレデンシャル状のアンビエント変数が洗浄され、次に明示的な `config.env` の値が洗浄後にマージされる。stderr は親のストリームへ継承され、破棄は共有の終了エスカレーションの前にこのプロバイダーの EOF ウィンドウを適用する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from this backend to the seam it plugs into and the protocol it drives.
+パッケージレベルの契約では不十分なときにこれらのページを読む。このバックエンドから、それが差し込まれるシームとそれが駆動するプロトコルへ進む。
 
-- [Subagent subsystem](../../../docs/subsystems/subagent.md) — the service contract, provider contract, and terminal result semantics.
-- [dsh-subagent seam](../subagent/README.md) — the registry and start API this provider registers on.
-- [Agent Client Protocol automation server](../../acp/acp/README.md) — the automation-only server this provider drives as a client.
-- [dsh-subprocess seam](../../subprocess/subprocess/README.md) — the process-spawn and teardown machinery behind each run.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-acp) — every accepted config field and its source declaration.
+- [Subagent サブシステム](../../../docs/subsystems/subagent.md) — サービス契約、プロバイダー契約、および終端結果のセマンティクス。
+- [dsh-subagent シーム](../subagent/README.md) — このプロバイダーが登録するレジストリと start API。
+- [Agent Client Protocol オートメーションサーバー](../../acp/acp/README.md) — このプロバイダーがクライアントとして駆動するオートメーション専用サーバー。
+- [dsh-subprocess シーム](../../subprocess/subprocess/README.md) — 各実行の背後にあるプロセス spawn とティアダウンの機構。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-subagent-acp) — 受け入れられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Child-agent request
+### 子エージェントのリクエスト
 
-#### What the model sees
+#### モデルが見るもの
 
-The remote child receives the standalone task content through ACP plus its own process's configured system prompt, tools, and fresh session. It receives no parent conversation. This provider advertises no optional start-time capabilities, so the local service rejects requests for `agentPreset`, `agentOptions`, depth enforcement, or structured output instead of silently omitting them.
+リモートの子は、ACP を通じてスタンドアロンのタスク内容を受け取り、それに加えて自身のプロセスの設定済みシステムプロンプト、ツール、および新しいセッションを受け取る。親の会話は受け取らない。このプロバイダーは省略可能な開始時ケイパビリティを何も広告しないため、ローカルサービスは `agentPreset`、`agentOptions`、深さの強制、または構造化出力のリクエストを暗黙に省略するのではなく拒否する。
 
-#### Token effect
+#### トークンへの影響
 
-The child pays for an independent full context and its own multi-step history. These tokens never enter the parent's context.
+子は独立した完全なコンテキストと自身のマルチステップ履歴のコストを払う。これらのトークンが親のコンテキストに入ることは決してない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Independent of the parent request cache. Each ACP child can reuse only prefixes identical under its own provider, model, composition, and history; child steps otherwise grow append-only.
+親のリクエストキャッシュとは独立している。各 ACP の子は、自身のプロバイダー、モデル、コンポジション、履歴の下で同一のプレフィックスだけを再利用できる; それ以外の場合、子のステップは追記のみで成長する。
 
-### Parent tool result, indirectly
+### 親ツール結果 (間接的)
 
-#### What the model sees
+#### モデルが見るもの
 
-Through `dsh-tool-subagent`, the parent model first receives a child id, then a completion notice containing final or partial assistant text, the stop reason, and safe diagnostic. The parent Session independently retains the external task identity and complete terminal result. Intermediate messages and tool traffic do not enter the parent Session.
+`dsh-tool-subagent` を通じて、親モデルは最初に子 id を受け取り、次に最終または部分的な assistant テキスト、stop reason、および安全な診断を含む完了通知を受け取る。親 Session は外部タスクの同一性と完全な終端結果を独立に保持する。中間メッセージとツールトラフィックは親 Session に入らない。
 
-#### Token effect
+#### トークンへの影響
 
-Parent input grows by the start acknowledgement and completion notice, whose size depends on the result data and persists until compaction. This provider adds no parent schema by itself.
+親の入力は開始承認と完了通知の分だけ増え、そのサイズは結果データに依存し、compaction まで持続する。このプロバイダーはそれ自体では親スキーマを追加しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ; 新たに可視になった内容は再利用可能なリクエストプレフィックスに従い、既存の KV キャッシュエントリーを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this backend is a poor fit or needs special operational care. They are current package constraints, not a general ACP comparison or a task backlog.
+これらの制限は、このバックエンドが適さない場合や特別な運用上の注意が必要な場合を定義する。それらは現在のパッケージ制約であり、一般的な ACP の比較やタスクのバックログではない。
 
-- **A fresh process per run** — there is no process pooling; each delegation pays the full spawn and ACP handshake cost.
-- **Local workspaces only** — the resolved working directory is a local path handed to a child on the same machine; remote workspace mapping is not designed.
-- **No optional start-time capabilities** — this provider cannot apply `agentPreset`, `agentOptions`, `outputSchema`, or a depth cap inside the remote process, so the seam rejects requests that require them.
-- **Only committed `agent_message_chunk` text is collected** — the automation server keeps reasoning, tool activity, plans, and other trace data in the child session log rather than emitting them on ACP.
-- **Permission prompts are auto-answered** (`permission: allow | reject`) — no human is surfaced a child's `session/request_permission`.
+- **実行ごとに新しいプロセス** — プロセスプーリングはない; 各委譲が spawn と ACP ハンドシェイクの全コストを払う。
+- **ローカルワークスペースのみ** — 解決された作業ディレクトリは、同じマシン上の子に渡されるローカルパスである; リモートワークスペースのマッピングは設計されていない。
+- **省略可能な開始時ケイパビリティなし** — このプロバイダーはリモートプロセス内で `agentPreset`、`agentOptions`、`outputSchema`、または深さ上限を適用できないため、シームはそれらを必要とするリクエストを拒否する。
+- **コミットされた `agent_message_chunk` テキストだけが収集される** — オートメーションサーバーは推論、ツール活動、計画、その他のトレースデータを ACP で emit するのではなく子セッションログに保つ。
+- **権限プロンプトは自動応答される** (`permission: allow | reject`) — 子の `session/request_permission` が人間に提示されることはない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
+この開発メモはメンテナー向けの作業コンテキストである: 未解決の質問と未決定の方向性。明示的に非権威である — 出荷済みの挙動と制限は上記のセクションとパッケージコードにある。
 
-- **Process pooling** — persistent-process reuse is a possible future optimization but changes the per-run isolation model.
-- **Remote workspaces** — mapping a remote ACP agent's workspace would need its own backend capability.
-- **Continuable ACP children** — would require persisting the remote session id and a per-child continuation advertisement.
+- **プロセスプーリング** — 持続プロセスの再利用は将来の最適化の可能性があるが、実行ごとの分離モデルを変える。
+- **リモートワークスペース** — リモート ACP エージェントのワークスペースのマッピングには独自のバックエンドケイパビリティが必要になる。
+- **継続可能な ACP の子** — リモートセッション id の永続化と子ごとの継続広告が必要になる。
 
 </details>

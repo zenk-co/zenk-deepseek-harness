@@ -1,65 +1,65 @@
 ---
-description: "Package map for shared utilities: atomic file writes, branded ids, deques, JSON values, harness home paths, launch environment, native commands, output retention, time zones, and timeouts."
+description: "共有実用集のパッケージ地図。不可分文件書込、銘付き id、両端待ち行列、JSON 値、harness 居経路、起動環境、生命令、出力保持、時間帯、期限。"
 kind: "package-group"
 ---
 
-# util/ — shared utilities
+# util/ — 共有実用集
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `util/` group gives capability packages shared mechanical primitives instead of duplicate implementations. It covers atomic writes, branded ids, deques, lossless JSON values, UUIDs, Harness-home paths, launch environments, outbound proxy policy, native commands, output retention, time-zone canonicalization, and timeout handling. Every root entry here is a library: it registers no product service or event, and the consuming capability retains the business semantics.
+`util/` 群は重複実装の代わりに共有の機械的素材をケイパビリティパッケージに与える。不可分書込、銘付き id、両端待ち行列、可逆 JSON 値、UUID、Harness 居経路、起動環境、外向 proxy 方針、生命令、出力保持、時間帯正準化、期限処理を覆う。ここの各根項目は蔵書である。製品サービスもイベントも登録せず、消費ケイパビリティが業務意味論を保つ。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ群](#packages)
+- [関連文書](#related-documentation)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ群
 
-Each package provides one primitive; open a package page for how to use it.
+各パッケージは素材 1 つを提供する。使い方は各包頁を開くこと。
 
-| Package | Role |
+| パッケージ | 役割 |
 |---|---|
-| [`brand/`](brand/README.md) | Nominal string types and their stateless constructor |
-| [`package-manifest/`](package-manifest/README.md) | Shared TypeScript declarations for package manifests |
-| [`plugin-market-index/`](plugin-market-index/README.md) | Validates plugin market index format 1 and builds pinned install arguments |
-| [`crypto/`](crypto/README.md) | Mints RFC 9562 v4 UUIDs from the cross-runtime `crypto.getRandomValues` primitive |
-| [`deque/`](deque/README.md) | Provides amortized constant-time queue operations with bounded vacant storage |
-| [`chunked-list/`](chunked-list/README.md) | Retains immutable list versions with bounded append copying and checkpoint validation |
-| [`values/`](values/README.md) | Validates, snapshots, compares, and freezes lossless JSON-compatible values |
-| [`home-paths/`](home-paths/README.md) | Resolves the single Harness home and joins shared user-data paths |
-| [`http-proxy/`](http-proxy/README.md) | Resolves one outbound proxy policy and installs it for `fetch`, SDK agents, and spawned children |
-| [`launch-environment/`](launch-environment/README.md) | Frozen launch environment that remembers which layer supplied each value |
-| [`atomic-write/`](atomic-write/README.md) | Atomic file replacement and cross-process writer locking |
-| [`lazy-require/`](lazy-require/README.md) | Loads CommonJS-compatible Host dependencies on first use with caller-relative resolution |
-| [`native-command/`](native-command/README.md) | Runs host-native commands directly, never through a shell string |
-| [`workspace-path/`](workspace-path/README.md) | Provides browser-safe Workspace path and display helpers |
-| [`code-language/`](code-language/README.md) | Maps a filename suffix to the syntax-highlighting language that the Code preview, diff review, and the read card render |
-| [`output-retention/`](output-retention/README.md) | Bounds model-facing output and reports exact omission metadata |
-| [`time/`](time/README.md) | Validates and canonicalizes a caller-reported IANA time zone |
-| [`timeout/`](timeout/README.md) | Deadline arithmetic, signal fusion, and timeout-versus-cancel classification |
+| [`brand/`](brand/README.md) | 名目文字列型とその無状態構成子 |
+| [`package-manifest/`](package-manifest/README.md) | 包宣言用の共有 TypeScript 宣言 |
+| [`plugin-market-index/`](plugin-market-index/README.md) | 插件市場索引形式 1 を検証し固定導入引数を組み立てる |
+| [`crypto/`](crypto/README.md) | 越実行時 `crypto.getRandomValues` 素材から RFC 9562 v4 UUID を鋳る |
+| [`deque/`](deque/README.md) | 有界空き貯蔵で償却定時待ち行列操作を提供する |
+| [`chunked-list/`](chunked-list/README.md) | 有界追加写しと検査点検証で不変一覧版を保つ |
+| [`values/`](values/README.md) | 可逆 JSON 適合値を検証、 snapshot、比較、凍結する |
+| [`home-paths/`](home-paths/README.md) | 単一 Harness 居を解決し共有利用者資料経路を結合する |
+| [`http-proxy/`](http-proxy/README.md) | 単一外向 proxy 方針を解決し `fetch`、SDK 応答者、子出産に導入する |
+| [`launch-environment/`](launch-environment/README.md) | 各値を供給した層を憶える凍結起動環境 |
+| [`atomic-write/`](atomic-write/README.md) | 不可分文件置換と越過程書込錠 |
+| [`lazy-require/`](lazy-require/README.md) | 呼出者相対解決で CommonJS 適合 Host 依存を初用時に読み込む |
+| [`native-command/`](native-command/README.md) | 殻文字列経由でなく host 生命令を直接走らせる |
+| [`workspace-path/`](workspace-path/README.md) | ブラウザー安全な Workspace 経路と表示補助を提供する |
+| [`code-language/`](code-language/README.md) | ファイル名接尾辞を符号 preview、差分査読、読み札が描く構文強調言語に写像する |
+| [`output-retention/`](output-retention/README.md) | 模型対面出力を限り厳密な省略附属を報告する |
+| [`time/`](time/README.md) | 呼出者報告の IANA 時間帯を検証し正準化する |
+| [`timeout/`](timeout/README.md) | 期限算術、信号融合、期限対取消分類 |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連文書
 
-- [Root package map](../README.md) — where `util/` sits among all package groups.
-- [Generated configuration catalog](../../docs/config-catalog.md) — the library-package index this group forms part of.
-- [Adding a package cookbook](../../docs/cookbook/adding-a-package.md) — how a new shared primitive lands in this group.
+- [根包地図](../README.md) — 全包群の中での `util/` 位置。
+- [生成設定目録](../../docs/config-catalog.md) — この群が一部を成す蔵書包索引。
+- [包追加手引き](../../docs/cookbook/adding-a-package.md) — 新共有素材がこの群に着陸する仕方。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業背景 — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,6 +1,6 @@
 # XLSX 模糊测试诊断
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 使用 Openpyxl 和 XlsxWriter 生成表格文件，再将源码 XLSX 适配器的结果与独立记录的单元格值、公式和不支持内容类别比较。此诊断任务需要显式运行，会保留失败结果并以非零状态退出；它不属于默认单元测试集。
 

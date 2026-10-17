@@ -1,40 +1,40 @@
 ---
-description: "Computer-use capability packages for selecting and registering one desktop provider."
+description: "デスクトッププロバイダーを 1 つ選択・登録するための computer-use ケイパビリティーパッケージ。"
 kind: "package-group"
 ---
 
 # packages/computer-use
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Computer-use providers let models observe and operate a desktop. This group owns exclusive provider registration. Each provider owns its operations, tools, and platform requirements; the experimental Cua Driver providers live in the experimental group.
+computer-use プロバイダーによりモデルはデスクトップを観測・操作できる。このグループは排他的プロバイダー登録を所有する。各プロバイダーは自身の操作、ツール、プラットフォーム要件を所有し、実験的 Cua Driver プロバイダーは experimental グループに属する。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-Choose one provider and mount the shared registration service.
+プロバイダーを 1 つ選択し、共有登録サービスをマウントする。
 
 | Package | Role | ctx key |
 |---|---|---|
 | [`computer-use`](computer-use/README.md) | Exclusive named provider registration | `ctx.computerUse` |
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Computer use](../../docs/subsystems/computer-use.md) — capability ownership and provider choices.
-- [Experimental packages](../experimental/README.md) — Cua Driver MCP and native providers.
+- [コンピューター利用](../../docs/subsystems/computer-use.md) — capability ownership and provider choices.
+- [実験的パッケージ](../experimental/README.md) — Cua Driver MCP and native providers.
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 None.

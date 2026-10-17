@@ -1,25 +1,25 @@
 ---
 kind: upgrade-guide
-description: "The legacy ui-chat.transcriptView value normal, and an unset value in non-Desktop Web, now display Detailed instead of Standard."
+description: "レガシーな ui-chat.transcriptView 値 normal と、非 Desktop Web での未設定値は、Standard ではなく Detailed として表示されるようになった。"
 ---
 
-# Legacy `normal` work details display as Detailed
+# レガシーな `normal` の作業詳細は Detailed として表示される
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-The Host setting `ui-chat.transcriptView` selects Settings → General → Work details. In v0.1.7-rc.2 the client displayed the legacy saved value `normal` as `standard`, and every client used `standard` when the setting was missing, `null`, or invalid.
+ホスト設定 `ui-chat.transcriptView` は Settings → General → Work details を選択する。v0.1.7-rc.2 ではクライアントはレガシーの保存値 `normal` を `standard` として表示し、設定が存在しない、`null`、または無効な場合、すべてのクライアントが `standard` を使っていた。
 
-From the next release:
+次リリースから:
 
-- A saved `normal` displays as `detailed` on Desktop and Web. The saved value on disk is not rewritten.
-- A missing, `null`, or invalid value displays as `detailed` in non-Desktop Web (the npm `dsh web` install). Desktop still uses `standard`.
-- Saved `compact`, `standard`, `detailed`, and `verbose` values are unchanged.
+- 保存済み `normal` は Desktop と Web で `detailed` として表示される。ディスク上の保存値は書き換えられない。
+- 存在しない、`null`、または無効な値は非 Desktop Web（npm の `dsh web` インストール）で `detailed` として表示される。Desktop は引き続き `standard` を使う。
+- 保存済みの `compact`、`standard`、`detailed`、`verbose` 値は変わらない。
 
-Users who relied on the old reading see running Turns with process-group bodies expanded instead of collapsed summaries.
+以前の表示に頼っていたユーザーは、実行中のターンが折りたたみサマリーではなく展開されたプロセスグループ本体で見える。
 
-## Migration
+## 移行
 
-1. To keep the previous presentation, open Settings → General → Work details and choose Standard. The client saves `standard` to `ui-chat.transcriptView`, which every later default change leaves untouched.
-2. Confirm: start a Turn that calls tools and check that its process group shows a collapsed summary with live task detail.
+1. 以前の表示を保つには Settings → General → Work details を開いて Standard を選ぶ。クライアントは `standard` を `ui-chat.transcriptView` に保存し、以降のデフォルト変更はそれに触れない。
+2. 確認: ツールを呼び出すターンを開始し、プロセスグループがライブタスク詳細付きの折りたたみサマリーを表示することを確かめる。
