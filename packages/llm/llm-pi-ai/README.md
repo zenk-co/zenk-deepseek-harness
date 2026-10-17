@@ -90,6 +90,8 @@ kind: "package-reference"
 
 生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-llm-pi-ai)が、受け入れ可能な全フィールドとその JSDoc の網羅的な情報源である。
 
+Ollama Cloud は `ollama-cloud` ルート（表示名 `Ollama Cloud`）として正式提供する。上流 pi-ai カタログにないため本パッケージの手書きオーバーレイが認証（`OLLAMA_API_KEY`）、既定エンドポイント（`https://ollama.com/v1`）、プロトコル（`openai-completions`）を供給し、未設定の `displayName` と `api` はこの値に解決される。モデルカタログは同梱しないため、`/models` 取得（Fetch available models）または手入力で `models` に列挙する。
+
 ### プロバイダーにサインインする
 
 pi-ai がログインを用意しているプロバイダーには harness 認可シーム経由でサインインできる。フローは OAuth または対話型キープロンプトを提供し（キーは設定フォームではなく pi-ai 自身のログインプロンプトに入力する）、結果の資格情報は harness 資格情報ストアの `llm-pi-ai/<provider id>` に保存される。保存済みサインインは `apiKeyEnv` オーバーライドの下位でルートを認証し、ストアのプロセス横断ロックの下で自身を更新する。サインアウトは保存済みレコードを削除する。レコード文法外の手動宣言ルートキー（小文字ハイフン区切り識別子）にはサインインできない。そのレコード書き込みは `LlmError('UNSTORABLE_PROVIDER_ID')` で拒否されるためであり、そのようなルートは代わりに `apiKeyEnv` またはアンビエントなプロバイダー設定で認証する。
@@ -176,7 +178,7 @@ pnpm run verify-provider-data
 git add packages/llm/llm-pi-ai/src/provider-data.generated.ts
 ```
 
-生成差分をレビューし、依存関係やジェネレーターの変更と一緒にステージする。生成ファイルを手で編集しない。生成エラーはコミット前に解決しなければならない。
+生成差分をレビューし、依存関係やジェネレーターの変更と一緒にステージする。生成ファイルを手で編集しない。生成エラーはコミット前に解決しなければならない。上流にない `ollama-cloud` は生成対象外であり、`src/provider-data.ts` の手書きオーバーレイで供給する。
 
 `pre-commit` フックは、`pnpm-lock.yaml`、このパッケージの `package.json`、ジェネレーター、または生成ファイルがステージされると `node_modules/.bin/tsx packages/llm/llm-pi-ai/scripts/gen-provider-data.ts --check --cached` を実行する。ステージされた生成ファイルを、インストール済み依存関係と現在のジェネレーターから算出した期待データと比較する。ファイルの書き換えやステージは行わない。作業ファイルだけの更新では不十分であり、生成ファイルもステージする。チェックが古いメタデータを報告したら、コミット再試行の前に上記コマンドを再実行する。ローカルフックが発動しなくても、CI はチェックアウトとインストール済みロックファイル依存関係に対して `pnpm run verify-provider-data` を実行する。
 

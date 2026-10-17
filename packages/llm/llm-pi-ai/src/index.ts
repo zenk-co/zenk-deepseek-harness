@@ -66,7 +66,7 @@ import type {} from '@deepseek-ai/dsh-fs'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { PiAiAdapter } from './adapter.ts'
 import { authContextFrom, credentialStoreFrom } from './auth.ts'
-import { catalogProvider, catalogProviderIds } from './catalog.ts'
+import { catalogDisplayName, catalogProvider, catalogProviderIds } from './catalog.ts'
 import { assertServiceable, Config, resolveProfiles } from './config.ts'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { discoverModels } from './discovery.ts'
@@ -121,7 +121,8 @@ function registrationFacts(profiles: ReadonlyMap<string, ResolvedPiAiProviderPro
  * configuration surfaces could neither show nor edit it. A catalog route also
  * carries its catalog endpoint and native authentication, which a settings
  * editor shows while the profile leaves the endpoint or the credential
- * reference unset.
+ * reference unset. The Ollama Cloud overlay shows its product name; upstream
+ * routes keep their route key as the display name.
  * @param profiles - the currently resolved provider profiles.
  * @returns the directory entries in catalog order, declared routes last.
  */
@@ -145,7 +146,7 @@ function directoryEntries(
       ...error === undefined ? {} : { error },
     })
   }
-  for (const provider of catalogProviderIds()) declare(provider, provider)
+  for (const provider of catalogProviderIds()) declare(provider, catalogDisplayName(provider))
   for (const [provider, profile] of profiles) declare(provider, profile.displayName, profile.catalogError)
   return [...entries.values()]
 }
