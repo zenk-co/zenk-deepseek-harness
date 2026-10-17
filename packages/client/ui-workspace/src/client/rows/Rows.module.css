@@ -219,6 +219,11 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+.sessionRow .meta {
+  flex: none;
+  max-width: 40%;
+}
+
 .time {
   flex: none;
   font-size: 10px;
