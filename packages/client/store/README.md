@@ -4,13 +4,13 @@ kind: "package-library"
 ---
 # @deepseek-ai/dsh-client-store
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-React-free observable and snapshot-store primitives shared by Client controllers and renderer adapters. The package owns synchronous and animation-frame publication, Immer-backed updates, shallow equality, and optional browser persistence; React hook construction remains in `@deepseek-ai/dsh-client-ui-renderer`. Use it when Client state must publish stable snapshots without depending on React.
+React 非依存の observable およびスナップショットストアプリミティブであり、Client コントローラーとレンダラーアダプターで共有される。パッケージは同期的およびアニメーションフレーム発行、Immer 支援更新、shallow equality、任意のブラウザー永続化を所有し、React フック構築は `@deepseek-ai/dsh-client-ui-renderer` に残る。React に依存せず安定したスナップショットを発行しなければならない Client 状態で使う。
 
-## Table of Contents
+## 目次
 
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
@@ -19,24 +19,24 @@ React-free observable and snapshot-store primitives shared by Client controllers
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package provides browser-side state primitives and registers nothing model-facing.
+None。このパッケージはブラウザー側の状態プリミティブを提供し、モデル向けには何も登録しないため。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; the stores neither assemble nor send model requests.
+None。ストアはモデルリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Persistence is browser-local** — persisted stores use JSON in `localStorage`; non-browser runtimes disable persistence, and the package provides no cross-device synchronization.
-- **Web-shell build input** — the static ESM retains third-party imports for Vite; independent consumers supply its development dependencies ([dependency rules](../AGENTS.md#dependency-declaration)).
+- **永続化はブラウザーローカルである** — 永続化ストアは `localStorage` 内の JSON を使う。非ブラウザーランタイムは永続化を無効化し、パッケージはデバイス間同期を提供しない。
+- **Web シェルビルド入力** — 静的 ESM は Vite 用にサードパーティインポートを保持する。独立したコンシューマーはその開発依存を提供する ([依存規則](../AGENTS.md#dependency-declaration))。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

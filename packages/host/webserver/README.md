@@ -1,33 +1,33 @@
 ---
-description: "The web GUI host's HTTP server: named-route and upgrade registration, an optional TLS listener, index transforms, and the single fallback seat that serves the Web shell's SPA dist."
+description: "Web GUI ホストの HTTP サーバー: 名前付きルートとアップグレードの登録、省略可能な TLS リスナー、インデックス変換、および Web シェルの SPA dist を提供する単一のフォールバック席。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-host-webserver
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Browsers reach the web GUI over HTTP through `dsh-host-webserver`: a `node:http` server — `node:https` once `tls` names a certificate and key — where other plugins register named routes, upgrade routes, index startup inputs, and one fallback handler. It knows no harness concepts and serves no files — the `/api` bridge, plugin bundles, the HMR event stream, and the SPA dist belong to the plugins that register them. Route matching is fixed: exact over the whole table, then longest prefix, then the fallback handler. It serves browsers only; Electron loads dist over `file://` and carries fetch over an IPC bridge.
+ブラウザーは `dsh-host-webserver` を通じて HTTP で Web GUI に到達する: `node:http` サーバー — `tls` が証明書と鍵を名指すと `node:https` になる — であり、他のプラグインが名前付きルート、アップグレードルート、インデックス起動入力、および 1 つのフォールバックハンドラーを登録する。Harness の概念を何も知らず、ファイルも提供しない — `/api` ブリッジ、プラグインバンドル、HMR イベントストリーム、SPA dist はそれらを登録するプラグインに属する。ルートマッチングは固定である: テーブル全体に対する完全一致、次に最長プレフィックス、次にフォールバックハンドラー。ブラウザーにのみ提供する; Electron は dist を `file://` でロードし、fetch を IPC ブリッジで運ぶ。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [本パッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 本パッケージを使う
 
-Compose the webserver as the HTTP transport of a browser-facing host, then let the feature plugins claim their routes. Activation listens immediately; registration order carries no request-facing semantics because named routes compose to be disjoint. Add `tls` to carry those same routes over HTTPS instead of plain HTTP.
+ブラウザー向けホストの HTTP トランスポートとして webserver をコンポーズし、次にフィーチャープラグインに自身のルートを要求させる。アクティベーションは即座にリッスンする; 名前付きルートは互いに素になるよう構成されるため、登録順はリクエストに関する意味を持たない。同じルートを平文 HTTP の代わりに HTTPS で運ぶには `tls` を追加する。
 
-### Minimal configuration
+### 最小構成
 
 ```yaml
 - name: '@deepseek-ai/dsh-host-webserver'
@@ -36,13 +36,13 @@ Compose the webserver as the HTTP transport of a browser-facing host, then let t
     port: 3000
 ```
 
-`host` takes one concrete IPv4 or IPv6 literal of a local interface — for example a container's own Pod address from `hostname -i`. A loopback literal (any address in 127/8, `::1`, or a mapped form of either) keeps the server on this machine; any other literal serves the network that address belongs to, over plain HTTP unless `tls` is set. An unspecified address — including the IPv4-mapped forms Linux reads as IPv4 any — is rejected at load instead of opening the port on every interface at once. `port` 0 requests an OS-assigned port; `ctx.webServer.port` reads the listening port afterwards, and the exported `isLoopbackHost(host)` and `isWildcardHost(host)` classify an address by its parsed value, so a mapped or zoned spelling classifies as the address it names. A dotted-quad IPv6 tail names the address's own low 32 bits, exactly as `listen` reads it, so `::0.0.0.1` is loopback `::1` while `::127.0.0.1` is the non-loopback `::7f00:1`; `normalizeBindAddress(host)` returns that address text — `127.0.0.1` for a genuinely mapped `::ffff:127.0.0.1`, `::1` for `::0.0.0.1` and for `::1%lo` — ready to be a URL host. `bindUrlHost(host)` writes that text as a URL host, bracketing IPv6, and returns `undefined` for a non-loopback zoned address that no URL can carry; `ctx.webServer.getOrigin()` combines it with the protocol and listening port into the root URL local clients reach, and throws before the port is bound or when no URL form exists.
+`host` はローカルインターフェースの具体的な IPv4 または IPv6 リテラルを 1 つ取る — たとえば `hostname -i` によるコンテナ自身の Pod アドレスである。ループバックリテラル (127/8 の任意のアドレス、`::1`、またはそのいずれかのマップ形式) はサーバーをこのマシン上に保つ; それ以外のリテラルはそのアドレスが属するネットワークに提供し、`tls` が設定されていない限り平文 HTTP で行う。未指定アドレス — Linux が IPv4 any として読む IPv4 マップ形式を含む — は、すべてのインターフェースで一度にポートを開く代わりにロード時に拒否される。`port` 0 は OS 割り当てのポートを要求する; `ctx.webServer.port` は後からリッスンポートを読む。エクスポートされた `isLoopbackHost(host)` と `isWildcardHost(host)` は解析された値でアドレスを分類するため、マップまたはゾーン付きの表記はそれが名指すアドレスとして分類される。ドット付きクアッドの IPv6 末尾は、`listen` が読むのと全く同じく、アドレス自身の下位 32 ビットを名指すため、`::0.0.0.1` はループバック `::1` であり、`::127.0.0.1` は非ループバックの `::7f00:1` である; `normalizeBindAddress(host)` はそのアドレステキスト — 真にマップされた `::ffff:127.0.0.1` には `127.0.0.1`、`::0.0.0.1` と `::1%lo` には `::1` — を返し、URL ホストとして使えるようにする。`bindUrlHost(host)` はそのテキストを URL ホストとして書き、IPv6 をブラケットで囲み、どの URL にも運べない非ループバックのゾーン付きアドレスには `undefined` を返す; `ctx.webServer.getOrigin()` はそれをプロトコルとリッスンポートと組み合わせて、ローカルクライアントが到達するルート URL にする。ポートがバインドされる前、または URL 形式が存在しない場合は throw する。
 
-Set `compression: 'gzip'` to wrap eligible socket-backed responses without changing route APIs. The client must accept gzip and the media type must be compressible or `multipart/form-data`; known response lengths below `compressionThresholdBytes` remain uncompressed, while unknown-length streams are eligible immediately. Existing encodings, `Cache-Control: no-transform`, range responses, SSE, ZIP, and the packaged `.gz` Worker image remain unchanged. The shipped Web bundle uses compression level 1 with a 1024-byte threshold; other compositions default to no compression.
+対象となるソケットベースのレスポンスをルート API を変えずにラップするには `compression: 'gzip'` を設定する。クライアントは gzip を受け入れなければならず、メディアタイプは圧縮可能か `multipart/form-data` でなければならない; `compressionThresholdBytes` 未満の既知のレスポンス長は非圧縮のままで、長さ不明のストリームは即座に対象になる。既存のエンコーディング、`Cache-Control: no-transform`、range レスポンス、SSE、ZIP、およびパッケージ済みの `.gz` Worker イメージは変わらない。同梱の Web バンドルは圧縮レベル 1 と 1024 バイトのしきい値を使う; 他のコンポジションはデフォルトで圧縮なしである。
 
-### Serving HTTPS
+### HTTPS を提供する
 
-`tls` serves the same routes over TLS on that one address: the carrier opens no second HTTP listener and never redirects. Both files are read once during activation, before the socket binds, so an unreadable, empty, or malformed file, a key that does not match the certificate, or a bind failure rejects initialization — a misconfigured certificate never falls back to HTTP. Paths resolve against the process working directory, the key must be unencrypted PEM, and `certFile` may hold a chain whose leaf certificate comes first. Replacing either file takes a reload, and this carrier neither provisions nor renews certificates.
+`tls` は同じルートをその 1 つのアドレス上の TLS で提供する: キャリアは 2 つ目の HTTP リスナーを開かず、リダイレクトもしない。両方のファイルはアクティベーション中、ソケットがバインドされる前に一度だけ読まれるため、読めない、空、または不正なファイル、証明書と一致しない鍵、またはバインド失敗は初期化を拒否する — 設定を誤った証明書が HTTP にフォールバックすることは決してない。パスはプロセスの作業ディレクトリに対して解決され、鍵は暗号化されていない PEM でなければならず、`certFile` はリーフ証明書が先頭のチェーンを保持してよい。どちらのファイルの置き換えにもリロードが必要であり、このキャリアは証明書のプロビジョニングも更新も行わない。
 
 ```yaml
 - name: '@deepseek-ai/dsh-host-webserver'
@@ -54,91 +54,91 @@ Set `compression: 'gzip'` to wrap eligible socket-backed responses without chang
       keyFile: /etc/dsh/tls/key.pem
 ```
 
-`ctx.webServer.protocol` reads `'http:'` or `'https:'` for the bound listener, so a plugin that keys request policy — a session cookie's `Secure` flag, an origin check — on the transport reads one configuration-derived value instead of inspecting sockets or trusting forwarded headers. Clients still verify the certificate you supplied: this carrier ships no trust store, no HTTP-to-HTTPS redirect, and no HSTS header.
+`ctx.webServer.protocol` はバインドされたリスナーについて `'http:'` または `'https:'` を読むため、リクエストポリシー — セッション Cookie の `Secure` フラグ、origin チェック — をトランスポートに基づかせるプラグインは、ソケットを検査したり転送ヘッダーを信頼したりする代わりに、設定由来の 1 つの値を読む。クライアントは依然として提供された証明書を検証する: このキャリアはトラストストア、HTTP から HTTPS へのリダイレクト、HSTS ヘッダーを一切同梱しない。
 
-### Registering routes
+### ルートを登録する
 
-`register(route)` adds a named `exact` or `prefix` HTTP route, `registerUpgrade(route)` adds an upgrade route for an exact pathname, and both return a disposer that removes the registration. A duplicate path within either table throws — route patterns are a composition-level contract, so a collision is a misconfiguration. HTTP matching is exact over the whole table, then longest prefix, then the fallback handler; upgrades match exactly and unmatched connections are closed.
+`register(route)` は名前付きの `exact` または `prefix` HTTP ルートを追加し、`registerUpgrade(route)` は正確なパス名のアップグレードルートを追加し、どちらも登録を除去する disposer を返す。どちらかのテーブル内で重複するパスは throw する — ルートパターンはコンポジションレベルの契約であるため、衝突は設定ミスである。HTTP マッチングはテーブル全体に対する完全一致、次に最長プレフィックス、次にフォールバックハンドラーである; アップグレードは完全一致し、一致しない接続は閉じられる。
 
-### The fallback seat
+### フォールバック席
 
-`registerFallback(handler)` claims the one handler for every request no named route matches. A second registration throws; while no fallback is registered the server answers 404. In the shipped Web composition the [SPA dist server](../frontend-static/README.md) owns the seat and calls `renderIndex` on every index response it renders.
+`registerFallback(handler)` は、名前付きルートが一致しないすべてのリクエストのための唯一のハンドラーを要求する。2 つ目の登録は throw する; フォールバックが登録されていない間、サーバーは 404 を返す。同梱の Web コンポジションでは [SPA dist サーバー](../frontend-static/README.md) がその席を所有し、レンダリングするすべてのインデックスレスポンスで `renderIndex` を呼ぶ。
 
-Index startup inputs are two layers. `collectIndexInjections()` gathers a fresh injection table — one `webserver/index-inject` emit per call, each subscriber pushing its current rows — and `renderIndex(html)` renders those rows into the index.html body before applying the raw `tapIndex(transform)` transforms in registration order. A `script-preload` row renders an advisory classic-script preload link. Static deployments carry the same rows in their boot payload. `applyIndexTaps(html)` applies only the raw transforms; it is the escape hatch for markup no row expresses.
+インデックス起動入力は 2 つの層である。`collectIndexInjections()` は新鮮な注入テーブル — 呼び出しごとに 1 回の `webserver/index-inject` emit で、各サブスクライバーが現在の行をプッシュする — を集め、`renderIndex(html)` はそれらの行を index.html のボディへレンダリングしてから、生の `tapIndex(transform)` 変換を登録順に適用する。`script-preload` 行は勧告的な classic-script プリロードリンクをレンダリングする。静的デプロイメントは同じ行を自身のブートペイロードで運ぶ。`applyIndexTaps(html)` は生の変換だけを適用する; 行が表現しないマークアップのためのエスケープハッチである。
 
-### Behavior under failure
+### 失敗時の挙動
 
-A listen failure (for example EADDRINUSE) rejects plugin initialization with the bind diagnostic, and unusable TLS material rejects it too, naming the config field and the resolved path but never the file's contents. An HTTP request whose handler throws is answered 400 — or the socket destroyed when headers are already out — and logged as a warning; it never exits the process. An upgrade-handler exception or upgraded-socket transport error logs a warning and destroys its socket.
+リッスン失敗 (たとえば EADDRINUSE) はバインド診断とともにプラグイン初期化を拒否し、使用できない TLS 素材も同様に拒否し、設定フィールドと解決されたパスを名指すがファイルの内容は決して名指さない。ハンドラーが throw した HTTP リクエストには 400 を返す — またはヘッダーがすでに送信済みの場合はソケットを破棄する — とともに警告としてログに記録する; プロセスを終了することは決してない。アップグレードハンドラーの例外またはアップグレード済みソケットのトランスポートエラーは警告をログに記録し、そのソケットを破棄する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-### Design concept
+### 設計概念
 
-The package is a plain route registry with no harness vocabulary: `WebServer` extends Cordis `Service` and holds three route tables plus the fallback slot, the raw index-tap list, and the `webserver/index-inject` event the index renderer gathers rows through. Index rendering composes two layers per response: `renderIndex` renders the fresh injection table, including advisory `script-preload` rows, into the body, then applies the raw taps in registration order; `applyIndexTaps` runs the taps alone. The upgrade handler owns the protocol handshake and connection contents; the webserver only delivers the raw socket and request. `host`, `port`, and `protocol` getters and `getOrigin()` expose composition-time facts other plugins adapt to (for example the directory-picker chooser), and an explicit `tls: null` normalizes to an unset listener, so `protocol` has a single source.
+このパッケージは Harness の語彙を持たない単純なルートレジストリである: `WebServer` は Cordis `Service` を拡張し、3 つのルートテーブルとフォールバックスロット、生の index-tap リスト、およびインデックスレンダラーが行を集める `webserver/index-inject` イベントを保持する。インデックスレンダリングはレスポンスごとに 2 つの層を構成する: `renderIndex` は新鮮な注入テーブル (勧告的な `script-preload` 行を含む) をボディへレンダリングし、次に生の tap を登録順に適用する; `applyIndexTaps` は tap だけを実行する。アップグレードハンドラーはプロトコルハンドシェイクと接続の内容を所有する; webserver は生のソケットとリクエストを届けるだけである。`host`、`port`、`protocol` ゲッターと `getOrigin()` は、他のプラグインが適応するコンポジション時の事実 (たとえば directory-picker チューザー) を公開し、明示的な `tls: null` は未設定のリスナーに正規化されるため、`protocol` は単一の情報源を持つ。
 
-### Matching and lifecycle
+### マッチングとライフサイクル
 
-`match(pathname)` consults the exact table first, then walks the prefix table for the longest match, then the fallback. Activation registers one effect that owns the whole acquisition — the TLS reads, the plain or secure server, and the bind — so a disposal that lands mid-initialization waits for the listener and then closes it rather than leaving it unowned. Disposal starts `close()` and `closeAllConnections()`, destroys every tracked upgraded socket and every raw TLS connection, and returns only after the server and those sockets have closed. Node's `closeAllConnections()` includes neither upgraded sockets nor a TLS socket whose handshake has not finished, so the service tracks both explicitly.
+`match(pathname)` は最初に完全一致テーブルを参照し、次に最長一致のためにプレフィックステーブルを走査し、次にフォールバックを参照する。アクティベーションは取得全体 — TLS 読み込み、平文または安全なサーバー、およびバインド — を所有する 1 つのエフェクトを登録するため、初期化の途中で着地した破棄はリスナーを待ってから閉じ、所有されないまま残すことはない。破棄は `close()` と `closeAllConnections()` を開始し、追跡されたすべてのアップグレード済みソケットとすべての生の TLS 接続を破棄し、サーバーとそれらのソケットが閉じた後にのみ戻る。Node の `closeAllConnections()` はアップグレード済みソケットも、ハンドシェイクが終わっていない TLS ソケットも含まないため、サービスは両方を明示的に追跡する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `WebServer` service: route tables, fallback seat, index rendering, matching, TLS listener, lifecycle |
-| [`src/injections.ts`](src/injections.ts) | Structured `IndexInjection` rows and `renderIndexInjections` row rendering |
-| [`tests/tls-fixture.ts`](tests/tls-fixture.ts) | Generated TLS material for TLS-listener tests; another suite may materialize the same pair |
+| [`src/index.ts`](src/index.ts) | `WebServer` サービス: ルートテーブル、フォールバック席、インデックスレンダリング、マッチング、TLS リスナー、ライフサイクル |
+| [`src/injections.ts`](src/injections.ts) | 構造化された `IndexInjection` 行と `renderIndexInjections` による行レンダリング |
+| [`tests/tls-fixture.ts`](tests/tls-fixture.ts) | TLS リスナーのテスト用に生成される TLS 素材; 別のスイートが同じペアを具現化してもよい |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these when the server contract is not enough: the subsystem reference, then the fallback owner and the layering decision behind who registers which route.
+サーバー契約では不十分なときにこれらを読む: サブシステム参照、次にフォールバックの所有者と、誰がどのルートを登録するかの背後にあるレイヤリングの決定。
 
-- [HTTP server subsystem](../../../docs/subsystems/web-server.md) — routes, matching order, and the config the server accepts.
-- [SPA dist server](../frontend-static/README.md) — the shipped owner of the fallback seat.
-- [Web config-tree boot and transport layering](../../boot/app-boot/README.md) — why feature plugins own every route.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-host-webserver) — every accepted config field and its source declaration.
+- [HTTP サーバーサブシステム](../../../docs/subsystems/web-server.md) — ルート、マッチング順序、サーバーが受け入れる設定。
+- [SPA dist サーバー](../frontend-static/README.md) — フォールバック席の同梱の所有者。
+- [Web 設定ツリーのブートとトランスポートのレイヤリング](../../boot/app-boot/README.md) — なぜフィーチャープラグインがすべてのルートを所有するのか。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-host-webserver) — 受け入れられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the HTTP carrier bridges browser and API handler and registers nothing model-facing.
+なし。HTTP キャリアはブラウザーと API ハンドラーを橋渡しし、モデル向けのものは何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし; このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the server is intentionally minimal. They are current package constraints, not a task backlog.
+これらの制限は、サーバーが意図的に最小限である範囲を定義する。それらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **No certificate lifecycle** — `tls` serves the PEM files present at activation: the carrier never provisions, renews, or watches them, and it applies Node's default TLS policy. Replacing a certificate takes a reload.
-- **No server-wide authentication or origin policy** — route owners such as `dsh-client-connection` enforce their own request policy. Binding a non-loopback address still exposes unprotected routes and static assets to that network.
-- **Socket options are fixed** — config selects the bind host and port, while backlog and other socket settings remain internal until a deployment needs them.
+- **証明書ライフサイクルなし** — `tls` はアクティベーション時に存在する PEM ファイルを提供する: キャリアはそれらをプロビジョニング、更新、監視することは決してなく、Node のデフォルト TLS ポリシーを適用する。証明書の置き換えにはリロードが必要である。
+- **サーバー全体の認証または origin ポリシーなし** — `dsh-client-connection` などのルート所有者が自身のリクエストポリシーを強制する。非ループバックアドレスへのバインドは、保護されていないルートと静的アセットをそのネットワークに依然として公開する。
+- **ソケットオプションは固定** — 設定はバインドホストとポートを選択し、backlog とその他のソケット設定は、デプロイメントがそれを必要とするまで内部にとどまる。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-Two working notes, both non-authoritative:
+2 つの作業ノート。どちらも非権威である:
 
-- TLS test material is generated at test time (`tests/tls-fixture.ts`), never committed: GitHub push protection rejects PEM private keys even in tests, and the certificate is disposable anyway. The helper issues one self-signed localhost certificate per process, covering 127.0.0.1, `::1`, and `localhost`, and writes the key owner-only.
-- `selfsigned` stays on the 4.x line: 5.x installs two `@peculiar/asn1-schema` copies under pnpm, and its extension builder then throws for every `generate()` call.
+- TLS テスト素材はテスト時に生成され (`tests/tls-fixture.ts`)、コミットされることは決してない: GitHub の push 保護はテスト内であっても PEM 秘密鍵を拒否し、証明書はいずれにせよ使い捨てである。ヘルパーはプロセスごとに 1 つの自己署名 localhost 証明書を発行し、127.0.0.1、`::1`、`localhost` をカバーし、鍵を所有者のみ書き込みで書き出す。
+- `selfsigned` は 4.x 系にとどまる: 5.x は pnpm の下に `@peculiar/asn1-schema` のコピーを 2 つインストールし、その extension builder がすべての `generate()` 呼び出しで throw する。
 
 </details>

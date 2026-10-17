@@ -1,39 +1,39 @@
 ---
-description: "The model-facing todo_write tool over the DeepSeek Harness session log: whole-list replacement, per-session ownership, and the todos projection, for users and maintainers choosing, configuring, or debugging the tool."
+description: "DeepSeek Harness セッションログ上のモデル向け todo_write ツール: リスト全体の置き換え、セッションごとの所有権、todos プロジェクション。ツールを選択、構成、デバッグするユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-todo
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-tool-todo` gives the agent a structured task list to plan with: break multi-step work into concrete tasks, mark the task you are working on, and check tasks off as they finish. The list survives across turns and reopened sessions, so the agent and the UI always see the latest plan. One configuration flag decides whether several tasks may be in progress at once, for agents that run work in parallel. Use it wherever an agent should keep a visible task list; each update replaces the whole list, and only the owning agent session can change it.
+`dsh-tool-todo` はエージェントに計画のための構造化タスクリストを与える。多段階の作業を具体的なタスクに分解し、作業中のタスクをマークし、終わったタスクにチェックを付ける。リストはターンと再開されたセッションをまたいで生存するので、エージェントと UI は常に最新の計画を見る。1 つの設定フラグが、作業を並行実行するエージェントのために、複数のタスクを同時に進行中にしてよいかを決める。エージェントが可視のタスクリストを維持すべきあらゆる場所で使う。各更新はリスト全体を置き換え、所有エージェントセッションだけが変更できる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use this package when you want the agent to maintain a visible task list while it works: plan multi-step work, show what is active, and record completion. Mounting it with the parallelism flag is the only setup; the agent then updates the list through its own planning tool whenever the plan changes.
+エージェントが作業中に可視のタスクリストを維持してほしいときにこのパッケージを使う。多段階の作業を計画し、何がアクティブかを示し、完了を記録する。並行フラグ付きでマウントするのが唯一のセットアップである。その後は計画が変わるたびにエージェントが自身の計画ツールを通じてリストを更新する。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it when one agent session should own the task list and whole-list updates are fine — the common shape for planning tools. Avoid it when several agents must share one list or when you need per-item edits: the list belongs to one agent and every update replaces the whole list. It needs an agent session to exist at all; automation-only surfaces that never run an agent cannot use it.
+1 つのエージェントセッションがタスクリストを所有し、リスト全体の更新で問題ない場合 — 計画ツールの一般的な形 — にこれを選ぶ。複数のエージェントが 1 つのリストを共有しなければならない場合や、項目ごとの編集が必要な場合は避ける。リストは 1 つのエージェントに属し、すべての更新がリスト全体を置き換える。これが機能するにはエージェントセッションの存在が必須である。エージェントを一切実行しないオートメーション専用サーフェスはこれを使えない。
 
-### Minimal configuration
+### 最小構成
 
-`allowParallelInProgress` is required with no default: a composition that omits it fails at load, and a non-boolean value is rejected. Set `true` for agents that may run work concurrently (subagents, background commands, workflow fan-out) and `false` for the single-active discipline.
+`allowParallelInProgress` は既定値なしの必須である。これを省略した構成はロード時に失敗し、非ブール値は拒否される。作業を並行実行しうるエージェント（subagent、バックグラウンドコマンド、ワークフローファンアウト）には `true` を、シングルアクティブの規律には `false` を設定する。
 
 ```yaml
 - name: '@deepseek-ai/dsh-tool-todo'
@@ -41,131 +41,131 @@ Choose it when one agent session should own the task list and whole-list updates
     allowParallelInProgress: true
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `allowParallelInProgress` | required | Whether several todos may be `in_progress` at once; also selects the active-status clause of the model description |
+| `allowParallelInProgress` | required | 複数の todo が同時に `in_progress` になってよいか。モデル説明のアクティブステータス条項も選択する |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-todo) is the exhaustive source for the accepted field.
+生成された [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-todo) が受け入れられるフィールドの網羅的なソースである。
 
-### What each call does
+### 各呼び出しが行うこと
 
-The agent sends the ENTIRE list on every update; the new list replaces the previous one, so there are no partial updates or per-item edits. Each item is a short task description plus a status of `pending`, `in_progress`, or `completed`. A successful update returns the new counts — `Updated todo list: <pending> pending, <inProgress> in progress, <completed> completed.` — and the UI shows the new plan. Updates fail visibly when a task description is empty or duplicated, when an item carries fields beyond the description and status, or — when parallel work is disabled — when more than one task is marked in progress.
+エージェントは更新のたびにリスト全体を送信する。新しいリストが前のものを置き換えるので、部分更新や項目ごとの編集はない。各項目は短いタスク説明と、`pending`、`in_progress`、`completed` のいずれかのステータスからなる。成功した更新は新しいカウント — `Updated todo list: <pending> pending, <inProgress> in progress, <completed> completed.` — を返し、UI は新しい計画を表示する。更新は、タスク説明が空または重複している場合、項目が説明とステータス以外のフィールドを持つ場合、または並行作業が無効な場合に複数のタスクが進行中とマークされている場合に、目に見えて失敗する。
 
-### Single owner
+### 単一オーナー
 
-The task list belongs to the one agent session that created it — subagents and other agents each keep their own list, and there is no way to share a list between agents. A call from outside an agent session is rejected, so the agent learns the update failed instead of silently writing nowhere. If you need a list shared across agents, this package does not provide it.
+タスクリストはそれを作成した 1 つのエージェントセッションに属する。subagent とその他のエージェントはそれぞれ自分のリストを持ち、エージェント間でリストを共有する方法はない。エージェントセッション外からの呼び出しは拒否されるので、エージェントは黙ってどこにも書かれないのではなく、更新が失敗したことを知る。エージェント間で共有されるリストが必要なら、このパッケージはそれを提供しない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-This section explains the design decisions behind the tool and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節ではツール背後の設計判断とそれを実現するコードを説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱っている。
 
-### Design philosophy
+### 設計哲学
 
-The tool is built on four commitments:
+このツールは 4 つの約束の上に成り立っている:
 
-- **Whole-list replace, log-backed state.** The model resends the entire list; the `todo/write` snapshot lives on the event-sourced session log, so durability, replay, and resume reconstruction come from the log rather than a service.
-- **Single owner.** The list belongs to the calling agent session; there is no shared or swarm scope, and non-agent callers are rejected.
-- **Deployment policy, not a coded rule.** `allowParallelInProgress` is a required composition choice because the tool cannot observe runtime concurrency.
-- **Validation keeps the logged snapshot honest.** Schema-level rejection of unknown keys and `execute`-level rejection of empty or duplicate content keep the durable snapshot equal to what the model believes it wrote.
+- **リスト全体の置き換え、ログに支えられた状態。** モデルはリスト全体を再送する。`todo/write` スナップショットはイベントソースのセッションログ上にあり、durable 性、リプレイ、再開時の再構築はサービスではなくログから来る。
+- **単一オーナー。** リストは呼び出し元エージェントセッションに属する。共有スコープもスウォームスコープもなく、非エージェント呼び出し元は拒否される。
+- **コーディングされたルールではなくデプロイポリシー。** ツールは実行時の並行性を観察できないので、`allowParallelInProgress` は必須の構成選択である。
+- **検証がログのスナップショットを正直に保つ。** 不明なキーのスキーマレベルの拒否と、空または重複コンテンツの `execute` レベルの拒否により、durable スナップショットはモデルが書いたと信じているものと等しく保たれる。
 
-The [todo_write tool Agent Note](../../../.agents/notes/archived/feature/2026-06-29-todo-write-tool.md) records the original design and alternatives; the [parallel in-progress Agent Note](../../../.agents/notes/archived/feature/2026-07-26-todo-parallel-in-progress.md) records the policy decision.
+[todo_write ツール Agent Note](../../../.agents/notes/archived/feature/2026-06-29-todo-write-tool.md) が元の設計と代替案を記録し、[parallel in-progress Agent Note](../../../.agents/notes/archived/feature/2026-07-26-todo-parallel-in-progress.md) がポリシー決定を記録する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, tool registration, `todos` projection unit |
-| [`src/types.ts`](src/types.ts) | The one home of the `todos` projection-key declaration and its payload types |
-| [`src/client.ts`](src/client.ts) | Client-namespace re-export of the types outlet |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: `Config` スキーマ、ツール登録、`todos` プロジェクションユニット |
+| [`src/types.ts`](src/types.ts) | `todos` プロジェクションキー宣言とそのペイロード型の唯一の拠り所 |
+| [`src/client.ts`](src/client.ts) | types アウトレットのクライアント名前空間再エクスポート |
 
-### Export shape
+### エクスポート形状
 
-The plugin is a function/namespace plugin: it exports `name` / `inject` / `apply` and no default export. A stray `export default` would make the Loader's `unwrapExports` collapse the module and drop `inject` (see [postmortem 0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md)).
+このプラグインは関数／名前空間プラグインである。`name` / `inject` / `apply` をエクスポートし、デフォルトエクスポートを持たない。誤って `export default` があると、Loader の `unwrapExports` がモジュールを畳み込み、`inject` を落とす（[postmortem 0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md) を参照）。
 
-### Session projection
+### セッションプロジェクション
 
-When the composition mounts `ctx.sessionProjections` ([`@deepseek-ai/dsh-session-projection`](../../session/session-projection/README.md)), this package registers the `todos` unit on an injected child: the projection is the standing plan — the latest whole `todo/write` list, `null` before the first write, cleared when the next turn starts while `turn/end` keeps the finished checklist visible. The key merges into `SessionProjectionMap` here; carriers serve the value on the history tail page and the `session/projection` push frame. Compositions without the registry are unaffected; see [src/index.ts](src/index.ts) for the unit registration.
+構成が `ctx.sessionProjections`（[`@deepseek-ai/dsh-session-projection`](../../session/session-projection/README.md)）をマウントすると、このパッケージは注入された子に `todos` ユニットを登録する。プロジェクションは常設の計画である — 最新の `todo/write` リスト全体、最初の書き込み前は `null`、次のターンが始まるとクリアされるが、`turn/end` は終了したチェックリストを可視のまま保つ。キーはここで `SessionProjectionMap` にマージされる。キャリアは履歴テールページと `session/projection` プッシュフレームでその値を供給する。レジストリのない構成は影響を受けない。ユニット登録は [src/index.ts](src/index.ts) を参照。
 
-### Call mechanics
+### 呼び出しの仕組み
 
-Each call validates the submitted list against the schema, rejects incoherent input, and on success appends the full snapshot as a `todo/write` session event and returns the new counts; the current list is always the most recent `todo/write` in the log (last-write-wins on replay). See [src/index.ts](src/index.ts) for the exact validation and append steps.
+各呼び出しは送信されたリストをスキーマに対して検証し、整合しない入力を拒否し、成功すると完全なスナップショットを `todo/write` セッションイベントとして追記して新しいカウントを返す。現在のリストは常にログ内の最新の `todo/write` である（リプレイでは後書き優先）。正確な検証と追記のステップは [src/index.ts](src/index.ts) を参照。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the session subsystem to the generated catalogs and the decision records behind the tool.
+パッケージレベルのコントラクトでは足りないときにこれらのページを読む。セッションサブシステムから、生成されたカタログとツール背後の決定記録へ進む。
 
-- [Todo subsystem](../../../docs/subsystems/todo.md) — the `todo/write` event payload, ownership rules, and `TodoItem`.
-- [todo group map](../README.md) — the sibling group page and its package table.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-todo) — the `todo_write` schema the model receives.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-todo) — every accepted config field and its source declaration.
-- [todo_write tool Agent Note](../../../.agents/notes/archived/feature/2026-06-29-todo-write-tool.md) — the original design, alternatives, and dropped fields.
-- [parallel in-progress Agent Note](../../../.agents/notes/archived/feature/2026-07-26-todo-parallel-in-progress.md) — why the active-count cap is a deployment policy.
+- [Todo サブシステム](../../../docs/subsystems/todo.md) — `todo/write` イベントペイロード、所有権ルール、`TodoItem`。
+- [todo グループマップ](../README.md) — 兄弟グループページとそのパッケージ表。
+- [生成されたツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-todo) — モデルが受け取る `todo_write` スキーマ。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-todo) — 受け入れられるすべての設定フィールドとそのソース宣言。
+- [todo_write ツール Agent Note](../../../.agents/notes/archived/feature/2026-06-29-todo-write-tool.md) — 元の設計、代替案、脱落したフィールド。
+- [parallel in-progress Agent Note](../../../.agents/notes/archived/feature/2026-07-26-todo-parallel-in-progress.md) — アクティブ数の上限がなぜデプロイポリシーなのか。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Tool schema
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The model sees the generated [`todo_write` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-todo): an object with one required `todos` array of `{ content, status }` items, where `status` is `pending`, `in_progress`, or `completed`. The `todos` description states that each call replaces the whole list; the tool description's active-status clause follows `allowParallelInProgress`.
+モデルは生成された [`todo_write` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-todo) を見る。1 つの必須の `todos` 配列を持ち、その項目は `{ content, status }` で、`status` は `pending`、`in_progress`、`completed` のいずれかである。`todos` の説明は、各呼び出しがリスト全体を置き換えることを述べる。ツール説明のアクティブステータス条項は `allowParallelInProgress` に従う。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost on every request where the tool is visible; the description and schema are stable for a given configuration.
+ツールが可視のすべてのリクエストに固定スキーマコスト。説明とスキーマは所与の構成に対して安定している。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the definition and visibility are unchanged. Plugin lifecycle or scoped restrictions may invalidate reuse from this schema.
+定義と可視性が変わらない間はプレフィックス安定。プラグインライフサイクルまたはスコープ付き制限は、このスキーマからの再利用を無効化しうる。
 
-### Tool-call history and result
+### ツール呼び出し履歴と結果
 
-#### What the model sees
+#### モデルが見るもの
 
-Each assistant tool call retains the entire replacement list in its arguments. Success returns exactly `Updated todo list: <pending> pending, <inProgress> in progress, <completed> completed.` Stable failures are ``Error: invalid todo: `content` must be a non-empty string``, `Error: invalid todos: duplicate content "<content>"`, `Error: todo_write requires an owning agent session`, and — only where the deployment set `allowParallelInProgress: false` — `Error: invalid todos: at most one task may be in_progress (got <n>)`. The full `todo/write` session event is UI and replay state, not a second model message.
+各アシスタントツール呼び出しは、その引数に置き換えリスト全体を保持する。成功は正確に `Updated todo list: <pending> pending, <inProgress> in progress, <completed> completed.` を返す。安定した失敗は ``Error: invalid todo: `content` must be a non-empty string``、`Error: invalid todos: duplicate content "<content>"`、`Error: todo_write requires an owning agent session`、そして — デプロイが `allowParallelInProgress: false` を設定した場合にのみ — `Error: invalid todos: at most one task may be in_progress (got <n>)` である。完全な `todo/write` セッションイベントは UI とリプレイの状態であり、2 つ目のモデルメッセージではない。
 
-#### Token effect
+#### トークンへの影響
 
-Token growth scales with every full list the model submits, and those call arguments remain until compaction. The result itself is small and fixed-shape.
+トークン増加はモデルが送信するリスト全体ごとに比例し、それらの呼び出し引数は compaction まで残る。結果自体は小さく、形状が固定である。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the tool is a poor fit. They are current package constraints, not a task backlog.
+これらの制限は、ツールが適さない状況を定義する。現在のパッケージ制約であり、タスクバックログではない。
 
-- **Single-owner scope only** — the list belongs to the one calling agent session; subagent, shared, and swarm scopes are a deliberate cut, and a non-agent caller is rejected.
-- **The item shape is deliberately minimal** — `content` plus three-state `status`; whole-list replacement needs no stable id, priority, or active-form fields.
-- **Whole-list replacement is the only operation** — no partial updates, no read-back tool, and no per-item edits; the model must resend the entire list each call.
+- **単一オーナースコープのみ** — リストは呼び出し元の 1 つのエージェントセッションに属する。subagent、共有、スウォームのスコープは意図的なカットであり、非エージェント呼び出し元は拒否される。
+- **項目の形状は意図的に最小** — `content` と 3 状態の `status`。リスト全体の置き換えには安定 id、優先度、アクティブ形フィールドは不要である。
+- **リスト全体の置き換えが唯一の操作** — 部分更新、読み戻しツール、項目ごとの編集はない。モデルは呼び出しのたびにリスト全体を再送しなければならない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-This Dev Note is working context for maintainers: open questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発者ノートはメンテナー向けの作業コンテキストである。すなわち、未決の問いと決定されていない方向性である。これは明示的に非権威である。出荷済みの動作、制限、受け入れられた根拠は、上の節、パッケージコード、リンクされた Agent Notes にある。
 
-#### Future: cross-agent and shared lists
+#### 将来: エージェント横断と共有リスト
 
-The single-owner scope is a deliberate cut, and cross-agent or shared lists remain a separate future design: they would need per-item log deltas and explicit scope selection, and would change the model-visible contract. No design exists yet.
+単一オーナースコープは意図的なカットであり、エージェント横断または共有リストは別個の将来設計のままである。それらには項目ごとのログデルタと明示的なスコープ選択が必要になり、モデル可視のコントラクトを変えることになる。設計はまだ存在しない。
 
 </details>

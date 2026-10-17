@@ -1,12 +1,12 @@
 # Todo
 
-English | [中文](todo.zh.md)
+日本語 | [English](todo.en.md) | [中文](todo.zh.md)
 
-The durable todo vocabulary owned by [`@deepseek-ai/dsh-tool-todo`](../../packages/todo/tool-todo/README.md). The model-facing tool replaces one agent session's whole list; the package also owns the event declaration and replay projection. Tool behavior and configuration are on the [package README](../../packages/todo/tool-todo/README.md).
+[`@deepseek-ai/dsh-tool-todo`](../../packages/todo/tool-todo/README.md) が所有する永続的な todo 語彙。モデル向けツールは一つのエージェントセッションのリスト全体を置き換える。パッケージはイベント宣言とリプレイ投影も所有する。ツール動作と設定は [パッケージ README](../../packages/todo/tool-todo/README.md) にある。
 
-Source: [`packages/todo/tool-todo/src/types.ts`](../../packages/todo/tool-todo/src/types.ts)
+ソース: [`packages/todo/tool-todo/src/types.ts`](../../packages/todo/tool-todo/src/types.ts)
 
-## `TodoItem` — one list entry
+## `TodoItem` — 一つのリスト項目
 
 ```ts type-equiv
 /**
@@ -27,6 +27,6 @@ interface TodoItem {
 }
 ```
 
-## Durable event
+## 永続イベント
 
-The package declaration-merges `todo/write: { todos: TodoItem[] }` into `SessionEventMap`. The event is log-only and carries the complete replacement list; the generated [persistence catalog](../persistence-catalog.md#todowrite--log-only) records its declaration site.
+パッケージは `todo/write: { todos: TodoItem[] }` を `SessionEventMap` に宣言マージする。イベントはログのみであり、完全な置換リストを運ぶ。生成された [永続化カタログ](../persistence-catalog.md#todowrite--log-only) はその宣言箇所を記録する。

@@ -1,64 +1,64 @@
 ---
-description: "The one-shot Claude Code subagent provider for users and maintainers choosing a product backend, installing a Profile bundle, or configuring an unattended Claude Code delegation."
+description: "プロダクトバックエンドの選択、プロファイルバンドルのインストール、または無人 Claude Code 委譲の設定を行うユーザーとメンテナー向けの、ワンショット Claude Code サブエージェントプロバイダー。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-subagent-claude-code
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Install this Profile Bundle when a delegated task should run as a fresh, unattended Claude Code session in the parent workspace. Each run accepts one self-contained text task and returns the final answer or a safe failure diagnostic; reasoning, tool traffic, stderr, usage, and workspace diffs stay out of the parent Session. Native Claude settings and authentication remain authoritative, while Profile configuration selects the model, environment, and `permissionMode`. The platform-pinned runtime starts on demand and never falls back to the host `claude` executable. Choose it when isolation and genuine Claude Code behavior matter more than continuation or prompts.
+委譲されたタスクを、親ワークスペース内の新しい無人 Claude Code セッションとして実行したいときに、このプロファイルバンドルをインストールする。各実行は 1 つの自己完結したテキストタスクを受け付け、最終回答または安全な失敗診断を返す。推論、ツールトラフィック、stderr、使用量、ワークスペースの差分は親 Session に入らない。ネイティブの Claude 設定と認証が権威のままであり、プロファイル設定がモデル、環境、`permissionMode` を選択する。プラットフォーム固定のランタイムはオンデマンドで起動し、ホストの `claude` 実行ファイルに決してフォールバックしない。継続やプロンプトよりも分離と本物の Claude Code の振る舞いが重要な場合に選ぶ。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Enable **Claude Code subagent** in the Web or Desktop Plugins page when a task needs a fresh native Claude Code session in the parent workspace.
+タスクが親ワークスペース内の新しいネイティブ Claude Code セッションを必要とするとき、Web またはデスクトップの Plugins ページで **Claude Code subagent** を有効にする。
 
-### Installing the Bundle
+### バンドルのインストール
 
-The Official entry is visible offline. Enabling it installs the [target for the running DSH installation](../../boot/plugin-manager/README.md#use-this-package) through the ordinary bundle installer and selects its profile layer. The layer registers the provider and adds `subagent_claude_code` to every Agent as a global tool; it starts no native process until delegation. Restart when the installer reports that one is required.
+Official エントリーはオフラインでも表示される。有効にすると、通常のバンドルインストーラーを通じて[実行中の DSH インストール向けのターゲット](../../boot/plugin-manager/README.md#use-this-package)がインストールされ、そのプロファイルレイヤーが選択される。レイヤーはプロバイダーを登録し、`subagent_claude_code` をグローバルツールとしてすべてのエージェントに追加する。委譲までネイティブプロセスは起動しない。インストーラーが再起動が必要と報告したら再起動する。
 
-Switching Off deselects the layer and leaves the package installed. Remove is a separate package operation. Enabling or switching Off registers or removes the global tool in the running Host, so live Agents see the change on their next request.
+オフへの切り替えはレイヤーを選択解除し、パッケージはインストールされたままにする。削除は別個のパッケージ操作である。有効化またはオフへの切り替えは、実行中の Host でグローバルツールを登録または除去するため、ライブのエージェントは次のリクエストで変更を見る。
 
-The layer inserts Host rows only, so any profile can select it, including the shipped headless, SDK, and ACP profiles. Existing provider-only consumers follow the [upgrade guide](../../../docs/upgrade-guide/v0.2.1-alpha.1/native-subagent-bundle-tools/guide.md).
+このレイヤーは Host 行のみを挿入するため、同梱の headless、SDK、ACP プロファイルを含むどのプロファイルでも選択できる。プロバイダーのみの既存コンシューマーは[アップグレードガイド](../../../docs/upgrade-guide/v0.2.1-alpha.1/native-subagent-bundle-tools/guide.md)に従う。
 
-### Configuration
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `providerName` | `claude-code` | Non-empty registry name on `ctx.subagents`; each mounted instance needs a unique value |
-| `model` | native Claude settings | Optional non-empty model name fixed for every run from this provider instance; omission sends no SDK override |
-| `env` | `{}` | Explicit SDK/CLI environment layered over the credential-scrubbed parent environment |
-| `permissionMode` | `dontAsk` | Native non-interactive permission policy fixed for every run from this provider instance |
-| `disposeGraceMs` | `3000` | Grace between the shared managed-range owner's termination tiers |
+| `providerName` | `claude-code` | `ctx.subagents` 上の空でないレジストリ名。マウントされる各インスタンスには一意の値が必要 |
+| `model` | native Claude 設定 | このプロバイダーインスタンスからのすべての実行に固定される、任意の空でないモデル名。省略時は SDK 上書きを送らない |
+| `env` | `{}` | クレデンシャルを除去した親環境の上に重ねられる明示的な SDK/CLI 環境 |
+| `permissionMode` | `dontAsk` | このプロバイダーインスタンスからのすべての実行に固定されるネイティブの非対話権限ポリシー |
+| `disposeGraceMs` | `3000` | 共有マネージドレンジオーナーの終了段階間の猶予 |
 
-| `permissionMode` value | Native behavior |
+| `permissionMode` の値 | ネイティブの振る舞い |
 |---|---|
-| `dontAsk` | Deny operations that are not already authorized instead of prompting |
-| `acceptEdits` | Accept file edits; any remaining permission prompt is denied by the unattended callback |
-| `auto` | Let Claude Code's native classifier allow or deny permission requests |
-| `plan` | Run in native planning mode, deny execution approval, and return the completed plan as the final answer |
-| `bypassPermissions` | Explicitly set the SDK's dangerous confirmation and bypass permission checks |
+| `dontAsk` | すでに許可されていない操作を、プロンプトではなく拒否する |
+| `acceptEdits` | ファイル編集を承認する。残る権限プロンプトは無人コールバックによって拒否される |
+| `auto` | Claude Code のネイティブ分類器に権限リクエストの許可または拒否を委ねる |
+| `plan` | ネイティブのプランニングモードで実行し、実行承認を拒否し、完了したプランを最終回答として返す |
+| `bypassPermissions` | SDK の危険な確認を明示的に設定し、権限チェックをバイパスする |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-claude-code) is the exhaustive source for every accepted field and its JSDoc. A configured `model` passes unchanged to every query from that provider instance; omission leaves native model selection in force. Credential-shaped ambient variables are removed before the explicit `env` overlay, so an API key intended for the child must be supplied there. The provider omits the SDK `settingSources` option, so Claude Code reads the host's normal user, project, and local settings relative to the selected child working directory. It does not copy or filter those files, create or modify login state, inspect `PATH`, or fall back to a host `claude` executable.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-subagent-claude-code)が、受け入れられるすべてのフィールドとその JSDoc の網羅的な情報源である。設定された `model` はそのプロバイダーインスタンスからのすべてのクエリに変更なく渡され、省略時はネイティブのモデル選択が有効なままである。クレデンシャル形のアンビエント変数は明示的な `env` オーバーレイの前に除去されるため、子向けの API キーはそこで供給しなければならない。プロバイダーは SDK の `settingSources` オプションを省略するため、Claude Code は選択された子作業ディレクトリを基準に、ホストの通常のユーザー、プロジェクト、ローカル設定を読む。それらのファイルをコピーまたはフィルタリングせず、ログイン状態を作成または変更せず、`PATH` を検査せず、ホストの `claude` 実行ファイルにフォールバックしない。
 
 <a id="exposing-the-tool"></a>
-### Exposing the tool
+### ツールの公開
 
-The bundle inserts `tool-subagent-claude-code` as a Host row, so `subagent_claude_code` is a global tool visible to every preset, including minimal. Later user patches can configure or disable that row by id. A preset that registers its own tool with the same name shadows the global tool for its Agents. To mount the provider and tool without selecting the bundle layer, insert the same rows in `cordis.patch.yml`:
+バンドルは `tool-subagent-claude-code` を Host 行として挿入するため、`subagent_claude_code` は minimal を含むすべての preset に見えるグローバルツールである。後からのユーザーパッチは id でその行を構成または無効化できる。同じ名前で自身のツールを登録する preset は、そのエージェントにとってグローバルツールをシャドウする。バンドルレイヤーを選択せずにプロバイダーとツールをマウントするには、`cordis.patch.yml` に同じ行を挿入する:
 
 ```yaml
 - insert:
@@ -72,119 +72,119 @@ The bundle inserts `tool-subagent-claude-code` as a Host row, so `subagent_claud
         maxDepth: provider-managed
 ```
 
-The tool returns a child id after accepting the task and sends its result to the parent Agent on completion. Each external activation executes once and accepts no follow-up input or resume.
+ツールはタスクを受け入れた後に子 id を返し、完了時にその結果を親エージェントへ送る。各外部アクティベーションは 1 回だけ実行され、追加入力や再開を受け付けない。
 
-### What you get
+### 得られるもの
 
-The completion notice contains the final Claude Code answer, or the stop reason and optional safe diagnostic. The parent Session also retains the external task identity and complete terminal result independently of the notice; no local child Session is created. Product reasoning, tool activity, raw stderr, and workspace diffs do not enter the parent Session.
+完了通知には、最終的な Claude Code 回答、または停止理由と任意の安全な診断が含まれる。親 Session は通知とは独立に、外部タスクのアイデンティティと完全な終端結果も保持する。ローカルの子 Session は作成されない。プロダクトの推論、ツールアクティビティ、生の stderr、ワークスペースの差分は親 Session に入らない。
 
-### Failure and recovery
+### 失敗とリカバリー
 
-An install that omits optional dependencies, uses an unsupported platform, or loses the selected payload leaves the provider dormant and fails the first delegation at the SDK startup boundary with a safe `query-start` / `unknown` failure fact; there is no host-CLI fallback. The original product error stays on the internal cause chain and in the provider's Host log. A cancelled run settles as `aborted`.
+任意の依存関係を省いたインストール、サポートされないプラットフォーム、または選択されたペイロードの喪失は、プロバイダーを休眠させ、最初の委譲を SDK 起動境界で安全な `query-start` / `unknown` 失敗ファクトによって失敗させる。host-CLI フォールバックはない。元のプロダクトエラーは内部の原因チェーンとプロバイダーの Host ログに留まる。キャンセルされた実行は `aborted` として決着する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the provider drives a real Claude Code CLI and where the observable behavior comes from; the full contract lives in [Use this package](#use-this-package).
+この節は、プロバイダーが本物の Claude Code CLI をどのように駆動し、観測可能な振る舞いがどこから来るかを説明する。完全な契約は[このパッケージを使う](#use-this-package)にある。
 
-### Design concept
+### 設計概念
 
-- **One fresh query per run.** Every run has an independent SDK query, cancellation controller, CLI process, and non-persisted product session; there is no continuation, resume, or pooling.
-- **Native settings are authoritative.** The provider deliberately omits the SDK `settingSources` option, so Claude Code reads the host's normal user, project, and local settings; an optional `model` and the required `permissionMode` are the only query-level overrides.
-- **Unattended by design.** `AskUserQuestion` is disabled and permission prompts are denied except in bypass mode, so the query never waits for a user interface.
+- **実行ごとに新しいクエリを 1 つ。** すべての実行は独立した SDK クエリ、キャンセルコントローラー、CLI プロセス、非永続のプロダクトセッションを持つ。継続、再開、プーリングはない。
+- **ネイティブ設定が権威である。** プロバイダーは意図的に SDK の `settingSources` オプションを省略するため、Claude Code はホストの通常のユーザー、プロジェクト、ローカル設定を読む。任意の `model` と必須の `permissionMode` が唯一のクエリレベルの上書きである。
+- **設計上無人である。** `AskUserQuestion` は無効化され、バイパスモード以外では権限プロンプトが拒否されるため、クエリがユーザーインターフェースを待つことは決してない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config schema, provider registration |
-| [`src/run.ts`](src/run.ts) | The SDK query lifecycle, result acceptance, and permission handling |
-| [`src/process.ts`](src/process.ts) | Managed-range termination escalation on disposal |
-| [`cordis.patch.yml`](cordis.patch.yml) | The Profile layer that registers the provider and contributes preset delegation tools |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: 設定スキーマ、プロバイダー登録 |
+| [`src/run.ts`](src/run.ts) | SDK クエリのライフサイクル、結果受け入れ、権限処理 |
+| [`src/process.ts`](src/process.ts) | 破棄時のマネージドレンジ終了エスカレーション |
+| [`cordis.patch.yml`](cordis.patch.yml) | プロバイダーを登録し preset 委譲ツールを提供するプロファイルレイヤー |
 
-### Run flow
+### 実行フロー
 
-A start accepts only a non-empty sequence of text blocks and derives the child cwd from the parent session. It creates a private `AbortController`, calls the official SDK `query()` with the exact concatenated task, and publishes the run only after the SDK's custom-spawn hook has supplied a live CLI handle owned by the subprocess seam. The provider iterates the complete message stream and accepts only a `result` message with `subtype: "success"`, `is_error: false`, and a nonblank `result`, followed by normal iterator completion. Every other outcome maps to a fixed-category `error` diagnostic naming the lifecycle stage and observed process outcome — the category set lives in [`src/run.ts`](src/run.ts). Local cancellation wins the result race and maps to `aborted` without a failure diagnostic.
+start は空でないテキストブロックのシーケンスのみを受け付け、親セッションから子 cwd を導出する。プライベートな `AbortController` を作成し、正確に連結されたタスクで公式 SDK の `query()` を呼び出し、SDK のカスタムスポーンフックが subprocess シーム所有の生きた CLI ハンドルを供給した後にのみ実行を公開する。プロバイダーはメッセージストリーム全体を反復し、`subtype: "success"`、`is_error: false`、空でない `result` を持つ `result` メッセージに続く正常なイテレーター完了のみを受け入れる。他のすべての結果は、ライフサイクルステージと観測されたプロセス結果を名指す固定カテゴリーの `error` 診断にマップされる — カテゴリーセットは [`src/run.ts`](src/run.ts) にある。ローカルのキャンセルは結果レースに勝ち、失敗診断なしで `aborted` にマップされる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from this provider to the seam it plugs into and the sibling product provider.
+パッケージレベルの契約では足りないときにこれらのページを読む。このプロバイダーから、それが接続するシームと兄弟プロダクトプロバイダーへと進む。
 
-- [Subagent subsystem](../../../docs/subsystems/subagent.md) — the service contract, provider contract, and terminal result semantics.
-- [dsh-subagent seam](../subagent/README.md) — the registry and start API this provider registers on.
-- [Codex subagent provider](../subagent-codex/README.md) — the sibling product backend over the official app-server protocol.
-- [historical Claude Code and Codex backends](../../../.agents/notes/archived/feature/2026-08-04-claude-code-and-codex-subagent-backends.md) — the design record for the product providers.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-claude-code) — every accepted config field and its source declaration.
+- [Subagent サブシステム](../../../docs/subsystems/subagent.md) — サービス契約、プロバイダー契約、終端結果の意味論。
+- [dsh-subagent シーム](../subagent/README.md) — このプロバイダーが登録するレジストリと start API。
+- [Codex サブエージェントプロバイダー](../subagent-codex/README.md) — 公式 app-server プロトコル上の兄弟プロダクトバックエンド。
+- [歴史的な Claude Code と Codex バックエンド](../../../.agents/notes/archived/feature/2026-08-04-claude-code-and-codex-subagent-backends.md) — プロダクトプロバイダーの設計記録。
+- [生成される設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-subagent-claude-code) — 受け入れられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Child request
+### 子リクエスト
 
-#### What the model sees
+#### モデルが見るもの
 
-The Claude Code child receives the standalone text task as one fresh SDK query. Its workspace is the selected child working directory; the selected provider instance fixes the query's configured model, environment, and non-interactive permission mode, while an omitted model and every other product setting come from native Claude configuration. The executable version comes from the Bundle's pinned SDK platform payload.
+Claude Code の子は、スタンドアロンのテキストタスクを 1 つの新しい SDK クエリとして受け取る。そのワークスペースは選択された子作業ディレクトリである。選択されたプロバイダーインスタンスが、クエリの設定されたモデル、環境、非対話権限モードを固定する。省略されたモデルとその他のすべてのプロダクト設定は、ネイティブの Claude 設定から来る。実行可能ファイルのバージョンは、バンドルの固定された SDK プラットフォームペイロードから来る。
 
-#### Token effect
+#### トークンへの影響
 
-The child pays for an independent Claude Code context and query. Child tokens do not enter the parent's context.
+子は独立した Claude Code コンテキストとクエリのコストを支払う。子のトークンは親のコンテキストに入らない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Independent of the parent request cache. Reuse depends only on Claude Code's own model, instructions, tools, native settings, and fresh query.
+親リクエストのキャッシュとは独立である。再利用は Claude Code 自身のモデル、指示、ツール、ネイティブ設定、新しいクエリにのみ依存する。
 
-### Parent scheduling and results, indirectly
+### 親のスケジューリングと結果 (間接的)
 
-#### What the model sees
+#### モデルが見るもの
 
-Through `dsh-tool-subagent`, the parent model first receives a child id, then the final Claude Code answer or a failure notice with its stop reason and safe diagnostic. Diagnostics contain only fixed stage, category, and observed protocol or process facts. Product reasoning, intermediate messages, tool activity, stderr, usage, product identifiers, commands, paths, and raw protocol payloads are not copied into the parent Session.
+`dsh-tool-subagent` を通じて、親モデルはまず子 id を受け取り、次に最終的な Claude Code 回答か、停止理由と安全な診断を伴う失敗通知を受け取る。診断は、固定のステージ、カテゴリー、および観測されたプロトコルまたはプロセスのファクトのみを含む。プロダクトの推論、中間メッセージ、ツールアクティビティ、stderr、使用量、プロダクト識別子、コマンド、パス、生のプロトコルペイロードは親 Session にコピーされない。
 
-#### Token effect
+#### トークンへの影響
 
-Parent input grows by the start acknowledgement and completion notice, including the final answer or failure detail. Child tokens do not enter the parent context. This provider adds no parent tool schema by itself.
+親入力は、最終回答または失敗詳細を含む開始確認と完了通知の分だけ増える。子のトークンは親のコンテキストに入らない。このプロバイダー自体は親ツールスキーマを追加しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Start acknowledgements and completion notices append after the reusable parent request prefix. A notice may wake another turn without rewriting the existing prefix.
+開始確認と完了通知は、再利用可能な親リクエストプレフィックスの後に追記される。通知は既存のプレフィックスを書き換えることなく別のターンを起こしうる。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this provider is a poor fit or needs special operational care. They are current package constraints, not a general Claude Code comparison or a task backlog.
+これらの制限は、このプロバイダーが不向きになる場合や特別な運用上の注意を要する場合を定義する。現在のパッケージ制約であり、一般的な Claude Code 比較やタスクバックログではない。
 
-- **One fresh query and process per run** — there is no continuation, resume, pooling, progress stream, or product-session persistence.
-- **Static instance selection** — Profile rows fix provider names, optional models, and tool bindings; calls cannot choose or change either a provider or model dynamically, and every exposed tool needs a unique `toolName`.
-- **Host settings are intentionally authoritative** — when `model` is omitted, project and user settings choose it; native settings always retain the remaining tools and behavior, and the provider does not provide a filtered or hermetic production mode.
-- **Authentication and account state remain native** — the Bundle supplies the CLI but does not create an account, log in, or rewrite Claude settings; configuration and authentication failures surface with their lifecycle stage and the safe `unknown` fallback rather than a separate public classification.
-- **The SDK platform payload is required at delegation time** — installs that omit optional dependencies, unsupported platforms, and missing or damaged payloads fail at the first query; there is no host-CLI fallback.
-- **No human interaction path** — `AskUserQuestion` is disabled, permission prompts are denied, MCP elicitation is declined, and blocking dialogs fail closed instead of suspending.
-- **Assistant payload is final text only** — failed runs can also expose a separate safe diagnostic; reasoning, intermediate messages, tool traffic, usage, stderr, and workspace diffs remain outside the parent Session. Task identity and terminal results are retained in the parent log.
-- **No optional shared capabilities** — `agentPreset`, `agentOptions`, output schemas, and harness depth enforcement are rejected by the shared service for this provider.
-- **No wall-clock timeout or side-effect rollback** — the caller cancels long work, and files or external systems changed before cancellation are not restored.
+- **実行ごとに新しいクエリとプロセスを 1 つずつ** — 継続、再開、プーリング、進捗ストリーム、プロダクトセッションの永続化はない。
+- **静的なインスタンス選択** — プロファイル行がプロバイダー名、任意のモデル、ツールバインディングを固定する。呼び出しはプロバイダーやモデルを動的に選択または変更できず、公開されるすべてのツールには一意の `toolName` が必要である。
+- **Host 設定は意図的に権威である** — `model` を省略した場合、プロジェクトとユーザー設定がそれを選ぶ。ネイティブ設定は常に残りのツールと振る舞いを保持し、プロバイダーはフィルタリングされたまたはハーメティックなプロダクションモードを提供しない。
+- **認証とアカウント状態はネイティブのままである** — バンドルは CLI を供給するが、アカウント作成、ログイン、Claude 設定の書き換えは行わない。設定と認証の失敗は、別個の公開分類ではなく、そのライフサイクルステージと安全な `unknown` フォールバックとして現れる。
+- **委譲時に SDK プラットフォームペイロードが必要である** — 任意の依存関係を省いたインストール、サポートされないプラットフォーム、欠落または破損したペイロードは最初のクエリで失敗する。host-CLI フォールバックはない。
+- **人間のインタラクション経路はない** — `AskUserQuestion` は無効化され、権限プロンプトは拒否され、MCP elicitation は拒否され、ブロッキングダイアログは中断せずにフェイルクローズする。
+- **assistant ペイロードは最終テキストのみである** — 失敗した実行は別個の安全な診断も公開しうる。推論、中間メッセージ、ツールトラフィック、使用量、stderr、ワークスペース差分は親 Session の外に留まる。タスクのアイデンティティと終端結果は親ログに保持される。
+- **オプションの共有ケイパビリティはない** — `agentPreset`、`agentOptions`、出力スキーマ、harness の深さエンフォースメントは、このプロバイダーに対して共有サービスによって拒否される。
+- **ウォールクロックタイムアウトや副作用ロールバックはない** — 長時間の作業をキャンセルするのは呼び出し元であり、キャンセル前に変更されたファイルや外部システムは復元されない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
+この開発者ノートはメンテナー向けの作業コンテキストである: 未解決の問いと未決定の方針。これは明示的に権威を持たない — 出荷済みの振る舞いと制限は、上記の節とパッケージコードにある。
 
-- **Payload size disclosure** — the current darwin-arm64 platform payload packs to about 92 MB and unpacks to about 325 MB; these are disclosure numbers, not installation thresholds.
-- **Version-pinned protocol** — the runtime dependency is pinned to Agent SDK 0.3.263; upgrading pins a new SDK version and requires re-running the keyless real-product and loader-composition evidence.
+- **ペイロードサイズの開示** — 現在の darwin-arm64 プラットフォームペイロードは約 92 MB にパックされ、約 325 MB に展開される。これらは開示の数値であり、インストールの閾値ではない。
+- **バージョン固定のプロトコル** — ランタイム依存関係は Agent SDK 0.3.263 に固定されている。アップグレードは新しい SDK バージョンの固定と、キーなし実プロダクトおよびローダーコンポジションの証拠の再実行を必要とする。
 
 </details>

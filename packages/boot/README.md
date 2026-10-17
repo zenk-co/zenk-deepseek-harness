@@ -1,45 +1,45 @@
 ---
-description: "The boot package group: how dsh app bins start — environment loading, profile and patch layers, clear startup failures, and app-owned command lines."
+description: "dsh アプリバイナリーの起動方法を束ねる boot パッケージグループ: 環境読み込み、プロファイルとパッチ層、明確な起動失敗、アプリ所有のコマンドライン。"
 kind: "package-group"
 ---
 
-# boot/ — shared app-bin boot glue
+# boot/ — 共有アプリバイナリー起動処理
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The boot group launches profile applications and manages their installed composition. `app-boot` resolves configuration and starts the Loader, `cmdline` supplies application arguments, and `plugin-manager` exposes current-profile operations shared with the CLI. Each package README owns its details.
+boot グループはプロファイルアプリケーションを起動し、そのインストール済み構成を管理する。`app-boot` は設定を解決して Loader を起動し、`cmdline` はアプリケーション引数を提供し、`plugin-manager` は CLI と共有する現在プロファイル操作を公開する。各パッケージの詳細は各パッケージ README が所有する。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発ノート](#dev-note)
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`app-boot`](app-boot/README.md) | Boots a dsh app from a `cordis.yml`: loads `.env`, applies profile and patch layers, and reports startup failures clearly | (library for the bins) |
-| [`cmdline`](cmdline/README.md) | Lets the app own its flags, `--help`, and exit code; passes everything after the launcher's flags through verbatim | `cmdlineArgs`, `appExit` |
-| [`hmr`](hmr/README.md) | Coordinates module and configuration reloads with package mutations | `hmr` |
-| [`config-editor`](config-editor/README.md) | Persists active profile configuration through Loader reconciliation | `configEditor` |
-| [`plugin-manager`](plugin-manager/README.md) | Manages current-profile plugins and bundle packages through shared CLI operations | `pluginManager` |
-| [`plugin-market`](plugin-market/README.md) | Reads the plugin market indexes the user configures for Discover and the `plugin_market` tool | `pluginMarket` |
+| [`app-boot`](app-boot/README.md) | `cordis.yml` から dsh アプリを起動する。`.env` を読み込み、プロファイルとパッチ層を適用し、起動失敗を明確に報告する（バイナリー向けライブラリー） | (バイナリー向けライブラリー) |
+| [`cmdline`](cmdline/README.md) | アプリがフラグ、`--help`、終了コードを所有できるようにする。ランチャーのフラグより後ろのすべてをそのまま渡す | `cmdlineArgs`、`appExit` |
+| [`hmr`](hmr/README.md) | パッケージ変更に伴うモジュールと設定のリロードを調整する | `hmr` |
+| [`config-editor`](config-editor/README.md) | Loader 照合経由で有効なプロファイル設定を永続化する | `configEditor` |
+| [`plugin-manager`](plugin-manager/README.md) | 共有 CLI 操作経由で現在プロファイルのプラグインとバンドルパッケージを管理する | `pluginManager` |
+| [`plugin-market`](plugin-market/README.md) | Discover と `plugin_market` ツール向けにユーザーが設定したプラグインマーケットインデックスを読む | `pluginMarket` |
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [dsh app](../../apps/cli/README.md) — the `dsh` bin that consumes these helpers for its boot sequence.
-- [Profile bundles](../bundle/README.md) — installable patch layers that `dsh --profile` compositions mount.
-- [dsh-home-paths](../util/home-paths/README.md) — the harness-home resolver both packages build on.
-- [dsh-cmdline](cmdline/README.md) — how an app owns its flag family instead of the launcher.
+- [dsh アプリ](../../apps/cli/README.md) — 起動シーケンスにこれらのヘルパーを消費する `dsh` バイナリー。
+- [プロファイルバンドル](../bundle/README.md) — `dsh --profile` 構成がマウントするインストール可能なパッチ層。
+- [dsh-home-paths](../util/home-paths/README.md) — 両パッケージが構築するハーネスホーム解決。
+- [dsh-cmdline](cmdline/README.md) — ランチャーではなくアプリがフラグ体系を所有する仕組み。
 
-- [Profile management](../../docs/subsystems/boot.md) — service methods and result records.
+- [プロファイル管理](../../docs/subsystems/boot.md) — サービスメソッドと結果レコード。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
-None.
+なし。

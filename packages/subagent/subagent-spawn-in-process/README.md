@@ -1,39 +1,39 @@
 ---
-description: "In-process spawn subagent backend for users and maintainers choosing, configuring, or debugging fresh-child delegation."
+description: "新鮮な子への委譲を選択・構成・デバッグするユーザーとメンテナー向けのインプロセス spawn サブエージェントバックエンド。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-subagent-spawn-in-process
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-subagent-spawn-in-process` is an in-process subagent backend: it runs each delegated task in a fresh child agent that shares this process and its agent factory, LLM, and tool services. The child starts with an empty conversation, so a task prompt must stand alone; it inherits the parent's working directory, session lineage, provider, model, reasoning effort, and output-token limit unless `request.agentOptions` overrides them. A delegation tool or API call reaches it under the `spawn` provider name. Choose it for the cheapest delegation transport; choose the fork backend when the child must build on the parent's completed conversation turns.
+`dsh-subagent-spawn-in-process` はインプロセスサブエージェントバックエンドである。委譲された各タスクを、このプロセスとそのエージェントファクトリー・LLM・ツールサービスを共有する新鮮な子エージェントで実行する。子は空の会話で開始するため、タスクプロンプトは単独で成立しなければならない。`request.agentOptions` 上書きがない限り、親の作業ディレクトリ・セッション lineage・プロバイダー・モデル・reasoning effort・出力トークン上限を継承する。委譲ツールや API 呼び出しは `spawn` プロバイダー名下でそこに届く。最も安い委譲輸送に選ぶ。子が親の完了会話ターン上に構築しなければならない場合は fork バックエンドを選ぶ。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this backend in a composition that delegates work to fresh in-process children. The common path is explicit: load the subagent service and this backend, then point a delegation tool such as `dsh-tool-subagent` at the `spawn` provider.
+新鮮なインプロセス子へ作業を委譲する構成に、このバックエンドをマウントする。通常パスは明示的である。サブエージェントサービスとこのバックエンドを読み込み、次に `dsh-tool-subagent` のような委譲ツールを `spawn` プロバイダーへ向ける。
 
-### When to choose it
+### 選ぶ場合
 
-Choose the spawn backend when the child needs no parent conversation and running in this process is acceptable. Avoid it when the child must build on completed parent turns — the fork backend seeds that history — or when the child must run outside this process, which the out-of-process backends provide. Because the child inherits the parent's working directory and LLM selection by default, a self-contained prompt behaves exactly as written.
+子が親会話を必要とせず、このプロセス内実行が許容できる場合に spawn バックエンドを選ぶ。子が完了済み親ターン上に構築しなければならない場合（その履歴を fork バックエンドが植える）や、子がこのプロセス外で実行しなければならない場合（プロセス外バックエンドが提供する）は避ける。子が既定で親の作業ディレクトリと LLM 選択を継承するため、自己完結プロンプトは書かれたとおりに振る舞う。
 
-### Minimal configuration
+### 最小構成
 
-Load the subagent service and this backend, then configure one delegation tool per target. This is the smallest composition that exposes a `subagent` tool backed by spawn:
+サブエージェントサービスとこのバックエンドを読み込み、次に対象ごとに委譲ツールを 1 件構成する。これは spawn 支援の `subagent` ツールを公開する最小構成である。
 
 ```yaml
 - name: '@deepseek-ai/dsh-subagent'
@@ -43,108 +43,107 @@ Load the subagent service and this backend, then configure one delegation tool p
     provider: spawn
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `providerName` | `spawn` | Provider name registered on `ctx.subagents` |
+| `providerName` | `spawn` | `ctx.subagents` に登録されるプロバイダー名 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-spawn-in-process) is the exhaustive source for every accepted field and its JSDoc.
+生成された[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-subagent-spawn-in-process)は受け入れるすべてのフィールドとその JSDoc の網羅的ソースである。
 
-### What a delegation does
+### 委譲が行うこと
 
-One tool call creates a background child and returns its session id immediately. The child works in its own session; the parent receives its final answer in a completion notice. The child can also send messages through `send_message`. A rejected start leaves no published child. Programmatic callers such as workflows can await the activation result directly.
-
-An explicit `agentPreset` selects the currently registered preset independently; omission joins the parent's active revision. Only spawn supports this choice. Persona and tools belong in the [preset definition](../../preset/agent-preset-registry/README.md). Cold resume follows the shared [child composition rules](../subagent/README.md#restoring-child-composition).
+1 ツール呼び出しはバックグラウンド子を作り、そのセッション id をただちに返す。子は自身のセッションで働き、親は完了通知で最終回答を受け取る。子は `send_message` 経由でもメッセージを送れる。拒まれた開始は公開子を残さない。ワークフローのようなプログラム呼び出し元は有効化結果を直接 await できる。
+明示的 `agentPreset` は現在登録済みプリセットを独立に選択する。省略時は親の有効リビジョンに join する。この選択に対応するのは spawn のみである。persona とツールは[プリセット定義](../../preset/agent-preset-registry/README.md)に属する。コールド再開は共有[子構成ルール](../subagent/README.md#restoring-child-composition)に従う。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains provider preparation and the activation lifecycle owned by the subagent service.
+このセクションではプロバイダー準備とサブエージェントサービスが所有する有効化ライフサイクルを説明する。
 
-### Design concept
+### 設計概念
 
-This backend registers the provider and prepares a fresh child session. `dsh-subagent` owns activation depth checks, child creation, preset composition, structured output, result collection, and disposal. The caller signal cancels unpublished creation; the published handle cancels and reaches quiescence through `dispose()`.
+このバックエンドはプロバイダーを登録し、新鮮な子セッションを準備する。`dsh-subagent` は有効化深度検査、子生成、プリセット合成、構造化出力、結果収集、破棄を所有する。呼び出し元信号は未公開生成を取り消し、公開ハンドルは `dispose()` 経由で取り消して静穏に達する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Provider registration: `Config` schema, capability declaration, `prepareContinuable()` |
+| [`src/index.ts`](src/index.ts) | プロバイダー登録: `Config` スキーマ、ケイパビリティ宣言、`prepareContinuable()` |
 
-### Run flow
+### 実行フロー
 
-`startActivation()` resolves the provider and calls `prepareContinuable()`, then creates and publishes the child. Structured output is attached separately for each activation. Callers can await `result` and use `dispose()` to wait for the entire child subtree to reach quiescence.
+`startActivation()` はプロバイダーを解決して `prepareContinuable()` を呼び、次に子を生成・公開する。構造化出力は有効化ごとに別々に付随する。呼び出し元は `result` を await でき、`dispose()` で子サブツリー全体が静穏に達するのを待てる。
 
-### Ownership and scope
+### 所有権とスコープ
 
-The child has its own registration scope below the inherited or independently selected preset. The parent's agent-local tool restrictions are not imported. The backend advertises `agentPreset` and `agentOptions` alongside its other start-time capabilities; the subagent manager applies them during child creation.
+子は継承または独立選択プリセットの下に自身の登録スコープを持つ。親のエージェントローカルツール制限は import されない。バックエンドは他の開始時ケイパビリティと並んで `agentPreset` と `agentOptions` を広告し、サブエージェントマネージャーは子生成中にそれらを適用する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough; they move from the shared subagent model to the sibling backends and exhaustive configuration.
+パッケージレベルの契約では足りないときに、これらのページを読む。共有サブエージェントモデルから兄弟バックエンドと網羅的構成へと進む。
 
-- [Subagent subsystem](../../../docs/subsystems/subagent.md) — start requests, results, live runs, and the provider contract.
-- [dsh-subagent-fork-in-process](../subagent-fork-in-process/README.md) — the sibling backend that seeds completed parent turns.
-- [dsh-tool-subagent](../tool-subagent/README.md) — the model-facing delegation tool that reaches this provider.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-spawn-in-process) — every accepted config field and its source declaration.
+- [サブエージェントサブシステム](../../../docs/subsystems/subagent.md) — 開始要求、結果、ライブ実行、プロバイダー契約。
+- [dsh-subagent-fork-in-process](../subagent-fork-in-process/README.md) — 完了済み親ターンを植える兄弟バックエンド。
+- [dsh-tool-subagent](../tool-subagent/README.md) — このプロバイダーに届くモデル向け委譲ツール。
+- [生成構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-subagent-spawn-in-process) — 受け入れるすべての構成フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Child-agent request
+### 子エージェント要求
 
-#### What the model sees
+#### モデルが見るもの
 
-The fresh child receives the task content verbatim as its only user message in a new empty conversation, with the parent provider, model, reasoning effort, output-token limit, and working directory by default. The inherited or selected preset supplies tools and prompt sections. No parent conversation message is included.
+新鮮な子はタスク内容を逐語でその唯一のユーザーメッセージとして新しい空の会話で受け取り、既定で親プロバイダー・モデル・reasoning effort・出力トークン上限・作業ディレクトリを伴う。継承または選択プリセットがツールとプロンプト節を供給する。親会話メッセージは含まれない。
 
-#### Token effect
+#### トークンへの影響
 
-The child pays for a new independent context and history, and no parent-history token is duplicated. The preset's prompt and tools determine repeated prompt, schema, and generated SDK costs.
+子は新しい独立コンテキストと履歴の代価を払い、親履歴トークンの重複はない。プリセットのプロンプトとツールが繰り返しプロンプト・スキーマ・生成 SDK コストを決める。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The child's request cache is independent of the parent's. Child history grows append-only, while preset, generated-SDK, provider, or model changes establish a different child prefix.
+子のリクエストキャッシュは親から独立である。子履歴は追記専用に成長し、プリセット・生成 SDK・プロバイダー・モデル変更は異なる子プレフィックスを確立する。
 
-### Parent tool result, indirectly
+### 親ツール結果、間接的に
 
-#### What the model sees
+#### モデルが見るもの
 
-Through `dsh-tool-subagent`, the parent first receives the child session id, then a completion notice with its final answer. Child-authored messages arrive through `send_message`. Internal child tool calls remain in the child session.
+`dsh-tool-subagent` 経由で、親はまず子セッション id を受け、次に最終回答付き完了通知を受ける。子作成メッセージは `send_message` 経由で届く。内部の子ツール呼び出しは子セッションに残る。
 
-#### Token effect
+#### トークンへの影響
 
-Parent input grows by one data-dependent result, retained until compaction.
+親入力はデータ依存の結果 1 件分成長し、コンパクションまで保持される。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用である。新しく可視になる内容は再利用可能なリクエストプレフィックスの後に続き、既存 KV キャッシュエントリを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the backend is the wrong choice; they are current package constraints.
+バックエンドが誤った選択である場合を定める。これらは現在のパッケージ制約である。
 
-- **Fresh means no parent transcript** — the child inherits cwd, lineage, provider, model, reasoning effort, and output-token limit, but none of the parent's conversation; use the fork backend when completed-turn context is required.
+- **新鮮とは親 transcript なしを意味する** — 子は cwd、lineage、プロバイダー、モデル、reasoning effort、出力トークン上限を継承するが、親会話は継承しない。完了ターン文脈が必要な場合は fork バックエンドを使う。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

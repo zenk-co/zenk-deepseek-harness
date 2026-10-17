@@ -1,107 +1,107 @@
 ---
-description: "Shell layout for the Web GUI: the three-column AppFrame whose right column is a track for an edge-anchored panel, the panel-geometry service, and theme presentation; for users and maintainers of the window chrome."
+description: "Web GUI のシェルレイアウト: 右カラムがエッジ固定パネルのトラックである 3 カラム AppFrame、パネルジオメトリサービス、テーマプレゼンテーション。ウィンドウクロームのユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-layout
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package provides the Web GUI's three-column AppFrame, edge-column widths, and `ctx.layout` presentation control. The right column concedes space before the center; its occupant renders fullscreen while the frame retains the wide-screen track underneath. The theme presenter owns color scheme, alias tokens, font sizes, font lists, and document metadata. Layout state resets on reload.
+このパッケージは Web GUI の 3 カラム AppFrame、エッジカラムの幅、`ctx.layout` プレゼンテーション制御を提供する。右カラムは中央より先にスペースを譲る。その占有者はフルスクリーンでレンダリングし、その間フレームは下層にワイドスクリーン用トラックを保持する。テーマプレゼンターはカラースキーム、エイリアストークン、フォントサイズ、フォントリスト、ドキュメントメタデータを所有する。レイアウト状態はリロードでリセットされる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Desktop Mod+B toggles the left sidebar through the same layout action used by its controls. The shortcut command is unavailable behind modal dialogs and yields to terminal input.
+デスクトップの Mod+B は、そのコントロールが使うのと同じレイアウトアクションを通じて左サイドバーを切り替える。このショートカットコマンドはモーダルダイアログの背後では利用できず、ターミナル入力に譲る。
 
-The root slot composes the sidebar, main content, and right column. The sidebar spans 264–420px, defaults to 280px, and retains a 56px rail when collapsed; below 1024px it collapses automatically, and opening the right panel collapses a manually expanded sidebar. The right panel first opens at 45% of the viewport, then retains the user's pixel preference, capped at 70%. To protect 400px for the center, the frame first reduces the right panel to 300px, then reports insufficient room so its occupant closes it, and only then compresses the center further. Dragging has no transition delay; the right handle is absent while closed or fullscreen.
+ルートスロットはサイドバー、メインコンテンツ、右カラムを構成する。サイドバーは 264～420px にわたり、デフォルトは 280px、折りたたみ時は 56px のレールを保持する。1024px 未満では自動的に折りたたまれ、右パネルを開くと手動で展開したサイドバーが折りたたまれる。右パネルは最初にビューポートの 45% で開き、その後はユーザーのピクセル指定値を保持し、上限は 70% である。中央のために 400px を保護するため、フレームはまず右パネルを 300px に縮め、次にスペースが不十分であると報告してその占有者が右パネルを閉じ、その後にのみ中央をさらに圧縮する。ドラッグにはトランジション遅延がない。右ハンドルは閉じている間またはフルスクリーン中は存在しない。
 
-Global panels occupy the root-scoped `main` keyed slot; `conversation` is the reserved key for the Conversation. `ctx.layout.selectPanel(id)` selects a registered panel, and `null` selects the Conversation without changing the current Session. The Plugins page contributes one of the shipped global panels.
+グローバルパネルはルートスコープの `main` キー付きスロットを占める。`conversation` は Conversation 用の予約キーである。`ctx.layout.selectPanel(id)` は登録済みパネルを選択し、`null` は現在の Session を変えずに Conversation を選択する。Plugins ページは同梱のグローバルパネルの 1 つを提供する。
 
-The single root-scoped `shell.bottom` slot spans the full width below the three columns. Its occupant controls its own height and visibility; the columns shrink by that height, and empty content reserves no space. Main-panel navigation preserves the bottom component. Column resize handles stop above it, while `shell.overlay` covers the whole frame. The default composition leaves this slot empty.
+単一のルートスコープスロット `shell.bottom` は 3 カラムの下の全幅に広がる。その占有者が自身の高さと可視性を制御し、カラムはその高さの分だけ縮小し、空のコンテンツはスペースを予約しない。メインパネルのナビゲーションはボトムコンポーネントを保持する。カラムのリサイズハンドルはその上で停止し、`shell.overlay` はフレーム全体を覆う。デフォルトの構成ではこのスロットは空のままである。
 
 <a id="window-chrome-seat"></a>
-### Window-chrome seat
+### ウィンドウクロームの座席
 
-On macOS desktop (`html[data-platform='darwin']`, set only by the desktop preload) a collapsed sidebar hides its column entirely instead of keeping the rail, and the frame mounts the single root-scoped `shell.leading` seat at its top-left — beside the hiddenInset traffic lights, over every main panel; ui-sidebar occupies it with the reopen and New Session controls. While the seat is mounted the frame publishes `--dsh-frame-leading-clearance`, the inline band the window chrome occupies measured from the frame's left edge; a main panel whose content reaches the top-left corner pads by it so nothing lands under the lights or the controls. The frame also always publishes `--dsh-frame-top-clearance` (48px) on the root element, the constant step below the window's top strip; entry pages in the main panel (plugin manager and similar, not the conversation) pad their top by it. The frame declares no darwin drag of its own: every chrome row marks itself `data-window-drag`, ui-web base.css turns that mark into the one darwin drag rule, and the row's own box is therefore the window's draggable geometry — a row's blank runs drag while its controls stay clickable. The frame's remaining drag rule is the Windows caption row, which belongs to that platform.
+macOS デスクトップ（`html[data-platform='darwin']`、デスクトップ preload だけが設定する）では、折りたたまれたサイドバーはレールを保持せずにカラムを完全に隠し、フレームは単一のルートスコープ座席 `shell.leading` を左上にマウントする — hiddenInset のトラフィックライトの隣、すべてのメインパネルの上である。ui-sidebar が再オープンと New Session のコントロールでそれを占める。座席がマウントされている間、フレームは `--dsh-frame-leading-clearance` を発行する。これはウィンドウクロームが占める、フレームの左端から測ったインラインバンドである。コンテンツが左上隅に達するメインパネルは、ライトやコントロールの下に何も来ないよう、それだけパディングする。フレームはさらに、ルート要素上で常に `--dsh-frame-top-clearance`（48px）を発行する。これはウィンドウ上部ストリップの下の一定の段差であり、メインパネルのエントリーページ（plugin manager など、conversation ではない）はその分だけ上部をパディングする。フレーム自身は darwin のドラッグを宣言しない。すべてのクローム行が自身を `data-window-drag` とマークし、ui-web base.css がそのマークを唯一の darwin ドラッグ規則に変換するので、その行自身のボックスがウィンドウのドラッグ可能なジオメトリになる — 行の空白はドラッグし、そのコントロールはクリック可能なままである。フレームに残るドラッグ規則は Windows キャプション行であり、これはそのプラットフォームに属する。
 
-Windows Electron's `data-windows-titlebar` marker reserves the caption height above all columns and removes the collapsed sidebar rail. Only the content area's top-left corner has a 16px radius; the other corners and the internal divider remain square. The frame publishes `--dsh-windows-content-radius` and `--dsh-windows-sidebar-width` for ui-sidebar-right's fullscreen corner and sidebar clearance. Ordinary Web documents do not receive the marker; macOS retains its separate layout.
+Windows Electron の `data-windows-titlebar` マーカーはすべてのカラムの上にキャプションの高さを予約し、折りたたまれたサイドバーのレールを取り除く。コンテンツ領域の左上隅だけが 16px の半径を持ち、他の隅と内部ディバイダーは直角のままである。フレームは ui-sidebar-right のフルスクリーン隅とサイドバークリアランスのために `--dsh-windows-content-radius` と `--dsh-windows-sidebar-width` を発行する。通常の Web ドキュメントはこのマーカーを受け取らない。macOS は独自の別レイアウトを保持する。
 
-The root publishes `--dsh-frame-top-clearance` for the reserved strip (48px on macOS, the caption height on Windows), and `--dsh-frame-overlay-top` adds 20px for dialogs and menus. Native fullscreen reduces the overlay inset to 20px; dialogs retain their own 24px minimum. `--dsh-frame-chrome-top` excludes the Windows caption from modal mask painting and becomes zero in fullscreen. The full-viewport modal layer still blocks background clicks. Plain browser documents publish none of these values.
+ルートは予約ストリップ（macOS では 48px、Windows ではキャプションの高さ）のために `--dsh-frame-top-clearance` を発行し、`--dsh-frame-overlay-top` はダイアログとメニューのために 20px を加える。ネイティブフルスクリーンはオーバーレイのインセットを 20px に減らす。ダイアログは自身の 24px の最小値を保持する。`--dsh-frame-chrome-top` は Windows キャプションをモーダルマスクの描画から除外し、フルスクリーンではゼロになる。フルビューポートのモーダルレイヤーは依然として背景クリックをブロックする。通常のブラウザドキュメントはこれらの値を一切発行しない。
 
-### Theme presentation
+### テーマプレゼンテーション
 
-The presenter consumes resolved theme snapshots and projects them onto the document: `html { color-scheme }` for native UA chrome, `body[data-ds-dark-theme]` from the active color scheme, the theme's alias tokens, `--dsh-content-font-size`, `--dsh-code-font-size`, `--dsh-terminal-font-size`, and each non-empty `--dsh-font-family-<role>` list as inline variables on body, and one owned `<meta name="theme-color">` whose content follows the computed body background. Disposing the presenter removes its metadata node with its other global writes.
+プレゼンターは解決済みのテーマスナップショットを消費し、それらをドキュメントに投影する: ネイティブ UA クローム用の `html { color-scheme }`、アクティブなカラースキームからの `body[data-ds-dark-theme]`、テーマのエイリアストークン、`--dsh-content-font-size`、`--dsh-code-font-size`、`--dsh-terminal-font-size`、空でない各 `--dsh-font-family-<role>` リストを body 上のインライン変数として、そして計算された body 背景に従う所有された 1 つの `<meta name="theme-color">` である。プレゼンターを破棄すると、その他のグローバル書き込みとともにメタデータノードを削除する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-`selectPanel(id)` checks the live `main` registry before changing selection; an absent key throws and leaves the current panel intact. `beginNavigation()` returns an abort signal for an asynchronous UI navigation. A later call, a valid panel selection (including repeated selection), or layout disposal aborts that signal without cancelling underlying Session creation. Consumers check the signal before committing navigation or moving drafts.
+`selectPanel(id)` は選択を変更する前にライブの `main` レジストリをチェックする。存在しないキーはスローし、現在のパネルをそのまま保つ。`beginNavigation()` は非同期 UI ナビゲーション用の abort シグナルを返す。後続の呼び出し、有効なパネル選択（同じ選択の繰り返しを含む）、またはレイアウトの破棄は、基盤となる Session 作成をキャンセルせずにそのシグナルを abort する。コンシューマーはナビゲーションをコミットする前、またはドラフトを移動する前にシグナルをチェックする。
 
-One registration declares the frame slots and binds `ctx.layout` methods `selectPanel`, `toggleSidebar`, `openRightbar(track, fullscreen)`, and `closeRightbar`. One root store separates `panelInfo` selection from `layoutInfo` measurements, width preferences, and presentation reports. `ctx.layout.panelInfo` and the standard `usePanelInfo` hook share the same selection source; AppFrame subscribes to the stable layout object. The `rightbar` owner supplies actual `width`, `viewportWidth`, and normal-presentation eligibility `canShow`; insufficient room causes a deterministic close, never automatic reopening on widening. Fullscreen hides the width handle without releasing a track the occupant retains. AppFrame keeps the column containers mounted. The right column's root controller renders `rightbar.session` through `SessionProvider` only while the Conversation is selected; its unmount report releases the track. The independent title component uses the selected Session title only while the Conversation is visible, with the build-configured product title or localized `common.brand.localBuild` as its fallback; locale revisions update that fallback. The theme presenter is a second effect: pure DOM writes from resolved snapshots — initial state through the getter once, then event-driven only, with no React path. It applies palette, font-size, font-list, and token variables before measuring the rendered background as the single color authority. Fullscreen presentation suppresses grid and handle transitions; its occupant reports the new columns only after covering the frame. Fullscreen exit keeps transitions suppressed while the frame installs its destination geometry: close removes the right track, and restore retains it. Subsequent normal geometry actions restore ordinary transitions.
+1 つの登録がフレームスロットを宣言し、`ctx.layout` メソッド `selectPanel`、`toggleSidebar`、`openRightbar(track, fullscreen)`、`closeRightbar` をバインドする。1 つのルートストアが `panelInfo` の選択を、`layoutInfo` の計測値、幅の設定値、プレゼンテーション報告から分離する。`ctx.layout.panelInfo` と標準の `usePanelInfo` フックは同じ選択ソースを共有し、AppFrame は安定したレイアウトオブジェクトを購読する。`rightbar` オーナーは実際の `width`、`viewportWidth`、通常プレゼンテーションの適格性 `canShow` を供給する。スペース不足は決定論的なクローズを引き起こし、広げても自動再オープンは決して起きない。フルスクリーンは、占有者が保持しているトラックを解放せずに幅ハンドルを隠す。AppFrame はカラムコンテナをマウントしたままにする。右カラムのルートコントローラーは、Conversation が選択されている間だけ `SessionProvider` を通じて `rightbar.session` をレンダリングし、そのアンマウント報告がトラックを解放する。独立したタイトルコンポーネントは、Conversation が可視の間だけ選択された Session のタイトルを使い、ビルド構成のプロダクトタイトルまたはローカライズ済み `common.brand.localBuild` をフォールバックとする。ロケールリビジョンはそのフォールバックを更新する。テーマプレゼンターは第 2 のエフェクトである: 解決済みスナップショットからの純粋な DOM 書き込み — 初期状態は getter を通じて 1 回、その後はイベント駆動のみで、React 経路はない。パレット、フォントサイズ、フォントリスト、トークン変数を適用してから、レンダリングされた背景を唯一の色の権威として測定する。フルスクリーンプレゼンテーションはグリッドとハンドルのトランジションを抑制する。その占有者はフレームを覆った後にのみ新しいカラムを報告する。フルスクリーン終了は、フレームが移動先のジオメトリを設置する間、トランジションを抑制したままにする: クローズは右トラックを削除し、復元はそれを保持する。その後の通常のジオメトリアクションは通常のトランジションを復元する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the layout surface is not enough. They move from the frame to the columns it renders and the theme it presents.
+レイアウトのサーフェスでは足りないときにこれらのページを読むこと。フレームから、それがレンダリングするカラムと提示するテーマへと進む。
 
-- [ui-sidebar](../ui-sidebar/README.md) — occupies the `sidebar` column and its seats.
-- [ui-conversation](../ui-conversation/README.md) — occupies the `main` key `conversation`.
-- [ui-sidebar-right](../ui-sidebar-right/README.md) — occupies the `rightbar` column with one docking surface per session.
-- [ui-theme](../ui-theme/README.md) — the theme seam whose resolved snapshots the presenter consumes.
-- [Web client architecture](../../../docs/subsystems/web-client.md) — how browser plugin rows load and register slots.
+- [ui-sidebar](../ui-sidebar/README.md) — `sidebar` カラムとその座席を占める。
+- [ui-conversation](../ui-conversation/README.md) — `main` キー `conversation` を占める。
+- [ui-sidebar-right](../ui-sidebar-right/README.md) — セッションごとに 1 つのドッキングサーフェスで `rightbar` カラムを占める。
+- [ui-theme](../ui-theme/README.md) — プレゼンターが消費する解決済みスナップショットを持つテーマシーム。
+- [Web クライアントアーキテクチャ](../../../docs/subsystems/web-client.md) — ブラウザのプラグイン行がどのようにロードされスロットを登録するか。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the layout shell manages browser viewing state; nothing here reaches a model request.
+なし。レイアウトシェルはブラウザの表示状態を管理し、ここにあるものはモデルリクエストに到達しない。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てず、送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the current layout behavior. They are current package constraints, not a general window-manager comparison or a task backlog.
+これらの制限は現在のレイアウト挙動を定義する。これらは現在のパッケージ制約であり、一般的なウィンドウマネージャーとの比較やタスクバックログではない。
 
-- **Panel geometry is transient** — reload restores the sidebar default and the right panel hidden; each dragged width is one frame-wide preference, not a per-Session fact.
-- **Extremely narrow windows** — after the right panel closes, the center may still fall below 400px; the left 56px rail remains.
-- **Track and panel travel on one shared curve only while animating** — during a discrete open/close the frame sets `data-animating` and its track transition and the occupant's slide read the same duration and easing variables; an occupant that used its own would detach the panel's edge from the conversation's while squeezing. Drags and instant presentation switches run transition-free, so the curve does not cover them.
-- **No scroll anchoring during squeeze reflow** — layout changes may move the reader's viewport.
+- **パネルジオメトリは一時的** — リロードはサイドバーをデフォルトに、右パネルを非表示に戻す。ドラッグされた各幅はフレーム全体で 1 つの設定値であり、セッション単位の事実ではない。
+- **極端に狭いウィンドウ** — 右パネルが閉じた後も中央が 400px を下回ることがあり、左の 56px レールは残る。
+- **トラックとパネルが同じ曲線で移動するのはアニメーション中のみ** — 離散的な開閉の間、フレームは `data-animating` を設定し、そのトラックのトランジションと占有者のスライドが同じ duration と easing の変数を読む。占有者が独自のものを使うと、圧縮中にパネルの端が conversation の端から外れる。ドラッグと即時プレゼンテーション切り替えはトランジションなしで実行されるため、曲線はそれらをカバーしない。
+- **圧縮リフロー中のスクロールアンカリングなし** — レイアウト変更で読者のビューポートが移動することがある。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

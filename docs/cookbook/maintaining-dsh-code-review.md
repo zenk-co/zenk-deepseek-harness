@@ -1,26 +1,26 @@
-# Maintaining the dsh-code-review skill
+# dsh-code-review スキルの保守
 
-English | [中文](maintaining-dsh-code-review.zh.md)
+日本語 | [English](maintaining-dsh-code-review.en.md) | [中文](maintaining-dsh-code-review.zh.md)
 
-The [`dsh-code-review`](../../.agents/skills/dsh-code-review/SKILL.md) skill is kept current by a single designated operator running a private periodic maintenance tool. This cookbook is the entry point for that operator — and for anyone taking over the role — and for repo contributors who want to understand why skill updates arrive as small periodic PRs rather than one-off audits. The workflow itself is specified in the [human-review skill-maintenance Agent Note](../../.agents/notes/proposed/process/2026-07-13-human-review-skill-maintenance.md).
+[`dsh-code-review`](../../.agents/skills/dsh-code-review/SKILL.md) スキルは指名された単一オペレーターがプライベートな定期保守ツールで最新に保つ。この cookbook はそのオペレーター (および役割を引き継ぐ人) と、スキル更新が単発監査ではなく小さな定期 PR として届く理由を理解したいリポジトリコントリビューターの入口である。ワークフロー自体は[人的レビュースキル保守 Agent Note](../../.agents/notes/proposed/process/2026-07-13-human-review-skill-maintenance.md)で仕様化されている。
 
-## What the maintainer receives
+## メンテナーが受け取るもの
 
-The operator invokes the wrapper manually, daily with a two-UTC-day overlap; a manual weekly recovery run uses a seven-day window. The workflow:
+オペレーターはラッパーを手動で起動する。日次は 2 UTC 日の重複付き、週次の手動回復実行は 7 日ウィンドウを使う。ワークフローは次のとおりである。
 
-1. It selects PRs merged in the chosen window (default two UTC days for the daily cadence, seven for weekly) whose merge commit is reachable from `origin/master`. PRs whose merge commit is not reachable (stacked branches whose parent was squashed) or that exceed a 250-commit acquisition cap are logged to `skipped-pulls.json` and skipped rather than aborting the run.
-2. It collects pre-merge human review feedback with commit anchors (inline comments and review submissions), then compares feedback-time and final landed PR patches. It does not acquire PR conversation comments because current GitHub state cannot give them a force-push-safe feedback-time baseline, and it excludes target-branch-only changes from adoption evidence.
-3. Two independently configured reviewer adapters classify who wrote each item and whether the change adopted it, then classify agreed-adopted items against the current skill.
-4. The primary adapter drafts a complete revised `SKILL.md`; both adapters review the same diff; blocking findings loop until both approve.
-5. `pnpm run doc-sync` and `pnpm run lint` run against the candidate before the tool declares success.
+1. 選んだウィンドウ (日次は既定 2 UTC 日、週次は 7 日) にマージされ、マージコミットが `origin/master` から到達可能な PR を選ぶ。マージコミットに到達できない PR (親が squash されたスタックブランチ) や 250 コミット取得上限を超える PR は `skipped-pulls.json` に記録してスキップし、実行を中断しない。
+2. コミットアンカー付きのマージ前人的レビューフィードバック (インラインコメントとレビュー提出) を集め、フィードバック時点と最終着地 PR パッチを比較する。現在の GitHub 状態では force-push 安全なフィードバック時点ベースラインを与えられないため PR 会話コメントは取得しない。採用証拠から対象ブランチ専用変更を除外する。
+3. 独立に設定された 2 件のレビュアーアダプターが各項目の書き手と変更がそれを採用したかを分類し、合意採用項目を現在のスキルに照らして分類する。
+4. プライマリアダプターが完全な改訂 `SKILL.md` を起草する。両アダプターが同じ差分をレビューする。ブロッキング所見は両者が承認するまでループする。
+5. ツールが成功を宣言する前に候補に対して `pnpm run doc-sync` と `pnpm run lint` を実行する。
 
-Each run stores its artifacts on the operator's machine. The saved diff, candidate `SKILL.md`, and promotion manifest land under `~/dsh-code-review-outputs/` named by timestamp. The manifest records the source master commit and skill blob, source feedback IDs and URLs, landed evidence ranges, adapter verdicts, and gate results; raw per-adapter I/O stays in a private temp directory whose path is written to the notification and to the daily log under `~/Library/Logs/dsh-code-review-maintainer/`. The maintenance worktree itself is restored clean after every run so the operator is never tempted to edit the maintenance copy in place.
+各実行は成果物をオペレーターのマシンに保存する。保存された差分、候補 `SKILL.md`、昇格マニフェストはタイムスタンプ名で `~/dsh-code-review-outputs/` に置かれる。マニフェストはソース master コミットとスキル blob、ソースフィードバック ID と URL、着地証拠範囲、アダプター判定、ゲート結果を記録する。アダプターごとの生 I/O はプライベート一時ディレクトリに残り、そのパスは通知と `~/Library/Logs/dsh-code-review-maintainer/` 配下の日次ログに書かれる。保守ワークツリー自体は毎実行後にクリーンに戻されるため、オペレーターは保守コピーをその場で編集してはならない。
 
-## What the operator does with a candidate diff
+## 候補差分に対するオペレーターの作業
 
-When a run produces a candidate, a macOS notification arrives with a `dsh-code-review-promote <timestamp>` hint.
+実行が候補を生むと、`dsh-code-review-promote <timestamp>` ヒント付きの macOS 通知が届く。
 
-1. **Read the diff on its own merits.** Do not defer to "the reviewers approved"; the maintainer contract is that the operator makes the final decision. Look for checklist bloat, historical prose, unsupported extrapolation from a single incident, and duplicated coverage with existing skill or authoritative-doc content.
+1. **差分をそれ自体として読む。**「レビュアーが承認した」に委ねない。最終決定はオペレーターが下すというのがメンテナー契約である。チェックリスト肥大、歴史的散文、単一インシデントからの裏付けなき外挿、既存スキルや権威文書内容との重複カバレッジを探す。
 
    ```sh
    ls ~/dsh-code-review-outputs/                         # every candidate ever produced
@@ -29,36 +29,35 @@ When a run produces a candidate, a macOS notification arrives with a `dsh-code-r
    less ~/dsh-code-review-outputs/2026-07-16T02-00-00Z.manifest.json
    ```
 
-2. **Cross-check against the run artifacts.** The promotion manifest maps each proposed rule to source feedback and landed evidence; detailed per-adapter I/O, consensus, and adopted evidence live under the run's private temp directory (path shown in the log). Spot-check at least one candidate: does the linked human comment actually support the added rule? Does the linked PR actually adopt it?
-
-3. **Decide one of three:**
-   - **Discard.** Delete the saved candidate. The tool re-considers the same feedback on the next run under whatever the current skill then says.
+2. **実行成果物と突き合わせる。** 昇格マニフェストは提案ルールごとにソースフィードバックと着地証拠を対応付ける。詳細なアダプターごとの I/O、合意、採用証拠はその実行のプライベート一時ディレクトリにある (パスはログに表示)。少なくとも 1 件の候補を抜き打ち確認する。リンクされた人的コメントは本当に加筆ルールを裏付けるか。リンクされた PR は本当にそれを採用しているか。
+3. **3 択で決める:**
+   - **破棄。** 保存済み候補を削除する。ツールは同じフィードバックを次回実行でそのときの現在のスキル配下で再検討する。
 
      ```sh
      rm ~/dsh-code-review-outputs/2026-07-16T02-00-00Z.{diff,SKILL.md,manifest.json}
      ```
-   - **Batch.** Keep the candidate aside if the update is small and could combine with a future one. The source-skill check still applies; rerun the analysis or manually rebase and re-review the diff if `master` changes first.
-   - **Promote.** From a clean `master` checkout of the repo, run the promote helper. It refreshes `master`, verifies that the current skill matches the recorded source blob, applies the saved diff, and opens a draft PR whose body lists the source feedback URLs or IDs, landed commit range, originating run, checks, and operator edits. It stops on skill drift rather than overwriting newer guidance; the operator still reviews the PR on GitHub and either merges it or closes it.
+   - **バッチ。** 更新が小さく将来分とまとめられそうなら候補を脇に置く。ソーススキルチェックは依然適用される。先に `master` が変わったら分析を再実行するか差分を手動でリベースして再レビューする。
+   - **昇格。** リポジトリのクリーンな `master` チェックアウトから昇格ヘルパーを実行する。これは `master` を更新し、現在のスキルが記録済みソース blob と一致することを検証し、保存済み差分を適用し、ソースフィードバック URL または ID、着地コミット範囲、起点実行、チェック、オペレーター編集を列挙する本文付きドラフト PR を開く。新しいガイダンスを上書きせずスキル漂流で停止する。オペレーターは依然 GitHub 上で PR をレビューし、マージかクローズする。
 
      ```sh
      cd ~/path/to/deepseek-harness   # clean master
      dsh-code-review-promote 2026-07-16T02-00-00Z
      ```
 
-4. **Do not commit adapter output verbatim.** Small edits during promotion — tightening wording, removing an example that only makes sense with the source PR's context, folding a rule into an existing one — are expected and preserve the "reviewer judgment" the workflow depends on. Amend the branch before merging.
+4. **アダプター出力を逐語的にコミットしない。** 昇格時の小さな編集 — 言い回しの引き締め、ソース PR の文脈でのみ意味が通る例の削除、既存ルールへの折りたたみ — は想定内であり、ワークフローが依存する「レビュアー判断」を保つ。マージ前にブランチを修正すること。
 
-## When a run produces no candidate
+## 実行が候補を生まない場合
 
-That is the common case after every nonempty classification stage has produced at least one valid adapter result. The tool records "no candidate" in its daily log, sends no notification (to avoid alert fatigue), and moves on. Days without a skill update are the workflow behaving correctly, not a stall.
+空でない分類段階がすべて少なくとも 1 件の有効なアダプター結果を生んだ後では、これが通常ケースである。ツールは日次ログに "no candidate" を記録し、通知は送らず (アラート疲れを避けるため)、先へ進む。スキル更新のない日はワークフローが正しく振る舞っているのであり、停滞ではない。
 
-## Interruptions and handoff
+## 中断と引き継ぎ
 
-The mechanism lives on one machine. Interruptions the operator handles as they arise:
+機構は 1 台のマシン上にある。オペレーターは中断をその都度扱う。
 
-- **Daily run missed.** The two-day overlap window catches one skipped day automatically; longer gaps recover by running the wrapper manually with `DSH_CODE_REVIEW_SINCE=<Nd>`. Overlapping windows are idempotent: guidance already in the current skill is classified `covered` and does not re-enter as a candidate.
-- **Adapter provider outage.** The tool refuses to run when the two reviewer commands resolve to byte-identical executables. A single batch whose adapter response fails schema or id validation is failed closed at the batch level (every item in the batch marked unclear) and the run continues; the raw output is preserved for debugging. If either adapter produces no valid result for any nonempty batch in an operation, the run fails, writes a failure record, and notifies the operator; it never collapses a total-provider outage into "no candidate."
-- **Handoff to another maintainer.** Open a follow-up Agent Note that supersedes the current one: either move the mechanism into the repository or record the new operator's private setup. Do not silently transfer the tool — the "single-maintainer bus factor" in the Agent Note's Risks section is the reason the handoff needs a documented decision.
+- **日次実行の欠落。** 2 日重複ウィンドウが 1 日のスキップを自動的に拾う。より長い欠落はラッパーを `DSH_CODE_REVIEW_SINCE=<Nd>` 付きで手動実行して回復する。重複ウィンドウは冪等である。現在のスキルに既にあるガイダンスは `covered` に分類され、候補として再登場しない。
+- **アダプタープロバイダー障害。** 2 件のレビュアーコマンドがバイト同一実行ファイルに解決されるとツールは実行を拒否する。アダプター応答がスキーマまたは id 検証に失敗した単一バッチはバッチレベルでフェイルクローズされ (バッチ内全項目を unclear 化)、実行は続く。生出力はデバッグ用に保存される。いずれかのアダプターが操作中の空でないバッチすべてで有効な結果を出さないと、実行は失敗し、失敗レコードを書き、オペレーターに通知する。完全プロバイダー障害を "no candidate" に潰すことは決してない。
+- **別のメンテナーへの引き継ぎ。** 現在のものを置き換える後続 Agent Note を開く。機構をリポジトリ内に移すか、新オペレーターのプライベートセットアップを記録する。ツールを黙って譲渡しない — Agent Note の Risks 節にある「単一メンテナーのバス係数」が引き継ぎに文書化された決定を要する理由である。
 
-## Where the operator's private setup lives
+## オペレーターのプライベートセットアップの場所
 
-The tool source, reviewer adapters, provider credentials, and scheduler are the operator's private infrastructure and are outside this repository by design (see the Agent Note's "Where the mechanism lives" section). This cookbook and the Agent Note describe **what the workflow guarantees**; **how** those guarantees are implemented is a private-infrastructure concern. If you are the new operator, the Agent Note's `## Proposal` sections are the specification you build against.
+ツールソース、レビュアーアダプター、プロバイダー資格情報、スケジューラーはオペレーターのプライベートインフラであり、設計上このリポジトリの範囲外である (Agent Note の "Where the mechanism lives" 節を参照)。この cookbook と Agent Note は**ワークフローが保証すること**を記述する。**それらの保証をどう実装するか**はプライベートインフラの関心事である。新オペレーターなら、Agent Note の `## Proposal` 節が構築対象の仕様である。

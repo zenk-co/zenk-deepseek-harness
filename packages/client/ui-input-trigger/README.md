@@ -1,91 +1,91 @@
 ---
-description: "Input trigger pipeline for the Web GUI: / and @ detection under the caret, the grouped candidate menu, and pick routing to registered sources; for users and maintainers of slash commands and references."
+description: "Web GUI 向け入力トリガーパイプライン。キャレット下の / と @ 検出、グループ化候補メニュー、登録ソースへの選択ルーティング。スラッシュコマンドと参照のユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-input-trigger
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-When users type `/` or `@` at the caret in the Web GUI, this package opens a grouped menu for slash commands, file references, and session references. It supports keyboard and pointer selection, including drill-down choices and launchers that open a single candidate group over the current selection. A pick either invokes a command flow or inserts a reference for the consuming input surface to handle. The package affects browser presentation only; it does not assemble or send model requests.
+Web GUI でユーザーがキャレット位置に `/` や `@` を打つと、このパッケージはスラッシュコマンド・ファイル参照・セッション参照向けのグループ化メニューを開く。ドリルダウン選択や現選択上に単一候補グループを開くランチャーを含め、キーボードとポインター選択に対応する。選択はコマンドフローを呼ぶか、消費入力面が扱う参照を挿入する。このパッケージはブラウザー提示にのみ影響し、モデルリクエストを組立も送信もしない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin alongside `ui-conversation`; the menu then appears in the input overlay when the user types a trigger under the caret. Grouped candidates render under title rows, or under the section headings a source attaches to its own rows; a pick routes to the source, and the consuming surface applies the result — a slash command opens its popup or executes, a reference inserts its inline token. Menu icons and navigation chevrons use the `--dsw-alias-menu-icon` color. A row shows its icon, its title (the candidate `label`, or the `name` when no label is given), the `name` as a trailing alias when the label is not the name in another letter case, and the description right-aligned; a query matches either the name or the label.
+`ui-conversation` と並べてこのプラグインをマウントすると、ユーザーがキャレット下にトリガーを打ったときに入力オーバーレイ内にメニューが現れる。グループ化候補はタイトル行の下、またはソースが自身の行に付す節見出しの下に描画される。選択はソースへルーティングされ、消費面が結果を適用する。すなわちスラッシュコマンドはポップアップを開くか実行し、参照はインライントークンを挿入する。メニューアイコンと移動シェブロンは `--dsw-alias-menu-icon` 色を使う。行はアイコン、タイトル（候補 `label`、なければ `name`）、ラベルが別字遣いの名前と異なる場合の末尾別名としての `name`、右寄せ説明を示し、クエリーは名前またはラベルのいずれかに一致する。
 
-### Keyboard and mouse
+### キーボードとマウス
 
-The composer surface keeps focus while the menu is open: rows pick on mousedown, the highlight rides `aria-activedescendant`, and a pointer press outside both the menu and the composer card dismisses it. Opening it from the launcher button puts the keyboard back in the editor before the menu opens, so the arrows drive it there too. Space and Enter adjudication polls the optional `matchSpace`/`matchEnter` hooks in registration order; the first non-undefined answer wins, and a source can refuse a submission it cannot consume whole. Restoring a persisted command chip polls the optional `matchClaim` hook through `resolveClaim`: it awaits the source's own warmup and answers only a claim, never opening a popup, running an action, or executing the command. Tab acts on the highlighted completion: a candidate declaring `drill: true` routes through `onPick` with `action: 'drill'`, while an ordinary candidate settles through `action: 'pick'`; without a highlight Tab passes untouched so native focus traversal survives. Escape and Shift+Tab leave the menu instead, never settling: the exit gesture cannot consume or rewrite the draft. A dismissed menu stays dismissed: the same token re-tracked with the same query keeps its menu closed, so restoring the caret after a pointer dismissal — or after a settled command closes the surface it opened — cannot bring the menu back; typing a new query or moving to another token re-arms it. A drillable row's trailing chevron exposes the same second verb to pointer users. A source implementing the optional `header` hook additionally publishes crumbs above its group: the pipeline re-polls it on every hit with the live query and whether a drill, rather than typing, produced it, and a crumb pick routes back through `onPick` with `action: 'drill'`.
+コンポーザー面はメニュー表示中も焦点を保持する。行は mousedown で選択され、強調は `aria-activedescendant` に乗り、メニューとコンポーザーカードの両外側のポインター押下はそれを閉じる。ランチャーボタンから開くとメニューが開く前にキーボードがエディターへ戻るため、矢印はそこで駆動する。Space と Enter 裁定は任意 `matchSpace`/`matchEnter` フックを登録順に照会する。最初の非 undefined 回答が勝ち、ソースは全体消費できない投入を拒める。永続コマンドチップの復元は任意 `matchClaim` フックを `resolveClaim` 経由で照会する。ソース自身の warmup を await し、請求にのみ答え、ポップアップを開くこともアクション実行もコマンド実行もしない。Tab は強調補完に作用する。`drill: true` を宣言する候補は `action: 'drill'` 付き `onPick` 経由でルーティングされ、通常候補は `action: 'pick'` 経由で確定する。強調なしの Tab はそのまま通過し、ネイティブ焦点移動が生き残る。Escape と Shift+Tab は代わりにメニューを離れ、確定しない。終了 gesture は下書きを消費も書換えもできない。閉じたメニューは閉じたままである。同じクエリーで再追跡された同じトークンはメニューを閉じたままにするため、ポインター閉鎖後のキャレット復元や確定コマンドが開いた面を閉じたことがメニューを復活させることはない。新しいクエリーを打つか別のトークンへ移動すると再 armed される。ドリル可能行の末尾シェブロンは同じ第 2 動詞をポインターユーザーに公開する。任意 `header` フックを実装するソースはさらにそのグループ上に crumb を公開する。パイプラインはライブクエリーと、入力ではなくドリルが生んだかを添えて毎ヒット再照会し、crumb 選択は `action: 'drill'` 付き `onPick` 経由で戻る。
 
-A source may implement `openReference(session, reference)` to open a draft reference without submitting it. Acceptance may precede asynchronous catalog loading. Chips route by source name; editable tokens route through the current source lexicon. Returning `false`, a missing source, or a disposed controller leaves the editor gesture unchanged.
+ソースは下書き参照を投入せず開くために `openReference(session, reference)` を実装できる。受諾は非同期カタログ読み込みに先行しうる。チップはソース名でルーティングされ、編集可能トークンは現ソース語彙経由でルーティングされる。`false` 戻り、ソース欠如、破棄済みコントローラーはエディター gesture を不変のままにする。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-Menus use the shared `MenuSurface` material, including the macOS backing for background blur; custom content follows the [menu rules](../../../docs/web-styling.md#component-rules).
+メニューは macOS 背景 blur 用裏付けを含む共有 `MenuSurface` 素材を使う。カスタム内容は[メニュールール](../../../docs/web-styling.md#component-rules)に従う。
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-`src/core/` is the pure core — trigger detection, menu reduction, and exact match, with zero React/DOM/cordis — while `src/client/service.ts` wires the core to the menu snapshot store, the per-hit candidate fetch (generation-gated, `AbortSignal`-superseded, failed sources dropping silently with a console record), and the pick paths. One `InputTriggerController` resolves per session scope (`sessionOf`); the conversation wiring layer drives `track`/`arbitrate`/`onSpace`/`adjudicate` on the controller. A source is warmed into every session controller it can reach; sources whose `lexicon` rolls change after warm implement `subscribeLexicon` and the controller re-polls on each notification. `MenuView` self-registers into `conversation.input.overlay` (list kind, session scope) and renders null while closed. The `listbox` role sits on its scrolling viewport rather than the bounded shell, because a breadcrumb header is not an option and a listbox may not carry one; crumbs ride their own snapshot store beside the menu store, so the frozen reducer stays unaware of them. The overlay SlotMap merge lives here because the dependency direction (ui-conversation → ui-input-trigger) admits no reverse type import.
+`src/core/` は純粋コアであり、トリガー検出・メニュー縮約・完全一致で、React/DOM/cordis ゼロである。一方 `src/client/service.ts` はコアをメニュースナップショットストア、ヒットごとの候補取得（世代 gate、`AbortSignal` 置換、失敗ソースは console 記録付きで黙って落とす）、選択パスへ配線する。1 つの `InputTriggerController` がセッションスコープごと（`sessionOf`）に解決し、会話配線層がコントローラー上で `track`/`arbitrate`/`onSpace`/`adjudicate` を駆動する。ソースは到達できるすべてのセッションコントローラーへ warm される。warm 後に `lexicon` が変わるソースは `subscribeLexicon` を実装し、コントローラーは各通知で再照会する。`MenuView` は `conversation.input.overlay` へ自登録し（list 種、セッションスコープ）、閉じている間は null を描画する。`listbox` role は境界シェルではなくスクロール視口上にあり、パンくずヘッダーが選択肢ではなく listbox がそれを運べないためである。crumb はメニューストアの隣に自身のスナップショットストアに乗り、凍結 reducer はそれらを知らない。オーバーレイ SlotMap マージは依存方向（ui-conversation → ui-input-trigger）が逆方向型 import を許さないためここにある。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the trigger pipeline is not enough. They move from the pipeline to the sources that register into it and the shell that owns the input.
+トリガーパイプラインでは足りないときに、これらのページを読む。パイプラインからそこへ登録するソースと入力を所有するシェルへと進む。
 
-- [ui-commands](../ui-commands/README.md) — registers the `/` command source into this pipeline and owns the command popup shell.
-- [ui-reference](../ui-reference/README.md) — registers the `@` file and session reference sources.
-- [ui-conversation](../ui-conversation/README.md) — declares the input overlay slot and owns the composer and input machine.
-- [Web client architecture](../../../docs/subsystems/web-client.md) — how browser plugin rows load and register slots.
+- [ui-commands](../ui-commands/README.md) — このパイプラインに `/` コマンドソースを登録し、コマンドポップアップシェルを所有する。
+- [ui-reference](../ui-reference/README.md) — `@` ファイル・セッション参照ソースを登録する。
+- [ui-conversation](../ui-conversation/README.md) — 入力オーバーレイスロットを宣言し、コンポーザーと入力機構を所有する。
+- [Web クライアントアーキテクチャ](../../../docs/subsystems/web-client.md) — ブラウザープラグイン行の読み込みとスロット登録の仕組み。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the trigger pipeline is browser presentation only — picks produce command claims and reference inserts whose model-visible consequences are owned by the consuming host and input-machine packages.
+なし。トリガーパイプラインはブラウザー提示専用であるため。選択はコマンド請求と参照挿入を生み、そのモデル可視の帰結は消費 host と入力機構パッケージが所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組立も送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the current trigger pipeline. They are current package constraints, not a general menu comparison or a task backlog.
+現在のトリガーパイプラインを定める。これらは現在のパッケージ制約であり、一般メニュー比較やタスク backlog ではない。
 
-- **Global source layer only** — session-scope source registration (per-session shadowing) is designed but not enabled; the ledger tracks the trigger condition, a real per-session source need.
-- **Overlay SlotMap merge home is split from slot ownership** — the sole `conversation.input.overlay` merge lives here, while ui-conversation owns its anchor, children declaration, and lifecycle because the dependency direction is ui-conversation → ui-input-trigger.
+- **グローバルソース層のみ** — セッションスコープソース登録（セッションごとの影付け）は設計済みだが有効ではない。台帳はトリガー条件を追跡する。真のセッションごとソースが必要である。
+- **オーバーレイ SlotMap マージの home はスロット所有から分離している** — 唯一の `conversation.input.overlay` マージはここにあり、ui-conversation がその錨、子宣言、ライフサイクルを所有する。依存方向が ui-conversation → ui-input-trigger であるためである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,78 +1,78 @@
 ---
-description: "Keep shell processes alive across tool calls."
+description: "ツール呼び出しをまたいでシェルプロセスを存続させる。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-experimental-terminal-bundle
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Add six experimental global terminal tools to every Agent. The bundle owns an isolated terminal registry with the platform shell backend; terminals remain Agent-owned. It ships switched off in Web and Desktop. Select it in Plugins to enable it.
+すべてのエージェントに6つの実験的なグローバルターミナルツールを追加する。このバンドルはプラットフォームシェルバックエンドを持つ分離されたターミナルレジストリーを所有し、ターミナルはエージェントが所有する。Web と Desktop ではオフのまま出荷される。プラグインで選択すると有効になる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [関連情報](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と将来の課題](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-In Web or Desktop, open Plugins and enable **Persistent terminals** in Official. Switch it off to remove its profile layer.
+Web または Desktop でプラグインを開き、Official の **Persistent terminals** を有効にする。オフに切り替えるとプロファイル層が削除される。
 
-Enabling or disabling the bundle registers or removes its global tools in the running Host, so every Agent sees the change on its next request, in every preset including minimal.
+バンドルの有効化または無効化により、動作中の Host 内のグローバルツールが登録または削除されるため、ミニマルを含むすべてのプリセットのすべてのエージェントは次のリクエストから変更を反映する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation details — click to expand</summary>
+<summary>実装の詳細 — クリックして展開</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) inserts the Host group `optional-persistent-terminals`, which registers the tools in the global tool layer. Later profile patches can override its rows by id. The [profile composer](../../boot/app-boot/README.md) owns patch ordering and errors.
+[`cordis.patch.yml`](cordis.patch.yml) は Host グループ `optional-persistent-terminals` を挿入し、グローバルツール層にツールを登録する。後段のプロファイルパッチは行 ID 指定でその行を上書きできる。[プロファイルコンポーザー](../../boot/app-boot/README.md) がパッチ順序とエラーを所有する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 関連情報
 
-[Capability implementation](../tool-terminal/README.md)
+[ケイパビリティ実装](../tool-terminal/README.md)
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the [capability implementation](../tool-terminal/README.md), which owns model context and results.
+[ケイパビリティ実装](../tool-terminal/README.md) 経由で間接的に関わる。同実装がモデルコンテキストと結果を所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The layer adds no request content directly; the capability implementation owns cache effects from tools, prompts, and results. Toggling the bundle changes the tool list of live Sessions, which invalidates their cached request prefix once.
+この層はリクエスト内容を直接追加しない。ツール、プロンプト、結果に由来するキャッシュ効果はケイパビリティ実装が所有する。バンドルの切り替えはライブセッションのツール一覧を変更し、キャッシュ済みリクエストプレフィックスを1回無効化する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と将来の課題
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Terminals belong to the Agent that created them. POSIX uses Bash and Windows uses PowerShell; the bundle does not share another terminal registry.
+- ターミナルは作成したエージェントに属する。POSIX は Bash、Windows は PowerShell を使い、このバンドルは他のターミナルレジストリーを共有しない。
 
 -----
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Maintainer context — click to expand</summary>
+<summary>メンテナー向けコンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

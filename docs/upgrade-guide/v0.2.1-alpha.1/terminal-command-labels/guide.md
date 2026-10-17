@@ -1,18 +1,18 @@
 ---
 kind: upgrade-guide
-description: "Custom TerminalBlock consumers must provide localized accessible names for overflowing command lines."
+description: "カスタム TerminalBlock コンシューマーは、はみ出すコマンド行にローカライズされたアクセシブル名を提供しなければならない。"
 ---
 
-# Terminal command labels
+# ターミナルコマンドラベル
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-`TerminalBlockLabels` from `@deepseek-ai/dsh-client-ui-primitives` requires a `commandLine(line: number): string` formatter. Previously, callers supplied no accessible name for command lines. Each horizontally overflowing line now uses this name for its keyboard-focusable group; lines that fit, including wrapped lines, add no Tab stop. This affects custom UI plugins that render `TerminalBlock`.
+`@deepseek-ai/dsh-client-ui-primitives` の `TerminalBlockLabels` は `commandLine(line: number): string` フォーマッターを必要とする。以前、呼び出し側はコマンド行にアクセシブル名を提供しなかった。水平にはみ出す各行はキーボードフォーカス可能なグループにこの名前を使うようになった。収まる行（折り返し行を含む）は Tab ストップを追加しない。これは `TerminalBlock` を描画するカスタム UI プラグインに影響する。
 
-## Migration
+## 移行
 
-1. Add `commandLine` to each labels object passed to `TerminalBlock`. The argument is the authored line number, starting at one.
-2. Return a localized name, such as “Command line 1”, through the plugin's locale dictionary. Keep the original command text separate from this name.
-3. Rebuild the plugin. Verify that a long command can receive keyboard focus and scroll with the arrow keys, and that a short or wrapped command adds no Tab stop.
+1. `TerminalBlock` に渡す各 labels オブジェクトに `commandLine` を追加する。引数は作成時の行番号で、1 から始まる。
+2. プラグインのロケール辞書を通じて「Command line 1」のようなローカライズ名を返す。元のコマンドテキストはこの名前と分けて保つ。
+3. プラグインをリビルドする。長いコマンドがキーボードフォーカスを受け、矢印キーでスクロールできること、短いコマンドや折り返しコマンドが Tab ストップを追加しないことを検証する。

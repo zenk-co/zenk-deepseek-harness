@@ -1,41 +1,41 @@
 ---
-description: "The provider-neutral model-call service for users and maintainers streaming requests, registering provider adapters, or resolving model metadata."
+description: "プロバイダー中立のモデル呼び出しサービス。リクエストのストリーミング、プロバイダーアダプターの登録、モデルメタデータの解決を行うユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-llm
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `@deepseek-ai/dsh-llm` to stream model calls through configured provider adapters, discover models, and resolve model capabilities and call defaults. Callers must keep all model-visible input reconstructable from the session log. Loop-built requests arrive deep-frozen, so extensions and adapters cannot rewrite them. Each stream is one provider attempt: provider-specific translation stays with its adapter, while the optional `@deepseek-ai/dsh-llm-retry` package re-runs failed requests. Streams always end with a terminal result, so callers can handle success, failure, and cancellation consistently.
+`@deepseek-ai/dsh-llm` は、設定済みのプロバイダーアダプターを通じたモデル呼び出しのストリーミング、モデルのディスカバリー、モデルケイパビリティと呼び出しデフォルトの解決に使う。呼び出し元は、モデル可視のすべての入力をセッションログから再構築可能に保たなければならない。ループが構築したリクエストは深く凍結された状態で到着するため、拡張とアダプターがそれらを書き換えることはできない。各ストリームは 1 回のプロバイダー試行である。プロバイダー固有の変換はそのアダプターに留まり、失敗したリクエストの再実行はオプションの `@deepseek-ai/dsh-llm-retry` パッケージが担う。ストリームは常に終端結果で終わるため、呼び出し元は成功、失敗、キャンセルを一貫して扱える。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-`listModels` describes models offered by catalog-driven interfaces. Core resolution and streaming can still accept unlisted ids. The GUI requires catalog membership for selection and submission; adapters intended for GUI use must implement `listModels` and advertise their available models. The base implementation returns an empty list and therefore offers no GUI models.
+`listModels` はカタログ駆動のインターフェースが提供するモデルを記述する。コアの解決とストリーミングは、カタログにない id も依然として受け入れることができる。GUI では選択と送信にカタログメンバーシップが必要であり、GUI での使用を意図したアダプターは `listModels` を実装して利用可能なモデルを広告しなければならない。基本実装は空のリストを返すため、GUI 向けのモデルを提供しない。
 
-Any composition that calls a model provider — an agent loop, a session-title generator, a compaction summarizer — streams its requests through this service. Mount it together with at least one provider adapter; the service itself has no configuration and no provider wire code.
+モデルプロバイダーを呼び出すあらゆるコンポジション — エージェントループ、セッションタイトル生成器、コンパクション要約器 — は、このサービスを通じてリクエストをストリームする。少なくとも 1 つのプロバイダーアダプターと一緒にマウントする。サービス自体には設定もプロバイダーの wire コードもない。
 
-### When to choose it
+### 選ぶべきとき
 
-Choose this package whenever a plugin or composition needs to call a model: it is the only supported path into provider adapters, and it keeps one vocabulary across the loop, the session log, and every consumer. Do not reach for it when you need provider-specific wire behavior (that belongs in an adapter such as `dsh-llm-deepseek` or `dsh-llm-pi-ai`) or retry execution (that belongs in `dsh-llm-retry`).
+プラグインやコンポジションがモデルを呼び出す必要があるときは常にこのパッケージを選ぶ。プロバイダーアダプターへの唯一のサポートされた経路であり、ループ、セッションログ、すべてのコンシューマーにわたって単一の語彙を保つ。プロバイダー固有の wire の振る舞い (`dsh-llm-deepseek` や `dsh-llm-pi-ai` などのアダプターに属する) や再試行の実行 (`dsh-llm-retry` に属する) が必要なときは、これに頼らない。
 
-### Minimal composition
+### 最小コンポジション
 
-Mount the service and at least one adapter, then select the provider by name in every request:
+サービスと少なくとも 1 つのアダプターをマウントし、すべてのリクエストでプロバイダーを名前で選択する:
 
 ```yaml
 - name: '@deepseek-ai/dsh-llm'
@@ -44,7 +44,7 @@ Mount the service and at least one adapter, then select the provider by name in 
     apiKeyEnv: DEEPSEEK_API_KEY
 ```
 
-A stream returns token-level chunks and always ends with one terminal `finish` chunk. `BlockAssembler` turns the chunks into content blocks and messages; `AssistantStreamAccumulator` preserves their exact timestamps and token boundaries in a compact representation that the loop embeds in one durable attempt settlement:
+ストリームはトークンレベルのチャンクを返し、常に 1 つの終端 `finish` チャンクで終わる。`BlockAssembler` はチャンクをコンテンツブロックとメッセージに変換し、`AssistantStreamAccumulator` はそれらの正確なタイムスタンプとトークン境界を、ループが 1 つの永続的な試行決着に埋め込むコンパクトな表現で保持する:
 
 ```text
 for await (const chunk of ctx.llm.stream({
@@ -56,13 +56,13 @@ for await (const chunk of ctx.llm.stream({
 }
 ```
 
-After a successful mount, `ctx.llm.listProviders()` reports the registered routes in registration order.
+マウントが成功すると、`ctx.llm.listProviders()` は登録済みのルートを登録順に報告する。
 
-`GenerateOptions.messages` accepts durable `Message` values and request-only `RequestUserInput` values. Request-only inputs carry user-role content with no `id` or `source`; Session writes and Agent delivery still require durable messages. Callers keep auxiliary inputs unchanged until the stream settles. A caller that records its exact request, such as session-title generation, must use durable messages.
+`GenerateOptions.messages` は永続 `Message` 値とリクエスト専用の `RequestUserInput` 値を受け入れる。リクエスト専用入力は `id` も `source` も持たない user ロールのコンテンツを運ぶ。セッション書き込みとエージェントデリバリーには依然として永続メッセージが必要である。呼び出し元はストリームが決着するまで補助入力を変更しない。セッションタイトル生成のように自身の正確なリクエストを記録する呼び出し元は、永続メッセージを使わなければならない。
 
-`prepareCall(config, signal, configure?)` accepts concrete `LlmCallConfig` values. The optional synchronous, pure `ConfigureCall` function receives detached, deeply frozen `LlmCallControls` and model metadata from the captured adapter generation. Callers can compose ordinary functions to choose concrete controls; later writes replace earlier ones. Preparation retains the captured route, applies defaults to omitted controls, validates the result, and returns a frozen configuration for recording and dispatch. Callback failures or cancellation reject before dispatch. Preparation requires a registered adapter.
+`prepareCall(config, signal, configure?)` は具象 `LlmCallConfig` 値を受け入れる。オプションの同期的で純粋な `ConfigureCall` 関数は、捕捉されたアダプター世代からの切り離された深く凍結された `LlmCallControls` とモデルメタデータを受け取る。呼び出し元は通常の関数を合成して具象コントロールを選べる。後からの書き込みが先のものを置き換える。準備は捕捉されたルートを保持し、省略されたコントロールにデフォルトを適用し、結果を検証し、記録とディスパッチのための凍結された設定を返す。コールバックの失敗またはキャンセルはディスパッチ前に拒否する。準備には登録済みアダプターが必要である。
 
-Configuration functions select controls before adapter defaults are materialized. For example, combine least-effort selection with an explicit output cap, then pass `configure(maxTokens)` as the third argument:
+設定関数はアダプターのデフォルトがマテリアライズされる前にコントロールを選択する。例えば、最小エフォート選択と明示的な出力上限を組み合わせ、`configure(maxTokens)` を第 3 引数として渡す:
 
 ```ts
 import type { ConfigureCall } from '@deepseek-ai/dsh-llm'
@@ -79,119 +79,119 @@ const configure = (maxTokens: number): ConfigureCall =>
   (controls, model) => outputLimit(maxTokens)(leastReasoning(controls, model), model)
 ```
 
-### What you can do
+### できること
 
-- **Stream one model call** — `ctx.llm.stream(options)` yields raw chunks (token-level deltas) for any registered provider and model; consumers assemble them with `BlockAssembler`.
-- **Register provider adapters** — an adapter owns one or more provider routes, and its registration captures that route's retry policy; registering the same route twice fails with `DUPLICATE_ADAPTER`.
-- **Expose and activate providers through configuration** — adapters declare configurable-provider routes plus a settings namespace, so configuration surfaces can activate dormant providers and edit connection facts without a restart. `LlmConfigurableProvider.error` reports a configuration diagnostic for repair; unaffected models can remain serviceable. An entry can also carry `defaultBaseURL`, the endpoint the adapter uses when the profile sets none, and `nativeAuth`, the environment variables and OAuth sign-in that the adapter's authentication reads when the profile names no credential reference; `baseURLEnv` lists environment variables used to configure the endpoint. Configuration UIs read these fields from the directory without calling the adapter.
-- **Discover and resolve models** — List the models an adapter advertises, interrogate an endpoint for the models it serves (candidates carry optional `inputModalities`; absence means unknown), and resolve one exact model's context window, output default, reasoning efforts, input modalities, and system prompt update mode: `LlmResolvedModelInfo.systemPromptUpdate` is `'in-history'` when the model reads the latest `system` message at any position as the effective system prompt and absent when only a leading system message is read; `normalizeModelInfo` rejects any other value with `INVALID_MODEL_INFO`.
-- **Validate call config** — an explicit or configured reasoning effort is checked against the exact model before any provider I/O, and an adapter-configured output cap is materialized when the request omits one.
-- **Read an embedded Assistant stream without expanding it** — `assistantStreamFirstTokenTime` (first token), `assistantStreamHasVisibleContent` (any visible content), and `assistantStreamHasVisibleText` (any visible text) answer their questions from the compact records with early exit; `lastAssistantStreamChunk` scans backward to the last raw chunk of one type, `assistantStreamChunks` and `joinAssistantStreamText` scan the whole stream, and `assembleAssistantStream` feeds a `BlockAssembler` one joined delta per run with the same blocks, usage, and replay state as the per-member expansion. `runFirstTokenTime` and `runFirstVisibleTime` do the early-exit scan for one packed run, and `isTokenDelta`, `isVisibleChunk`, and `chunkHasVisibleText` define the token and visibility rules for a single chunk. `expandAssistantStream` remains the validating path for records read at a durable boundary; it is not memoized, because a retained expansion costs roughly ten times the compact stream for as long as the event lives.
+- **1 つのモデル呼び出しをストリームする** — `ctx.llm.stream(options)` は、登録済みの任意のプロバイダーとモデルに対して生のチャンク (トークンレベルのデルタ) を yield する。コンシューマーは `BlockAssembler` でそれらを組み立てる。
+- **プロバイダーアダプターを登録する** — アダプターは 1 つ以上のプロバイダールートを所有し、その登録がそのルートの再試行ポリシーを捕捉する。同じルートを 2 回登録すると `DUPLICATE_ADAPTER` で失敗する。
+- **設定を通じてプロバイダーを公開・有効化する** — アダプターは設定可能プロバイダーのルートと設定名前空間を宣言するので、設定サーフェスは再起動なしに休眠中のプロバイダーを有効化し、接続情報を編集できる。`LlmConfigurableProvider.error` は修復のための設定診断を報告する。影響を受けていないモデルは引き続き利用可能であり続けられる。エントリーは `defaultBaseURL` — プロファイルが何も設定しない場合にアダプターが使うエンドポイント — と、`nativeAuth` — プロファイルが資格情報参照を名指さない場合にアダプターの認証が読む環境変数と OAuth サインイン — を運ぶこともできる。`baseURLEnv` はエンドポイントの設定に使う環境変数を列挙する。設定 UI はアダプターを呼び出すことなく、ディレクトリからこれらのフィールドを読む。
+- **モデルをディスカバリーして解決する** — アダプターが広告するモデルを一覧し、エンドポイントが提供するモデルを問い合わせ (候補はオプションの `inputModalities` を運び、欠如は不明を意味する)、1 つの正確なモデルのコンテキストウィンドウ、出力デフォルト、推論エフォート、入力モダリティ、システムプロンプト更新モードを解決する。`LlmResolvedModelInfo.systemPromptUpdate` は、モデルが任意の位置にある最新の `system` メッセージを有効なシステムプロンプトとして読む場合に `'in-history'` であり、先頭のシステムメッセージのみを読む場合は存在しない。`normalizeModelInfo` はそれ以外の値を `INVALID_MODEL_INFO` で拒否する。
+- **呼び出し設定を検証する** — 明示的または設定済みの推論エフォートは、プロバイダーの I/O の前に正確なモデルに対してチェックされ、アダプター設定の出力上限は、リクエストが省略したときにマテリアライズされる。
+- **埋め込み Assistant ストリームを展開せずに読む** — `assistantStreamFirstTokenTime` (最初のトークン)、`assistantStreamHasVisibleContent` (可視コンテンツの有無)、`assistantStreamHasVisibleText` (可視テキストの有無) は、コンパクトなレコードから早期終了でそれぞれの問いに答える。`lastAssistantStreamChunk` は 1 つの型の最後の生チャンクまで逆方向にスキャンし、`assistantStreamChunks` と `joinAssistantStreamText` はストリーム全体をスキャンし、`assembleAssistantStream` はメンバーごとの展開と同じブロック、usage、リプレイ状態で、1 ランにつき 1 つの結合済みデルタを `BlockAssembler` に供給する。`runFirstTokenTime` と `runFirstVisibleTime` は 1 つのパック済みランに対して早期終了スキャンを行い、`isTokenDelta`、`isVisibleChunk`、`chunkHasVisibleText` は単一チャンクのトークンと可視性のルールを定義する。`expandAssistantStream` は、永続境界で読み取られたレコードの検証経路であり続ける。メモ化されないのは、保持された展開がイベントの生存期間中、コンパクトストリームのおよそ 10 倍のコストを要するためである。
 
-### Failures and recovery
+### 失敗と復旧
 
-Every stream ends in exactly one terminal `finish` chunk: `{ kind: 'error', failure }` on failure, `{ kind: 'aborted', failure }` on cancellation. Failures carry stable codes such as `NO_ADAPTER`, `MISSING_CREDENTIAL`, `AUTH`, `RATE_LIMIT`, and `CONTEXT_WINDOW_EXCEEDED`; consumers route on the code, never on message text. `QUOTA` is provider-neutral exhaustion, while `ACCOUNT_QUOTA` is reserved for a first-party account balance that the current product can replenish. A request naming an unregistered provider fails with `NO_ADAPTER`, and a malformed credential fails with `INVALID_CREDENTIAL` instead of surfacing as an opaque fetch error. This service never re-runs a request: retrying is the job of `dsh-llm-retry` at the agent's failed-step extension point.
+すべてのストリームは正確に 1 つの終端 `finish` チャンクで終わる。失敗時は `{ kind: 'error', failure }`、キャンセル時は `{ kind: 'aborted', failure }` である。失敗は `NO_ADAPTER`、`MISSING_CREDENTIAL`、`AUTH`、`RATE_LIMIT`、`CONTEXT_WINDOW_EXCEEDED` などの安定したコードを運ぶ。コンシューマーはメッセージ本文ではなくコードでルーティングする。`QUOTA` はプロバイダー中立の枯渇であり、`ACCOUNT_QUOTA` は現在の製品が補充できるファーストパーティのアカウント残高のために予約されている。未登録のプロバイダーを名指すリクエストは `NO_ADAPTER` で失敗し、不正な形式の資格情報は不透明な fetch エラーとして表面化せず `INVALID_CREDENTIAL` で失敗する。このサービスはリクエストを決して再実行しない。再試行はエージェントの失敗ステップ拡張ポイントにおける `dsh-llm-retry` の仕事である。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design behind the service; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節はサービス背後の設計を説明する。観測可能な振る舞いは[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計方針
 
-The service is built on one separation: **the logical contract is provider-neutral, adapters own the wire.** It defines the canonical message, content-block, and stream-chunk vocabulary once, and every provider adapter translates only its own wire format into that vocabulary. The registry is the topology owner — adapter routes, configurable-provider entries, and discovery offers all register here and are disposed with their fiber — while an agent-loop request stays a pure function of the session log: loop-built requests arrive deep-frozen, so listeners and adapters read them and never rewrite them.
+このサービスは 1 つの分離の上に成り立つ: **論理契約はプロバイダー中立で、wire はアダプターが所有する。** 正規のメッセージ、コンテンツブロック、ストリームチャンクの語彙を一度だけ定義し、各プロバイダーアダプターは自身の wire フォーマットのみをその語彙へ変換する。レジストリがトポロジーの所有者である — アダプタールート、設定可能プロバイダーエントリー、ディスカバリーオファーはすべてここに登録され、そのファイバーとともに破棄される — 一方で、エージェントループのリクエストはセッションログの純粋関数に留まる。ループが構築したリクエストは深く凍結された状態で到着するので、リスナーとアダプターはそれらを読み、決して書き換えない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | The `LlmRuntime` service: adapter registry, configurable-provider directory, model discovery, call preparation, and the streaming boundary |
-| [`src/types.ts`](src/types.ts) | The `StreamChunk` protocol, content-block map, finish reasons, and shared vocabulary |
-| [`src/message.ts`](src/message.ts) | Immutable message constructors shared by delivery, history, and requests |
-| [`src/assembler.ts`](src/assembler.ts) | `BlockAssembler`: incremental chunk-to-block assembly |
-| [`src/assistant-stream.ts`](src/assistant-stream.ts) | Compact timed Assistant stream accumulation, strict validation, exact expansion, and record-level readers |
-| [`src/call-config.ts`](src/call-config.ts) | Call-config validation, adapter-default materialization, and request freezing |
-| [`src/retry-policy.ts`](src/retry-policy.ts) | Provider-owned retry policy resolution (normal and always modes) |
-| [`src/error.ts`](src/error.ts) | `HarnessError`/`LlmError` taxonomy and provider-neutral failure codes |
-| [`src/content.ts`](src/content.ts) | Shared file and image helpers: content walks, file projection, image offload accounting, and offloaded-image projection |
-| [`src/api-key.ts`](src/api-key.ts) | Credential format check shared by every adapter |
-| [`src/adapter-failure.ts`](src/adapter-failure.ts) | Failure normalization into terminal finish chunks |
+| [`src/index.ts`](src/index.ts) | `LlmRuntime` サービス: アダプターレジストリ、設定可能プロバイダーディレクトリ、モデルディスカバリー、呼び出し準備、ストリーミング境界 |
+| [`src/types.ts`](src/types.ts) | `StreamChunk` プロトコル、コンテンツブロックマップ、終了理由、共有語彙 |
+| [`src/message.ts`](src/message.ts) | デリバリー、履歴、リクエストで共有される不変メッセージコンストラクター |
+| [`src/assembler.ts`](src/assembler.ts) | `BlockAssembler`: チャンクからブロックへの増分組み立て |
+| [`src/assistant-stream.ts`](src/assistant-stream.ts) | コンパクトなタイミング付き Assistant ストリームの蓄積、厳密な検証、正確な展開、レコードレベルのリーダー |
+| [`src/call-config.ts`](src/call-config.ts) | 呼び出し設定の検証、アダプターデフォルトのマテリアライズ、リクエストの凍結 |
+| [`src/retry-policy.ts`](src/retry-policy.ts) | プロバイダー所有の再試行ポリシー解決 (normal モードと always モード) |
+| [`src/error.ts`](src/error.ts) | `HarnessError`/`LlmError` 分類とプロバイダー中立の失敗コード |
+| [`src/content.ts`](src/content.ts) | 共有のファイル・画像ヘルパー: コンテンツ走査、ファイルプロジェクション、画像オフロードの計算、オフロード済み画像のプロジェクション |
+| [`src/api-key.ts`](src/api-key.ts) | すべてのアダプターで共有される資格情報フォーマットチェック |
+| [`src/adapter-failure.ts`](src/adapter-failure.ts) | 終端 finish チャンクへの失敗の正規化 |
 
-### Main flow
+### メインフロー
 
-A request is validated against its exact model's capability — context window, output default, reasoning efforts, input modalities, and `systemPromptUpdate` mode — and any adapter-configured defaults are materialized. The runtime preserves freezing for already-frozen input; hand-built callers own input immutability. `prepareCall()` binds those facts, detached context, and retry policy to the exact adapter generation that performs terminal dispatch, so HMR or dynamic settings cannot combine one generation's image capability with another generation's endpoint. An image-capable adapter projects durable references into route-specific request versions; `resolveImageAttachmentAccess()` separately maps an attachment provider's optional host object into the current tool execution world without changing the request image or its `variantId`. A text-only route receives deterministic per-image placeholders, including tool-role result images, without rewriting append-only session history. Durable `FileBlock` references never reach any adapter: request assembly replaces each one, including tool-role result occurrences, with deterministic handle text naming the file and its saved read-only path, resolved through the mounted attachment and filesystem providers. `ctx.llm.fileRequestText(ref)` exposes that exact synchronous projection to request measurement. An image occurrence derived with `offloaded: true` reaches every route as placeholder text through `projectOffloadedImages()`. An image-capable route whose retained occurrences exceed its `LlmImageRequestBudget` at their exact bytes fails with `IMAGE_OFFLOAD_REQUIRED` naming the additional oldest occurrences (`requiredImageOffload()`), never with an unlogged projection; `dsh-compaction-image-offload` logs the selected occurrences in one `image/offload` event and retries. Adapters that charge visual tokens declare per-route `imageRequestPricing`, which `ctx.llm.imageRequestPricing(provider, model)` resolves synchronously for the token meter. Dispatch goes through the `llm/stream` waterfall, then chunks return as token-level deltas and every adapter outcome reaches the consumer as one terminal `finish` chunk. `imageRequestTarget(provider, model, image)` exposes the same request-image dimensions and byte target to screenshot consumers; adapters without image resizing preserve the normalized source.
+リクエストは、その正確なモデルのケイパビリティ — コンテキストウィンドウ、出力デフォルト、推論エフォート、入力モダリティ、`systemPromptUpdate` モード — に対して検証され、アダプター設定のデフォルトがマテリアライズされる。ランタイムは既に凍結された入力の凍結状態を保つ。手で構築する呼び出し元は入力の不変性を自ら所有する。`prepareCall()` はそれらの事実、切り離されたコンテキスト、再試行ポリシーを、終端ディスパッチを行う正確なアダプター世代に束縛するので、HMR や動的設定が、ある世代の画像ケイパビリティと別の世代のエンドポイントを組み合わせることはできない。画像対応アダプターは永続参照をルート固有のリクエストバージョンに投影する。`resolveImageAttachmentAccess()` は、リクエスト画像やその `variantId` を変更することなく、添付プロバイダーのオプションのホストオブジェクトを現在のツール実行ワールドへ別途マップする。テキスト専用ルートは、ツールロールの結果画像を含め、決定論的な画像ごとのプレースホルダーを受け取り、追記専用のセッション履歴を書き換えない。永続 `FileBlock` 参照がアダプターに到達することは決してない。リクエストの組み立てが、ツールロールの結果出現を含む各参照を、ファイルとその保存された読み取り専用パスを名指す決定論的なハンドルテキストに置き換え、それはマウントされた添付プロバイダーとファイルシステムプロバイダーを通じて解決される。`ctx.llm.fileRequestText(ref)` はその正確な同期プロジェクションをリクエスト計測に公開する。`offloaded: true` で導出された画像出現は、`projectOffloadedImages()` を通じてプレースホルダーテキストとしてすべてのルートに届く。保持された出現が正確なバイト数で `LlmImageRequestBudget` を超える画像対応ルートは、追加で最も古い出現を名指す `IMAGE_OFFLOAD_REQUIRED` で失敗し (`requiredImageOffload()`)、ログに記録されないプロジェクションで失敗することはない。`dsh-compaction-image-offload` は選択された出現を 1 つの `image/offload` イベントに記録して再試行する。視覚トークンを課金するアダプターはルートごとの `imageRequestPricing` を宣言し、`ctx.llm.imageRequestPricing(provider, model)` がトークンメーターのためにそれを同期的に解決する。ディスパッチは `llm/stream` waterfall を通り、その後チャンクはトークンレベルのデルタとして戻り、すべてのアダプター結果は 1 つの終端 `finish` チャンクとしてコンシューマーに届く。`imageRequestTarget(provider, model, image)` は同じリクエスト画像の寸法とバイトターゲットをスクリーンショットのコンシューマーに公開する。画像リサイズを行わないアダプターは正規化されたソースをそのまま保つ。
 
-File detection reads current content, including tool-role result content, on every request without caching message identities or freeze state. The [archived file-scan decision](../../../.agents/notes/archived/simplification/2026-09-07-file-content-scan.md) records the measured traversal cost.
+ファイル検出は、メッセージの同一性や凍結状態をキャッシュすることなく、すべてのリクエストで現在のコンテンツ (ツールロールの結果コンテンツを含む) を読む。[アーカイブされたファイルスキャンの決定](../../../.agents/notes/archived/simplification/2026-09-07-file-content-scan.md)が計測された走査コストを記録している。
 
-### Invariants
+### 不変条件
 
-- **Model-visible ⟺ logged** — callers must keep every provider request's model-visible input reconstructable from the session log; loop-built requests arrive deep-frozen and cannot be rewritten.
-- **Replay state travels only within one adapter** — assistant replay state rides along only when the same adapter instance owns the historical and target routes; otherwise it is dropped before dispatch.
-- **Prepared calls are one-shot** — a prepared call can be dispatched exactly once, and its call-config fields must match the prepared config.
-- **Image projection follows the captured route** — durable `ImageBlock` references become route-specific request versions only for image-capable models; text-only models receive stable placeholders.
-- **File projection is unconditional** — no provider receives file bytes; every route gets one deterministic handle line per `FileBlock`, and the model reads the saved copy with its file tools on demand.
-- **Protocol ordering** — `usage` precedes `finish`, tool arguments stay raw JSON strings, and nothing follows the terminal `finish`.
-- **Registry mutations are atomic** — route and directory registration validates the whole candidate set before anything moves, so a refused change leaves the previous state serving.
+- **モデル可視 ⟺ ログ記録済み** — 呼び出し元は、すべてのプロバイダーリクエストのモデル可視入力をセッションログから再構築可能に保たなければならない。ループが構築したリクエストは深く凍結されて到着し、書き換えることができない。
+- **リプレイ状態は 1 つのアダプター内でのみ移動する** — assistant リプレイ状態は、同じアダプターインスタンスが過去ルートとターゲットルートを所有する場合にのみ同伴する。そうでなければディスパッチ前に破棄される。
+- **準備済み呼び出しはワンショットである** — 準備済み呼び出しは正確に 1 回ディスパッチでき、その呼び出し設定フィールドは準備済み設定と一致しなければならない。
+- **画像プロジェクションは捕捉されたルートに従う** — 永続 `ImageBlock` 参照は画像対応モデルのみでルート固有のリクエストバージョンになる。テキスト専用モデルは安定したプレースホルダーを受け取る。
+- **ファイルプロジェクションは無条件である** — どのプロバイダーもファイルバイトを受け取らない。すべてのルートが `FileBlock` ごとに 1 つの決定論的なハンドル行を受け取り、モデルは必要に応じて自身のファイルツールで保存されたコピーを読む。
+- **プロトコルの順序** — `usage` は `finish` より前にあり、ツール引数は生の JSON 文字列のままであり、終端 `finish` の後に何も続かない。
+- **レジストリの変更はアトミックである** — ルートとディレクトリの登録は、何かが動く前に候補集合全体を検証するので、拒否された変更は以前の状態を提供し続けたままにする。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared types to the concrete adapters, the retry executor, and the measurement service.
+パッケージレベルの契約では足りないときにこれらのページを読む。共有型から、具象アダプター、再試行エグゼキューター、計測サービスへ進む。
 
-- [LLM streaming subsystem](../../../docs/subsystems/llm-streaming.md) — the message and block types, compact Assistant stream records, the `StreamChunk` protocol, and the adapter contract.
-- [llm-deepseek adapter](../llm-deepseek/README.md) — the direct DeepSeek Messages implementation.
-- [llm-pi-ai adapter](../llm-pi-ai/README.md) — the pi-ai-backed multi-provider implementation.
-- [llm-retry](../llm-retry/README.md) — the retry executor that re-runs failed model requests.
-- [Token meter](../token-meter/README.md) — replay-aware request and context pressure measurement.
-- [Twin LLM adapters](../../../.agents/notes/implemented/architecture/2026-06-13-twin-llm-adapters.md) — why the DeepSeek route ships two structurally different adapters.
-- [Terminal LLM stream failures](../../../.agents/notes/implemented/architecture/2026-07-29-terminal-llm-stream-failures.md) — the service boundary between model-request outcomes and plugin failures.
+- [LLM ストリーミングサブシステム](../../../docs/subsystems/llm-streaming.md) — メッセージとブロックの型、コンパクトな Assistant ストリームレコード、`StreamChunk` プロトコル、アダプター契約。
+- [llm-deepseek アダプター](../llm-deepseek/README.md) — 直接の DeepSeek Messages 実装。
+- [llm-pi-ai アダプター](../llm-pi-ai/README.md) — pi-ai をバックエンドとするマルチプロバイダー実装。
+- [llm-retry](../llm-retry/README.md) — 失敗したモデルリクエストを再実行する再試行エグゼキューター。
+- [トークンメーター](../token-meter/README.md) — リプレイを考慮したリクエストとコンテキストの圧力計測。
+- [ツイン LLM アダプター](../../../.agents/notes/implemented/architecture/2026-06-13-twin-llm-adapters.md) — DeepSeek ルートが構造的に異なる 2 つのアダプターを出荷する理由。
+- [終端 LLM ストリーム失敗](../../../.agents/notes/implemented/architecture/2026-07-29-terminal-llm-stream-failures.md) — モデルリクエストの結果とプラグイン失敗の間のサービス境界。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the LLM service adds no content; adapters choose when to add the shared image descriptors and per-image placeholders exported by this package.
+なし。LLM サービスはコンテンツを追加しない。アダプターが、このパッケージがエクスポートする共有画像記述子と画像ごとのプレースホルダーをいつ追加するかを選ぶ。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Reasoning-effort materialization preserves the assembled request prefix. Image identity and request-preview text are deterministic, while an optional execution-world path is resolved for each request; a changed path or an offload decision can prevent reuse from that image.
+推論エフォートのマテリアライズは、組み立て済みのリクエストプレフィックスを保つ。画像の同一性とリクエストプレビューテキストは決定論的であり、オプションの実行ワールドパスはリクエストごとに解決される。パスが変わった場合やオフロードの決定は、その画像からの再利用を妨げることがある。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where this service stops and other packages or future work begin. They are current package constraints, not a task backlog.
+これらの制限は、このサービスがどこで止まり、他のパッケージや将来の作業がどこから始まるかを定義する。それらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **No retry execution, caching, or rate limiting ships in this service** — provider registration stores the retry policy, but a stream remains a single provider attempt; `@deepseek-ai/dsh-llm-retry` executes the policy at durable agent-step boundaries.
-- **`GenerateOptions` sampling is `temperature`/`maxTokens`/`stop` only** — no `tool_choice`, `top_p`, or penalty fields; the vocabulary grows when a producer lands ([dropped inert knobs](../../../.agents/notes/archived/simplification/2026-07-04-drop-inert-request-knobs.md)).
-- **Variants normally require a producer** — `prefill`, per-tool `strict`, block `cache` hints, and the `agent` message-source variant have no producer ([Agent Note](../../../.agents/notes/archived/simplification/2026-07-04-prune-producerless-vocabulary-variants.md)).
-- **`BlockAssembler` handles core block kinds only** — a plugin-added block type whose stream is never closed by `block-end` makes `blocks()` throw.
-- **`GenerateOptions.sessionId` is a locally-declared brand** — importing dsh-session's `SessionId` would create a dependency cycle.
-- **Tool updates require session history** — `GenerateOptions.tools` contains active definitions. `toolHistory` supplies the initial declarations and historically resolved additions from `Session.toolHistory()`. At adapter dispatch, `projectToolUpdates` constructs deferred declarations and retains removed definitions for `in-history`; `addition-only` omits removed definitions and removal messages. Unsupported routes receive active tools without developer messages or `deferLoading`. Missing history or a request prefix omitting recorded updates falls back to current declarations without developer messages. Explicitly deferred baseline tools remain deferred until their first retained addition block; declaring a deferred tool does not activate it.
+- **このサービスには再試行の実行、キャッシュ、レート制限は出荷されない** — プロバイダー登録は再試行ポリシーを保存するが、ストリームは 1 回のプロバイダー試行のままである。`@deepseek-ai/dsh-llm-retry` が永続エージェントステップ境界でポリシーを実行する。
+- **`GenerateOptions` のサンプリングは `temperature`/`maxTokens`/`stop` のみ** — `tool_choice`、`top_p`、ペナルティのフィールドはない。語彙はプロデューサーが着地したときに拡大する ([削除された不活性ノブ](../../../.agents/notes/archived/simplification/2026-07-04-drop-inert-request-knobs.md))。
+- **バリアントは通常プロデューサーを必要とする** — `prefill`、ツールごとの `strict`、ブロック `cache` ヒント、`agent` メッセージソースバリアントにはプロデューサーがない ([Agent Note](../../../.agents/notes/archived/simplification/2026-07-04-prune-producerless-vocabulary-variants.md))。
+- **`BlockAssembler` はコアのブロック種別のみを扱う** — ストリームが `block-end` で閉じられないプラグイン追加のブロック型は `blocks()` を throw させる。
+- **`GenerateOptions.sessionId` はローカルに宣言されたブランドである** — dsh-session の `SessionId` をインポートすると依存サイクルが生じる。
+- **ツール更新にはセッション履歴が必要である** — `GenerateOptions.tools` はアクティブな定義を含む。`toolHistory` は `Session.toolHistory()` からの初期宣言と歴史的に解決された追加を供給する。アダプターディスパッチ時に、`projectToolUpdates` は遅延宣言を構築し、`in-history` のために削除された定義を保持する。`addition-only` は削除された定義と削除メッセージを省略する。サポートされないルートは、developer メッセージや `deferLoading` なしでアクティブツールを受け取る。履歴が欠落している場合や、リクエストプレフィックスが記録済みの更新を省略している場合は、developer メッセージなしの現在の宣言にフォールバックする。明示的に遅延されたベースラインツールは、最初の保持された追加ブロックまで遅延されたままである。遅延ツールを宣言しても有効化されない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is non-authoritative working context: open questions and undecided directions. Shipped behavior and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発者ノートは権威を持たない作業コンテキストである。未解決の問いと未決定の方向性を記す。出荷済みの振る舞いと受け入れられた根拠は、上の各節、パッケージコード、リンクされた Agent Note にある。
 
-#### Open items
+#### 未解決項目
 
-- `GenerateOptions.sessionId` is a locally-declared brand because importing dsh-session's `SessionId` would create a dependency cycle; a future ids-owning package could dissolve the workaround.
-- Reasoning-effort identifiers are adapter-owned opaque strings resolved only against each adapter's advertised set; a shared cross-adapter effort vocabulary is not decided.
-- The `llm/adapters-updated` event is payload-free by design; consumers re-read the registries instead of receiving the new topology in the event.
+- `GenerateOptions.sessionId` はローカルに宣言されたブランドである。dsh-session の `SessionId` をインポートすると依存サイクルが生じるためであり、将来 id を所有するパッケージがこの回避策を解消できる。
+- 推論エフォートの識別子はアダプター所有の不透明な文字列で、各アダプターが広告する集合に対してのみ解決される。アダプター間で共有するエフォート語彙は決定されていない。
+- `llm/adapters-updated` イベントは設計上ペイロードを持たない。コンシューマーはイベントで新しいトポロジーを受け取る代わりに、レジストリを読み直す。
 
 </details>

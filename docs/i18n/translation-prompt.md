@@ -1,34 +1,34 @@
-# Translation prompt (pipeline asset)
+# 翻訳プロンプト（パイプライン資産）
 
-本文件是自动翻译流水线的 prompt 模板；从 `# Translation Prompt` 开始的正文会逐字进入模型请求，因此本文件不参与双语配对（见 [README.md](README.md) 排除清单）。模板正文与内嵌 few-shot 正误例由 jingtingxiang 基于对存量译文的质量评审撰写，是流水线行为的拍板基线。渲染时把 [terminology.md](terminology.md) 整表填入 `{{terminology}}`；除此之外不注入任何其他仓库文件（translation-rules.md 约束人和 agent 的翻译工作，不注入本模板）。[style-samples.md](style-samples.md) 定义文体，模板中的 Examples 只用于说明典型问题，两者冲突时以文体样例为准。本模板遵循 [提示词 v4 约定 Agent Note](../../.agents/notes/archived/process/2026-07-23-translation-prompt-v4-contract.md) 记录的兼容协议。修改本文件会改变翻译行为，需正常经过 PR 评审。
+このファイルは自動翻訳パイプラインのプロンプトテンプレートである。`# Translation Prompt` から始まる本文はそのままモデルリクエストに入るため、このファイルはバイリンガルペアに含まれない（[README.md](README.md) の除外リストを参照）。テンプレート本文と埋め込み few-shot 正誤例は、jingtingxiang が既存訳文の品質レビューに基づいて執筆したものであり、パイプライン挙動の決定版の基準である。レンダリング時に [terminology.md](terminology.md) の全表を `{{terminology}}` に埋め込む。それ以外のリポジトリファイルは一切注入しない（translation-rules.md は人間と agent の翻訳作業を拘束するもので、このテンプレートには注入されない）。[style-samples.md](style-samples.md) が文体を定義し、テンプレート内の Examples は典型的な問題の説明にのみ使用する。両者が衝突する場合は文体サンプルを優先する。このテンプレートは[プロンプト v4 規約の Agent Note](../../.agents/notes/archived/process/2026-07-23-translation-prompt-v4-contract.md) に記録された互換プロトコルに従う。このファイルの変更は翻訳挙動を変えるため、通常どおり PR レビューを経る必要がある。
 
-## 占位符约定
+## プレースホルダー規約
 
-流水线渲染模板时替换以下占位符，除此之外不改写系统消息：
+パイプラインがテンプレートをレンダリングする際、以下のプレースホルダーを置換する。それ以外はシステムメッセージを書き換えない:
 
-| 占位符 | 填入内容 | 来源 |
+| プレースホルダー | 埋め込まれる内容 | 出所 |
 |---|---|---|
-| `{{source_lang}}` | 源语言名（`English` / `Chinese`） | 由改动侧文件推断：`.zh.md` 被改则为 `Chinese` |
-| `{{target_lang}}` | 目标语言名（`Chinese` / `English`） | 与 `{{source_lang}}` 相对 |
-| `{{terminology}}` | [terminology.md](terminology.md) 的完整表格（Markdown 原文） | 渲染时读取仓库当前版本，不缓存 |
+| `{{source_lang}}` | ソース言語名（`English` / `Chinese`） | 変更側のファイルから推定する。`.zh.md` が変更された場合は `Chinese` |
+| `{{target_lang}}` | ターゲット言語名（`Chinese` / `English`） | `{{source_lang}}` と相対 |
+| `{{terminology}}` | [terminology.md](terminology.md) の完全な表（Markdown 原文） | レンダリング時にリポジトリの現在バージョンを読み取り、キャッシュしない |
 
-流水线只识别上表中的占位符，并且一次翻译整篇文档。它不支持 `{{to}}`、`{{title_prompt}}`、`{{summary_prompt}}`、`{{terms_prompt}}`、`{{imt_style_guide}}`、`{{translation_rules}}` 或 `%%` 分段协议；输出采用模板正文规定的三段 XML，流水线解析取 `<final>` 段。
+パイプラインは上表のプレースホルダーだけを認識し、1 回で文書全体を翻訳する。`{{to}}`、`{{title_prompt}}`、`{{summary_prompt}}`、`{{terms_prompt}}`、`{{imt_style_guide}}`、`{{translation_rules}}`、または `%%` セグメントプロトコルには対応しない。出力はテンプレート本文が規定する 3 段の XML を採用し、パイプラインの解析は `<final>` 段を取る。
 
-语言切换行：已有配对的源文件自带切换行，模型按模板规则翻转即可。全新配对的源文件没有切换行，模型也无从得知文件名——此时由流水线在解析 `<final>` 后按目标文件名插入或校正切换行（机械后处理，配对门禁兜底校验）。
+言語切替行: すでにペアのあるソースファイルは切替行を自身に持つため、モデルはテンプレートの規則どおり反転させるだけでよい。完全に新しいペアのソースファイルには切替行がなく、モデルがファイル名を知ることもできない。この場合、パイプラインが `<final>` を解析した後にターゲットファイル名に従って切替行を挿入または校正する（機械的な後処理であり、ペアリングゲートが最終検証する）。
 
-## Few-shot 金标
+## Few-shot ゴールド標準
 
-流水线使用**整篇文档**的中英对照作为 few-shot，不是模板内嵌的句子级正误例。以下 5 组配对文档均经过人工评审；前四组随当前文档更新，第五组保留冻结的历史样例：
+パイプラインは**文書全体**の中英対照を few-shot として使用し、テンプレート内蔵の文単位の正誤例は使用しない。以下の 5 組のペア文書はすべて人手レビュー済みである。最初の 4 組は現在の文書に追随して更新され、5 番目の組は凍結された歴史サンプルを保つ:
 
 - `README.md` ↔ `README.zh.md`
 - `docs/development.md` ↔ `docs/development.zh.md`
 - `docs/i18n/README.md` ↔ `docs/i18n/README.zh.md`
 - `docs/i18n/translation-rules.md` ↔ `docs/i18n/translation-rules.zh.md`
-- `.agents/notes/archived/process/2026-07-02-bilingual-docs-and-pairing-gate.md` ↔ 对应 `.zh.md`
+- `.agents/notes/archived/process/2026-07-02-bilingual-docs-and-pairing-gate.md` ↔ 対応する `.zh.md`
 
-注入方式：在系统消息（本模板）之后、待译文档之前，每组作为一轮示例对话——user 消息为源文档全文，assistant 消息为定稿译文全文（裸文本，不带三段 XML 包装；只有真实请求要求三段输出）。上下文不足时按上列顺序从后往前删减组数。这 5 组也是评审校准锚点（见 [style-samples.md](style-samples.md)），改动任何一组即改变流水线行为。
+注入方式: システムメッセージ（このテンプレート）の後、翻訳対象文書の前に、各組を 1 ラウンドの例示会話として置く。user メッセージがソース文書全文、assistant メッセージが確定訳文全文である（裸のテキストで、3 段 XML の包装はない。3 段出力を求めるのは実際のリクエストだけである）。コンテキストが不足する場合は上記の順で後ろから組数を削減する。この 5 組はレビューの校正アンカーでもある（[style-samples.md](style-samples.md) を参照）。いずれかの組を変更するとパイプラインの挙動が変わる。
 
-## 模板正文
+## テンプレート本文
 
 ````text
 # Translation Prompt

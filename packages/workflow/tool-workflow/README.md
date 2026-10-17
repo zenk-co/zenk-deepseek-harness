@@ -1,186 +1,186 @@
 ---
-description: "The model-facing workflow tool: run a JavaScript orchestration script that fans out subagents, for users and maintainers choosing or configuring model-driven orchestration."
+description: "モデルに公開される workflow ツール: サブエージェントをファンアウトする JavaScript オーケストレーションスクリプトを実行します。モデル駆動オーケストレーションを選択または設定するユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-workflow
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-tool-workflow` lets a model run JavaScript orchestration that delegates to many subagents and returns a final JSON value. Use it only when the user explicitly requests a workflow or large multi-agent orchestration; prefer plain subagent calls for one or two delegations. Foreground execution waits for all work; cancellation or abnormal completion returns an error rather than partial success. `run_in_background: true` returns an owned job id immediately and exposes live output. Deployments can rename the tool with `toolName` and cap rendered results with `maxResultChars`.
+`dsh-tool-workflow` は、モデルが多数のサブエージェントに委譲する JavaScript オーケストレーションを実行し、最終的な JSON 値を返せるようにします。ユーザーがワークフローまたは大規模なマルチエージェントオーケストレーションを明示的に要求した場合にのみ使用してください。1、2 件の委譲には通常のサブエージェント呼び出しを優先します。フォアグラウンド実行はすべての作業を待ちます。キャンセルまたは異常な完了は部分的な成功ではなくエラーを返します。`run_in_background: true` は所有ジョブ ID を即座に返し、ライブ出力を公開します。デプロイは `toolName` でツール名を変更でき、`maxResultChars` でレンダリング結果を制限できます。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送りされた作業](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The `workflow` tool runs a model-authored orchestration script that fans work out across many subagents and returns the script's final JSON value. Use it only when the user explicitly asks for a workflow or for large multi-agent orchestration — an audit over many files, a migration, multi-angle research; for one or two delegations, prefer plain subagent calls.
+`workflow` ツールは、モデルが書いたオーケストレーションスクリプトを実行し、作業を多数のサブエージェントにファンアウトして、スクリプトの最終 JSON 値を返します。ユーザーがワークフローまたは大規模なマルチエージェントオーケストレーション（多数ファイルの監査、移行、多角的な調査）を明示的に求めた場合にのみ使用してください。1、2 件の委譲には通常のサブエージェント呼び出しを優先します。
 
-### Calling the tool
+### ツールの呼び出し
 
-The model submits three parameters plus one flag: `meta` (required identity data: `name`, `description`, and optional `whenToUse` and `phases`), `script` (required plain JavaScript body — no `export const meta` statement; its parameter description carries the body rules and the tool description carries the hook contract), `args` (optional JSON object exposed to the script as the `args` global; wrap a bare list in a field so the wire schema stays honest), and `run_in_background` (optional; present only while `enableRunInBackground` holds).
+モデルは 3 つのパラメーターと 1 つのフラグを送信します。`meta`（必須の識別データ: `name`、`description`、およびオプションの `whenToUse` と `phases`）、`script`（必須のプレーンな JavaScript 本体 — `export const meta` 文は含みません。そのパラメーター説明が本体のルールを運び、ツール説明がフック契約を運びます）、`args`（オプションの JSON オブジェクト。スクリプトに `args` グローバルとして公開されます。裸のリストはフィールドで包んで、wire スキーマが正直なままになるようにしてください）、および `run_in_background`（オプション。`enableRunInBackground` が成立する間のみ存在します）です。
 
-A foreground success returns the envelope `{ kind: 'foreground', runId, agentsStarted, result }`, rendered to the model as `workflow "<name>" completed (<count> agent<optional-s>).` followed by `Return value:` and the pretty-printed JSON. A workflow that cannot start — a script parse or meta validation failure — returns an error the model can correct from. Cancellation and execution failures return `Error: workflow run was cancelled` or `Error: workflow run failed: <error>`; partial output is never reported as success.
+フォアグラウンドの成功はエンベロープ `{ kind: 'foreground', runId, agentsStarted, result }` を返し、モデルには `workflow "<name>" completed (<count> agent<optional-s>).` に続けて `Return value:` と整形された JSON としてレンダリングされます。開始できないワークフロー — スクリプト解析や meta 検証の失敗 — は、モデルが修正できるエラーを返します。キャンセルと実行の失敗は `Error: workflow run was cancelled` または `Error: workflow run failed: <error>` を返します。部分的な出力が成功として報告されることはありません。
 
-### What to expect during a run
+### 実行中に期待できること
 
-While the script runs, the parent turn waits: the tool starts the run, awaits its result, and always disposes it, so the script and its children reach quiescence on every path — including cancellation, which is bridged from the parent step's abort signal. The model sees one final outcome, never intermediate child messages; the children's own work stays out of the parent conversation.
+スクリプトの実行中、親ターンは待機します。ツールは実行を開始し、その結果を待ち、常にそれを破棄するため、スクリプトとその子はすべてのパスで静止状態に達します — 親ステップの中止シグナルからブリッジされるキャンセルも含みます。モデルが見るのは 1 つの最終結果のみで、中間の子メッセージは見えません。子自身の作業は親の会話に入りません。
 
-### Background runs
+### バックグラウンド実行
 
-`run_in_background: true` returns `{ kind: 'background', jobId, runId }` immediately: the run is registered on `ctx.jobs` as an owned `workflow` job, so the session-header job list streams its `phase()`, `log()`, and member lifecycle lines live from the job's output ring, and the row's progress line tracks the current phase. No tool-step signal reaches the run — `job_kill`, the list's stop control, and owner teardown are what cancel it. Settlement is the job's settlement: a completed run carries the same rendered return value as the job's result (the completion notice announces it, the model's first `job_output` after settlement carries it once), a cancelled run settles `killed` with the kill reason, and a failed run settles `failed` with the script's failure message. Without a live job registry and a controller serving the caller the call fails, naming the missing composition pieces.
+`run_in_background: true` は `{ kind: 'background', jobId, runId }` を即座に返します。実行は所有された `workflow` ジョブとして `ctx.jobs` に登録されるため、セッションヘッダーのジョブ一覧はジョブの出力リングからその `phase()`、`log()`、メンバーのライフサイクル行をライブでストリームし、行の進捗行は現在のフェーズを追跡します。ツールステップのシグナルは実行に届きません — それをキャンセルするのは `job_kill`、一覧の停止コントロール、オーナーの破棄です。確定はジョブの確定です。完了した実行はジョブの結果と同じレンダリング済み戻り値を運び（完了通知がそれを告知し、確定後のモデルの最初の `job_output` がそれを 1 回運びます）、キャンセルされた実行は kill 理由とともに `killed` で確定し、失敗した実行はスクリプトの失敗メッセージとともに `failed` で確定します。ライブのジョブレジストリと呼び出し元にサービスするコントローラーがない場合、呼び出しは失敗し、不足している構成要素を挙げます。
 
-### Config
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `toolName` | `workflow` | The model-facing tool name to register. |
-| `maxResultChars` | `50000` | Rendered-result ceiling; longer JSON is truncated with a notice. |
-| `enableRunInBackground` | `true` | Expose `run_in_background`; disabled calls are also rejected. |
+| `toolName` | `workflow` | 登録するモデル向けツール名。 |
+| `maxResultChars` | `50000` | レンダリング結果の上限。長い JSON は通知付きで切り捨てられます。 |
+| `enableRunInBackground` | `true` | `run_in_background` を公開します。無効化された呼び出しも拒否されます。 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-workflow) is the exhaustive source for every accepted field.
+生成される [設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-workflow) が、受け付けられるすべてのフィールドの網羅的な情報源です。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the consumer is split from the engine and how the run lifecycle and records work; observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、コンシューマーがエンジンからどのように分離されているか、実行ライフサイクルとレコードがどう機能するかを説明します。観測可能な動作は [このパッケージを使う](#use-this-package) で完全に説明されています。
 
-### Design concept
+### 設計概念
 
-The consumer owns the model-facing schema, the `tool:<toolName>` system-prompt guidance, and the result envelope; script parsing, execution, caps, and cancellation live behind `ctx.workflowEngine`, while the PTC engine shares Node process confinement with `run_code`. Usage guidance ships with the tool plugin as a prompt section, never in the deployment persona.
+コンシューマーはモデル向けスキーマ、`tool:<toolName>` システムプロンプトガイダンス、結果エンベロープを所有します。スクリプトの解析、実行、上限、キャンセルは `ctx.workflowEngine` の背後にあり、PTC エンジンは `run_code` と Node プロセス閉じ込めを共有します。使用ガイダンスはデプロイのペルソナではなく、ツールプラグインにプロンプトセクションとして同梱されます。
 
-### Run lifecycle
+### 実行ライフサイクル
 
-`execute` starts the run and awaits `run.result` inside a `try/finally` that always disposes the run. `exec.signal` is bridged to `run.cancel()`, including the already-aborted-before-start case. A non-`completed` stop reason maps to an `isError` result reporting the reason; completion renders `{ kind, runId, agentsStarted, result }`, with the Native renderer truncating only that projection at `maxResultChars`.
+`execute` は実行を開始し、常に実行を破棄する `try/finally` の中で `run.result` を待ちます。`exec.signal` は `run.cancel()` にブリッジされ、開始前にすでに中止されているケースも含みます。`completed` 以外の停止理由はその理由を報告する `isError` 結果にマップされます。完了は `{ kind, runId, agentsStarted, result }` をレンダリングし、Native レンダラーはその射影のみを `maxResultChars` で切り捨てます。
 
-### Background lifecycle
+### バックグラウンドライフサイクル
 
-A background call registers the run through `jobs.start` inside the job starter, so a synchronous engine rejection registers nothing and admission preflight runs before the engine spawns. The job's `done` chains from `run.result`: dispose (a disposal failure is warned, never rejected into the registry), stop the mirrors, then map the stop reason onto the job outcome. The ring mirror (`src/record.ts`) subscribes `workflow/phase`, `workflow/log`, and member events once per plugin and routes them into the tracked runs' `JobHandle` faces (`append` for lines, `updateProgress` for the phase); a straggling event after settlement finds no tracked run, and an append against a settled job drops inside the registry.
+バックグラウンド呼び出しはジョブスターター内で `jobs.start` を通じて実行を登録するため、同期のエンジン拒否は何も登録せず、アドミッションプレフライトはエンジンが spawn する前に実行されます。ジョブの `done` は `run.result` から連鎖します。破棄（破棄の失敗は警告され、レジストリに拒否が投げられることはありません）、ミラーの停止、次に停止理由をジョブ結果にマップします。リングミラー（`src/record.ts`）はプラグインごとに 1 回 `workflow/phase`、`workflow/log`、メンバーイベントを購読し、追跡された実行の `JobHandle` フェイス（行には `append`、フェーズには `updateProgress`）にルーティングします。確定後に遅れて届いたイベントは追跡された実行を見つけられず、確定済みジョブへの append はレジストリ内部で破棄されます。
 
-### Durable session records
+### 永続セッションレコード
 
-For a root transport execution (`exec.parent` absent), the tool projects the run into the calling Agent's Session with four log-only events: run-start after `start()` returns, member starts and endings filtered by `run.id`, then run-end only after the result is available and disposal reaches quiescence. Nested transport calls execute normally but write no record. The first failed Session append disables later recording for that run with one warning, leaving either no record or a legal continuous prefix without changing the tool result or cleanup.
+ルート転送実行（`exec.parent` が存在しない）の場合、ツールは 4 つのログ専用イベントで実行を呼び出し元 Agent のセッションに投影します。`start()` が戻った後の run-start、`run.id` でフィルタリングされたメンバーの開始と終了、そして結果が利用可能になり破棄が静止状態に達した後にのみ run-end です。ネストされた転送呼び出しは通常どおり実行されますがレコードを書きません。最初のセッション append 失敗は、その実行の以降の記録を警告 1 件とともに無効化し、ツール結果やクリーンアップを変えずに、レコードなしまたは合法な連続プレフィックスのいずれかを残します。
 
-The engine's `workflow/phase` and `workflow/log` events have no per-line durable surface from this tool: the session log deliberately records run and member lifecycle only, and the Web transcript derives from those records. A background run's lines reach a human through the job observation record instead, which is transient by design.
+エンジンの `workflow/phase` と `workflow/log` イベントには、このツールからの行ごとの永続サーフェスはありません。セッションログは意図的に実行とメンバーのライフサイクルのみを記録し、Web トランスクリプトはそれらのレコードから導出されます。バックグラウンド実行の行は代わりにジョブ観察レコードを通じて人間に届きますが、これは設計上一時的です。
 
-### Render intent
+### レンダーインテント
 
-Decided up front per the [render-intent Agent Note](../../../.agents/notes/implemented/architecture/2026-07-02-tool-render-intent-union.md): a `generic` card titled `workflow: <meta.name>`, read directly from `args.meta.name` — presentation is a pure function of args — with the script text carried as `rawInput`. The result keeps the generic card.
+[render-intent Agent Note](../../../.agents/notes/implemented/architecture/2026-07-02-tool-render-intent-union.md) に従い事前に決定済みです。`workflow: <meta.name>` というタイトルの `generic` カードで、`args.meta.name` から直接読み取ります — プレゼンテーションは args の純粋関数です — スクリプトテキストは `rawInput` として運ばれます。結果も generic カードを保ちます。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: tool registration, run lifecycle, background job registration, recorder wiring |
-| [`src/record.ts`](src/record.ts) | Background runs' live-progress mirror into the job's output ring |
-| [`src/types.ts`](src/types.ts) | The four log-only record event payloads and their `SessionEventMap` declaration |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: ツール登録、実行ライフサイクル、バックグラウンドジョブ登録、レコーダー配線 |
+| [`src/record.ts`](src/record.ts) | バックグラウンド実行のライブ進捗をジョブの出力リングへミラーリング |
+| [`src/types.ts`](src/types.ts) | 4 つのログ専用レコードイベントペイロードとその `SessionEventMap` 宣言 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the tool-level contract is not enough. They move from the shared workflow model to the engine and the comparable delegation tool.
+ツールレベルの契約では足りないときにこれらのページを読んでください。共有された workflow モデルからエンジンと比較可能な委譲ツールへと進みます。
 
-- [Workflow subsystem](../../../docs/subsystems/workflow.md) — the seam contract, start request, and event payloads.
-- [Workflow seam](../workflow/README.md) — the run and result vocabulary behind the tool.
-- [PTC workflow engine](../workflow-ptc/README.md) — the engine that executes the scripts.
-- [subagent tool](../../subagent/tool-subagent/README.md) — the plain-delegation alternative for one or two children.
-- [Group map](../README.md) — the workflow capability family and its packages.
-- [historical Dynamic workflows Agent Note](../../../.agents/notes/archived/feature/2026-07-05-dynamic-workflows.md) — the seam design and its decisions.
+- [Workflow サブシステム](../../../docs/subsystems/workflow.md) — シーム契約、開始リクエスト、イベントペイロード。
+- [Workflow シーム](../workflow/README.md) — ツール背後の実行と結果の語彙。
+- [PTC workflow エンジン](../workflow-ptc/README.md) — スクリプトを実行するエンジン。
+- [subagent ツール](../../subagent/tool-subagent/README.md) — 1、2 件の子のための通常委譲の代替手段。
+- [グループマップ](../README.md) — workflow ケイパビリティファミリーとそのパッケージ。
+- [historical Dynamic workflows Agent Note](../../../.agents/notes/archived/feature/2026-07-05-dynamic-workflows.md) — シーム設計とその決定。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-Every parent request in this plugin's registration scope receives the workflow guidance below. A scoped tool restriction can hide the schema without removing this independently registered guidance.
+このプラグインの登録スコープ内のすべての親リクエストは、以下の workflow ガイダンスを受け取ります。スコープ付きツール制限は、独立して登録されたこのガイダンスを削除せずにスキーマを隠すことができます。
 
-##### Workflow guidance
+##### Workflow ガイダンス
 
 ```markdown
 Use the <toolName> tool ONLY when the user explicitly asks for a workflow or for large multi-agent orchestration: you write a JavaScript script (the tool description documents the exact format) that fans work out across many subagents with phases and structured results. For one or two delegations, prefer plain subagent calls.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Small fixed guidance cost per request while the plugin is active.
+プラグインがアクティブな間、リクエストごとに小さな固定のガイダンスコストです。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the plugin scope and guidance text are unchanged. Activation or disposal may invalidate reuse from this prompt section.
+プラグインスコープとガイダンステキストが変わらなければプレフィックス安定です。アクティブ化または破棄は、このプロンプトセクションからの再利用を無効化する可能性があります。
 
-### Tool schema
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-When visible, the generated default [`workflow` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-workflow) carries the complete JavaScript hook and metadata contract; `toolName` can rename the definition, and the model submits script, metadata, and optional args.
+可視のとき、生成されるデフォルトの [`workflow` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-workflow) は完全な JavaScript フックとメタデータ契約を運びます。`toolName` は定義の名前を変更でき、モデルはスクリプト、メタデータ、オプションの args を送信します。
 
-#### Token effect
+#### トークンへの影響
 
-Substantial fixed schema cost on each request where the tool is visible.
+ツールが可視の各リクエストで大きな固定スキーマコストです。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while `toolName`, definition, and visibility are unchanged. Renaming, plugin lifecycle, or scoped restrictions may invalidate reuse from this schema.
+`toolName`、定義、可視性が変わらなければプレフィックス安定です。名前変更、プラグインライフサイクル、スコープ付き制限は、このスキーマからの再利用を無効化する可能性があります。
 
-### Tool-call history and result
+### ツール呼び出し履歴と結果
 
-#### What the model sees
+#### モデルが見るもの
 
-The full model-written script, metadata, and args remain in the assistant tool call. A foreground success is exactly `workflow "<name>" completed (<count> agent<optional-s>).`, newline, `Return value:`, newline, and pretty-printed data-dependent JSON; a cap adds `… [truncated: <omitted> more characters]` on a new line. A background acceptance is exactly `workflow "<name>" started in the background as job <jobId>. Its return value arrives with the completion notice; check on it with job_output, stop it with job_kill.`, and the same rendered value later reaches the model through the job's completion notice and `job_output`. Failures are exactly `Error: workflow run was cancelled`, optionally suffixed ` (<error>)`, `Error: workflow run failed: <error-or-unknown error>`, or defensively `Error: workflow run ended abnormally (<reason>)`; a call without an owning agent becomes `Error: workflow tool requires a calling agent (exec.agent was undefined)`. Intermediate child messages are omitted.
+モデルが書いた完全なスクリプト、メタデータ、args はアシスタントのツール呼び出しに残ります。フォアグラウンドの成功は正確に `workflow "<name>" completed (<count> agent<optional-s>).`、改行、`Return value:`、改行、データ依存の整形済み JSON です。上限に達すると、新しい行に `… [truncated: <omitted> more characters]` が追加されます。バックグラウンドの受け入れは正確に `workflow "<name>" started in the background as job <jobId>. Its return value arrives with the completion notice; check on it with job_output, stop it with job_kill.` で、同じレンダリング済みの値が後でジョブの完了通知と `job_output` を通じてモデルに届きます。失敗は正確に `Error: workflow run was cancelled`（オプションで ` (<error>)` が付く）、`Error: workflow run failed: <error-or-unknown error>`、または防御的に `Error: workflow run ended abnormally (<reason>)` です。所有エージェントのない呼び出しは `Error: workflow tool requires a calling agent (exec.agent was undefined)` になります。中間の子メッセージは省略されます。
 
-#### Token effect
+#### トークンへの影響
 
-Call tokens can be large and remain until compaction. Result rendering is capped by `maxResultChars`; child-model tokens are separate from the parent's retained context.
+呼び出しトークンは大きくなり得て、コンパクションまで残ります。結果のレンダリングは `maxResultChars` で制限されます。子モデルのトークンは親の保持コンテキストとは別です。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用です。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送りされた作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the tool does not yet support. They are current constraints, not a task backlog.
+これらの制限は、ツールがまだサポートしていないことを定義します。それらは現在の制約であり、タスクバックログではありません。
 
-- **A background run reports no intermediate value to the model** — `job_output` before settlement returns status only; the return value arrives whole at completion, and cancellation still discards partial output.
-- **`args` must be an object and Native result text is bounded** — callers wrap top-level arrays and scalars in a field; the canonical workflow result stays complete, while JSON beyond `maxResultChars` is truncated in the model-facing projection rather than stored behind a retrieval handle.
-- **Workflow policy is fixed per tool registration** — provider selection, caps, and tool name are deployment config, not model-call arguments.
-- **Durable records are top-level and observational** — nested PTC mode dispatches are not recorded, and a recording failure intentionally degrades to an incomplete prefix rather than changing execution.
-- **No recorded-session scenario replays a background run yet** — unit and real-engine composition suites cover the path; the snapshot tree pins only the schema and prompt text.
+- **バックグラウンド実行はモデルに中間値を報告しない** — 確定前の `job_output` はステータスのみを返します。戻り値は完了時に全体として届き、キャンセルは依然として部分出力を破棄します。
+- **`args` はオブジェクトでなければならず、Native 結果テキストには上限がある** — 呼び出し元は最上位の配列やスカラーをフィールドで包みます。正規の workflow 結果は完全なままですが、`maxResultChars` を超える JSON は取得ハンドルの背後に保存されるのではなく、モデル向け射影で切り捨てられます。
+- **ワークフローポリシーはツール登録ごとに固定される** — プロバイダー選択、上限、ツール名はデプロイ設定であり、モデル呼び出しの引数ではありません。
+- **永続レコードはトップレベルかつ観察用** — ネストされた PTC モードのディスパッチは記録されず、記録の失敗は実行を変えずに意図的に不完全なプレフィックスへと劣化します。
+- **バックグラウンド実行を再生する記録セッションシナリオはまだない** — ユニットと実エンジン構成のスイートがこのパスをカバーし、スナップショットツリーはスキーマとプロンプトテキストのみを固定します。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発ノートはメンテナー向けの作業コンテキストです。未決定のオープンな方向性を扱います。明示的に非権威です — 出荷される動作、制限、受け入れられた根拠は、上のセクション、パッケージコード、リンクされた Agent Note にあります。
 
-Open directions: storing truncated JSON behind a retrieval handle instead of clipping the projection; recording nested dispatches beyond the top level; a recorded-session scenario for the background path.
+オープンな方向性: 射影をクリップする代わりに切り捨てられた JSON を取得ハンドルの背後に保存すること。トップレベルを超えたネストされたディスパッチの記録。バックグラウンドパスのための記録セッションシナリオ。
 
 </details>

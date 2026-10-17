@@ -1,39 +1,39 @@
 ---
-description: "Semantic session durability checkpoints for users and maintainers deploying persisted agents that must not lose a model request or tool side effect on crash."
+description: "クラッシュ時にモデルリクエストやツールの副作用を失わない、永続化エージェントを配置するユーザーとメンテナー向けの意味的セッション耐久性チェックポイント。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-checkpoint-policy
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package with a session persistence backend to make work durable before a model request, before a top-level tool can cause external effects, and before the next agent step begins. After each checkpoint, work can resume after a crash from stored requests, tool calls, responses, and results without loss. Checkpoint failures are fail-closed: a model adapter or top-level tool body does not run until the durable write succeeds. The package has no configuration and adds no prompt or tool schema; unfinished Assistant streams remain transient, and interrupted tool calls recover with an unknown outcome instead of an automatic retry.
+セッション永続化バックエンドとともにこのパッケージを使い、モデルリクエストの前、外部効果を起こし得るトップレベルツールの前、次のエージェントステップ開始の前に作業を耐久化する。各チェックポイントの後、保存済みリクエスト・ツール呼び出し・応答・結果からクラッシュ後の作業を損失なく再開できる。チェックポイント失敗はフェイルクローズドである。耐久書き込みが成功するまでモデルアダプターやトップレベルツール本体は実行されない。このパッケージには設定がなく、プロンプトやツールスキーマも追加しない。未完のアシスタントストリームは一時的であり、中断されたツール呼び出しは自動再試行ではなく不明な結果として回復する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin in any composition that persists sessions and must survive a crash without redoing or losing work. Persistence and checkpoint scheduling are separate plugins: a backend stores the event log, and this policy decides when the store must be flushed.
+セッションを永続化し、作業のやり直しや損失なくクラッシュを乗り切らなければならないすべての構成にこのプラグインをマウントする。永続化とチェックポイント scheduling は別プラグインである。バックエンドがイベントログを保存し、このポリシーがストアをいつフラッシュしなければならないかを決める。
 
-### When to choose it
+### 選択する場合
 
-Choose it for every persisted agent that can be interrupted — a crash between a recorded tool call and its result, or between a model request and its response, is exactly the failure this policy contains. Loading a backend without it is valid but weaker: events still inside the backend's batching window or an outstanding write can be lost. Skip the policy when nothing persists sessions, or when a specialized deployment deliberately replaces the checkpoint schedule.
+中断され得るすべての永続化エージェントに選ぶ。記録済みツール呼び出しと結果の間のクラッシュ、モデルリクエストと応答の間のクラッシュは、まさにこのポリシーが封じ込める障害である。これなしでバックエンドを読み込むことも有効だが弱い。バックエンドのバッチングウィンドウ内に残るイベントや未完了書き込みが失われ得る。セッションを何も永続化しない場合、または特殊な配置がチェックポイント schedule を意図的に置換する場合にポリシーを省く。
 
-### Minimal configuration
+### 最小設定
 
-No configuration fields exist; the plugin is a single load beside one persistence backend:
+設定フィールドは存在しない。1 件の永続化バックエンドのそばに単一読み込みするだけである。
 
 ```yaml
 - id: session-persistence
@@ -43,84 +43,84 @@ No configuration fields exist; the plugin is a single load beside one persistenc
   name: '@deepseek-ai/dsh-session-checkpoint-policy'
 ```
 
-### What becomes durable
+### 耐久化されるもの
 
-Three barriers are checkpointed. The model request is flushed before the adapter stream is constructed, so a crash before a response cannot replay an unpersisted request. A top-level tool call is flushed before the tool body runs, so a recorded call is durable before any external side effect; nested tool dispatches reuse the outer call's checkpoint. At each `agent/pre-step` boundary, everything the preceding step committed — its response and ordered tool results — is flushed before the next request is derived.
+3 件のバリアがチェックポイント化される。モデルリクエストはアダプターストリーム構築前にフラッシュされるため、応答前のクラッシュが未永続化リクエストを再実行できない。トップレベルツール呼び出しはツール本体実行前にフラッシュされるため、記録済み呼び出しは外部副作用の前に耐久化される。入れ子ツール配送は外側呼び出しのチェックポイントを再利用する。各 `agent/pre-step` 境界では、前ステップがコミットしたすべて（その応答と順序付きツール結果）が次リクエスト導出前にフラッシュされる。
 
-### Observable behavior and failures
+### 観測可能な動作と失敗
 
-After a checkpoint, the checkpointed work is durable: resume restores it from the store like any persisted session. If cancellation lands while a tool checkpoint flush is pending, the wrapper returns the canonical `ABORTED_BEFORE_DISPATCH` result and never enters the tool body. A checkpoint rejection is fail-closed at both boundaries — the adapter or top-level tool body does not run — and a step-boundary rejection fails the turn before another request starts.
+チェックポイントの後、チェックポイント化した作業は耐久性を持つ。保存内容から永続化セッションと同様に再開が復元する。ツールチェックポイントのフラッシュ待ちにキャンセルが届くと、ラッパーは正規 `ABORTED_BEFORE_DISPATCH` 結果を返し、ツール本体に決して入らない。チェックポイント拒否は両境界でフェイルクローズドである。アダプターやトップレベルツール本体は実行されず、ステップ境界拒否は次リクエスト開始前にターンを失敗させる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the policy joins the loop and the persistence seam; the observable contract is covered in [Use this package](#use-this-package).
+この節ではポリシーがループと永続化シームにどう加わるかを説明する。観測可能な契約は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design concept
+### 設計概念
 
-The plugin is a listener-only composition over three seams, with no state of its own: it wraps `llm/stream` so the downstream stream is not constructed until the live session's buffered request events are durable, wraps `tools/execute` after pre-execute policy and guards so a top-level tool body runs only after its recorded call is durable, and listens to `agent/pre-step` to persist the preceding response/result batch before request derivation. The session store's flush is the shared durability barrier; concurrent tool checkpoints serialize through it and cannot duplicate sequence numbers.
+このプラグインは 3 件のシーム上のリスナーのみの構成であり、独自状態を持たない。`llm/stream` をラップしてライブセッションのバッファ済みリクエストイベントが耐久化されるまで下流ストリームを構築せず、実行前ポリシーとガードの後で `tools/execute` をラップして記録済み呼び出しが耐久化された後にのみトップレベルツール本体が実行されるようにし、`agent/pre-step` を購読して前応答/結果バッチをリクエスト導出前に永続化する。セッションストアのフラッシュが共有の耐久性バリアであり、並行ツールチェックポイントはそれを通じて直列化され、シーケンス番号を重複できない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `apply` installs the three checkpoint listeners |
+| [`src/index.ts`](src/index.ts) | プラグイン入口。3 件のチェックポイントリスナーを設置する `apply` |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the durability model to the seam it joins and the shipped backends.
+パッケージレベルの契約だけでは足りない場合にこれらのページを読む。耐久性モデルからそれが加わるシームと出荷バックエンドへ進む。
 
-- [Session persistence subsystem](../../../docs/subsystems/persistence.md) — the flush checkpoint, batching window, and crash recovery every backend shares.
-- [Session package map](../README.md) — adjacent persistence, projection, title, and telemetry packages.
-- [Session persistence seam](../session-persistence/README.md) — the `ctx.sessionPersistence` service this policy flushes through.
-- [JSONL persistence backend](../session-persistence-jsonl/README.md) — the shipped backend this policy is usually loaded beside.
+- [Session persistence サブシステム](../../../docs/subsystems/persistence.md) — すべてのバックエンドが共有するフラッシュチェックポイント、バッチングウィンドウ、クラッシュ回復。
+- [Session パッケージマップ](../README.md) — 隣接する永続化・プロジェクション・タイトル・テレメトリーパッケージ。
+- [Session persistence シーム](../session-persistence/README.md) — このポリシーがフラッシュする `ctx.sessionPersistence` サービス。
+- [JSONL 永続化バックエンド](../session-persistence-jsonl/README.md) — 通常このポリシーのそばに読み込む出荷バックエンド。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Interrupted calls
+### 中断された呼び出し
 
-#### What the model sees
+#### モデルが見るもの
 
-The plugin adds no prompt or tool schema. A hard crash after a tool checkpoint but before its result leaves a durable unmatched call; session recovery supplies the model-visible `TOOL_OUTCOME_UNKNOWN` result owned by `dsh-session`. The message permits retry for read-only or idempotent work and requires state verification or user confirmation for calls that may have side effects.
+このプラグインはプロンプトやツールスキーマを追加しない。ツールチェックポイント後・結果前のハードクラッシュは耐久性のある不一致呼び出しを残し、セッション回復は `dsh-session` 所有のモデル可視 `TOOL_OUTCOME_UNKNOWN` 結果を提供する。そのメッセージは読み取り専用や冪等作業の再試行を許し、副作用があり得る呼び出しには状態検証やユーザー確認を求める。
 
-#### Token effect
+#### トークン効果
 
-Successful checkpoints add no tokens and do not change the request. Recovery adds one short tool-result message to balance the interrupted transcript.
+成功したチェックポイントはトークンを追加せず、リクエストを変更しない。回復は中断された転写を釣り合わせる短いツール結果メッセージを 1 件追加する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-The repair result is appended after the reusable prefix, so it does not invalidate earlier cache entries.
+修復結果は再利用可能プレフィックスの後に追記されるため、以前のキャッシュエントリを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the policy's durability guarantee stops. They are current package constraints, not a task backlog.
+ポリシーの耐久性保証がどこで止まるかをこれらの制限が定義する。これらはタスクバックログではなく現行パッケージ制約である。
 
-- **Durable execution intent, not exactly-once effects** — the policy records that a call was dispatched, not that its external effect completed. Side-effecting tools should forward `exec.callId` as an idempotency key when their provider supports one.
-- **No checkpoint inside an active model attempt** — a hard crash may lose transient Assistant frames that have not reached their durable `assistant/message` or `assistant/attempt` settlement.
-- **Unknown outcome, not automatic retry** — a persisted call without a result cannot prove whether its external effect completed, so recovery records an unknown outcome instead of retrying.
+- **厳密1回効果ではなく耐久性のある実行意図** — ポリシーは呼び出しが配送されたことを記録し、その外部効果が完了したことを記録しない。副作用ツールはプロバイダーが対応する場合 `exec.callId` を冪等キーとして転送すべきである。
+- **実行中モデル試行内のチェックポイントなし** — ハードクラッシュは耐久性のある `assistant/message` や `assistant/attempt` 確定に届いていない一時的アシスタントフレームを失い得る。
+- **自動再試行ではなく不明な結果** — 結果のない永続化呼び出しは外部効果が完了したかを証明できないため、回復は再試行ではなく不明な結果を記録する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

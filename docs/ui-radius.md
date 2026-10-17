@@ -1,80 +1,80 @@
-# DSH unified corner-radius standard
+# DSH 統一角丸標準
 
-English | [中文](ui-radius.zh.md)
+日本語 | [English](ui-radius.en.md) | [中文](ui-radius.zh.md)
 
-## Summary
+## 概要
 
-Choose consistent corner radii by component role and size, and align nested regions, hover fills, backgrounds, and strokes. This standard covers buttons, cells, cards, menus, dialogs, and avatars in DSH Web and Desktop.
+コンポーネントの役割とサイズによって一貫した角丸を選び、ネストした領域、hover の塗り、背景、ストロークを整列する。この標準は DSH Web と Desktop のボタン、セル、カード、メニュー、ダイアログ、アバターを対象とする。
 
-## Table of Contents
+## 目次
 
-- [Scope and authority](#scope)
-- [Select the radius](#radius-scale)
-- [Reuse tokens and preserve deliberate shapes](#shapes)
-- [Nested geometry and hover](#nested-hover)
-- [Settings card materials](#settings-cards)
-- [Apply and verify](#verification)
+- [範囲と権威](#scope)
+- [角丸を選ぶ](#radius-scale)
+- [トークンを再利用し、意図的な形状を保つ](#shapes)
+- [ネストした幾何と hover](#nested-hover)
+- [設定カードの素材](#settings-cards)
+- [適用と検証](#verification)
 
 <a id="scope"></a>
-## Scope and authority
+## 範囲と権威
 
-This reference defines the DSH Web and Desktop radius scale and its component rules. A local visual adjustment stays scoped to the named component or family and does not automatically change the global scale.
+このリファレンスは DSH Web と Desktop の角丸スケールとそのコンポーネントルールを定義する。ローカルの視覚調整は名指しされたコンポーネントまたはファミリーにスコープされ、グローバルスケールを自動的に変更しない。
 
-The [Web UI style reference](web-styling.md) defines general styling ownership. Shared values live in [`base.css`](../packages/client/ui-theme/src/styles/base.css), and curve behavior lives in [`corner-shape.css`](../packages/client/ui-theme/src/styles/corner-shape.css). Update the theme implementation and both language versions of this standard together when changing a rule.
+[Web UI スタイルリファレンス](web-styling.md)が一般的なスタイリングの所有権を定義する。共有値は [`base.css`](../packages/client/ui-theme/src/styles/base.css) に、曲線の動作は [`corner-shape.css`](../packages/client/ui-theme/src/styles/corner-shape.css) にある。ルールを変更するときは、テーマ実装とこの標準の両言語版を一緒に更新する。
 
 <a id="radius-scale"></a>
-## Select the radius
+## 角丸を選ぶ
 
-H means designed outer height in CSS pixels, including borders. R means CSS `border-radius`, before the browser clamps overlapping corners. Choose the component role first, then its size variant; width, label length, incidental wrapping, and content expansion do not independently select a larger radius.
+H は設計上の外側高さを CSS ピクセルで表し、ボーダーを含む。R はブラウザが重なり合う角をクランプする前の CSS `border-radius` を表す。まずコンポーネントの役割を決め、次にそのサイズバリアントを決める。幅、ラベル長、偶発的な折り返し、コンテンツの展開は、より大きい角丸を単独で選択しない。
 
-| Role | Typical dimensions or examples | Radius | Shared token |
+| 役割 | 典型的な寸法または例 | 角丸 | 共有トークン |
 |---|---|---|---|
-| Small detail | Below H20; keycaps, inline code, tiny controls | R4 | `--dsw-radius-xs` |
-| Compact control | H20–28; small buttons, compact icon buttons, compact menu items | R8 | `--dsw-radius-sm` |
-| Standard control or single-line cell | H32–40; buttons, inputs, selects, navigation rows | R12 | `--dsw-radius-md` |
-| Large control or grouped content | Large buttons, deliberately multiline cells, nested form groups | R16 | `--dsw-radius-lg` |
-| Independent content card | Settings cards, message bubbles, guide entry cards | R20 | `--dsw-radius-xl` |
-| Main enclosing surface | Composer, dialogs, main or floating panels | R28 | `--dsw-radius-panel` |
+| 小さいディテール | H20 未満。キーキャップ、インラインコード、小型コントロール | R4 | `--dsw-radius-xs` |
+| コンパクトコントロール | H20–28。小さいボタン、コンパクトなアイコンボタン、コンパクトなメニュー項目 | R8 | `--dsw-radius-sm` |
+| 標準コントロールまたは単行セル | H32–40。ボタン、入力欄、セレクト、ナビゲーション行 | R12 | `--dsw-radius-md` |
+| 大きいコントロールまたはグループ化されたコンテンツ | 大きいボタン、意図的に複数行のセル、ネストしたフォームグループ | R16 | `--dsw-radius-lg` |
+| 独立したコンテンツカード | 設定カード、メッセージバブル、ガイドエントリーカード | R20 | `--dsw-radius-xl` |
+| 主要な囲いサーフェス | コンポーザー、ダイアログ、メインまたはフローティングパネル | R28 | `--dsw-radius-panel` |
 
-Prefer an existing shared size variant when a proposed control falls between these bands. A taller card remains a card: do not promote it to R28 merely because it exceeds a button's height. A multiline cell intentionally designed for multiple lines uses R16; an ordinary button whose label wraps retains its button variant.
+提案中のコントロールがこれらの帯の間に入る場合は、既存の共有サイズバリアントを優先する。背の高いカードはカードのままである。ボタンの高さを超えるというだけで R28 に昇格させない。複数行のために意図的に設計された複数行セルは R16 を使い、ラベルが折り返す通常のボタンはそのボタンバリアントを保つ。
 
-Concrete defaults: `Button` uses H28/R8 for `sm` and H36/R12 for `md`, including outline variants. Standard H32 inputs and H36 selectors use R12. The Workspace files and New terminal guide entries both use R20, including title-only and described variants. Reserve R28 for their enclosing panel or dialog, not those entries. Composer statistics and the context-occupancy trigger use compact-control R8 with the theme curve, including hover, expanded, and focus states.
+具体的な既定値: `Button` は `sm` に H28/R8、`md` に H36/R12 を使い、アウトラインバリアントも同様である。標準の H32 入力欄と H36 セレクターは R12 を使う。Workspace files と New terminal のガイドエントリーはどちらも R20 を使い、タイトルのみと説明付きのバリアントを含む。R28 はそれらのエントリーではなく、それらを囲むパネルまたはダイアログのために取っておく。コンポーザーの統計とコンテキスト占有トリガーは、hover、展開、フォーカス状態を含め、テーマ曲線付きのコンパクトコントロール R8 を使う。
 
-Code blocks, diffs, and preview cards share R16: changed-file entry cards, delivered-file cards, submitted-plan cards, created-task cards, generic file attachment cards before and after sending, and hover preview panels. The 40px icon tiles inside changed-file, delivery, submitted-plan, and created-task cards use R10 on all four corners as a component-specific exception and share the same neutral tile fill and border in both themes. Their hover fills keep the same contour.
+コードブロック、diff、プレビューカードは R16 を共有する: 変更ファイルのエントリーカード、配達ファイルカード、提出済みプランカード、作成済みタスクカード、送信前後の汎用ファイル添付カード、hover プレビューパネル。変更ファイル、配達、提出済みプラン、作成済みタスクの各カード内の 40px アイコンタイルは、コンポーネント固有の例外として四隅すべてに R10 を使い、両テーマで同じニュートラルなタイル塗りとボーダーを共有する。それらの hover 塗りは同じ輪郭を保つ。
 
 <a id="shapes"></a>
-## Reuse tokens and preserve deliberate shapes
+## トークンを再利用し、意図的な形状を保つ
 
-Reuse `ui-primitives` controls before adding feature-owned geometry. Use `box-sizing: border-box` for fixed outer dimensions. Filled, outline, ghost, loading, and disabled variants keep the same size and radius; hover, pressed, selected, and focus states do not change the radius.
+フィーチャー所有の幾何を追加する前に `ui-primitives` のコントロールを再利用する。固定の外側寸法には `box-sizing: border-box` を使う。フィルド、アウトライン、ゴースト、ローディング、無効のバリアントは同じサイズと角丸を保つ。hover、押下、選択、フォーカス状態は角丸を変えない。
 
-Consume the named tokens instead of introducing local values such as 10px, 14px, 18px, or 24px for ordinary controls and cards. Schedule controls, Desktop onboarding, account notices, and shortcut controls retain their package-owned geometry; the [radius exception record](../packages/client/ui-theme/tests/expected/radius-exceptions.expected.json) pins each permitted file, selector, and declaration rather than exempting whole packages. A family-specific property may refer to a shared token, as `--dsl-guide-entry-radius` does. Geometry derived from a real inset may use `calc()`; it is not an additional scale tier.
+通常のコントロールとカードについて、10px、14px、18px、24px のようなローカル値を導入するのではなく、名前付きトークンを消費する。スケジュールコントロール、Desktop オンボーディング、アカウント通知、ショートカットコントロールはパッケージ所有の幾何を保持する。[radius exception record](../packages/client/ui-theme/tests/expected/radius-exceptions.expected.json) はパッケージ全体を免除するのではなく、許可された各ファイル、セレクター、宣言を固定する。ファミリー固有のプロパティは、`--dsl-guide-entry-radius` がそうであるように、共有トークンを参照してよい。実際のインセットから導かれる幾何は `calc()` を使ってよい。それは追加のスケール段ではない。
 
-Ordinary rounded surfaces use the theme's `superellipse(1.5)` curve where supported. `corner-shape` is not inherited: the theme applies it to elements and their `::before`/`::after`. Unsupported engines retain ordinary circular corners. Do not introduce component-specific smoothing that makes a fill and its outline curve differently.
+通常の角丸サーフェスは、サポートされる場所でテーマの `superellipse(1.5)` 曲線を使う。`corner-shape` は継承されない。テーマはそれを要素とその `::before`/`::after` に適用する。未サポートのエンジンは通常の円形コーナーを保つ。塗りとそのアウトラインが異なる曲線になるようなコンポーネント固有のスムージングを導入しない。
 
-Preserve intentional circles and capsules: avatars and status dots use `50%`; explicit pills and full-round tracks may use `999px`. Pair every such full-round declaration with `corner-shape: round` in the same rule. Do not turn every button into a capsule just because its height is small. Tiny drawing details, such as glyph marks or miniature tracks, may retain their established local geometry; they do not justify arbitrary radii on surrounding controls.
+意図的な円とカプセルを保つ: アバターとステータスドットは `50%` を使い、明示的なピルと完全ラウンドのトラックは `999px` を使ってよい。そのような完全ラウンド宣言はすべて、同じルール内で `corner-shape: round` と組み合わせる。高さが小さいというだけで全てのボタンをカプセルにしない。グリフマークやミニチュアトラックのような小さな描画ディテールは、確立されたローカル幾何を保持してよい。それらは周囲のコントロールに任意の角丸を正当化しない。
 
-Both the avatar container and its `img` must remain circular; an image that inherits only `border-radius` still needs an explicit `corner-shape: round` or must inherit the curve from its circular container. Keep equal width and height on both. See [Account settings](../packages/client/ui-settings-account/README.md#use-this-package) for account avatar sizes.
+アバターコンテナとその `img` はどちらも円形のままでなければならない。`border-radius` だけを継承する画像は、明示的な `corner-shape: round` が依然として必要か、円形コンテナから曲線を継承しなければならない。両方で幅と高さを等しく保つ。アカウントアバターのサイズは [Account settings](../packages/client/ui-settings-account/README.md#use-this-package) を参照。
 
-Edge-to-edge docked surfaces and adjoining cells may use R0 on shared edges. A header, footer, or image flush with a card rounds only its exposed outer corners; preserve square internal joins rather than rounding every child on all four sides.
+端から端までドッキングしたサーフェスと隣接セルは、共有エッジで R0 を使ってよい。カードと面一のヘッダー、フッター、画像は露出した外側の角だけを丸める。すべての子を四辺すべてで丸めるのではなく、内部の接合部は直角に保つ。
 
 <a id="nested-hover"></a>
-## Nested geometry and hover
+## ネストした幾何と hover
 
-Distinguish these three arrangements before changing a child radius:
+子の角丸を変更する前に、これら 3 つの配置を区別する:
 
-| Arrangement | Rule | Example |
+| 配置 | ルール | 例 |
 |---|---|---|
-| Circular concentric inset | Inner R = max(0, outer R − inset); both arcs share a center and use `round` | Outer R16, inset 4, inner R12 |
-| Fill flush against an enclosing edge | The enclosure owns the visible corner; clip the fill or inherit the matching corner | A split-button card with two independent hover regions |
-| Separate card or form group inside another surface | Choose the child's semantic tier; do not subtract all parent padding mechanically | R16 editor within an R20 settings card |
+| 円形の同心インセット | 内側 R = max(0, 外側 R − インセット)。両方の弧は中心を共有し `round` を使う | 外側 R16、インセット 4、内側 R12 |
+| 囲いのエッジに面一な塗り | 囲いが可視の角を所有する。塗りをクリップするか、一致する角を継承する | 2 つの独立した hover 領域を持つスプリットボタンカード |
+| 別のサーフェス内の分離カードまたはフォームグループ | 子の意味論的段を選ぶ。親のパディングを機械的にすべて差し引かない | R20 設定カード内の R16 エディター |
 
-Standard menus use outer R16, 4px padding, and R12 items, including command selection, task menus, and the exposed highlights in subagent and background-job menus. Tree disclosure gutters retain their indentation; controls inside a filled job row keep their own compact geometry. Compact menus use outer R12, 4px padding, and R8 items. Shared `SegmentedControl` uses outer R12, 4px inset, and R8 segments/indicator; `SegmentedTabs` uses outer R16, 4px inset, and R12 segments/indicator. Keep indicator offsets, width calculations, submenu alignment, and pointer bridges consistent when changing padding.
+標準メニューは外側 R16、4px パディング、R12 項目を使い、コマンド選択、タスクメニュー、subagent とバックグラウンドジョブのメニューで露出するハイライトを含む。ツリー開示ガターはそのインデントを保持し、フィルドのジョブ行内のコントロールは独自のコンパクト幾何を保つ。コンパクトメニューは外側 R12、4px パディング、R8 項目を使う。共有 `SegmentedControl` は外側 R12、4px インセット、R8 のセグメント/インジケーターを使い、`SegmentedTabs` は外側 R16、4px インセット、R12 のセグメント/インジケーターを使う。パディングを変更するときは、インジケーターのオフセット、幅計算、サブメニューの整列、ポインターブリッジの整合を保つ。
 
-The radius subtraction is also the nominal sizing rule for nested superellipses. Equal exponents do not make them exact offset curves, so their diagonal gap may differ from the side inset. Keep the shared superellipse menu and segmented-control treatments; use circular arcs when strict equal radial spacing is required.
+角丸の減算は、ネストした superellipse の公称サイズ決めルールでもある。等しい指数はそれらを正確なオフセット曲線にしないので、対角のギャップは側面のインセットと異なってよい。共有の superellipse メニューとセグメントコントロールの処理を保ち、厳密に等しい半径方向の間隔が必要なときは円弧を使う。
 
-A single clickable surface paints hover on itself. A flush pseudo-element or overlay uses the same radius and curve as the visible enclosure. Avoid a separately rounded fill that leaves a crescent between the background and the border.
+単一のクリック可能サーフェスは自身に hover を描く。面一の疑似要素またはオーバーレイは、可視の囲いと同じ角丸と曲線を使う。背景とボーダーの間に三日月形を残す、別々に丸められた塗りを避ける。
 
-For a split guide card, put the shared radius and clipping on the outer card; give the flush inner buttons square corners. Each button may keep its own hover color, while the outer card clips both fills to one contour. Keep dropdown menus outside the clipped subtree through the existing portal. Preserve a visible keyboard focus treatment rather than clipping an external focus ring away.
+スプリットガイドカードでは、共有の角丸とクリッピングを外側カードに置き、面一の内側ボタンには直角の角を与える。各ボタンは独自の hover 色を保ってよいが、外側カードが両方の塗りを 1 つの輪郭にクリップする。ドロップダウンメニューは既存のポータルを通じてクリップされたサブツリーの外に保つ。外部フォーカスリングをクリップして消すのではなく、可視のキーボードフォーカス処理を保つ。
 
 ```css
 .entry {
@@ -88,12 +88,12 @@ For a split guide card, put the shared radius and clipping on the outer card; gi
 }
 ```
 
-The enclosing guide sets `--dsl-guide-entry-radius: var(--dsw-radius-xl)`. Do not give the inner buttons their own R28 ends while the outer card is R20.
+囲いのガイドは `--dsl-guide-entry-radius: var(--dsw-radius-xl)` を設定する。外側カードが R20 のときに内側ボタンに独自の R28 の末端を与えない。
 
 <a id="settings-cards"></a>
-## Settings card materials
+## 設定カードの素材
 
-Account profile, balance, model-provider, preset, and plugin cards share this default material. Selected, warning, error, and expanded states may use their existing semantic colors while retaining the geometry.
+アカウントプロファイル、残高、モデルプロバイダー、プリセット、プラグインの各カードはこの既定素材を共有する。選択、警告、エラー、展開状態は既存の意味論的な色を使ってよいが、幾何は保持する。
 
 ```css
 .card {
@@ -103,15 +103,15 @@ Account profile, balance, model-provider, preset, and plugin cards share this de
 }
 ```
 
-The theme resolves the card fill to `--dsw-alias-bg-layer-2` and the stroke to `--dsw-alias-border-l4` on `body`, where palette aliases exist. Feature styles consume these aliases in both palettes. Nested editors use R16 and the existing module fill. Account usage/top-up links follow H36/R12 Button geometry; authorization buttons use the shared Button.
+テーマはカードの塗りを `--dsw-alias-bg-layer-2` に、ストロークを `--dsw-alias-border-l4` に、パレットエイリアスが存在する `body` 上で解決する。フィーチャースタイルは両パレットでこれらのエイリアスを消費する。ネストしたエディターは R16 と既存のモジュール塗りを使う。アカウントの使用量/チャージリンクは H36/R12 の Button 幾何に従い、認可ボタンは共有 Button を使う。
 
-Flat neutral borders use the shared 0.5px hairline. Elevated menus, popovers, dialogs, and panels use `border: 0` with the existing `--dsw-elevation-*` material, whose shadow includes the hairline. Do not add a second neutral border over that stroke or add a shadow to an ordinary settings card merely to distinguish its tab. Preserve semantic state-colored borders and the existing translucent-menu backdrop behavior.
+フラットなニュートラルボーダーは共有の 0.5px ヘアラインを使う。エレベーション付きのメニュー、ポップオーバー、ダイアログ、パネルは `border: 0` と既存の `--dsw-elevation-*` 素材を使い、その影はヘアラインを含む。そのストロークの上に 2 つ目のニュートラルボーダーを追加したり、タブを区別するためだけに通常の設定カードに影を追加したりしない。意味論的な状態色のボーダーと、既存の半透明メニューの背景の動作を保つ。
 
 <a id="verification"></a>
-## Apply and verify
+## 適用と検証
 
-1. Inspect the requested components together with their shared primitives, overlays, pseudo-elements, and sibling variants. Classify roles before replacing values; do not map every occurrence of one old radius to the same new token.
-2. Change the shared owner where appropriate, then align dependent fills, child corners, clipping, and state styles. Keep independent child cards on their own tier.
-3. Compare actual rendered outer size, radius, curve, fill, and stroke in light and dark themes. Inspect normal, hover, pressed/selected, disabled, and keyboard-focus states where applicable; for split buttons, hover both halves. Check a narrow layout and longer labels when they can affect the component.
-4. Use the existing radius, corner-shape, and elevation stylesheet guards and the smallest relevant browser scenario. The radius guard rejects off-scale literals and unknown tokens; it cannot determine whether a valid token is appropriate for a component or whether two rendered contours align. Confirm those visually.
-5. Follow repository validation and documentation requirements for the actual diff. Update affected expectations only after confirming the intended appearance. Report the resulting rule, tested surfaces, and any unverified states; do not add tests that merely repeat CSS values for a trivial local adjustment.
+1. 要求されたコンポーネントを、その共有プリミティブ、オーバーレイ、疑似要素、兄弟バリアントとともに検査する。値を置き換える前に役割を分類する。1 つの古い角丸のすべての出現を同じ新しいトークンにマッピングしない。
+2. 適切な場合は共有のオーナーを変更し、その後、依存する塗り、子の角、クリッピング、状態スタイルを整列する。独立した子カードは独自の段に保つ。
+3. ライトテーマとダークテーマで、実際にレンダリングされた外側サイズ、角丸、曲線、塗り、ストロークを比較する。該当する場合は通常、hover、押下/選択、無効、キーボードフォーカス状態を検査する。スプリットボタンでは両方の半分を hover する。コンポーネントに影響しうる場合は、狭いレイアウトと長いラベルをチェックする。
+4. 既存の角丸、corner-shape、エレベーションのスタイルシートガードと、最小の関連ブラウザーシナリオを使う。角丸ガードはスケール外のリテラルと不明なトークンを拒否する。有効なトークンがコンポーネントに適切か、2 つのレンダリングされた輪郭が整列するかは判定できない。それらは視覚的に確認する。
+5. 実際の diff に対してリポジトリの検証とドキュメント要件に従う。影響を受ける期待出力は、意図した外観を確認した後にのみ更新する。結果として得られたルール、テストしたサーフェス、未検証の状態を報告する。些細なローカル調整のために CSS 値をただ繰り返すテストを追加しない。

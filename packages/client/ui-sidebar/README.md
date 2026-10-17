@@ -1,117 +1,117 @@
 ---
-description: "Sidebar shell plugin for the dsh web client: brand row, New Session action, collapse control, scroll-aware region seat, and bottom-pinned Settings seat."
+description: "dsh Web クライアント用のサイドバーシェルプラグイン: ブランド行、New Session アクション、折りたたみコントロール、スクロール対応の領域シート、下部固定の Settings シート。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-sidebar
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Desktop product events use the optional [product analytics service](../product-analytics/README.md); ordinary Web interactions are excluded.
+デスクトップの製品イベントはオプションの[プロダクト分析サービス](../product-analytics/README.md)を使用する。通常の Web インタラクションは除外される。
 
-## Summary
+## 概要
 
-The dsh web client sidebar lets users recognize the active build, start a new session, collapse navigation to a 56px rail, browse Workspaces and Sessions, and open Settings. It preserves a bottom-pinned Settings entry and hides idle scrollbars without moving browser rows. New Session uses an explicitly selected Workspace, then the current Session's Workspace, then the most recently active Workspace; if none exists, it opens a blank New Session page. Deployments can replace the brand mark or name while retaining the navigation controls and rail geometry.
+dsh Web クライアントのサイドバーは、ユーザーがアクティブなビルドを認識し、新しいセッションを開始し、ナビゲーションを 56px のレールに折りたたみ、ワークスペースとセッションを閲覧し、Settings を開けるようにする。下部固定の Settings エントリを保持し、ブラウザの行を動かさずにアイドル時のスクロールバーを隠す。New Session は、明示的に選択されたワークスペース、次に現在のセッションのワークスペース、次に最後にアクティブだったワークスペースを使用し、どれも存在しない場合は空白の New Session ページを開く。デプロイは、ナビゲーションコントロールとレールの形状を維持したまま、ブランドマークや名前を置き換えられる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-The sidebar is the navigation shell: users see the brand, start new sessions, collapse the rail, and reach Settings. Feature plugins fill its seats — ui-workspace fills `sidebar.workspaces`, ui-settings registers the trigger row and settings panel at `sidebar.settings`.
+サイドバーはナビゲーションシェルである: ユーザーはブランドを見て、新しいセッションを開始し、レールを折りたたみ、Settings に到達する。機能プラグインがそのシートを埋める。ui-workspace が `sidebar.workspaces` を埋め、ui-settings が `sidebar.settings` にトリガー行と設定パネルを登録する。
 
-### Brand and New Session
+### ブランドと New Session
 
-The expanded brand row renders `sidebar.brand.mark` and `sidebar.brand.name` as independent single slots; the collapsed rail renders the same mark slot. On Web and Windows desktop, clicking the expanded brand starts a new session; hovering or focusing it shows no tooltip. Without occupants, the shell uses the fish mark and a localized local-build label. A complete build stacks a code badge below the label as `version[-commit][-dirty]`, using `DSH_CLIENT_VERSION`, the optional 7-character `DSH_CLIENT_COMMIT_HASH`, and `DSH_CLIENT_GIT_DIRTY=true`; missing version metadata omits the badge. New Session targets the explicit Workspace used by a scoped action, otherwise the current Session's Workspace, otherwise the most recently active Workspace; when none exists it clears into the blank New Session page. The expanded New Session button displays the effective binding as trailing grey text on hover or keyboard focus. While the shortcut is visible, the centered icon and label fade before it when space is narrow; CSS reserves the shortcut’s width without measuring the button. Icon-only controls retain tooltips with platform-formatted keycaps, including the resident macOS header control when the sidebar is hidden. All controls expose `aria-keyshortcuts`.
+展開されたブランド行は `sidebar.brand.mark` と `sidebar.brand.name` を独立した単一スロットとしてレンダリングし、折りたたまれたレールは同じ mark スロットをレンダリングする。Web と Windows デスクトップでは、展開されたブランドをクリックすると新しいセッションが開始される。ホバーやフォーカスしてもツールチップは表示されない。占有者がいない場合、シェルは魚のマークとローカライズされたローカルビルドのラベルを使用する。完全なビルドでは、ラベルの下にコードバッジが `version[-commit][-dirty]` として積み重なる。これは `DSH_CLIENT_VERSION`、オプションの 7 文字の `DSH_CLIENT_COMMIT_HASH`、`DSH_CLIENT_GIT_DIRTY=true` を使用し、バージョンメタデータがない場合はバッジを省略する。New Session は、スコープ付きアクションが使用した明示的なワークスペース、そうでなければ現在のセッションのワークスペース、そうでなければ最後にアクティブだったワークスペースを対象とする。どれも存在しない場合は空白の New Session ページに切り替わる。展開された New Session ボタンは、ホバーまたはキーボードフォーカス時に有効なバインディングを末尾のグレーテキストとして表示する。ショートカットが表示されている間、スペースが狭いと中央のアイコンとラベルがショートカットより先にフェードする。CSS はボタンを計測せずにショートカットの幅を確保する。アイコンのみのコントロールは、プラットフォーム形式のキーキャップ付きのツールチップを保持する。サイドバーが隠れている場合の常駐の macOS ヘッダーコントロールも含む。すべてのコントロールは `aria-keyshortcuts` を公開する。
 
-### Global panel entries
+### グローバルパネルエントリ
 
-Plugins add an icon component to the root-scoped `sidebar.panellist` list with an `id`, optional `order`, and a string or locale-aware `label`. The same id addresses the component registered in the layout's root-scoped `main` keyed slot; selecting a missing main entry throws without changing the current selection. The label supplies plain visible text, the accessible name, and the collapsed tooltip. Each row reads its own selected state through `usePanelInfo`; moving DOM focus to search or a directory picker does not change the displayed panel or its selected row. With no registrations, neither the list nor spacing for it is rendered. The shipped composition registers no example panel.
+プラグインは、ルートスコープの `sidebar.panellist` リストにアイコンコンポーネントを追加する。`id`、オプションの `order`、文字列またはロケール対応の `label` を伴う。同じ id が、レイアウトのルートスコープの `main` キー付きスロットに登録されたコンポーネントを指す。存在しない main エントリを選択すると、現在の選択を変えずに例外がスローされる。ラベルはプレーンな可視テキスト、アクセシブル名、折りたたみ時のツールチップを提供する。各行は `usePanelInfo` を通じて自身の選択状態を読み取る。DOM フォーカスを検索やディレクトリピッカーに移動しても、表示中のパネルやその選択行は変わらない。登録がない場合、リストもそのための余白もレンダリングされない。出荷される構成はサンプルパネルを登録しない。
 
-### Collapse behavior
+### 折りたたみの動作
 
-The sidebar and conversation-header toggles show the effective shortcut from the command catalog in their hover and keyboard-focus tooltips and `aria-keyshortcuts`. An unbound command shows only the action label.
+サイドバーと会話ヘッダーのトグルは、ホバー時とキーボードフォーカス時のツールチップと `aria-keyshortcuts` に、コマンドカタログからの有効なショートカットを表示する。バインドされていないコマンドはアクションラベルのみを表示する。
 
-The top expand button hosts the optional, non-interactive `sidebar.toggle.badge` slot while collapsed. Its occupant supplies status and tooltip content without adding another action or changing the button's navigation behavior.
+折りたたまれている間、上部の展開ボタンはオプションの非インタラクティブな `sidebar.toggle.badge` スロットをホストする。その占有者は、別のアクションを追加したりボタンのナビゲーション動作を変えたりせずに、ステータスとツールチップのコンテンツを提供する。
 
-During a live collapse, the expanded content fades out at its current width, the upper controls share one fade and leftward translation into the 56px rail, and the layout's column slide ends the motion. A page that starts collapsed renders the rail statically, and reduced-motion mode disables both transitions. The bottom-pinned `sidebar.settings` control shares the fade timing but has no horizontal translation.
+ライブの折りたたみ中、展開されたコンテンツは現在の幅でフェードアウトし、上部のコントロールは 1 つのフェードと 56px レールへの左方向の平行移動を共有し、レイアウトのカラムスライドが動きを終わらせる。折りたたまれた状態で開始するページはレールを静的にレンダリングし、reduced-motion モードは両方のトランジションを無効にする。下部固定の `sidebar.settings` コントロールはフェードのタイミングを共有するが、水平方向の平行移動はない。
 
-On Windows Electron, `html[data-windows-titlebar]` fixes the sidebar toggle in the caption's top-left corner in both states, aligned with New Session's left edge only when expanded. The expanded brand sits below the caption and above New Session, with 8px of extra space above that button. Collapsing hides the brand and sidebar content and places New Session between the sidebar toggle and the Desktop-owned menus. The sidebar sets the root `--dsh-windows-menu-start` to 84px when collapsed; the Desktop preload uses it to position its menu after New Session and defaults to 48px when expanded. Caption icon buttons use centered 16px glyphs in 28px controls with the compact control radius and exclude themselves from the window drag region. The sidebar toggle and New Session bubbles open below the caption, where the Desktop-owned menu text cannot cover them; an occupying `sidebar.toggle.badge` chooses its own bubble side.
+Windows Electron では、`html[data-windows-titlebar]` がサイドバートグルをどちらの状態でもキャプションの左上隅に固定し、展開時のみ New Session の左端と揃える。展開されたブランドはキャプションの下、New Session の上に位置し、そのボタンの上に 8px の追加スペースがある。折りたたむと、ブランドとサイドバーコンテンツが隠れ、New Session がサイドバートグルと Desktop 所有のメニューの間に置かれる。サイドバーは折りたたみ時にルートの `--dsh-windows-menu-start` を 84px に設定する。Desktop の preload はそれを使用してメニューを New Session の後に配置し、展開時はデフォルトで 48px とする。キャプションのアイコンボタンは、コンパクトなコントロール角丸を持つ 28px のコントロール内に中央揃えの 16px グリフを使用し、ウィンドウのドラッグ領域から自身を除外する。サイドバートグルと New Session のバブルはキャプションの下に開き、Desktop 所有のメニューテキストがそれらを覆うことはできない。占有する `sidebar.toggle.badge` は自身のバブルの側を選ぶ。
 
-### macOS desktop
+### macOS デスクトップ
 
-Under `html[data-platform='darwin']` (set only by the desktop preload) the expanded column opens with a 52px top strip that clears the hiddenInset traffic lights and carries the collapse toggle; the strip and the logo row below each mark themselves `data-window-drag`, so each row's own box is the window's drag region (ui-web base.css declares the one darwin drag rule), and the brand wordmark is not a New Session shortcut there — the dedicated New Session button keeps the action — and collapsing hides the column entirely instead of leaving the rail. The package registers `HeaderLeadingControls` into the frame's `shell.leading` window-chrome seat (ui-layout), which mounts it — the open-sidebar and New Session controls beside the traffic lights — only while the column is hidden, over every main panel. The [Desktop reference](../../../apps/desktop/README.md) owns window integration.
+`html[data-platform='darwin']`(デスクトップ preload のみが設定)の下では、展開されたカラムは、hiddenInset のトラフィックライトを避けて折りたたみトグルを運ぶ 52px の上部ストリップとともに開く。ストリップとその下のロゴ行はそれぞれ自身を `data-window-drag` とマークするため、各行自身のボックスがウィンドウのドラッグ領域になる(ui-web の base.css が唯一の darwin ドラッグルールを宣言する)。そこではブランドのワードマークは New Session のショートカットではなく、専用の New Session ボタンがアクションを保持する。折りたたむと、レールを残すのではなくカラム全体が隠れる。このパッケージは `HeaderLeadingControls` をフレームの `shell.leading` ウィンドウクロームシート(ui-layout)に登録する。これはカラムが隠れている間のみ、すべてのメインパネルの上に、それをマウントする(トラフィックライトの隣のサイドバー開閉と New Session のコントロール)。[Desktop リファレンス](../../../apps/desktop/README.md)がウィンドウ統合を所有する。
 
-### Scrollbars
+### スクロールバー
 
-Scrollbars in the column are a pointer affordance: the shell rebinds the scrollbar indirection to `transparent` whenever the pointer is outside the column and keeps the thumb drawn for 2s after the pointer leaves, so a list nobody is pointing at carries no bar. The reservation that keeps rows from moving belongs to the scrolling region (ui-workspace), so revealing a thumb never reflows.
+カラム内のスクロールバーはポインターのアフォーダンスである。シェルは、ポインターがカラムの外にあるときはいつでもスクロールバーの間接参照を `transparent` に再バインドし、ポインターが離れてから 2 秒間サムを描画したままにするため、誰もポインティングしていないリストにはバーが表示されない。行が動かないようにするための確保はスクロール領域(ui-workspace)に属するため、サムの表示でリフローが起きることは決してない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The shell is pure composition: `SidebarRootComponentProps` composes the layout owner share, the global `useSessions` and `useWorkspaces` hooks, the declared brand, the `sidebar.workspaces` and `sidebar.settings` child slots, and injected navigation callbacks. Panel entries and their optional titles use the same composition path. Panel metadata is derived from list registrations and locale changes; selection belongs to the layout store.
+シェルは純粋な構成である: `SidebarRootComponentProps` は、レイアウトオーナーのシェア、グローバルな `useSessions` と `useWorkspaces` フック、宣言されたブランド、`sidebar.workspaces` と `sidebar.settings` の子スロット、注入されたナビゲーションコールバックを構成する。パネルエントリとそのオプションのタイトルも同じ構成経路を使用する。パネルのメタデータはリスト登録とロケール変更から導出され、選択はレイアウトストアに属する。
 
-### Slot discipline
+### スロットの規律
 
-Declaration-aware `slots.inject()` lets a replacing package activate before or after the sidebar. The foot is the `sidebar.settings` seat: the sidebar renders only the bottom-pinned layout slot and shares its column state (`wide`). The `/client` exports are the plugin body (`apply`/`inject`) plus the contract types only; SidebarRoot, the row components, and the tree derivation remain package-internal behind the slot registration.
+宣言を認識する `slots.inject()` により、置き換えるパッケージはサイドバーの前でも後でもアクティブ化できる。フットは `sidebar.settings` シートである: サイドバーは下部固定のレイアウトスロットのみをレンダリングし、そのカラム状態(`wide`)を共有する。`/client` のエクスポートはプラグイン本体(`apply`/`inject`)とコントラクト型のみである。SidebarRoot、行コンポーネント、ツリーの導出はスロット登録の背後でパッケージ内部に留まる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the surfaces that fill the shell's seats and the composition model.
+これらのページは、シェルのシートを埋めるサーフェスと構成モデルを扱う。
 
-- [ui-workspace](../ui-workspace/README.md) — the Workspace and Session browser rendered into `sidebar.workspaces`.
-- [ui-settings](../ui-settings/README.md) — the settings domain base registering the trigger row at `sidebar.settings`.
-- [ui-layout](../ui-layout/README.md) — the layout owner whose rail and column state the collapse uses.
-- [ui-theme](../ui-theme/README.md) — the scrollbar token indirection the shell rebinds.
-- [Slot system standard](../../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) — the composition model behind the seats.
+- [ui-workspace](../ui-workspace/README.md) — `sidebar.workspaces` にレンダリングされるワークスペースとセッションのブラウザ。
+- [ui-settings](../ui-settings/README.md) — `sidebar.settings` にトリガー行を登録する設定ドメインの基盤。
+- [ui-layout](../ui-layout/README.md) — 折りたたみが使用するレールとカラム状態を持つレイアウトオーナー。
+- [ui-theme](../ui-theme/README.md) — シェルが再バインドするスクロールバートークンの間接参照。
+- [Slot システム標準](../../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) — シートの背後の構成モデル。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+なし。このパッケージはモデルに面するものを何も登録しないブラウザ側 UI プラグインレイヤーである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てることも送信することもない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the shell owns versus what its occupants own; they are current package constraints.
+これらの制限は、シェルが所有するものと占有者が所有するものを定義する。現在のパッケージの制約である。
 
-- **Session state-dot rendering is owned by ui-workspace** — no done/error notification sources are available to this shell.
-- **Workspace browser behavior is composition-owned** — grouping, ordering, search, and row state belong to ui-workspace, not this shell.
-- **"New task completed" unread marking is local viewing state** — completion-time > last-seen never reaches the host.
+- **セッションの状態ドットのレンダリングは ui-workspace が所有する** — このシェルには done/error 通知ソースが利用できない。
+- **ワークスペースブラウザの動作は構成が所有する** — グループ化、並び順、検索、行の状態はこのシェルではなく ui-workspace に属する。
+- **「New task completed」の未読マークはローカルの閲覧状態である** — 完了時刻 > 最終閲覧はホストに到達することは決してない。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

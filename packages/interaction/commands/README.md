@@ -1,35 +1,35 @@
 ---
-description: "Human slash-command registry for interactive UIs: plugin-owned commands that run directly against an agent without creating a model message, for users and maintainers composing or extending command surfaces."
+description: "interactive UI 向けの人間用スラッシュコマンドレジストリ: モデルメッセージを作成せずにエージェントに対して直接実行されるプラグイン所有のコマンド。コマンドサーフェスを構成・拡張するユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-commands
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-commands` lets users run `/command [input]` actions in interactive Harness UIs without turning the command or its result into a model message. Commands can advertise input hints, accept attachments, and target one agent while preserving a global command with the same name for other agents. Every admitted run is recorded in the receiving agent's session log, while the UI renders the settled result outside model history. Use it for direct human controls in the `dsh` CLI or Web client; UI-less demos and ACP automation do not provide this command surface.
+`dsh-commands` を使用すると、interactive Harness UI で `/command [input]` アクションを実行できる。コマンドやその結果がモデルメッセージになることはない。コマンドは入力ヒントを提示でき、添付を受け付け、1 つのエージェントを対象にしつつ、他のエージェント向けに同名のグローバルコマンドを保持できる。受け付けられたすべての実行は受信側エージェントのセッションログに記録され、UI は確定した結果をモデル履歴の外にレンダリングする。`dsh` CLI や Web クライアントでの直接的な人間用コントロールに使用する。UI のないデモや ACP 自動化はこのコマンドサーフェスを提供しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Compose this service when an interactive UI should let users drive agent-side behavior with slash commands instead of model prompts. UI-less demo spines and ACP automation provide no command adapter and do not need it.
+interactive UI が、モデルプロンプトの代わりにスラッシュコマンドでユーザーがエージェント側の動作を操作できるようにする場合、このサービスを構成する。UI のないデモのスパインと ACP 自動化はコマンドアダプターを提供せず、必要ともしない。
 
-### Registering a command
+### コマンドの登録
 
-A plugin registers a command with `ctx.commands.register()`: a lowercase name, a discovery description, an optional `input` hint, and a handler. An optional branded `definitionId` gives the definition a stable, plugin-namespaced identity for adapters; it is independent of display copy and execution `commandId`. The effective descriptor carries only the selected definition's identity, so a scoped override never inherits the shadowed registration's identity.
+プラグインは `ctx.commands.register()` でコマンドを登録する: 小文字の名前、検出用の説明、オプションの `input` ヒント、ハンドラーである。オプションのブランド付き `definitionId` は、アダプター向けにプラグイン名前空間付きの安定した ID を定義に与える。これは表示用コピーや実行時の `commandId` とは独立している。有効なディスクリプターは選択された定義の ID のみを保持するため、スコープ付きオーバーライドがシャドウされた登録の ID を継承することはない。
 
 ```text
 ctx.commands.register({
@@ -43,107 +43,107 @@ ctx.commands.register({
 })
 ```
 
-The handler returns `success` or `error` plus optional UI text that the adapter renders. `recordInput` defaults to true; a command whose own authoritative domain event already carries the payload sets it to false so the session log does not duplicate the input. Registering the same name twice in one scope throws.
+ハンドラーは `success` または `error` と、アダプターがレンダリングするオプションの UI テキストを返す。`recordInput` のデフォルトは true である。自身の権威あるドメインイベントがすでにペイロードを運ぶコマンドは、セッションログが入力を重複させないよう false に設定する。同じスコープで同じ名前を 2 回登録すると例外がスローされる。
 
-### Command syntax
+### コマンドの構文
 
-A command line starts with a slash at byte zero, a lowercase name containing letters, digits, `_` or `-`, and then either end-of-input or whitespace. Everything after the name — including separator whitespace — is the command's `rawInput`, and the command owns its own grammar for it. Lines that are not syntactically a command, or that name an unknown command, are rejected by the adapter instead of becoming a model prompt.
+コマンドラインはバイト 0 のスラッシュで始まり、英字、数字、`_`、`-` を含む小文字の名前が続き、その後に入力の終端または空白が来る。名前の後のすべて(区切りの空白を含む)がコマンドの `rawInput` であり、その文法はコマンド自身が所有する。構文的にコマンドでない行、または未知のコマンドを名指す行は、モデルプロンプトになる代わりにアダプターによって拒否される。
 
-### Agent-scoped commands
+### エージェントスコープのコマンド
 
-A plain registration is global. A command-producing plugin mounted beneath an agent's own context declares its `commands` injection and registers an exact agent-scoped command, which shadows the global definition of the same name for that agent only.
+通常の登録はグローバルである。エージェント自身のコンテキストの下にマウントされたコマンド生成プラグインは、自身の `commands` インジェクションを宣言し、正確にエージェントスコープのコマンドを登録する。これはそのエージェントに対してのみ、同名のグローバル定義をシャドウする。
 
-### Attachments
+### 添付
 
-A command may declare `input.attachments` to accept composer images and generic files. The executor enforces the declaration: attachments sent to a non-declaring command, an absent attachment store, an unknown Session-scoped file-upload receipt, or an over-limit image batch each settle as an error before the handler runs. Images cross the command wire as base64 input; generic files cite receipts from their completed background uploads, so command submission never reads their bytes again. Admitted `ImageBlock`s and `FileBlock`s reach the handler as one frozen `invocation.attachments` array in the user's selection order, and the handler owns their model-visible use.
+コマンドは `input.attachments` を宣言して、コンポーザーの画像と汎用ファイルを受け付けられる。executor がこの宣言を強制する。宣言していないコマンドに送られた添付、添付ストアの不在、未知のセッションスコープのファイルアップロードレシート、上限を超える画像バッチは、いずれもハンドラーが実行される前にエラーとして確定する。画像は base64 入力としてコマンドのワイヤを通過する。汎用ファイルは完了したバックグラウンドアップロードのレシートを参照するため、コマンド送信がそのバイトを再び読み取ることはない。受け付けられた `ImageBlock` と `FileBlock` は、ユーザーの選択順で 1 つの凍結された `invocation.attachments` 配列としてハンドラーに届き、そのモデル可視の利用はハンドラーが所有する。
 
-### Dispatching from an adapter
+### アダプターからのディスパッチ
 
-An interactive adapter calls `execute(agent, line, attachments, signal)` with the exact receiving agent, the full command line, and the submission's ordered attachments. It returns the settled `CommandExecution` — the normalized result plus its lifecycle `commandId` — or `undefined` for invalid syntax or an unknown name. `list(agent)` and `find(agent, name)` serve discovery after agent-scoped shadowing.
+interactive アダプターは、正確な受信エージェント、完全なコマンドライン、送信の順序付き添付を伴って `execute(agent, line, attachments, signal)` を呼び出す。戻り値は確定した `CommandExecution`(正規化された結果とそのライフサイクル `commandId`)か、無効な構文または未知の名前に対する `undefined` である。`list(agent)` と `find(agent, name)` は、エージェントスコープのシャドウイング後の検出を担う。
 
-### Cancellation
+### キャンセル
 
-The caller's abort signal stops the registry from awaiting a handler; a handler that ignores the signal may continue its own external side effects after the caller stops waiting. A cancelled or thrown handler settles as a `command/done` error in the log.
+呼び出し元の abort シグナルは、レジストリがハンドラーを待機するのを止める。シグナルを無視するハンドラーは、呼び出し元が待機を止めた後も自身の外部副作用を続ける可能性がある。キャンセルされた、または例外をスローしたハンドラーは、ログ内で `command/done` エラーとして確定する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The observable behavior is covered in [Use this package](#use-this-package); this section explains how the registry is built and where its contracts live.
+観察可能な動作は[このパッケージの使い方](#use-this-package)で扱う。このセクションでは、レジストリがどのように構築され、そのコントラクトがどこにあるかを説明する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `CommandRuntime` service: registration, scoping, dispatch, lifecycle events |
-| [`src/types.ts`](src/types.ts) | Command definition, descriptor, execution, and result types |
-| [`src/brand.ts`](src/brand.ts) | Stable command-definition identities and per-execution lifecycle ids |
+| [`src/index.ts`](src/index.ts) | `CommandRuntime` サービス: 登録、スコープ、ディスパッチ、ライフサイクルイベント |
+| [`src/types.ts`](src/types.ts) | コマンドの定義、ディスクリプター、実行、結果の型 |
+| [`src/brand.ts`](src/brand.ts) | 安定したコマンド定義 ID と実行ごとのライフサイクル ID |
 
-### Lifecycle events
+### ライフサイクルイベント
 
-`execute()` mints a `commandId`, appends `command/run` before the handler runs, and appends `command/done` at settlement with the outcome kind and verbatim text; the exact payload fields live in [`src/index.ts`](src/index.ts). A successful result may name an earlier non-command authoritative domain event through `sourceEventSeq`; a thrown or aborted handler settles as `kind: 'error'`. Both events are direct standalone log-only appends: no turn wraps them, and persistence drains them at ordinary checkpoints and teardown. Admission misses (invalid syntax or unknown name) log nothing.
+`execute()` は `commandId` を発行し、ハンドラーの実行前に `command/run` を追記し、確定時に結果種別とそのままのテキストを伴う `command/done` を追記する。正確なペイロードフィールドは [`src/index.ts`](src/index.ts) にある。成功した結果は `sourceEventSeq` を通じて、以前の非コマンドの権威あるドメインイベントを名指せる。例外をスローした、または中断されたハンドラーは `kind: 'error'` として確定する。どちらのイベントも直接のスタンドアロンなログ専用追記である。それらをラップするターンはなく、永続化は通常のチェックポイントと終了処理でそれらを排出する。受け付けの失敗(無効な構文または未知の名前)は何もログしない。
 
-### Scoping
+### スコープ
 
-Registrations live in global and agent-scoped layers merged per agent via `ScopedLayers`. The child-injection shape — a command-producing plugin mounted beneath `agent.ctx` declares its own `commands` injection — preserves agent scope without making the core agent loop depend on a UI service. Duplicate names within one layer fail during registration, and registration or removal notifies every `commands/change` observer so live adapters can refresh discovery; observer failures are logged and cannot veto the mutation or starve later observers.
+登録はグローバル層とエージェントスコープ層に存在し、`ScopedLayers` によってエージェントごとにマージされる。子インジェクションの形(コマンド生成プラグインが `agent.ctx` の下にマウントされ、自身の `commands` インジェクションを宣言する)は、コアの agent loop を UI サービスに依存させずにエージェントスコープを保持する。1 つの層内での重複名は登録時に失敗し、登録または削除はすべての `commands/change` オブザーバーに通知するため、ライブのアダプターが検出を更新できる。オブザーバーの失敗はログされ、変更を拒否したり後続のオブザーバーを飢えさせたりすることはできない。
 
-### Attachment admission
+### 添付の受け付け
 
-Attachment enforcement happens in the executor: images are committed through `admitEncodedImages`, files are resolved through the single Session-aware receipt provider, and the executor restores their original mixed order before calling the handler. Validation rejection starts no attachment writes. An image-storage failure can leave unreachable content-addressed objects for deferred collection, but publishes no model-visible message. Cancellation is honored before the handler runs. Command errors leave the dispatching composer's draft and attachment cards intact.
+添付の強制は executor で行われる。画像は `admitEncodedImages` を通じてコミットされ、ファイルは単一のセッション対応レシートプロバイダーを通じて解決され、executor はハンドラーを呼び出す前に元の混在順を復元する。検証の拒否は添付の書き込みを一切開始しない。画像ストレージの障害は、遅延回収用の到達不能なコンテンツアドレスオブジェクトを残す可能性があるが、モデル可視のメッセージは公開しない。キャンセルはハンドラーの実行前に尊重される。コマンドのエラーは、ディスパッチ元コンポーザーのドラフトと添付カードをそのまま保つ。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared command vocabulary to the design evidence and adjacent surfaces.
+パッケージレベルのコントラクトでは足りない場合にこれらのページを読む。共有のコマンド語彙から設計の根拠、隣接するサーフェスへと進む。
 
-- [Commands subsystem reference](../../../docs/subsystems/commands.md) — registry semantics, input metadata, and the `ctx.commands` Cordis surface.
-- [historical Command registration Agent Note](../../../.agents/notes/archived/feature/2026-07-19-plugin-command-registration.md) — the boundary and dispatch contract behind this service.
-- [Interaction group map](../README.md) — adjacent approval, permission, and question packages.
-- [Plan mode package](../../plan/plan-mode/README.md) — a shipped command producer that drives model-visible work.
+- [Commands サブシステムリファレンス](../../../docs/subsystems/commands.md) — レジストリのセマンティクス、入力メタデータ、`ctx.commands` Cordis サーフェス。
+- [historical Command registration Agent Note](../../../.agents/notes/archived/feature/2026-07-19-plugin-command-registration.md) — このサービスの背後の境界とディスパッチのコントラクト。
+- [Interaction グループマップ](../README.md) — 隣接する承認、権限、質問のパッケージ。
+- [Plan mode パッケージ](../../plan/plan-mode/README.md) — モデル可視の作業を駆動する、出荷済みのコマンドプロデューサー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Direct human commands
+### 直接的な人間用コマンド
 
-#### What the model sees
+#### モデルに見えるもの
 
-The registry itself submits nothing. Known slash commands execute in the UI command plane, and their `CommandResult` text is not submitted as a user message. Unknown slash-command input is rejected by shipped adapters instead of becoming a model prompt. A command producer may explicitly use the receiving `Agent`; for example, [`dsh-plan-mode`](../../plan/plan-mode/README.md#model-and-human-interactions) submits the optional message and ordered attachments in `/plan [message]` after selecting plan mode. The executor only admits attachments into durable objects; the declaring producer decides whether and how they become model-visible message content.
+レジストリ自体は何も送信しない。既知のスラッシュコマンドは UI コマンドプレーンで実行され、その `CommandResult` テキストがユーザーメッセージとして送信されることはない。未知のスラッシュコマンド入力は、モデルプロンプトになる代わりに出荷済みのアダプターによって拒否される。コマンドプロデューサーは受信側の `Agent` を明示的に使用できる。たとえば [`dsh-plan-mode`](../../plan/plan-mode/README.md#model-and-human-interactions) は、プランモードを選択した後、`/plan [message]` のオプションのメッセージと順序付き添付を送信する。executor は添付を永続オブジェクトへ受け付けるのみであり、それらがモデル可視のメッセージコンテンツになるかどうか、どのようになるかは宣言したプロデューサーが決める。
 
-#### Token effect
+#### トークンへの影響
 
-Command discovery, execution, and UI output add no model tokens. Explicit agent work scheduled by a command producer has the same token effect as the corresponding agent input.
+コマンドの検出、実行、UI 出力はモデルトークンを追加しない。コマンドプロデューサーがスケジュールする明示的なエージェント作業は、対応するエージェント入力と同じトークン影響を持つ。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Registry metadata, command input, and direct output never enter a model request and do not affect its cache. A mutated domain owns any later cache effect.
+レジストリのメタデータ、コマンド入力、直接出力はモデルリクエストに入ることはなく、そのキャッシュに影響しない。変更されたドメインが、その後のキャッシュ影響を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the registry does not offer. They are current package constraints, not a UI backlog.
+これらの制限は、レジストリが提供しないものを定義する。現在のパッケージの制約であり、UI のバックログではない。
 
-- **Only unstructured text input** — forms, completion schemas, and typed arguments remain command-owned parsing concerns.
-- **Cooperative side-effect cancellation** — dispatch stops awaiting on abort; handlers must honor the signal to stop work that has already escaped into external systems.
+- **非構造化テキスト入力のみ** — フォーム、補完スキーマ、型付き引数は、コマンドが所有するパースの関心事のままである。
+- **協調的な副作用のキャンセル** — ディスパッチは abort で待機を止める。すでに外部システムに流出した作業を止めるには、ハンドラーがシグナルを尊重する必要がある。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

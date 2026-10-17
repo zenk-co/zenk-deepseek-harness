@@ -3,23 +3,23 @@ kind: upgrade-guide
 description: "Stored credentials now precede environment fallbacks when the store is mounted; the shipped headless profile omits stored authentication."
 ---
 
-# A stored key takes precedence over an exported variable
+# 保存キーがエクスポート変数より優先される
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更内容
 
-Earlier releases used an exported environment variable before the `refs` entry with the same name in `$DSH_HOME/.credentials.yaml` (`~/.dsh/.credentials.yaml` by default). This applied to `DEEPSEEK_API_KEY=… dsh`, a shell profile export, a CI secret, and a container `-e` value. While the name was exported, the Models page could not save a key for it.
+以前のリリースでは、`$DSH_HOME/.credentials.yaml`（デフォルトでは `~/.dsh/.credentials.yaml`）内の同名 `refs` エントリよりも、エクスポートされた環境変数が使用されていた。これは `DEEPSEEK_API_KEY=… dsh`、シェルプロファイルのエクスポート、CI シークレット、コンテナーの `-e` 値に適用されていた。その名前がエクスポートされている間、Models ページはその名前のキーを保存できなかった。
 
-Now the stored entry wins. The exported variable applies only while the file stores no value for that name, and `$cwd/.env` and `$DSH_HOME/.env` still apply only after both. The Models page can save and replace a key while the name is exported.
+現在は保存エントリが優先される。エクスポート変数は、その名前の値がファイルに保存されていない間のみ適用され、`$cwd/.env` と `$DSH_HOME/.env` は両方の後でのみ適用される。Models ページは、その名前がエクスポートされていてもキーを保存・置換できる。
 
-The shipped `headless` profile instead disables the credential store, authorization and DeepSeek account provider. It uses the launch environment, project `.env`, then Harness-home `.env`, and leaves `.credentials.yaml` untouched. Saved API keys and sign-ins no longer authenticate headless jobs by default. Web, SDK and ACP retain the store.
+出荷 `headless` プロファイルは代わりにクレデンシャルストア、認可、DeepSeek アカウントプロバイダーを無効にする。起動環境、プロジェクト `.env`、Harness ホーム `.env` の順に使用し、`.credentials.yaml` には触れない。保存済み API キーとサインインはデフォルトで headless ジョブを認証しなくなった。Web、SDK、ACP はストアを保持する。
 
-You are affected when a harness home stores a value under `refs` and the process that launches `dsh` exports the same name. This includes a container that mounts such a home. Requests now use the stored key instead of the exported one. A CI job or container that starts with a fresh harness home, without `.credentials.yaml`, is not affected. The [stored credential precedence](../../../../.agents/notes/implemented/architecture/2026-10-09-stored-credential-precedence.md) Agent Note records the reason.
+影響を受けるのは、harness ホームが `refs` 配下に値を保存し、`dsh` を起動するプロセスが同名をエクスポートしている場合である。そのようなホームをマウントしたコンテナーも含まれる。リクエストはエクスポートされたものではなく保存キーを使用するようになる。`.credentials.yaml` のない新規 harness ホームで開始する CI ジョブやコンテナーは影響を受けない。理由は[保存クレデンシャル優先順位](../../../../.agents/notes/implemented/architecture/2026-10-09-stored-credential-precedence.md) Agent Note に記録されている。
 
-## Migration
+## 移行手順
 
-1. Compare the names under `refs` in `$DSH_HOME/.credentials.yaml` with the variables that your shell, CI job, or container exports. A name that appears in only one place needs no action.
-2. For each name that appears in both places, keep the stored key if it is the account you want. Otherwise, delete the name's line under `refs`. A running harness reloads the file, so the next request reads the exported variable without a restart.
-3. For a headless job, export the required key and run `dsh headless "<task>"`. To keep using a saved key or sign-in, apply the three-row [headless restoration patch](../../../../packages/bundle/headless/README.md#credentials); restored storage also restores saved-first precedence. Existing profile, home or command overlays can override the shipped rows, so inspect `dsh headless --dump-config` when checking the effective composition.
-4. Confirm the intended request account and that the launching process exports a non-empty value where needed. Check names and presence without printing credential values. A headless run relying only on a saved credential now fails; restoring storage or supplying supported environment authentication resolves it.
+1. `$DSH_HOME/.credentials.yaml` 内の `refs` 配下の名前と、シェル・CI ジョブ・コンテナーがエクスポートする変数を比較する。片方にしか存在しない名前は対処不要である。
+2. 両方に存在する名前ごとに、求めるアカウントであれば保存キーを保持する。そうでなければ `refs` 配下のその名前の行を削除する。実行中の harness はファイルを再読み込みするため、再起動なしに次のリクエストがエクスポート変数を読み込む。
+3. headless ジョブでは、必要なキーをエクスポートして `dsh headless "<task>"` を実行する。保存キーやサインインを使い続けるには、3 行の [headless 復元パッチ](../../../../packages/bundle/headless/README.md#credentials)を適用する。ストレージ復元により保存優先の優先順位も復元される。既存のプロファイル・ホーム・コマンドオーバーレイが同梱行をオーバーライドできるため、実効構成の確認時は `dsh headless --dump-config` を検査する。
+4. 意図したリクエストアカウントであること、必要な箇所で起動プロセスが空でない値をエクスポートしていることを確認する。クレデンシャル値を出力せずに名前と存在を確認する。保存クレデンシャルのみに依存する headless 実行は失敗するようになる。ストレージ復元か、対応する環境認証の提供で解決する。

@@ -1,35 +1,35 @@
 ---
-description: "The shell executor seam for developers and maintainers choosing, composing, or implementing command execution over ctx.shell."
+description: "開発者とメンテナーが ctx.shell 上でコマンド実行を選択、構成、または実装するためのシェルエグゼキューターシーム。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-shell
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `ctx.shell` to run shell commands with bounded output or keep them running as background work. One execution handle supports foreground results and background reads. A profile can select local or sandboxed Bash or PowerShell execution without changing callers. Resolve requests before execution to make the working directory, timeout, and output limits explicit. Command exits, timeouts, and caller aborts return results; only infrastructure failures reject, while the `bash` and `pwsh` tools own model-visible rendering and sandbox guidance.
+`ctx.shell` を使うと、シェルコマンドを上限付きの出力で実行したり、バックグラウンド作業として動かし続けたりできる。1 つの実行ハンドルがフォアグラウンド結果とバックグラウンド読み取りの両方を支える。プロファイルは呼び出し側を変えずに、ローカルまたはサンドボックス化された Bash または PowerShell の実行を選択できる。実行前にリクエストを解決することで、作業ディレクトリ、タイムアウト、出力上限が明示される。コマンドの終了、タイムアウト、呼び出し側の中断は結果を返し、reject するのはインフラ障害だけである。一方、モデル可視のレンダリングとサンドボックスガイダンスは `bash` と `pwsh` ツールが所有する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use `ctx.shell` when an agent or an in-process plugin needs to run a shell command and read its output, keep a process running and poll it, or hand a foreground command a way to outlive its deadline. There is one execution method — `execute(spec)` resolves with the prepared handle — and "foreground" is a property of what the caller awaits, not of the spawn. It is the contract every shell executor and the model-facing `bash`/`pwsh` tools build on, so code written against it works over any executor implementation.
+エージェントまたはプロセス内プラグインが、シェルコマンドを実行して出力を読む、プロセスを動かし続けてポーリングする、あるいはフォアグラウンドコマンドに期限を超えて生き延びる手段を与える必要がある場合は `ctx.shell` を使う。実行メソッドは 1 つだけ —— `execute(spec)` が準備済みハンドルで解決する —— であり、「フォアグラウンド」は spawn の性質ではなく、呼び出し側が await するものの性質である。これはすべてのシェルエグゼキューターとモデルに面する `bash`/`pwsh` ツールがその上に築く契約なので、これに対して書かれたコードはどのエグゼキューター実装でも動く。
 
-### Foreground commands
+### フォアグラウンドコマンド
 
-Await the handle's `result()` projection to run a command in the foreground. The promise resolves when the command finishes: a nonzero exit, an executor timeout kill, or a caller abort kill is a result, never a rejection. `result()` rejects only for infrastructure failures such as an unusable working directory or a missing shell. The result carries the exit code or signal, whether a timeout or an abort cut the run short (first-cause classification), and the collected stdout/stderr with spill-file paths when a stream overflowed its budget.
+ハンドルの `result()` プロジェクションを await すると、コマンドがフォアグラウンドで実行される。promise はコマンドの終了時に解決する。非ゼロ終了、エグゼキューターのタイムアウトによる kill、呼び出し側の中断による kill はいずれも結果であり、rejection にはならない。`result()` が reject するのは、使用不能な作業ディレクトリやシェルの不在といったインフラ障害だけである。結果は終了コードまたはシグナル、タイムアウトまたは中断で実行が打ち切られたかどうか（原因の先着順分類）、およびストリームがバジェットをあふれた場合の spill ファイルパス付きで収集された stdout/stderr を運ぶ。
 
 ```text
 const execution = await ctx.shell.execute(ctx.shell.resolve({ command: 'ls -la' }))
@@ -37,23 +37,23 @@ const result = await execution.result()
 console.log(result.exitCode, result.stdout.text)
 ```
 
-### Background processes
+### バックグラウンドプロセス
 
-Resolve the request with `onExpiry: 'none'` and await `execute` for the prepared handle: no deadline is armed, and the process runs until killed or finished. Read output incrementally with `readOutput()` — consecutive reads never repeat output, and lossy reads point at full-stream spill files. Terminate the provider-managed range with `kill()` (returns `false` once the direct command has finished) and await `done` for direct-command settlement. Job ids, ownership, polling, and notices belong to the generic `ctx.jobs` runtime, where the tool layer registers the handle. `ShellProcess.observed` exposes non-consuming offset readers over the same captured streams — for observers independent of the consuming cursor, such as the job registry's pull sources — including the `spawn failed: …` note a rejected spawn leaves on stderr.
+リクエストを `onExpiry: 'none'` で解決し、`execute` を await して準備済みハンドルを得る。期限は設定されず、プロセスは kill されるか終了するまで動き続ける。出力は `readOutput()` で逐次読む —— 連続する読み取りが出力を繰り返すことはなく、lossy な読み取りは全ストリームの spill ファイルを指す。`kill()` でプロバイダー管理範囲を終了し（直接コマンドが終了済みなら `false` を返す）、直接コマンドの決着は `done` を await する。ジョブ id、所有権、ポーリング、通知は汎用の `ctx.jobs` ランタイムに属し、ツール層がそこでハンドルを登録する。`ShellProcess.observed` は、同じキャプチャ済みストリームに対する非消費型のオフセットリーダー —— 消費カーソルから独立したオブザーバー（ジョブレジストリのプルソースなど）向け —— を公開する。reject された spawn が stderr に残す `spawn failed: …` の通知も含まれる。
 
-### Deadlines and bounded waits
+### 期限と上限付き待機
 
-The deadline includes asynchronous preparation. Expiry before a process starts returns a settled handle whose result is `timedOut: true`, with empty output. Cancellation or preparation failure rejects `execute` before publication; late preparation cannot spawn a process.
+期限には非同期の準備も含まれる。プロセス開始前の期限切れは、結果が `timedOut: true` で出力が空の、決着済みハンドルを返す。キャンセルまたは準備の失敗は、公開前に `execute` を reject する。遅れた準備がプロセスを spawn することはできない。
 
-The seam has two expiry policies and no hand-over protocol. `'kill'` stops the command at the deadline and classifies the result `timedOut`; `'none'` arms no deadline, so only the caller's signal and `kill()` stop the command. A caller that wants to wait only for a while runs the command under `'none'` and bounds its own wait: the handle stays valid after the caller stops waiting, and nothing changes hands at that moment. The `bash`/`pwsh` tools do exactly this — with a job registry composed they register every command with `ctx.jobs` as it starts and wait on the job, so a foreground command that outlives its timeout simply keeps running as the job it already was.
+このシームには 2 つの期限切れポリシーがあり、ハンドオーバープロトコルはない。`'kill'` は期限でコマンドを停止し、結果を `timedOut` に分類する。`'none'` は期限を設定しないので、コマンドを止めるのは呼び出し側のシグナルと `kill()` だけである。しばらくだけ待ちたい呼び出し側は、`'none'` でコマンドを実行して自分の待機に上限を設ける。呼び出し側が待機をやめてもハンドルは有効なままで、その時点で何も引き継がれない。`bash`/`pwsh` ツールはまさにこれを実践する —— ジョブレジストリが構成されている場合、開始時にすべてのコマンドを `ctx.jobs` に登録してジョブを待つので、タイムアウトより長生きするフォアグラウンドコマンドは、それ自身であるジョブとしてそのまま動き続ける。
 
-### Requests and resolved specs
+### リクエストと解決済みスペック
 
-Every execution starts from a `ShellExecRequest` with optional fields; the executor's `resolve()` turns it into a fully-resolved `ShellExecSpec` with explicit defaults and caps before anything runs. This request/spec split is the repository's template for explicit resolution at package boundaries: callers never rely on hidden defaults inside `execute`. `resolve()` fills the working directory, timeout, and expiry policy (default `'kill'`) from the executor's configuration and the request, caps per-call overrides, and carries optional inputs — `stdin`, ordinary `env`, and the trusted `DSH_*` snapshot — through verbatim.
+すべての実行は省略可能なフィールドを持つ `ShellExecRequest` から始まる。エグゼキューターの `resolve()` は、何かが走る前に、明示的なデフォルトと上限を持つ完全解決済みの `ShellExecSpec` へそれを変換する。このリクエスト/スペック分割は、パッケージ境界での明示的解決に関するこのリポジトリのテンプレートである。呼び出し側が `execute` 内部の隠れたデフォルトに頼ることはない。`resolve()` は作業ディレクトリ、タイムアウト、期限切れポリシー（デフォルト `'kill'`）をエグゼキューターの設定とリクエストから埋め、呼び出しごとの上書きに上限をかけ、省略可能な入力 —— `stdin`、通常の `env`、信頼済みの `DSH_*` スナップショット —— をそのまま通す。
 
-### Choosing and composing an executor
+### エグゼキューターの選択と構成
 
-The seam is not an executor: mount exactly one provider per composition, and the tools work unchanged. On POSIX, `dsh-bash-local` runs commands as fresh `bash -c` processes and `dsh-bash-sandbox` confines every command through the sandbox capability; on Windows, `dsh-pwsh-local` and `dsh-pwsh-sandbox` are the counterparts. The `bash` and `pwsh` tools advertise escalation fields only while a sandboxing executor is mounted. The smallest composition is the executor alone:
+このシームはエグゼキューターではない。構成ごとにプロバイダーをちょうど 1 つマウントすれば、ツールは変更なしで機能する。POSIX では `dsh-bash-local` がコマンドを新しい `bash -c` プロセスとして実行し、`dsh-bash-sandbox` がすべてのコマンドをサンドボックスケイパビリティを通じて閉じ込める。Windows では `dsh-pwsh-local` と `dsh-pwsh-sandbox` が対応する。`bash` と `pwsh` ツールがエスカレーションフィールドを広告するのは、サンドボックス化エグゼキューターがマウントされている間だけである。最小の構成はエグゼキューター単独である:
 
 ```yaml
 - id: bash
@@ -62,85 +62,85 @@ The seam is not an executor: mount exactly one provider per composition, and the
     cwd: /path/to/workspace
 ```
 
-### The shared exit-status contract
+### 共有の終了ステータス契約
 
-Tool results end with a machine-readable exit marker — `[exit code: N]` or `[killed by signal: X]` — so the model can always tell how a command ended. The seam owns that marker format and the `parseExitStatus` helper that splits a rendered result back into its output body and structured exit status, keeping the `bash` and `pwsh` tools from drifting on it.
+ツール結果は機械可読な終了マーカー —— `[exit code: N]` または `[killed by signal: X]` —— で終わるので、モデルはコマンドがどう終わったかを常に判別できる。このシームがそのマーカー形式と、レンダリング済み結果を出力本体と構造化された終了ステータスに再分割する `parseExitStatus` ヘルパーを所有し、`bash` と `pwsh` ツールがここでずれないようにしている。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design of the seam and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、このシームの設計を説明し、それを実現するコードを示す。観察可能な挙動は[このパッケージを使う](#use-this-package)で完全にカバーされている。
 
-### Design philosophy
+### 設計哲学
 
-The package is one role of a standard capability seam: the Service Definition that names the executor contract, with Service Providers and Consumers split so each role evolves independently (see the [capability-seams note](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md)). Two decisions anchor the contract:
+このパッケージは標準的なケイパビリティシームの 1 つのロールである。エグゼキューター契約を名指す Service Definition であり、Service Provider と Consumer が分割されているため、各ロールが独立して進化できる（[capability-seams ノート](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md)を参照）。2 つの決定が契約を支えている:
 
-- **Explicit resolution at the boundary.** `resolve(request)` is the single place defaults and caps are applied; `execute` accepts only resolved specs and never re-defaults, so no hidden fallback lives inside an implementation.
-- **One execution, projected views.** `execute` resolves with the prepared handle; the foreground result and the background cursor reads are projections over the same spawned process, so foreground/background is the caller's choice, never a second spawn path. The handle carries no id or owner; job identity, ownership, and lifecycle belong to the generic `ctx.jobs` runtime, keeping executors independent of sessions.
+- **境界での明示的解決。** `resolve(request)` がデフォルトと上限を適用する唯一の場所であり、`execute` は解決済みスペックのみを受け取って再デフォルト化しないので、隠れたフォールバックが実装内部に存在しない。
+- **1 回の実行、複数の射影。** `execute` は準備済みハンドルで解決し、フォアグラウンド結果とバックグラウンドカーソルの読み取りは同じ spawn 済みプロセスへの射影である。したがってフォアグラウンド/バックグラウンドは呼び出し側の選択であり、2 つ目の spawn 経路にはならない。ハンドルは id や所有者を運ばない。ジョブの識別、所有権、ライフサイクルは汎用の `ctx.jobs` ランタイムに属し、エグゼキューターをセッションから独立させている。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: abstract `ShellExecutor` service and the shared settings namespace |
-| [`src/types.ts`](src/types.ts) | Request/spec vocabulary, `ShellExecution`, `ShellRunResult`, and sandbox facts |
-| [`src/render.ts`](src/render.ts) | `parseExitStatus`: the exit-status marker contract the shell tools share |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: 抽象 `ShellExecutor` サービスと共有設定名前空間 |
+| [`src/types.ts`](src/types.ts) | リクエスト/スペックの語彙、`ShellExecution`、`ShellRunResult`、サンドボックスの事実 |
+| [`src/render.ts`](src/render.ts) | `parseExitStatus`: シェルツールが共有する終了ステータスマーカー契約 |
 
-### Settings namespace
+### 設定名前空間
 
-`SHELL_SETTINGS_NAMESPACE` is exported here rather than by a provider because it names the capability, not an implementation: a host composes exactly one provider of `ctx.shell`, so the providers share one namespace without colliding, and a settings document carried between platforms keeps resolving on both.
+`SHELL_SETTINGS_NAMESPACE` がプロバイダーではなくここでエクスポートされるのは、それが実装ではなくケイパビリティを名指すためである。ホストは `ctx.shell` のプロバイダーをちょうど 1 つ構成するので、プロバイダーは衝突せずに 1 つの名前空間を共有し、プラットフォーム間で持ち運ばれる設定ドキュメントはどちらでも解決し続ける。
 
-### Background lifecycle and ownership
+### バックグラウンドのライフサイクルと所有権
 
-A spawned process belongs to the subprocess service, not to the executor: it survives an executor-only reload and is killed and joined when the composition tears down. Implementations must honor the seam's semantics — `result()` rejects only for infrastructure failures; the handle is published after preparation and its `done` never rejects (provider rejections, synchronous or asynchronous, settle the handle as `killed` with a stage-neutral note on stderr while `result()` carries the same failure as its rejection; a live handle whose rejection follows the execution's own `kill()` or abort settles as its terminal outcome instead); `readOutput` is consuming and lossy reads report spill files.
+spawn されたプロセスはエグゼキューターではなくサブプロセスサービスに属する。エグゼキューターのみのリロードを生き延び、構成の解体時に kill されて join される。実装はこのシームのセマンティクスを守らなければならない —— `result()` はインフラ障害のときだけ reject する。ハンドルは準備後に公開され、その `done` は決して reject しない（プロバイダーの rejection は、同期・非同期を問わず、ハンドルを `killed` として決着させ、ステージに中立な通知を stderr に残す。なお `result()` は同じ失敗を自身の rejection として運ぶ。実行自身の `kill()` または abort に続く rejection では、生きたハンドルはその最終結果として決着する）。`readOutput` は消費型であり、lossy な読み取りは spill ファイルを報告する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the seam contract is not enough. They move from the shared subsystem reference to the concrete executors and the model-facing tools.
+シーム契約だけでは足りないときに、これらのページを読む。共有サブシステムリファレンスから、具体的なエグゼキューターとモデルに面するツールへと進む。
 
-- [Bash executor subsystem](../../../docs/subsystems/shell.md) — the request/spec vocabulary, results, and service contract in full.
-- [bash-local](../bash-local/README.md) — the default POSIX executor: fresh `bash -c` processes, budgets, and deadlines.
-- [bash-sandbox](../bash-sandbox/README.md) — the confining executor: sandbox modes, denials, and escalation.
-- [tool-bash](../tool-bash/README.md) — the model-facing `bash` tool over this seam.
-- [Capability seams note](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md) — the Service Definition / Provider / Consumer split this seam follows.
+- [Bash エグゼキューターサブシステム](../../../docs/subsystems/shell.md) — リクエスト/スペックの語彙、結果、サービス契約の全体。
+- [bash-local](../bash-local/README.md) — デフォルトの POSIX エグゼキューター: 新しい `bash -c` プロセス、バジェット、期限。
+- [bash-sandbox](../bash-sandbox/README.md) — 閉じ込めエグゼキューター: サンドボックスモード、拒否、エスカレーション。
+- [tool-bash](../tool-bash/README.md) — このシーム上のモデルに面する `bash` ツール。
+- [ケイパビリティシームノート](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md) — このシームが従う Service Definition / Provider / Consumer の分割。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-tool-bash`, which turns executor output and sandbox facts into guidance and retained tool-result tokens.
+間接的。`dsh-tool-bash` を通じ、エグゼキューター出力とサンドボックスの事実をガイダンスと保持されるツール結果トークンに変換する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+直接の無効化はない。リクエストプレフィックスの変更は、名指されたコンシューマーが所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the seam does not provide. They are current package constraints, not a roadmap.
+これらの制限は、このシームが提供しないものを定義する。現在のパッケージ制約であり、ロードマップではない。
 
-- **No interactive-input vocabulary** — `stdin` is written once at spawn and closed; the seam has no channel to feed a running task and no PTY session concept.
-- **Foreground timeouts are always executor-owned** — a caller-owned-deadline mode on the seam is explicitly deferred by the [tool-call timeout-policy note](../../../.agents/notes/implemented/architecture/2026-07-07-tool-call-timeout-policy.md).
+- **対話的入力の語彙がない** — `stdin` は spawn 時に 1 回書かれて閉じられる。このシームには実行中のタスクに投入するチャネルも、PTY セッションの概念もない。
+- **フォアグラウンドのタイムアウトは常にエグゼキューター所有** — シーム上の呼び出し側所有期限モードは、[tool-call timeout-policy ノート](../../../.agents/notes/implemented/architecture/2026-07-07-tool-call-timeout-policy.md)によって明示的に先送りされている。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

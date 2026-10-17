@@ -1,85 +1,85 @@
 ---
-description: "Configure Desktop product analytics, identity fields, and event timing without collecting Web usage."
+description: "Web の利用状況を収集せずに Desktop のプロダクト分析、ID フィールド、イベントタイミングを構成する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-product-analytics
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Desktop reports selected interactions through the existing OTel product exporter by default, without a user-facing control. Ordinary Web clients never submit these events, and missing login identity is omitted.
+Desktop はデフォルトで、既存の OTel プロダクトエクスポーターを通じて選択されたインタラクションを報告する。ユーザー向けのコントロールはない。通常の Web クライアントはこれらのイベントを決して送信せず、欠落したログイン ID は省略される。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Desktop mounts Analytics and its required Telemetry exporter. The `product-analytics` settings namespace owns the live `enabled` field, which defaults to `true`; configure it through the existing Cordis Config / settings mechanism. There is no user-facing control. Ordinary Web mounts neither service. Disabled collection starts no environment queries, reads no analytics identity and accepts no new events; the exporter remains mounted and may finish exporting records already queued. Session-feedback telemetry has its own policy.
+Desktop は Analytics とそれに必要な Telemetry エクスポーターをマウントする。`product-analytics` 設定名前空間がライブの `enabled` フィールドを所有し、デフォルトは `true` である。既存の Cordis Config / 設定メカニズムを通じて構成する。ユーザー向けのコントロールはない。通常の Web はどちらのサービスもマウントしない。無効化された収集は環境クエリを開始せず、分析 ID を読まず、新しいイベントを受け付けない。エクスポーターはマウントされたままで、すでにキューに入ったレコードのエクスポートを完了する場合がある。セッションフィードバックのテレメトリーは独自のポリシーを持つ。
 
-The renderer and Electron subscribe to the Host policy through the existing authenticated stream, including reconnection. Electron also reads the initial policy before native launch reporting. Welcome obtains the current policy over IPC. The Host checks its current volatile configuration again at event intake and after environment and identity lookup. `DSH_PRODUCT_ANALYTICS_OTLP_URL` overrides the export destination for isolated collectors. The [exporter](../../host/product-telemetry-otel/README.md) owns batching, retry, and shutdown delivery.
+レンダラーと Electron は、既存の認証済みストリームを通じて Host ポリシーを購読する。再接続も含む。Electron はネイティブの起動報告の前に初期ポリシーも読む。Welcome は IPC 経由で現在のポリシーを取得する。Host はイベント受付時、および環境と ID の検索後に、現在の揮発性設定を再確認する。`DSH_PRODUCT_ANALYTICS_OTLP_URL` は分離されたコレクター用のエクスポート先を上書きする。[エクスポーター](../../host/product-telemetry-otel/README.md)がバッチ処理、リトライ、シャットダウン時の配信を所有する。
 
-Every product event carries available `device_id`, `user_id`, and `app_version` plus the static fields below. Identity reuses the existing login record without creating an identifier and is read for each event through `deepseekAccount.getDeviceIdentity()`. Static environment collection is independent of identity lookup. No separate environment event is emitted; API keys, account tokens, prompts, responses, hostnames, and machine UUIDs are excluded.
+すべてのプロダクトイベントは、利用可能な `device_id`、`user_id`、`app_version` と以下の静的フィールドを運ぶ。ID は既存のログインレコードを再利用し、識別子を新規作成しない。各イベントごとに `deepseekAccount.getDeviceIdentity()` を通じて読まれる。静的環境の収集は ID 検索から独立している。別個の環境イベントは発行されない。API キー、アカウントトークン、プロンプト、レスポンス、ホスト名、マシン UUID は除外される。
 
-| Field | Meaning and source |
+| フィールド | 意味とソース |
 |---|---|
-| `os_name` | `windows` or `macos`; other platforms retain the raw Node platform name (such as `linux`) |
-| `os_version` | Legacy `<Node platform> <kernel release>` from `node:os.release()` |
-| `os_version_full` | Windows registry major/minor/build plus `UBR` revision; macOS `sw_vers` product version including a security-response suffix when present |
-| `os_build` | Windows registry `CurrentBuildNumber`; macOS `sw_vers` build |
-| `os_arch` | Native architecture mapped to `ia32`, `x64`, `arm`, or `arm64`; Windows processor CIM architecture or macOS `hw.optional.arm64` (`1` means ARM64; an absent key means Intel x64), independent of application emulation |
-| `app_arch` | Running binary architecture from `process.arch` |
-| `cpu_model` | First logical processor's model from `node:os.cpus()` |
-| `cpu_logical_count` | Number of system-reported logical processors from `node:os.cpus()`, not application parallelism |
-| `cpu_physical_core_count` | Sum of Windows processor CIM `NumberOfCores` across sockets; macOS `hw.physicalcpu` |
-| `memory_total_bytes` | Total physical memory from `node:os.totalmem()`, in bytes without rounding |
-| `missing_fields` | Sorted comma-separated `field=reason` pairs using `unavailable`, `invalid-value`, `query-failed`, `timeout`, `output-limit`, or `unsupported`; omitted when all fields are available |
+| `os_name` | `windows` または `macos`。その他のプラットフォームは生の Node プラットフォーム名（`linux` など）を保持する |
+| `os_version` | `node:os.release()` からの従来形式 `<Node プラットフォーム> <カーネルリリース>` |
+| `os_version_full` | Windows レジストリの major/minor/build に `UBR` リビジョンを加えたもの。macOS は `sw_vers` のプロダクトバージョン（存在する場合はセキュリティレスポンスのサフィックスを含む） |
+| `os_build` | Windows レジストリの `CurrentBuildNumber`。macOS は `sw_vers` の build |
+| `os_arch` | `ia32`、`x64`、`arm`、`arm64` にマッピングされたネイティブアーキテクチャ。Windows はプロセッサ CIM アーキテクチャ、macOS は `hw.optional.arm64`（`1` は ARM64、キーが存在しない場合は Intel x64）で、アプリケーションのエミュレーションとは独立 |
+| `app_arch` | `process.arch` からの実行中バイナリのアーキテクチャ |
+| `cpu_model` | `node:os.cpus()` からの最初の論理プロセッサのモデル |
+| `cpu_logical_count` | `node:os.cpus()` からのシステム報告の論理プロセッサ数。アプリケーションの並列度ではない |
+| `cpu_physical_core_count` | ソケット全体の Windows プロセッサ CIM `NumberOfCores` の合計。macOS は `hw.physicalcpu` |
+| `memory_total_bytes` | `node:os.totalmem()` からの物理メモリ合計（丸めなしのバイト数） |
+| `missing_fields` | `unavailable`、`invalid-value`、`query-failed`、`timeout`、`output-limit`、`unsupported` を使った、ソート済みカンマ区切りの `field=reason` ペア。すべてのフィールドが利用可能な場合は省略 |
 
-The first enabled intake collects one environment snapshot; concurrent and later intakes reuse its successful fields and failures until the plugin remounts or the Host restarts. Intake waits for sampling while callers submit asynchronously; startup does not await collection. Identity changes remain visible on subsequent events. Each metadata command has a configurable `environmentQueryTimeoutMillis` deadline (5,000 ms) and `environmentQueryMaxOutputBytes` bound per output stream (16,384 bytes). Disposal cancels commands and waits for child closure; disabled or disposed intake never emits late results. Missing revision never becomes `.0`, and missing numeric fields never become zero. Only Windows and macOS have full-version, native-architecture, and physical-core queries; other platforms mark those fields `unsupported`.
+最初の有効な取り込みが 1 つの環境スナップショットを収集し、並行および以降の取り込みは、プラグインが再マウントされるか Host が再起動するまで、その成功したフィールドと失敗を再利用する。取り込みはサンプリングを待つ間、呼び出し元は非同期に送信し、起動は収集を待たない。ID の変更は以降のイベントにも見える。各メタデータコマンドには、構成可能な `environmentQueryTimeoutMillis` デッドライン（5,000 ms）と、出力ストリームごとの `environmentQueryMaxOutputBytes` 上限（16,384 バイト）がある。破棄はコマンドをキャンセルし、子のクローズを待つ。無効化または破棄された取り込みは遅れて結果を発行しない。欠落したリビジョンが `.0` になることはなく、欠落した数値フィールドがゼロになることもない。フルバージョン、ネイティブアーキテクチャ、物理コアのクエリがあるのは Windows と macOS のみであり、その他のプラットフォームはそれらのフィールドを `unsupported` とマークする。
 
-Electron forwards its build-inlined `DSH_CLIENT_VERSION` to the Host; analytics and the exporter reuse this client version. The exporter requires it. The [Desktop composition](../../bundle/web-app/README.md) owns batching and timeout settings, including cancellation at the shutdown deadline.
+Electron はビルド時にインライン化された `DSH_CLIENT_VERSION` を Host へ転送し、分析とエクスポーターはこのクライアントバージョンを再利用する。エクスポーターはこれを必要とする。[Desktop 構成](../../bundle/web-app/README.md)がバッチ処理とタイムアウト設定（シャットダウンデッドラインでのキャンセルを含む）を所有する。
 
-The [event types](src/events.ts) own names and allowed fields. Authentication events cover the native welcome page only; workspace login after API-key entry is excluded. Views count visible page entry, including reshown native welcome windows; transient onboarding loading does not repeat the same page impression, and closing an onboarding popup reports `button_name=close`. Funded Continue uses `continue`. Message submission retains its original occurrence timestamp and captures `msg_type=default|queue|steer`, model, explicit effort, and `run_mode` before asynchronous command adjudication; only the ordinary message path reports before reference serialization, so handled and claimed commands are excluded. Later serialization, attachment, or send failures do not retract this attempt; queue execution does not count again. Attachment-only submissions follow the same rule. Plan takes precedence over an active goal. Capture and reporting failures cannot interrupt submission. Message submissions and model or effort switches omit `session_id` while the Session is blank. Model and plugin switches report only accepted changes. Fork events carry the created child ID and the source IDs, before the optional child-title update; failed creation emits nothing.
+[イベント型](src/events.ts)が名前と許可されるフィールドを所有する。認証イベントはネイティブ Welcome ページのみを対象とし、API キー入力後のワークスペースログインは除外される。Views は、再表示されたネイティブ welcome ウィンドウを含む、可視ページへの入場を数える。一時的なオンボーディングの読み込みは同じページインプレッションを繰り返さず、オンボーディングポップアップを閉じると `button_name=close` を報告する。Funded Continue は `continue` を使う。メッセージ送信は、非同期のコマンド裁定の前に、元の発生タイムスタンプを保持し、`msg_type=default|queue|steer`、モデル、明示的エフォート、`run_mode` をキャプチャする。参照のシリアライズの前に報告するのは通常のメッセージパスだけであるため、処理済みおよびクレーム済みのコマンドは除外される。後続のシリアライズ、添付、または送信の失敗はこの試行を撤回しない。キュー実行は再度カウントされない。添付のみの送信も同じ規則に従う。Plan はアクティブなゴールより優先される。キャプチャと報告の失敗は送信を中断できない。メッセージ送信とモデル・エフォートの切り替えは、セッションが空の間 `session_id` を省略する。モデルとプラグインの切り替えは受け入れられた変更のみを報告する。Fork イベントは、作成された子 ID とソース ID を運ぶ（オプションの子タイトル更新の前）。作成に失敗した場合は何も発行しない。
 
-Only `plugin_toggle` carries `plugin_type`: plugin rows use `plugin`, and packages use `bundle`. Installation reports `is_success`; cancellation uses `is_success=false` and `error_reason=user_cancelled`, and an absent recovery result uses `is_success=false` and `error_reason=unknown_result`. Duration is milliseconds from the install click through the terminal result, including validation, inspection, and internal registry retries. `input_value` retains registry package identifiers and plain versions only; Git inputs become `[git]`, other URLs `[url]`, and paths or unrecognized inputs `[path-or-other]`. Both click and result use this redacted value. Reopening a hidden install dialog counts another `plugin_add_button_click`. `is_builtin` means installation-supplied (`installed=false`), not whether a profile explicitly depends on the package. Explicit build-approval retry starts a new attempt. Restart-required is success. A temporary disconnect retains the pending operation; only an absent recovery result reports `unknown_result`.
+`plugin_type` を運ぶのは `plugin_toggle` だけである: プラグイン行は `plugin` を使い、パッケージは `bundle` を使う。インストールは `is_success` を報告する。キャンセルは `is_success=false` と `error_reason=user_cancelled` を使い、復旧結果が存在しない場合は `is_success=false` と `error_reason=unknown_result` を使う。所要時間はインストールのクリックから最終結果までのミリ秒で、検証、検査、内部レジストリリトライを含む。`input_value` はレジストリのパッケージ識別子とプレーンなバージョンのみを保持する。Git 入力は `[git]`、その他の URL は `[url]`、パスまたは認識されない入力は `[path-or-other]` になる。クリックと結果の両方がこのマスク済み値を使う。非表示のインストールダイアログを再度開くと、もう一度 `plugin_add_button_click` としてカウントされる。`is_builtin` はインストールが提供したもの（`installed=false`）を意味し、プロファイルがパッケージに明示的に依存しているかどうかではない。明示的なビルド承認のリトライは新しい試行を開始する。再起動が必要な場合は成功である。一時的な切断は保留中の操作を保持し、復旧結果が存在しない場合にのみ `unknown_result` を報告する。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-Presentational components receive callbacks. Shared Client services resolve the optional Desktop analytics sender, which requires both the native preload marker and the synchronized Host policy. The sender retains its own RPC context when called by other plugins. Native actions use the authenticated Host API; its generated Typert validator accepts only the typed event fields. The Host attaches its cached static environment and current identity before queueing. It observes live compaction events without replaying Session history.
+プレゼンテーションコンポーネントはコールバックを受け取る。共有 Client サービスはオプションの Desktop 分析送信者を解決し、それにはネイティブのプリロードマーカーと同期された Host ポリシーの両方が必要である。送信者は他のプラグインから呼ばれたときに自身の RPC コンテキストを保持する。ネイティブアクションは認証済み Host API を使い、その生成された Typert バリデーターは型付きイベントフィールドのみを受け付ける。Host はキューに入れる前に、キャッシュされた静的環境と現在の ID を添付する。セッション履歴をリプレイせずに、ライブの compaction イベントを観察する。
 
 </details>
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as analytics adds no model context or Session events.
+分析はモデルコンテキストやセッションイベントを追加しないため、なし。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; collection does not modify model requests.
+なし。収集はモデルリクエストを変更しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-Delivery is best effort.
+配信はベストエフォートである。
 
-- Environment sampling is one-shot: startup contention can cause a cached timeout for the whole run. `missing_fields` describes sampling failure, not hardware absence; a later event does not retry. Deployments can increase the query deadline; remount or restart samples again.
-- Host security policies can block or terminate the fixed PowerShell queries, producing `query-failed` on managed Windows machines.
-- Disabling stops new collection; it does not clear the exporter queue.
-- Renderer failures are discarded, and the exporter has no durable outbox or warehouse acknowledgement.
-- Native startup reporting waits for Host authentication; a process that fails before Host readiness cannot report its launch.
+- 環境サンプリングは 1 回限りである: 起動時の競合により、実行全体でキャッシュされたタイムアウトが発生することがある。`missing_fields` はサンプリングの失敗を表し、ハードウェアの不在ではない。以降のイベントは再試行しない。デプロイはクエリのデッドラインを延ばせる。再マウントまたは再起動で再度サンプリングされる。
+- Host のセキュリティポリシーが固定の PowerShell クエリをブロックまたは終了させ、管理された Windows マシンで `query-failed` を生じることがある。
+- 無効化は新しい収集を停止するが、エクスポーターのキューをクリアしない。
+- レンダラーの失敗は破棄され、エクスポーターには永続的なアウトボックスやウェアハウスの確認応答はない。
+- ネイティブの起動報告は Host 認証を待つ。Host の準備前に失敗したプロセスは自身の起動を報告できない。
 
-### Dev Note
+### 開発メモ
 
-None.
+なし。

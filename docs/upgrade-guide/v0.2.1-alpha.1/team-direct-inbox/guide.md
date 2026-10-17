@@ -1,21 +1,21 @@
 ---
 kind: upgrade-guide
-description: "Agent Teams removes its pending-message limit and stops delivering historical queued mail."
+description: "Agent Teams は保留メッセージの上限を撤廃し、履歴キュー済みメールの配送を停止する。"
 ---
 
-# Agent Teams messages use target inboxes
+# Agent Teams のメッセージは宛先インボックスを使う
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-The experimental Agent Teams plugin sends new messages directly to the target Agent inbox instead of retaining a separate Team mailbox. `send_message` returns only `{ "sent": true }`; it exposes neither a message ID nor an `accepted` or `queued` status. Acceptance does not confirm model processing or a synchronous storage flush. Failed sends are not retained for retry, and explicit resends are not deduplicated.
+実験的な Agent Teams プラグインは、新規メッセージを Team の別メールボックスに保持せず、宛先 Agent のインボックスへ直接送信するようになる。`send_message` は `{ "sent": true }` のみを返し、メッセージ ID も `accepted` や `queued` のステータスも公開しない。受け付けはモデルの処理や同期的なストレージ書き込みを保証しない。送信失敗は再試行用に保持されず、明示的な再送の重複排除も行われない。
 
-The `maxPendingMessagesPerMember` configuration key is removed. Historical `team/message/queued` and `team/message/delivered` records remain readable, but queued messages that were not delivered before upgrading are never dispatched. Roster and task state remain durable.
+`maxPendingMessagesPerMember` 設定キーは削除される。履歴の `team/message/queued` および `team/message/delivered` 記録は引き続き読み取れるが、アップグレード前に配送されなかったキュー済みメッセージは以後配送されない。名簿とタスクの状態は耐久性を保つ。
 
-## Migration
+## 移行
 
-1. Before upgrading, let pending Team messages finish and confirm that their targets received them. After upgrading, explicitly resend any required undelivered message; check the target's history first to avoid duplicates. Do not edit historical Session records.
-2. Remove `maxPendingMessagesPerMember` from the `@deepseek-ai/dsh-experimental-agent-team` plugin configuration in your `cordis.yml` or overlays. There is no replacement Team queue limit; `maxMessageBytes` still bounds each complete sender-framed message.
-3. Update any consumer of `send_message` results to read `sent` instead of message IDs or delivery statuses, and handle send errors explicitly. Do not treat success as completed target work. The `ctx.agentTeams.sendMessage()` service still returns `messageId`.
-4. Start your Team-enabled profile, send a message to another member, and confirm that the tool returns `{ "sent": true }` and that the target receives it. Consult the [package reference](../../../../packages/experimental/agent-team/README.md#use-this-package) for delivery semantics.
+1. アップグレード前に、保留中の Team メッセージを送り終え、宛先が受信したことを確認する。アップグレード後は、必要な未配送メッセージを明示的に再送する。重複を避けるため、まず宛先の履歴を確認する。履歴 Session 記録は編集しない。
+2. `cordis.yml` やオーバーレイ内の `@deepseek-ai/dsh-experimental-agent-team` プラグイン設定から `maxPendingMessagesPerMember` を削除する。Team キューの上限の代替はない。`maxMessageBytes` は引き続き送信者成形済みの完全な各メッセージを制限する。
+3. `send_message` 結果の利用側を、メッセージ ID や配送ステータスではなく `sent` を読むように更新し、送信エラーを明示的に処理する。成功を宛先作業の完了とみなさない。`ctx.agentTeams.sendMessage()` サービスは引き続き `messageId` を返す。
+4. Team 有効なプロファイルを開始し、他のメンバーへのメッセージ送信でツールが `{ "sent": true }` を返し、宛先が受信することを確認する。配送セマンティクスについては[パッケージ参照](../../../../packages/experimental/agent-team/README.md#use-this-package)を参照すること。

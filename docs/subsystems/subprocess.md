@@ -1,18 +1,18 @@
-# Subprocess
+# サブプロセス
 
-English | [中文](subprocess.zh.md)
+日本語 | [English](subprocess.en.md) | [中文](subprocess.zh.md)
 
-The subprocess seam is split across a Service Definition ([dsh-subprocess](../../packages/subprocess/subprocess), `ctx.subprocess`) and Service Provider ([dsh-subprocess-local](../../packages/subprocess/subprocess-local)); its Consumers are other capability seams and out-of-process backends: the [bash executor family](shell.md) uses collected batch output, LSP uses raw protocol pipes, the PTY backend uses the terminal primitive, and the ACP subagent backend uses piped ndjson plus inherited stderr. This seam owns the managed `DSH_*` environment namespace, the shared credential scrub (`scrubbedParentEnv`), and the `CollectedOutput` shape; [dsh-shell](../../packages/shell/shell) re-exports the vocabulary so bash consumers keep one import root.
+サブプロセスシームは、サービス定義 ([dsh-subprocess](../../packages/subprocess/subprocess)、`ctx.subprocess`) とサービスプロバイダー ([dsh-subprocess-local](../../packages/subprocess/subprocess-local)) に分割される。そのコンシューマーは他のケイパビリティシームとプロセス外バックエンドである。[bash エグゼキューター系](shell.md)は収集されたバッチ出力を使い、LSP は生のプロトコルパイプを使い、PTY バックエンドはターミナルプリミティブを使い、ACP サブエージェントバックエンドはパイプされた ndjson と継承された stderr を使う。このシームは管理された `DSH_*` 環境名前空間、共有の資格情報スクラブ (`scrubbedParentEnv`)、`CollectedOutput` の形を所有する。[dsh-shell](../../packages/shell/shell)が語彙を再エクスポートするので、bash のコンシューマーは単一のインポートルートを保つ。
 
-Source: [`packages/subprocess/subprocess/src/types.ts`](../../packages/subprocess/subprocess/src/types.ts) and [`packages/subprocess/subprocess/src/index.ts`](../../packages/subprocess/subprocess/src/index.ts)
+ソース: [`packages/subprocess/subprocess/src/types.ts`](../../packages/subprocess/subprocess/src/types.ts) および [`packages/subprocess/subprocess/src/index.ts`](../../packages/subprocess/subprocess/src/index.ts)
 
-## Executable lookup
+## 実行ファイルの検索
 
-One provider's spawn working directories, executable paths, ordinary processes, and terminal sessions inhabit the same path and process namespace as the mounted filesystem provider. `resolveExecutable(command, env?, signal?)` verifies absolute executable paths or resolves bare names through the provider's scrubbed `PATH` plus deliberate overrides.
+あるプロバイダーのスポーン作業ディレクトリ、実行ファイルパス、通常プロセス、ターミナルセッションは、マウントされたファイルシステムプロバイダーと同じパス・プロセス名前空間に属する。`resolveExecutable(command, env?, signal?)` は絶対実行ファイルパスを検証するか、プロバイダーのスクラブ済み `PATH` と意図的なオーバーライドを通じて裸の名前を解決する。
 
-## Managed environment namespace and captured output
+## 管理環境名前空間とキャプチャ済み出力
 
-`DSH_*` variables are Harness-owned child-process facts; implementations discard ambient `DSH_*` names before the caller's explicit `env` merges, so a current fact arrives only as a deliberate string entry, while an explicit `undefined` tombstone removes an ordinary ambient value. Each collected stream reports its truncation and spill-recovery state through `CollectedOutput`.
+`DSH_*` 変数は Harness 所有の子プロセス事実である。実装は呼び出し元の明示的 `env` がマージされる前に環境の `DSH_*` 名を破棄するので、現在の事実は意図的な文字列エントリーとしてのみ到着し、明示的な `undefined` トゥームストーンは通常の環境値を削除する。各収集ストリームは `CollectedOutput` を通じてその切詰めとスピル復旧の状態を報告する。
 
 ```ts type-equiv
 /** One environment key inside the managed {@link DSH_ENV_PREFIX} namespace. */
@@ -36,9 +36,9 @@ interface CollectedOutput {
 }
 ```
 
-## Node-shaped stdio dispositions
+## Node 形式の stdio 配置
 
-Each stream's disposition is explicit, chosen per consumer: raw pipes for protocol framing (LSP JSON-RPC, ACP ndjson), inherit for pass-through diagnostics, and collect mode for bounded batch output — with the spill file optional, so a diagnostic tail (a language server's stderr) buffers without leaving files behind.
+各ストリームの配置は明示的で、コンシューマーごとに選ばれる。プロトコルフレーミング用の生パイプ (LSP JSON-RPC、ACP ndjson)、パススルー診断用の inherit、有界のバッチ出力用の collect モード — スピルファイルはオプションなので、診断テール (言語サーバーの stderr) はファイルを残さずにバッファリングする。
 
 ```ts type-equiv
 /**
@@ -88,9 +88,9 @@ interface SubprocessStdio {
 }
 ```
 
-## The fully-explicit spawn spec
+## 完全に明示的な spawn スペック
 
-The seam applies no defaults: every disposition, limit, and directory is explicit on the spec, so the caller's own config — not a hidden subprocess-service default — decides them. `argv` is never shell-interpreted.
+シームはデフォルトを適用しない。すべての配置、制限、ディレクトリがスペック上で明示されるので、隠れたサブプロセスサービスのデフォルトではなく、呼び出し元自身の設定がそれらを決める。`argv` がシェル解釈されることは決してない。
 
 ```ts type-equiv
 /**
@@ -132,9 +132,9 @@ interface SubprocessSpawnSpec {
 }
 ```
 
-## Handles: streams, readers, and managed-range termination
+## ハンドル: ストリーム、リーダー、管理レンジの終了
 
-A spawn returns a live handle synchronously while target and managed-range identities remain provider-private. Collect-mode readers take whole-stream byte offsets and never consume, so independent readers cannot steal one another's deltas; piped streams belong to the caller. `terminate()` starts the provider's documented procedure, and `waitForExit()` observes the same provider-managed range; staged providers may use `graceMs`, while immediate providers do not delay. Consumers can build their own teardown ladders over those two operations (the ACP backend's stdin-EOF-first `disposeAcpChild` is the template).
+spawn はライブハンドルを同期的に返し、ターゲットと管理レンジの同一性はプロバイダー非公開のままである。collect モードのリーダーはストリーム全体のバイトオフセットを取り、消費しないので、独立したリーダーが互いのデルタを奪うことはない。パイプされたストリームは呼び出し元のものである。`terminate()` はプロバイダーの文書化された手順を開始し、`waitForExit()` は同じプロバイダー管理レンジを観測する。段階的プロバイダーは `graceMs` を使ってよく、即時プロバイダーは遅延しない。コンシューマーはこれら 2 つの操作の上に独自のティアダウンラダーを構築できる (ACP バックエンドの stdin-EOF 優先の `disposeAcpChild` がテンプレートである)。
 
 ```ts type-equiv
 /**
@@ -220,9 +220,9 @@ interface SubprocessCollectedOutputs {
 ```
 
 
-## Outcomes carry exit facts only
+## 結果は終了事実のみを運ぶ
 
-`done` reports Node's close-event vocabulary and no cause classification — the service kills on abort but never decides why (the caller reads the deadline signal it owns, e.g. the bash executor's `timedOut`/`aborted` split). Collected output stays readable through `handle.collected` after settlement, so batch and streaming callers share one access path.
+`done` は Node の close イベント語彙を報告し、原因分類は行わない — サービスはアボート時に kill するが、理由を決めることは決してない (呼び出し元が、例えば bash エグゼキューターの `timedOut`/`aborted` の分割のように、自身が所有する期限シグナルを読む)。収集された出力は決着後も `handle.collected` を通じて読めるので、バッチとストリーミングの呼び出し元は 1 つのアクセス経路を共有する。
 
 ```ts type-equiv
 /**
@@ -240,19 +240,19 @@ interface SubprocessOutcome {
 }
 ```
 
-## Terminal-process primitive
+## ターミナルプロセスプリミティブ
 
-`spawnTerminal(spec)` is the non-pipe process primitive. The provider allocates the controlling terminal and owns UTF-8 text transport, foreground-process-group inspection and signalling, and one awaited TERM-to-KILL operation that reaches quiescence for every session member the provider can still observe; providers document substrate-specific observability limits. The PTY backend remains responsible for prompt detection, readiness inference, scrollback, sandbox policy, and persistent-session ownership; ordinary `spawn()` cannot reconstruct controlling-terminal semantics.
+`spawnTerminal(spec)` は非パイプのプロセスプリミティブである。プロバイダーは制御端末を割り当て、UTF-8 テキスト転送、フォアグラウンドプロセスグループの検査とシグナル送信、およびプロバイダーがまだ観測できるすべてのセッションメンバーの静止に到達する 1 つの await される TERM→KILL 操作を所有する。プロバイダーは基盤固有の観測限界を文書化する。PTY バックエンドはプロンプト検出、レディネスの推論、スクロールバック、サンドボックスポリシー、永続セッションの所有権に引き続き責任を持つ。通常の `spawn()` は制御端末のセマンティクスを再現できない。
 
-The terminal spec fully specifies argv, cwd, environment overrides, terminal type, dimensions, cleanup grace, and optional allocation cancellation and shell activity observation. Its handle exposes `pid`, ordered output, `done`, `write`, `resize`, `inspectForeground`, `inspectActivity`, `signalForeground`, and awaited `terminate`; [`SubprocessTerminalSpawnSpec` and `SubprocessTerminalHandle`](../../packages/subprocess/subprocess/src/types.ts) define these fields and operations. `resize(cols, rows)` updates the live PTY dimensions and rejects after process exit.
+ターミナルスペックは argv、cwd、環境オーバーライド、ターミナル種別、寸法、クリーンアップ猶予、オプションの割り当てキャンセルとシェルアクティビティ観測を完全に指定する。そのハンドルは `pid`、順序付き出力、`done`、`write`、`resize`、`inspectForeground`、`inspectActivity`、`signalForeground`、await される `terminate` を公開する。[`SubprocessTerminalSpawnSpec` と `SubprocessTerminalHandle`](../../packages/subprocess/subprocess/src/types.ts) がこれらのフィールドと操作を定義する。`resize(cols, rows)` はライブ PTY の寸法を更新し、プロセス終了後は拒否する。
 
-`inspectActivity()` returns `SubprocessTerminalActivity`: `state` is `idle`, `busy` or `unknown`, and `revision` changes with provider-observed activity or input. A terminal request opts into supported shell lifecycle observation with `shellActivity`; provider-specific support and conservative unknown cases are documented by [subprocess-local](../../packages/subprocess/subprocess-local/README.md#running-terminal-sessions).
+`inspectActivity()` は `SubprocessTerminalActivity` を返す。`state` は `idle`、`busy`、`unknown` のいずれかで、`revision` はプロバイダーが観測したアクティビティまたは入力に応じて変わる。ターミナルリクエストは `shellActivity` でサポートされるシェルライフサイクル観測にオプトインする。プロバイダー固有のサポートと保守的な unknown ケースは [subprocess-local](../../packages/subprocess/subprocess-local/README.md#running-terminal-sessions) が文書化する。
 
-`terminalEnvironment(signal?)` returns `SubprocessTerminalEnvironment`: the execution environment platform (`posix` or `windows`) and optional `defaultShell`. These facts come from the provider rather than the Web server or browser. `resolveExecutable` verifies shell candidates; `SubprocessExecutableNotFoundError` identifies a missing executable, while provider and transport failures remain errors.
+`terminalEnvironment(signal?)` は `SubprocessTerminalEnvironment` を返す。実行環境のプラットフォーム (`posix` または `windows`) とオプションの `defaultShell` である。これらの事実は Web サーバーやブラウザーではなくプロバイダーから来る。`resolveExecutable` はシェル候補を検証する。`SubprocessExecutableNotFoundError` は実行ファイルの欠落を識別し、プロバイダーとトランスポートの失敗はエラーのままである。
 
-## Service behavior
+## サービスの振る舞い
 
-The abstract [`SubprocessRuntime`](../../packages/subprocess/subprocess/src/index.ts) Service Definition specifies execution-world coordinates, executable lookup, ordinary `spawn`, and `spawnTerminal`. [`LocalSubprocessRuntime`](../../packages/subprocess/subprocess-local/src/index.ts) provides them with platform-selected managed ranges, per-disposition wiring, credential scrubbing, `node-pty`, platform process inspection, and terminate-and-join disposal. See [`dsh-subprocess`](../../packages/subprocess/subprocess/README.md) for the Service Definition contract and [`dsh-subprocess-local`](../../packages/subprocess/subprocess-local/README.md) for local mechanics.
+抽象 [`SubprocessRuntime`](../../packages/subprocess/subprocess/src/index.ts) サービス定義は、実行ワールド座標、実行ファイル検索、通常の `spawn`、`spawnTerminal` を指定する。[`LocalSubprocessRuntime`](../../packages/subprocess/subprocess-local/src/index.ts) はそれらを、プラットフォームが選ぶ管理レンジ、配置ごとの配線、資格情報スクラブ、`node-pty`、プラットフォームプロセス検査、terminate-and-join 破棄で提供する。サービス定義の契約は [`dsh-subprocess`](../../packages/subprocess/subprocess/README.md)、ローカルの仕組みは [`dsh-subprocess-local`](../../packages/subprocess/subprocess-local/README.md) を参照。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

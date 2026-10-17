@@ -1,145 +1,145 @@
 ---
-description: "The anonymous public HTTP(S) fetch backend for ctx.web: how deployments mount bounded, safe URL retrieval with same-origin redirects and text-only decoding."
+description: "ctx.web の匿名公開 HTTP(S) フェッチバックエンド: デプロイが同一オリジンリダイレクトとテキストのみのデコードを備えた、上限付きで安全な URL 取得をどうマウントするか。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-web-fetch-http
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-With `dsh-web-fetch-http`, the harness can fetch public HTTP(S) pages through the web service (`ctx.web`) and get their status code plus bounded, decoded content without sending credentials. Choose it when a composition needs safe retrieval with URL validation, public-address resolution, connection pinning, same-origin redirects, byte and character caps, and an explicit product `User-Agent`. It returns non-2xx responses as results rather than errors, and rejects non-public destinations, binary data, and unsupported content types. The model-facing `web_fetch` tool lives in `dsh-tool-web`, which renders this provider's bodies.
+`dsh-web-fetch-http` により、ハーネスは web サービス（`ctx.web`）を通じて公開 HTTP(S) ページをフェッチし、資格情報を送信せずにステータスコードと上限付きのデコード済みコンテンツを取得できる。URL 検証、公開アドレス解決、接続ピン留め、同一オリジンリダイレクト、バイトと文字の上限、明示的なプロダクト `User-Agent` を備えた安全な取得が必要な構成で選ぶ。非 2xx 応答はエラーではなく結果として返し、非公開の宛先、バイナリデータ、サポートされないコンテンツタイプを拒否する。モデル向けの `web_fetch` ツールは `dsh-tool-web` にあり、このプロバイダーのボディをレンダリングする。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the provider in a composition that already loads the web service; it registers as the `http` fetch provider, so `ctx.web.fetch()` resolves it automatically when it is the only usable fetch backend — or pin it with `fetchProvider: http`.
+web サービスをすでにロードしている構成でこのプロバイダーをマウントする。`http` フェッチプロバイダーとして登録されるため、`ctx.web.fetch()` は、これが唯一の使用可能なフェッチバックエンドである場合に自動的に解決する — または `fetchProvider: http` で固定する。
 
-### When to choose it
+### いつ選ぶか
 
-Choose this backend when a deployment must fetch public pages with bounded output and safe transport: no credentials are sent, every resolved address must be public, each connection is pinned to the validated answer set, redirects cannot escape the origin, and every response is capped.
+デプロイが公開ページを、上限付き出力と安全なトランスポートでフェッチしなければならない場合にこのバックエンドを選ぶ: 資格情報は送信されず、解決されたすべてのアドレスは公開でなければならず、各接続は検証済みの回答セットに固定され、リダイレクトはオリジンを脱出できず、すべての応答に上限が付く。
 
-### Minimal configuration
+### 最小構成
 
-Load the web service and the provider; configurable limits have safe defaults and validate at plugin construction, so an invalid value fails loudly instead of building a provider with nonsensical caps. The URL security limit is fixed at 2,048 characters.
+web サービスとプロバイダーをロードする。構成可能な制限には安全なデフォルトがあり、プラグイン構築時に検証されるため、無効な値はナンセンスな上限を持つプロバイダーを構築するのではなく、大声で失敗する。URL セキュリティ制限は 2,048 文字に固定されている。
 
 ```yaml
 - name: '@deepseek-ai/dsh-web'
 - name: '@deepseek-ai/dsh-web-fetch-http'
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `maxResponseBytes` | `5,000,000` | Maximum response body size in bytes |
-| `maxBodyChars` | `100,000` | Maximum decoded body length in characters |
-| `timeoutMs` | `30,000` | Fetch timeout — a resource backstop, not the model-facing tool budget |
-| `maxRedirects` | `5` | Maximum same-origin redirect hops (`0` follows none) |
-| `userAgent` | `deepseek-harness/…` | `User-Agent` header sent on every request |
+| `maxResponseBytes` | `5,000,000` | 応答ボディの最大サイズ（バイト） |
+| `maxBodyChars` | `100,000` | デコード済みボディの最大長（文字） |
+| `timeoutMs` | `30,000` | フェッチのタイムアウト — リソースのバックストップであり、モデル向けツール予算ではない |
+| `maxRedirects` | `5` | 同一オリジンリダイレクトの最大ホップ数（`0` は追従しない） |
+| `userAgent` | `deepseek-harness/…` | すべてのリクエストで送信される `User-Agent` ヘッダー |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web-fetch-http) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-web-fetch-http)が、受け付けられるすべてのフィールドとその JSDoc の網羅的なソースである。
 
-### What a fetch returns
+### フェッチが返すもの
 
-A successful call yields a `WebFetchResult`: the final URL after allowed redirects, the HTTP status code, a decoded body classified as `html` or `text`, and a `truncated` flag. A non-2xx response is a result, not an error — the status code is part of the fetched resource state; `WebError` is reserved for failures to safely retrieve or represent the resource.
+成功した呼び出しは `WebFetchResult` を返す: 許可されたリダイレクト後の最終 URL、HTTP ステータスコード、`html` または `text` として分類されたデコード済みボディ、`truncated` フラグである。非 2xx 応答はエラーではなく結果である — ステータスコードはフェッチされたリソース状態の一部である。`WebError` は、リソースを安全に取得または表現することの失敗のために予約されている。
 
 ```text
 const page = await ctx.web.fetch({ url: 'https://example.com' })
 // page.body.kind === 'html' | 'text'; page.statusCode === 200 | 404 | ...
 ```
 
-### Transport behavior
+### トランスポートの動作
 
-The provider keeps requests anonymous and bounded: it accepts only `http:` and `https:` URLs without embedded credentials and rejects URLs over 2,048 characters. It resolves each hostname once, rejects the complete result if any IPv4 or IPv6 address is not public unicast, and pins the connection to that validated set. IPv6 checks discover the active DNS64 prefix and reject translations to non-public IPv4. Each same-origin redirect repeats resolution and pinning; cross-origin redirects fail and require a fresh call. The provider also enforces byte, character, hop, and time caps, rejects unsupported content types, and sends an explicit product `User-Agent`.
+プロバイダーはリクエストを匿名かつ上限付きに保つ: 埋め込み資格情報のない `http:` と `https:` の URL のみを受け付け、2,048 文字を超える URL を拒否する。各ホスト名を 1 回解決し、いずれかの IPv4 または IPv6 アドレスが公開ユニキャストでない場合は結果全体を拒否し、接続をその検証済みセットに固定する。IPv6 チェックはアクティブな DNS64 プレフィックスを発見し、非公開 IPv4 への変換を拒否する。各同一オリジンリダイレクトは解決とピン留めを繰り返す。クロスオリジンリダイレクトは失敗し、新しい呼び出しを必要とする。プロバイダーはバイト、文字、ホップ、時間の上限を執行し、サポートされないコンテンツタイプを拒否し、明示的なプロダクト `User-Agent` を送信する。
 
-### Failures and recovery
+### 失敗と回復
 
-Failures throw `WebError` with a machine-routable code: `WEB_INVALID_URL`, `WEB_BLOCKED_URL`, `WEB_FETCH_TOO_LARGE`, `WEB_FETCH_TIMEOUT`, `WEB_REDIRECT_BLOCKED`, `WEB_UNSUPPORTED_CONTENT_TYPE`, `WEB_ABORTED`, or `WEB_PROVIDER_ERROR`. Direct callers can route on the code; the model-facing `web_fetch` tool surfaces the failure text to the model under its own error wrapper.
+失敗は機械ルーティング可能なコード付きで `WebError` をスローする: `WEB_INVALID_URL`、`WEB_BLOCKED_URL`、`WEB_FETCH_TOO_LARGE`、`WEB_FETCH_TIMEOUT`、`WEB_REDIRECT_BLOCKED`、`WEB_UNSUPPORTED_CONTENT_TYPE`、`WEB_ABORTED`、または `WEB_PROVIDER_ERROR`。直接の呼び出し元はコードでルーティングできる。モデル向けの `web_fetch` ツールは、自身のエラーラッパーの下で失敗テキストをモデルに提示する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the provider; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではプロバイダーの背後にある設計判断を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計思想
 
-The package is built on one separation and one layered timeout:
+このパッケージは 1 つの分離と 1 つの階層化タイムアウトの上に築かれている:
 
-- **Safe retrieval vs. presentation.** This provider owns URL validation, public-address enforcement, connection pinning, HTTP transport, redirect policy, caps, charset decoding, and binary rejection; `dsh-tool-web` owns HTML→markdown and truncation formatting. A non-2xx response is data, not failure.
-- **Two timeout layers.** The provider's `timeoutMs` is a resource backstop for direct `ctx.web.fetch()` callers; the model-facing tool-call budget belongs to `dsh-tool-call-timeout-policy`, which arms `exec.signal`. When the outer deadline fires first the provider reports `WEB_ABORTED` and the policy replaces it with `TOOL_TIMEOUT`; `WEB_FETCH_TIMEOUT` therefore identifies a direct service caller whose provider budget elapsed.
+- **安全な取得とプレゼンテーションの分離。** このプロバイダーは URL 検証、公開アドレスの執行、接続ピン留め、HTTP トランスポート、リダイレクトポリシー、上限、文字セットのデコード、バイナリ拒否を所有し、`dsh-tool-web` は HTML→markdown と切り詰めのフォーマットを所有する。非 2xx 応答は失敗ではなくデータである。
+- **2 層のタイムアウト。** プロバイダーの `timeoutMs` は直接の `ctx.web.fetch()` 呼び出し元のためのリソースバックストップであり、モデル向けツール呼び出し予算は `dsh-tool-call-timeout-policy` に属し、それが `exec.signal` をアームする。外側のデッドラインが先に発火すると、プロバイダーは `WEB_ABORTED` を報告し、ポリシーがそれを `TOOL_TIMEOUT` に置き換える。したがって `WEB_FETCH_TIMEOUT` は、プロバイダー予算が経過した直接のサービス呼び出し元を識別する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config schema, limit validation, provider registration |
-| [`src/provider.ts`](src/provider.ts) | The `HttpFetchProvider`: pinned transport, redirect following, capped reads, charset decoding |
-| [`src/network.ts`](src/network.ts) | Public-address resolution, DNS64 discovery, and connection pinning |
-| [`src/policy.ts`](src/policy.ts) | URL validation, same-origin checks, content-type classification, charset parsing |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: 設定スキーマ、上限検証、プロバイダー登録 |
+| [`src/provider.ts`](src/provider.ts) | `HttpFetchProvider`: ピン留めトランスポート、リダイレクト追従、上限付き読み取り、文字セットデコード |
+| [`src/network.ts`](src/network.ts) | 公開アドレス解決、DNS64 発見、接続ピン留め |
+| [`src/policy.ts`](src/policy.ts) | URL 検証、同一オリジンチェック、コンテンツタイプ分類、文字セット解析 |
 
-### Read path
+### 読み取りパス
 
-A fetch validates the URL, resolves the hostname once, rejects the complete answer set when any address is not public, and pins the connection to the accepted addresses. It repeats that check for each same-origin redirect; a cross-origin redirect or non-public target fails before response bytes are accepted. The final response is classified by `Content-Type`, decoded from its declared charset, and read under the byte cap; the decoded text is then truncated to the character cap.
+フェッチは URL を検証し、ホスト名を 1 回解決し、いずれかのアドレスが公開でない場合は回答セット全体を拒否し、接続を受け入れられたアドレスに固定する。各同一オリジンリダイレクトでそのチェックを繰り返す。クロスオリジンリダイレクトまたは非公開ターゲットは、応答バイトが受け入れられる前に失敗する。最終応答は `Content-Type` で分類され、宣言された文字セットからデコードされ、バイト上限の下で読まれる。次にデコードされたテキストが文字上限まで切り詰められる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the package-level contract is not enough. They move from the shared vocabulary to the service, the model-facing tools, and the design rationale.
+パッケージレベルの契約では足りないときにこれらのページを読む。共有語彙からサービス、モデル向けツール、設計根拠へと進む。
 
-- [Web subsystem](../../../docs/subsystems/web.md) — the exhaustive fetch request/result vocabulary and error codes.
-- [Web package map](../README.md) — the six-package family and each role.
-- [dsh-web](../web/README.md) — the web service this provider registers into.
-- [dsh-tool-web](../tool-web/README.md) — the model-facing `web_fetch` tool that renders this provider's bodies.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web-fetch-http) — every accepted config field and its source declaration.
-- [Web capability seam decision](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) — why search and fetch share one provider-selection service.
+- [Web サブシステム](../../../docs/subsystems/web.md) — 網羅的なフェッチリクエスト/結果の語彙とエラーコード。
+- [Web パッケージマップ](../README.md) — 6 パッケージファミリーと各役割。
+- [dsh-web](../web/README.md) — このプロバイダーが登録する web サービス。
+- [dsh-tool-web](../tool-web/README.md) — このプロバイダーのボディをレンダリングするモデル向け `web_fetch` ツール。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-web-fetch-http) — 受け付けられるすべての設定フィールドとそのソース宣言。
+- [Web ケイパビリティシームの決定](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) — サーチとフェッチが 1 つのプロバイダー選択サービスを共有する理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-tool-web`, which renders this provider's `maxBodyChars`-bounded decoded text or markdown-shaped HTML under its fetch-result wrapper while redirects, headers, and transport limits remain hidden.
+間接的に、`dsh-tool-web` を通じて。それは、リダイレクト、ヘッダー、トランスポート制限が隠れたまま、このプロバイダーの `maxBodyChars` 上限付きデコード済みテキストまたは markdown 形式の HTML を、自身のフェッチ結果ラッパーの下でレンダリングする。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+直接の無効化はない。名前付きのコンシューマーがリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the provider is unsafe or a poor fit. They are current package constraints.
+これらの制限は、このプロバイダーが安全でない、または不向きな場合を定義する。これらは現在のパッケージ制約である。
 
-- **Only textual content decodes** — html/xhtml and `text/*` plus JSON/XML families; a missing `Content-Type` or any binary type throws `WEB_UNSUPPORTED_CONTENT_TYPE`, and text-extractable PDF decoding is named deferred work.
-- **Charset comes only from the `Content-Type` header** (UTF-8 default) — an HTML `<meta charset>` declaration is ignored, and a declared-but-unrecognized charset label throws rather than falling back.
+- **デコードされるのはテキストコンテンツのみ** — html/xhtml と `text/*` に加えて JSON/XML ファミリー。`Content-Type` の欠落またはバイナリタイプは `WEB_UNSUPPORTED_CONTENT_TYPE` をスローし、テキスト抽出可能な PDF のデコードは延期された作業として名指しされている。
+- **文字セットは `Content-Type` ヘッダーからのみ**（デフォルト UTF-8） — HTML の `<meta charset>` 宣言は無視され、宣言されたが認識されない文字セットラベルはフォールバックではなくスローする。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

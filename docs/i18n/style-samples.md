@@ -1,10 +1,10 @@
-# 翻译语体样例（style samples）
+# 翻訳語体サンプル（style samples）
 
-本文件是翻译语体的校准锚点：每组样例是一段英文原文与一段人工定稿的中文译文，覆盖本仓库文档的主要文体。**译文的语体以这些样例为准**——文体样例的效力高于对语气的文字描述，但术语表、忠实性与结构规则仍然优先。翻译或评审时对照最接近的文体样例。本文件中英对照、自成双语，不参与配对（见 [README.md](README.md) 排除清单）。
+本ファイルは翻訳語体の校正アンカーである。各組のサンプルは 1 つの英語原文と 1 つの人手で確定された中国語訳からなり、本リポジトリ文書の主要な文体をカバーする。**訳文の語体はこれらのサンプルを基準とする**——文体サンプルの効力は口調についての文言による説明より高いが、用語集、忠実性、構造の規則が引き続き優先される。翻訳やレビューの際は最も近い文体サンプルと照合する。本ファイルは英語と中国語を対照し、それ自体でバイリンガルとして完結しており、ペアリングには参加しない（[README.md](README.md) の除外リストを参照）。
 
-维护方式：人工评审校准出新的金标段落后追加到对应文体；发现语义、结构或术语错误时直接修正。新增或修正样例都需经过 PR 评审。
+保守方法: 人によるレビューで校正された新しいゴールド標準段落が見つかったら対応する文体に追記する。意味、構造、用語の誤りを見つけたら直接修正する。サンプルの追加と修正はどちらも PR レビューを経る必要がある。
 
-## ① 架构叙述
+## ① アーキテクチャ叙述
 
 > This document describes the architecture of the DeepSeek Harness — the foundation of **DeepSeek Code**. The governing principle, from the microkernel design discussion: **everything is a plugin**. The core is deliberately tiny — a handful of abstract services plus one concrete loop plugin (`dsh-agent-loop`) — and every product feature is a plugin against the extension API described here, without modifying the loop.
 
@@ -18,7 +18,7 @@
 
 本文档描述整体行为逻辑；类型定义存放于 [subsystems/](../subsystems/core.zh.md)；各类事件、服务的详细参考见 [subsystems/](../subsystems/core.zh.md) 中的生成区块；相应的 README 说明每个包（package）要求的配置和行为（[索引](../../packages/README.zh.md)）。
 
-## ② 防御模式规则
+## ② 防御パターンの規則
 
 > Hard-won bug-class rules: each pattern below is a class of defect that actually shipped or nearly shipped here, stated as the rule that prevents its recurrence. Read this before writing lifecycle, concurrency, subprocess, or teardown code.
 
@@ -32,7 +32,7 @@
 
 **异步状态不等同于同步瞬时状态**：调用 `agent.followup()` 不会在返回前同步更新状态；后台任务的完成时间与轮次边界存在竞态；`reader.close()` 既会在读到文件末尾时触发，也会在资源释放时触发。切勿把刚刚发起的状态变更当成已经生效，据此控制流程；生命周期逻辑应以实际触发的事件和已完成的 promise（`agent/status`、`task.done`）为准，并观察完整的状态变化（先 `running`，再 `idle`），不要把状态当作逐次 `followup()` 的结果：多次排队的 `followup()` 会作为连续轮次运行，但可能共用一个 `running` 区间；取消或资源释放还可能丢弃尚未启动的队列项。
 
-## ③ 测试政策清单
+## ③ テストポリシーのチェックリスト
 
 > **Coverage gate** (`pnpm run test:coverage`): the gating run, per-file 100% on `packages/*/*/src`. An uncovered line is often dead code the gate is correctly flagging for deletion, not a missing test to bolt on. Line coverage is necessary, never sufficient — it proves lines ran, not that the feature works as shipped.
 
@@ -50,38 +50,38 @@
 
 **优先使用真实实现，而非 mock 替身**——仅对开销极大、结果不确定的依赖做 mock（LLM（大语言模型）适配器、网络、时钟），其余下游组件全部使用真实实现。手写的 mock 替身只能验证数据通路能传输字节，无法保证线上工具符合预期逻辑；长期下来业务逻辑与 mock 实现会出现偏差，但测试仍会显示通过。
 
-## ④ 机制描述
+## ④ メカニズムの記述
 
 > Blob hashes, not commit hashes, so the record is computable for files edited in the same PR (`git hash-object foo.md`) and consistency is a pure content comparison. The recorded hash also recovers the exact last-confirmed text of either side (`git cat-file -p <hash>`), so an out-of-sync pair is updated by diffing the edited side against its last-confirmed state and patching the counterpart minimally — never by re-translating whole files.
 
 系统采用文件 blob hash 而非 commit hash 记录状态。同一 PR 内修改文件时，可通过 `git hash-object foo.md` 直接算出对应 blob hash，仅对比文件内容即可判断双语文档是否同步。通过记录的 blob hash，可使用 `git cat-file -p <hash>` 还原上次确认对齐时两侧的原文。当双语文档不一致时，只需对比修改版本与上次确认版本的差异，最小幅度同步修改另一侧译文，无需全文重新翻译。
 
-## ⑤ 政策声明
+## ⑤ ポリシー宣言
 
 > The gate's limit, stated plainly: a green gate means the pair was confirmed consistent at these exact contents, not that the confirmation was sound. It checks hashes and Markdown structure; it cannot judge whether the two sides actually say the same thing — that is the reviewer's half of the contract. A re-recorded pair with a sloppy counterpart passes the gate; it must not pass review.
 
 门禁的限制很明确：通过门禁只说明两侧文件当前的 blob hash 与伴随记录吻合，并且 Markdown 结构签名一致，也就是说，这组内容曾被确认一致；它不代表这次确认可靠。评审人必须检查两种语言是否真正表达了相同的意思。即使译文粗糙、表意有误，重新记录配对后仍能通过门禁，但绝不能通过人工评审。
 
-## ⑥ Agent Note 论证
+## ⑥ Agent Note の論証
 
 > Comparing git timestamps of the pair (no record) — rejected: formatting-only edits would false-positive, and a counterpart committed after an unrelated edit would false-negative; content identity is the only signal that means what the gate claims.
 
 对比双语文件的 git 时间戳（无记录方案）——不予采纳：仅调整格式的改动会触发误报，无关修改后再提交译文又会造成漏检。只有基于内容本身的标识（每侧文件的 blob hash 与伴随记录比对），才能承载门禁所声称的语义。
 
-## ⑦ 统一要求（长段拆分示范）
+## ⑦ 統一要件（長い段落の分割例）
 
 > **Universal requirement**: every in-scope document merges as a complete bilingual pair. The manifest contains only explicit exclusions: it has no per-file rollout list, date cutoff, or README-specific policy class. […] Pairing is a continuing obligation: every later edit to either side updates the counterpart and consistency record in the same change.
 
 **统一要求**：每篇纳入范围的文档合入时都必须构成完整的双语配对。manifest（元数据清单）只包含显式排除项：其中没有逐文件推进清单、日期分界或 README 专用政策类别。（……）配对是一项持续义务：后续修改任一侧时，都必须在同一变更中同步更新对侧文件和一致性记录。
 
-## 从样例提炼的要点
+## サンプルから抽出した要点
 
-- 语体是规范制度文：完整主谓、确定语气；不口语化，也不学术腔。
-- 给句子补显式执行主体：英文的被动句和抽象主语，中文写成「系统／门禁／工具／评审人」做主语。
-- 用中文工程惯用语替换直译：false positive/negative→误报／漏检、ratchet→只向前收紧不倒退放宽、reviewable act→评审凭证。
-- 隐喻本地化而非移植：bilingual from birth→从创建起就要求双语齐备；grandfathered→历史存量遗留。
-- 类别名词说中文并在首现括注英文：实操手册（cookbook）、事故复盘（postmortem）；指目录或路径时保留代码体英文。
-- 长段按语义单元拆段，一段一件事；名词短语展开为动词句。
-- 母语重写不等于删减：原文每个语义成分都要落地。
-- 样例与 [terminology.md](terminology.md) 冲突时，以术语表为准：收录样例前按表修正术语（例如 agent、mock、LLM 保留英文，cancellation 译「取消」）。
-- 代码体标识符（事件名 `agent/status`、状态值 `running`、包名 `dsh-bash-local` 等）在译文中保留 code span 原文，不得口语化改写；Pass 2 必须逐句核验。
+- 語体は規範制度文である。完全な主述、断定の語気。口語的でも学術的でもない。
+- 文には実行主体を明示的に補う。英語の受動文や抽象主語は、中国語では「系统／门禁／工具／评审人」を主語にして書く。
+- 直訳を中国語の工程慣用語に置き換える: false positive/negative→误报／漏检、ratchet→只向前收紧不倒退放宽、reviewable act→评审凭证。
+- 隠喩は移植ではなく現地化する: bilingual from birth→从创建起就要求双语齐备；grandfathered→历史存量遗留。
+- カテゴリ名は中国語で述べ、初出時に括弧で英語を添える: 实操手册（cookbook）、事故复盘（postmortem）。ディレクトリやパスを指す場合はコード体の英語を保つ。
+- 長い段落は意味単位で分割し、1 段落 1 事項とする。名詞句は動詞文に展開する。
+- 母語による書き直しは削減ではない。原文のあらゆる意味成分を反映させる。
+- サンプルと [terminology.md](terminology.md) が衝突する場合は用語集を優先する: サンプルを収録する前に表に従って用語を修正する（例: agent、mock、LLM は英語のまま、cancellation は「取消」と訳す）。
+- コード体の識別子（イベント名 `agent/status`、状態値 `running`、パッケージ名 `dsh-bash-local` など）は訳文でも code span の原文を保ち、口語的に書き換えてはならない。Pass 2 は必ず逐語で照合する。

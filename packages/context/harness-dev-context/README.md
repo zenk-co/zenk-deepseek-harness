@@ -1,90 +1,90 @@
 ---
-description: "Model context for users and maintainers of the Web GUI that names the DeepSeek Harness checkout and GUI URL without letting either change the system prompt."
+description: "DeepSeek Harness チェックアウトと GUI URL を名指ししつつ、どちらもシステムプロンプトを変更しないようにする、Web GUI のユーザーとメンテナー向けのモデルコンテキスト。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-harness-dev-context
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-harness-dev-context` tells an agent running behind the DeepSeek Harness Web GUI where the harness implementation checkout lives, how the GUI relates to "this page", and which URL serves it. The system prompt carries only value-free guidance; the current checkout path and GUI URL arrive as runtime context, so starting the process from another checkout, port, or installation never rewrites a Session's logged system prompt. Sessions whose prompt still embeds those values from earlier releases keep that text verbatim.
+`dsh-harness-dev-context` は、DeepSeek Harness Web GUI の背後で実行されるエージェントに、harness 実装チェックアウトがどこにあるか、GUI が「このページ」とどう関係するか、どの URL がそれを提供するかを伝える。システムプロンプトは値を持たないガイダンスのみを運び、現在のチェックアウトパスと GUI URL はランタイムコンテキストとして到着するため、別のチェックアウト、ポート、インストールからプロセスを開始しても、セッションの記録済みシステムプロンプトが書き換えられることは決してない。プロンプトに以前のリリースのそれらの値を依然として埋め込んでいるセッションは、そのテキストを逐語的に保つ。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The shipped Web bundle mounts this plugin as its `harness-dev-context` row. Disable that row in a profile patch when the agent should not learn the harness checkout or GUI URL. The plugin takes no configuration and activates only where every injected service exists: `systemPrompt`, `sessionProjections`, and the `webApp` service of the Web runtime, so `--help` and non-Web compositions never mount it.
+出荷済み Web バンドルはこのプラグインを `harness-dev-context` 行としてマウントする。エージェントが harness チェックアウトや GUI URL を知るべきでない場合は、プロファイルパッチでその行を無効化する。このプラグインは設定を取らず、注入されたすべてのサービスが存在する場所でのみ有効化される: `systemPrompt`、`sessionProjections`、および Web ランタイムの `webApp` サービス。そのため `--help` や非 Web の構成では決してマウントされない。
 
-### What the model gets
+### モデルが受け取るもの
 
-Two system-prompt sections explain that the checkout differs from the working directory and that "this page" means this GUI, together with the GUI update contract. Two runtime-context lines state the current values: the installation root four directories above this package, and the Web GUI's advertised URL from `webApp.getAdvertisedUrl()`, the same value as `DSH_WEB_URL` and the startup URL. Runtime context follows the shared snapshot rules: an unchanged value adds nothing, and a changed one appends a snapshot before the step's input instead of rewriting earlier messages.
+2 つのシステムプロンプトセクションが、チェックアウトが作業ディレクトリと異なること、および「このページ」がこの GUI を意味することを、GUI 更新契約とともに説明する。2 つのランタイムコンテキスト行が現在の値を述べる: このパッケージの 4 つ上のディレクトリにあるインストールルートと、`webApp.getAdvertisedUrl()` からの Web GUI の告知 URL（`DSH_WEB_URL` および起動 URL と同じ値）。ランタイムコンテキストは共有スナップショットルールに従う: 変更のない値は何も追加せず、変更された値は以前のメッセージを書き換えるのではなくステップの入力の前にスナップショットを追加する。
 
-### Sessions from earlier releases
+### 以前のリリースのセッション
 
-Earlier releases embedded both values in the system prompt. When a Session's latest nonempty system prompt still contains those exact paragraphs, the sections repeat them verbatim, old values included, so upgrading and later port or checkout changes leave that Session's prompt byte-identical; the runtime-context lines still give the current values. Text that only resembles an earlier paragraph receives the current guidance.
+以前のリリースは両方の値をシステムプロンプトに埋め込んでいた。セッションの最新の非空システムプロンプトが依然としてそれらの正確な段落を含む場合、セクションはそれらを古い値を含めて逐語的に繰り返すため、後でポートやチェックアウトを変更してもそのセッションのプロンプトはバイト単位で同一のままである。ランタイムコンテキスト行は依然として現在の値を提供する。以前の段落に似ているだけのテキストは現在のガイダンスを受け取る。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design of the plugin; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションではプラグインの設計を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design concept
+### 設計思想
 
-A host-only session projection, `harnessDevLegacyPrompt`, folds every committed nonempty `system/message` into the earlier-format paragraphs it contains, matched by their fixed text around the value on one line. The section text providers read that state through `AssembleContext.agent`; assemblies without an agent use the current guidance. The projection is restored with every other unit when a Session resumes, so no historical event is read synchronously.
+ホスト専用のセッションプロジェクション `harnessDevLegacyPrompt` が、コミットされたすべての非空 `system/message` を、それが含む以前の形式の段落（1 行の値の周りの固定テキストで照合）に畳み込む。セクションテキストプロバイダーは `AssembleContext.agent` を通じてその状態を読み、エージェントのない組み立ては現在のガイダンスを使う。プロジェクションはセッション再開時に他のすべてのユニットとともに復元されるため、履歴イベントが同期的に読まれることはない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: sections, runtime contexts, earlier-format projection |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: セクション、ランタイムコンテキスト、以前の形式のプロジェクション |
 
-### Main flow
+### メインフロー
 
-Activation registers the projection unit, both sections, and both contexts. At each assembly the sections choose the admitted earlier paragraph or the current guidance; at each request admission the contexts read the advertised URL. Disposing the plugin fiber removes every registration.
+有効化はプロジェクションユニット、両方のセクション、および両方のコンテキストを登録する。各組み立てでセクションは許可された以前の段落または現在のガイダンスを選び、各リクエスト受付でコンテキストは告知 URL を読む。プラグインファイバーの破棄はすべての登録を削除する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the package-level contract is not enough. They move from the decision record to the services this plugin reads.
+パッケージレベルの契約では足りないときにこれらのページを読む。決定記録から、このプラグインが読むサービスへと進む。
 
-- [Process-specific values as runtime context](../../../.agents/notes/implemented/bug-fix/2026-10-11-process-specific-prompt-values-in-runtime-context.md) — why the values left the system prompt and how earlier Sessions stay stable.
-- [Session projections subsystem](../../../docs/subsystems/session-projection.md) — the projection contract the earlier-format state uses.
-- [Web app bundle](../../bundle/web-app/README.md) — the `webApp` service and the row that mounts this plugin.
-- [Context group map](../README.md) — sibling request-context packages.
+- [ランタイムコンテキストとしてのプロセス固有値](../../../.agents/notes/implemented/bug-fix/2026-10-11-process-specific-prompt-values-in-runtime-context.md) — なぜ値がシステムプロンプトを離れたか、以前のセッションがどう安定を保つか。
+- [セッションプロジェクションサブシステム](../../../docs/subsystems/session-projection.md) — 以前の形式の状態が使うプロジェクション契約。
+- [Web アプリバンドル](../../bundle/web-app/README.md) — `webApp` サービスとこのプラグインをマウントする行。
+- [Context グループマップ](../README.md) — 兄弟のリクエストコンテキストパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Harness checkout and Web GUI
+### Harness チェックアウトと Web GUI
 
-#### What the model sees
+#### モデルが見るもの
 
-Two system-prompt paragraphs at first-party orders 10000 and 10100, after reusable instructions, and two runtime-context lines at context orders 200 and 210. A Session admitted under an earlier release sees its own earlier paragraphs instead of the two below.
+ファーストパーティ順序 10000 と 10100 の 2 つのシステムプロンプト段落（再利用可能な命令の後）と、コンテキスト順序 200 と 210 の 2 つのランタイムコンテキスト行。以前のリリースで受け入れられたセッションは、以下の 2 つではなく、自身の以前の段落を見る。
 
-##### System-prompt paragraphs
+##### システムプロンプト段落
 
 ```markdown
 The runtime context names the DeepSeek Harness implementation checkout. The checkout location and current working directory are separate values and may differ; never infer the working directory from the checkout path. Use pwd to determine the current working directory. Use this checkout only to inspect or extend DSH itself.
@@ -92,7 +92,7 @@ The runtime context names the DeepSeek Harness implementation checkout. The chec
 You are interacting with the user through the DeepSeek Harness Web GUI whose URL the runtime context names. When the user refers to "this page", "this GUI", or "this app" without naming another target, they mean this GUI. The browser provides no implicit DOM, route, or screenshot context. The client-plugin HMR receiver is active, but client-plugin changes reload without a refresh only while `pnpm run dev:web` is also running from this same checkout to rebuild their bundles; verify that watcher before promising automatic updates. Every other change — the apps/web shell and plain packages — requires rebuilding the affected Web artifacts and verifying this existing URL after a page refresh. Starting another server does not update this GUI. The apps/web Vite entry builds the shell but is not a standalone application because only dsh web injects window.__DSH_BOOT__. Do not start a replacement server unless the user asks; if one is needed, use a managed background job and verify its exact URL.
 ```
 
-##### Runtime-context lines
+##### ランタイムコンテキスト行
 
 ```markdown
 Current DeepSeek Harness implementation checkout: "<installation root>".
@@ -100,33 +100,34 @@ Current DeepSeek Harness implementation checkout: "<installation root>".
 Current DeepSeek Harness Web GUI URL: "<advertised URL>".
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Two prompt paragraphs per Session and two lines in each runtime-context snapshot. A changed checkout or URL adds one snapshot.
+セッションごとに 2 つのプロンプト段落と、各ランタイムコンテキストスナップショットに 2 行。チェックアウトまたは URL が変わるとスナップショットが 1 つ追加される。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The system prompt is identical across checkouts, ports, and installations, so a process started elsewhere leaves the cached prefix intact; a changed value appends one runtime-context snapshot after it.
+システムプロンプトはチェックアウト、ポート、インストール間で同一であるため、別の場所で開始されたプロセスはキャッシュされたプレフィックスを無傷のままにする。変更された値はその後にランタイムコンテキストスナップショットを 1 つ追加する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits describe what the stability guarantee covers. They are current package constraints.
 
-- **Two paragraphs only** — other system-prompt text that changes between releases still rewrites the first system message on routes without in-history prompt updates.
-- **Earlier values stay** — an earlier-format Session keeps its old checkout path and URL in the system prompt for its whole lifetime; only the later runtime-context lines are current.
-- **Mixed releases** — a release without this package rewrites the first system message of a Session started with it, so every checkout that serves a shared `DSH_HOME` needs this package before they alternate.
-- **Optional values** — the two runtime-context lines are optional, so a custom persona that sets `includeRuntimeContext: false` without `complete: true` keeps the sections that point at values its requests never carry. The shipped `minimal` persona sets both.
-- **Sessions without the sections** — a Session created while `surfaceContext: false` hid both paragraphs has neither in its log, so the first resumed request adds the new sections and rewrites the first system message on routes without in-history prompt updates.
-- **One earlier wording** — the projection recognizes the paragraphs as the release immediately before this package rendered them; a Session holding an older wording gets the current guidance.
+これらの制限は安定性保証が何をカバーするかを説明する。これらは現在のパッケージ制約である。
+
+- **2 つの段落のみ** — リリース間で変わる他のシステムプロンプトテキストは、履歴内プロンプト更新のないルートで依然として最初のシステムメッセージを書き換える。
+- **以前の値は残る** — 以前の形式のセッションは、そのライフタイム全体にわたりシステムプロンプトに古いチェックアウトパスと URL を保つ。現在なのは後のランタイムコンテキスト行だけである。
+- **混在リリース** — このパッケージのないリリースは、それとともに開始されたセッションの最初のシステムメッセージを書き換えるため、共有 `DSH_HOME` にサービスを提供するすべてのチェックアウトは、交互に使う前にこのパッケージを必要とする。
+- **任意の値** — 2 つのランタイムコンテキスト行は任意であるため、`complete: true` なしに `includeRuntimeContext: false` を設定するカスタムペルソナは、そのリクエストが決して運ばない値を指すセクションを保つ。出荷済み `minimal` ペルソナは両方を設定する。
+- **セクションのないセッション** — `surfaceContext: false` が両方の段落を隠している間に作成されたセッションは、ログにどちらも持たないため、最初の再開リクエストが新しいセクションを追加し、履歴内プロンプト更新のないルートで最初のシステムメッセージを書き換える。
+- **1 つの以前の文言** — プロジェクションは、このパッケージがそれらをレンダリングする直前のリリースとして段落を認識する。より古い文言を持つセッションは現在のガイダンスを受け取る。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

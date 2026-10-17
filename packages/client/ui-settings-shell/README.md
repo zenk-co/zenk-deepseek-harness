@@ -1,77 +1,77 @@
 ---
-description: "The shell executor's settings page on the dsh web client's Plugins page: the command timeout and the per-stream output cap of the shell namespace."
+description: "dsh web クライアントの Plugins ページにあるシェルエグゼキューターの設定ページ: shell 名前空間のコマンドタイムアウトとストリームごとの出力上限。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-settings-shell
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Open **Plugins** in the sidebar and select **Shell** in the Official group to set how long one command may run and how much of each output stream stays in memory. The page stages what is typed and writes it only on save, marks the values the user overrode, and offers to reset each back to the deployment's default. The page exists while the Host serves the `shell` namespace, so a deployment without a local shell executor shows no trace of it.
+サイドバーの **Plugins** を開き、Official グループの **Shell** を選択して、1 つのコマンドが実行できる時間と各出力ストリームがメモリに残る量を設定する。ページは入力内容をステージングし、保存時にのみ書き込み、ユーザーが上書きした値をマークし、それぞれをデプロイメントのデフォルトに戻すリセットを提供する。ページは Host が `shell` 名前空間を提供している間だけ存在するので、ローカルシェルエグゼキューターのないデプロイメントにはその痕跡が一切現れない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The **Shell** card in the Official group opens the page. **Command timeout (ms)** ends a command that runs longer; **Output cap per stream (bytes)** spills output beyond it to a temporary file. Both render the effective value — the user's override over the composed default — and a field the user overrode carries an **Overridden** badge with **Reset to default** beside it. Nothing is written until **Save**; leaving the page drops the drafts, an empty field saves as a reset, and text that is not a number blocks the save and says so under the field.
+Official グループの **Shell** カードがページを開く。**Command timeout (ms)** はそれより長く実行されるコマンドを終了させ、**Output cap per stream (bytes)** はそれを超える出力を一時ファイルにスピルする。どちらも有効値 — 構成されたデフォルトに対するユーザーの上書き — を表示し、ユーザーが上書きしたフィールドには **Overridden** バッジが付き、その隣に **Reset to default** がある。**Save** までは何も書き込まれない。ページを離れるとドラフトは破棄され、空のフィールドはリセットとして保存され、数値でないテキストは保存をブロックし、フィールドの下にその旨を表示する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The Host half is an empty `apply`, present only so the package holds a Loader row the client module system serves the browser half for. The browser half binds the composed shell executor entry (`bash-sandbox` off Windows, `pwsh-sandbox` on it) through `ctx.configForms.get`, keeps the staged form in `ShellCardController` over the shared `SettingsFormModel` of `ui-primitives`, and registers `ShellCard` into the Plugins page's `plugins.item` slot through `ctx.configForms.whileServed`, which registers while the Host serves either entry and withdraws when it stops. The page's copy lives in this package's `settings.shell` dictionary; the `SettingsForm` frame takes its copy as props.
+Host 側は空の `apply` であり、パッケージが Loader 行を保持してクライアントモジュールシステムがブラウザー側にサービスを提供するためだけに存在する。ブラウザー側は、構成されたシェルエグゼキューターエントリー (Windows 以外では `bash-sandbox`、Windows では `pwsh-sandbox`) を `ctx.configForms.get` でバインドし、ステージングされたフォームを `ui-primitives` の共有 `SettingsFormModel` 上で `ShellCardController` に保持し、`ShellCard` を `ctx.configForms.whileServed` を通じて Plugins ページの `plugins.item` スロットに登録する。これは Host がいずれかのエントリーを提供している間登録し、停止すると撤回する。ページのコピーはこのパッケージの `settings.shell` 辞書にあり、`SettingsForm` フレームはそのコピーを props として受け取る。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [ui-plugin-manager](../ui-plugin-manager/README.md) — the Plugins page and the `plugins.item` slot the page registers into.
-- [ui-settings](../ui-settings/README.md) — the settings scope and the served-namespace watch the page rides.
-- [ui-primitives](../ui-primitives/README.md) — the settings form model and fields the page renders.
-- [bash-local](../../shell/bash-local/README.md) — the executor that registers the `shell` namespace.
+- [ui-plugin-manager](../ui-plugin-manager/README.md) — Plugins ページと、ページが登録する `plugins.item` スロット。
+- [ui-settings](../ui-settings/README.md) — 設定スコープと、ページが利用する提供名前空間のウォッチ。
+- [ui-primitives](../ui-primitives/README.md) — 設定フォームモデルと、ページがレンダリングするフィールド。
+- [bash-local](../../shell/bash-local/README.md) — `shell` 名前空間を登録するエグゼキューター。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side settings surface that registers no model surface.
+なし。このパッケージはモデルサーフェスを登録しないブラウザー側の設定サーフェスであるため。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てることも送信することもない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **The page follows the composed executor** — the POSIX and PowerShell executor families share the `shell` namespace because a host composes exactly one of them, so the served schema differs by platform (PowerShell adds `pwshPath`) while the page edits the same two fields on both.
+- **ページは構成されたエグゼキューターに従う** — POSIX と PowerShell のエグゼキューター系は `shell` 名前空間を共有する。ホストはそのうちちょうど 1 つを構成するので、提供されるスキーマはプラットフォームごとに異なる (PowerShell は `pwshPath` を追加する) が、ページはどちらでも同じ 2 つのフィールドを編集する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

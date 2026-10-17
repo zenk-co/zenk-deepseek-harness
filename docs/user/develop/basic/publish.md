@@ -1,23 +1,23 @@
-# Package and install a plugin
+# プラグインのパッケージ化とインストール
 
-English | [中文](publish.zh.md)
+日本語 | [English](publish.en.md) | [中文](publish.zh.md)
 
-The previous tutorials loaded a local plugin through a `--patch` overlay. This tutorial packages it as an installable **bundle**, installs it into a **profile** with `dsh plugin add`, and explains the layer order that determines the composed configuration. It assumes the `dsh` CLI is installed. Complete [plugin configuration](./config.md) first.
+前のチュートリアルでは、`--patch` オーバーレイを通じてローカルプラグインをロードした。このチュートリアルでは、それをインストール可能な **バンドル** としてパッケージ化し、`dsh plugin add` で **プロファイル** にインストールし、合成後の設定を決めるレイヤー順序を説明する。`dsh` CLI がインストール済みであることを前提とする。先に [プラグイン構成](./config.md) を完了すること。
 
-To use a fresh source checkout instead, complete the [run-from-source section](../../../../README.md#run-from-source), keep this tutorial's `hello-plugin` directory at the repository root, and run the remaining `dsh ...` commands from there as `pnpm dsh ...`. See [source execution](../../../../apps/cli/reference/README.md#source-execution) for build and launcher behavior.
+代わりに新しいソースチェックアウトを使う場合は、[run-from-source セクション](../../../../README.md#run-from-source) を完了し、このチュートリアルの `hello-plugin` ディレクトリをリポジトリルートに置き、残りの `dsh ...` コマンドをそこから `pnpm dsh ...` として実行する。ビルドとランチャーの動作は [source execution](../../../../apps/cli/reference/README.md#source-execution) を参照。
 
-## Two concepts, two manifests
+## 2 つの概念、2 つのマニフェスト
 
-Installation is built on two concepts. Both are described by a `package.json`, but they carry different kinds of manifest under the `dsh` key, and they answer different questions:
+インストールは 2 つの概念の上に成り立っている。どちらも `package.json` で記述されるが、`dsh` キーの下に異なる種類のマニフェストを持ち、異なる問いに答える:
 
-- A **bundle** is an npm package that ships a configuration layer. Its manifest declares `dsh.bundle`, answering "what does this package contribute?": a patch file that inserts or overrides plugin rows.
-- A **profile** is a directory under `$DSH_HOME/profiles/<name>` describing one runnable composition. Its manifest declares `dsh.profile`, answering "which bundles compose this setup, in what order?".
+- **バンドル** は構成レイヤーを出荷する npm パッケージである。そのマニフェストは `dsh.bundle` を宣言し、「このパッケージは何を貢献するか」に答える。すなわち、プラグイン行を挿入または上書きするパッチファイルである。
+- **プロファイル** は `$DSH_HOME/profiles/<name>` 配下のディレクトリで、1 つの実行可能な構成を記述する。そのマニフェストは `dsh.profile` を宣言し、「どのバンドルが、どの順序でこのセットアップを構成するか」に答える。
 
-A bundle is what you author and distribute; a profile is what a user boots with `dsh --profile <name>`. Nothing is both.
+バンドルはあなたが作成して配布するものであり、プロファイルはユーザーが `dsh --profile <name>` で起動するものである。両方であるものはない。
 
-### The bundle manifest
+### バンドルマニフェスト
 
-Create the package directory:
+パッケージディレクトリを作成する:
 
 ```sh
 mkdir -p hello-plugin
@@ -30,7 +30,7 @@ hello-plugin/
 └── index.js           # plugin modules the patch rows reference
 ```
 
-Create `hello-plugin/package.json`:
+`hello-plugin/package.json` を作成する:
 
 ```json
 {
@@ -43,7 +43,7 @@ Create `hello-plugin/package.json`:
 }
 ```
 
-Create `hello-plugin/index.js` with the plugin entry point:
+プラグインエントリポイントを持つ `hello-plugin/index.js` を作成する:
 
 ```js
 export const name = 'hello-plugin'
@@ -53,7 +53,7 @@ export function apply() {
 }
 ```
 
-Create `hello-plugin/cordis.patch.yml`. The patch is a YAML array like the `--patch` overlays you wrote, except plugin rows reference the package by name instead of a relative source path so Node resolution finds the installed code:
+`hello-plugin/cordis.patch.yml` を作成する。パッチは、あなたが書いた `--patch` オーバーレイと同様の YAML 配列だが、プラグイン行が相対ソースパスではなく名前でパッケージを参照する点が異なる。これにより Node の解決がインストール済みコードを見つける:
 
 ```yaml
 - insert:
@@ -61,28 +61,28 @@ Create `hello-plugin/cordis.patch.yml`. The patch is a YAML array like the `--pa
       name: dsh-hello-plugin
 ```
 
-`patch` also accepts an ordered list of files, for example `["./base.patch.yml", "./web.patch.yml"]`; the launcher applies them in that order as one layer, and each file's relative plugin paths resolve beside that file. A package without the `dsh.bundle` declaration still installs, but only as a plain dependency: `dsh plugin` prints a warning and activates no layer. Use that package format for a library that plugin packages import rather than a plugin users enable.
+`patch` はファイルの順序付きリストも受け入れる。たとえば `["./base.patch.yml", "./web.patch.yml"]` である。ランチャーはそれらをその順序で 1 つのレイヤーとして適用し、各ファイルの相対プラグインパスはそのファイルの隣で解決される。`dsh.bundle` 宣言のないパッケージもインストールできるが、プレーンな依存関係としてだけである。`dsh plugin` は警告を出力し、レイヤーを有効化しない。そのパッケージ形式は、ユーザーが有効化するプラグインではなく、プラグインパッケージが import するライブラリに使う。
 
-Declare the DSH releases the bundle supports with an `engines.dsh` SemVer range, for example `"engines": { "dsh": ">=0.2.0 <0.3.0" }`. Installation and profile startup refuse a bundle whose range the running DSH does not satisfy; without `engines.dsh`, they check its `@deepseek-ai/dsh*` peer dependency ranges instead ([rule](../../../../packages/boot/app-boot/README.md#profiles)).
+バンドルがサポートする DSH リリースを `engines.dsh` SemVer 範囲で宣言する。たとえば `"engines": { "dsh": ">=0.2.0 <0.3.0" }` である。インストールとプロファイル起動は、実行中の DSH が満たさない範囲のバンドルを拒否する。`engines.dsh` がない場合は、代わりにその `@deepseek-ai/dsh*` peer 依存関係の範囲をチェックする（[rule](../../../../packages/boot/app-boot/README.md#profiles)）。
 
-### The profile manifest
+### プロファイルマニフェスト
 
-A profile directory holds two files:
+プロファイルディレクトリは 2 つのファイルを保持する:
 
-- `package.json` — the profile's out-of-tree plugin dependencies (managed by pnpm) plus the `dsh.profile` manifest with its ordered `bundles` list.
-- `cordis.patch.yml` — the user's own patch layer, applied after every bundle layer.
+- `package.json` — プロファイルのツリー外プラグイン依存関係（pnpm が管理）と、順序付き `bundles` リストを持つ `dsh.profile` マニフェスト。
+- `cordis.patch.yml` — ユーザー自身のパッチレイヤー。すべてのバンドルレイヤーの後に適用される。
 
-You never write a profile manifest by hand: `dsh --profile <name> --from-default-profile <template>` can create or reset one from a shipped application template, while `dsh plugin` creates a base-backed profile and maintains its installed bundle list. The [CLI behavior reference](../../../../apps/cli/reference/README.md#profile-boot) owns the creation rules; the next section shows the plugin path.
+プロファイルマニフェストを手書きすることはない。`dsh --profile <name> --from-default-profile <template>` が出荷済みアプリケーションテンプレートから作成またはリセットでき、`dsh plugin` は base に支えられたプロファイルを作成し、そのインストール済みバンドルリストを維持する。作成ルールは [CLI 動作リファレンス](../../../../apps/cli/reference/README.md#profile-boot) が所有する。次の節でプラグインの手順を示す。
 
-## Install into a profile
+## プロファイルへインストール
 
-`dsh plugin --profile <name> <args...>` forwards to pnpm in the profile directory, so every pnpm verb works. From the directory that contains `hello-plugin`, install the package checkout:
+`dsh plugin --profile <name> <args...>` はプロファイルディレクトリ内の pnpm に転送されるので、すべての pnpm 動詞が動作する。`hello-plugin` を含むディレクトリから、パッケージチェックアウトをインストールする:
 
 ```sh
 dsh plugin --profile demo add ./hello-plugin
 ```
 
-The first use initializes the profile (with `@deepseek-ai/dsh-base` as its first bundle), pnpm links the checkout, and `dsh` appends the bundle to `dsh.profile.bundles` because the package declares `dsh.bundle`:
+最初の使用でプロファイルが初期化され（最初のバンドルとして `@deepseek-ai/dsh-base` を持つ）、pnpm がチェックアウトをリンクし、パッケージが `dsh.bundle` を宣言しているので `dsh` がバンドルを `dsh.profile.bundles` に追記する:
 
 ```json
 {
@@ -102,51 +102,51 @@ The first use initializes the profile (with `@deepseek-ai/dsh-base` as its first
 }
 ```
 
-A linked checkout keeps its own `node_modules`. Declare dsh packages whose instances the plugin must share with the host under both `peerDependencies` and `devDependencies`, as the harness packages do. At that manifest's lookup position, peers present in the running dsh's runtime resolution use the installation's copy; the devDependency copy serves your type checker and standalone tests. Keep independently versioned third-party dependencies and stateless dsh utilities under `dependencies`.
+リンクされたチェックアウトは独自の `node_modules` を保持する。プラグインがホストとインスタンスを共有しなければならない dsh パッケージは、harness パッケージと同様に `peerDependencies` と `devDependencies` の両方で宣言する。そのマニフェストのルックアップ位置で、実行中の dsh のランタイム解決に存在する peer はインストール側のコピーを使い、devDependency のコピーは型チェッカーとスタンドアロンテストに奉仕する。独立してバージョン管理されるサードパーティ依存関係とステートレスな dsh ユーティリティは `dependencies` に置く。
 
-Ordinary linked imports follow Node's ancestor order and check each directory's current peer declarations. A nearer physical package wins before a higher peer declaration. A link target can lack `package.json`; ancestor peers still apply, even without a physical `node_modules` beside that manifest. Explicit `require.resolve(..., { paths })` is always native, including paths inside a profile. These rules are shared by npm, Desktop, and source launches; they do not invalidate loaded modules or validate peer version ranges. See the [resolution rules](../../../../.agents/notes/implemented/architecture/2026-09-19-profile-resolution-lookup-order.md) for scope and file-query behavior.
+通常のリンクされた import は Node の祖先順に従い、各ディレクトリの現在の peer 宣言をチェックする。より近い物理パッケージが、より上位の peer 宣言より優先される。リンクターゲットは `package.json` を欠くことができる。そのマニフェストの隣に物理的な `node_modules` がなくても、祖先 peer は適用される。明示的な `require.resolve(..., { paths })` は常にネイティブであり、プロファイル内のパスも含む。これらのルールは npm、Desktop、ソース起動で共有される。ロード済みモジュールを無効化したり、peer バージョン範囲を検証したりはしない。スコープとファイルクエリの動作は [resolution rules](../../../../.agents/notes/implemented/architecture/2026-09-19-profile-resolution-lookup-order.md) を参照。
 
-Linking a broad checkout does not apply peer interception to the running installation's own package directories. Links whose targets stay inside the profile, including its pnpm store, remain profile-owned installation content rather than external linked roots. Overlapping external links do not change lookup order: each request still starts from its importer's directory.
+広いチェックアウトをリンクしても、実行中インストール自身のパッケージディレクトリに peer インターセプションは適用されない。ターゲットがプロファイル内 — その pnpm ストアを含む — にとどまるリンクは、外部のリンク済みルートではなくプロファイル所有のインストール内容のままである。重複する外部リンクはルックアップ順序を変えない。各リクエストは依然としてその importer のディレクトリから始まる。
 
-Verify the layer without booting, then boot:
+起動せずにレイヤーを検証し、次に起動する:
 
 ```sh
 dsh --profile demo --dump-config   # shows a "# == dsh-hello-plugin" layer
 dsh --profile demo
 ```
 
-`dsh plugin --profile demo remove dsh-hello-plugin` removes both the dependency and the layer.
+`dsh plugin --profile demo remove dsh-hello-plugin` は依存関係とレイヤーの両方を削除する。
 
-## The loading order
+## ロード順序
 
-The effective configuration composes over an empty root by applying, in order:
+有効な設定は、空のルートの上に次の順序で適用して合成される:
 
-1. Each bundle patch named in the profile's `dsh.profile.bundles` list, in list order — `@deepseek-ai/dsh-base` first, then each installed bundle in the order it was added.
-2. The profile's own `cordis.patch.yml`.
-3. The home-level `$DSH_HOME/cordis.patch.yml` — machine-local preferences shared by every profile.
-4. Each `--patch <path>` overlay, in argv order.
+1. プロファイルの `dsh.profile.bundles` リストに挙がった各バンドルパッチをリスト順に — 最初に `@deepseek-ai/dsh-base`、次に各インストール済みバンドルを追加された順に。
+2. プロファイル自身の `cordis.patch.yml`。
+3. ホームレベルの `$DSH_HOME/cordis.patch.yml` — すべてのプロファイルが共有するマシンローカルの設定。
+4. 各 `--patch <path>` オーバーレイを argv 順に。
 
-App arguments are not another patch layer. A surface bundle can resolve them through an ordinary app-owned service, described below.
+アプリ引数は別のパッチレイヤーではない。サーフェスバンドルは、以下で説明する通常のアプリ所有サービスを通じてそれらを解決できる。
 
-Later layers win per row, and a patch replaces a row's entire `config` value rather than deep-merging keys. Two consequences for bundle authors:
+後のレイヤーが行ごとに優先され、パッチはキーを深くマージするのではなく、行の `config` 値全体を置き換える。バンドル作者にとっての 2 つの帰結:
 
-- Your patch can override rows from earlier layers by `id` — the same way [the `dsh-web-app` bundle](../../../../packages/bundle/web-app/cordis.patch.yml) overrides `dsh-base` rows — but must restate every key the row needs, not just the changed one.
-- Users can override your rows in their profile's `cordis.patch.yml` without touching your package, so prefer configuration defaults users are likely to keep and let the schema carry the rest.
+- あなたのパッチは `id` で以前のレイヤーの行を上書きできる — [the `dsh-web-app` bundle](../../../../packages/bundle/web-app/cordis.patch.yml) が `dsh-base` の行を上書きするのと同じ方法で — ただし、変更したキーだけでなく行が必要とするすべてのキーを書き直さなければならない。
+- ユーザーはあなたのパッケージに触れずにプロファイルの `cordis.patch.yml` であなたの行を上書きできるので、ユーザーが維持しそうな設定既定値を優先し、残りはスキーマに委ねる。
 
-In-box bundle names always resolve from the dsh installation itself; pnpm manages only out-of-tree packages, so your bundle can rely on `@deepseek-ai/dsh-base` being present and current.
+同梱バンドル名は常に dsh インストール自体から解決される。pnpm が管理するのはツリー外パッケージだけなので、あなたのバンドルは `@deepseek-ai/dsh-base` が存在して最新であることを当てにできる。
 
-## Give a surface bundle its own command line
+## サーフェスバンドルに独自のコマンドラインを持たせる
 
-A bundle that defines a runnable app mounts an ordinary provider plugin:
+実行可能なアプリを定義するバンドルは、通常のプロバイダープラグインをマウントする:
 
 ```yaml
 - id: hello-startup
   name: 'dsh-hello-plugin/startup'
 ```
 
-The plugin exports `inject = ['cmdlineArgs']`, calls `parseCmdline` from [`@deepseek-ai/dsh-cmdline`](../../../../packages/boot/cmdline/README.md) with its own commander program, and provides its app-owned service from the program's action. The launcher hands every plugin the same immutable arguments after launcher flags, so app-specific flags need no launcher change and multiple plugins may parse the snapshot. The Loader row needs no launcher marker or special kind.
+プラグインは `inject = ['cmdlineArgs']` をエクスポートし、自身の commander プログラムで [`@deepseek-ai/dsh-cmdline`](../../../../packages/boot/cmdline/README.md) の `parseCmdline` を呼び、プログラムのアクションからアプリ所有サービスを提供する。ランチャーはランチャーフラグの後の同じ不変の引数をすべてのプラグインに渡すので、アプリ固有のフラグにランチャーの変更は不要であり、複数のプラグインがそのスナップショットを解析してよい。Loader 行にはランチャーマーカーや特別な種類は不要である。
 
-Rows configured by those arguments inject the provider's service and read it from their own `!!js` options, with the deployment value beside it as the fallback:
+それらの引数で構成される行は、プロバイダーのサービスを注入し、自身の `!!js` オプションからそれを読む。隣にあるデプロイ値がフォールバックとなる:
 
 ```yaml
 - id: my-app
@@ -156,36 +156,36 @@ Rows configured by those arguments inject the provider's service and read it fro
     port: !!js ctx.myAppStartup.port ?? 8080
 ```
 
-On `--help`, the provider publishes no service, so those rows never activate. Loader mounts the composition once, waits for each row's ordinary injections, and only then evaluates that row's `!!js` config against its injected context.
+`--help` ではプロバイダーがサービスを公開しないので、それらの行は決してアクティブ化しない。Loader は構成を一度マウントし、各行の通常の注入を待ち、それからその行の `!!js` 設定を注入されたコンテキストに対して評価する。
 
-## Installing from GitHub: the build-script catch
+## GitHub からのインストール: ビルドスクリプトの落とし穴
 
-Publishing to a registry is not required — users can install straight from a git host:
+レジストリへの公開は必須ではない。ユーザーは git ホストから直接インストールできる:
 
 ```sh
 dsh plugin --profile demo add github:you/hello-plugin
 ```
 
-But a git install fetches **sources, not built artifacts**: nothing runs your `build` script, so a TypeScript package arrives without its `lib/` output and fails to load. Two things must happen, one on each side:
+しかし git インストールが取得するのは **ソースであり、ビルド済み成果物ではない**。`build` スクリプトは何も実行しないので、TypeScript パッケージは `lib/` 出力なしで届き、ロードに失敗する。両側で 1 つずつ、2 つのことが必要である:
 
-- **The author** ships a `prepare` script — pnpm runs it after a git install — that builds the published entry points from source, self-contained: it must not assume dev-only context such as a sibling monorepo checkout. A dedicated tsdown config can transpile `src/` without project references or type checking.
-- **The user** allowlists the build. pnpm ≥10 refuses to run a git dependency's `prepare` script until it is explicitly allowed, so the first `add` fails; `dsh` points at the fix — copy the exact package key pnpm printed into the profile's `pnpm-workspace.yaml`:
+- **作者** は `prepare` スクリプトを出荷する — pnpm が git インストール後にそれを実行する — これは公開されるエントリポイントをソースからビルドし、自己完結でなければならない。隣接するモノレポチェックアウトのような開発専用コンテキストを前提としてはならない。専用の tsdown 設定はプロジェクト参照や型チェックなしで `src/` をトランスパイルできる。
+- **ユーザー** はビルドを許可リストに入れる。pnpm ≥10 は明示的に許可されるまで git 依存関係の `prepare` スクリプトの実行を拒否するので、最初の `add` は失敗する。`dsh` が修正方法を示す。pnpm が出力した正確なパッケージキーをプロファイルの `pnpm-workspace.yaml` にコピーする:
 
   ```yaml
   allowBuilds:
     dsh-hello-plugin: true
   ```
 
-  and re-run the `add`.
+  そして `add` を再実行する。
 
-Treat that allowance as **permission to execute the package's code on your machine at install time**, outside any sandbox the agent runs under. Only allow packages whose source you trust, and pin a commit (`github:you/hello-plugin#<sha>`) so a later push cannot silently change what runs.
+その許可は、**インストール時にあなたのマシンでパッケージのコードを実行する権限** として扱う。エージェントが実行されるサンドボックスの外である。ソースを信頼するパッケージだけを許可し、コミットを固定する（`github:you/hello-plugin#<sha>`）ことで、後の push が実行内容を黙って変えられないようにする。
 
-If you would rather not ask users for the allowance, distribute built artifacts instead — neither form needs any build permission:
+ユーザーに許可を求めたくない場合は、代わりにビルド済み成果物を配布する。どちらの形式もビルド権限を必要としない:
 
-- **Publish to npm** with `lib/` built at `pnpm publish` time; `dsh plugin add your-package` then installs prebuilt code.
-- **Ship a tarball** from `pnpm pack`; users run `dsh plugin add ./hello-plugin-0.1.0.tgz`.
+- `pnpm publish` 時に `lib/` をビルドして **npm に公開する**。`dsh plugin add your-package` はビルド済みコードをインストールする。
+- `pnpm pack` から **tarball を出荷する**。ユーザーは `dsh plugin add ./hello-plugin-0.1.0.tgz` を実行する。
 
-## Next steps
+## 次のステップ
 
-- [Plugins and lifecycle](../framework/index.md) — the full plugin lifecycle
-- [CLI behavior reference](../../../../apps/cli/reference/README.md) — exact layer precedence, flags, and profile mechanics
+- [プラグインとライフサイクル](../framework/index.md) — 完全なプラグインライフサイクル
+- [CLI 動作リファレンス](../../../../apps/cli/reference/README.md) — 正確なレイヤー優先順位、フラグ、プロファイルの仕組み

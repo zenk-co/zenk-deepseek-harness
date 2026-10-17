@@ -1,47 +1,47 @@
 ---
-description: "Retrospective Session persistence types and adjacent-release changes for dsh-v0.1.5-alpha.1."
+description: "dsh-v0.1.5-alpha.1 の遡及セッション永続化型と隣接リリース変更。"
 kind: persistence-release
 ---
 
-# Persistence release: dsh-v0.1.5-alpha.1
+# 永続化リリース: dsh-v0.1.5-alpha.1
 
-English | [中文](dsh-v0.1.5-alpha.1.zh.md)
+日本語 | [English](dsh-v0.1.5-alpha.1.en.md) | [中文](dsh-v0.1.5-alpha.1.zh.md)
 
-## Summary
+## 概要
 
-The writer format advances from 2 to 3: system/message is added and EpochHeader removes system. Surface replacement fields change from start/end to startSeq/endSeq, and tool/code-dispatch event keys become tool/ptc-dispatch keys.
+ライター形式は 2 から 3 に進む。system/message が追加され、EpochHeader は system を除去する。Surface 置換フィールドは start/end から startSeq/endSeq に変わり、tool/code-dispatch イベントキーは tool/ptc-dispatch キーになる。
 
-## Table of Contents
+## 目次
 
-- [Release evidence](#evidence)
-- [Declaration](#declaration)
-- [Structural changes](#changes)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [リリース証拠](#evidence)
+- [宣言](#declaration)
+- [構造変更](#changes)
+- [検証](#verification)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="evidence"></a>
-## Release evidence
+## リリース証拠
 
-This approximate backfill supports reading and format validation; it is not a contemporaneous compatibility acknowledgement. See the [archive reference](README.md) for extraction and coverage limits.
+このおおよそのバックフィルは読み取りと形式検証を支える。同時代の互換性承認ではない。抽出と対象範囲の制限は[アーカイブリファレンス](README.md)を見る。
 
-| Item | Recorded value |
+| 項目 | 記録値 |
 |---|---|
-| Source tag | `dsh-v0.1.5-alpha.1` |
-| Source date | 2026-09-08T15:25:45.000Z |
-| Release record | Release object present. |
-| Previous release | [dsh-v0.1.3-alpha.2](dsh-v0.1.3-alpha.2.md) |
-| Session writer version | 3 |
-| Reconstructed inventory | <!-- persistence-release-inventory:start -->57 roots / 443 types<!-- persistence-release-inventory:end --> |
-| This snapshot | [dsh-v0.1.5-alpha.1.schema.json](dsh-v0.1.5-alpha.1.schema.json) |
+| ソースタグ | `dsh-v0.1.5-alpha.1` |
+| ソース日付 | 2026-09-08T15:25:45.000Z |
+| リリース記録 | Release オブジェクトあり。 |
+| 前リリース | [dsh-v0.1.3-alpha.2](dsh-v0.1.3-alpha.2.md) |
+| セッションライターバージョン | 3 |
+| 再構成目録 | <!-- persistence-release-inventory:start -->57 roots / 443 types<!-- persistence-release-inventory:end --> |
+| このスナップショット | [dsh-v0.1.5-alpha.1.schema.json](dsh-v0.1.5-alpha.1.schema.json) |
 
-Source evidence for the writer version constant at this tag:
+このタグ時点のライターバージョン定数のソース証拠。
 
 - `packages/core/session/src/types.ts`: `export const SESSION_FORMAT_VERSION = 3`
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-release
 schemaVersion: 1
@@ -88,13 +88,13 @@ changes:
 ```
 
 <a id="changes"></a>
-## Structural changes
+## 構造変更
 
 <!-- persistence-release-changes:start -->
 
-Detected 12 changed roots and 25 structural differences. The review requirement below is calculated using current rules for comparison only; it does not assert historical compliance, migration correctness, or runtime compatibility.
+12 件の変更ルートと 25 件の構造差分を検出。下のレビュー要件は比較専用の現行規則で算出し、履歴適合、移行正当性、ランタイム互換性を主張しない。
 
-| Path | Change | Review requirement |
+| パス | 変更 | レビュー要件 |
 |---|---|---|
 | `SessionEventEnvelope` | `union-variants-changed` | `review-required` |
 | `SessionHeader.version` | `type-changed` | `review-required` |
@@ -125,15 +125,15 @@ Detected 12 changed roots and 25 structural differences. The review requirement 
 <!-- persistence-release-changes:end -->
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Extraction passed canonical-graph, root-digest, and reachable-type-digest validation, permitting the original optional `surfaceOp` only for historical surface events. The in-tree check reconstructs each tag from its predecessor and verifies before/after values, snapshot coverage, and bilingual machine declarations.
+抽出は正規グラフ、ルートダイジェスト、到達可能型ダイジェストの検証に合格し、元の任意 `surfaceOp` を履歴 surface イベントに限り許可した。ツリー内検査は各タグをその先行タグから再構成し、変更前後の値、スナップショット対象範囲、バイリンガルマシン宣言を検証する。
 
 ```sh
 pnpm run verify-persistence-releases
 ```
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
-None.
+なし。

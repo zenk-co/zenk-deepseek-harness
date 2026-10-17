@@ -1,37 +1,37 @@
 ---
-description: "Keyless LLM replay plugin for snapshot tests, for test authors booting the real agent against recorded model transcripts."
+description: "スナップショットテスト用のキー不要 LLM リプレイプラグイン。記録済みモデルトランスクリプトに対して実エージェントを起動するテスト作成者向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-llm-replay
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-llm-replay` lets snapshot tests run the real agent without an API key by replaying model streams from recorded Session JSONL fixtures. Each parent and subagent session receives its recorded script in first-call order, while calls within a session advance independently. A `replay.override.json` sidecar represents pre-chunk failures, cancellation, hangs, and injected retries that durable settlements cannot reconstruct. Use it for deterministic ACP, headless, and Web browser scenarios that need real loop behavior with fixed model output.
+`dsh-llm-replay` は、記録済みの Session JSONL フィクスチャからモデルストリームをリプレイすることで、API キーなしでスナップショットテストが実エージェントを実行できるようにする。各親セッションとサブエージェントセッションは、初回呼び出し順に自身の記録済みスクリプトを受け取り、セッション内の呼び出しは独立して進む。`replay.override.json` サイドカーは、永続的な確定からは再構成できない、チャンク前の失敗、キャンセル、ハング、注入されたリトライを表現する。固定されたモデル出力で実際のループ挙動を必要とする決定論的な ACP、ヘッドレス、Web ブラウザシナリオに使用する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-This package gives a keyless test a real agent with a fixed model transcript: mount it in place of a real LLM adapter, point it at a recorded fixture, and run the scenario exactly as if the model had produced the recorded output.
+このパッケージは、固定されたモデルトランスクリプトを持つ実エージェントをキー不要テストに提供する。実際の LLM アダプターの代わりにマウントし、記録済みフィクスチャを指定し、モデルが記録済み出力を生成した場合とまったく同じようにシナリオを実行する。
 
-### Mounting it
+### マウントする
 
-Prepared callers require the routed adapter mode. Configure `models[].reasoningEfforts` from least to greatest selectable effort. Configuration functions receive that order during preparation; `defaultReasoningEffort` remains independent of the first entry.
+準備済みの呼び出し元はルーティングされたアダプターモードを必要とする。`models[].reasoningEfforts` は選択可能なエフォートの小さい順から大きい順に構成する。準備中、構成関数はその順序を受け取る。`defaultReasoningEffort` は先頭エントリーとは独立したままである。
 
-With `providers` configured, the plugin registers a replay-only adapter whose catalog is available to scenarios that exercise model discovery; without `providers`, it installs the catch-all `llm/stream` waterfall used by tests that do not need discovery:
+`providers` を構成すると、プラグインはモデル検出を試すシナリオからカタログを利用できるリプレイ専用アダプターを登録する。`providers` がない場合は、検出を必要としないテストが使用する catch-all の `llm/stream` ウォーターフォールをインストールする:
 
 ```yaml
 - id: llm-replay
@@ -55,106 +55,106 @@ With `providers` configured, the plugin registers a replay-only adapter whose ca
   # harness per scenario.
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `file` | `$DSH_SNAPSHOT_FILE` | Path to the selected primary fixture: `session.jsonl` for v0 or `session.vN.jsonl` for a positive generation; required (config or env) |
-| `overrideFile` | `$DSH_SNAPSHOT_OVERRIDE` | Optional `ReplayOverrideDoc` sidecar for the primary session |
-| `childFiles` | `$DSH_SNAPSHOT_CHILD_FILES` | Recorded subagent child-session logs for a nested scenario |
-| `providers` | — | Optional replay-only provider and model catalog; a model may declare `contextWindow`, text/image modalities, positive `imageRequestTokens` when image-capable, and `systemPromptUpdate: in-history` so a keyless scenario exercises in-history system prompt replacement; invalid values fail at load (`llm-replay: provider "…" model "…" systemPromptUpdate must be "in-history" when present`) and routes never perform provider I/O |
-| `paceMs` | — (burst) | Optional per-chunk delay in ms for genuinely incremental delivery |
+| `file` | `$DSH_SNAPSHOT_FILE` | 選択されたプライマリフィクスチャへのパス: v0 では `session.jsonl`、正の世代では `session.vN.jsonl`。必須 (設定または環境変数) |
+| `overrideFile` | `$DSH_SNAPSHOT_OVERRIDE` | プライマリセッション用の任意の `ReplayOverrideDoc` サイドカー |
+| `childFiles` | `$DSH_SNAPSHOT_CHILD_FILES` | ネストされたシナリオ用の記録済みサブエージェント子セッションログ |
+| `providers` | — | 任意のリプレイ専用プロバイダーとモデルカタログ。モデルは `contextWindow`、テキスト/画像モダリティ、画像対応時の正の `imageRequestTokens`、および履歴内システムプロンプト置換をキー不要シナリオで試せるようにする `systemPromptUpdate: in-history` を宣言できる。不正な値はロード時に失敗する (`llm-replay: provider "…" model "…" systemPromptUpdate must be "in-history" when present`)。ルートがプロバイダー I/O を実行することはない |
+| `paceMs` | — (バースト) | 真に増分的な配信を行うための、チャンクごとの任意の遅延 (ミリ秒) |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-llm-replay) is the exhaustive source for every accepted field and its JSDoc.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-llm-replay)は、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### How the fixture works
+### フィクスチャの仕組み
 
-The fixture is a projection of one selected persisted Session generation produced by running the real agent once — this plugin does not record. The snapshot harness supplies the numerically highest canonical parent path (`<scenario>/session.jsonl` for v0 or `<scenario>/session.vN.jsonl` for a positive generation), and validates filename/header agreement before replay. The fixture keeps the header and every event payload but omits body `seq`/`time` envelopes (`seq0`/`time0` for historical packed rows). Replay supplies contiguous sequences and deterministic timestamps, restores typed values replaced by snapshot tokens, rejects partial or mixed envelopes, decodes the complete physical artifact through the build-static Session format catalog, and migrates historical input in memory before it exposes events or the inherited cut; current input takes direct restoration. For a projected v0 header only, an absent `delegationDepth` denotes `0`. The parser never rewrites or renames the fixture. Runtime persistence continues to write complete logs. Replay expands the compact stream on each current-view `assistant/message` or `assistant/attempt`, so a recorded fixture replays the same logical stream the live model produced. A fixture may carry its `request/header` content tokenized to `{{system}}`/`{{tools}}`; replay materializes validation-only values, while derivation reads only Assistant settlements, marked summary events, and Session metadata. Every replay and comparison fixture must pass the same content-only catalog validation; replay never repairs a refused artifact. Comparison encoding preserves accepted catalog output, including extension request-header fields; current `header.system` is rejected. Wire-notification expected outputs compare directly with current-writer output, retaining event order, inserted system messages, wrapper fields, and opaque delivery and captured-generation values; only complete Session artifacts use the format migration catalog.
+フィクスチャは、実エージェントを一度実行して生成された、選択された 1 つの永続 Session 世代の投影である — このプラグインは記録を行わない。スナップショットハーネスは、数値上最も高い正規の親パス (`<scenario>/session.jsonl` (v0) または正の世代の `<scenario>/session.vN.jsonl`) を提供し、リプレイ前にファイル名とヘッダーの一致を検証する。フィクスチャはヘッダーとすべてのイベントペイロードを保持するが、ボディの `seq`/`time` エンベロープ (歴史的なパック行では `seq0`/`time0`) は省略する。リプレイは連続するシーケンスと決定論的なタイムスタンプを供給し、スナップショットトークンに置き換えられた型付き値を復元し、部分的または混在したエンベロープを拒否し、build-static の Session 形式カタログを通して物理アーティファクト全体をデコードし、イベントや継承カットを公開する前に歴史的な入力をメモリ内で移行する。現在の入力は直接復元される。投影された v0 ヘッダーに限り、`delegationDepth` の欠落は `0` を意味する。パーサーはフィクスチャを書き換えたり名前変更したりしない。実行時の永続化は引き続き完全なログを書き込む。リプレイは現在のビューの各 `assistant/message` または `assistant/attempt` でコンパクトストリームを展開するので、記録済みフィクスチャはライブモデルが生成したのと同じ論理ストリームをリプレイする。フィクスチャは `request/header` の内容を `{{system}}`/`{{tools}}` にトークン化して保持することがある。リプレイは検証専用の値を具体化し、派生は Assistant の確定、マークされたサマリーイベント、Session メタデータのみを読む。すべてのリプレイおよび比較フィクスチャは同じ内容のみのカタログ検証に合格しなければならない。リプレイは拒否されたアーティファクトを修復しない。比較エンコードは、拡張リクエストヘッダーフィールドを含む、受け入れられたカタログ出力を保持する。現在の `header.system` は拒否される。ワイヤ通知の期待出力は現在のライターの出力と直接比較され、イベント順序、挿入されたシステムメッセージ、ラッパーフィールド、および不透明な配信値とキャプチャされた世代の値を保持する。完全な Session アーティファクトのみが形式移行カタログを使用する。
 
-### Nested agents
+### ネストされたエージェント
 
-A scenario where a parent agent delegates to in-process subagents records one role per Session: parent `session[.vN].jsonl`, then contiguous children `session.<ordinal>[.vN].jsonl`. The snapshot harness supplies only the highest generation of each role. Live Session ids are freshly random each run, so replay binds each live Session to a recorded script by first-call order: the first live Session to make a model call claims the parent script, the next new Session the next child script, and so on, with each Session advancing its own cursor. More distinct live Sessions than recorded scripts fails loud.
+親エージェントがインプロセスサブエージェントに委任するシナリオは、Session ごとに 1 つの役割を記録する: 親の `session[.vN].jsonl`、続いて連続する子の `session.<ordinal>[.vN].jsonl` である。スナップショットハーネスは各役割の最も高い世代のみを提供する。ライブ Session ID は実行ごとに新しくランダムになるため、リプレイは各ライブ Session を初回呼び出し順に記録済みスクリプトに束縛する: 最初にモデル呼び出しを行うライブ Session が親スクリプトを要求し、次の新しい Session が次の子スクリプトを要求し、以降も同様で、各 Session は自身のカーソルを進める。記録済みスクリプトより多くの異なるライブ Session が存在する場合は明確に失敗する。
 
-### Failure modes and overrides
+### 失敗モードとオーバーライド
 
-When replay serves `deepseek-official` with `ctx.deepseekLlmApiExtensions`, it prepares and accepts those fields after selecting a valid script entry and before yielding the first chunk. This mirrors the live adapter's post-2xx commit point, so durable acceptance watermarks and SDK event notifications behave the same in recording and replay. Replay supplies a synthetic `{ messages: [] }` base body: it proves acceptance side effects, not prepared field bytes.
+リプレイが `ctx.deepseekLlmApiExtensions` を伴って `deepseek-official` にサービスを提供する場合、有効なスクリプトエントリーを選択した後、最初のチャンクを yield する前にそれらのフィールドを準備して受け入れる。これはライブアダプターの 2xx 後のコミットポイントを反映するので、永続的な受け入れウォーターマークと SDK イベント通知は記録時とリプレイ時で同じように動作する。リプレイは合成の `{ messages: [] }` ベースボディを供給する。これは受け入れの副作用を証明するものであり、準備されたフィールドのバイト列を証明するものではない。
 
-Two failure modes are not reconstructable from a durable Assistant settlement alone: a pure throw before any chunk has no exception-bearing stream member, and a cancel/hang requires nontermination rather than a replayed finite prefix. A scenario that needs those supplies an optional sidecar (`<scenario>/replay.override.json`) that either replaces the derived script with a bare `ReplayEntry[]` or augments it with `{ patches: [{ at, entry }] }`, which keeps every derived call and swaps the named 0-based call indexes; `at` equal to the derived length appends the retry attempt after an injected transient throw. A `throw` entry accepts DeepSeek request extensions when it has prefix chunks; a zero-chunk throw defaults to pre-2xx non-acceptance and may set `accepted: true` for a post-2xx failure. A `hang` entry may name `readyFile`, which replay writes before waiting for cancellation so an external driver can cancel deterministically.
+2 つの失敗モードは、永続的な Assistant の確定だけからは再構成できない: チャンク前の純粋な throw には例外を運ぶストリームメンバーがなく、キャンセル/ハングはリプレイされる有限のプレフィックスではなく非終了を必要とする。これらを必要とするシナリオは任意のサイドカー (`<scenario>/replay.override.json`) を用意する。これは派生スクリプトを裸の `ReplayEntry[]` で置き換えるか、または `{ patches: [{ at, entry }] }` で拡張する。後者はすべての派生呼び出しを保持したまま、指定された 0 始まりの呼び出しインデックスを差し替える。派生長と等しい `at` は、注入された一時的な throw の後にリトライ試行を追加する。`throw` エントリーは、プレフィックスチャンクを持つ場合に DeepSeek リクエスト拡張を受け入れる。ゼロチャンクの throw は既定で 2xx 前の非受け入れとなり、2xx 後の失敗に対しては `accepted: true` を設定できる。`hang` エントリーは `readyFile` を指定でき、リプレイはキャンセルを待つ前にこれを書き込むので、外部ドライバーが決定論的にキャンセルできる。
 
-### What can go wrong
+### 何がうまくいかないことがあるか
 
-- **The fixture is not fully consumed** — `assertConsumed()` at teardown turns a scenario that silently drove fewer model calls than recorded into a crisp diagnostic; call it when installing replay directly in a test.
-- **An unrecorded session makes a call** — replay fails loud and tells you to re-record the scenario.
-- **A scripted placeholder matches nothing** — `{{fromRequest:<regex>}}` resolution validates the pattern and the request corpus and fails loud on no match, an invalid pattern, or an unterminated placeholder.
+- **フィクスチャが完全に消費されない** — ティアダウン時の `assertConsumed()` は、記録より少ないモデル呼び出ししか駆動しなかったシナリオを明快な診断に変える。テストにリプレイを直接インストールする場合はこれを呼び出す。
+- **記録されていないセッションが呼び出しを行う** — リプレイは明確に失敗し、シナリオを再記録するよう促す。
+- **スクリプト化されたプレースホルダーが何にもマッチしない** — `{{fromRequest:<regex>}}` の解決はパターンとリクエストコーパスを検証し、マッチなし、不正なパターン、未終端のプレースホルダーで明確に失敗する。
 
-Isolated transcript extraction supplies an explicit empty child-fact set to V3→V4. It retains recorded catalog entries but does not discover related files. Complete historical parent catalog migration belongs to JSONL persistence.
+分離されたトランスクリプト抽出は、V3→V4 に明示的な空の子ファクト集合を供給する。記録済みカタログエントリーは保持するが、関連ファイルの探索は行わない。完全な歴史的親カタログの移行は JSONL 永続化の責務である。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design of the replay plugin; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではリプレイプラグインの設計を説明する。観察可能な挙動は[このパッケージを使う](#use-this-package)で完全に説明されている。
 
-### Design
+### 設計
 
-Replay treats the selected projected Session generation as the fixture. One parser completes projected envelopes, validates and migrates the whole artifact through `sessionFormatCatalog`, and returns the current header, inherited cut, and event list as one result. `deriveReplayScript` expands each `assistant/message` or `assistant/attempt` stream in log order, so each durable settlement becomes one `chunks` entry; a non-empty stream without a `finish` chunk is the fingerprint of a thrown `stream()` and must be expressed through an override sidecar. A `compaction/summary` carrying `llmStreamCall: true` and a complete `rawOutput` replays as one canonical successful stream at that event's position. Scripted strings may embed `{{fromRequest:<regex>}}`; at stream time each placeholder resolves against the live request's string leaves, taking the pattern's last match and its first capture group (or the whole match) in place.
+リプレイは、選択された投影済み Session 世代をフィクスチャとして扱う。1 つのパーサーが投影されたエンベロープを完成させ、`sessionFormatCatalog` を通してアーティファクト全体を検証・移行し、現在のヘッダー、継承カット、イベントリストを 1 つの結果として返す。`deriveReplayScript` は各 `assistant/message` または `assistant/attempt` ストリームをログ順に展開するので、各永続確定は 1 つの `chunks` エントリーになる。`finish` チャンクを持たない非空ストリームは throw された `stream()` の指紋であり、オーバーライドサイドカーで表現しなければならない。`llmStreamCall: true` と完全な `rawOutput` を持つ `compaction/summary` は、そのイベントの位置で 1 つの正規の成功ストリームとしてリプレイされる。スクリプト化された文字列は `{{fromRequest:<regex>}}` を埋め込むことができ、ストリーム時に各プレースホルダーはライブリクエストの文字列リーフに対して解決され、パターンの最後のマッチとその最初のキャプチャグループ (またはマッチ全体) をその場で取る。
 
-The [committed-corpus test](tests/session-format-corpus.spec.ts) restores each versioned `session*.jsonl` under `snapshots/`, `packages/`, and `scripts/snapshots/python-sdk-single-exe/` through the real catalog without changing source bytes. Its [inventory](tests/session-format-corpus-inventory.ts) pins deliberate historical refusals by path, source generation, error type, and exact reason; a refusal that disappears or changes fails. Current-generation artifacts cannot receive an exception. Headerless snapshot-harness protocol examples have a separate explicit exemption. All other restoration errors fail with the artifact path; historical files remain unchanged, and native current fixtures require owner correction.
+[コミット済みコーパステスト](tests/session-format-corpus.spec.ts)は、`snapshots/`、`packages/`、`scripts/snapshots/python-sdk-single-exe/` 配下の各バージョン付き `session*.jsonl` を、ソースバイトを変更せずに実カタログを通して復元する。その[インベントリ](tests/session-format-corpus-inventory.ts)は、意図的な歴史的拒否をパス、ソース世代、エラー型、正確な理由で固定する。拒否が消えたり変わったりすれば失敗する。現在世代のアーティファクトは例外を受け取ることができない。ヘッダーレスのスナップショットハーネスプロトコル例には別個の明示的な免除がある。その他すべての復元エラーはアーティファクトパスを伴って失敗する。歴史的ファイルは変更されないままであり、ネイティブの現在フィクスチャはオーナーによる修正を必要とする。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Types, fixture derivation, override validation, placeholder resolution, session binding, `installLlmReplay`, and the plugin export |
-| [`tests/session-format-corpus.spec.ts`](tests/session-format-corpus.spec.ts) | Committed-generation restoration and exact historical refusal checks |
+| [`src/index.ts`](src/index.ts) | 型、フィクスチャ派生、オーバーライド検証、プレースホルダー解決、セッションバインディング、`installLlmReplay`、およびプラグインエクスポート |
+| [`tests/session-format-corpus.spec.ts`](tests/session-format-corpus.spec.ts) | コミット済み世代の復元と正確な歴史的拒否のチェック |
 
-### Binding and stream flow
+### バインディングとストリームフロー
 
-`installLlmReplay` loads the ordered scripts, then installs either a routed replay adapter (when `providers` is non-empty) or a catch-all `llm/stream` waterfall listener. Each live `stream()` call is keyed by its calling session id: a new session claims the next unclaimed script (parent first, because it streams before it can delegate), and calls without a `sessionId` share one anonymous session bound to the primary script. The returned `ReplayHandle` carries a disposer for HMR safety and `assertConsumed()`, which throws unless every recorded script bound to a live session and every bound cursor drained.
+`installLlmReplay` は順序付きスクリプトをロードし、次にルーティングされたリプレイアダプター (`providers` が空でない場合) または catch-all の `llm/stream` ウォーターフォールリスナーのいずれかをインストールする。各ライブ `stream()` 呼び出しは呼び出し元セッション ID でキー付けされる: 新しいセッションは次の未請求スクリプトを要求し (親が最初である — 親は委任できるようになる前にストリームを流すため)、`sessionId` のない呼び出しはプライマリスクリプトに束縛された 1 つの匿名セッションを共有する。返される `ReplayHandle` は HMR 安全のためのディスポーザーと `assertConsumed()` を持つ。後者は、ライブセッションに束縛されたすべての記録済みスクリプトが束縛され、すべての束縛カーソルが排出されていない限り throw する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the replay adapter to the harness that records fixtures and the loop that consumes streams.
+パッケージレベルの契約では足りないときにこれらのページを読む。リプレイアダプターから、フィクスチャを記録するハーネス、そしてストリームを消費するループへと進む。
 
-- [session-snapshot](../session-snapshot/README.md) — the snapshot support that records fixtures and drives replay, record, and refresh modes.
-- [LLM package](../../llm/llm/README.md) — the provider stream contract and adapter registry replay implements.
-- [Testing policy](../../../docs/testing.md) — the keyless snapshot tier and when it is required.
-- [Test-support group map](../README.md) — sibling harnesses and support packages.
+- [session-snapshot](../session-snapshot/README.md) — フィクスチャを記録し、replay、record、refresh モードを駆動するスナップショットサポート。
+- [LLM package](../../llm/llm/README.md) — リプレイが実装するプロバイダーストリーム契約とアダプターレジストリ。
+- [Testing policy](../../../docs/testing.md) — キー不要スナップショット層と、それが必須となる条件。
+- [Test-support group map](../README.md) — 兄弟ハーネスとサポートパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this keyless test adapter sends no request to a provider model; it only replays recorded assistant chunks into the test loop.
+なし。このキー不要テストアダプターはプロバイダーモデルにリクエストを送らず、記録済みのアシスタントチャンクをテストループにリプレイするだけである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てることも送信することもない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when replay cannot stand in for a live model. They are current package constraints, not a task backlog.
+これらの制限は、リプレイがライブモデルの代わりになれない条件を定義する。これらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **First-call-order script binding assumes sequential delegation** — a cut that runs sibling subagents concurrently would bind live sessions to recorded scripts non-deterministically; a stronger keying is deferred until such a scenario exists.
-- **Only ordinary loop chunks and marked local compaction outputs are derivable** — a pure pre-chunk throw, a cancel/hang, or an unmarked external summarizer call needs the `replay.override.json` sidecar; replacement and patch forms affect only the primary session, and child scripts still derive from their logs.
+- **初回呼び出し順のスクリプトバインディングは逐次委任を前提とする** — 兄弟サブエージェントを並行実行するカットは、ライブセッションを記録済みスクリプトに非決定論的に束縛することになる。より強いキー付けは、そのようなシナリオが存在するまで先送りされる。
+- **派生できるのは通常のループチャンクとマーク付きローカルコンパクション出力のみ** — チャンク前の純粋な throw、キャンセル/ハング、マークされていない外部要約呼び出しには `replay.override.json` サイドカーが必要である。置換形式とパッチ形式はプライマリセッションにのみ影響し、子スクリプトは引き続き自身のログから派生する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

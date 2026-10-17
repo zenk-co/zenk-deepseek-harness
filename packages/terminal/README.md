@@ -1,53 +1,53 @@
 ---
-description: "Package map for the persistent terminal service and the shell backend that starts interactive bash or pwsh."
+description: "永続ターミナルサービスと、対話的な bash または pwsh を起動するシェルバックエンドのパッケージマップ。"
 kind: "package-group"
 ---
 
-# terminal/ — persistent PTY capability family
+# terminal/ — 永続 PTY ケイパビリティファミリー
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `terminal/` family lets agents keep interactive shell and REPL sessions alive across tool calls, including the working directory, environment variables, and running child processes. Use `terminal/` for owner-isolated session management, `terminal-bash/` for sandboxed interactive bash or pwsh sessions. Choose this family when a task needs interactive input or state that a one-shot bash command cannot retain. Sessions remain local to one harness process and do not survive a restart.
+`terminal/` ファミリーにより、エージェントは作業ディレクトリー、環境変数、動作中の子プロセスを含め、対話的なシェルや REPL セッションをツール呼び出しをまたいで存続させられる。所有者分離のセッション管理には `terminal/`、サンドボックス化された対話的 bash または pwsh セッションには `terminal-bash/` を使う。対話入力やワンショット bash コマンドに残せない状態が必要なタスクではこのファミリーを選ぶこと。セッションは1つのハーネスプロセスにローカルであり、再起動を超えて存続しない。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-This group contains one session service and one shell backend. Each child README owns the full contract; the subsystem reference owns the shared vocabulary and the generated service surface.
+このグループは1つのセッションサービスと1つのシェルバックエンドを含む。完全な契約は子 README が所有し、共有語彙と生成サービスサーフェイスはサブシステムリファレンスが所有する。
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`terminal/`](terminal/README.md) | Session service: owner-scoped sessions with opaque ids, exact-owner fencing, and awaited cleanup | `ctx.terminals` |
-| [`terminal-bash/`](terminal-bash/README.md) | Shell backend: interactive bash or pwsh under the shared sandbox policy, with readiness detection and bounded output | registers a backend on `ctx.terminals` |
+| [`terminal/`](terminal/README.md) | セッションサービス: 所有者スコープのセッション、不透明 ID、厳密な所有者フェンシング、待機付きクリーンアップ | `ctx.terminals` |
+| [`terminal-bash/`](terminal-bash/README.md) | シェルバックエンド: 共有サンドボックスポリシー下での対話的 bash または pwsh、準備完了検出と有界出力 | `ctx.terminals` 上にバックエンドを登録する |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Start with the subsystem reference for the shared types and the service surface, then the Agent Note for the design rationale and deferred boundaries.
+共有型とサービスサーフェイスはサブシステムリファレンスから、設計根拠と延期された境界は Agent Note から読み進めること。
 
-- [Terminal subsystem reference](../../docs/subsystems/terminal.md) — ids, backend and session contracts, send readiness, bounded reads, and the generated `ctx.terminals` API.
-- [Persistent PTY Agent Note](../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — the design decision, alternatives, and deferred work.
-- [Capability seams](../../docs/capability-seams.md) — the Service Definition / Service Provider / Consumer split this family follows.
+- [Terminal サブシステムリファレンス](../../docs/subsystems/terminal.md) — ID、バックエンドとセッションの契約、send readiness、有界読み取り、生成済み `ctx.terminals` API。
+- [永続 PTY Agent Note](../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — 設計判断、代替案、将来の課題。
+- [ケイパビリティシーム](../../docs/capability-seams.md) — このファミリーが従う Service Definition / Service Provider / Consumer 分割。
 
-See [`tool-terminal`](../experimental/tool-terminal/README.md) for the experimental optional capability.
+[実験的なオプショナルケイパビリティ](../experimental/tool-terminal/README.md) の [`tool-terminal`](../experimental/tool-terminal/README.md) も参照すること。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

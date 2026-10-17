@@ -5,13 +5,13 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-session-title-first-prompt-llm
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-session-title-first-prompt-llm` summarizes the first eligible human message through `ctx.llm` as an optional `ctx.sessionTitle` provider. It registers the `first-prompt` cadence, runs automatically only when a fresh non-fork session first creates its fallback, and attributes the result to that message's exact seq. An automatic failure retains the fallback and is retried only through `ctx.sessionTitle.refresh()`. The plugin owns its system instruction, JSON framing, and output parsing; it shares only the [execution module](../session-title-llm/README.md) from `dsh-session-title-llm` with the all-prompts provider. Automatic behavior and configuration come first; the implementation is a small provider strategy over that executor.
+`dsh-session-title-first-prompt-llm` は、任意の `ctx.sessionTitle` プロバイダーとして `ctx.llm` 経由で最初の対象人間メッセージを要約します。`first-prompt` ケイデンスを登録し、新規の非フォークセッションがフォールバックを初めて作成するときのみ自動実行し、結果をそのメッセージの正確な seq に帰属させます。自動失敗ではフォールバックを保持し、`ctx.sessionTitle.refresh()` からのみ再試行します。このプラグインはシステム命令、JSON フレーミング、出力解析を所有し、`dsh-session-title-llm` から all-prompts プロバイダーと共有するのは[実行モジュール](../session-title-llm/README.md)のみです。自動動作と設定を先に説明し、実装はそのエグゼキューター上の小さなプロバイダー戦略です。
 
-## Table of Contents
+## 目次
 
 - [Use this package](#use-this-package)
 - [Understand the implementation](#understand-the-implementation)
@@ -23,45 +23,45 @@ English | [中文](README.zh.md)
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-Mount this plugin beside the title service when a session should be titled from its first eligible human message. It requires its own `targetWords` and `targetCjkCharacters` plus the shared [execution controls](../session-title-llm/README.md#configuration), all with no defaults.
+セッションに最初の対象人間メッセージからタイトルを付ける場合、タイトルサービスと並べてこのプラグインをマウントします。共有の[実行制御](../session-title-llm/README.md#configuration)に加え、独自の `targetWords` と `targetCjkCharacters` が必要で、いずれにも既定値はありません。
 
-### When titles are generated
+### タイトルが生成されるタイミング
 
-Automatic generation runs only for a fresh session with no parent and no prior title: after its first eligible human message, the fallback is created and one auxiliary request summarizes that message. Later prompts, explicit user renames, and inherited fork history do not trigger another automatic call. An automatic failure keeps the fallback; `ctx.sessionTitle.refresh()` is the explicit retry. Forks keep their inherited title and never run this provider automatically, even when their seeded first message came from the parent.
+自動生成は、親がなく prior タイトルもない新規セッションでのみ実行されます。最初の対象人間メッセージの後、フォールバックが作成され、そのメッセージを要約する 1 回の補助リクエストが実行されます。以降のプロンプト、明示的なユーザーによる改名、継承したフォーク履歴では別の自動呼び出しは起動しません。自動失敗ではフォールバックを保持し、明示的な再試行は `ctx.sessionTitle.refresh()` です。フォークは継承タイトルを保持し、シードされた最初のメッセージが親由来であってもこのプロバイダーを自動実行しません。
 
-### Configuration
+### 設定
 
-The plugin requires `targetWords` and `targetCjkCharacters` plus the shared [execution controls](../session-title-llm/README.md#configuration): `maxInputBytes`, `maxOutputTokens`, `timeoutMs`, and the optional paired `provider`/`model` route. Omit both to inherit the exact route from the current logged main request, or set both to route title generation independently. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-session-title-first-prompt-llm) is the exhaustive source for every accepted field.
+このプラグインは `targetWords` と `targetCjkCharacters` に加え、共有の[実行制御](../session-title-llm/README.md#configuration)が必要です。`maxInputBytes`、`maxOutputTokens`、`timeoutMs`、および任意のペア `provider`/`model` ルートです。両方を省略すると記録済みメインリクエストの正確なルートを継承し、両方を設定するとタイトル生成を独立にルーティングします。生成済みの[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-session-title-first-prompt-llm)が受け付ける全フィールドの網羅的な情報源です。
 
-### Failures and recovery
+### 失敗と回復
 
-A generation that fails — a missing route before any main request, input over `maxInputBytes`, timeout, cancellation, or invalid model output — warns and keeps the current title; only an explicit `refresh()` retries. Automatic work adds no tokens and no latency to the main agent request.
+生成が失敗した場合 — メインリクエスト前のルート欠落、`maxInputBytes` 超過の入力、タイムアウト、キャンセル、無効なモデル出力 — は警告して現在のタイトルを保持し、明示的な `refresh()` のみが再試行します。自動処理はメインエージェントリクエストにトークンも遅延も加えません。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-This section explains the plugin's shape; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節ではプラグインの形状を説明します。観測可能な動作はすべて [Use this package](#use-this-package) で扱っています。
 
-### Design concept
+### 設計概念
 
-A small provider strategy: it builds the first-message system instruction and JSON input, parses the assembled response into a title, and delegates only route, bounds, cancellation, logging, and assembly to the [shared execution module](../session-title-llm/README.md).
+小さなプロバイダー戦略です。最初のメッセージ用システム命令と JSON 入力を構築し、組み立て済み応答をタイトルに解析し、ルート、バウンド、キャンセル、ログ記録、組み立てのみを[共有実行モジュール](../session-title-llm/README.md)に委譲します。
 
-### Source map
+### ソースマップ
 
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: config schema, first-message prompt and framing, output parsing, and direct provider registration |
 
-### Scheduling
+### スケジューリング
 
-The title service schedules automatic work: for the `first-prompt` cadence it starts a revision only when the session has no parent, holds exactly one eligible message, and has no title yet; the provider call begins after the exact main-request route is logged, and a newer revision supersedes older work.
+タイトルサービスは自動処理をスケジュールします。`first-prompt` ケイデンスでは、セッションに親がなく、対象メッセージをちょうど 1 件保持し、まだタイトルがない場合のみリビジョンを開始します。プロバイダー呼び出しは正確なメインリクエストルートが記録された後に始まり、新しいリビジョンが古い処理に取って代わります。
 
 </details>
 
@@ -70,44 +70,44 @@ The title service schedules automatic work: for the `first-prompt` cadence it st
 <a id="further-exploration"></a>
 ## Further Exploration
 
-Read these pages when the provider contract is not enough. They move from the shared execution module to the alternative cadence and the service it plugs into.
+プロバイダー契約だけでは足りない場合にこれらのページを読んでください。共有実行モジュールから代替ケイデンス、そしてそれが差し込まれるサービスへ進みます。
 
-- [Shared LLM execution module](../session-title-llm/README.md) — the execution module this provider uses.
-- [All-messages title provider](../../experimental/session-title-all-prompts-llm/README.md) — the cadence that retitles after every new prompt.
-- [Session title service](../session-title/README.md) — fallback behavior, rename, refresh, and provider registration.
-- [Session package map](../README.md) — adjacent persistence, projection, title, and telemetry packages.
+- [Shared LLM execution module](../session-title-llm/README.md) — このプロバイダーが使う実行モジュール。
+- [All-messages title provider](../../experimental/session-title-all-prompts-llm/README.md) — 新しいプロンプトごと改題するケイデンス。
+- [Session title service](../session-title/README.md) — フォールバック動作、改名、更新、プロバイダー登録。
+- [Session package map](../README.md) — 隣接する永続化、プロジェクション、タイトル、テレメトリーパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### First-message title request
+### 最初のメッセージのタイトルリクエスト
 
-#### What the model sees
+#### モデルが見るもの
 
-The title model receives this provider's title instruction and a JSON array containing only the first eligible human message; it never receives a `currentTitle`. Later prompts and inherited fork history do not trigger another automatic call.
+タイトルモデルは、このプロバイダーのタイトル命令と、最初の対象人間メッセージのみを含む JSON 配列を受け取ります。`currentTitle` は受け取りません。以降のプロンプトや継承したフォーク履歴では別の自動呼び出しは起動しません。
 
-#### Token effect
+#### トークン効果
 
-At most one automatic auxiliary request is made for a fresh session, bounded by `maxInputBytes` and `maxOutputTokens`; explicit refreshes may make additional calls. It selects the route's least supported reasoning effort, or leaves effort unspecified when the route exposes none. The main agent request gains zero tokens.
+新規セッションにつき自動補助リクエストは最大 1 回で、`maxInputBytes` と `maxOutputTokens` で制限されます。明示的な更新では追加呼び出しが発生することがあります。ルートのサポートが最も弱い reasoning effort を選択し、ルートが何も公開しない場合は effort を未指定のままにします。メインエージェントリクエストのトークンはゼロ増です。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-No main-request invalidation. The auxiliary request uses the configured or logged route and has provider-specific cache behavior.
+メインリクエストの無効化はありません。補助リクエストは設定または記録済みルートを使い、プロバイダー固有のキャッシュ動作になります。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this provider stops representing the session. They are current package constraints.
+これらの制限は、このプロバイダーがセッションを表さなくなる条件を定めます。これらは現行パッケージの制約です。
 
-- **First message may go stale** — the first message alone may cease to represent a long-running session; use the all-messages provider when later prompts should retitle it.
-- **Forks never retitle automatically** — a fork keeps its inherited title and never runs this provider automatically, even when its seeded first message came from the parent.
+- **First message may go stale** — 最初のメッセージだけでは長期実行セッションを表さなくなることがあります。以降のプロンプトで改題すべき場合は all-messages プロバイダーを使ってください。
+- **Forks never retitle automatically** — フォークは継承タイトルを保持し、シードされた最初のメッセージが親由来であってもこのプロバイダーを自動実行しません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

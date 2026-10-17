@@ -1,20 +1,20 @@
-# Git Worktrees
+# Git ワークツリー
 
-English | [中文](worktrees.zh.md)
+日本語 | [English](worktrees.en.md) | [中文](worktrees.zh.md)
 
-The experimental [`dsh-experimental-worktree`](../../packages/experimental/worktree/README.md) service provides `ctx.worktrees`. Its [`create_worktree`](../../packages/experimental/tool-worktree/README.md) consumer creates a new Git branch and checkout, then selects it through the [working-directory service](working-directory.md). The [Git Worktrees optional bundle](../../packages/experimental/tool-worktree/README.md#use-this-package) loads both packages through the GUI plugin manager. It ships switched off; explicit compositions can also mount the two packages.
+実験的な [`dsh-experimental-worktree`](../../packages/experimental/worktree/README.md) サービスは `ctx.worktrees` を提供する。その [`create_worktree`](../../packages/experimental/tool-worktree/README.md) コンシューマーは新しい Git ブランチとチェックアウトを作成し、次に[作業ディレクトリサービス](working-directory.md)を通じてそれを選択する。[Git ワークツリー任意バンドル](../../packages/experimental/tool-worktree/README.md#use-this-package)は両パッケージを GUI プラグインマネージャー経由で読み込む。出荷時は無効であり、明示的な構成でも 2 つのパッケージをマウントできる。
 
-## Creation and retention
+## 作成と保持
 
-The calling Session's current directory selects the source repository. Creation pins the requested local commit, branch, or tag before allocating the checkout; omission selects `HEAD`. Each name must identify a new branch and an unused checkout path. The operation neither fetches missing objects nor copies staged, unstaged, untracked, or ignored files from the source checkout.
+呼び出しセッションの現在ディレクトリがソースリポジトリを選択する。作成はチェックアウト割り当て前に要求されたローカルコミット、ブランチ、タグを固定する。省略時は `HEAD` を選択する。各名前は新しいブランチと未使用チェックアウトパスを特定しなければならない。操作は欠落オブジェクトの取得も、ソースチェックアウトからのステージ済み・未ステージ・未追跡・無視ファイルのコピーも行わない。
 
-The default destination is `<current checkout root>/.agents/worktrees/<name>`. `repositoryRoot` is the top-level directory of the caller’s current checkout; a linked checkout therefore contains its own pool. The service writes a `.gitignore` containing `*` and a trailing newline only when its allocation creates the configured pool directory. Existing files and ignore rules are preserved. The calling Session’s existing sandbox policy must permit writes to the destination and shared Git administration directory. Successful Git setup precedes the working-directory change.
+既定の宛先は `<現在のチェックアウトルート>/.agents/worktrees/<name>` である。`repositoryRoot` は呼び出し元の現在チェックアウトの最上位ディレクトリである。したがってリンクされたチェックアウトは独自プールを含む。サービスは、設定されたプールディレクトリを割り当て作成した場合にのみ `*` と末尾改行を含む `.gitignore` を書き込む。既存ファイルと無視規則は保全される。呼び出しセッションの既存サンドボックスポリシーは宛先と共有 Git 管理ディレクトリへの書き込みを許可しなければならない。正常な Git 設定が作業ディレクトリ変更に先行する。
 
-Leaving through `working_directory({ cd: path })` retains the checkout and branch. Cancellation or failure can also retain partial artifacts; the error identifies their location. The service aborts and drains pending operations on disposal. The [package README](../../packages/experimental/worktree/README.md) owns configuration and Git requirements.
+`working_directory({ cd: path })` による退出はチェックアウトとブランチを保持する。取り消しや失敗も部分成果物を残し得る。エラーはその場所を特定する。サービスは破棄時に保留操作を中止して排出する。[パッケージ README](../../packages/experimental/worktree/README.md)は設定と Git 要件を所有する。
 
-## Request and result
+## 要求と結果
 
-The request selects only the new name and local revision. The result identifies the created checkout and exact commit; it does not change the Session's original project or write permissions.
+要求は新しい名前とローカルリビジョンのみを選択する。結果は作成されたチェックアウトと正確なコミットを特定する。セッションの元プロジェクトや書き込み権限は変えない。
 
 ```ts type-equiv
 /** A new checkout from a locally available Git commit, branch, or tag. */
@@ -46,13 +46,13 @@ interface CreatedWorktree {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される(doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。再生成は `pnpm run gen-cordis-catalog`)。言語版の違いは、ロケール固有のペアドキュメントパスのみである。シグネチャブロックは `ts cordis-catalog` フェンスを使用し、元のソース JSDoc を保持する。ディスパッチモードは [primer](../cordis-primer.md#dispatch-modes) で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxworktrees--worktreeservice"></a>
 
 ### `ctx.worktrees` — `WorktreeService`
 
-Creates retained Git worktrees under the mounted filesystem and sandbox providers.
+マウントされたファイルシステムとサンドボックスプロバイダーの下に保持される Git ワークツリーを作成する。
 
 ```ts cordis-catalog
 /**
@@ -70,7 +70,7 @@ Creates retained Git worktrees under the mounted filesystem and sandbox provider
 async create(agent: Agent, request: CreateWorktreeRequest = {}, signal?: AbortSignal): Promise<CreatedWorktree>
 ```
 
-Types: [Agent](core.md)
+型: [Agent](core.md)
 
-Source: [`packages/experimental/worktree/src/index.ts`](../../packages/experimental/worktree/src/index.ts)
+ソース: [`packages/experimental/worktree/src/index.ts`](../../packages/experimental/worktree/src/index.ts)
 <!-- END GENERATED cordis-surface -->

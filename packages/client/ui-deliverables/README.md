@@ -1,130 +1,130 @@
 ---
-description: "Changed files, deliveries, and clickable file references for the Web GUI: the changed-files card and delivery cards a finished turn ends with, the review tab that compares each changed file, and inline-code links in the closing prose; for users and maintainers of the deliverables experience."
+description: "Web GUI の変更ファイル、受け渡し、クリック可能なファイル参照: 完了したターンが最後に表示する変更ファイルカードと受け渡しカード、各変更ファイルを比較するレビュータブ、締めの散文のインラインコードリンク。deliverables 体験のユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-deliverables
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package renders the changed-files card a finished turn ends with — the files the turn changed, with the Host's line counts, each opening the turn's review tab on that file — plus cards for explicitly delivered files, and links matching inline-code references in the closing prose so a mentioned file opens in the right Sidebar. Listed and linked paths come from the recorded summary, successful mutations, and explicit deliveries, never from the prose. Only the shipped Web patch loads this package; removing its cordis.yml entry removes the guidance, cards, and prose links together.
+このパッケージは、完了したターンが最後に表示する変更ファイルカードをレンダリングする。すなわち、そのターンが変更したファイルを Host の行数付きで示し、各行がそのファイル上でそのターンのレビュータブを開くカードである。加えて、明示的に受け渡しされたファイルのカードと、締めの散文にあるインラインコード参照に一致するリンクをレンダリングし、言及されたファイルが右側の Sidebar で開かれるようにする。一覧表示とリンクの対象パスは、記録されたサマリー、成功した変更、明示的な受け渡しから来るのであり、決して散文からではない。出荷済みの Web パッチだけがこのパッケージをロードする。cordis.yml のエントリーを削除すると、ガイダンス、カード、散文リンクがまとめて削除される。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin alongside `ui-conversation` and the Host [workspace-changes](../../deliverables/workspace-changes/README.md) plugin; a finished turn then ends with the changed-files card between the closing message's body and its action footer. Without a served summary — a turn that changed no file, the plugin composed out, or a Host restarted since the turn ran — the card is absent and only deliveries and prose links remain; outside a git repository the summary lists file-tool edits only.
+このプラグインを `ui-conversation` と Host 側の [workspace-changes](../../deliverables/workspace-changes/README.md) プラグインとともにマウントすると、完了したターンは締めのメッセージ本体とそのアクションフッターの間の変更ファイルカードで終わる。提供されるサマリーがない場合（ファイルを変更しなかったターン、プラグインが構成から外された場合、そのターン実行後に Host が再起動された場合）はカードがなく、受け渡しと散文リンクだけが残る。git リポジトリ外では、サマリーはファイルツールの編集のみを列挙する。
 
-Changed-file and delivery entry cards and hover previews follow the [R16 preview-card rule](../../../docs/ui-radius.md#radius-scale); their file-icon tiles use the same rule’s R10 exception. Each retains the same contour on hover.
+変更ファイルと受け渡しのエントリーカードおよびホバープレビューは [R16 プレビューカード規則](../../../docs/ui-radius.md#radius-scale)に従う。それらのファイルアイコンタイルは同規則の R10 例外を使う。それぞれはホバー時も同じ輪郭を保つ。
 
 <a id="explicit-deliveries"></a>
-### Explicit deliveries
+### 明示的な受け渡し
 
-The `present` tool's preparing stage is one non-expandable document-icon row. It does not show filenames, create delivery cards, or enable file actions before the recorded call supplies arguments.
+`present` ツールの準備段階は、展開できないドキュメントアイコンの 1 行である。記録された呼び出しが引数を供給するまで、ファイル名を表示せず、受け渡しカードを作成せず、ファイルアクションを有効にしない。
 
-The Web `standard`, `ptc`, and `cordis` presets expose `present` for final files accessible through the Session filesystem, including files created through Bash. Call it with `files: [{ path, description? }]` after creating the files. The [present tool](../../deliverables/tool-present/README.md) owns file-count limits and Session declarations. A single delivery fills the row; multiple deliveries form a two-column grid, collapsed after four files. Cards show the basename, description or file type, and a shared native opening control. Delivery and changed-file icon tiles use white at 50% opacity in the light theme and 5% in the dark theme. Icon tiles and single-file changed cards use the same border as delivery cards. Clicking the card previews the file in the right Sidebar. The control opens the default application and lists associated applications, with file reveal last. Matching inline-code references also open Sidebar previews. Duplicate declarations use the last description before the closing reply.
+Web の `standard`、`ptc`、`cordis` プリセットは、Bash を通じて作成されたファイルを含め、セッションのファイルシステムを通じてアクセス可能な最終ファイルのために `present` を公開する。ファイルを作成した後に `files: [{ path, description? }]` で呼び出す。[present ツール](../../deliverables/tool-present/README.md)がファイル数の制限とセッション宣言を所有する。単一の受け渡しは 1 行を占め、複数の受け渡しは 2 列グリッドを形成し、4 ファイルを超えると折りたたまれる。カードはベース名、説明またはファイル種別、および共有のネイティブオープンコントロールを表示する。受け渡しと変更ファイルのアイコンタイルは、ライトテーマでは不透明度 50% の白、ダークテーマでは 5% を使う。アイコンタイルと単一ファイルの変更カードは、受け渡しカードと同じボーダーを使う。カードをクリックすると右の Sidebar でファイルがプレビューされる。コントロールは既定のアプリケーションを開き、関連付けられたアプリケーションを一覧表示し、ファイルの表示（reveal）が最後に来る。一致するインラインコード参照も Sidebar プレビューを開く。重複した宣言は、締めの返信より前の最後の説明を使う。
 
-The `present` tool row retains its document icon and recorded result across progress, success, failure, and interruption. Native actions share pending state and publish progress or retryable errors on the card. Successful open or reveal feedback stays visible for five seconds, fades over 200ms, then restores the file description; failures remain visible until another attempt. Desktop metadata is loaded when cards mount and invalidated on connection replacement. Without a Host desktop, cards retain Sidebar preview but omit native controls; failed metadata reads offer Retry. Delivery cards and change review expose `deliverables.file.actions` and `deliverables.review.file.actions`, supplied by [ui-open-in-app](../ui-open-in-app/README.md). Association GET requests and native POST actions both validate the recorded file coordinates and Session filesystem mapping before using the Host desktop.
+`present` ツール行は、進行中、成功、失敗、中断を通じてそのドキュメントアイコンと記録された結果を保持する。ネイティブアクションは保留状態を共有し、進行状況または再試行可能なエラーをカードに表示する。オープンまたは reveal の成功フィードバックは 5 秒間表示され、200ms でフェードアウトし、その後ファイルの説明に戻る。失敗は次の試行まで表示され続ける。デスクトップメタデータはカードのマウント時にロードされ、接続の置き換え時に無効化される。Host のデスクトップがない場合、カードは Sidebar プレビューを保持するがネイティブコントロールを省略する。メタデータの読み取りに失敗すると再試行が提示される。受け渡しカードと変更レビューは、[ui-open-in-app](../ui-open-in-app/README.md) が提供する `deliverables.file.actions` と `deliverables.review.file.actions` を公開する。関連付けアプリケーションの GET リクエストとネイティブ POST アクションはどちらも、Host デスクトップを使う前に、記録されたファイル座標とセッションファイルシステムのマッピングを検証する。
 
-### The changed-files card
+### 変更ファイルカード
 
-Coding Tools must be enabled to show this card or request its summary. Turning the preference off removes the card immediately while explicit delivery cards, inline file links, and recorded workspace changes remain available.
+このカードを表示し、そのサマリーを要求するには Coding Tools を有効にする必要がある。設定をオフにするとカードは即座に削除されるが、明示的な受け渡しカード、インラインファイルリンク、記録されたワークスペース変更は利用可能なまま残る。
 
-The card renders the summary the Host serves for the turn's latest `workspace/changes` announcement, read once per announcement through the authenticated summary route; while the read is pending, once the Host answers that the summary is gone, or when it lists no file, there is no card. A single changed file shows “Edited” and its basename with its file-type icon, without a file list; its header retains the counts or binary/oversized status and the file’s accessible full path. Multiple files use a code-file icon and a header naming the complete changed-file count and summed added and deleted lines; hovering or focusing it replaces the counts with “Preview in sidebar”. Each row shows one file's display path in the regular UI font with its own monospace counts, “binary” for a binary file, or “too large” for a file the Host did not capture. Rows appear in the recorded display order, so repository files above the working directory and files outside it sort first. Four rows show before a fold; the control reveals every recorded file and, once expanded, collapses the list again from the bottom. Each row opens the turn's review in the right Sidebar on that file, and the header opens it on the first file. Hovering a file row or the single-file header for 500ms opens a scrollable, single-column preview of the comparison, independent of the Sidebar’s view. Its full path uses muted monospace text and scrolls horizontally when needed. File-status notes accompanying code and hunk headers are hidden in the preview; comparisons without hunks retain their status text. Each row exposes the full path as its accessible description. The preview is 48px narrower than the card, inset 24px on each side, and at most 420px high, further constrained by the viewport. The whole preview fades in and out over 100ms. Moving into the preview keeps it open; leaving it, pressing Escape, or activating the row by pointer or keyboard dismisses it. Comparisons load only when the preview opens and share the review tab’s cache and retry states.
+カードは、そのターンの最新の `workspace/changes` 告知に対して Host が提供するサマリーをレンダリングする。サマリーは告知ごとに認証済みサマリールートを通じて 1 回読まれる。読み取りが保留中、Host がサマリーが存在しないと答えた場合、またはファイルを列挙しない場合はカードがない。単一の変更ファイルは「編集済み」とそのベース名をファイル種別アイコン付きで表示し、ファイルリストは示さない。そのヘッダーは行数またはバイナリ/過大ステータスと、そのファイルのアクセシブルな完全パスを保持する。複数ファイルではコードファイルアイコンと、変更ファイルの完全な数および追加・削除行数の合計を示すヘッダーを使う。そのヘッダーをホバーまたはフォーカスすると、行数が「サイドバーでプレビュー」に置き換わる。各行は 1 ファイルの表示パスを通常の UI フォントで示し、自身の行数をモノスペースで、バイナリファイルには「バイナリ」、Host が取得しなかったファイルには「大きすぎる」を表示する。行は記録された表示順で現れるので、作業ディレクトリより上のリポジトリファイルとその外のファイルが先に並ぶ。折りたたみ前に 4 行が表示され、コントロールが記録されたすべてのファイルを現し、展開後はリストを再び下から折りたたむ。各行はそのファイル上でそのターンのレビューを右の Sidebar で開き、ヘッダーは最初のファイルでそれを開く。ファイル行または単一ファイルのヘッダーを 500ms ホバーすると、Sidebar のビューとは独立に、比較のスクロール可能な単一列プレビューが開く。その完全パスは控えめなモノスペーステキストを使い、必要に応じて横スクロールする。コードと hunk ヘッダーに付随するファイルステータスの注記はプレビューでは隠される。hunk のない比較はステータステキストを保持する。各行は完全パスをそのアクセシブルな説明として公開する。プレビューはカードより 48px 狭く、左右に 24px インセットし、高さは最大 420px で、ビューポートによってさらに制約される。プレビュー全体は 100ms でフェードイン・フェードアウトする。プレビューへ移動すると開いたままになり、離れる、Escape を押す、または行をポインターやキーボードでアクティブにすると閉じる。比較はプレビューが開いたときにのみロードされ、レビュータブのキャッシュと再試行状態を共有する。
 
-### The review tab
+### レビュータブ
 
-A row opens the turn's `changes-review` tab, addressed by the viewed Session and the announcing event's sequence and titled by the turn, on that row's file; another row of the same card reveals the same tab on its file. The header's file selector lists every recorded file with its counts and switches the comparison. A new tab selects the side-by-side view without wrapping. Comparisons containing only additions or only deletions render in one column, including surrounding context, without changing the selected view; mixed changes use the selected view. Its controls switch between unified and side-by-side comparison, toggle line wrapping, open the whole current file in the Sidebar, and, with a Host desktop available, open it in the default application with the same pending and retryable-error states as the cards; the view and wrap choices are kept per tab. The tab reads the summary and each comparison once through the authenticated routes. A text comparison lists its hunks with the old and new line numbers of every line, and highlights each rendered hunk side independently with the code preview's filename grammar and Shiki token colours. Additions and deletions use separate code and line-number backgrounds in each theme, with coloured line numbers, signs, and aligned edge markers; plain code text keeps the primary text colour. The tab also shows a note when the file was created or deleted in the turn, when both sides hold the same lines, when the Host's line comparison timed out and every line shows as replaced, or when the tab stopped drawing at 5,000 lines. A binary or oversized file, a comparison the Host no longer serves, and a failed read each show one line instead; a failed read offers Retry. The comparison is the turn's snapshot of the file, not its current content.
+行を開くと、そのターンの `changes-review` タブが、閲覧中のセッションと告知イベントのシーケンスでアドレス指定され、ターンによってタイトル付けされて、その行のファイル上で開く。同じカードの別の行は同じタブをそのファイル上で表示する。ヘッダーのファイルセレクターは記録されたすべてのファイルを行数付きで列挙し、比較を切り替える。新しいタブは折り返しなしのサイドバイサイドビューを選択する。追加のみまたは削除のみを含む比較は、選択されたビューを変更せずに、周囲のコンテキストを含めて 1 列でレンダリングされる。混在した変更は選択されたビューを使う。そのコントロールは、unified とサイドバイサイドの比較の切り替え、行の折り返しの切り替え、現在のファイル全体を Sidebar で開く、そして Host デスクトップが利用可能な場合はカードと同じ保留および再試行可能エラー状態で既定のアプリケーションで開く、を行う。ビューと折り返しの選択はタブごとに保持される。タブはサマリーと各比較を認証済みルートを通じて 1 回ずつ読む。テキスト比較はすべての行の旧・新行番号付きで hunk を列挙し、レンダリングされた各 hunk 側をコードプレビューのファイル名文法と Shiki トークン色で独立にハイライトする。追加と削除はテーマごとに別々のコード背景と行番号背景を使い、色付きの行番号、記号、整列された端マーカーを伴う。プレーンなコードテキストはプライマリテキスト色を保つ。タブはまた、ファイルがそのターンで作成または削除された場合、両側が同じ行を持つ場合、Host の行比較がタイムアウトしてすべての行が置換として表示される場合、またはタブが 5,000 行で描画を停止した場合に、注記を表示する。バイナリまたは過大なファイル、Host がもはや提供しない比較、失敗した読み取りはそれぞれ代わりに 1 行を表示する。失敗した読み取りは再試行を提示する。比較はそのターン時点のファイルのスナップショットであり、現在の内容ではない。
 
-The selected-file title uses the shared `ui-primitives` [`PathLabel`](../ui-primitives/README.md#component-catalog): complete and left-aligned when it fits, otherwise clipped at the left with a fade that preserves trailing characters and the extension. Directories use subdued text, the filename uses primary text, and hovering reveals the complete displayed path. Resizing the pane or selecting another file updates the fade; the dropdown arrow, line counts, and toolbar actions retain their space.
+選択されたファイルのタイトルは共有の `ui-primitives` [`PathLabel`](../ui-primitives/README.md#component-catalog) を使う。収まる場合は完全に左揃えで表示され、そうでなければ左端でクリップされ、末尾の文字と拡張子を保つフェードが付く。ディレクトリは控えめなテキスト、ファイル名はプライマリテキストを使い、ホバーで完全な表示パスが現れる。ペインのリサイズや別のファイルの選択はフェードを更新する。ドロップダウン矢印、行数、ツールバーアクションはそのスペースを保持する。
 
-Without wrapping, the two columns synchronize vertical scrolling and horizontal offsets up to each side’s available range. Line backgrounds, including empty alignment rows, cover each column’s full scrollable width. Both columns suppress elastic edge feedback and scroll chaining on both axes; the browser retains control of native momentum within each column’s scrollable range. Both horizontal scrollbars remain at the bottom of the visible comparison; scrolling vertically preserves a long line’s horizontal offset when the other side fits without horizontal scrolling.
+折り返しなしでは、2 つの列は各側の利用可能な範囲まで垂直スクロールと水平オフセットを同期する。空の整列行を含む行背景は、各列のスクロール可能な幅全体を覆う。両方の列は両軸で弾性エッジフィードバックとスクロールチェーンを抑制する。ブラウザーは各列のスクロール可能範囲内でネイティブモメンタムの制御を保つ。両方の水平スクロールバーは可視の比較の下部に留まる。垂直スクロールは、もう一方の側が水平スクロールなしで収まる場合、長い行の水平オフセットを保つ。
 
-### Inline-code links
+### インラインコードリンク
 
-The closing prose links produced or delivered paths: an inline-code token resolves by exact target, by an exact argument recorded for that target, or by a unique basename. Every matching fact must identify the same file; ambiguous arguments and basenames stay inert. No suffix or current-directory guess is used. A resolved mention keeps its code chip and takes the markdown sheet's link language, with the full path as its title.
+締めの散文は、生成または受け渡しされたパスをリンクする。インラインコードトークンは、完全一致のターゲット、そのターゲットに対して記録された完全一致の引数、または一意のベース名で解決される。一致するすべての事実が同じファイルを識別しなければならない。曖昧な引数とベース名は不活性のまま残る。サフィックスやカレントディレクトリによる推測は使われない。解決された言及はコードチップを保ち、マークダウンシートのリンク言語をとり、完全パスをタイトルとする。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The Node half registers the static `ui:deliverable-file-references` system-prompt section described under [Model Experience](#model-experience). Explicit Markdown links use the shared [Markdown renderer](../ui-primitives/README.md); inline-code matching remains limited to produced or delivered files. The browser half registers a wrapper around the changed-files card and explicit deliveries into the chat view's `conversation.chat.turnTail` list alongside other feature artifacts. `deliverablesDefinition` folds the sequence of each Turn's latest validated `workspace/changes` announcement into `DeliverablesTurnData.changes`, whose summary the card reads from the Host and caches until the connection is replaced, its `deliverables/presented` events into deliveries, and the successful first-party mutation calls of `write`, `edit`, and mutating `str_replace_editor` commands into recorded file targets and exact argument aliases after validating their raw arguments; the produced paths feed only the prose mention resolver. Successful absolute `meta.path` values identify those targets. Root results without that field retain the legacy argument fallback; malformed relative targets contribute no guessed path. Reads, deletes, unsupported tools, malformed calls, malformed events, and failed results contribute nothing. Each row opens `dsh-resource://changes-review/session/<sessionId>/<seq>/<turn>` through `ctx.sidebarRight.openResource` with the file's index as the `changes-review` navigation parameter; the package registers the `changes-review` tab type at the `builtin` band for that pattern and its body under the keyed `sidebar.right.pane.tab` seat with an exclusive store of per-tab choices, and the body reads the summary and the comparisons through the authenticated routes into stores cleared on connection replacement. The package also provides the `chatFileMentions` service the chat view consults per closing message; composing the plugin out removes every surface and leaves the view's empty list at zero cost.
+Node 側は、[モデル体験](#model-experience)で説明する静的 `ui:deliverable-file-references` システムプロンプトセクションを登録する。明示的な Markdown リンクは共有の [Markdown レンダラー](../ui-primitives/README.md)を使い、インラインコードのマッチングは生成または受け渡しされたファイルに限定されたままである。ブラウザー側は、変更ファイルカードのラッパーと明示的な受け渡しを、他の機能アーティファクトと並んでチャットビューの `conversation.chat.turnTail` リストに登録する。`deliverablesDefinition` は、各ターンの最新の検証済み `workspace/changes` 告知のシーケンスを `DeliverablesTurnData.changes`（そのサマリーをカードが Host から読み、接続が置き換えられるまでキャッシュする）に、`deliverables/presented` イベントを受け渡しに、そして `write`、`edit`、および変更を伴う `str_replace_editor` コマンドの成功したファーストパーティ変更呼び出しを、raw 引数を検証した後に記録済みファイルターゲットと完全一致引数エイリアスに畳み込む。生成されたパスは散文の言及リゾルバーにのみ供給される。成功した絶対 `meta.path` 値がそれらのターゲットを識別する。そのフィールドのないルート結果はレガシーの引数フォールバックを保持し、不正な相対ターゲットは推測パスを一切寄与しない。読み取り、削除、サポート外のツール、不正な呼び出し、不正なイベント、失敗した結果は何も寄与しない。各行は `ctx.sidebarRight.openResource` を通じて `dsh-resource://changes-review/session/<sessionId>/<seq>/<turn>` を、そのファイルのインデックスを `changes-review` ナビゲーションパラメーターとして開く。このパッケージはそのパターン用の `changes-review` タブ種別を `builtin` バンドに、その本体をキー付きの `sidebar.right.pane.tab` シートに、タブごとの選択の排他的ストアとともに登録し、本体はサマリーと比較を認証済みルートを通じて、接続の置き換え時にクリアされるストアへ読み込む。このパッケージはまた、チャットビューが締めのメッセージごとに参照する `chatFileMentions` サービスを提供する。プラグインを構成から外すとすべてのサーフェスが削除され、ビューの空のリストがゼロコストで残る。
 
-Native opening uses an authenticated POST addressed by the viewed Session, event sequence, and original file index; the review tab's native open of a changed file uses the same coordinates. For a declaration the Host reads the viewed Session header with the event and passes its cwd, or the deployment workspace root when absent, to `workspaceFiles.stat`; for a changed file it passes the working directory the served summary carries. This uses the same composed filesystem as Sidebar previews and does not activate an Agent, including for child Sessions. Native actions require the canonical process path to map from a Host path back to that same process path. Providers without this mapping return 422, after which the review tab hides its native open; a same-named Host file is insufficient. The same configured desktop availability governs metadata and execution. Edits affect subsequent opens; deletion returns an error. No file-content copy or attachment is created. Plugin disposal cancels and awaits pending native-open requests.
+ネイティブオープンは、閲覧中のセッション、イベントシーケンス、元のファイルインデックスでアドレス指定される認証済み POST を使う。変更ファイルのレビュータブのネイティブオープンも同じ座標を使う。宣言の場合、Host はイベント付きの閲覧中セッションヘッダーを読み、その cwd、または存在しない場合はデプロイメントのワークスペースルートを `workspaceFiles.stat` に渡す。変更ファイルの場合は、提供されたサマリーが運ぶ作業ディレクトリを渡す。これは Sidebar プレビューと同じ構成済みファイルシステムを使い、子セッションを含め、Agent をアクティブ化しない。ネイティブアクションは、正規のプロセスパスが Host パスから同じプロセスパスへマップし戻せることを要求する。このマッピングのないプロバイダーは 422 を返し、その後レビュータブはネイティブオープンを隠す。同名の Host ファイルでは不十分である。同じ設定済みデスクトップ可用性がメタデータと実行の両方を統治する。編集は後続のオープンに影響し、削除はエラーを返す。ファイル内容のコピーやアタッチメントは作成されない。プラグインの破棄は保留中のネイティブオープン要求をキャンセルして待機する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the deliverables surface is not enough. They move from the card to the Host recorder, the turn-tail hole, and the decisions behind the vocabulary.
+deliverables サーフェスでは足りないときにこれらのページを読む。カードから Host のレコーダー、ターンテールのホール、および語彙の背後にある決定へ進む。
 
-- [workspace-changes](../../deliverables/workspace-changes/README.md) — the Host plugin that records and serves the summary the card renders.
-- [ui-chat](../ui-chat/README.md) — declares the `conversation.chat.turnTail` hole and renders the closing prose.
-- [historical Turn changed-files card](../../../.agents/notes/archived/feature/2026-09-11-turn-changed-files-card.md) — the decision behind git-recorded summaries replacing the mutation-call row.
-- [historical Workspace file links](../../../.agents/notes/archived/feature/2026-07-31-web-workspace-file-links.md) — the decision behind the earlier produced-files row; its Host open path is superseded by the [right Sidebar](../../../.agents/notes/implemented/feature/2026-09-04-right-sidebar-docking-infrastructure.md).
-- [Inline file mentions](../../../.agents/notes/archived/feature/2026-08-07-web-inline-file-mentions.md) — the decision behind clickable mentions in the closing prose.
-- [Client package map](../README.md) — adjacent browser UI packages.
+- [workspace-changes](../../deliverables/workspace-changes/README.md) — カードがレンダリングするサマリーを記録し提供する Host プラグイン。
+- [ui-chat](../ui-chat/README.md) — `conversation.chat.turnTail` ホールを宣言し、締めの散文をレンダリングする。
+- [Turn 変更ファイルカードの過去の記録](../../../.agents/notes/archived/feature/2026-09-11-turn-changed-files-card.md) — 変更呼び出し行を置き換えた git 記録サマリーの背後にある決定。
+- [ワークスペースファイルリンクの過去の記録](../../../.agents/notes/archived/feature/2026-07-31-web-workspace-file-links.md) — 初期の生成ファイル行の背後にある決定。その Host オープンパスは[右 Sidebar](../../../.agents/notes/implemented/feature/2026-09-04-right-sidebar-docking-infrastructure.md)に置き換えられた。
+- [インラインファイル言及](../../../.agents/notes/archived/feature/2026-08-07-web-inline-file-mentions.md) — 締めの散文のクリック可能な言及の背後にある決定。
+- [Client パッケージマップ](../README.md) — 隣接するブラウザー UI パッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Clickable file-reference guidance
+### クリック可能なファイル参照ガイダンス
 
-#### What the model sees
+#### モデルが見るもの
 
-The guidance prefers primary results in the final reply: inline images support explanations and comparisons, image links serve references and file lists, and image file cards serve separate deliverables. File destinations use angle brackets, including paths with spaces. It recommends separate `present` cards for complete file deliverables, especially Office files, usually selecting the most important one or two, with at most four files per call when more are needed. It discourages cards solely for code edits and extra commands to inspect diff visibility. This guidance applies even with Coding Tools disabled: it accepts fewer file surfaces to avoid duplicate presentation and unnecessary tool calls. It asks the model to link every existing-file mention outside commands, configuration expressions, and code blocks, including repeats and tables. Labels default to filenames or clear aliases, with only enough parent directories to distinguish files. Precise references display `filename:24` or `filename:24–30`; their destinations retain full relative or absolute paths with `#L24` or `#L24-L30` anchors. The display suffix contains neither `#` nor `L`.
+ガイダンスは最終返信での主要な結果を好む。インライン画像は説明と比較を支え、画像リンクは参照とファイルリストに役立ち、画像ファイルカードは個別の受け渡しに役立つ。ファイルの宛先は山括弧を使い、スペースを含むパスも同様である。完全なファイルの受け渡し、特に Office ファイルには個別の `present` カードを推奨し、通常は最も重要な 1 つか 2 つを選び、さらに必要な場合は 1 回の呼び出しあたり最大 4 ファイルとする。コード編集のみのカードや diff の可視性を確認するための追加コマンドは推奨しない。このガイダンスは Coding Tools が無効でも適用される。重複した提示と不要なツール呼び出しを避けるため、より少ないファイルサーフェスを受け入れる。モデルには、コマンド、設定式、コードブロックの外にある既存ファイルのすべての言及を、繰り返しや表も含めてリンクするよう求める。ラベルは既定でファイル名または明確なエイリアスとし、ファイルを区別するのに十分な親ディレクトリのみを含める。精密な参照は `filename:24` または `filename:24–30` を表示し、その宛先は `#L24` または `#L24-L30` アンカー付きの完全な相対または絶対パスを保持する。表示サフィックスは `#` も `L` も含まない。
 
-#### Token effect
+#### トークンへの影響
 
-One fixed paragraph containing output-selection, rendering, and file-reference guidance whenever this package is loaded. The [present tool](../../deliverables/tool-present/README.md#model-experience) owns the delivery schema and result text.
+このパッケージがロードされている間は常に、出力選択、レンダリング、ファイル参照のガイダンスを含む 1 つの固定段落。受け渡しスキーマと結果テキストは [present ツール](../../deliverables/tool-present/README.md#model-experience)が所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The section is static at first-party order 9000 for the lifetime of the package mount, so it remains in the reusable prompt prefix and does not change across Turns.
+このセクションはパッケージのマウント中ずっとファーストパーティ順序 9000 で静的であり、再利用可能なプロンプトプレフィックスに留まり、ターンをまたいで変化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the current deliverables vocabulary. They are current package constraints, not a general file-linking comparison or a task backlog.
+これらの制限は現在の deliverables 語彙を定義する。それらは現在のパッケージ制約であり、一般的なファイルリンクの比較でもタスクバックログでもない。
 
-- **Inline local images require an HTTP(S) page**: Desktop’s `dsh-app:` pages do not support this file route. POSIX absolute paths and Windows drive-letter paths are supported; relative Chat image paths require the viewed Session’s workspace root. Separate image file links are optional.
-- **Mention matching uses exact paths, unique argument aliases, or unique basenames only** — a suffix mention stays inert; widening the matcher is deferred until a real closing-message shape needs it.
-- **Terminal-created files require explicit delivery** — the card lists them once git records the change, but delivery cards and inline-code references require `present`; explicit Markdown links can reference existing files directly.
-- **Declarations do not preserve file contents** — reopening or transferring a Session requires source files accessible through the viewed Session’s filesystem. Missing files, directories, and final symbolic links return 404.
-- **Native opening needs a Host desktop** — without one the review tab offers no native open; the comparison itself needs only the Host that recorded the turn.
-- **Comparison highlighting is hunk-local** — each rendered old and new hunk side is tokenized independently because omitted source lines are unavailable; unknown suffixes remain plain, and the tab draws at most 5,000 lines before saying so.
-- **Comparisons carry whole file text** — the comparison route serves a listed file's complete text wherever the Host recorded it, including ignored files and files outside the workspace root the Sidebar previews are confined to.
-- **Files outside the workspace open by absolute path only** — the recorded path is the Host path at recording time; a moved workspace or a different viewing Session cannot relocate it.
+- **インラインのローカル画像には HTTP(S) ページが必要**: Desktop の `dsh-app:` ページはこのファイルルートをサポートしない。POSIX 絶対パスと Windows ドライブレターパスはサポートされる。相対的な Chat 画像パスには閲覧中セッションのワークスペースルートが必要である。個別の画像ファイルリンクはオプションである。
+- **言及マッチングは完全一致パス、一意の引数エイリアス、または一意のベース名のみを使う** — サフィックスの言及は不活性のまま残る。マッチャーの拡張は、実際の締めメッセージの形がそれを必要とするまで先送りされる。
+- **ターミナルで作成されたファイルには明示的な受け渡しが必要** — カードは git が変更を記録した時点でそれらを列挙するが、受け渡しカードとインラインコード参照には `present` が必要である。明示的な Markdown リンクは既存ファイルを直接参照できる。
+- **宣言はファイル内容を保持しない** — セッションの再オープンや転送には、閲覧中セッションのファイルシステムを通じてアクセス可能なソースファイルが必要である。存在しないファイル、ディレクトリ、末尾のシンボリックリンクは 404 を返す。
+- **ネイティブオープンには Host デスクトップが必要** — それがなければレビュータブはネイティブオープンを提供しない。比較自体はターンを記録した Host だけを必要とする。
+- **比較のハイライトは hunk ローカル** — 省略されたソース行は利用できないため、レンダリングされた旧・新の各 hunk 側は独立にトークン化される。未知のサフィックスはプレーンのまま残り、タブは最大 5,000 行を描画してからその旨を表示する。
+- **比較はファイルテキスト全体を運ぶ** — 比較ルートは、Host が記録した場所であればどこでも、列挙されたファイルの完全なテキストを提供する。無視されたファイルや、Sidebar プレビューが制限されるワークスペースルート外のファイルも含む。
+- **ワークスペース外のファイルは絶対パスのみで開く** — 記録されたパスは記録時点の Host パスである。移動したワークスペースや別の閲覧セッションはそれを再配置できない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

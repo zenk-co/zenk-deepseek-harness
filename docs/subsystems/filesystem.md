@@ -1,18 +1,18 @@
-# Filesystem
+# ファイルシステム
 
-English | [中文](filesystem.zh.md)
+日本語 | [English](filesystem.en.md) | [中文](filesystem.zh.md)
 
-The optional filesystem capability has four parts: [dsh-fs](../../packages/fs/fs) owns `ctx.fs` and atomic text operations with optional guards, [dsh-fs-local](../../packages/fs/fs-local) implements local disk, [dsh-fs-observation-policy](../../packages/fs/fs-observation-policy) records observed presence or absence and adds freshness rules through events rather than a service, and [dsh-tool-fs](../../packages/fs/tool-fs) directly executes model-facing read/write/edit calls and renders windows. It is outside the agent-loop spine; alternate backends do not change policy or tool schemas.
+任意のファイルシステムケイパビリティは 4 つの部分からなる。[dsh-fs](../../packages/fs/fs)は `ctx.fs` とガード付きの原子的なテキスト操作を所有し、[dsh-fs-local](../../packages/fs/fs-local)はローカルディスクを実装し、[dsh-fs-observation-policy](../../packages/fs/fs-observation-policy)は観測された存在または不在を記録し、サービスではなくイベントを通じて鮮度ルールを追加し、[dsh-tool-fs](../../packages/fs/tool-fs)はモデル向けの read/write/edit 呼び出しを直接実行してウィンドウを描画する。これは agent-loop の主軸の外側にあり、代替バックエンドはポリシーやツールスキーマを変更しない。
 
-`dsh-fs-observation-policy` is optional. Without it, the `FileSystem` Service Definition, a provider, and the `dsh-tool-fs` Consumer form the complete, unconstrained filesystem seam: `write` unconditionally creates or overwrites, and `edit` unconditionally replaces literal text. The policy plugin changes these operations by deciding the `fs/*` waterfalls. Removing it does not break the tool because the tool calls `ctx.fs` and dispatches events; it does not call policy methods. A deployment that loads `dsh-tool-fs` is expected to also load `dsh-fs-observation-policy` so the default behavior is read-before-write/edit.
+`dsh-fs-observation-policy` は任意である。これがなければ、`FileSystem` サービス定義、プロバイダー、および `dsh-tool-fs` コンシューマーが完全な制約なしファイルシステムシームを形成する。`write` は無条件に作成または上書きし、`edit` は無条件にリテラルテキストを置換する。ポリシープラグインは `fs/*` ウォーターフォールを決定することでこれらの操作を変更する。これを外してもツールは壊れない。ツールは `ctx.fs` を呼び出してイベントを送出するだけであり、ポリシーメソッドを呼ばないからである。`dsh-tool-fs` を読み込むデプロイメントでは、デフォルト動作を read-before-write/edit にするために `dsh-fs-observation-policy` も読み込むことが期待される。
 
-Provider source: [`packages/fs/fs/src/types.ts`](../../packages/fs/fs/src/types.ts) and [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts). Policy source: [`packages/fs/fs-observation-policy/src/types.ts`](../../packages/fs/fs-observation-policy/src/types.ts). Read-rendering source: [`packages/fs/tool-fs/src/read-render.ts`](../../packages/fs/tool-fs/src/read-render.ts).
+プロバイダーのソース: [`packages/fs/fs/src/types.ts`](../../packages/fs/fs/src/types.ts) および [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)。ポリシーのソース: [`packages/fs/fs-observation-policy/src/types.ts`](../../packages/fs/fs-observation-policy/src/types.ts)。読み描画のソース: [`packages/fs/tool-fs/src/read-render.ts`](../../packages/fs/tool-fs/src/read-render.ts)。
 
-## Target identity and metadata (provider contract)
+## ターゲットの同一性とメタデータ (プロバイダー契約)
 
-Every operation resolves a user-supplied path to an opaque backend target first. Consumers may display `displayPath`, but must not parse `targetKey` (a branded opaque id) or assume it is a local absolute path.
+すべての操作はまずユーザー指定のパスを不透明なバックエンドターゲットに解決する。コンシューマーは `displayPath` を表示してよいが、`targetKey` (ブランド化された不透明な id) を解析したり、ローカルの絶対パスと仮定したりしてはならない。
 
-Consumers that share the filesystem's execution world obtain cross-capability coordinates through the provider instead of interpreting that identity: `processPath(target)` returns the canonical absolute path a subprocess can open, `processPathFromHostPath(hostPath)` maps an absolute harness-host file only when that execution world shares it, `fileUrl(target)` returns its provider-platform `file:` URI, and `contains(parent, child)` tests canonical identity or descendant containment.
+ファイルシステムの実行ワールドを共有するコンシューマーは、その同一性を解釈する代わりにプロバイダーを通じてケイパビリティ横断の座標を取得する。`processPath(target)` はサブプロセスが開ける正規の絶対パスを返し、`processPathFromHostPath(hostPath)` はその実行ワールドが共有する場合に限り絶対の harness ホストファイルをマップし、`fileUrl(target)` はプロバイダープラットフォームの `file:` URI を返し、`contains(parent, child)` は正規の同一性または子孫包含を検査する。
 
 ```ts type-equiv
 /**
@@ -30,7 +30,7 @@ interface FsTarget {
 }
 ```
 
-The backend owns file-version tokens — the freshness token a write/edit guards against. The policy plugin stores them for stale checks; consumers do not interpret them. Both ids are branded opaque strings.
+バックエンドはファイルバージョイントークン — write/edit がガード対象とする鮮度トークン — を所有する。ポリシープラグインは stale チェックのためにそれらを格納し、コンシューマーはそれらを解釈しない。両方の id はブランド化された不透明な文字列である。
 
 ```ts type-equiv
 /**
@@ -52,7 +52,7 @@ type FsTargetKey = Branded<'FsTargetKey'>
 type FsVersion = Branded<'FsVersion'>
 ```
 
-`stat` returns metadata (never content), or `undefined` when the target is absent. `type` lets consumers reject directories and special files before reading, and `size` lets text consumers choose `readText` vs `streamText` without probing by failure. A text consumer applies its own retention ceiling while consuming `streamText`. Raw-byte consumers use `readBytes(target, signal, maxBytes)`; its required complete-content cap makes a known or discovered overflow fail with `FS_TOO_LARGE` instead of truncating or buffering without a bound.
+`stat` はメタデータ (コンテンツではない) を返し、ターゲットが不在の場合は `undefined` を返す。`type` によりコンシューマーは読み取り前にディレクトリや特殊ファイルを拒否でき、`size` によりテキストコンシューマーは失敗による探索なしに `readText` と `streamText` を選択できる。テキストコンシューマーは `streamText` の消費中に独自の保持上限を適用する。生バイトのコンシューマーは `readBytes(target, signal, maxBytes)` を使い、その必須の完全コンテンツ上限により、既知または検出されたオーバーフローは切り詰めや無制限のバッファリングではなく `FS_TOO_LARGE` で失敗する。
 
 ```ts type-equiv
 /**
@@ -71,7 +71,7 @@ interface FsInfo {
 }
 ```
 
-`lstat` is the path-level no-follow metadata primitive. It takes a path instead of an `FsTarget` because `resolve` intentionally follows symlinks to produce stable identity; consumers that need trust-boundary checks can call `lstat` first and reject `symlink` before resolving.
+`lstat` はパスレベルの no-follow メタデータプリミティブである。`resolve` が安定した同一性を生成するために意図的にシンボリックリンクをたどるため、`FsTarget` ではなくパスを受け取る。信頼境界チェックが必要なコンシューマーは、まず `lstat` を呼び出して解決前に `symlink` を拒否できる。
 
 ```ts type-equiv
 /**
@@ -90,7 +90,7 @@ interface FsPathInfo {
 }
 ```
 
-`listDir` returns direct child entries in stable name order. Each entry carries the child basename, type, resolved target, and cheap metadata when the backend can report it. It must not read file contents, so `size` is only for regular files and `version` is metadata-derived. Broken or disappeared children may be returned as `other` without metadata; permission or backend I/O failures while listing or resolving child metadata fail the whole listing with `FS_PERMISSION_DENIED` or `FS_IO_ERROR`.
+`listDir` は直接の子エントリを安定した名前順で返す。各エントリは子のベース名、型、解決済みターゲット、およびバックエンドが報告できる場合の安価なメタデータを運ぶ。ファイル内容を読んではならず、`size` は通常ファイルにのみ、`version` はメタデータ由来に限る。壊れた子や消失した子はメタデータなしで `other` として返される場合があり、子メタデータの一覧化や解決中の権限またはバックエンド I/O 失敗は、一覧全体を `FS_PERMISSION_DENIED` または `FS_IO_ERROR` で失敗させる。
 
 ```ts type-equiv
 /**
@@ -111,9 +111,9 @@ interface FsDirEntry {
 }
 ```
 
-## Write and edit guards (provider contract)
+## 書き込みと編集のガード (プロバイダー契約)
 
-Both `writeText` and `editText` take their version guard OPTIONALLY: omit it for an unconditional (bare-provider) mutation, supply it to guard. `writeText`'s guard is an `FsWriteIntent` — `createIfAbsent` creates a missing target and rejects an existing one with `FS_NOT_OBSERVED`, including a target that appears after the provider's initial probe because publication itself must be no-replace; `replaceIfVersion` replaces only when the target exists at the observed version, else `FS_STALE_VERSION`. Omitting `expected` unconditionally creates-or-overwrites. The union itself carries only the two guarded intents; "no guard" is expressed by omission, so write and edit both use the same optional `expected` field.
+`writeText` と `editText` はどちらもバージョンガードを任意で受け取る。省略すれば無条件 (素のプロバイダー) の変更となり、指定すればガードする。`writeText` のガードは `FsWriteIntent` である。`createIfAbsent` は欠落したターゲットを作成し、既存のものは `FS_NOT_OBSERVED` で拒否する。これにはプロバイダーの初期プローブ後に現れたターゲットも含まれる。公開自体が no-replace でなければならないからである。`replaceIfVersion` はターゲットが観測されたバージョンで存在する場合にのみ置換し、そうでなければ `FS_STALE_VERSION` となる。`expected` を省略すれば無条件に作成または上書きする。共用体自体は 2 つのガード付き意図のみを運ぶ。「ガードなし」は省略で表すため、write と edit はどちらも同じ任意の `expected` フィールドを使う。
 
 ```ts type-equiv
 /**
@@ -148,7 +148,7 @@ interface FsWriteOutcome {
 }
 ```
 
-`editText` is a provider-level mutation, not a `read` plus `write` composed elsewhere. When guarded it verifies the expected version BEFORE literal matching (so a stale edit reports `FS_STALE_VERSION`, not a match failure against newer content); unguarded it edits the current content. Either way it applies the replacement and writes atomically — keeping matching, line-ending handling, the stale check, and atomic replacement inside one mutation critical section — and a missing target reports `FS_STALE_VERSION` on both paths.
+`editText` はプロバイダーレベルの変更であり、他所で合成された `read` に `write` を足したものではない。ガード付きの場合はリテラル照合の前に期待バージョンを検証する (そのため stale な編集は新しい内容に対する照合失敗ではなく `FS_STALE_VERSION` を報告する)。ガードなしの場合は現在の内容を編集する。いずれの場合も置換を適用して原子的に書き込む。照合、改行処理、stale チェック、原子的な置換を 1 つの変更クリティカルセクション内に保ち、ターゲット欠落は両方の経路で `FS_STALE_VERSION` を報告する。
 
 ```ts type-equiv
 /** A literal-replacement edit request. */
@@ -178,11 +178,11 @@ interface FsEditOutcome {
 }
 ```
 
-## The fs policy events (provider contract vocabulary)
+## fs ポリシーイベント (プロバイダー契約の語彙)
 
-`dsh-fs` owns three events the tool dispatches and the policy plugin listens for, so the emitter (`dsh-tool-fs`) and the listener (`dsh-fs-observation-policy`) share a vocabulary without the emitter depending on the policy plugin. They carry only `dsh-fs` vocabulary plus an opaque `object` actor — no model-facing concepts and no agent/session owner structure.
+`dsh-fs` はツールが送出しポリシープラグインが購読する 3 つのイベントを所有するため、送出側 (`dsh-tool-fs`) と購読側 (`dsh-fs-observation-policy`) は、送出側がポリシープラグインに依存することなく語彙を共有する。これらは `dsh-fs` の語彙と不透明な `object` アクターのみを運ぶ。モデル向けの概念も agent/セッション所有者構造も含まない。
 
-`fs/write-intent` and `fs/edit-intent` are **single-slot decision waterfalls**: the tool dispatches each with a default thunk returning `undefined` (the bare provider), and a listener fully decides without calling `next()`. The slot is first-wins by registration order — the policy plugin owning it is a deployment convention, not an enforced invariant. `fs/observed` is a fire-and-forget recording event carrying an `FsObservation`: present at a version or confirmed absent. It is dispatched with a plain `ctx.emit`; its listener MUST be synchronous and side-effect-only, because the tool does NOT guard the emit — a throwing listener can replace a read error or surface as the tool's `isError` result after a mutation already succeeded. The generated [cordis surface](#cordis-surface) below shows the exact signatures.
+`fs/write-intent` と `fs/edit-intent` は**単一スロット決定ウォーターフォール**である。ツールはそれぞれを `undefined` を返すデフォルトサンク (素のプロバイダー) と共に送出し、リスナーは `next()` を呼ばずに完全に決定する。スロットは登録順の先勝ちであり、それをポリシープラグインが所有するのはデプロイメントの慣例であって強制される不変条件ではない。`fs/observed` は `FsObservation` を運ぶ fire-and-forget の記録イベントである。バージョン付きの present または確認済みの absent を運ぶ。これは素の `ctx.emit` で送出される。そのリスナーは同期的で副作用のみでなければならならない。ツールは送出をガードしないため、投げるリスナーは読み取りエラーを置き換えたり、変更が既に成功した後にツールの `isError` 結果として表面化したりし得るからである。下の生成された [cordis surface](#cordis-surface) が正確なシグネチャを示す。
 
 ```ts type-equiv
 /**
@@ -195,9 +195,9 @@ type FsObservation =
   | { readonly kind: 'absent' }
 ```
 
-## Execution context (policy plugin)
+## 実行コンテキスト (ポリシープラグイン)
 
-The policy plugin needs just enough execution context to derive the observed-state owner by narrowing the opaque `object` actor the `fs/*` events carry. `ToolExecution` has the required fields, so `dsh-tool-fs` passes its execution object through as the actor without making `dsh-fs-observation-policy` import the tool, agent, or session packages.
+ポリシープラグインは、`fs/*` イベントが運ぶ不透明な `object` アクターを絞り込んで観測状態の所有者を導出するのに十分な実行コンテキストだけを必要とする。`ToolExecution` が必須フィールドを持つため、`dsh-tool-fs` はツール、agent、セッションパッケージを `dsh-fs-observation-policy` に import させることなく、その実行オブジェクトをそのままアクターとして渡す。
 
 ```ts type-equiv
 /**
@@ -219,9 +219,9 @@ interface FsObservationActor {
 }
 ```
 
-## Read outcome (consumer / read rendering)
+## 読み取り結果 (コンシューマー / 読み描画)
 
-A text read is bounded by line window, byte cap, and backend limits. After the byte cap is reached, scanning continues without retaining more lines so `totalLines` remains exact. The result the model-facing `read` tool renders is purely presentational; there is no `full`/`partial` view — authorization is freshness-based (the tool emits a present `fs/observed` directly with the stat's version), so any windowed read can authorize a later write/edit when the file is unchanged. A metadata miss emits an absent observation before the tool returns `FS_NOT_FOUND`, allowing a later guarded write to recreate an externally deleted target without authorizing edit. `dsh-tool-fs`, the executor that owns the read, implements read windowing and constructs this result; the policy plugin does not.
+テキスト読み取りは行ウィンドウ、バイト上限、バックエンド制限で区切られる。バイト上限に達した後も走査は行を保持せずに続くため、`totalLines` は正確なままである。モデル向け `read` ツールが描画する結果は純粋に表示用であり、`full`/`partial` ビューはない。認可は鮮度ベースである (ツールは stat のバージョンで直接 present の `fs/observed` を送出する) ため、ファイルが不変なら任意のウィンドウ読み取りが後の write/edit を認可できる。メタデータ欠落はツールが `FS_NOT_FOUND` を返す前に absent 観測を送出し、edit を認可せずに後のガード付き書き込みが外部で削除されたターゲットを再作成できるようにする。読み取りを所有する実行者 `dsh-tool-fs` が読みウィンドウ化を実装してこの結果を構築する。ポリシープラグインは行わない。
 
 ```ts type-equiv
 /** Outcome of a bounded text read — what {@link formatReadOutput} renders. */
@@ -237,13 +237,13 @@ interface FileReadOutcome {
 }
 ```
 
-## Observed-file state (policy plugin)
+## 観測ファイル状態 (ポリシープラグイン)
 
-Observed state is a `WeakMap<owner, Map<targetKey, FsObservation>>` held inside the `dsh-fs-observation-policy` plugin. Missing map entry means unseen; `{ kind: 'absent' }` means a `read` or `str_replace_editor` `view`, `str_replace`, or `insert` metadata miss confirmed absence; `{ kind: 'present', version }` means a read, write, or edit observed that version. The write decision maps unseen and absent to `createIfAbsent`, while present maps to `replaceIfVersion`; the edit decision maps unseen to `FS_NOT_OBSERVED`, absent to `FS_NOT_FOUND`, and present to its version guard. The owner is derived from the event actor (normally `exec.agent.session`), treated as opaque and never read. Disposal drops everything (HMR safety), and the policy performs no filesystem I/O.
+観測状態は `dsh-fs-observation-policy` プラグイン内に保持される `WeakMap<owner, Map<targetKey, FsObservation>>` である。マップエントリ欠落は未観測を意味し、`{ kind: 'absent' }` は `read` または `str_replace_editor` の `view`、`str_replace`、`insert` のメタデータ欠落が不在を確認したことを意味し、`{ kind: 'present', version }` は read、write、または edit がそのバージョンを観測したことを意味する。書き込み決定は未観測と absent を `createIfAbsent` に写像し、present は `replaceIfVersion` に写像する。編集決定は未観測を `FS_NOT_OBSERVED`、absent を `FS_NOT_FOUND`、present をそのバージョンガードに写像する。所有者はイベントアクター (通常は `exec.agent.session`) から導出され、不透明として扱われ読み取られることはない。破棄はすべてを捨て (HMR 安全性)、ポリシーはファイルシステム I/O を行わない。
 
-## Error taxonomy (provider contract)
+## エラー分類 (プロバイダー契約)
 
-Filesystem failures use stable `FsErrorCode` strings carried by `FsError` (`HarnessError`). The tool registry preserves `{ name, code }` on error results, so retry, permission, and UI layers can branch without parsing text.
+ファイルシステム障害は `FsError` (`HarnessError`) が運ぶ安定した `FsErrorCode` 文字列を使う。ツールレジストリはエラー結果に `{ name, code }` を保持するため、リトライ層、権限層、UI 層はテキストを解析せずに分岐できる。
 
 ```ts type-equiv
 /**
@@ -267,15 +267,15 @@ type FsErrorCode =
   | 'FS_ABORTED'
 ```
 
-`FS_NOT_DIRECTORY`, `FS_PERMISSION_DENIED`, and `FS_IO_ERROR` are used by directory listing to distinguish an existing non-directory target, a denied listing, and an unexpected backend I/O failure. `FS_SANDBOX_DENIED` is a POLICY refusal from a sandbox-enforcing backend (`dsh-fs-sandbox`) — the mode fence denied a write/edit — distinct from `FS_PERMISSION_DENIED` (the host kernel refusing). `FS_NOT_OBSERVED` means the policy plugin has no prior-observation record for this owner (or a `createIfAbsent` hit an existing file). `FS_NOT_FOUND` also represents an edit rejected from confirmed absence. `FS_STALE_VERSION` means the backend version no longer matches the observed one (or the provider itself receives an edit for a missing target). Freshness authorization has no partial/full distinction, so there is no `FS_PARTIAL_OBSERVATION`.
+`FS_NOT_DIRECTORY`、`FS_PERMISSION_DENIED`、`FS_IO_ERROR` はディレクトリ一覧化で使い、存在する非ディレクトリターゲット、拒否された一覧化、予期しないバックエンド I/O 失敗を区別する。`FS_SANDBOX_DENIED` はサンドボックス強制バックエンド (`dsh-fs-sandbox`) による POLICY 拒否であり — モードフェンスが write/edit を拒否した — ホストカーネルによる拒否である `FS_PERMISSION_DENIED` とは異なる。`FS_NOT_OBSERVED` はポリシープラグインがこの所有者の事前観測記録を持たないこと (または `createIfAbsent` が既存ファイルに当たったこと) を意味する。`FS_NOT_FOUND` は確認済み不在から拒否された編集も表す。`FS_STALE_VERSION` はバックエンドバージョンが観測版と一致しなくなったこと (またはプロバイダー自体が欠落ターゲットへの編集を受けたこと) を意味する。鮮度認可に partial/full の区別はないため、`FS_PARTIAL_OBSERVATION` は存在しない。
 
-## No timeouts on file IO
+## ファイル I/O にタイムアウトなし
 
-`read`/`write`/`edit` take **no** `timeoutMs`, and the provider contract arms no deadline — unlike bash and web (which consume [`@deepseek-ai/dsh-timeout`](../../packages/util/timeout/README.md)) and the subprocess-backed `glob`/`grep` (whose declared `timeoutMs` is enforced by `@deepseek-ai/dsh-tool-call-timeout-policy`): those are process-backed, where a deadline can really kill the work. A local syscall is best-effort-abortable at most — a timeout could not force an in-progress `fsync`/`rename` to stop, so a `timeoutMs` here would be a deadline the seam cannot enforce, and an implicit default in the exact place explicit-over-implicit forbids. Cancellation still propagates through the tool-execution signal for best-effort abort at syscall boundaries.
+`read`/`write`/`edit` は `timeoutMs` を**受け取らず**、プロバイダー契約も期限を設定しない — [`@deepseek-ai/dsh-timeout`](../../packages/util/timeout/README.md) を消費する bash や web とは異なり、宣言された `timeoutMs` が `@deepseek-ai/dsh-tool-call-timeout-policy` により強制されるサブプロセス裏付けの `glob`/`grep` とも異なる。これらはプロセス裏付けであり、期限が作業を実際に殺せるからである。ローカル syscall はせいぜいベストエフォートで中止可能な程度であり、タイムアウトは進行中の `fsync`/`rename` を止めさせることはできない。そのためここでの `timeoutMs` はシームが強制できない期限となり、explicit-over-implicit が禁じるまさにその場所での暗黙のデフォルトとなる。キャンセルはツール実行シグナルを通じて伝播し、syscall 境界でベストエフォートの中止を行う。
 
-## The service and the plugin
+## サービスとプラグイン
 
-`FileSystem` (`ctx.fs`, abstract) owns the provider primitives: `resolve`, `processPath`, `processPathFromHostPath`, `fileUrl`, `contains`, `stat`, `lstat`, `readText`, `streamText`, `readBytes`, `listDir`, `writeText`, and `editText`. `dsh-fs-observation-policy` registers **no service** — it is a plugin that adds policy through the `fs/*` event gate: it decides the write/edit intent waterfalls from unseen/absent/present state and records `FsObservation` values. The executor is `dsh-tool-fs`: it reads/writes/edits through `ctx.fs`, dispatches the waterfalls, and emits the recording event. The generated [`ctx.fs` section](#ctxfs--filesystem-abstract-seam) below shows the exact signatures.
+`FileSystem` (`ctx.fs`、abstract) はプロバイダープリミティブを所有する。`resolve`、`processPath`、`processPathFromHostPath`、`fileUrl`、`contains`、`stat`、`lstat`、`readText`、`streamText`、`readBytes`、`listDir`、`writeText`、および `editText` である。`dsh-fs-observation-policy` は**サービスを登録しない** — `fs/*` イベントゲートを通じてポリシーを追加するプラグインであり、unseen/absent/present 状態から write/edit 意図ウォーターフォールを決定し、`FsObservation` 値を記録する。実行者は `dsh-tool-fs` であり、`ctx.fs` を通じて読み書き編集し、ウォーターフォールを送出して記録イベントを送出する。下の生成された [`ctx.fs` セクション](#ctxfs--filesystem-abstract-seam) が正確なシグネチャを示す。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -283,13 +283,13 @@ type FsErrorCode =
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によりソースから生成される (`pnpm run verify-cordis-catalog` により doc-sync で鮮度を検証し、`pnpm run gen-cordis-catalog` で再生成する) — 言語面はロケール固有のペア文書パスのみが異なる。シグネチャブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは [primer](../cordis-primer.md#dispatch-modes) で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxfs--filesystem-abstract-seam"></a>
 
-### `ctx.fs` — `FileSystem` (abstract seam)
+### `ctx.fs` — `FileSystem` (抽象シーム)
 
-Abstract filesystem provider. Targets must preserve identity across aliases; reads expose regular UTF-8 text or typed errors, listings are stable and content-free, and mutations are atomic. Optional guards add stale protection without changing the unguarded provider contract.
+抽象ファイルシステムプロバイダー。ターゲットはエイリアスを越えて同一性を保持しなければならず、読み取りは通常の UTF-8 テキストまたは型付きエラーを公開し、一覧は安定して内容なしであり、変更は原子的である。任意のガードはガードなしプロバイダー契約を変えずに stale 保護を追加する。
 
 ```ts cordis-catalog
 /**
@@ -460,19 +460,19 @@ abstract writeText( target: FsTarget, content: string, expected?: FsWriteIntent,
 abstract editText( target: FsTarget, edit: FsEditRequest, expected?: { version: FsVersion }, signal?: AbortSignal, sandboxPolicy?: SandboxExecutionPolicy, ): Promise<FsEditOutcome>
 ```
 
-Types: [SandboxExecutionPolicy](sandbox.md)
+型: [SandboxExecutionPolicy](sandbox.md)
 
-Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
+ソース: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
 
 <a id="fs-events"></a>
 
-### `fs/*` events
+### `fs/*` イベント
 
 <a id="fsedit-intent--waterfall"></a>
 
 #### `fs/edit-intent` — waterfall
 
-Single-slot decision for the next FileSystem.editText. Calling `next()` yields an unconditional edit; the first returned guard wins.
+次の FileSystem.editText への単一スロット決定。`next()` の呼び出しは無条件の編集をもたらし、最初に返されたガードが勝つ。
 
 ```ts cordis-catalog
 /**
@@ -485,13 +485,13 @@ Single-slot decision for the next FileSystem.editText. Calling `next()` yields a
 'fs/edit-intent'(target: FsTarget, actor: object | undefined, next: () => { version: FsVersion } | undefined | Promise<{ version: FsVersion } | undefined>): Promise<{ version: FsVersion } | undefined>
 ```
 
-Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
+ソース: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
 
 <a id="fsobserved--emit"></a>
 
 #### `fs/observed` — emit
 
-Record an authoritative positive or negative observation. Listeners must be synchronous recorders: throws fail the tool call and returned promises are not awaited.
+権威ある肯定または否定の観測を記録する。リスナーは同期的な記録者でなければならない。throw はツール呼び出しを失敗させ、返された promise は待機されない。
 
 ```ts cordis-catalog
 /**
@@ -506,13 +506,13 @@ Record an authoritative positive or negative observation. Listeners must be sync
 'fs/observed'(target: FsTarget, observation: FsObservation, actor: object | undefined): void
 ```
 
-Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
+ソース: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
 
 <a id="fswrite-intent--waterfall"></a>
 
 #### `fs/write-intent` — waterfall
 
-Single-slot decision for the next FileSystem.writeText. Calling `next()` yields the bare provider's unconditional write; the first listener that returns an intent owns the decision rather than composing with peers.
+次の FileSystem.writeText への単一スロット決定。`next()` の呼び出しは素のプロバイダーの無条件書き込みをもたらし、意図を返す最初のリスナーがピアと合成するのではなく決定を所有する。
 
 ```ts cordis-catalog
 /**
@@ -526,5 +526,5 @@ Single-slot decision for the next FileSystem.writeText. Calling `next()` yields 
 'fs/write-intent'(target: FsTarget, actor: object | undefined, next: () => FsWriteIntent | undefined | Promise<FsWriteIntent | undefined>): Promise<FsWriteIntent | undefined>
 ```
 
-Source: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
+ソース: [`packages/fs/fs/src/index.ts`](../../packages/fs/fs/src/index.ts)
 <!-- END GENERATED cordis-surface -->

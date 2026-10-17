@@ -1,40 +1,40 @@
-# Webhook runtime
+# Webhook ランタイム
 
-English | [中文](webhook.zh.md)
+日本語 | [English](webhook.en.md) | [中文](webhook.zh.md)
 
-The Webhook subsystem turns authenticated external deliveries into optional ordinary root Sessions. Provider adapters own authentication and generic JSON intake; trusted programmatic rules own conditions and external calls; `ctx.webhookRuntime` owns callback lifetime plus Workspace-backed Session creation. The [historical implemented decision](../../.agents/notes/archived/feature/2026-08-22-fire-and-forget-webhook-sessions.md) records why the runtime keeps no delivery or completion state.
+Webhook サブシステムは、認証済みの外部配信を通常の任意のルートセッションに変える。プロバイダーアダプターは認証と汎用 JSON 取り込みを所有し、信頼されたプログラム的ルールは条件と外部呼び出しを所有し、`ctx.webhookRuntime` はコールバック寿命とワークスペース起点のセッション作成を所有する。[歴史的な実装済み決定](../../.agents/notes/archived/feature/2026-08-22-fire-and-forget-webhook-sessions.md)は、ランタイムが配信や完了の状態を保持しない理由を記録している。
 
-## Shared values
+## 共有値
 
-`WebhookRuleId`, `WebhookSourceId`, and `WebhookDeliveryId` are opaque strings. A delivery id records the provider's identifier only: the runtime neither stores nor deduplicates it.
+`WebhookRuleId`、`WebhookSourceId`、`WebhookDeliveryId` は不透明な文字列である。配信 id はプロバイダーの識別子のみを記録する。ランタイムはそれを格納も重複排除もしない。
 
-`WebhookEventMap` is merge-extensible by provider kind. `WebhookEventOf<K>` selects a known provider event and otherwise admits generic lossless JSON, allowing an out-of-tree adapter without changing the runtime package.
+`WebhookEventMap` はプロバイダー種別ごとにマージ拡張可能である。`WebhookEventOf<K>` は既知のプロバイダーイベントを選択し、そうでない場合は汎用のロスレス JSON を受け入れるため、ツリー外アダプターでもランタイムパッケージを変更せずに済む。
 
-`VerifiedWebhookDelivery<K>` contains `kind`, configured `source`, provider `deliveryId`, normalized `event`, and non-negative safe-integer `receivedAt`. The runtime validates, detaches, and freezes the entire value before dispatching it to more than one rule.
+`VerifiedWebhookDelivery<K>` は `kind`、構成済み `source`、プロバイダー `deliveryId`、正規化 `event`、非負安全整数 `receivedAt` を含む。ランタイムは値全体を検証、デタッチ、凍結してから複数のルールに配送する。
 
-`WebhookRule<K>` contains a unique id, provider kind, and `run(delivery, signal)`. The callback may execute arbitrary trusted code. It returns `null` or one `WebhookSessionRequest`, and it must observe the signal for asynchronous work that should stop when the registration unloads.
+`WebhookRule<K>` は一意な id、プロバイダー種別、`run(delivery, signal)` を含む。コールバックは任意の信頼されたコードを実行できる。`null` または 1 つの `WebhookSessionRequest` を返し、登録のアンロード時に停止すべき非同期作業についてはシグナルを遵守しなければならない。
 
-`WebhookSessionRequest` requires an absolute `workspacePath`, title, text prompt, agent preset, and permission preset. Optional `model` names an explicit provider/model route plus optional output-token cap and uses that adapter's reasoning default. Omission snapshots the complete current deployment selection, including reasoning effort, until the first request records its durable header.
+`WebhookSessionRequest` は絶対 `workspacePath`、タイトル、テキストプロンプト、エージェントプリセット、権限プリセットを必須とする。任意の `model` は明示的なプロバイダー・モデル経路に任意の出力トークン上限を加えたものを指定し、そのアダプターの reasoning 既定値を使う。省略時は現在のデプロイ選択全体のスナップショットとなり、reasoning effort を含め、最初の要求が永続ヘッダーを記録するまで継続する。
 
-## Fire-and-forget dispatch
+## ファイアアンドフォーゲット配送
 
-`dispatch()` snapshots the matching rules, schedules each independently, and returns before any callback settles. Throws and rejections are contained per rule. Registration disposal removes the rule before aborting and draining its active calls, so no later delivery can enter code that is unloading.
+`dispatch()` は一致するルールをスナップショットし、各々を独立にスケジュールし、コールバックの決着前に復帰する。スローと拒否はルールごとに封じ込められる。登録の破棄はそのアクティブ呼び出しを中止して排出する前にルールを除去するため、後の配信がアンロード中のコードに入ることはない。
 
-The runtime has no queue, retry, deduplication, execution status, crash replay, Agent-status listener, or completion result. Repeated delivery may create repeated Sessions. The only active-operation table is private teardown bookkeeping and disappears with the process.
+ランタイムにキュー、再試行、重複排除、実行状態、クラッシュ時リプレイ、エージェント状態リスナー、完了結果はない。繰り返し配信は繰り返しセッションを作り得る。唯一のアクティブ操作テーブルは私的なテアダウン記帳であり、プロセスと共に消える。
 
-## Session creation
+## セッション作成
 
-A non-null result is snapshotted before asynchronous preflight. The runtime validates permission and agent presets, resolves or creates the canonical Workspace, creates an Agent whose Session cwd equals the Workspace path, mounts the selected agent preset before publication, and durably attaches the Session before applying permission, title, and the initial follow-up.
+非 null 結果は非同期プリフライトの前にスナップショットされる。ランタイムは権限とエージェントのプリセットを検証し、正規ワークスペースを解決または作成し、セッション cwd がワークスペースパスに等しいエージェントを作成し、公開前に選択されたエージェントプリセットをマウントし、権限、タイトル、最初のフォローアップを適用する前にセッションを永続的にアタッチする。
 
-The follow-up is a normal durable user-role message with `source.kind: "webhook"` and the provider, source, delivery, and rule identifiers. Its accepted inbox insertion commits the webhook operation. The runtime does not specially flush or wait for the turn; ordinary Session persistence and Agent lifecycle apply afterward.
+フォローアップは `source.kind: "webhook"` を持つ通常の永続的な user ロールメッセージであり、プロバイダー、ソース、配信、ルールの識別子を含む。その受け入れ済みインボックス挿入が webhook 操作をコミットする。ランタイムはターンを特別にフラッシュも待機もしない。以後は通常のセッション永続化とエージェントライフサイクルが適用される。
 
-Failed attachment disposes the new Agent before a prompt exists. A failure between attachment and prompt admission attempts Workspace detach and Agent disposal without replacing the original error. A Workspace automatically created during preflight remains because another concurrent caller may already use it.
+失敗したアタッチはプロンプト存在前に新しいエージェントを破棄する。アタッチとプロンプト受付の間の失敗は、元のエラーを置き換えずにワークスペースのデタッチとエージェント破棄を試みる。プリフライト中に自動作成されたワークスペースは残る。別の並行呼び出し元がすでに使っている場合があるためである。
 
-## GitHub adapter
+## GitHub アダプター
 
-`@deepseek-ai/dsh-webhook-github` registers an exact route on an injected WebServer, resolves its credential reference for each request, verifies the untouched `application/json` body before parsing, and returns `202` immediately after in-memory dispatch. Its normalized event guarantees a signed lossless-JSON object; rules validate the event-specific fields they consume.
+`@deepseek-ai/dsh-webhook-github` は注入された WebServer 上に正確なルートを登録し、要求ごとに認証情報参照を解決し、手つかずの `application/json` 本体をパース前に検証し、インメモリー配送直後に `202` を返す。その正規化イベントは署名済みロスレス JSON オブジェクトを保証する。ルールは消費するイベント固有フィールドを検証する。
 
-The [GitHub review guide](../user/guide/github-review.md) mounts this route on an isolated second WebServer so exposing webhook ingress does not expose the browser API.
+[GitHub レビューガイド](../user/guide/github-review.md)は、webhook 取り込みの公開がブラウザー API を公開しないよう、このルートを分離された 2 つ目の WebServer 上にマウントする。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -42,13 +42,13 @@ The [GitHub review guide](../user/guide/github-review.md) mounts this route on a
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される(doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。再生成は `pnpm run gen-cordis-catalog`)。言語版の違いは、ロケール固有のペアドキュメントパスのみである。シグネチャブロックは `ts cordis-catalog` フェンスを使用し、元のソース JSDoc を保持する。ディスパッチモードは [primer](../cordis-primer.md#dispatch-modes) で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxwebhookruntime--webhookruntime"></a>
 
 ### `ctx.webhookRuntime` — `WebhookRuntime`
 
-Fire-and-forget rule runtime. Session creation is the only built-in action.
+ファイアアンドフォーゲットのルールランタイム。セッション作成は唯一の組み込みアクションである。
 
 ```ts cordis-catalog
 /**
@@ -66,5 +66,5 @@ register<K extends string>(rule: WebhookRule<K>): () => Promise<void>
 dispatch<K extends string>(delivery: VerifiedWebhookDelivery<K>): void
 ```
 
-Source: [`packages/experimental/webhook/src/index.ts`](../../packages/experimental/webhook/src/index.ts)
+ソース: [`packages/experimental/webhook/src/index.ts`](../../packages/experimental/webhook/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -1,19 +1,19 @@
-# Client component rules
+# クライアントコンポーネントのルール
 
-English | [中文](client-components.zh.md)
+日本語 | [English](client-components.en.md) | [中文](client-components.zh.md)
 
-Rules for client components, their state, and their effects. [packages/client/AGENTS.md](../../packages/client/AGENTS.md) carries the detailed discipline; [slots.md](../subsystems/slots.md) owns the Slot design and [web-styling.md](../web-styling.md) the styling rules. Each section below states the requirement, how a reviewer judges it, where its boundary and exception sit, and a correct and a wrong example.
+クライアントコンポーネント、その状態、エフェクトに関するルール。[packages/client/AGENTS.md](../../packages/client/AGENTS.md) が詳細な規律を定め、[slots.md](../subsystems/slots.md) が Slot の設計を、[web-styling.md](../web-styling.md) がスタイルのルールを所有する。以下の各セクションでは、要件、レビュアーによる判定方法、境界と例外の位置づけ、正しい例と誤った例を示す。
 
-## State arrives through injection
+## 状態はインジェクション経由で届く
 
-A Slot's component receives everything it renders through the inject face of its own registration — plain data, action callbacks, and the reserved `hooks` compartment the renderer binds to `use<Name>` hooks — while the parent's render site passes owner data through the derived `renderSlot`. It never reads one large global state at the top of the tree to hand values down. Keeping every live value on that face is what makes a prop that did not change keep its identity, and what lets a component subscribe only to the sub-state it reads. Without it any unrelated field change re-renders the whole subtree, which is how a long session under streaming events loses frames while the user scrolls or types.
+Slot のコンポーネントは、レンダリングするすべてのものを自身のレジストレーションの inject フェース経由で受け取る — プレーンなデータ、アクションコールバック、そしてレンダラーが `use<Name>` フックに束縛する予約済みの `hooks` コンパートメント — 一方、親のレンダーサイトはオーナーデータを派生した `renderSlot` 経由で渡す。ツリーの頂点で 1 つの大きなグローバル状態を読み取って値を下に渡すことは決してない。すべてのライブ値をそのフェースに載せることで、変化していないプロップが同一性を保ち、コンポーネントが必要なサブ状態だけを購読できるようになる。これがなければ無関係なフィールドの変更がサブツリー全体を再レンダーし、ストリーミングイベント下の長いセッションでユーザーのスクロールや入力中にフレームを失う原因になる。
 
-- Judged by: at the registration and at its render site, the author must be able to name which sub-states the rendered component subscribes to and which of its incoming props keep a stable identity across renders. Watch the mutability of every prop: a value rebuilt each render — a fresh object, array, or inline callback — propagates re-renders even when nothing in it changed.
-- Not covered: the component's own local state (`useState` for a fold, a hover, a draft) is not injection content, and a component that subscribes to nothing outside React needs no new seat.
-- Exception: a new hook seat changes the Slot contract, so that change states its impact — which components subscribe to what — in review; using an existing face needs no per-component approval.
-- Fix: narrow the injection to what the view renders, expose one field per read through a hook seat, and pass a narrow action set instead of a store or service handle. [Component inputs](../subsystems/slots.md#component-inputs) owns the inject factory, the standard hook seats, and how each becomes a prop.
+- 判定方法: レジストレーションとそのレンダーサイトにおいて、作成者はレンダリングされるコンポーネントがどのサブ状態を購読するか、どの受信プロップがレンダー間で安定した同一性を保つかを言えなければならない。すべてのプロップの可変性に注意する: レンダーごとに再構築される値 — 新しいオブジェクト、配列、インラインコールバック — は中身が変わっていなくても再レンダーを伝播させる。
+- 対象外: コンポーネント自身のローカル状態（折りたたみ、ホバー、下書きのための `useState`）はインジェクション内容ではなく、React の外側を何も購読しないコンポーネントには新しいシートは不要である。
+- 例外: 新しいフックシートは Slot 契約を変更するため、その変更はレビューで影響 — どのコンポーネントが何を購読するか — を明示する。既存フェースの利用にはコンポーネントごとの承認は不要である。
+- 修正方法: インジェクションをビューがレンダリングするものに絞り、読み取りごとに 1 フィールドをフックシート経由で公開し、ストアやサービスハンドルではなく狭いアクション集合を渡す。[Component inputs](../subsystems/slots.md#component-inputs) が inject ファクトリー、標準フックシート、各シートがプロップになる方法を所有する。
 
-The registration carries plain data, a narrow action set, and one hook seat; the render site passes owner data, and the component reads only the field it renders:
+レジストレーションはプレーンなデータ、狭いアクション集合、1 つのフックシートを持ち、レンダーサイトはオーナーデータを渡し、コンポーネントはレンダリングするフィールドだけを読む:
 
 ```tsx
 // The inject factory returns plain data and callbacks; hooks is the reserved compartment.
@@ -37,7 +37,7 @@ function SidebarRight({ id, useInfo, rename }: Props) {
 }
 ```
 
-The top-level component reads the whole view store and hands it down as one prop, so the render site can no longer answer either question above:
+トップレベルのコンポーネントはビュー全体のストアを読み取り、1 つのプロップとして下に渡すため、レンダーサイトは上記のどちらの問いにも答えられなくなる:
 
 ```tsx
 function Sidebar() {
@@ -50,18 +50,18 @@ function SidebarRight({ view }: { view: ViewStore }) {
 }
 ```
 
-Every field change in that store re-renders the whole sidebar subtree, and the component's subscription set is invisible to the site that bound it.
+そのストアのあらゆるフィールド変更がサイドバー全体のサブツリーを再レンダーし、コンポーネントの購読集合はそれを束縛したサイトから見えなくなる。
 
-## Props carry data and callbacks, not React nodes
+## プロップはデータとコールバックを持ち、React ノードは持たない
 
-A prop is data or a callback; a React node travels through a declared slot. Passing an element as a prop value or an injected member hides a second composition path that the Slot contract does not describe, moves render control from the registration surface to the call site, and lets one package assemble another package's markup. New node-valued props or injected members are never added; a location that needs host-supplied markup is declared as a child slot instead.
+プロップはデータまたはコールバックであり、React ノードは宣言済みスロット経由で移動する。要素をプロップ値やインジェクトされたメンバーとして渡すと、Slot 契約が記述しない第 2 のコンポジション経路を隠し、レンダー制御をレジストレーション面から呼び出しサイトへ移し、あるパッケージが別パッケージのマークアップを組み立てられるようになる。ノード値を持つ新しいプロップやインジェクトされたメンバーは決して追加しない。ホスト供給のマークアップが必要な位置は、代わりに子スロットとして宣言する。
 
-- Judged by: `ReactNode`, `ReactElement`, or a `() => JSX.Element` in a component's props type, in an inject factory's return value, or in an owner-props object at a render site.
-- Not covered: node-valued fields that already shipped keep working. The rule triggers when a change touches one, and that change converts it rather than extending it.
-- Exception: when the conversion cannot happen in the same change, the owning domain expert confirms the deferral and the change records that confirmation; the author never self-approves.
-- Fix: declare the location in the parent registration's `children`, render it with `renderSlot`, and pass data through the child's props. [Extension rules](../subsystems/slots.md#extension-rules) own which package may declare and render which slot.
+- 判定方法: コンポーネントのプロップ型、inject ファクトリーの戻り値、レンダーサイトのオーナープロップオブジェクトにおける `ReactNode`、`ReactElement`、または `() => JSX.Element`。
+- 対象外: すでに出荷済みのノード値フィールドは動作し続ける。このルールは変更がその 1 つに触れたときに発動し、その変更は拡張ではなく変換する。
+- 例外: 変換を同じ変更で実施できない場合、所有するドメインエキスパートが延期を確認し、その変更が確認を記録する。作成者自身による承認は決して行わない。
+- 修正方法: 親レジストレーションの `children` に位置を宣言し、`renderSlot` でレンダリングし、子のプロップ経由でデータを渡す。どのパッケージがどのスロットを宣言・レンダリングできるかは [Extension rules](../subsystems/slots.md#extension-rules) が所有する。
 
-The header location is a declared child slot, so the host passes data and the registered component owns its markup:
+ヘッダー位置は宣言済みの子スロットであるため、ホストはデータを渡し、登録済みコンポーネントがマークアップを所有する:
 
 ```tsx
 // The card declares the header location; the host passes data only.
@@ -78,7 +78,7 @@ function ToolCard({ title, renderSlot }: Props) {
 }
 ```
 
-A React node crosses the boundary as a prop value, so the composition path it travels is not declared anywhere:
+React ノードがプロップ値として境界を越えるため、その移動経路となるコンポジション経路はどこにも宣言されない:
 
 ```tsx
 type ToolCardProps = {
@@ -90,18 +90,18 @@ type ToolCardProps = {
 <ToolCard header={<ArchiveBadge />} />
 ```
 
-The card's Slot contract stops describing what it renders, the call site keeps render control, and the badge's package becomes a runtime reference from whoever passes it.
+カードの Slot 契約はレンダリング内容の記述をやめ、呼び出しサイトがレンダー制御を保持し、バッジのパッケージはそれを渡す側からのランタイム参照になる。
 
-## A slot registration is a stable function component
+## スロットレジストレーションは安定した関数コンポーネントである
 
-The value registered into a slot is a stable function component declared at module scope. A component function created during render is a new component type on every pass, and React treats a changed type as a different component: it unmounts the subtree and mounts a fresh one, which resets expanded rows, input focus, and scroll position. Registration-time parameters reach the component through props rather than by closing over render-time variables.
+スロットに登録される値は、モジュールスコープで宣言された安定した関数コンポーネントである。レンダー中に作成されたコンポーネント関数は毎回新しいコンポーネント型となり、React は型の変化を別コンポーネントとして扱う: サブツリーをアンマウントして新しいものをマウントするため、展開済みの行、入力フォーカス、スクロール位置がリセットされる。レジストレーション時のパラメーターは、レンダー時変数をクロージャーで取り込むのではなく、プロップ経由でコンポーネントに届ける。
 
-- Judged by: where the registered value is created. An inline arrow in a registration or render call, a component defined inside a render body, and a `useCallback` wrapper around an inline component all fail; a module-scope `function` declaration passes.
-- Not covered: the rule constrains the identity of the registered value, not its complexity. A stable component may still read injected props, hooks, and callbacks.
-- Exception: creating a component during render is correct only when the caller wants the remount, and an ordinary change needs no separate approval; a change to the form of the Slot contract follows the injection-face review described under State arrives through injection.
-- Fix: move the component to module scope, type its props from the registration's shares, and pass the varying value through the inject face instead of the closure.
+- 判定方法: 登録値が作成される場所。レジストレーションやレンダー呼び出し内のインラインアロー、レンダー本体内部で定義されたコンポーネント、インラインコンポーネントを包む `useCallback` はいずれも不合格であり、モジュールスコープの `function` 宣言が合格である。
+- 対象外: このルールは登録値の同一性を制約するもので、複雑さを制約するものではない。安定したコンポーネントはインジェクトされたプロップ、フック、コールバックを読み取り続けてもよい。
+- 例外: レンダー中にコンポーネントを作成することが正しいのは、呼び出し側が再マウントを望む場合のみであり、通常の変更に個別の承認は不要である。Slot 契約の形式への変更は、状態はインジェクション経由で届くで説明したインジェクションフェースのレビューに従う。
+- 修正方法: コンポーネントをモジュールスコープに移動し、レジストレーションの共有からプロップの型を付け、変化する値をクロージャーではなく inject フェース経由で渡す。
 
-The registration holds one stable reference to a module-scope component, and the varying value arrives injected; the render site supplies the local component:
+レジストレーションはモジュールスコープのコンポーネントへの安定した参照を 1 つ保持し、変化する値はインジェクトされて届く。レンダーサイトはローカルコンポーネントを提供する:
 
 ```tsx
 function PanelTitle({ title, count }: Props) {
@@ -123,25 +123,25 @@ ctx.slots.registerFactory(
 renderFactorySlot('panel', { /* owner data */ }, { slots: { title: PanelTitle } })
 ```
 
-An inline arrow at the render site creates a new component type whenever that render runs:
+レンダーサイトのインラインアローは、そのレンダーが実行されるたびに新しいコンポーネント型を作成する:
 
 ```tsx
 // A new component type each time this render runs.
 renderFactorySlot('panel', { /* owner data */ }, { slots: { title: (p) => <span>{p.title}</span> } })
 ```
 
-React sees a different type than the previous registration, remounts the seat, and resets its local state — expanded, focused, or scrolled position — on an otherwise unrelated update.
+React は前回のレジストレーションとは異なる型と見なし、シートを再マウントし、無関係な更新であってもローカル状態 — 展開、フォーカス、スクロール位置 — をリセットする。
 
-## Components never receive a Cordis context
+## コンポーネントは Cordis コンテキストを決して受け取らない
 
-`ctx` belongs to the apply world: the plugin body and the `inject` factories closed over it. A component never receives a Cordis context, never imports a service class to poke it, and never reads a React context, because business components see zero contexts — the renderer's binding contexts are internal to it. A bare observable reaches a component only after Injection wraps it in a hook; a component that subscribes directly owns a lifecycle that nothing on the Injection face releases.
+`ctx` は apply の世界に属する: プラグイン本体とそれに閉じた `inject` ファクトリーである。コンポーネントは Cordis コンテキストを決して受け取らず、サービス クラスをインポートしてそれを操作することも、React コンテキストを読むこともない。ビジネス コンポーネントが見るコンテキストはゼロであり — レンダラーの束縛コンテキストはその内部専用である。素のオブザーバブルがコンポーネントに届くのは、Injection がフックで包んだ後のみである。直接購読するコンポーネントは、インジェクションフェース上の何ものも解放しないライフサイクルを所有することになる。
 
-- Judged by: `ctx` or `Context` in a component's parameter or props type; a component body reading `observable.value`, calling `subscribe`, or wiring `useSyncExternalStore`; a service class imported into a feature `.tsx` module.
-- Not covered: a component-internal behavioral hook that subscribes to nothing outside React (a timer, a media query) is not injection content and stays in the component.
-- Exception: none. The direct subscription still present in `TabSlot` is remediation work owned by that entry's owner, not a precedent for new code.
-- Fix: move the fact into the registration's `inject` — plain data and callbacks, with bare observables in the reserved `hooks` compartment — or into a declared store, and read it through the derived seat.
+- 判定方法: コンポーネントのパラメーターやプロップ型における `ctx` または `Context`。コンポーネント本体が `observable.value` を読む、`subscribe` を呼ぶ、`useSyncExternalStore` を配線する。サービス クラスがフィーチャーの `.tsx` モジュールにインポートされている。
+- 対象外: React の外側を何も購読しないコンポーネント内部の振る舞いフック（タイマー、メディアクエリ）はインジェクション内容ではなく、コンポーネント内に残る。
+- 例外: なし。`TabSlot` に残る直接購読は、そのエントリの所有者が持つ修復作業であり、新規コードの前例ではない。
+- 修正方法: その事実をレジストレーションの `inject` — プレーンなデータとコールバック、素のオブザーバブルは予約済み `hooks` コンパートメント — または宣言済みストアに移動し、派生シート経由で読む。
 
-Injection binds the observable, and the component reads one derived hook whose subscription the renderer owns:
+インジェクションがオブザーバブルを束縛し、コンポーネントはレンダラーが購読を所有する派生フックを 1 つ読む:
 
 ```tsx
 // The inject factory is the only place that closes over ctx.
@@ -156,7 +156,7 @@ function TabView({ useTab, action }: Props) {
 }
 ```
 
-The component holds `ctx` and reads the source itself, so the subscription and its lifetime belong to the component:
+コンポーネントは `ctx` を保持してソース自体を読むため、購読とその有効期間はコンポーネントに属する:
 
 ```tsx
 function TabView({ ctx }: { ctx: Context }) {
@@ -165,13 +165,13 @@ function TabView({ ctx }: { ctx: Context }) {
 }
 ```
 
-No one releases that subscription, re-renders fire outside React's scheduling, and the component is now bound to one store implementation.
+その購読を解放する者はおらず、再レンダーは React のスケジューリング外で発火し、コンポーネントは 1 つのストア実装に束縛される。
 
-## Context comes from the current scope
+## コンテキストは現在のスコープから得る
 
-`session`, `panel`, `tab`, and the like come from the current scope — a provider, an injected member, or a framework hook. A new global `current`, `active`, `selection`, or `viewId` is not a channel for reaching them, so the several composers and conversations of one session each work independently.
+`session`、`panel`、`tab` などは現在のスコープから得る — プロバイダー、インジェクトされたメンバー、フレームワークフックである。到達のためのチャネルとして新しいグローバルな `current`、`active`、`selection`、`viewId` は存在しないため、1 つのセッションの複数のコンポーザーと会話がそれぞれ独立に動作する。
 
-The judged condition is whether a component obtains its context through the scope, or through a global field. Multi-instance behavior is the test: two composers under one session must not cross. Where an object really is globally unique, a service or instance carries it and callers `inject` it explicitly.
+判定条件は、コンポーネントがコンテキストをスコープ経由で取得するか、グローバルフィールド経由で取得するかである。マルチインスタンス動作がテストになる: 1 つのセッション下の 2 つのコンポーザーは交差してはならない。真にグローバルに一意なオブジェクトは、サービスまたはインスタンスが保持し、呼び出し側が明示的に `inject` する。
 
 ```ts
 // The injected factory closes over the scope's own session and panel.
@@ -183,18 +183,18 @@ const inject = (ctx: Scope) => ({ session: ctx.session, panel: ctx.panel })
 const activeTabId = globalThis.__activeTabId   // every tab reads the same value
 ```
 
-The wrong form makes instances cross-talk, and ownership of state becomes unauditable.
+誤った形式はインスタンス間の混線を起こし、状態の所有関係を監査不能にする。
 
-## Resource consumers go through `useResource`
+## リソース利用者は `useResource` 経由で読む
 
-An element that shows a resource reads it through the injected `useResource` hook, addressed by the resource's protocol and address. A domain wrapper — a Tab, a panel — composes its own hook over `useResource`, and its return structure is free, but the fetch, cache, and subscription underneath are not rebuilt. A second read path per protocol splits cache and invalidation policy, so one address can be live in one place and stale in another.
+リソースを表示する要素は、インジェクトされた `useResource` フック経由でそれを読み、リソースのプロトコルとアドレスで指定する。ドメインワラッパー — Tab、パネル — は `useResource` 上に自身のフックを組み立て、その戻り値の構造は自由であるが、下にあるフェッチ、キャッシュ、購読を作り直すことはない。プロトコルごとに第 2 の読み取り経路があるとキャッシュと無効化ポリシーが分裂するため、1 つのアドレスが一方ではライブ、他方ではステイルになりうる。
 
-- Judged by: the read path. `useResource<Protocol>(address)`, or a business hook whose body calls it, passes; a hand-built subscribe-and-cache, a copy of a provider's stream handling, or a flat generic hook such as `useTabStream` fails.
-- Not covered: non-resource local UI state — a collapse, a hover, a draft — stays `useState` and gets no resource address. [Client resources](../subsystems/client-resources.md) owns the status values and what holds a resource open.
-- Exception: reshaping the snapshot is free, but a wrapper that hides protocol differences behind conditional branches states its ownership in review, and a new protocol's hook comes from that protocol's owner.
-- Fix: call `useResource` inside the domain hook, map its result onto what the component renders, and delete the bespoke cache.
+- 判定方法: 読み取り経路。`useResource<Protocol>(address)`、または本体内でそれを呼ぶビジネスフックは合格である。手作りの購読＋キャッシュ、プロバイダーのストリーム処理のコピー、`useTabStream` のようなフラットな汎用フックは不合格である。
+- 対象外: リソースでないローカル UI 状態 — 折りたたみ、ホバー、下書き — は `useState` のままでリソースアドレスを持たない。ステータス値とリソースを開いたままにするものの所有は [Client resources](../subsystems/client-resources.md) が持つ。
+- 例外: スナップショットの整形は自由であるが、条件分岐の背後でプロトコル差異を隠すワラッパーはレビューで所有関係を明示し、新しいプロトコルのフックはそのプロトコルの所有者から提供される。
+- 修正方法: ドメインフック内で `useResource` を呼び、その結果をコンポーネントがレンダリングするものに写像し、独自キャッシュを削除する。
 
-The domain wrapper takes the injected hook as an argument and only reshapes its result, so the bottom layer stays single:
+ドメインワラッパーはインジェクトされたフックを引数として受け取り、その結果を整形するだけであるため、最下層は単一のままである:
 
 ```tsx
 // The bottom layer is the standard hook, reached through the component's inject face.
@@ -211,7 +211,7 @@ function ChatBody({ id, useResource }: Props) {
 }
 ```
 
-A wrapper rebuilds subscription, cache, and invalidation under its own name, so the provider's lifecycle and the shared cache no longer apply:
+ワラッパーが独自名の下で購読、キャッシュ、無効化を作り直すため、プロバイダーのライフサイクルと共有キャッシュは適用されなくなる:
 
 ```tsx
 export function useTabStream(id: string) {
@@ -224,19 +224,19 @@ export function useTabStream(id: string) {
 }
 ```
 
-Every protocol grows its own fetch and invalidation logic, cache entries and refresh policy cannot be unified, and consumers of one address disagree about its current value.
+すべてのプロトコルが独自のフェッチと無効化ロジックを育て、キャッシュエントリと更新ポリシーを統一できず、1 つのアドレスの利用者間で現在値の見解が割れる。
 
-## Store usage is narrow and explicit
+## ストア利用は狭く明示的に行う
 
-A front-end store carries shared viewing or interaction state. Its spec declares the initial state, the actions that mutate it, and — when the value should survive a reload — a persistence key the framework runs mechanically, with a session-scope instance suffixing that key so per-session instances persist independently. The store's attributes and the actions that mutate them are encapsulated and injected as a narrow interface, so a component receives those and the selectors it needs and never the whole view store. Business data lives in the object layer rather than in a store, and a setting change goes through the settings interface, not through store state.
+フロントエンドストアは共有の表示状態や操作状態を保持する。その仕様は初期状態、それを変異させるアクション、そして値がリロードを超えて存続すべき場合にフレームワークが機械的に実行する永続化キーを宣言し、セッションスコープのインスタンスはそのキーに接尾辞を付けてセッションごとのインスタンスが独立に永続化される。ストアの属性とそれを変異させるアクションはカプセル化され、狭いインターフェースとしてインジェクトされるため、コンポーネントはそれらと必要なセレクターを受け取り、ビュー全体のストアを受け取ることは決してない。ビジネスデータはストアではなくオブジェクト層に存在し、設定変更はストア状態ではなく設定インターフェース経由で行う。
 
-- Judged by: whether the injected face is a narrow interface or the store object itself, and whether the handle is built inside `apply` or at module level.
-- Persistence: the spec's `persist` key is the whole mechanism, run by the framework; the engine instance exposes `getSnapshot`, `subscribe`, the baked actions, and `clearPersisted`, and nothing hydrates it by hand.
-- Not covered: render state in a store is fine while it does not change a setting, and component-local state is not store content. [Store contracts](../subsystems/slots.md#component-inputs) own how a declared store becomes props, and [Web Client architecture](../subsystems/web-client.md) owns where business data lives.
-- Exception: a store handle exported at module level is forbidden — module-cache identity is a disguised singleton across plugin reloads; restructuring an injection face into a narrow one needs no separate approval.
-- Fix: replace the store handle in the inject return with the fields and action callbacks the component renders, and keep the handle inside `apply`.
+- 判定方法: インジェクトされるフェースが狭いインターフェースかストアオブジェクト自体か、そしてハンドルが `apply` 内部で構築されるかモジュールレベルで構築されるか。
+- 永続化: 仕様の `persist` キーが仕組みの全体であり、フレームワークが実行する。エンジンインスタンスは `getSnapshot`、`subscribe`、ベイク済みアクション、`clearPersisted` を公開し、手動でハイドレーションするものは何もない。
+- 対象外: 設定を変更しないレンダー状態のストア保持は問題なく、コンポーネントローカル状態はストア内容ではない。宣言済みストアがプロップになる方法は [Store contracts](../subsystems/slots.md#component-inputs) が、ビジネスデータの所在は [Web Client architecture](../subsystems/web-client.md) が所有する。
+- 例外: モジュールレベルでエクスポートされたストアハンドルは禁止である — モジュールキャッシュの同一性はプラグインリロードをまたぐ偽装シングルトンである。インジェクションフェースを狭い形に組み替えることに個別の承認は不要である。
+- 修正方法: inject の戻り値にあるストアハンドルを、コンポーネントがレンダリングするフィールドとアクションコールバックに置き換え、ハンドルは `apply` 内部に保持する。
 
-One handle is built inside `apply` and passed to the registration, and the inject face carries only the fields and actions the view renders:
+1 つのハンドルが `apply` 内部で構築されてレジストレーションに渡され、inject フェースはビューがレンダリングするフィールドとアクションのみを運ぶ:
 
 ```tsx
 // The handle is built in apply; persistence is the spec's own key.
@@ -254,7 +254,7 @@ function SidebarHeader({ useStore, actions, onSelect }: Props) {
 }
 ```
 
-The whole view store is injected for the component to pick fields from, and a module-level handle takes instance lifecycle away from the framework:
+ビュー全体のストアがコンポーネントがフィールドを選ぶためにインジェクトされ、モジュールレベルのハンドルがインスタンスのライフサイクルをフレームワークから奪う:
 
 ```tsx
 // The component receives the store itself and picks its own fields.
@@ -268,19 +268,19 @@ function SidebarHeader({ viewStore }: Props) {
 export const paneStore = createPaneStore()
 ```
 
-The component's dependency face stops being auditable, and the shared module identity outlives every scope teardown: two panes end up on one instance instead of one each.
+コンポーネントの依存フェースは監査不能になり、共有モジュール同一性はあらゆるスコープ破棄を超えて存続する: 2 つのペインが 1 つずつではなく 1 つのインスタンスに載る。
 
-## Identity and initial state are deliberate
+## 同一性と初期状態は意図的に定める
 
-Switching state does not remount a control or replace its DOM node: the instance and its DOM identity stay the same across a state change, so focus, selection, and an in-progress draft survive it. Initial state is ready when the first flow runs — the same path prepares the data and establishes the state — instead of being filled in later by an effect. A component receives hooks, selectors, and action callbacks rather than a whole service.
+状態の切り替えはコントロールを再マウントしたり DOM ノードを置換したりしない: 状態変更をまたいでインスタンスと DOM 同一性は同じままであるため、フォーカス、選択、入力中の下書きが存続する。初期状態は最初のフロー実行時に準備済みである — 同じ経路がデータを準備して状態を確立する — エフェクトで後から埋めるのではない。コンポーネントはサービス全体ではなく、フック、セレクター、アクションコールバックを受け取る。
 
-- Judged by: after a state change, whether the control instance and its DOM node keep their identity; an unmount followed by a mount is the violation. The initialization path is judged the same way: state established inside the first flow passes, state written from an effect fails.
-- Dependency face: hooks read, selectors pick a sub-state, and action callbacks write back. A whole service passed as a prop or an injected member fails.
-- Scope: input and command controls that hold an internal instance and local state, and business views created by a factory.
-- Exception: a genuinely required remount — switching to a data set whose instance state cannot migrate — is explained in review together with the state migration plan; the reviewer of a change that affects a control's instance lifetime accepts it.
-- Fix: derive the initial value where the first flow builds its state, keep the layout node mounted and vary its props, and replace a service prop with the three narrow shares.
+- 判定方法: 状態変更後にコントロールインスタンスと DOM ノードが同一性を保つか。アンマウントに続くマウントが違反である。初期化経路も同じ方法で判定する: 最初のフロー内部で確立された状態が合格、エフェクトから書き込まれた状態が不合格である。
+- 依存フェース: フックが読み取り、セレクターがサブ状態を選び、アクションコールバックが書き戻す。プロップやインジェクトされたメンバーとしてサービス全体を渡すことは不合格である。
+- 適用範囲: 内部インスタンスとローカル状態を持つ入力・コマンドコントロール、およびファクトリーで生成されるビジネスビュー。
+- 例外: 真に必要な再マウント — インスタンス状態を移行できないデータ集合への切り替え — は、状態移行計画とともにレビューで説明する。コントロールのインスタンス有効期間に影響する変更は、そのレビュアーが承認する。
+- 修正方法: 最初のフローが状態を構築する場所で初期値を導出し、レイアウトノードをマウントしたままプロップだけを変え、サービスプロップを 3 つの狭い共有に置き換える。
 
-The draft exists with the session and the composer node stays mounted while only its props change:
+下書きはセッションとともに存在し、コンポーザーノードはプロップだけが変わりマウントされたままである:
 
 ```tsx
 // The draft is built by the first flow; nothing fills it in later.
@@ -295,7 +295,7 @@ return (
 )
 ```
 
-Initial state arrives one commit late, and the keyed control is rebuilt whenever the session changes:
+初期状態は 1 コミット遅れで届き、キー付きコントロールはセッションが変わるたびに作り直される:
 
 ```tsx
 // The draft is filled in after the first commit.
@@ -305,18 +305,18 @@ useEffect(() => { setDraftState(initialDraft) }, [])
 <Composer service={composerService} key={sessionId} />
 ```
 
-The first frame renders an empty draft, and every session switch drops focus, selection, and whatever the user had typed.
+最初のフレームは空の下書きをレンダリングし、セッション切り替えのたびにフォーカス、選択、入力途中の文字が失われる。
 
-## `useLayoutEffect` is not a default
+## `useLayoutEffect` は既定ではない
 
-`useLayoutEffect` is not used by default, and replacing it with `useEffect` is not a fix, because the two differ in timing rather than in what the code is doing. A layout measurement first answers why it happens here, why CSS cannot express it, and why it must be a pixel measurement; only then does it move into an injected measurement hook with the owning domain expert's sign-off. An effect of either kind never records state or binds logic, because that belongs in Injection.
+`useLayoutEffect` は既定で使わず、`useEffect` への置換は修正ではない。両者はコードの内容ではなくタイミングが異なるためである。レイアウト測定はまず、なぜここで発生するのか、なぜ CSS で表現できないのか、なぜピクセル測定でなければならないのかに答える。その後初めて、所有するドメインエキスパートの承認を得てインジェクトされた測定フックに移動する。どちらの種類のエフェクトも状態の記録やロジックの束縛を行わない。それは Injection の役割であるためである。
 
-- Judged by purpose, not by hook name: which measurement or which binding the effect exists for. A state-recording or logic-binding effect returns to Injection as a Provider or an injected hook; only a measurement that survived the three questions stays, and its result is consumed as a declarative layout parameter.
-- Not covered: the timing difference between the two effects, which `@types/react` documents for `useLayoutEffect` as synchronous after DOM mutation and before paint, is background fact and not a license to rewrite one as the other.
-- Exception: any retained `useLayoutEffect` needs the owning domain expert's confirmation, and the change records that confirmation.
-- Fix: express the layout in CSS — grid, `aspect-ratio`, a container query — or collect the measurement inside the injected hook and expose one value.
+- 判定方法はフック名ではなく目的: エフェクトがどの測定のため、どの束縛のために存在するか。状態記録やロジック束縛のエフェクトは Provider やインジェクトされたフックとして Injection に戻す。3 つの問いに耐えた測定のみが残り、その結果は宣言的なレイアウトパラメーターとして消費される。
+- 対象外: 2 つのエフェクトのタイミング差 — `useLayoutEffect` について `@types/react` が DOM 変更後・ペイント前の同期的実行と文書化していること — は背景事実であり、一方を他方に書き換える許可ではない。
+- 例外: 保持される `useLayoutEffect` は所有するドメインエキスパートの確認を要し、その変更が確認を記録する。
+- 修正方法: レイアウトを CSS で表現する — grid、`aspect-ratio`、コンテナークエリ — または測定をインジェクトされたフック内に集約して 1 つの値を公開する。
 
-Layout is declared in CSS, and the one measurement that survived the questions lives in an injected hook:
+レイアウトは CSS で宣言し、問いを生き残った 1 つの測定はインジェクトされたフックに存在する:
 
 ```tsx
 // Fix 1 — express the layout in CSS and delete the measurement.
@@ -330,7 +330,7 @@ function CardBase({ useLayoutMeasurements }: Props) {
 }
 ```
 
-Both of the first two effects below answer the wrong question — which effect to use — and the third parks a binding in an effect:
+下の最初の 2 つのエフェクトは誤った問い — どちらのエフェクトを使うか — に答えており、3 つ目は束縛をエフェクトに置いている:
 
 ```tsx
 // A synchronous pixel measurement the design did not need.
@@ -343,19 +343,19 @@ useEffect(() => { setHeight(ref.current.getBoundingClientRect().height) }, [])
 useEffect(() => { bindShortcut(handler) }, [])
 ```
 
-The rename leaves the layout problem in place, the measured height now depends on which effect was chosen, and the shortcut binds one render late instead of through Injection.
+改名はレイアウト問題を残したままにし、測定された高さは選択したエフェクトに依存するようになり、ショートカットは Injection 経由ではなく 1 レンダー遅れで束縛される。
 
-## Effects never push render-derived data to a parent
+## エフェクトはレンダーから導出できるデータを親に押し戻さない
 
-An effect body never calls a setter that arrived through props or slot props to push data back to a parent when that data could be decided during render from props or state the component already has. Such a push costs a second render, leaves the parent without the value on its first frame, and turns any later state change into a render cascade. The value is decided during render, the host takes it through a render-time channel, or a user gesture updates its own state in its handler.
+エフェクト本体は、コンポーネントがすでに持つプロップや状態からレンダー中に決定できるデータを、プロップやスロットプロップ経由で届いたセッターを呼んで親に押し戻すことは決してない。そのような押し戻しは 2 回目のレンダーを要し、親は最初のフレームで値を欠き、以後の状態変更はすべてレンダーカスケードになる。値はレンダー中に決定する、ホストはレンダー時チャネル経由で受け取る、またはユーザー操作がハンドラー内で自身の状態を更新する。
 
-- Judged by: a setter from props or slot props called inside an effect, whose argument derives from the current props or state, with no external event or subscription callback driving it. A cleanup `return () => setX(undefined)` is part of the same violation.
-- Consequences to name in review: the extra render pass; the parent's first frame missing the value; a dependency array that goes stale when a member is omitted; the effect → parent state → render cascade; and a child lifecycle entangled with parent state.
-- Not covered: an effect that reacts to a genuine external event — a subscription callback, a socket frame, a user gesture — is not this pattern, and an event handler may update state directly.
-- Exception: none by default; any exception needs the owning domain expert's confirmation.
-- Fix, in order: render the UI where the state already is; if the host must render it, hand the value over during render; if the state is shared across entries, move it to the inject face or a declared store.
+- 判定方法: プロップやスロットプロップ由来のセッターがエフェクト内部で呼ばれ、その引数が現在のプロップや状態から導出され、外部イベントや購読コールバックによる駆動がないもの。クリーンアップの `return () => setX(undefined)` も同じ違反の一部である。
+- レビューで指摘すべき結果: 余分なレンダーパス。親の最初のフレームでの値欠落。メンバー省略時に古くなる依存配列。エフェクト → 親状態 → レンダーのカスケード。子ライフサイクルと親状態の絡み合い。
+- 対象外: 真の外部イベント — 購読コールバック、ソケットフレーム、ユーザー操作 — に反応するエフェクトはこのパターンではなく、イベントハンドラーは状態を直接更新してよい。
+- 例外: 既定ではなし。例外には所有するドメインエキスパートの確認が必要である。
+- 修正方法 (順序付き): 状態がすでにある場所で UI をレンダリングする。ホストがレンダリングしなければならない場合は、レンダー中に値を渡す。状態がエントリ間で共有される場合は、inject フェースまたは宣言済みストアに移動する。
 
-The control is rendered where its state already lives, and the shared variant is read during render while the write stays in the gesture handler:
+コントロールは状態がすでにある場所でレンダリングされ、共有バリアントはレンダー中に読み取られ、書き込みは操作ハンドラーに残る:
 
 ```tsx
 // 1. Render it where the state already lives; no channel is needed.
@@ -368,7 +368,7 @@ const { toggleOriginal } = actions
 return <Button onClick={toggleOriginal}>{showOriginal ? rendered : source}</Button>
 ```
 
-`label` and `disabled` are render-derivable, so calling the parent's setter from an effect makes the parent render twice and still lack the header on its first frame:
+`label` と `disabled` はレンダーから導出できるため、エフェクトから親のセッターを呼ぶと親は 2 回レンダーし、最初のフレームでもヘッダーを欠く:
 
 ```tsx
 useEffect(() => {
@@ -377,18 +377,18 @@ useEffect(() => {
 }, [label, disabled, setHeaderAction])
 ```
 
-The parent renders twice for data it could have had on the first pass, the header appears a frame late or flashes, and the hand-written dependency list decides when it is published.
+親は最初のパスで得られたはずのデータのために 2 回レンダリングし、ヘッダーは 1 フレーム遅れて現れるか点滅し、手書きの依存リストが公開タイミングを決める。
 
-## Build and style follow their owners
+## ビルドとスタイルは所有者に従う
 
-Every build adjustment for a client package goes through the tsdown plugin for that package, and a package does not grow its own build branch. Styling goes through CSS Modules, and only images, GIFs, and SVG are inlined — inlined into CSS rather than into JSX. Large text never appears inline in TSX, and a `style` object holds only runtime-computed values, because static values and style variants belong to CSS Module class names.
+クライアントパッケージのビルド調整はすべてそのパッケージの tsdown プラグイン経由で行い、パッケージは独自のビルド分岐を育てない。スタイルは CSS Modules 経由で行い、インライン化するのは画像、GIF、SVG のみである — JSX ではなく CSS にインライン化する。大きなテキストは TSX にインラインで現れることは決してなく、`style` オブジェクトはランタイム計算値のみを保持する。静的値とスタイルバリアントは CSS Module クラス名に属するためである。
 
-- Judged by: a new build branch inside a package instead of the tsdown plugin; a literal color, a component library, or Tailwind in feature styling; base64 data or large text in TSX; and a `style` object carrying static values or a variant switch.
-- Not covered: a runtime-computed value such as a measured gutter or a progress percentage may enter `style`, and a component-local custom property may carry a layout value. [Component rules](../web-styling.md#component-rules) own the tokens, CSS Module, and class-name rules.
-- Exception: a new build branch or a new inline form is explained in review before it lands, and the owning package's rules decide whether it stays.
-- Fix: move the variant into a CSS Module class switched by `className`, keep base64 in CSS produced by the build chain, and delete the large text constant from the TSX module.
+- 判定方法: tsdown プラグインではなくパッケージ内部の新しいビルド分岐。フィーチャースタイルにおけるリテラル色、コンポーネントライブラリ、Tailwind。TSX 内の base64 データや大きなテキスト。静的値やバリアント切り替えを運ぶ `style` オブジェクト。
+- 対象外: 測定されたガターや進捗割合のようなランタイム計算値は `style` に入ってよく、コンポーネントローカルのカスタムプロパティはレイアウト値を運んでよい。トークン、CSS Module、クラス名ルールは [Component rules](../web-styling.md#component-rules) が所有する。
+- 例外: 新しいビルド分岐や新しいインライン形式は、着地前にレビューで説明し、所有するパッケージのルールが残留可否を決める。
+- 修正方法: バリアントを `className` で切り替える CSS Module クラスに移動し、base64 はビルドチェーンが生成する CSS に保持し、TSX モジュールから大きなテキスト定数を削除する。
 
-The component switches class names and data attributes, and the CSS Module owns the presentation:
+コンポーネントはクラス名とデータ属性を切り替え、CSS Module が表示を所有する:
 
 ```tsx
 import s from './card.module.css'
@@ -403,7 +403,7 @@ export function Card({ active, tone, children }: Props) {
 }
 ```
 
-Large text and inlined binary data enter the module, and the `style` object encodes a variant the theme cannot override:
+大きなテキストとインライン化されたバイナリデータがモジュールに入り、`style` オブジェクトはテーマが上書きできないバリアントをエンコードする:
 
 ```tsx
 const HUGE = '...several KB of text...'   // large text inline in the module
@@ -412,18 +412,18 @@ const HUGE = '...several KB of text...'   // large text inline in the module
 <div style={{ color: toneColor, backgroundImage: `url(${AVATAR_DATA_URL})` }} />
 ```
 
-The bundle carries text and binary data that belong in CSS and assets, diffs carry unreadable blobs, and a theme override can no longer reach that colour.
+バンドルは CSS とアセットに属するテキストとバイナリデータを運び、差分は読めない塊を運び、テーマ上書きはその色に届かなくなる。
 
-## A key states what it identifies
+## キーは何を識別するかを明示する
 
-Pass a `key` only when it names which entity or instance an element represents, and state that identity — a `turnId`, for example, is unique inside one session. Most lists already have a stable business id and need no extra key. A key invented to silence a warning or to encode render order states an identity the data does not have, and an array index is never that identity, because an insert or delete shifts every following item onto a different element.
+`key` は要素が表すエンティティやインスタンス — たとえば 1 つのセッション内で一意な `turnId` — を名指す場合にのみ渡し、その同一性を明示する。ほとんどのリストはすでに安定したビジネス ID を持ち、追加のキーは不要である。警告を黙らせるための発明キーやレンダー順をエンコードするキーは、データが持たない同一性を主張する。配列インデックスはその同一性には決してならない。挿入や削除で後続の全項目が別要素にずれるためである。
 
-- Judged by: whether the item's identity can be expressed by position or by a stable id. When a key is passed, the change states what makes it unique, and `key={index}` over a mutable list fails.
-- Not covered: React's own requirement that a list's items carry keys still applies; that key is the item's stable business id and not a second key beside it.
-- Exception: none. An ordinary change needs no sign-off, while the key semantics of a shared component are stated in review.
-- Fix: use the entity's stable id, and when two rows genuinely share one id, fix the id source instead of mixing an index into the key.
+- 判定方法: 項目の同一性を位置で表せるか安定 ID で表せるか。キーを渡す場合、その変更は何が一意性を生むかを明示し、可変リスト上の `key={index}` は不合格である。
+- 対象外: リスト項目がキーを持つという React 自身の要件は依然適用される。そのキーは項目の安定したビジネス ID であり、その横の第 2 のキーではない。
+- 例外: なし。通常の変更に承認は不要であるが、共有コンポーネントのキー意味はレビューで明示する。
+- 修正方法: エンティティの安定 ID を使い、2 行が真に 1 つの ID を共有する場合はインデックスをキーに混ぜるのではなく ID 発行元を修正する。
 
-The key is the turn's own id, whose uniqueness inside a session is the identity the element represents:
+キーはターンの固有 ID であり、セッション内での一意性が要素の表す同一性である:
 
 ```tsx
 // turnId is unique inside a session; the id is the identity.
@@ -436,7 +436,7 @@ export function TurnList({ turns }: Props) {
 }
 ```
 
-The index stands in for identity, so every following row changes identity when the list changes:
+インデックスは同一性の代理であるため、リスト変更時に後続の全行が同一性を変える:
 
 ```tsx
 // The index stands in for identity.
@@ -445,27 +445,27 @@ The index stands in for identity, so every following row changes identity when t
 ))}
 ```
 
-After an insert or a delete, each following row keeps its previous state on new data, so an expanded row or an in-progress edit appears on the wrong item.
+挿入や削除の後、後続の各行は新しいデータ上で以前の状態を保持するため、展開済み行や編集中の内容が誤った項目に現れる。
 
-## Each shared layer keeps its own isolation level
+## 共有層はそれぞれの分離度を保つ
 
-A feature absorbs its requirement in its own package, and how much separation it must keep from shared code depends on which shared layer that code belongs to. The violation to look for is a feature-specific concept placed in a shared layer, because every other consumer then has to understand a concept that is not theirs and the branch is hard to withdraw.
+フィーチャーは要件を自身のパッケージ内で吸収し、共有コードから保つべき分離の程度は、そのコードが属する共有層によって決まる。探すべき違反は、共有層に置かれたフィーチャー固有の概念である。他のすべての利用者が自分とは無関係な概念を理解しなければならず、その分岐は撤回困難になるためである。
 
 | Shared code | Isolation a feature keeps |
 |---|---|
-| `ui-primitives`, the catalogued controls | Consume the catalogued control. A new control starts in the feature package and is promoted into the shared catalog only when a second consumer needs it. |
-| `ui-layout` and the shell layout | Consume it; adapt in the feature package with a wrapper, an overridden style, or an added layer. |
-| `ui-renderer` and the other render machinery | No value dependency from business code; extend only through the documented registration seams — slots, provide/inject-bound hooks, declared stores. |
-| Another feature plugin | No runtime import and no re-export of its values. UI crosses through slots and behavior through injected services; shared runtime code lives in a narrow static owner such as `client/store`, `ui-primitives`, or a browser-safe utility package. |
-| The data object layer (`client/connection`, `session-controller/client`, `client/store`) | Read through the documented surface; a feature's own concepts do not enter these objects or their stores. |
-| The feature's own package | Unrestricted — the requirement is absorbed here, including its own rows, ordering, and presentation. |
+| `ui-primitives`、カタログ化されたコントロール | カタログ化されたコントロールを利用する。新しいコントロールはフィーチャーパッケージで開始し、第 2 の利用者が必要になったときにのみ共有カタログに昇格する。 |
+| `ui-layout` とシェルレイアウト | 利用する。フィーチャーパッケージでラッパー、上書きスタイル、層追加により適合させる。 |
+| `ui-renderer` とその他のレンダー機構 | ビジネスコードからの値依存はなし。文書化された登録シーム — スロット、provide/inject 束縛フック、宣言済みストア — 経由でのみ拡張する。 |
+| 他のフィーチャープラグイン | 値のランタイムインポートも再エクスポートもなし。UI はスロット経由、振る舞いはインジェクトされたサービス経由で越境する。共有ランタイムコードは `client/store`、`ui-primitives`、ブラウザーセーフなユーティリティーパッケージのような狭い静的所有者に存在する。 |
+| データオブジェクト層（`client/connection`、`session-controller/client`、`client/store`） | 文書化された面経由で読む。フィーチャー固有の概念はこれらのオブジェクトやストアに入らない。 |
+| フィーチャー自身のパッケージ | 無制限 — 要件は自身の行、順序、表示を含めここで吸収する。 |
 
-- Judged by: whether the diff puts a feature-specific branch, field, or concept into any layer but the feature's own package.
-- Not covered: code the feature owns, and a change to a shared layer that is genuinely general rather than one feature's need.
-- Exception: a shared-layer change carries the owning domain expert's confirmation and regresses every consumer; a GUI change runs the minimum check in [packages/client/AGENTS.md](../../packages/client/AGENTS.md).
-- Fix: absorb the requirement in the feature package, or, when the need is genuinely general, promote it to the shared layer in its own change with the owner's sign-off.
+- 判定方法: 差分がフィーチャー自身のパッケージ以外の層にフィーチャー固有の分岐、フィールド、概念を置くかどうか。
+- 対象外: フィーチャーが所有するコード、および 1 フィーチャーの需要ではなく真に一般的な共有層への変更。
+- 例外: 共有層の変更は所有するドメインエキスパートの確認を伴い、すべての利用者をリグレッションする。GUI 変更は [packages/client/AGENTS.md](../../packages/client/AGENTS.md) の最小チェックを実行する。
+- 修正方法: 要件をフィーチャーパッケージ内で吸収する。または需要が真に一般的な場合は、所有者の承認を得て独自変更として共有層に昇格する。
 
-The feature owns its row rendering and its ordering rule, and the base component is consumed unchanged:
+フィーチャーは行レンダリングと順序規則を所有し、ベースコンポーネントは変更せず利用する:
 
 ```tsx
 // The feature owns its rows; the base is consumed, not edited.
@@ -480,7 +480,7 @@ export function WorkspaceBrowser({ rows, onArchive }: Props) {
 }
 ```
 
-A base component learns one feature's ordering rule, so every consumer inherits a concept that is not theirs:
+ベースコンポーネントは 1 フィーチャーの順序規則を学ぶため、すべての利用者が自分とは無関係な概念を継承する:
 
 ```tsx
 // ui-layout: the base learns one feature's ordering rule.
@@ -490,4 +490,4 @@ export function BrowserList({ rows, ...rest }: Props) {
 }
 ```
 
-Every other consumer of `ui-layout` now has to understand an archive concept that only one feature has, and withdrawing the branch means auditing all of them.
+`ui-layout` の他のすべての利用者は、1 フィーチャーだけが持つアーカイブ概念を理解しなければならず、その分岐の撤回はそれらすべての監査を意味する。

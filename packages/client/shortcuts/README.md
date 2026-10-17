@@ -1,92 +1,92 @@
 ---
-description: "Customize application keyboard commands for each device"
+description: "デバイスごとにアプリケーションのキーボードコマンドをカスタマイズする"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-shortcuts
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Customize application keyboard commands for each device. Desktop and Web choose separate defaults for the receiving device. Custom bindings survive reloads on the same device. Commands disappear when their owning plugin unloads, while their saved overrides remain available for reinstallation.
+デバイスごとにアプリケーションのキーボードコマンドをカスタマイズする。Desktop と Web は受信デバイスごとに別々のデフォルトを選ぶ。カスタムバインディングは同じデバイスでのリロードを生き延びる。コマンドは所有プラグインがアンロードされると消えるが、保存された上書きは再インストールのために利用可能なまま残る。
 
-Windows uses ` + ` between modifiers and the first ordinary key. Two simultaneous ordinary keys appear side by side, such as `F G`, on Windows and macOS Desktop, including tooltips and the shortcut reference.
+Windows は修飾キーと最初の通常キーの間に ` + ` を使う。2 つの同時通常キーは、Windows と macOS Desktop では `F G` のように並んで表示され、ツールチップとショートカットリファレンスも同様である。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The Web app bundle mounts this package automatically. Feature plugins register commands through `ctx.shortcuts` inside `ctx.effect()`. Each command declares defaults for explicit `desktop:macos`, `desktop:windows`, `desktop:linux`, `web:macos`, `web:windows`, and `web:linux` profiles; an omitted profile is unbound. The service accepts physical `code` values, expands `primary` to the device modifier, and rejects duplicate ids and overlapping default combinations across supported profiles. Labels, keycaps, modified flags, and binding conflicts share one observable catalog. Command owners resolve the current target before executing an action.
+Web アプリバンドルはこのパッケージを自動的にマウントする。フィーチャープラグインは `ctx.effect()` 内で `ctx.shortcuts` を通じてコマンドを登録する。各コマンドは明示的な `desktop:macos`、`desktop:windows`、`desktop:linux`、`web:macos`、`web:windows`、`web:linux` プロファイルのデフォルトを宣言し、省略されたプロファイルは未バインドである。このサービスは物理 `code` 値を受け付け、`primary` をデバイスの修飾キーに展開し、サポートされるプロファイル間で重複する id と重複するデフォルトの組み合わせを拒否する。ラベル、キーキャップ、修飾フラグ、バインディングの競合は 1 つの観察可能なカタログを共有する。コマンドのオーナーはアクションを実行する前に現在のターゲットを解決する。
 
-Feature plugins contribute read-only sequences through `registerFixed()` and observe locally arbitrated input through `observeFixedInput()`. Fixed rows follow the owning registration and locale; owners may use the `application` display group without making the action editable. Each action declares at least one physical combination and has no saved overrides. These combinations participate in conflict checks and cannot be assigned to editable commands. The Host's `stopSequenceMs` setting controls the maximum double-Escape interval, defaults to 500 milliseconds, and accepts integers from 1 to 2,147,483,646 so expiry stays within the browser timer limit; pages adopt the validated value on load.
+フィーチャープラグインは `registerFixed()` を通じて読み取り専用シーケンスを提供し、`observeFixedInput()` を通じてローカルで裁定された入力を受け取る。固定行は所有する登録とロケールに従い、オーナーはアクションを編集可能にすることなく `application` 表示グループを使える。各アクションは少なくとも 1 つの物理的な組み合わせを宣言し、保存された上書きを持たない。これらの組み合わせは競合チェックに参加し、編集可能なコマンドに割り当てることはできない。Host の `stopSequenceMs` 設定は最大のダブル Escape 間隔を制御し、デフォルトは 500 ミリ秒で、期限切れがブラウザのタイマー制限内に収まるよう 1 から 2,147,483,646 までの整数を受け付ける。ページはロード時に検証済みの値を採用する。
 
-Preferences store only overrides: a missing command inherits its default, `null` clears its binding, and restoring a default removes its override. Restore All affects only the current runtime/platform profile. Web uses origin-local `dsh.keybindings.v1` storage; Desktop uses Electron's device-local `userData/keybindings.json`, independently of Harness home and workspace settings. The schema version is independent of Session data. macOS and Windows Desktop read version 1 without rewriting it and save version 2 on the next successful edit; version 2 adds optional `secondCode`. Web and Linux retain their existing binding restrictions.
+設定は上書きのみを保存する: 欠落したコマンドはそのデフォルトを継承し、`null` はバインディングをクリアし、デフォルトの復元はその上書きを削除する。Restore All は現在のランタイム/プラットフォームプロファイルにのみ影響する。Web はオリジンローカルの `dsh.keybindings.v1` ストレージを使い、Desktop は Electron のデバイスローカルな `userData/keybindings.json` を使い、Harness ホームやワークスペース設定とは独立している。スキーマバージョンは Session データとは独立である。macOS と Windows の Desktop はバージョン 1 を書き換えずに読み、次の成功した編集でバージョン 2 を保存する。バージョン 2 はオプションの `secondCode` を追加する。Web と Linux は既存のバインディング制限を保つ。
 
-Windows and macOS Desktop accept one or two distinct supported non-modifier keys, with zero to four modifiers. Two-key bindings require overlapping presses in either order; sequential presses do not match. Modifier-only bindings are rejected. A single key and a pair containing that key conflict when their modifiers match, including keys reserved by fixed actions. Previously saved bindings that overlap a mounted fixed action remain visible but cannot execute. All effective bindings, including Command+C and Ctrl+C, take priority over native actions, editors, terminals, embedded pages, and modal controls. Recording and input-method composition remain protected. A pair takes priority only once both keys are held; the first key retains its normal behavior and may insert a character.
+Windows と macOS の Desktop は 1 つまたは 2 つの相異なるサポート対象の非修飾キーと、0～4 の修飾キーを受け付ける。2 キーのバインディングはどちらの順序でも押下が重なることが必要で、逐次押下は一致しない。修飾キーのみのバインディングは拒否される。あるキーと、そのキーを含むペアは、修飾キーが一致するとき競合する（固定アクションが予約したキーを含む）。マウント済みの固定アクションと重なる以前に保存されたバインディングは可視のまま残るが実行できない。Command+C、Ctrl+C を含むすべての有効なバインディングは、ネイティブアクション、エディター、ターミナル、埋め込みページ、モーダルコントロールより優先される。記録とインプットメソッドのコンポジションは保護されたままである。ペアは両方のキーが保持されて初めて優先される。最初のキーは通常の挙動を保ち、文字を挿入することがある。
 
-Bindings activate after the first read. Failed reads preserve the last accepted configuration, or use defaults when none exists. Edits, including Restore All, remain disabled while preferences are unreadable. Repair the stored document and reopen the application; reset operations never replace unreadable or future-version data. Write failures preserve active bindings and drafts. Another browser tab's update invalidates open drafts; saving requires reviewing the latest configuration. Browser writes reread first, but simultaneous cross-tab writes remain last-writer-wins.
+バインディングは最初の読み取り後に有効になる。失敗した読み取りは最後に受理された構成を保持し、存在しない場合はデフォルトを使う。編集（Restore All を含む）は設定が読めない間は無効のままである。保存されたドキュメントを修復してアプリケーションを開き直すこと。リセット操作は読めないデータや将来バージョンのデータを決して置き換えない。書き込み失敗はアクティブなバインディングとドラフトを保持する。別のブラウザタブの更新は開いているドラフトを無効化し、保存には最新の構成の確認が必要である。ブラウザの書き込みはまず再読み取りするが、同時のタブ間書き込みは最後のライターが勝つのままである。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The Host build emits the Node entry and `./protocol` before Desktop bundles its keyboard integration; the Client pass emits the browser bundle.
+Host ビルドは Desktop がキーボード統合をバンドルする前に Node エントリーと `./protocol` を emit し、Client パスはブラウザバンドルを emit する。
 
-Windows and macOS Desktop intercept complete accepted combinations before local handlers and forward them through the trusted preload. Desktop startup requires the native keyboard bridge on every platform. On Windows and macOS, only native input dispatches configurable commands; DOM input continues to feed fixed actions. The adapter intercepts a key release only when it intercepted that key’s initial press. Default and user-saved bindings have identical priority, including over modal controls. Other environments dispatch after local handlers and respect their declared regions. Composition, dead keys, AltGraph, and consumed input pass through; macOS Web can consume a bound Option+Command+N reported as a dead key outside composition without guarding the next input. Web and Linux modal layers block background commands. Owned repeats remain consumed without rerunning the action. The context carries the original DOM input element, including elements inside a shadow root. Owners synchronously resolve their target and retain responsibility for action errors. `ctx.shortcuts.closeWindow()` owns the Desktop keyboard bridge and sends its current accepted revision; Web calls and bridge request failures reject. The pure `./protocol` export has no React, DOM, or Electron dependency and shares validation and serialized persistence between adapters. Explicit overrides displace conflicting new defaults; conflicting explicit overrides are all disabled. Desktop rejects stale revisions and restricts IPC to the current product window and top frame. Rejected adapter calls are logged and returned as save failures; errors while publishing an accepted command catalog propagate to the caller.
+Windows と macOS の Desktop は、受理された完全な組み合わせをローカルハンドラーの前にインターセプトし、信頼された preload を通じて転送する。Desktop の起動はすべてのプラットフォームでネイティブキーボードブリッジを必要とする。Windows と macOS では、ネイティブ入力だけが設定可能なコマンドをディスパッチし、DOM 入力は固定アクションを供給し続ける。アダプターはキーの初期押下をインターセプトしたときだけそのキーのリリースをインターセプトする。デフォルトとユーザー保存のバインディングは同一の優先度を持ち、モーダルコントロールに対しても優先される。その他の環境はローカルハンドラーの後にディスパッチし、宣言されたリージョンを尊重する。コンポジション、デッドキー、AltGraph、消費された入力は素通しされる。macOS Web はコンポジション外でデッドキーとして報告された、バインド済みの Option+Command+N を消費できるが、次の入力をガードしない。Web と Linux のモーダルレイヤーは背景コマンドをブロックする。所有されたリピートはアクションを再実行せずに消費されたままである。コンテキストは元の DOM 入力要素（shadow root 内の要素を含む）を運ぶ。オーナーはターゲットを同期的に解決し、アクションのエラーに対する責任を保持する。`ctx.shortcuts.closeWindow()` は Desktop キーボードブリッジを所有し、その現在の受理済みリビジョンを送る。Web の呼び出しとブリッジリクエストの失敗は拒否する。純粋な `./protocol` エクスポートは React、DOM、Electron への依存を持たず、アダプター間で検証とシリアライズされた永続化を共有する。明示的な上書きは競合する新しいデフォルトを退避させ、競合する明示的な上書きはすべて無効化される。Desktop は古いリビジョンを拒否し、IPC を現在のプロダクトウィンドウとトップフレームに制限する。拒否されたアダプター呼び出しはログに記録され、保存失敗として返される。受理されたコマンドカタログの公開中のエラーは呼び出し元に伝播する。
 
-DOM fixed-input observers receive composition and consumption flags before application dispatch. Consuming an event makes it unavailable to subsequent observers and commands. Focus, pointer, window blur, composition, modal changes, and locally stopped propagation reset pending DOM sequences. Native chords reset on window blur, focused-frame or configuration changes, composition, recording, and modifier release. Electron can omit keyups after native interception; completing a native binding discards held-key state, so each chord activation needs two fresh presses. Releasing a modifier clears held-key state because macOS may omit character keyup events while Command is held. The adapter removes its listeners and modal observer when disposed; one feature's observer failure does not prevent the remaining observers from receiving input.
+DOM の固定入力オブザーバーはアプリケーションのディスパッチ前にコンポジションと消費のフラグを受け取る。イベントを消費すると、後続のオブザーバーとコマンドからそれは利用できなくなる。フォーカス、ポインター、ウィンドウの blur、コンポジション、モーダル変更、ローカルで停止された伝播は保留中の DOM シーケンスをリセットする。ネイティブコードの和音はウィンドウの blur、フォーカスされたフレームまたは構成の変更、コンポジション、記録、修飾キーのリリースでリセットされる。Electron はネイティブインターセプト後に keyup を省略することがある。ネイティブバインディングを完了すると保持キー状態が破棄されるので、各和音のアクティベーションには 2 回の新しい押下が必要である。macOS が Command の保持中に文字の keyup イベントを省略することがあるため、修飾キーのリリースは保持キー状態をクリアする。アダプターは破棄時にリスナーとモーダルオブザーバーを取り除く。1 つのフィーチャーのオブザーバー失敗は残りのオブザーバーが入力を受け取ることを妨げない。
 
-Desktop native menus and embedded frames use the same command registry as DOM input. Preload and the client match the focused iframe name or browser webview lease against native input; the client rejects messages from an older configuration. Browser guest input ends when its lease is released, before guest destruction finishes. Native menu selection is explicit and works without a bound accelerator. Two-key chords have no native menu accelerator; their labels remain visible in the shortcut reference. Terminal Ctrl+W/R remains local input outside Windows and macOS Desktop. Explicit native-menu actions retain their modal checks; keyboard bindings use the device dispatch policy.
+Desktop のネイティブメニューと埋め込みフレームは DOM 入力と同じコマンドレジストリを使う。Preload とクライアントは、フォーカスされた iframe 名またはブラウザ webview リースをネイティブ入力と照合する。クライアントは古い構成からのメッセージを拒否する。ブラウザゲスト入力はそのリースが解放されたとき、ゲストの破棄が完了する前に終わる。ネイティブメニューの選択は明示的で、バインドされたアクセラレーターなしで機能する。2 キーの和音はネイティブメニューのアクセラレーターを持たず、そのラベルはショートカットリファレンスに可視のまま残る。ターミナルの Ctrl+W/R は Windows と macOS Desktop の外ではローカル入力のままである。明示的なネイティブメニューアクションはモーダルチェックを保持し、キーボードバインディングはデバイスのディスパッチポリシーを使う。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-- [Web Client](../../../docs/subsystems/web-client.md)
-- [UI primitives](../ui-primitives/README.md)
-- [Web app bundle](../../bundle/web-app/README.md)
+- [Web クライアント](../../../docs/subsystems/web-client.md)
+- [UI プリミティブ](../ui-primitives/README.md)
+- [Web アプリバンドル](../../bundle/web-app/README.md)
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+なし。このパッケージはブラウザ側の UI プラグインレイヤーであり、モデル向けのものを何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てず、送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Feature owners declare the Windows and macOS Web defaults explicitly: Mod+Slash, Mod+Backslash, and Control+Backquote stay two-key combinations; other defaults without Alt use Mod+Alt, and defaults with Alt use Mod+Shift except fullscreen uses Mod+Alt+Enter and session rename uses Mod+Alt+G. Web Settings uses Mod+Alt+Comma, leaving Mod+Comma to the browser. macOS Web leaves Refresh current page unbound by default to preserve browser-specific Command+Option+R actions; its button and explicit user bindings remain available. Mod is Command on macOS and Control on Windows. Windows and macOS accept any three or four distinct modifiers in Web and Desktop. Web also accepts the listed combinations and Mod+Shift combinations; browser or system delivery requires platform testing. Linux Web accepts Mod+Slash, Mod+Shift+Comma, and Mod+Shift+Period. Operating-system shortcuts that do not reach the window cannot be intercepted. A chord does not delay or consume its first key while waiting for the second; a native action or focus change can therefore prevent completion. Command registration or disposal invalidates open edit drafts even when saved preferences are unchanged. Desktop rereads its file on every catalog update; there is no file watcher.
+- フィーチャーのオーナーは Windows と macOS の Web デフォルトを明示的に宣言する: Mod+Slash、Mod+Backslash、Control+Backquote は 2 キーの組み合わせのままで、Alt なしの他のデフォルトは Mod+Alt を使い、Alt ありのデフォルトは Mod+Shift を使う（ただしフルスクリーンは Mod+Alt+Enter、セッション名変更は Mod+Alt+G を使う）。Web Settings は Mod+Alt+Comma を使い、Mod+Comma はブラウザに譲る。macOS Web はブラウザ固有の Command+Option+R アクションを保つため、Refresh current page をデフォルトで未バインドのままにする。そのボタンと明示的なユーザーバインディングは利用可能なままである。Mod は macOS では Command、Windows では Control である。Windows と macOS は Web と Desktop で任意の 3 つまたは 4 つの相異なる修飾キーを受け付ける。Web はさらに列挙された組み合わせと Mod+Shift の組み合わせを受け付ける。ブラウザまたはシステムによる配信にはプラットフォームでのテストが必要である。Linux Web は Mod+Slash、Mod+Shift+Comma、Mod+Shift+Period を受け付ける。ウィンドウに到達しないオペレーティングシステムのショートカットはインターセプトできない。和音は 2 番目のキーを待つ間、最初のキーを遅延させたり消費したりしないので、ネイティブアクションやフォーカス変更が完了を妨げることがある。コマンドの登録または破棄は、保存された設定が変わっていなくても開いている編集ドラフトを無効化する。Desktop はカタログ更新のたびにファイルを再読み取りする。ファイルウォッチャーはない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

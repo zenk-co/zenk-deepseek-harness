@@ -1,103 +1,103 @@
 ---
-description: "Configure and operate the Windows packaging runner, signing credentials, EV token and signature cache. Read the accepted isolation risks before running branch code or accessing the token. Hardware failures require operator inspection; packaging success does not establish installation or production readiness."
+description: "Windows パッケージングランナー、署名資格情報、EV トークン、署名キャッシュの設定と運用。ブランチコードの実行やトークンへのアクセスの前に、受け入れ済みの隔離リスクを読むこと。ハードウェア障害にはオペレーターの点検が必要であり、パッケージングの成功はインストールまたは本番の準備完了を確立しない。"
 ---
 
-# Windows signing and runner operations
+# Windows 署名とランナーの運用
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Configure and operate the Windows packaging runner, signing credentials, EV token and signature cache. Read the accepted isolation risks before running branch code or accessing the token. Hardware failures require operator inspection; packaging success does not establish installation or production readiness.
+Windows パッケージングランナー、署名資格情報、EV トークン、署名キャッシュの設定と運用。ブランチコードの実行やトークンへのアクセスの前に、受け入れ済みの隔離リスクを読むこと。ハードウェア障害にはオペレーターの点検が必要であり、パッケージングの成功はインストールまたは本番の準備完了を確立しない。
 
-## Table of Contents
+## 目次
 
-- [Trust and isolation limits](#trust-and-isolation)
-- [Machine setup and runner startup](#machine-setup)
-- [Signing configuration](#signing-configuration)
-- [Signing and timestamp completion](#windows-ev-signing)
-- [Failure records and operator recovery](#failure-and-recovery)
-- [Signature cache and concurrent stages](#signature-cache)
-- [Verification limits](#verification)
+- [信頼と隔離の限界](#trust-and-isolation)
+- [マシンセットアップとランナー起動](#machine-setup)
+- [署名構成](#signing-configuration)
+- [署名とタイムスタンプの完了](#windows-ev-signing)
+- [障害記録とオペレーターの復旧](#failure-and-recovery)
+- [署名キャッシュと並行ステージ](#signature-cache)
+- [検証の限界](#verification)
 
 <a id="trust-and-isolation"></a>
 
-## Trust and isolation limits
+## 信頼と隔離の限界
 
-The shared packaging runner assumes trusted internal-team code and operators. Under this assumption, credential and device isolation are deferred and the residual risk is accepted (tracked in #5973); signed/master-only access is not enforced. Unsigned mode skips signing-file loading but cannot prevent branch code running as the same Windows account from reading those files or accessing the token. SafeNet Single Logon may reuse authentication. Direct device calls can bypass the signing scripts and exhaust PIN retries; the persistent failure interlock only protects calls through those scripts. Cross-account token isolation and remaining retry counts are unverified. Reassess runner/account/device isolation before expanding access, executing untrusted contributions, changing runner sharing, or after suspicious activity.
+共有のパッケージングランナーは、信頼された社内チームのコードとオペレーターを前提とする。この前提の下で、資格情報とデバイスの隔離は先送りされ、残存リスクは受け入れられている（#5973 で追跡）。署名済み/マスター限定のアクセスは強制されない。未署名モードは署名ファイルの読み込みをスキップするが、同じ Windows アカウントで実行されるブランチコードがそれらのファイルを読んだりトークンにアクセスしたりすることを防げない。SafeNet Single Logon は認証を再利用しうる。直接のデバイス呼び出しは署名スクリプトを迂回して PIN の再試行を枯渇させうる。永続的な障害インターロックはそれらのスクリプトを通じた呼び出しのみを保護する。アカウント間のトークン隔離と残りの再試行回数は未検証である。アクセスを拡大する前、信頼できないコントリビューションを実行する前、ランナーの共有を変更する前、または不審な活動の後に、ランナー/アカウント/デバイスの隔離を再評価せよ。
 
 <a id="machine-setup"></a>
 
-## Machine setup and runner startup
+## マシンセットアップとランナー起動
 
-Use a runner-owned checkout and keep configuration, certificates and caches outside it. Registration and tool installation remain operator tasks. Packaging inputs and artifact retrieval are described in the [packaging guide](../packaging/README.md#windows-actions).
+ランナーが所有するチェックアウトを使い、設定、証明書、キャッシュはその外に置く。登録とツールのインストールはオペレーターのタスクのままである。パッケージング入力とアーティファクトの取得は[パッケージングガイド](../packaging/README.md#windows-actions)で説明されている。
 
-Run `pwsh -NoProfile -File apps/desktop/scripts/setup-windows-packaging.ps1 -Root <absolute-machine-root>` to prepare private `packaging/{presets,secrets,certificates}` and `cache/windows-signatures` directories and copy templates without overwriting existing files. Add `-CheckOnly` to inspect without writes. Fill the [preset templates](../config/windows-packaging/test.env.example) and [signing template](../config/windows-packaging/windows-signing.env.example) on the machine. Run `start-windows-packaging-runner.ps1 -RunnerRoot <registered-runner-directory> -ConfigRoot <machine-root>/packaging -CheckOnly` from the same scripts directory to inspect PowerShell 7.6.6 under the runner's `tools` directory, Node, Python, Git, tar and Visual C++ tools; packaging `--check` performs the remaining toolchain validation. Omit `-CheckOnly` to start the existing runner with an explicit config root and scrubbed inherited environment. Registration and tool installation are separate; these scripts never create tokens, alter system security settings or clear signing failure records. Use the signing cache maintenance command below to migrate existing entries before changing the preset's cache path.
+`pwsh -NoProfile -File apps/desktop/scripts/setup-windows-packaging.ps1 -Root <absolute-machine-root>` を実行して、プライベートな `packaging/{presets,secrets,certificates}` と `cache/windows-signatures` ディレクトリを準備し、既存ファイルを上書きせずにテンプレートをコピーする。`-CheckOnly` を追加すると書き込みなしで検査できる。マシン上で[プリセットテンプレート](../config/windows-packaging/test.env.example)と[署名テンプレート](../config/windows-packaging/windows-signing.env.example)を記入する。同じ scripts ディレクトリから `start-windows-packaging-runner.ps1 -RunnerRoot <registered-runner-directory> -ConfigRoot <machine-root>/packaging -CheckOnly` を実行して、ランナーの `tools` ディレクトリ配下の PowerShell 7.6.6、Node、Python、Git、tar、Visual C++ ツールを検査する。残りのツールチェーン検証はパッケージングの `--check` が実行する。`-CheckOnly` を省略すると、明示的な config ルートとスクラブ済みの継承環境で既存のランナーを起動する。登録とツールのインストールは別であり、これらのスクリプトはトークンを作成せず、システムのセキュリティ設定を変更せず、署名障害記録をクリアしない。プリセットのキャッシュパスを変更する前に、後述の署名キャッシュメンテナンスコマンドで既存エントリーを移行せよ。
 
-### Supervised startup
+### 監督付き起動
 
-Run `pwsh -NoProfile -File apps/desktop/scripts/windows-runner-task.ps1 -Action install -RunnerRoot <registered-runner-directory> -ConfigRoot <machine-root>/packaging` as the runner's Windows user, using its installed PowerShell 7. The installer checks the environment and copies startup scripts into `runner/dsh-task`; registration, tools and secrets remain separate. It registers a disabled, limited-permission interactive Task Scheduler task without storing an account password. For `-Action start` or `-Action status`, pass only `-RunnerRoot`; configuration and retry options apply only to installation. The task starts after this user's desktop login, including after reboot, and stops on logout. It does not provide unattended boot or unlock a signing Token.
+ランナーの Windows ユーザーとして、そのインストール済み PowerShell 7 を使って `pwsh -NoProfile -File apps/desktop/scripts/windows-runner-task.ps1 -Action install -RunnerRoot <registered-runner-directory> -ConfigRoot <machine-root>/packaging` を実行する。インストーラーは環境を検査し、起動スクリプトを `runner/dsh-task` へコピーする。登録、ツール、シークレットは別のままである。アカウントパスワードを保存せずに、無効で権限が限定された対話型のタスクスケジューラータスクを登録する。`-Action start` または `-Action status` では `-RunnerRoot` のみを渡す。構成と再試行のオプションはインストールにのみ適用される。タスクはこのユーザーのデスクトップログイン後に（再起動後も含めて）開始し、ログアウトで停止する。無人ブートを提供せず、署名トークンのロックも解除しない。
 
-The task permits one instance and has no execution time limit. A repeating trigger checks every `-RestartMinutes` minutes (default `1`) and restarts an exited launcher, including an unexpected zero exit. The persisted budget permits the initial launch plus `-RestartCount` restarts (default `10`) between explicit starts. Every desktop login also consumes this budget; `status` shows the remaining launches. After the budget is exhausted, login alone cannot restart the runner. Starting an already running task does not reset the budget. Missing or invalid budget/configuration files disable automatic starts until repaired. GitHub's launcher owns runner updates; task recovery does not rerun a failed workflow or clear signing interlocks. After retries are exhausted, inspect `runner/dsh-task/run-*.log`, the runner's `_diag` logs and `status`, correct the cause, then run `start`. A running task alone does not prove connectivity: verify `Connected to GitHub` and `Listening for Jobs`, then verify assignment in Actions. Logs are retained for operator-managed cleanup.
+このタスクは 1 インスタンスのみを許可し、実行時間制限を持たない。繰り返しトリガーは `-RestartMinutes` 分（既定 `1`）ごとに検査し、終了したランチャーを再起動する。予期しないゼロ終了も含む。永続化された予算は、明示的な開始の間に初回起動と `-RestartCount` 回（既定 `10`）の再起動を許可する。デスクトップログインのたびにこの予算が消費され、`status` は残りの起動回数を表示する。予算が尽きた後は、ログインだけではランナーを再起動できない。すでに実行中のタスクを開始しても予算はリセットされない。予算/構成ファイルの欠落または不正は、修復されるまで自動起動を無効にする。ランナーの更新は GitHub のランナーが所有し、タスクの回復は失敗したワークフローの再実行や署名インターロックのクリアを行わない。再試行が尽きたら、`runner/dsh-task/run-*.log`、ランナーの `_diag` ログ、`status` を確認し、原因を修正してから `start` を実行する。タスクが実行中であることだけでは接続性を証明しない。`Connected to GitHub` と `Listening for Jobs` を確認し、次に Actions での割り当てを確認する。ログはオペレーターが管理するクリーンアップのために保持される。
 
-Before maintenance, pause new workflow dispatch and wait for the runner to become idle. `-Action stop` refuses an active worker for this runner, disables future starts and stops its task process tree; the local check cannot prevent a concurrent GitHub assignment. `-Action uninstall` requires a stopped, disabled task and retains registration, configuration and logs. To update installed scripts, stop, uninstall and install again. When migrating a manually launched runner, stop its existing launcher only after it is idle, then start the task; never run both launchers together.
+メンテナンスの前に、新しいワークフローのディスパッチを停止し、ランナーがアイドルになるのを待つ。`-Action stop` はこのランナーのアクティブなワーカーを拒否し、将来の起動を無効にし、そのタスクのプロセスツリーを停止する。ローカルの検査は GitHub による並行の割り当てを防げない。`-Action uninstall` は停止済みで無効なタスクを要求し、登録、構成、ログを保持する。インストール済みスクリプトを更新するには、停止、アンインストール、再インストールを行う。手動起動のランナーを移行する場合、既存のランチャーはアイドルになってから停止し、その後タスクを開始する。両方のランチャーを同時に実行してはならない。
 
-Operators can run `pwsh -NoProfile -File apps/desktop/tests/windows-runner-task.ps1` on Windows to exercise installation, automatic recovery, duplicate-start prevention, stop, child-process teardown and uninstall against an isolated fake runner. This opt-in test creates a temporary task and retains diagnostic files; it does not contact GitHub or access signing hardware. Real-machine acceptance additionally checks an idle runner coming online, an Actions job being assigned, and login after an operator-approved reboot. Signed packaging and logout/reboot acceptance require separate operator verification.
+オペレーターは Windows 上で `pwsh -NoProfile -File apps/desktop/tests/windows-runner-task.ps1` を実行し、隔離された偽ランナーに対してインストール、自動回復、重複起動の防止、停止、子プロセスの破棄、アンインストールを試せる。このオプトインのテストは一時的なタスクを作成し、診断ファイルを保持する。GitHub に接続せず、署名ハードウェアにもアクセスしない。実機の受け入れではさらに、アイドルのランナーがオンラインになること、Actions ジョブが割り当てられること、オペレーター承認の再起動後のログインを確認する。署名付きパッケージングとログアウト/再起動の受け入れには、別個のオペレーター検証が必要である。
 
 <a id="signing-configuration"></a>
 
-## Signing configuration
+## 署名構成
 
-The [machine preset configuration](../packaging/README.md#configuration-and-local-builds) selects public settings and the signing file. Without a preset, use the target dotenv file.
+[マシンプリセット構成](../packaging/README.md#configuration-and-local-builds)は公開設定と署名ファイルを選択する。プリセットがない場合は、対象の dotenv ファイルを使う。
 
-Fill in `.env.windows` with `DSH_DESKTOP_WINDOWS_CER_FILE` (public EV leaf certificate), `DSH_DESKTOP_WINDOWS_SIGNTOOL` (SafeNet-compatible SignTool), `DSH_DESKTOP_WINDOWS_KEY_CONTAINER` (matching private-key container), and `DSH_DESKTOP_WINDOWS_TOKEN_PIN` (Token Password). The private key stays on the USB token; keep the certificate and local credential file out of Git.
+`.env.windows` に `DSH_DESKTOP_WINDOWS_CER_FILE`（公開 EV リーフ証明書）、`DSH_DESKTOP_WINDOWS_SIGNTOOL`（SafeNet 互換 SignTool）、`DSH_DESKTOP_WINDOWS_KEY_CONTAINER`（対応する秘密鍵コンテナー）、`DSH_DESKTOP_WINDOWS_TOKEN_PIN`（トークンパスワード）を記入する。秘密鍵は USB トークン上に留まる。証明書とローカル資格情報ファイルを Git に入れないこと。
 
-The PIN cannot contain `]`, a quote, or a line break because those characters delimit the SafeNet `/kc` value or its CMD argument. The CMD disables delayed expansion so a PIN containing `!` reaches SafeNet unchanged. Packaging withholds every `DSH_DESKTOP_WINDOWS_*` field from build and runtime-preparation subprocesses, gives signing preflight, the dedicated runtime signing stages and electron-builder only the four configured inputs, gives the signing CMD only the validated signing fields in an otherwise scrubbed environment, clears those fields before SignTool starts, and redacts SignTool diagnostics. SafeNet still requires the PIN in the SignTool process command line. The local `.env.windows` or machine-owned `secrets/windows-signing.env` stores the PIN in plaintext and needs restricted file access. CI reads the machine-owned file outside the checkout and retains it across jobs. Do not commit or share its contents or print credentials in logs. Configuration checks consume no token PIN attempts; signing still stops the batch on its first failure.
+PIN は `]`、引用符、改行を含められない。これらの文字は SafeNet の `/kc` 値またはその CMD 引数を区切るためである。CMD は遅延展開を無効にするので、`!` を含む PIN もそのまま SafeNet に届く。パッケージングはすべての `DSH_DESKTOP_WINDOWS_*` フィールドをビルドおよびランタイム準備のサブプロセスから伏せ、署名プリフライト、専用のランタイム署名ステージ、electron-builder には 4 つの設定済み入力のみを与え、署名 CMD にはその他の点ではスクラブされた環境で検証済みの署名フィールドのみを与え、SignTool の起動前にそれらのフィールドをクリアし、SignTool の診断をリダクトする。SafeNet は依然として SignTool プロセスのコマンドラインに PIN を要求する。ローカルの `.env.windows` またはマシン所有の `secrets/windows-signing.env` は PIN を平文で保存するため、ファイルアクセスを制限する必要がある。CI はチェックアウトの外にあるマシン所有のファイルを読み、ジョブをまたいで保持する。その内容をコミットまたは共有したり、ログに資格情報を出力したりしないこと。構成チェックはトークンの PIN 試行を消費しない。署名はそれでも最初の失敗でバッチを停止する。
 
-Signed Windows configuration derives the updater's `publisherName` from the same public certificate's `CN`, `O`, and `C` attributes. Each must be present, nonempty, and single-valued. These identity attributes allow certificate renewal without pinning a leaf thumbprint. The installed application's `app-update.yml` carries the expected publisher; the downloaded feed does not choose it. Unsigned test builds omit updater configuration. See the [signature qualification record](../tests/README.md) for real-file verification and its limits.
+署名付き Windows 構成は、アップデーターの `publisherName` を同じ公開証明書の `CN`、`O`、`C` 属性から導出する。それぞれが存在し、空でなく、単一値でなければならない。これらの ID 属性により、リーフのサムプリントを固定することなく証明書を更新できる。インストールされたアプリケーションの `app-update.yml` が期待されるパブリッシャーを運び、ダウンロードされたフィードがそれを選ぶことはない。未署名のテストビルドはアップデーター構成を省略する。実ファイル検証とその限界については[署名認定記録](../tests/README.md)を参照。
 
 <a id="windows-ev-signing"></a>
 
-## Signing and timestamp completion
+## 署名とタイムスタンプの完了
 
-Follow the [version and build instructions](../packaging/README.md#release-versions) before starting a signed build. Configuration checks do not establish token authentication.
+署名付きビルドを開始する前に[バージョンとビルドの手順](../packaging/README.md#release-versions)に従う。構成チェックはトークン認証を確立しない。
 
-Signed Windows builds run a supervised signing preflight before compilation or dependency preparation. Static configuration, certificate validity, audit storage, compiler availability and any retained signing interlock are checked without token access. The local .NET Framework C# compiler creates a small private probe; the production signer signs it once, and verification requires the configured certificate and a timestamp before building continues. The probe is never executed. The overall 60-second preflight deadline includes timestamp attempts; deadline expiry, hardware signing errors and verification failures stop the run without another hardware attempt. Success proves the current signing path works, not that the PIN was independently authenticated: SafeNet may reuse login state. Do not log out or repeat authentication to test the PIN. `--check`, preparation-only and `--unsigned` modes do not run this hardware preflight; unsigned artifacts remain ineligible for release upload. Automated regression tests use a fake signer; release operators qualify real hardware separately.
+署名付き Windows ビルドは、コンパイルまたは依存関係の準備の前に監督付きの署名プリフライトを実行する。静的構成、証明書の有効性、監査ストレージ、コンパイラーの可用性、保持された署名インターロックは、トークンアクセスなしで検査される。ローカルの .NET Framework C# コンパイラーが小さなプライベートプローブを作成し、本番署名者がそれを 1 回署名する。ビルドを続行する前に、検証が構成済み証明書とタイムスタンプを要求する。プローブは決して実行されない。全体で 60 秒のプリフライトのデッドラインにはタイムスタンプの試行が含まれる。デッドラインの満了、ハードウェア署名エラー、検証失敗は、それ以上のハードウェア試行なしで実行を停止する。成功は現在の署名パスが機能することを証明するが、PIN が独立に認証されたことは証明しない。SafeNet はログイン状態を再利用しうる。PIN を試すためにログアウトしたり認証を繰り返したりしないこと。`--check`、準備のみ、`--unsigned` モードはこのハードウェアプリフライトを実行しない。未署名のアーティファクトはリリースアップロードの対象外のままである。自動回帰テストは偽署名者を使い、リリースオペレーターが実ハードウェアを別途認定する。
 
-Insert and unlock the token before packaging. The electron-builder hook passes each artifact to the CRLF `scripts/windows-sign.cmd`, which invokes the configured SignTool once with `/f`, SafeNet `/kc "[{{PIN}}]=container"`, `/csp "eToken Base Cryptographic Provider"`, a SHA-256 file digest, without a timestamp. The hook then completes a DigiCert SHA-256 RFC 3161 timestamp on isolated copies without signing credentials. The hook never substitutes electron-builder's bundled SignTool and never retries a failed signing request. Windows release packaging fails instead of emitting unsigned artifacts when the SignTool, certificate, container, PIN, token, or signature is unavailable.
+パッケージングの前にトークンを挿入しロックを解除する。electron-builder フックは各アーティファクトを CRLF の `scripts/windows-sign.cmd` へ渡し、それが設定済みの SignTool を `/f`、SafeNet `/kc "[{{PIN}}]=container"`、`/csp "eToken Base Cryptographic Provider"`、SHA-256 ファイルダイジェスト付きで、タイムスタンプなしに 1 回呼び出す。次にフックが、署名資格情報なしで、隔離されたコピー上で DigiCert の SHA-256 RFC 3161 タイムスタンプを完了する。フックは electron-builder 同梱の SignTool を決して代用せず、失敗した署名リクエストを決して再試行しない。Windows リリースのパッケージングは、SignTool、証明書、コンテナー、PIN、トークン、または署名が利用できない場合、未署名のアーティファクトを出力する代わりに失敗する。
 
-Timestamp completion retries only a normally exited timestamp command returning failure or warning, at most three times with one- and two-second delays. Each attempt starts from the same verified primary signature. Launch errors, uncertain termination and verification failures stop immediately. SignTool operates on short private paths; publication copies verified bytes to the target volume before atomic replacement. Final Windows trust, certificate, timestamp and normalized full-file equality are required. Exhaustion stops packaging and preserves evidence without another hardware call. See the [signature completion decision](../../../.agents/notes/implemented/process/2026-09-17-windows-signature-completion.md).
+タイムスタンプの完了は、正常に終了したが失敗または警告を返したタイムスタンプコマンドのみを、1 秒と 2 秒の遅延で最大 3 回再試行する。各試行は同じ検証済みの一次署名から始まる。起動エラー、終了の不確実性、検証失敗は即座に停止する。SignTool は短いプライベートパス上で動作し、公開処理はアトミックな置き換えの前に検証済みバイトをターゲットボリュームへコピーする。最終的な Windows の信頼、証明書、タイムスタンプ、正規化されたファイル全体の一致が要求される。枯渇は、それ以上のハードウェア呼び出しなしでパッケージングを停止し、証拠を保存する。[署名完了の決定](../../../.agents/notes/implemented/process/2026-09-17-windows-signature-completion.md)を参照。
 
 <a id="failure-and-recovery"></a>
 
-## Failure records and operator recovery
+## 障害記録とオペレーターの復旧
 
-Treat `SignTool Error: No private key is available.` as a signing failure: stop all signing attempts and have the operator inspect the signing configuration and token state before continuing. The device-specific PIN retry limit and remaining attempts are unverified; do not probe them with authentication attempts. Do not retry packaging or signing probes after this error. The signer serializes token operations and rejects all queued tasks after the first failure.
+`SignTool Error: No private key is available.` は署名失敗として扱う。すべての署名試行を停止し、続行する前にオペレーターに署名構成とトークンの状態を点検させる。デバイス固有の PIN 再試行制限と残りの試行回数は未検証である。認証試行でそれらを探ってはならない。このエラーの後にパッケージングや署名プローブを再試行しないこと。署名者はトークン操作を直列化し、最初の失敗後にすべてのキュー済みタスクを拒否する。
 
-Windows package commands print `DESKTOP_PACKAGING_RECORD` with a unique directory under `.desktop-build/packaging-runs/`. Each run retains `run.json`, timestamped `events.jsonl`, redacted `stdout.log` and `stderr.log`, and `result.json`. A signing failure also writes `fatal.json` and notifies the parent through stderr; the supervisor immediately requests termination of its stage process tree and waits for exit. Failed stages cannot start subsequent stages or create a release completion record. Journal failures also stop the run. Termination errors remain failures and require operator inspection; a missing final record means completion was not established.
+Windows パッケージコマンドは `DESKTOP_PACKAGING_RECORD` を、`.desktop-build/packaging-runs/` 配下の一意のディレクトリとともに出力する。各実行は `run.json`、タイムスタンプ付きの `events.jsonl`、リダクトされた `stdout.log` と `stderr.log`、および `result.json` を保持する。署名失敗はさらに `fatal.json` を書き込み、stderr を通じて親に通知する。スーパーバイザーは直ちにそのステージのプロセスツリーの終了を要求し、終了を待つ。失敗したステージは後続ステージを開始できず、リリース完了記録を作成できない。ジャーナルの失敗も実行を停止する。終了エラーは失敗のままであり、オペレーターの点検を必要とする。最終記録の欠落は完了が確立されなかったことを意味する。
 
-Hardware signing requires a supervised run. Before invoking the command interpreter, the signer atomically acquires `%USERPROFILE%/.dsh-desktop-signing/attempt.json` and records the attempt. Only successful signing followed by verification of the configured primary signature releases that file; timestamps are completed afterward without hardware access. Failure, interruption, an existing interlock, or unavailable audit storage prevents further hardware access, including from another signer instance, process, or checkout under the same Windows account. There is no timed recovery or automatic retry. An administrator must inspect the retained evidence and token state before explicitly authorizing interlock recovery; logging into the token or replacing a PIN file does not clear it. The records distinguish signing intent, command-interpreter PID, and completion; they do not measure internal CSP/token authentication attempts. Command arguments, PINs, and credential environments are not recorded. Independent Windows accounts and unrelated signing programs are outside this interlock.
+ハードウェア署名には監督付きの実行が必要である。コマンドインタープリターを呼び出す前に、署名者は `%USERPROFILE%/.dsh-desktop-signing/attempt.json` をアトミックに取得し、その試行を記録する。成功した署名とそれに続く構成済み一次署名の検証のみがそのファイルを解放する。タイムスタンプはその後、ハードウェアアクセスなしで完了される。失敗、中断、既存のインターロック、または監査ストレージの利用不能は、同じ Windows アカウント下の別の署名者インスタンス、プロセス、チェックアウトからのものも含め、それ以上のハードウェアアクセスを妨げる。時限の回復や自動再試行はない。管理者が、インターロックの回復を明示的に承認する前に、保持された証拠とトークンの状態を点検しなければならない。トークンへのログインや PIN ファイルの置き換えはそれをクリアしない。記録は署名の意図、コマンドインタープリターの PID、完了を区別するが、内部の CSP/トークン認証試行は測定しない。コマンド引数、PIN、資格情報環境は記録されない。独立した Windows アカウントと無関係な署名プログラムはこのインターロックの外にある。
 
 <a id="signature-cache"></a>
 
-## Signature cache and concurrent stages
+## 署名キャッシュと並行ステージ
 
-Runtime signing shares complete signed files across the current Windows account's worktrees. `DSH_DESKTOP_WINDOWS_SIGNATURE_CACHE_DIR` in `.env.windows` selects an absolute fixed-drive directory; the default is `%USERPROFILE%\.dsh-desktop-signing\signature-cache\v1`. Cache directories must belong to the current account and exclude other ordinary accounts from their access permissions; linked paths are rejected. Entries identify the original bytes, public certificate and signing toolchain. Every restoration checks the digest, Windows trust, timestamp and certificate before replacing the unsigned file; invalid entries stop packaging without hardware fallback. Cache age alone does not trigger signing. The cache trusts programs running as the same account and does not defend against administrators. The [runtime signature cache decision](../../../.agents/notes/implemented/process/2026-09-17-windows-runtime-signature-cache.md) owns qualification and design limits.
+ランタイム署名は、現在の Windows アカウントのワークツリーをまたいで完全な署名済みファイルを共有する。`.env.windows` の `DSH_DESKTOP_WINDOWS_SIGNATURE_CACHE_DIR` が絶対の固定ドライブディレクトリを選択し、既定は `%USERPROFILE%\.dsh-desktop-signing\signature-cache\v1` である。キャッシュディレクトリは現在のアカウントに属し、そのアクセス権限から他の通常アカウントを排除しなければならない。リンクされたパスは拒否される。エントリーは元のバイト、公開証明書、署名ツールチェーンを識別する。すべての復元は、未署名ファイルを置き換える前にダイジェスト、Windows の信頼、タイムスタンプ、証明書を検査する。無効なエントリーは、ハードウェアフォールバックなしでパッケージングを停止する。キャッシュの古さだけでは署名をトリガーしない。キャッシュは同じアカウントで実行されるプログラムを信頼し、管理者に対して防御しない。[ランタイム署名キャッシュの決定](../../../.agents/notes/implemented/process/2026-09-17-windows-runtime-signature-cache.md)が認定と設計上の限界を所有する。
 
-Preflight, primary-runtime signing, application-runtime signing and artifact creation each hold the account's signing-stage lock until their supervised child processes settle. Other builds wait before entering those stages; compilation and preparation do not hold the lock. Runtime signing workers own their locks, so terminating only the outer packaging process does not unlock a surviving cache user. Migration and maintenance acquire the same lock; older or external signing commands do not participate and must be scheduled separately. Stage waiting is outside the preflight deadline. Closing the stage handle releases ordinary contention without removing the separate hardware-attempt interlock; a retained hardware failure still requires operator recovery.
+プリフライト、一次ランタイム署名、アプリケーションランタイム署名、アーティファクト作成は、それぞれ監督付きの子プロセスが決着するまでアカウントの署名ステージロックを保持する。他のビルドはそれらのステージに入る前に待機する。コンパイルと準備はロックを保持しない。ランタイム署名ワーカーは自身のロックを所有するので、外側のパッケージングプロセスだけを終了しても、生き残ったキャッシュ利用者のロックは解除されない。移行とメンテナンスも同じロックを取得する。古いまたは外部の署名コマンドは参加せず、別途スケジュールしなければならない。ステージの待機はプリフライトのデッドラインの外にある。ステージハンドルを閉じると通常の競合は解放されるが、別個のハードウェア試行インターロックは除去されない。保持されたハードウェア障害は依然としてオペレーターの復旧を必要とする。
 
-Cache-hit copying, hashing and per-file trust checks run with `DSH_DESKTOP_WINDOWS_SIGNATURE_CACHE_CONCURRENCY` workers from `.env.windows` (default `4`, integer `1`–`8`). All restores and their post-verification finish before cache misses enter serial hardware signing. A restore or verification failure stops new dispatch and drains active work before releasing the stage lock; hardware signing, runtime smoke checks and final integrity validation remain required.
+キャッシュヒットのコピー、ハッシュ、ファイルごとの信頼チェックは、`.env.windows` の `DSH_DESKTOP_WINDOWS_SIGNATURE_CACHE_CONCURRENCY` ワーカー（既定 `4`、整数 `1`–`8`）で実行される。すべての復元とその検証後処理は、キャッシュミスが直列のハードウェア署名に入る前に完了する。復元または検証の失敗は、ステージロックを解放する前に新しいディスパッチを停止し、アクティブな作業をドレインする。ハードウェア署名、ランタイムスモークチェック、最終的な整合性検証は引き続き必要である。
 
-Each runtime stage writes `SIGNATURE_CACHE_SUMMARY` to stdout and its packaging journal, including the actual directory, policy identity, hit/miss counts, newly published and retained entries, signing requests, avoided signing requests and validation failures. Timings distinguish signing, trust verification of restored and newly signed files, and restoration; restoration includes its trust check and staging cleanup. These counters exclude preflight, final artifact signing and the outer runtime signature checks. Stage lock events record waiting separately. Concurrent timings sum per-file work rather than stage wall time.
+各ランタイムステージは `SIGNATURE_CACHE_SUMMARY` を stdout と自身のパッケージングジャーナルに書き込む。実際のディレクトリ、ポリシー ID、ヒット/ミス件数、新しく公開されたエントリーと保持されたエントリー、署名リクエスト、回避された署名リクエスト、検証失敗を含む。タイミングは、署名、復元されたファイルと新たに署名されたファイルの信頼検証、復元を区別する。復元にはその信頼チェックとステージングのクリーンアップが含まれる。これらのカウンターはプリフライト、最終アーティファクト署名、外側のランタイム署名チェックを除外する。ステージロックイベントは待機を別途記録する。並行タイミングはステージの実時間ではなくファイルごとの作業を合計する。
 
-Use `pnpm --dir apps/desktop run cache:windows-signatures --usage` to inspect structurally complete-entry bytes and counts, or `--from <absolute-old-cache>` to import an explicitly selected cache owned by the same account. Migration leaves the source unchanged, skips staging names, rejects corrupt entries and retains valid existing entries even when their timestamp bytes differ. `--clear` explicitly removes complete entries under the stage lock; no automatic capacity eviction runs. `--directory <absolute-cache>` selects a maintenance destination without loading release credentials. Incomplete staging entries remain untouched and are counted separately; inspect them only after all builds have stopped. These commands never clear hardware failure evidence. Default storage is outside AppData so MSIX launcher virtualization does not split the account's cache; redirected overrides fail explicitly.
+`pnpm --dir apps/desktop run cache:windows-signatures --usage` を使うと、構造的に完全なエントリーのバイト数と件数を検査でき、`--from <absolute-old-cache>` を使うと同じアカウントが所有する明示的に選択されたキャッシュをインポートできる。移行はソースを変更せず、ステージング名をスキップし、破損エントリーを拒否し、タイムスタンプのバイトが異なる場合でも有効な既存エントリーを保持する。`--clear` はステージロックの下で完全なエントリーを明示的に削除する。自動の容量退避は実行されない。`--directory <absolute-cache>` はリリース資格情報をロードせずにメンテナンス先を選択する。不完全なステージングエントリーはそのまま残され、別途カウントされる。すべてのビルドが停止した後にのみそれらを検査せよ。これらのコマンドはハードウェア障害の証拠を決してクリアしない。既定のストレージは AppData の外にあるので、MSIX ランチャーの仮想化がアカウントのキャッシュを分割しない。リダイレクトされたオーバーライドは明示的に失敗する。
 
 <a id="verification"></a>
 
-## Verification limits
+## 検証の限界
 
-Real hardware and installation evidence is owned by the [Desktop qualification record](../tests/README.md) and [installed-update procedure](../tests/installed-update/README.md). This document does not authorize PIN retries, automatic interlock deletion, device initialization or changes to the accepted isolation policy.
+実ハードウェアとインストールの証拠は、[Desktop 認定記録](../tests/README.md)と[インストール済み更新手順](../tests/installed-update/README.md)が所有する。このドキュメントは、PIN の再試行、インターロックの自動削除、デバイスの初期化、または受け入れ済み隔離ポリシーの変更を承認しない。
 
-## Dev Note
+## 開発者ノート
 
-None.
+なし。

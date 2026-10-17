@@ -1,79 +1,79 @@
-# Conversation assembly
+# 会話のアセンブリ
 
-English | [中文](conversation.zh.md)
+日本語 | [English](conversation.en.md) | [中文](conversation.zh.md)
 
-Conversation is the target-neutral assembly layer between a Client `SessionEventLikeEntry` window and browser views. [`ui-conversation`](../../packages/client/ui-conversation/README.md) owns the event and view registries, one identity-stable binding per `SessionBinding`, Turn/Step locations, incremental Context assembly, target sources, the shared shell, and input orchestration. Target packages such as [`ui-chat`](../../packages/client/ui-chat/README.md) and [`ui-trajectory`](../../packages/client/ui-trajectory/README.md) own their Definitions, final snapshots, and rendering.
+会話は、Client の `SessionEventLikeEntry` ウィンドウとブラウザービューの間にあるターゲット中立のアセンブリ層である。[`ui-conversation`](../../packages/client/ui-conversation/README.md) は、イベントレジストリとビューレジストリ、`SessionBinding` ごとに 1 つの同一性安定なバインディング、Turn/Step ロケーション、インクリメンタルな Context アセンブリ、ターゲットソース、共有シェル、入力オーケストレーションを所有する。[`ui-chat`](../../packages/client/ui-chat/README.md) や [`ui-trajectory`](../../packages/client/ui-trajectory/README.md) などのターゲットパッケージは、自身の Definition、最終スナップショット、レンダリングを所有する。
 
-This page defines the data model and the extension path for a business-owned Conversation node. The [Web Client architecture](web-client.md) places the subsystem between Client models and Slots; the [Conversation Node assembly decision](../../.agents/notes/implemented/architecture/2026-08-09-client-conversation-node-assembly.md) owns its rationale.
+このページは、ビジネスが所有する会話ノードのデータモデルと拡張パスを定義する。[Web クライアントアーキテクチャ](web-client.md)はこのサブシステムを Client モデルとスロットの間に位置づけ、その根拠は[会話ノードアセンブリの決定](../../.agents/notes/implemented/architecture/2026-08-09-client-conversation-node-assembly.md)が所有する。
 
-## Data model and ownership
+## データモデルと所有権
 
-The Session Controller owns the contiguous loaded logical-event window. Each `SessionEventLikeEntry` is either `{ type: 'event', event: SessionEvent }` for one durable event or `{ type: 'transient', event: AssistantLiveChunkEvent }` for one Client-only `assistant/live-chunk` presentation. Both inner events expose `type`, `seq`, `time`, and `data`. `ui-conversation` passes these entries to the assembler without opening a second history stream. One `ConversationNodeAssembler` per Session applies every registered Definition and publishes an independent source for each registered view target.
+Session コントローラーは、連続してロードされた論理イベントウィンドウを所有する。各 `SessionEventLikeEntry` は、1 つの永続イベントに対する `{ type: 'event', event: SessionEvent }` か、Client 専用の `assistant/live-chunk` プレゼンテーション 1 つに対する `{ type: 'transient', event: AssistantLiveChunkEvent }` のいずれかである。両方の内側のイベントは `type`、`seq`、`time`、`data` を公開する。`ui-conversation` は第 2 の履歴ストリームを開くことなく、これらのエントリーをアセンブラーに渡す。Session ごとに 1 つの `ConversationNodeAssembler` が、登録されたすべての Definition を適用し、登録されたビューターゲットごとに独立したソースを発行する。
 
-| Concept | Owner and purpose |
+| 概念 | 所有者と目的 |
 |---|---|
-| Event Definition | A business package matches one durable or Client-only transient event at a time, correlates it by stable `(kind, id)`, folds deterministic State, and optionally materializes one target node. |
-| Context | The engine-owned ordered Matches and current State for one `(kind, id)`. Durable and transient events may be starts. The earliest loaded start initializes State; later Matches update it. Update-only evidence stays pending until its start is loaded. |
-| Location | The engine-owned Session, Turn, or Step coordinates derived from durable boundary events. Definitions may publish typed data onto one Turn or Step. |
-| View Definition | A target package creates one incremental builder per Session and owns the final snapshot type for that target. |
-| Group Definition | A business package derives one target's root references and group snapshots from materialized Nodes; it owns membership, segmentation, summaries, and incremental caches. |
-| View | A Slot entry such as Chat or Trajectory reads only its target snapshot and renders target-owned nodes. |
+| イベント Definition | ビジネスパッケージが、永続または Client 専用の一時イベントを 1 度に 1 つマッチし、安定した `(kind, id)` で相関付け、決定的な State を畳み込み、任意で 1 つのターゲットノードを実体化する。 |
+| Context | 1 つの `(kind, id)` に対するエンジン所有の順序付き Match と現在の State。永続イベントと一時イベントは開始になり得る。最も早くロードされた開始が State を初期化し、以降の Match がそれを更新する。更新のみの証拠は、その開始がロードされるまで保留のままである。 |
+| Location | 永続的な境界イベントから導出される、エンジン所有の Session、Turn、または Step 座標。Definition は型付きデータを 1 つの Turn または Step に発行できる。 |
+| View Definition | ターゲットパッケージが Session ごとに 1 つのインクリメンタルビルダーを作成し、そのターゲットの最終スナップショット型を所有する。 |
+| Group Definition | ビジネスパッケージが、実体化された Node からあるターゲットのルート参照とグループスナップショットを導出する。メンバーシップ、セグメンテーション、サマリー、インクリメンタルキャッシュを所有する。 |
+| View | Chat や Trajectory のようなスロットエントリーが、自身のターゲットスナップショットだけを読み、ターゲット所有のノードをレンダリングする。 |
 
-Chat and Trajectory may recognize the same durable event family, but each keeps its own Definition State and final node payload. Shared target-neutral machinery is limited to identity routing, ordered replay, Location data, predecessor dependencies, and publication cadence.
+Chat と Trajectory は同じ永続イベントファミリーを認識することがあるが、それぞれが自身の Definition State と最終ノードペイロードを保つ。共有されるターゲット中立の機構は、同一性ルーティング、順序付きリプレイ、Location データ、先行依存関係、発行ケイデンスに限られる。
 
-## Target activation
+## ターゲットのアクティブ化
 
-Each Session keeps a monotonic set of active targets. Creating or reading a target source does not activate it. The shell explicitly activates its persisted or newly selected View, while another consumer activates a target through its first source subscription. First activation creates that target's builder and calls `replace()` once from the current target-indexed Contexts. Later flushes call `apply()` for every active target, and unsubscription does not remove one.
+各 Session はアクティブターゲットの単調な集合を保持する。ターゲットソースを作成または読むだけではアクティブ化されない。シェルは永続化された、または新しく選択された View を明示的にアクティブ化し、別のコンシューマーは最初のソースサブスクリプションを通じてターゲットをアクティブ化する。最初のアクティブ化がそのターゲットのビルダーを作成し、現在のターゲットインデックス付き Context から `replace()` を 1 回呼ぶ。以降のフラッシュはすべてのアクティブターゲットに対して `apply()` を呼び、サブスクリプション解除はターゲットを除去しない。
 
-The shell owns View selection and resolves the registered preferred View or Chat fallback before rendering when a binding is created or selected as current, and after View-roster changes. The assembler receives only the resolved target id and does not select Chat or another default target. A third-party View participates through the same selection and activation operations. A View Definition may expose `toolCallFocus(callId)`; the shell supplies Inspect only for a visible target that declares this capability, and the target maps the call id to its own focus identity.
+シェルは View の選択を所有し、バインディングが作成されたとき、または現在として選択されたときにレンダリングの前に、また View ロスターの変更後に、登録された優先 View または Chat フォールバックを解決する。アセンブラーは解決されたターゲット id だけを受け取り、Chat や他のデフォルトターゲットを選択しない。サードパーティの View は同じ選択とアクティブ化の操作を通じて参加する。View Definition は `toolCallFocus(callId)` を公開できる。シェルはこのケイパビリティを宣言する可視ターゲットに対してのみ Inspect を提供し、ターゲットは call id を自身のフォーカス同一性にマップする。
 
 <a id="group-definitions"></a>
-## Group Definitions
+## Group Definition
 
-The optional `ctx.uiConversation.groups.register(definition)` contribution uses the same effect-owned registry lifecycle as event and view registrations. It requires an existing View target and rejects duplicate target registrations without constructing a Builder. Each Session creates its own Group context only when that target activates. Registration replacement discards the old context and clears its observed groups during the existing registry rebuild.
+省略可能な `ctx.uiConversation.groups.register(definition)` コントリビューションは、イベントおよびビューの登録と同じエフェクト所有のレジストリライフサイクルを使う。既存の View ターゲットを必要とし、Builder を構築せずにターゲットの重複登録を拒否する。各 Session はそのターゲットがアクティブ化されたときにのみ、自身の Group context を作成する。登録の置換は古い context を破棄し、既存のレジストリ再構築の中でその観測済みグループをクリアする。
 
-The [group types](../../packages/client/ui-conversation/src/client/contract/groups.ts) define the complete protocol:
+[グループ型](../../packages/client/ui-conversation/src/client/contract/groups.ts)が完全なプロトコルを定義する:
 
-| Type | Meaning |
+| 型 | 意味 |
 |---|---|
-| `ConversationGroupDefinition<Node, State, Data>` | `create()` initializes Session-local State; `update(context, input)` returns its next State; `buildGroups(context)` returns pending output or `null`. Replacement input requires entries and a complete group replacement. |
-| `ConversationGroupInput<Node>` | `replace` supplies target order, timeline, and synchronous `readNode`, `readTurn`, and `readPosition` readers. `apply` adds projected `previous/current` Node changes, lifecycle `changedTurns`, and `changedTurnOrders`. Do not retain readers in State. |
-| `GroupNodePosition` | Owning Turn, when present, and immediate previous/next visible Node keys. Neighbours preserve interruptions that a Turn-only key list omits. |
-| `NodeReference` / `GroupReference` | Branded `NodeKey` or `GroupKey`, distinguished by `kind`. A Node reference may select a renderer-owned `groupPart`; omission selects the whole Node. |
-| `GroupSnapshot<Data>` | Immutable group key, business data, and ordered Node references. Groups cannot contain other groups or own source Node data. |
-| `GroupUpdate<Data>` | `entries` replaces the complete root sequence; only apply input may omit it to preserve the sequence. Replacement input requires both `entries` and `groups.replace`. `groups.replace.snapshots` replaces all groups; `groups.apply.upserts/removes` updates only named group records. Removal does not delete Nodes. |
-| `ConversationGroupDataMap` | Declaration-merged target-to-data association shared by registration and `views.grouped(target)`. Undeclared targets have no group payload type. |
-| `ConversationGroupedView<Data>` | Stable root `entries` and keyed `groupSource(key)` readers; a removed group reads as `undefined`. |
+| `ConversationGroupDefinition<Node, State, Data>` | `create()` は Session ローカルの State を初期化する。`update(context, input)` は次の State を返す。`buildGroups(context)` は保留中の出力または `null` を返す。置換入力は entries と完全なグループ置換を要求する。 |
+| `ConversationGroupInput<Node>` | `replace` はターゲット順序、タイムライン、および同期の `readNode`、`readTurn`、`readPosition` リーダーを提供する。`apply` は投影された `previous/current` Node 変更、ライフサイクルの `changedTurns`、`changedTurnOrders` を加える。State にリーダーを保持してはならない。 |
+| `GroupNodePosition` | 所有する Turn (存在する場合) と、直前/直後の可視 Node キー。隣接は、Turn のみのキーリストが省略してしまう中断を保つ。 |
+| `NodeReference` / `GroupReference` | ブランド付きの `NodeKey` または `GroupKey` で、`kind` によって区別される。Node 参照はレンダラー所有の `groupPart` を選択できる。省略すると Node 全体を選択する。 |
+| `GroupSnapshot<Data>` | 不変のグループキー、ビジネスデータ、順序付き Node 参照。グループは他のグループを含むことも、ソース Node データを所有することもできない。 |
+| `GroupUpdate<Data>` | `entries` は完全なルートシーケンスを置き換える。シーケンスを保つために省略できるのは apply 入力のみである。置換入力は `entries` と `groups.replace` の両方を要求する。`groups.replace.snapshots` はすべてのグループを置き換え、`groups.apply.upserts/removes` は指名されたグループレコードだけを更新する。除去は Node を削除しない。 |
+| `ConversationGroupDataMap` | 宣言マージされたターゲット→データの対応で、登録と `views.grouped(target)` が共有する。宣言されていないターゲットはグループペイロード型を持たない。 |
+| `ConversationGroupedView<Data>` | 安定したルート `entries` とキー付きの `groupSource(key)` リーダー。除去されたグループは `undefined` として読める。 |
 
-The Builder exposes `groupInput()` when grouping is registered; missing input fails at first activation. It records the Node values after its own projections and preserves content-only order identity. The assembler supplies changed Turns with every update; direct ungrouped Builder callers may omit them. Builders with independent sources defer their notifications to `publish()`. First activation and ordinary flush share the same sequence: materialize Location data and Nodes, update the Builder, call the Group Definition, validate and install grouping, then publish every affected target and Location source. The group phase reuses the existing publication cadence.
+Builder はグループ化が登録されている場合に `groupInput()` を公開する。入力が欠けていると最初のアクティブ化で失敗する。Builder は自身の投影の後の Node 値を記録し、コンテンツのみの順序同一性を保つ。アセンブラーは更新ごとに変更された Turn を提供する。直接の非グループ化 Builder 呼び出し元はそれらを省略できる。独立したソースを持つ Builder は通知を `publish()` まで遅らせる。最初のアクティブ化と通常のフラッシュは同じシーケンスを共有する: Location データと Node を実体化し、Builder を更新し、Group Definition を呼び、グループ化を検証してインストールし、その後、影響を受けるすべてのターゲットと Location ソースを発行する。グループフェーズは既存の発行ケイデンスを再利用する。
 
-Target position indexes supply the readers and identify Turns whose visible keys or neighbours changed. `changedTurnOrders` includes both owners of a moved Node and Turns adjacent to inserted or removed unscoped Nodes; lifecycle-only changes remain in `changedTurns`. A business Definition can resegment those Turns and refresh only groups containing changed content. Structural output still replaces the complete root-reference array, without requiring unchanged Node contents to be reread.
+ターゲット位置インデックスがリーダーを供給し、可視キーまたは隣接が変わった Turn を識別する。`changedTurnOrders` には、移動した Node の両方の所有者と、挿入または除去されたスコープ外 Node に隣接する Turn が含まれる。ライフサイクルのみの変更は `changedTurns` に残る。ビジネス Definition はそれらの Turn を再セグメント化し、変更されたコンテンツを含むグループだけを更新できる。構造出力は依然として完全なルート参照配列を置き換えるが、変更されていない Node のコンテンツを読み直す必要はない。
 
-The Group store validates the whole submitted result before installation: root Group references and records correspond one-to-one, all referenced Nodes exist, and each `(NodeKey, groupPart)` occupies at most one root or member position. A whole Node cannot coexist with one of its parts. Duplicate upserts, duplicate removals, and simultaneous upsert/removal of a group fail. Data-only upserts retain root and member arrays, do not read Nodes, and notify only changed group sources; full replacement revalidates every reference.
+Group ストアはインストールの前に、提出された結果全体を検証する: ルート Group 参照とレコードは 1 対 1 で対応し、参照されるすべての Node が存在し、各 `(NodeKey, groupPart)` は最大 1 つのルートまたはメンバー位置を占める。Node 全体とそのパーツの 1 つが共存することはできない。重複する upsert、重複する remove、および 1 つのグループの同時 upsert/remove は失敗する。データのみの upsert はルートとメンバーの配列を保ち、Node を読まず、変更されたグループソースだけに通知する。完全置換はすべての参照を再検証する。
 
-Renderers switch on the two reference kinds and choose components in the owning View, not through a renderer field in group data. Root Node references and referenced group members form the complete render list; unreferenced target Nodes remain stored but do not render. The group body reads members separately from summary data. Presentation modes must retain component types, keys, and member parents; changing data membership may legitimately remount a moved member. The framework does not interpret part completeness, segmentation, or presentation policies.
+レンダラーは 2 つの参照 kind で分岐し、グループデータ内のレンダラーフィールドではなく、所有する View 内でコンポーネントを選ぶ。ルート Node 参照と参照されたグループメンバーが完全なレンダーリストを形成する。参照されていないターゲット Node は保存されたままレンダリングされない。グループボディはサマリーデータとは別にメンバーを読む。表示モードはコンポーネント型、キー、メンバーの親を保たなければならず、データメンバーシップの変更は移動したメンバーを正当に再マウントさせることがある。フレームワークはパーツの完全性、セグメンテーション、表示ポリシーを解釈しない。
 
-## Replayable event families
+## 再生可能なイベントファミリー
 
-Choose one stable business id before writing the Definition. Every event that contributes to the same Node must carry that id or derive it independently from its own payload; the client must never assign an update to “the latest unfinished” Context.
+Definition を書く前に、1 つの安定したビジネス id を選ぶ。同じ Node に寄与するすべてのイベントは、その id を運ぶか、自身のペイロードから独立に導出しなければならない。クライアントは更新を「最新の未完了」Context に割り当てては決してならない。
 
-For a review job, the event contract could be:
+レビュージョブの場合、イベント契約は次のようになり得る:
 
-| Event | Role | Required durable facts |
+| イベント | 役割 | 必要な永続ファクト |
 |---|---|---|
-| `review/start` | unique start | `reviewId`, Turn/Step coordinates, title |
-| `review/progress` | update | the same `reviewId`, coordinates, replayable progress |
-| `review/end` | update | the same `reviewId`, coordinates, final summary |
+| `review/start` | 一意な開始 | `reviewId`、Turn/Step 座標、タイトル |
+| `review/progress` | 更新 | 同じ `reviewId`、座標、再生可能な進捗 |
+| `review/end` | 更新 | 同じ `reviewId`、座標、最終サマリー |
 
-Use the producer-owned branded id type across the process boundary. Put the `SessionEventMap` merge and payload types on the producer's type-only export, then import that export for side effects from the client package. Each `(kind, id)` may have at most one start event. A single-event business can use the event's stable identity, such as `event.seq`, as its Definition-local id.
+プロセス境界を越えてプロデューサー所有のブランド付き id 型を使う。`SessionEventMap` マージとペイロード型をプロデューサーの型専用エクスポートに置き、そのエクスポートをクライアントパッケージから副作用のためにインポートする。各 `(kind, id)` は最大 1 つの開始イベントを持てる。単一イベントのビジネスは、`event.seq` のようなイベントの安定した同一性を Definition ローカル id として使える。
 
-Incremental events are supported. Prefer whole-value checkpoints when the producer can emit them cheaply, because they remain useful when the start is outside the loaded window. Each delta must carry the stable id and produce deterministic State when replayed in ascending log `seq`; it must not depend on live-only memory. If the current history window contains only updates, the assembler keeps a pending Context and builds no State until an older page supplies the start. If the product must render before the start is loaded, a terminal or checkpoint event must carry enough whole fallback state for the Definition to build that result directly; do not recover it by scanning unrelated events.
+インクリメンタルイベントはサポートされる。プロデューサーが安価に発行できる場合は全体値のチェックポイントを優先する。開始がロード済みウィンドウの外にある場合でも有用だからである。各デルタは安定した id を運び、ログの `seq` 昇順で再生したときに決定的な State を生成しなければならず、ライブ専用のメモリーに依存してはならない。現在の履歴ウィンドウが更新のみを含む場合、アセンブラーは保留 Context を保持し、古いページが開始を供給するまで State を構築しない。製品が開始のロード前にレンダリングしなければならない場合、終端またはチェックポイントイベントは、Definition がその結果を直接構築するのに十分な全体フォールバック状態を運ばなければならない。無関係なイベントを走査してそれを回復してはならない。
 
-Live Assistant deltas arrive as Client-only `assistant/live-chunk` events. Reconnect baselines expand the active process-local compact stream into the same transient events, while durable `assistant/message` and `assistant/attempt` events embed complete compact streams for history replay. A transient event may initialize a Context. Every tool delta and its later `tool/call` can match as start under the same callId, even before the name arrives; only the earliest calls `start()`, and later Matches call `update()`. A preparing Tool node becomes visible only after its name is available. Historical pages do not expand settled messages into live deltas. A Definition that consumes Assistant output handles live chunks and durable settlements through the same matching and update interfaces, while unrelated Definitions return `null` without expanding a stream.
+ライブの Assistant デルタは Client 専用の `assistant/live-chunk` イベントとして到着する。再接続ベースラインは、アクティブなプロセスローカルのコンパクトストリームを同じ一時イベントに展開する。一方、永続的な `assistant/message` と `assistant/attempt` イベントは履歴再生用の完全なコンパクトストリームを埋め込む。一時イベントは Context を初期化できる。すべてのツールデルタと、その後の `tool/call` は、名前が届く前であっても同じ callId の下で開始としてマッチし得る。`start()` を呼ぶのは最も早いものだけで、以降の Match は `update()` を呼ぶ。準備中の Tool ノードは、名前が利用可能になってから初めて可視になる。履歴ページは確定済みメッセージをライブデルタに展開しない。Assistant 出力を消費する Definition は、同じマッチと更新のインターフェースを通じてライブチャンクと永続的な確定を扱う。一方、無関係な Definition はストリームを展開せずに `null` を返す。
 
-## Definition and typed Chat payload
+## Definition と型付き Chat ペイロード
 
-The example keeps the producer declarations and client contribution in one block so the complete relationship is visible. In a package family, keep the branded id and `SessionEventMap` declaration with the event producer, and keep the Definition, Chat data merge, and renderer in the client plugin.
+例では、全体の関係が見えるように、プロデューサーの宣言とクライアントのコントリビューションを 1 つのブロックにまとめている。パッケージファミリーでは、ブランド付き id と `SessionEventMap` 宣言をイベントプロデューサーに置き、Definition、Chat データマージ、レンダラーをクライアントプラグインに置く。
 
 ```ts ignore-check
 import { createElement } from 'react'
@@ -243,59 +243,59 @@ export function apply(ctx: ClientContext): void {
 }
 ```
 
-`match(event)` is an identity extractor, not a fold: it receives only the current `SessionEventLike` and returns the Definition-local id and lifecycle role. After a match, the assembler locates the Context by `(kind, id)` and initializes from its earliest loaded start, whether durable or transient. Every later Match calls `update`, including another start. Removing transient Matches reselects the start from remaining evidence and recomputes State; no remaining start leaves State undefined. Both functions return the State that the engine adopts; returning a new immutable value is preferred, but a function that mutates and returns the same object has the same adoption semantics.
+`match(event)` は同一性抽出器であり、畳み込みではない: 現在の `SessionEventLike` だけを受け取り、Definition ローカルの id とライフサイクル役割を返す。マッチの後、アセンブラーは `(kind, id)` によって Context を突き止め、永続か一時かを問わず、最も早くロードされた開始から初期化する。以降のすべての Match は、別の開始であっても `update` を呼ぶ。一時 Match の除去は、残りの証拠から開始を再選択し、State を再計算する。開始が残らない場合、State は undefined のままになる。どちらの関数もエンジンが採用する State を返す。新しい不変値を返すのが好ましいが、同じオブジェクトを変更して返す関数も採用の意味論は同じである。
 
-`ConversationNodeDefinitionInput` accepts either this function or a read-only table from event type to matching function. Function-form registrations receive every event; table registrations receive only their listed types. The Registry copies table entries and precomputes ordered candidate Sets when registrations change, keeping candidate construction out of per-event dispatch. Replace a table by unregistering and registering again. Resolved `ConversationNodeDefinition` values retain a callable `match(event)` in both cases.
+`ConversationNodeDefinitionInput` は、この関数か、イベント型からマッチ関数への読み取り専用テーブルのいずれかを受け入れる。関数形式の登録はすべてのイベントを受け取り、テーブル登録は列挙された型だけを受け取る。レジストリはテーブルエントリーをコピーし、登録が変わったときに順序付き候補 Set を事前計算して、候補構築をイベントごとのディスパッチから外に保つ。テーブルを置き換えるには、登録解除して再登録する。解決された `ConversationNodeDefinition` 値は、どちらの場合も呼び出し可能な `match(event)` を保つ。
 
-A match result with `exclusive: true` claims that event on the Definition's target. The assembler evaluates every match of the event before accepting any, so the outcome is independent of registration order: other Definitions of the claimed target build no Context for the event, and the target's unmatched-event fallback does not run. Definitions of other targets and Definitions without a target still receive it. Two claims on one target, or a claim from a Definition without a target, throw during dispatch; a claim returned by the fallback itself has no effect. A business Definition uses a claim to present one kind of message that a generic Definition of the same target would otherwise also present, such as a late question reply.
+`exclusive: true` を持つマッチ結果は、Definition のターゲット上でそのイベントをクレームする。アセンブラーはどのマッチも受け入れる前にイベントのすべてのマッチを評価するため、結果は登録順に依存しない: クレームされたターゲットの他の Definition はそのイベントの Context を構築せず、そのターゲットの未マッチイベントフォールバックも実行されない。他のターゲットの Definition とターゲットを持たない Definition は依然としてそれを受け取る。1 つのターゲットへの 2 つのクレーム、またはターゲットを持たない Definition からのクレームはディスパッチ中に throw し、フォールバック自体が返したクレームは効果を持たない。ビジネス Definition は、同じターゲットの汎用 Definition がそうしなければ同様に提示してしまう種類のメッセージ — たとえば遅れて届いた質問への返信 — を提示するためにクレームを使う。
 
-`buildLocationData(context, scope)` optionally publishes Definition-owned data onto an engine-owned Turn or Step. Use declaration merging to give each key a precise value type. Another Node in the same Location can consume that value through its constrained slot hook, such as `useTurnData(key)`, without receiving the Session or scanning `snapshot.chat.nodes`.
+`buildLocationData(context, scope)` は任意で、Definition 所有のデータをエンジン所有の Turn または Step に発行する。宣言マージを使い、各キーに正確な値型を与える。同じ Location の別の Node は、Session を受け取ったり `snapshot.chat.nodes` を走査したりすることなく、`useTurnData(key)` のような制約付きスロットフックを通じてその値を消費できる。
 
-`target` and `buildViewNode(context)` declare one target-owned rendering contribution and must appear together. Preserve `context.key` as the React-facing identity, choose `anchorSeq` from the matched event ordering, and return only renderer-ready data. Once a target Node has been published, keep returning the same key; use `visibility: 'hidden'` when it must temporarily leave the visible flow rather than withdrawing it with `null`.
+`target` と `buildViewNode(context)` は、1 つのターゲット所有のレンダリングコントリビューションを宣言し、一緒に現れなければならない。`context.key` を React 向けの同一性として保ち、マッチしたイベントの順序から `anchorSeq` を選び、レンダラー対応のデータだけを返す。ターゲット Node が公開された後は、同じキーを返し続ける。可視フローから一時的に外す必要がある場合は、`null` で撤回するのではなく `visibility: 'hidden'` を使う。
 
-A Chat Node also chooses where its row stands through `groupTree`. Positions are ordered from the outermost inward, and a Node at a position also has the effect of every inner one. Chat process grouping, whole-Turn folding, and Turn-input detection read only this position; [group-tree.ts](../../packages/client/ui-chat/src/client/contract/group-tree.ts) holds the complete contract.
+Chat ノードは `groupTree` を通じて自身の行が立つ位置も選ぶ。位置は最も外側から内側へ順序付けられ、ある位置の Node はその内側のすべての効果も持つ。Chat のプロセスグループ化、ターン全体の折りたたみ、Turn 入力の検出はこの位置だけを読む。完全な契約は [group-tree.ts](../../packages/client/ui-chat/src/client/contract/group-tree.ts) にある。
 
-| The Node is | Declare |
+| Node がこうである場合 | 宣言 |
 |---|---|
-| A person's input claimed in Step 1; its Turn opens an exchange | `exchange` |
-| Another input of its Turn, such as later human input or a trigger notice; before the process it is the opening input, after it the whole Turn stays open | `input` |
-| A Turn notice that stays outside whole-Turn folding, such as an error or the completed-turn footer | `turn` |
-| An independent row that whole-Turn folding still hides, such as a model retry | `process` |
-| Ordinary process content that joins the surrounding step run | omit `groupTree` |
+| Step 1 でクレームされた人の入力。その Turn が交換を開く | `exchange` |
+| その Turn の別の入力 (後続の人間入力やトリガー通知など)。プロセスの前では開始入力となり、後では Turn 全体が開いたままになる | `input` |
+| ターン全体の折りたたみの外にとどまる Turn 通知 (エラーや完了ターンのフッターなど) | `turn` |
+| ターン全体の折りたたみが依然として隠す独立した行 (モデルのリトライなど) | `process` |
+| 周囲のステップランに加わる通常のプロセスコンテンツ | `groupTree` を省略 |
 
-The [Chat business rules](../../packages/client/ui-chat/src/client/conversation-nodes/README.md#process-grouping) list the positions the built-in Nodes declare. When a generic Definition of the same target also matches the event your Node presents, claim the event with `exclusive: true` as described above.
+[Chat ビジネスルール](../../packages/client/ui-chat/src/client/conversation-nodes/README.md#process-grouping)が、ビルトイン Node が宣言する位置を列挙している。同じターゲットの汎用 Definition もあなたの Node が提示するイベントにマッチする場合、上述のように `exclusive: true` でそのイベントをクレームする。
 
-## Predecessor reads
+## 先行の読み取り
 
-Some Definitions need the latest earlier State of another business kind. `start` receives a `ConversationContextReader`; call `reader.previous<State>(kind)` there instead of accepting a Context collection or scanning events. The reader returns the nearest started Context before the current start `seq` as read-only data.
+Definition によっては、別のビジネス kind の最新の以前の State を必要とする。`start` は `ConversationContextReader` を受け取る。Context 集合を受け取ったりイベントを走査したりする代わりに、そこで `reader.previous<State>(kind)` を呼ぶ。リーダーは、現在の開始 `seq` より前の最も近い開始済み Context を読み取り専用データとして返す。
 
-The assembler records that dependency. If an older prepend later supplies a nearer predecessor, closes a previously unknown window gap, or revises the predecessor State, it reruns the dependent Context from `start` and replays its updates in ascending `seq`. The queried Definition remains responsible for writing useful State; the reader exposes no business-specific query methods and grants no mutation authority over another Context.
+アセンブラーはその依存関係を記録する。後に古いページの前置がより近い先行を供給した場合、以前は未知だったウィンドウのギャップを閉じた場合、または先行 State を改訂した場合、アセンブラーは依存する Context を `start` から再実行し、その更新を `seq` 昇順で再生する。問い合わせた Definition は有用な State を書く責任を引き続き負う。リーダーはビジネス固有のクエリメソッドを公開せず、別の Context に対する変更権限も与えない。
 
-## Window update paths
+## ウィンドウ更新パス
 
-History may be requested from the tail backward one page at a time. The Session journal validates non-overlapping logical sequence ranges first; the Assembler then orders accepted inputs by their first `seq` before State replay.
+履歴は末尾から 1 ページずつ過去へ要求できる。Session ジャーナルがまず重複しない論理シーケンス範囲を検証し、次にアセンブラーが受け入れられた入力を最初の `seq` で順序付けしてから State を再生する。
 
-| Path | Engine work | Definition-visible behavior |
+| パス | エンジンの作業 | Definition から見える挙動 |
 |---|---|---|
-| Replace on open, resync, or gap repair | Rebuild the loaded window, match every standard event or packed run once per Definition, then replay each started Context | `start`, followed by its updates in ascending logical `seq`; pending update-only Contexts remain without State |
-| Prepend one older page | Match only fresh older inputs, merge them into Contexts by `(kind, id)`, preserve existing keyed nodes, and replay only affected Contexts and dependencies | A newly found scalar start activates its collected scalar and packed updates; a changed Location or predecessor may rerun the Context |
-| Append one live event | Call each Definition's `match` once, look up the matched Context by key, and update only that Context | One scalar `update` and one requested publication for a matching post-start event; no existing Context scan |
+| オープン、再同期、ギャップ修復時の置換 | ロード済みウィンドウを再構築し、すべての標準イベントまたはパック済みランを Definition ごとに 1 回マッチし、開始済みの各 Context を再生する | `start` と、それに続く論理 `seq` 昇順の更新。保留中の更新のみの Context は State なしのまま残る |
+| 古いページを 1 つ前置 | 新たに加わった古い入力だけをマッチし、`(kind, id)` で Context にマージし、既存のキー付きノードを保ち、影響を受ける Context と依存関係だけを再生する | 新たに見つかったスカラーの開始が、収集済みのスカラー更新とパック済み更新をアクティブ化する。変更された Location または先行は Context を再実行することがある |
+| ライブイベントを 1 つ追加 | 各 Definition の `match` を 1 回呼び、マッチした Context をキーで引き、その Context だけを更新する | 開始後のマッチするイベントに対して 1 つのスカラー `update` と要求された 1 回の発行。既存 Context の走査はない |
 
-With `D` registered Definitions, one incoming scalar event or packed run performs `D` current-input matches and constant-time Context-key lookup after a match. Definition code must preserve that property: do not traverse the complete event window, every Context, `context.matches`, or the rendered Node collection on the normal append path. Use State for accumulated facts, Location data for same-Turn/Step sharing, and `reader.previous()` for indexed predecessor dependencies.
+登録された Definition が `D` 個あるとき、1 つの受信スカラーイベントまたはパック済みランは、`D` 回の現入力マッチと、マッチ後の定数時間の Context キー照会を実行する。Definition のコードはこの性質を保たなければならない: 通常の追加パスで、完全なイベントウィンドウ、すべての Context、`context.matches`、またはレンダリング済み Node 集合を走査してはならない。蓄積されたファクトには State、同一 Turn/Step の共有には Location データ、インデックス付きの先行依存関係には `reader.previous()` を使う。
 
-`publication` controls when changed State is materialized. Use `immediate` for structural or terminal changes, `animation-frame` for high-frequency visible deltas, and `none` when the State change feeds only a later publication. The engine applies every scalar update in log order and every packed run in one batch update; cadence only coalesces view publication.
+`publication` は、変更された State がいつ実体化されるかを制御する。構造的または終端的な変更には `immediate`、高頻度の可視デルタには `animation-frame`、State の変更が後の発行にのみ供給される場合は `none` を使う。エンジンはすべてのスカラー更新をログ順で適用し、すべてのパック済みランを 1 回のバッチ更新で適用する。ケイデンスはビューの発行を合流させるだけである。
 
-## Verification obligations
+## 検証の義務
 
-Add focused tests that establish these outcomes:
+次の結果を確立する焦点を絞ったテストを追加する:
 
-1. A complete window passed through replace produces the expected final State, Location data, Node payload, and `anchorSeq`.
-2. An update-only tail stays pending; prepending its start produces the same result as a complete replace.
-3. Initial history followed by live append produces the same result as replaying the combined window.
-4. Prepending an older page adds earlier rows without replacing existing keyed Node values whose data did not change.
-5. Repeated visible deltas preserve `context.key` and publish at most once per animation frame when requested.
-6. The keyed renderer consumes `node.data` and constrained Location hooks only; it does not scan the Session event window, Contexts, or Chat Nodes.
-7. Scalar and packed Assistant history produce the same final State, timing boundaries, and target snapshot, while one packed run remains one Match through replace, prepend, Location replay, and registry rebuild.
-8. Creating a target source performs no builder work; explicit selection or the first subscription performs one complete replacement, later updates reach every active target, and repeated activation performs no replacement.
+1. replace を通して渡された完全なウィンドウが、期待される最終 State、Location データ、Node ペイロード、`anchorSeq` を生成する。
+2. 更新のみの末尾は保留のままとなる。その開始を前置すると、完全な replace と同じ結果が得られる。
+3. 初期履歴に続くライブ追加は、結合されたウィンドウを再生するのと同じ結果を生成する。
+4. 古いページの前置は、データが変わっていない既存のキー付き Node 値を置き換えることなく、より前の行を追加する。
+5. 繰り返しの可視デルタは `context.key` を保ち、要求された場合はアニメーションフレームごとに最大 1 回発行する。
+6. キー付きレンダラーは `node.data` と制約付き Location フックだけを消費し、Session イベントウィンドウ、Context、Chat ノードを走査しない。
+7. スカラーとパック済みの Assistant 履歴は同じ最終 State、タイミング境界、ターゲットスナップショットを生成し、1 つのパック済みランは replace、prepend、Location 再生、レジストリ再構築を通じて 1 つの Match のままである。
+8. ターゲットソースの作成はビルダーの作業を行わない。明示的な選択または最初のサブスクリプションが 1 回の完全な置換を実行し、以降の更新はすべてのアクティブターゲットに届き、繰り返しのアクティブ化は置換を行わない。
 
-Use [`packages/client/ui-chat/src/client/conversation-nodes/assistant.ts`](../../packages/client/ui-chat/src/client/conversation-nodes/assistant.ts) for streaming and interruption, [`inbox.ts`](../../packages/client/ui-chat/src/client/conversation-nodes/inbox.ts) plus [`message.ts`](../../packages/client/ui-chat/src/client/conversation-nodes/message.ts) for predecessor queries, and [`packages/client/ui-deliverables`](../../packages/client/ui-deliverables) for a Definition that publishes Turn data without creating its own Node.
+ストリーミングと中断には [`packages/client/ui-chat/src/client/conversation-nodes/assistant.ts`](../../packages/client/ui-chat/src/client/conversation-nodes/assistant.ts) を、先行クエリには [`inbox.ts`](../../packages/client/ui-chat/src/client/conversation-nodes/inbox.ts) と [`message.ts`](../../packages/client/ui-chat/src/client/conversation-nodes/message.ts) を、自身の Node を作成せずに Turn データを発行する Definition には [`packages/client/ui-deliverables`](../../packages/client/ui-deliverables) を使う。

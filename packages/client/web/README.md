@@ -1,138 +1,138 @@
 ---
-description: "Web boot kernel for the web GUI: two-stage boot of the client plugin tree, the framework-free boot page, and the shared module table, for users and maintainers composing or debugging the browser application."
+description: "Web GUI の Web ブートカーネル: クライアントプラグインツリーの 2 段階ブート、フレームワーク非依存のブートページ、共有モジュールテーブル。ブラウザアプリケーションを構成またはデバッグするユーザーとメンテナー向け。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-client-web
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-client-web` boots the web GUI: it loads the client module system from the Host-provided boot graph, then activates every client plugin before the application mounts, so the full UI appears only when every plugin is up. A framework-free boot page reports per-entry status, so a failing bundle or plugin stays visible instead of a blank screen. It also defines the shared module table (`PLATFORM_MODULES`) that every dynamic bundle resolves its externals against. The model never sees this package.
+`dsh-client-web` は Web GUI をブートする: Host 提供のブートグラフからクライアントモジュールシステムをロードし、アプリケーションがマウントする前にすべてのクライアントプラグインをアクティベートするので、完全な UI はすべてのプラグインが起動しているときにだけ現れる。フレームワーク非依存のブートページがエントリーごとのステータスを報告するので、失敗したバンドルやプラグインは空白画面ではなく可視のままになる。また、すべての動的バンドルが外部依存を解決する基準となる共有モジュールテーブル（`PLATFORM_MODULES`）も定義する。モデルはこのパッケージを決して見ない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use it when you assemble the browser application: `apps/web`'s Vite entry runs `new AppWebEntry(container).run()` against the mount point, and the boot page carries the user through activation. Ordinary browser callers pass no options. A pre-injected page transport is the default ahead of the `seams` override: when `globalThis.__DSH_TRANSPORT__` carries `loadBundle`, the module stage adopts it as the bundle transport and skips the immediate-tier HTTP prefetch, while explicit `seams` still win (for example jsdom tests, where external `<script>` execution cannot reach the page context).
+ブラウザアプリケーションをアセンブルするときに使う: `apps/web` の Vite エントリーはマウントポイントに対して `new AppWebEntry(container).run()` を実行し、ブートページがユーザーをアクティベーションを通じて導く。通常のブラウザ呼び出し元はオプションを渡さない。注入済みのページトランスポートは `seams` オーバーライドより前のデフォルトである: `globalThis.__DSH_TRANSPORT__` が `loadBundle` を運ぶ場合、モジュールステージはそれをバンドルトランスポートとして採用し、immediate 層の HTTP プリフェッチをスキップする。明示的な `seams` は依然として優先される（例えば、外部 `<script>` 実行がページコンテキストに到達できない jsdom テスト）。
 
-Static application pages install `__DSH_BOOT_READY__` before the entry runs. The boot page renders immediately while `run()` waits; the page owner applies the Host rows with `applyIndexInjections` (also exported from `./injections`) and resolves the deferred after all scripts finish. A rejected deferred renders a boot failure unless the caller supplies `run(onFailure)` to present the error externally while retaining the loading page. Desktop uses this callback to request native recovery. Desktop and WebWorker share the injection interpreter; server-side `tapIndex` HTML transforms apply only to served documents.
+静的アプリケーションページは、エントリーが実行される前に `__DSH_BOOT_READY__` をインストールする。`run()` が待機している間、ブートページは即座にレンダリングされる。ページオーナーは `applyIndexInjections`（`./injections` からもエクスポートされる）で Host 行を適用し、すべてのスクリプト完了後に deferred を解決する。拒否された deferred は、呼び出し元がローディングページを保ったままエラーを外部に提示する `run(onFailure)` を提供しない限り、ブート失敗をレンダリングする。Desktop はこのコールバックを使ってネイティブリカバリーを要求する。Desktop と WebWorker は注入インタープリターを共有する。サーバー側の `tapIndex` HTML 変換は提供されるドキュメントにのみ適用される。
 
-The shell base styles apply automatic CJK/Latin spacing to ordinary content in supporting browsers. Semantic code and terminal, diff, read, and search output containers retain literal source spacing and column alignment; browsers without `text-autospace` support ignore both declarations.
+シェルのベーススタイルは、対応ブラウザーの通常コンテンツに CJK/Latin の自動スペーシングを適用する。セマンティックなコードおよびターミナル、diff、read、search の出力コンテナーは、リテラルのソーススペーシングと列整列を保つ。`text-autospace` をサポートしないブラウザーは両方の宣言を無視する。
 
-Web and Desktop mathematical rendering requires WOFF2 support. The [Web build](../../../apps/web/katex-fonts.ts) retains every KaTeX font face in WOFF2 and omits WOFF/TTF fallbacks; a face without WOFF2 rejects the build. Font glyphs, weights, styles, and layout rules are preserved.
+Web と Desktop の数式レンダリングには WOFF2 サポートが必要である。[Web ビルド](../../../apps/web/katex-fonts.ts)はすべての KaTeX フォントフェイスを WOFF2 で保持し、WOFF/TTF フォールバックを省略する。WOFF2 のないフェイスはビルドを拒否する。フォントグリフ、ウェイト、スタイル、レイアウトルールは保たれる。
 
-### What boot looks like
+### ブートの流れ
 
-Boot runs in two stages: the module stage adopts the parser-loaded bootstrap batch, builds the module system from the Host-provided boot graph, and prefetches the `immediately` tier through the shared application-batch URL, which executes once. The plugin stage then activates every graph entry and waits for all of them before handing the marked boot DOM to the UI renderer, which hydrates it and switches to the complete UI.
+ブートは 2 段階で実行される: モジュールステージはパーサーがロードしたブートストラップバッチを採用し、Host 提供のブートグラフからモジュールシステムを構築し、共有アプリケーションバッチ URL を通じて `immediately` 層をプリフェッチする。これは 1 回だけ実行される。次にプラグインステージがすべてのグラフエントリーをアクティベートし、すべてを待ってから、マークされたブート DOM を UI レンダラーに引き渡す。レンダラーはそれをハイドレートし、完全な UI に切り替える。
 
-### The boot page
+### ブートページ
 
-The boot page uses plain DOM and local CSS, so bundle and plugin-activation failures remain visible: it shows one spinner node whose CSS arc grows as entries activate, and reports per-entry status. The spinner and its animation phase persist until the full UI replaces the boot page. A plugin that fails import or activation is reported by name with the reason (missing service, import failure, or state) instead of a blank page. The console contains the original import error.
+ブートページは素の DOM とローカル CSS を使うので、バンドルとプラグインアクティベーションの失敗が可視のままになる: エントリーのアクティベートに応じて CSS の弧が伸びる 1 つのスピナーノードを表示し、エントリーごとのステータスを報告する。スピナーとそのアニメーションフェイズは、完全な UI がブートページを置き換えるまで持続する。インポートまたはアクティベーションに失敗したプラグインは、空白ページではなく、名前と理由（サービス欠如、インポート失敗、または状態）が報告される。コンソールには元のインポートエラーが含まれる。
 
 <a id="the-shared-module-table"></a>
-### The shared module table
+### 共有モジュールテーブル
 
-`PLATFORM_MODULES` (in `src/platform.ts`) names the shell-seeded shared modules — React, Cordis, Zod (`zod`), TanStack Virtual (`@tanstack/react-virtual`), and static UI libraries — and together with `PRELOADED_CLIENT_EXTERNALS` (the parser-preloaded runtime row) defines the implicit external baseline every dynamic bundle resolves against. `dsh.client.external` adds only exact non-baseline requests; see [shared modules and the module graph](../AGENTS.md#shared-modules-and-the-module-graph).
+`PLATFORM_MODULES`（`src/platform.ts` 内）は、シェルがシードする共有モジュール —— React、Cordis、Zod（`zod`）、TanStack Virtual（`@tanstack/react-virtual`）、静的 UI ライブラリ —— を名指し、`PRELOADED_CLIENT_EXTERNALS`（パーサーがプリロードするランタイム行）とともに、すべての動的バンドルが解決する暗黙の外部ベースラインを定義する。`dsh.client.external` は正確な非ベースラインリクエストのみを追加する。詳細は[共有モジュールとモジュールグラフ](../AGENTS.md#shared-modules-and-the-module-graph)を参照。
 
-Built-in and installed browser plugins in the same page receive the same module instances. The shell supplies the dependency versions declared in this package's `package.json`; the module table does not negotiate versions per plugin. External plugins that use these modules must target a host that provides the required specifiers and APIs, and keep those imports external when building their client bundle. Inlined dependencies remain private to their bundle; Host code and Workers resolve their dependencies separately.
+同じページ内の組み込みおよびインストール済みのブラウザプラグインは同じモジュールインスタンスを受け取る。シェルはこのパッケージの `package.json` で宣言された依存バージョンを供給する。モジュールテーブルはプラグインごとにバージョンを交渉しない。これらのモジュールを使う外部プラグインは、必要な指定子と API を提供するホストをターゲットにしなければならず、クライアントバンドルのビルド時にそれらのインポートを外部のままにしなければならない。インライン化された依存はそのバンドルにプライベートなままである。Host コードと Worker はそれぞれの依存を別々に解決する。
 
-### Configuration
+### 構成
 
-The package accepts no plugin config of its own; the generated [configuration catalog](../../../docs/config-catalog.md) lists every plugin config in the repo for comparison.
+このパッケージは独自のプラグイン構成を受け付けない。生成された[構成カタログ](../../../docs/config-catalog.md)が比較用にリポジトリ内のすべてのプラグイン構成を列挙する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-Menus use the shared `MenuSurface` material, including the macOS backing for background blur; custom content follows the [menu rules](../../../docs/web-styling.md#component-rules).
+メニューは共有の `MenuSurface` マテリアルを使う。背景ぼかしのための macOS バッキングも含む。カスタムコンテンツは[メニュールール](../../../docs/web-styling.md#component-rules)に従う。
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the boot kernel is built; observable behavior is covered in [Use this package](#use-this-package).
+このセクションではブートカーネルがどのように構築されるかを説明する。観察可能な挙動は[このパッケージを使う](#use-this-package)でカバーされている。
 
-### Design concept
+### 設計概念
 
-The kernel owns exactly three things: the module system, the Cordis Loader, and the boot page. The Host owns the graph, batch preload, and loader facade, so `AppWebEntry` never knows the bootstrap package id or parses the wire format. The dynamic UI renderer receives the mount point only after every client entry activates.
+カーネルはちょうど 3 つを所有する: モジュールシステム、Cordis ローダー、ブートページ。Host はグラフ、バッチプリロード、ローダーファサードを所有するので、`AppWebEntry` はブートストラップパッケージ id を知らず、ワイヤ形式も解析しない。動的 UI レンダラーは、すべてのクライアントエントリーがアクティベートされた後にのみマウントポイントを受け取る。
 
-### Two-stage boot
+### 2 段階ブート
 
-`run()` calls the Host-installed `window.__ModuleLoader__.create({ boot, staticModules, ...seams })`; the facade returns the constructed module system and parsed manifest after adopting the parser-loaded bootstrap batch. The module stage prefetches the `immediately` tier through the one shared application-batch URL. The plugin stage mounts the Loader, assigns `loader.internal = modules`, creates every graph entry uniformly, awaits quiescence, then audits activation: any entry that failed import, stayed pending on a missing service, or landed in another non-active state throws one aggregated error naming every failing entry.
+`run()` は Host がインストールした `window.__ModuleLoader__.create({ boot, staticModules, ...seams })` を呼び出す。ファサードはパーサーがロードしたブートストラップバッチを採用した後、構築されたモジュールシステムと解析済みマニフェストを返す。モジュールステージは 1 つの共有アプリケーションバッチ URL を通じて `immediately` 層をプリフェッチする。プラグインステージはローダーをマウントし、`loader.internal = modules` を代入し、すべてのグラフエントリーを均一に作成し、静止を待ってからアクティベーションを監査する: インポートに失敗した、欠落したサービスで保留のままになった、または別の非アクティブ状態に着地したエントリーは、失敗したすべてのエントリーを名指す 1 つの集約エラーを投げる。
 
-### Boot page mechanics
+### ブートページの仕組み
 
-The boot page is plain DOM with local CSS whose fallback fonts and colors match the theme tokens that arrive during loading. `internal/status` events drive one spinner node and per-entry labels; hydration preserves the node and animation phase through the application commit, and `fail()` renders the thrown reason. React mounting, slot rendering, and assembly live in `ui-renderer`; `ui-layout` owns the assembled browser-title projection.
+ブートページはローカル CSS を持つ素の DOM で、そのフォールバックフォントと色はロード中に到着するテーマトークンに一致する。`internal/status` イベントが 1 つのスピナーノードとエントリーごとのラベルを駆動する。ハイドレーションはアプリケーションコミットを通じてノードとアニメーションフェイズを保ち、`fail()` が投げられた理由をレンダリングする。React のマウント、スロットレンダリング、アセンブリは `ui-renderer` にあり、`ui-layout` がアセンブルされたブラウザタイトル投影を所有する。
 
-The boot kernel delegates manifest entry creation to Client Modules so live graph synchronization owns the same entry identities after startup. The initial activation audit remains strict; later page-local failures appear in Settings → Plugins → Plugin list.
+ブートカーネルはマニフェストエントリーの作成を Client Modules に委任するので、稼働後のライブグラフ同期が同じエントリー識別を所有する。初期アクティベーション監査は厳格なままである。その後のページローカルな失敗は 設定 → プラグイン → プラグイン一覧 に現れる。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Library entry: `AppWebEntry`, `getStaticModules`, platform tables |
-| [`src/boot.ts`](src/boot.ts) | `AppWebEntry`: module stage, boot page, immediate-tier prefetch, window drag-rect watcher install, then `bootClient` + `mountClient` |
-| [`src/boot-client.ts`](src/boot-client.ts) | `bootClient` / `assertEntriesActive`: Loader mount, one entry per manifest row, activation audit |
-| [`src/mount.ts`](src/mount.ts) | `mountClient`: renderer handoff through a `uiRenderer` dependency fiber |
-| [`src/boot-page.ts`](src/boot-page.ts) | Framework-free boot page: spinner, per-entry status, failure rendering |
-| [`src/platform.ts`](src/platform.ts) | `PLATFORM_MODULES` / `PRELOADED_CLIENT_EXTERNALS`: the implicit external baseline |
-| [`src/seed.ts`](src/seed.ts) | Static module table handed to the loader at boot |
-| [`src/window-drag/regions.ts`](src/window-drag/regions.ts) | The darwin app-region composition model, and the interactive selector `base.css` subtracts |
-| [`src/window-drag/recall.ts`](src/window-drag/recall.ts) | The shell's one window drag-rect watcher (electron/electron#32341): measure the marked rows per frame and pulse the recall mark while they move |
+| [`src/index.ts`](src/index.ts) | ライブラリエントリー: `AppWebEntry`、`getStaticModules`、プラットフォームテーブル |
+| [`src/boot.ts`](src/boot.ts) | `AppWebEntry`: モジュールステージ、ブートページ、immediate 層プリフェッチ、ウィンドウドラッグ矩形ウォッチャーのインストール、その後 `bootClient` + `mountClient` |
+| [`src/boot-client.ts`](src/boot-client.ts) | `bootClient` / `assertEntriesActive`: ローダーのマウント、マニフェスト行ごとに 1 エントリー、アクティベーション監査 |
+| [`src/mount.ts`](src/mount.ts) | `mountClient`: `uiRenderer` 依存ファイバーを通じたレンダラーへの引き渡し |
+| [`src/boot-page.ts`](src/boot-page.ts) | フレームワーク非依存のブートページ: スピナー、エントリーごとのステータス、失敗のレンダリング |
+| [`src/platform.ts`](src/platform.ts) | `PLATFORM_MODULES` / `PRELOADED_CLIENT_EXTERNALS`: 暗黙の外部ベースライン |
+| [`src/seed.ts`](src/seed.ts) | ブート時にローダーへ渡される静的モジュールテーブル |
+| [`src/window-drag/regions.ts`](src/window-drag/regions.ts) | darwin アプリリージョン構成モデル、および `base.css` が差し引くインタラクティブセレクター |
+| [`src/window-drag/recall.ts`](src/window-drag/recall.ts) | シェルの唯一のウィンドウドラッグ矩形ウォッチャー（electron/electron#32341): マークされた行をフレームごとに測定し、それらが移動する間 recall マークをパルスする |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these when the boot contract is not enough: the module system it boots, the renderer that mounts the app, and the client authoring rules behind the baseline.
+ブート契約では足りないときにこれらを読む: それがブートするモジュールシステム、アプリをマウントするレンダラー、ベースラインの背後にあるクライアント作成ルール。
 
-- [Client module system](../modules/README.md) — the lazy module table and boot graph this kernel consumes.
-- [UI renderer](../ui-renderer/README.md) — receives the mount point and binds slot data to React.
-- [Client modules subsystem](../../../docs/subsystems/client-modules.md) — the web plugin table, boot graph wire, and bundle route.
-- [Client authoring rules](../AGENTS.md#shared-modules-and-the-module-graph) — the shared-module baseline and `dsh.client.external` semantics.
-- [Client group map](../README.md) — the browser half this package belongs to.
+- [クライアントモジュールシステム](../modules/README.md) — このカーネルが消費する遅延モジュールテーブルとブートグラフ。
+- [UI レンダラー](../ui-renderer/README.md) — マウントポイントを受け取り、スロットデータを React にバインドする。
+- [クライアントモジュールサブシステム](../../../docs/subsystems/client-modules.md) — Web プラグインテーブル、ブートグラフワイヤ、バンドルルート。
+- [クライアント作成ルール](../AGENTS.md#shared-modules-and-the-module-graph) — 共有モジュールベースラインと `dsh.client.external` のセマンティクス。
+- [クライアントグループマップ](../README.md) — このパッケージが属するブラウザ側半分。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the boot kernel is a browser-side UI plugin layer that registers nothing model-facing.
+なし。ブートカーネルはモデルに面するものを何も登録しないブラウザ側 UI プラグイン層である。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストをアセンブルも送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the boot kernel does not support. They are current package constraints, not a task backlog.
+これらの制限は、ブートカーネルがサポートしないものを定義する。現在のパッケージ制約であり、タスクバックログではない。
 
-- **The application waits for the full roster** — one failed entry keeps the framework-free boot page visible with a per-entry report; partial UI availability is not supported.
+- **アプリケーションは完全なロスターを待つ** — 1 つの失敗エントリーはエントリーごとのレポートとともにフレームワーク非依存のブートページを可視に保つ。部分的な UI 可用性はサポートされない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

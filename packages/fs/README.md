@@ -1,58 +1,58 @@
 ---
-description: "The filesystem package group: the ctx.fs provider contract, local and sandbox-enforcing backends, the read-before-edit policy plugin, and the model-facing file and search tools."
+description: "文件系包群。ctx.fs 提供子契約、地域と砂箱強制後端、編集前読み方針插件、模型対面文件と探索道具。"
 kind: "package-group"
 ---
 
 # packages/fs
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `fs/` group gives agents durable, policy-governed access to files: the `ctx.fs` service contract in `fs/`, the host-filesystem and sandbox-enforcing backends in `fs-local/` and `fs-sandbox/`, the read-before-edit policy in `fs-observation-policy/`, and the model-facing tools in `tool-fs/` (`read`, `read_image`, `write`, `edit`) and `tool-fs-search/` (`glob`, `grep`). A deployment mounts one backend, loads the policy for freshness-guarded mutations, and registers the tool packages the model should see; backends swap without touching the tools or the policy. File I/O takes no timeout by design: a deadline would kill work the OS still finishes, so cancellation is a best-effort signal at syscall boundaries.
+`fs/` 群は応答者に durable な方針統治文件到達を与える。`fs/` 内の `ctx.fs` 服務契約、`fs-local/` と `fs-sandbox/` 内の host 文件系と砂箱強制後端、`fs-observation-policy/` 内の編集前読み方針、`tool-fs/` (`read`、`read_image`、`write`、`edit`) と `tool-fs-search/` (`glob`、`grep`) 内の模型対面道具である。配備は後端 1 つを載せ、新鮮防護変異用に方針を読み込み、模型に見せる道具包を登録する。後端は道具や方針に触れずに交換できる。文件入出力は設計上期限を取らない。期限は OS が依然終える作業を殺すため、取消は syscall 境界の最善努力信号である。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ群](#packages)
+- [関連文書](#related-documentation)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ群
 
-Seven packages play the filesystem roles; the subsystem reference owns the exhaustive contracts and the error taxonomy.
+7 包が文件系役割を演じる。subsystem 参照が網羅契約と誤り分類を所有する。
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx 鍵 |
 |---|---|---|
-| [`fs/`](fs/README.md) | `ctx.fs` service contract: execution-world paths, bounded text I/O, and atomic mutations with an optional version guard | `ctx.fs` |
-| [`fs-local/`](fs-local/README.md) | Host-filesystem backend: reads, writes, and edits real files on the local machine | registers on `ctx.fs` |
-| [`fs-sandbox/`](fs-sandbox/README.md) | Sandbox-enforcing backend: fences writes and edits by the per-call sandbox mode while reads pass through | registers on `ctx.fs` |
-| [`fs-observation-policy/`](fs-observation-policy/README.md) | Read-before-edit policy: records observed presence or absence and guards write/edit through the `fs/*` events | `fs/*` listeners |
-| [`tool-fs/`](tool-fs/README.md) | Model-facing `read`, `read_image`, `write`, and `edit` tools plus their executor | registers on `ctx.tools` |
-| [`tool-fs-search/`](tool-fs-search/README.md) | Model-facing `glob` and `grep` discovery tools backed by the packaged ripgrep binary | registers on `ctx.tools` |
-| [`tool-str-replace-editor/`](tool-str-replace-editor/README.md) | Standalone `str_replace_editor` tool: `view`, `create`, `str_replace`, and `insert` over `ctx.fs` | registers on `ctx.tools` |
+| [`fs/`](fs/README.md) | `ctx.fs` 服務契約。実行世界経路、有界文入出力、任意版防護付き不可分変異 | `ctx.fs` |
+| [`fs-local/`](fs-local/README.md) | Host 文件系後端。地域機械の実文件を読み書き編集する | `ctx.fs` に登録 |
+| [`fs-sandbox/`](fs-sandbox/README.md) | 砂箱強制後端。呼毎砂箱様式で書込と編集を柵付けし読みは通す | `ctx.fs` に登録 |
+| [`fs-observation-policy/`](fs-observation-policy/README.md) | 編集前読み方針。観測済み存否を記録し `fs/*` イベントで書込/編集を防護する | `fs/*` 待ち受け |
+| [`tool-fs/`](tool-fs/README.md) | 模型対面 `read`、`read_image`、`write`、`edit` 道具とその実行子 | `ctx.tools` に登録 |
+| [`tool-fs-search/`](tool-fs-search/README.md) | 梱包 ripgrep 二値裏付けの模型対面 `glob` と `grep` 探索道具 | `ctx.tools` に登録 |
+| [`tool-str-replace-editor/`](tool-str-replace-editor/README.md) | 単立 `str_replace_editor` 道具。`ctx.fs` 上の `view`、`create`、`str_replace`、`insert` | `ctx.tools` に登録 |
 
-The policy is a plugin, not a service the tools inject: removing it leaves the bare provider's unconditional mutation behavior instead of breaking the tools. The mode fence in `fs-sandbox` and the read-before-edit gate compose. `tool-fs-search` deliberately does not extend the provider contract — search is a process-backed ripgrep workflow, so filesystem backends stay free of a universal search API.
+方針は道具が注入する服務ではなく插件である。それを外すと道具を壊さず裸提供子の無条件変異動作が残る。`fs-sandbox` 内の様式柵と編集前読み門は組み合わさる。`tool-fs-search` は故意に提供子契約を広げない — 探索は過程裏付け ripgrep 作業流であるため、文件系後端は普遍探索 API を持たないままである。
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連文書
 
-Start with the subsystem reference for the shared vocabulary and error taxonomy, then the decisions that shaped the family.
+共有語彙と誤り分類は subsystem 参照から始め、群を形作った決定へ進む。
 
-- [Filesystem subsystem](../../docs/subsystems/filesystem.md) — targets, outcomes, guards, policy events, and the error taxonomy.
-- [Cross-family fs sandbox reference](../sandbox/sandbox-policy/README.md) — the shared sandbox mode fence over the filesystem seam.
-- [Portable execution world consumers decision](../../.agents/notes/implemented/architecture/2026-07-28-portable-execution-world-consumers.md) — why filesystem and subprocess providers share one execution world.
+- [文件系 subsystem](../../docs/subsystems/filesystem.md) — 標的、結末、防護、方針イベント、誤り分類。
+- [越族 fs 砂箱参照](../sandbox/sandbox-policy/README.md) — 文件系縫目上の共有砂箱様式柵。
+- [移植実行世界利用者決定](../../.agents/notes/implemented/architecture/2026-07-28-portable-execution-world-consumers.md) — 文件系と子過程提供子が 1 つの実行世界を共有する理由。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業背景 — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,107 +1,107 @@
 ---
-description: "OpenSSH connection configuration and remote helper lifecycle for deployments composing POSIX file, process and sandbox providers."
+description: "POSIX ファイル・プロセス・サンドボックスプロバイダーを構成する配置向けの OpenSSH 接続設定とリモートヘルパーライフサイクル。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-ssh
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-ssh` connects a POSIX Harness host to an installed helper on a POSIX SSH host. One deployment-owned OpenSSH alias supplies authentication and host identity; the paired filesystem, subprocess and sandbox providers use that connection. The connection verifies installed artifact digests before readiness; the helper owns remote cleanup when the connection closes or its lease expires.
+`dsh-ssh` は POSIX Harness ホストを POSIX SSH ホスト上のインストール済みヘルパーに接続する。配置所有の OpenSSH エイリアス 1 件が認証とホスト同一性を提供し、対になるファイルシステム・サブプロセス・サンドボックスプロバイダーがその接続を使う。接続は readiness の前にインストール済み成果物ダイジェストを検証し、ヘルパーは接続終了時やリース期限切れ時にリモートクリーンアップを担う。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Compose this service with [`fs-ssh`](../fs-ssh/README.md), [`subprocess-ssh`](../subprocess-ssh/README.md) and [`sandbox-ssh`](../sandbox-ssh/README.md) in a custom `dsh` profile. The host runs the Harness, model transport and Session storage; the remote machine supplies the files and processes. Headless profiles support this arrangement.
+カスタム `dsh` プロファイルでこのサービスを [`fs-ssh`](../fs-ssh/README.md)、[`subprocess-ssh`](../subprocess-ssh/README.md)、[`sandbox-ssh`](../sandbox-ssh/README.md) とともに構成する。ホストが Harness、モデル転送、Session 保存を担い、リモートマシンがファイルとプロセスを提供する。headless プロファイルはこの配置を対応する。
 
-### Deployment prerequisites
+### 配置の前提条件
 
-Both endpoints require Linux or macOS. The local `ssh` command must support connection multiplexing and Unix-socket forwarding; the server must permit that forwarding. Configure the alias, credentials and known-host entry before startup: the service enables `BatchMode`, requires strict host-key checking, disables agent forwarding and adds no interactive authentication flow.
+両端点に Linux または macOS が必要である。ローカル `ssh` コマンドは接続多重化と Unix ソケット転送に対応しなければならず、サーバーはその転送を許可しなければならない。起動前にエイリアス・資格情報・known-host エントリを設定する。このサービスは `BatchMode` を有効化し、厳格なホストキー検査を要求し、エージェント転送を無効化し、対話認証フローを追加しない。
 
-Install an [SSH helper executable archive](../ssh-helper-runtime/README.md), or the built helper script with its matching Node dependencies. Keep the runtime outside the workspace and writable temporary roots. They must also remain outside a backend’s replaced temporary tree, such as bwrap’s private `/tmp`; the workspace may still be under `/tmp`. Digest verification detects an unexpected installed artifact after helper startup; it does not make writable deployment files safe to execute or authenticate a malicious SSH host.
+[SSH ヘルパー実行可能アーカイブ](../ssh-helper-runtime/README.md)、または一致する Node 依存関係を持つビルド済みヘルパースクリプトをインストールする。ランタイムはワークスペースと書き込み可能一時ルートの外に保つ。それらは bwrap のプライベート `/tmp` のようなバックエンド置換一時ツリーの外にも残らなければならない。ワークスペースは `/tmp` 配下でもよい。ダイジェスト検証はヘルパー起動後の予期しないインストール成果物を検出する。書き込み可能な配置ファイルの実行を安全にしたり、悪意ある SSH ホストを認証したりはしない。
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `host` | required | Existing OpenSSH host alias |
-| `launch` | required | `{ kind: "executable" }`, or `{ kind: "node-script", node: "/absolute/node" }` |
-| `helper`, `workspace` | required | Absolute remote helper entry and default workspace |
-| `helperHash` | required | Lowercase SHA-256 of the installed helper entry |
-| `launch.bootstrapPath`, `launch.bootstrapHash` | omitted | Paired remote PTC script and digest; only for `node-script` |
-| `requestTimeoutMs` | `30000` | Connection and administrative-request deadline, from 1 through 2,147,483,647 ms |
-| `maxFrameBytes` | `67108864` | Per-message JSON payload ceiling, at most 64 MiB |
-| `maxPending` | `128` | Ordinary outstanding requests; heartbeat and bounded cleanup requests have reserved capacity |
-| `leaseMs` | `30000` | Helper heartbeat lease, from 3000 to 600000 ms |
+| `host` | 必須 | 既存 OpenSSH ホストエイリアス |
+| `launch` | 必須 | `{ kind: "executable" }`、または `{ kind: "node-script", node: "/absolute/node" }` |
+| `helper`、`workspace` | 必須 | リモートヘルパー入口と既定ワークスペースの絶対パス |
+| `helperHash` | 必須 | インストール済みヘルパー入口の小文字 SHA-256 |
+| `launch.bootstrapPath`、`launch.bootstrapHash` | 省略 | 対になるリモート PTC スクリプトとダイジェスト。`node-script` のみ |
+| `requestTimeoutMs` | `30000` | 接続と管理リクエスト期限。1〜2,147,483,647 ms |
+| `maxFrameBytes` | `67108864` | メッセージごとの JSON ペイロード上限。最大 64 MiB |
+| `maxPending` | `128` | 通常の未完了リクエスト数。ハートビートと有界クリーンアップリクエストは予約容量を持つ |
+| `leaseMs` | `30000` | ヘルパーハートビートリース。3000〜600000 ms |
 
-Pass the verified `ctx.ssh.ptcLaunch` as the `launch` configuration of [`NodePtcRuntime`](../../ptc-runtime/ptc-runtime-node/README.md). Executable deployments include their worker. Script deployments require both bootstrap fields for PTC; filesystem and Bash use may omit them. The getter refuses an unconfigured script bootstrap. The client rejects mismatched protocol versions, runtime kinds and helper digests before readiness.
+検証済み `ctx.ssh.ptcLaunch` を [`NodePtcRuntime`](../../ptc-runtime/ptc-runtime-node/README.md) の `launch` 設定として渡す。実行可能配置はワーカーを含む。スクリプト配置は PTC のために両 bootstrap フィールドが必要であり、ファイルシステムと Bash 用途では省略できる。ゲッターは未設定スクリプト bootstrap を拒否する。クライアントは readiness の前に不一致プロトコルバージョン・ランタイム種別・ヘルパーダイジェストを拒否する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The OpenSSH master carries private administrative RPC. Each program stream uses a separate forwarded Unix socket and an independent SSH channel. Program stdout cannot forge administrative replies or occupy the control stream’s channel window. SSH transport congestion still affects the shared connection.
+OpenSSH マスターがプライベート管理 RPC を運ぶ。各プログラムストリームは別転送 Unix ソケットと独立 SSH チャネルを使う。プログラム stdout は管理応答を偽造できず、制御ストリームのチャネルウィンドウを占有できない。SSH 転送輻輳は共有接続に依然影響する。
 
-Each stream reservation has a random 256-bit TLS pre-shared key carried only by administrative RPC. TLS authenticates both endpoints and protects every stream byte; the key is never sent as a stream preface. Socket directories are private (`0700`) and sockets use `0600`. Replacing a writable socket path cannot impersonate an endpoint or reveal the stream key; an attacker can still interrupt service or relay opaque TLS records.
+各ストリーム予約はランダム 256 ビット TLS 事前共有キーを持ち、管理 RPC のみで運ばれる。TLS は両端点を認証し、すべてのストリームバイトを保護する。キーはストリーム前文として送信されない。ソケットディレクトリはプライベート（`0700`）であり、ソケットは `0600` を使う。書き込み可能ソケットパスの置換は端点を詐称できず、ストリームキーを漏らさない。攻撃者は依然サービスを中断したり不透明 TLS レコードを中継したりできる。
 
-Connection disposal joins forwarding and cancellation subprocesses and partially established streams before removing local resources. Transport loss rejects pending operations and invalidates the connection. The helper starts managed cleanup on SSH EOF, termination signals or heartbeat expiry. A disconnected client cannot confirm the remote outcome; operations are never reconnected or replayed automatically.
+接続破棄は転送とキャンセルのサブプロセスおよび部分確立ストリームを結合してからローカルリソースを除去する。転送損失は保留操作を拒否し、接続を無効化する。ヘルパーは SSH EOF・終了シグナル・ハートビート期限切れで管理クリーンアップを開始する。切断クライアントはリモート結果を確認できない。操作は自動再接続も再実行もされない。
 
-Failed startup and process results release their reservations after native quiescence; the bounded completion cache preserves the original rejection for later result reads. Helper shutdown also joins endpoint and directory cleanup already in progress.
+失敗した起動とプロセス結果はネイティブ静止後に予約を解放する。有界完了キャッシュは後の結果読み取りのために元の拒否を保持する。ヘルパー停止は進行中の端点とディレクトリクリーンアップも結合する。
 
-For terminals opting into shell activity observation, root exit retains the reservation and its remaining work. Activity RPC continues to reach the provider; explicit termination awaits quiescence before releasing endpoints and recording the completed result. Helper connection disposal and lease expiry retain their existing termination authority.
+シェル活動観測を選んだターミナルでは、ルート終了が予約と残作業を保持する。活動 RPC は引き続きプロバイダーに届き、明示終了は端点解放と完了結果記録の前に静止を待つ。ヘルパー接続破棄とリース期限切れは既存の終了権限を保持する。
 
-The connection disables the helper’s SIGUSR1 debugger activation: the script invocation uses `--disable-sigusr1`, and the executable invocation supplies that flag through `NODE_OPTIONS`.
+接続はヘルパーの SIGUSR1 デバッガー起動を無効化する。スクリプト呼び出しは `--disable-sigusr1` を使い、実行可能呼び出しは `NODE_OPTIONS` 経由でそのフラグを渡す。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [SSH subsystem](../../../docs/subsystems/ssh.md) — execution coordinates, transport semantics and lifecycle ownership.
-- [POSIX SSH decision](../../../.agents/notes/implemented/architecture/2026-09-11-posix-ssh-runtime.md) — rationale, alternatives and required verification.
+- [SSH サブシステム](../../../docs/subsystems/ssh.md) — 実行座標、転送意味、ライフサイクル所有権。
+- [POSIX SSH 決定](../../../.agents/notes/implemented/architecture/2026-09-11-posix-ssh-runtime.md) — 根拠、代替案、必要な検証。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as host aliases, authentication and stream capabilities are private deployment details and consumers own every model-visible operation.
+なし。ホストエイリアス・認証・ストリーム能力はプライベートな配置詳細であり、コンシューマーがすべてのモデル可視操作を所有するためである。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-This provider contributes no request-prefix content. Its consumers own model-visible tools and results.
+このプロバイダーはリクエストプレフィックス内容を提供しない。そのコンシューマーがモデル可視ツールと結果を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- No Windows endpoint, automatic provisioning, reconnect or replay is supplied.
-- Web workspace UI paths still assume host filesystem access; use headless or a custom composition whose consumers honor provider paths.
-- TLS stream keys do not protect against remote OS process-memory inspection or debugging. File-effect policy retains the selected sandbox backend’s limits.
+- Windows 端点、自動プロビジョニング、再接続、再実行は提供されない。
+- Web ワークスペース UI パスは依然ホストファイルシステムアクセスを想定する。headless か、プロバイダーパスを尊重するコンシューマーを持つカスタム構成を使う。
+- TLS ストリームキーはリモート OS プロセスメモリ検査やデバッグから保護しない。ファイル効果ポリシーは選択サンドボックスバックエンドの制限を保持する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

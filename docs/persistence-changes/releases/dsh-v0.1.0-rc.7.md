@@ -3,45 +3,45 @@ description: "Retrospective Session persistence types and adjacent-release chang
 kind: persistence-release
 ---
 
-# Persistence release: dsh-v0.1.0-rc.7
+# 永続化リリース: dsh-v0.1.0-rc.7
 
-English | [中文](dsh-v0.1.0-rc.7.zh.md)
+日本語 | [English](dsh-v0.1.0-rc.7.en.md) | [中文](dsh-v0.1.0-rc.7.zh.md)
 
-## Summary
+## 概要
 
-assistant/chunk replayState changes from unknown to an object with required response and optional blocks. The writer format remains 0.
+assistant/chunk replayState が unknown から、必須 response と任意 blocks を持つオブジェクトに変更された。ライターフォーマットは 0 のままである。
 
-## Table of Contents
+## 目次
 
-- [Release evidence](#evidence)
-- [Declaration](#declaration)
-- [Structural changes](#changes)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [リリース証拠](#evidence)
+- [宣言](#declaration)
+- [構造変更](#changes)
+- [検証](#verification)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="evidence"></a>
-## Release evidence
+## リリース証拠
 
-This approximate backfill supports reading and format validation; it is not a contemporaneous compatibility acknowledgement. See the [archive reference](README.md) for extraction and coverage limits.
+この概算バックフィルは読み取りと形式検証を支援するものであり、同時代の互換性承認ではない。抽出と対象範囲の制限は[アーカイブリファレンス](README.md)を参照。
 
-| Item | Recorded value |
+| 項目 | 記録値 |
 |---|---|
-| Source tag | `dsh-v0.1.0-rc.7` |
-| Source date | 2026-08-17T11:03:17.000Z |
-| Release record | Release object present. |
-| Previous release | [dsh-v0.1.0-rc.6](dsh-v0.1.0-rc.6.md) |
-| Session writer version | 0 |
-| Reconstructed inventory | <!-- persistence-release-inventory:start -->47 roots / 376 types<!-- persistence-release-inventory:end --> |
-| This snapshot | [dsh-v0.1.0-rc.7.schema.json](dsh-v0.1.0-rc.7.schema.json) |
+| ソースタグ | `dsh-v0.1.0-rc.7` |
+| ソース日時 | 2026-08-17T11:03:17.000Z |
+| リリース記録 | Release オブジェクトあり。 |
+| 前リリース | [dsh-v0.1.0-rc.6](dsh-v0.1.0-rc.6.md) |
+| セッションライターバージョン | 0 |
+| 再構築インベントリ | <!-- persistence-release-inventory:start -->47 roots / 376 types<!-- persistence-release-inventory:end --> |
+| このスナップショット | [dsh-v0.1.0-rc.7.schema.json](dsh-v0.1.0-rc.7.schema.json) |
 
-Source evidence for the writer version constant at this tag:
+このタグにおけるライターバージョン定数のソース証拠:
 
 - `packages/core/session/src/types.ts`: `export const SESSION_FORMAT_VERSION = 0`
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-release
 schemaVersion: 1
@@ -55,28 +55,28 @@ changes:
 ```
 
 <a id="changes"></a>
-## Structural changes
+## 構造変更
 
 <!-- persistence-release-changes:start -->
 
-Detected 1 changed root and 1 structural difference. The review requirement below is calculated using current rules for comparison only; it does not assert historical compliance, migration correctness, or runtime compatibility.
+変更されたルート 1 件と構造差分 1 件を検出。下記のレビュー要件は現行ルールによる比較用に算出したものであり、歴史的準拠、移行正確性、実行時互換性を主張するものではない。
 
-| Path | Change | Review requirement |
+| パス | 変更 | レビュー要件 |
 |---|---|---|
 | `event:assistant/chunk.data.chunk.replayState` | `type-changed` | `review-required` |
 
 <!-- persistence-release-changes:end -->
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Extraction passed canonical-graph, root-digest, and reachable-type-digest validation, permitting the original optional `surfaceOp` only for historical surface events. The in-tree check reconstructs each tag from its predecessor and verifies before/after values, snapshot coverage, and bilingual machine declarations.
+抽出は正規グラフ、ルートダイジェスト、到達可能型ダイジェストの検証を通過した。歴史的サーフェスイベント用の元々の任意 `surfaceOp` のみ許可されている。ツリー内検査は各タグを前任から再構築し、前後値、スナップショット対象範囲、バイリンガル機械宣言を検証する。
 
 ```sh
 pnpm run verify-persistence-releases
 ```
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
-None.
+なし。

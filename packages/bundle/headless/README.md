@@ -1,62 +1,62 @@
 ---
-description: "One-shot task mode for dsh: run a single task from the command line and get the final answer printed, for users scripting or automating dsh."
+description: "dsh の単発タスクモード: コマンドラインから 1 つのタスクを実行し、最終回答を表示する。dsh をスクリプト化または自動化するユーザー向け。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-headless
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-headless` runs one dsh task from the command line and prints the final answer, then exits — no GUI, no server, no browser. Type `dsh --profile headless "run the tests"` and the agent handles it with the same model, tools, and safety defaults as every other surface. It suits scripts, CI, and one-off jobs: it opens no ports and leaves nothing running behind. It also offers a JSON event stream (`--json`) and `--session-id` to resume a conversation. Exit code 0 means the task completed; 1 means it aborted or errored. The boundary: one task per invocation, no interactive follow-up.
+`dsh-headless` はコマンドラインから 1 つの dsh タスクを実行し、最終回答を表示してから終了する — GUI もサーバーもブラウザもない。`dsh --profile headless "run the tests"` と入力すると、エージェントは他のすべてのサーフェスと同じモデル、ツール、安全デフォルトでそれを処理する。スクリプト、CI、単発ジョブに適する: ポートを開かず、背後に何も残さない。JSON イベントストリーム (`--json`) と会話を再開するための `--session-id` も提供する。終了コード 0 はタスク完了、1 は中断またはエラーを意味する。境界: 1 回の起動につき 1 タスク、対話的なフォローアップはない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Run one task, get the final answer, and exit. The task is the command-line argument, or stdin when you omit it; the whole invocation is the smallest working example.
+1 つのタスクを実行し、最終回答を取得して終了する。タスクはコマンドライン引数、省略時は stdin から取る。この起動全体が最小の実例である。
 
-### Running a one-shot task
+### 単発タスクの実行
 
 ```sh
 dsh --profile headless "run the tests"
 ```
 
-The agent works through the task, streams each non-empty provider reasoning delta to stderr under a `dsh: reasoning:` heading, then prints the final answer on stdout and exits. Consecutive reasoning deltas stay in one section, and the runner closes that section before later output when the provider supplied no trailing newline. A successful run without reasoning keeps stderr empty; a failure exits 1 and prints `dsh: <code>: <message>` to stderr. The task comes from the positional argument, or from stdin when the argument is omitted or is a lone `-`; a blank positional argument or an empty pipe is rejected before anything runs. A positional task is used as-is and stdin is not read, so put the whole prompt in the pipe when you want piped input; a piped task is sent verbatim, its trailing newline included.
+エージェントはタスクを進め、空でないプロバイダーの推論デルタをそれぞれ `dsh: reasoning:` 見出しの下で stderr にストリームし、その後最終回答を stdout に表示して終了する。連続する推論デルタは 1 つのセクションにまとまり、プロバイダーが末尾改行を供給しなかった場合、ランナーは後続の出力の前にそのセクションを閉じる。推論のない成功した実行では stderr は空のままである。失敗は 1 で終了し、`dsh: <code>: <message>` を stderr に表示する。タスクは位置引数から、または引数を省略したか単独の `-` の場合は stdin から取る。空白のみの位置引数または空のパイプは何かが実行される前に拒否される。位置引数のタスクはそのまま使われ stdin は読まれないため、パイプ入力を使いたい場合はプロンプト全体をパイプに入れる。パイプされたタスクはそのまま（末尾改行も含めて）送信される。
 
 ```sh
 { echo "Summarize these changes:"; git diff --stat; } | dsh --profile headless
 ```
 
-The task and run options are supplied through three settings:
+タスクと実行オプションは 3 つの設定で供給される:
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `task` | stdin | The task text; stdin supplies it when omitted or `-` |
-| `sessionId` | `session-<uuid>` | Exact Session identity to adopt; an unknown id fails |
-| `json` | `false` | Project the run as newline-delimited events on stdout |
+| `task` | stdin | タスクテキスト。省略時または `-` のとき stdin が供給する |
+| `sessionId` | `session-<uuid>` | 採用する正確な Session 識別子。未知の id は失敗する |
+| `json` | `false` | 実行を改行区切りイベントとして stdout に射影する |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-headless) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-headless)が、受け入れられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
 <a id="credentials"></a>
-### Credentials
+### 認証情報
 
-The shipped headless profile disables the managed credential store and its authorization and DeepSeek account consumers. API-key routes use the launch environment, then `<invocation cwd>/.env`, then `$DSH_HOME/.env`. Keys and sign-ins saved by the GUI are ignored without changing their file. Providers that require a saved sign-in fail unless stored authentication is restored; external provider credential chains, such as AWS profiles, remain available.
+同梱の headless プロファイルは、マネージド認証情報ストアとその authorization および DeepSeek アカウントのコンシューマーを無効化する。API キーの経路は起動環境、次に `<起動時の cwd>/.env`、次に `$DSH_HOME/.env` を使う。GUI が保存したキーとサインインはファイルを変えずに無視される。保存されたサインインを必要とするプロバイダーは、保存された認証が復元されない限り失敗する。AWS プロファイルのような外部プロバイダーの認証情報チェーンは引き続き利用可能である。
 
-Unset an empty launch variable to allow its `.env` fallback; an exported empty value shadows that fallback.
+空の起動変数は unset して `.env` フォールバックを有効にする。空の値がエクスポートされているとそのフォールバックが隠される。
 
-To restore stored authentication, add these rows to `$DSH_HOME/profiles/headless/cordis.patch.yml` or a `--patch` overlay:
+保存された認証を復元するには、次の行を `$DSH_HOME/profiles/headless/cordis.patch.yml` または `--patch` オーバーレイに追加する:
 
 ```yaml
 - id: credentials
@@ -67,106 +67,106 @@ To restore stored authentication, add these rows to `$DSH_HOME/profiles/headless
   disabled: false
 ```
 
-The restored store uses [saved credentials before environment fallbacks](../../credentials/credentials-local/README.md). Web, SDK and ACP profiles keep that default ordering. Headless sessions, settings and tool behavior are unchanged; this profile choice is not a filesystem access boundary.
+復元されたストアは[環境フォールバックより保存済み認証情報を優先する](../../credentials/credentials-local/README.md)。Web、SDK、ACP プロファイルはその既定の順序を保つ。Headless のセッション、設定、ツールの挙動は変わらない。このプロファイル選択はファイルシステムアクセスの境界ではない。
 
-### Choosing the session identity
+### セッション識別子の選択
 
-Every invocation defaults to a fresh `session-<uuid>` identity, which `--json` reports in its opening `session` event. Pass `--session-id <id>` to continue that conversation: the runner adopts the persisted Session with that id, and an id with no stored Session fails before the task runs rather than quietly opening an empty history. Adoption requires the composed `sessionPersistence` and `sessionQuery` services, so a profile that omits either fails loudly instead of returning an id whose history dies with the process. An Agent already live under the requested id in this process is refused: another owner may still drive it, so the runner cannot claim an exclusive run interval over it. The identity is opaque, so the exact string is used, whitespace included. The working directory is resolved through the mounted filesystem provider (`fs.resolve('.')` and `fs.processPath()`), or the process cwd when no filesystem service is mounted; new Sessions record that directory. Adoption compares the recorded cwd with the same provider-resolved directory and refuses a Session that is a subagent or forked session, that recorded no working directory, that runs under an agent preset this profile does not compose, or whose preset record is malformed — the check reads the preset the Session log currently records, so a Session that switched preset while blank is rejected too. A supervisor therefore cannot silently drive someone else's conversation under a different composition; any mismatch fails before the task runs.
+各起動は既定で新しい `session-<uuid>` 識別子を使い、`--json` は開始時の `session` イベントでそれを報告する。`--session-id <id>` を渡すとその会話を継続する: ランナーはその id の永続化済み Session を採用し、保存された Session のない id は空の履歴を黙って開くのではなくタスク実行前に失敗する。採用には構成された `sessionPersistence` と `sessionQuery` サービスが必要なため、どちらかを欠くプロファイルは、履歴がプロセスと共に消える id を返すのではなく明示的に失敗する。このプロセス内で要求された id で既にライブの Agent は拒否される。別の所有者がまだそれを駆動している可能性があるため、ランナーはそれに対して排他的な実行区間を要求できない。識別子は不透明なので、文字列が正確に（空白も含めて）使用される。作業ディレクトリはマウントされたファイルシステムプロバイダー (`fs.resolve('.')` と `fs.processPath()`) で解決され、ファイルシステムサービスがマウントされていない場合はプロセスの cwd になる。新しい Session はそのディレクトリを記録する。採用は、記録された cwd を同じプロバイダー解決ディレクトリと比較し、サブエージェントまたはフォークされた Session、作業ディレクトリを記録していない Session、このプロファイルが構成しないエージェントプリセットで実行される Session、またはプリセット記録が不正な Session を拒否する。チェックは Session ログが現在記録しているプリセットを読むため、ブランク中にプリセットを切り替えた Session も拒否される。したがって、スーパーバイザーは別の構成の下で他人の会話を黙って駆動することはできない。不一致はタスク実行前に必ず失敗する。
 
-### Machine-readable output
+### 機械可読出力
 
-`--json` replaces the final-text stdout line with a newline-delimited JSON event stream, while stderr keeps only the `dsh:` diagnostics. The stream opens with `session` (carrying the identity the run used) and closes with `final`, and carries `status`, `text`, `thinking`, `tool_call`, and `tool_result` events in between. `text` and `thinking` are projected from committed assistant messages, so a retried or discarded attempt never reaches the stream; they arrive when the step commits, not per token, and default-mode stderr reasoning remains the only live text channel. The terminal `final` event carries the same lossless answer as the default mode and is not capped; every other string and object key is capped at 8 KiB and flagged with `truncated`, and one event line, its newline included, is capped at 32 KiB — an over-long event keeps its scalar fields, drops structured ones, and at the extreme reduces to `type` and `truncated`, while a payload nested 64 levels or deeper is cut at that depth. An empty tool-argument string projects as `{}`, matching what the executor runs, while arguments that JSON cannot round-trip — an overflowing number such as `1e400` — keep their raw text rather than the `null` that `JSON.stringify` would report. A failure the runner raises outside a turn writes an `error` event and ends the stream without `final`, in addition to the `dsh:` stderr line; a profile whose own plugins fail to load exits before the runner mounts, so that case keeps only the loader's stderr diagnostics. A turn that fails in-turn still ends with a `final` event (often empty) and no `error` event, so a well-formed stream can still describe a failed run: treat exit code 1 and the `turn_end` reason as the failure signal.
+`--json` は最終テキストの stdout 行を改行区切り JSON イベントストリームに置き換え、stderr は `dsh:` 診断のみを保つ。ストリームは `session`（実行が使った識別子を運ぶ）で開き、`final` で閉じ、その間に `status`、`text`、`thinking`、`tool_call`、`tool_result` イベントを運ぶ。`text` と `thinking` はコミット済みアシスタントメッセージから射影されるため、再試行または破棄された試行がストリームに到達することはない。これらはトークンごとではなくステップのコミット時に到着し、既定モードの stderr 推論が唯一のライブテキストチャネルであり続ける。終端の `final` イベントは既定モードと同じロスレスな回答を運び、上限はない。他のすべての文字列とオブジェクトキーは 8 KiB に上限され、`truncated` が付く。1 つのイベント行は改行を含めて 32 KiB に上限される。長すぎるイベントはスカラーフィールドを保ち、構造化フィールドを落とし、極端な場合は `type` と `truncated` に縮約される。64 レベル以上ネストされたペイロードはその深さで切られる。空のツール引数文字列は実行器が実行する内容に一致する `{}` として射影される。一方、JSON が往復できない引数（`1e400` のようなオーバーフロー数値）は `JSON.stringify` が報告する `null` ではなく生テキストを保つ。ランナーがターン外で発生させる失敗は、`dsh:` stderr 行に加えて `error` イベントを書き、`final` なしでストリームを終える。プロファイル自身のプラグインのロードに失敗した場合はランナーがマウントされる前に終了するため、そのケースはローダーの stderr 診断のみを保つ。ターン内で失敗したターンはそれでも（多くの場合空の）`final` イベントで終わり `error` イベントはない。そのため、形式の整ったストリームでも失敗した実行を記述し得る: 終了コード 1 と `turn_end` 理由を失敗シグナルとして扱うこと。
 
-### When to use it
+### いつ使うか
 
-Use headless for scripted or automated dsh runs — CI steps, batch jobs, quick answers from a terminal. Avoid it when you need a multi-turn interactive session or a GUI; the browser surface ([dsh-web-app](../web-app/README.md)) serves that. The process stays alive only for the run, opens no listening port, and exits on its own, so it fits pipelines that wait on the process. When a supervisor needs progress rather than just the answer, `--json` gives it the event stream and `--session-id` lets a later invocation continue the same conversation.
+スクリプト化または自動化された dsh 実行 — CI ステップ、バッチジョブ、ターミナルからの素早い回答 — には headless を使う。マルチターンの対話セッションや GUI が必要な場合は避ける。ブラウザサーフェス ([dsh-web-app](../web-app/README.md)) がそれを担う。プロセスは実行中のみ生き、リスニングポートを開かず、自ら終了するため、プロセスを待つパイプラインに適する。スーパーバイザーが回答だけでなく進捗を必要とする場合、`--json` がイベントストリームを与え、`--session-id` により後続の起動が同じ会話を継続できる。
 
-### Help and task errors
+### ヘルプとタスクエラー
 
-`dsh --profile headless --help` prints the command's help text and exits without running anything. A whitespace-only positional task is a usage error on its own — nothing runs and the process exits 1, even when stdin is not a terminal, so an accidental blank argument never consumes a pipe. A task that is absent entirely is a usage error only when stdin is a terminal; otherwise the runner reads the task from stdin and rejects an empty result the same way. A lone `-` is the only stdin marker; mixing it with other task words is a usage error rather than a task that starts with a dash. In `--json` mode every usage error — including commander's own grammar rejections such as an unknown option or a missing option value — also writes an `error` event to stdout before the process exits, so a line-oriented supervisor sees a well-formed stream even when the runner never mounts; the event `message` carries the text without commander's `error: ` prefix.
+`dsh --profile headless --help` はコマンドのヘルプテキストを表示し、何も実行せずに終了する。空白のみの位置引数タスクはそれ自体が使用エラーである — 何も実行されずプロセスは終了 1 で終わり、stdin が端末でない場合でもそうである。したがって偶発的な空引数がパイプを消費することはない。タスクが完全に存在しない場合は、stdin が端末であるときのみ使用エラーである。そうでなければランナーは stdin からタスクを読み、空の結果を同じように拒否する。単独の `-` だけが stdin マーカーである。他のタスク語と混ぜると、ダッシュで始まるタスクではなく使用エラーになる。`--json` モードでは、すべての使用エラー — 不明なオプションやオプション値の欠落のような commander 自身の文法拒否を含む — もプロセス終了前に `error` イベントを stdout に書くため、行指向のスーパーバイザーはランナーがマウントされなかった場合でも形式の整ったストリームを見る。イベントの `message` は commander の `error: ` プレフィックスなしのテキストを運ぶ。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The runner is a direct driver over the core API carrier: it resolves the Agent identity — a fresh `session-<uuid>` by default, or the persisted Session `--session-id` names — and folds the owned durable event interval into one process-level outcome.
+ランナーはコア API キャリア上の直接ドライバーである。Agent 識別子 — 既定では新しい `session-<uuid>`、または `--session-id` が指定する永続化済み Session — を解決し、所有する耐久イベント区間を 1 つのプロセスレベルの結果に畳み込む。
 
-### Run flow
+### 実行フロー
 
-The runner awaits the complete application (`ctx.get('loader')?.await()`) so the composed tools and adapters are not half-mounted, reads the shared [`agentDefaultModel`](../../core/agent-default-model/README.md) selection, resolves the task from config or stdin, then resolves the Agent identity: a fresh `session-<uuid>` by default, or the persisted Session `--session-id` names, which it adopts through [`sessionQuery`](../../session-query/session-query/README.md) and refuses when no log exists. It submits the task as an ordinary user message. Without `--json` it streams that Agent's non-empty reasoning deltas to stderr; with `--json` it projects the run instead. It waits for child work and rechecks that the parent remains idle with an unchanged Session sequence before finishing, so settlement notices can drive a final parent answer. Idle children with parked inbox messages do not delay completion; process shutdown discards their unclaimed messages. It then flushes the Session and folds the owned interval (`firstSeq` onward) into the last non-empty `assistant/message` text and final `turn/end` reason. It writes the final text to stdout (or the `final` event) and requests exit.
+ランナーは完全なアプリケーション (`ctx.get('loader')?.await()`) を待って構成されたツールとアダプターが中途半端にマウントされていないようにし、共有の [`agentDefaultModel`](../../core/agent-default-model/README.md) 選択を読み、config または stdin からタスクを解決し、次に Agent 識別子を解決する: 既定では新しい `session-<uuid>`、または `--session-id` が指定する永続化済み Session であり、それを [`sessionQuery`](../../session-query/session-query/README.md) 経由で採用し、ログが存在しない場合は拒否する。タスクを通常のユーザーメッセージとして送信する。`--json` なしではその Agent の空でない推論デルタを stderr にストリームし、`--json` ありでは実行を射影する。子作業を待ち、終了前に親がアイドルのまま Session シーケンスが変わっていないことを再確認するため、決済通知が最終的な親の回答を駆動できる。保留中の受信メッセージを持つアイドルの子は完了を遅らせない。プロセスシャットダウンはそれらの未クレームメッセージを破棄する。次に Session をフラッシュし、所有区間（`firstSeq` 以降）を最後の空でない `assistant/message` テキストと最終 `turn/end` 理由に畳み込む。最終テキストを stdout（または `final` イベント）に書き、終了を要求する。
 
-### Patch surface over base
+### ベースへのパッチサーフェス
 
-The patch rides over `dsh-base`: it inherits the projection cache and shared PTC runtime, sets the coding persona prefix and separate cwd suffix on the base `system-prompt` row, keeps the same temporary process-wide PTC mode opt-in (`DSH_TOOLS_MODE`) as the Web surface, disables the shared HMR row, and mounts the startup provider and the runner. The cache checkpoints each persisted one-shot session for later consumers; its durability barrier flushes each covered log prefix before publishing the cache row and may split otherwise coalesced JSONL runs. The startup provider ([`src/startup.ts`](src/startup.ts)) injects `ctx.cmdlineArgs` ([`dsh-cmdline`](../../boot/cmdline/README.md)), reads the positional argument and the `--session-id`/`--json` options, prints the app's `--help`, and provides `headlessStartup`; the runner injects that service and reads its task and run options from lazy config.
+パッチは `dsh-base` の上に乗る: 射影キャッシュと共有 PTC ランタイムを継承し、ベース `system-prompt` 行にコーディングペルソナプレフィックスと別個の cwd サフィックスを設定し、Web サーフェスと同じ一時的なプロセス全体 PTC モードのオプトイン (`DSH_TOOLS_MODE`) を保ち、共有 HMR 行を無効化し、起動プロバイダーとランナーをマウントする。キャッシュは永続化された各単発セッションを後続のコンシューマー用にチェックポイントする。その耐久性バリアはキャッシュ行を公開する前にカバーする各ログプレフィックスをフラッシュし、そうでなければ合体される JSONL 実行を分割し得る。起動プロバイダー ([`src/startup.ts`](src/startup.ts)) は `ctx.cmdlineArgs` ([`dsh-cmdline`](../../boot/cmdline/README.md)) を注入し、位置引数と `--session-id`/`--json` オプションを読み、アプリの `--help` を表示し、`headlessStartup` を提供する。ランナーはそのサービスを注入し、遅延 config からタスクと実行オプションを読む。
 
-### Exit mapping
+### 終了コードのマッピング
 
-A completed final `turn/end` exits 0; any other outcome — aborted, error, or no turn in the owned interval — exits 1. An `error` reason also writes `dsh: <code>: <message>` to stderr. A live Agent failure without a later committed `turn/end` is a direct driver failure, including a summary whose start or end cannot be persisted; an earlier completed turn cannot make that run succeed. A direct driver failure (for example, Agent creation or an unusable `--session-id`) writes `dsh: <message>` to stderr and exits 1, and in `--json` mode also emits an `error` event without a `final` event.
+完了した最終 `turn/end` は 0 で終了する。それ以外の結果 — 中断、エラー、または所有区間にターンがない — は 1 で終了する。`error` 理由は `dsh: <code>: <message>` を stderr にも書く。後にコミットされた `turn/end` のないライブ Agent の失敗は直接ドライバー失敗であり、開始または終了を永続化できないサマリーも含む。先行する完了したターンがあってもその実行を成功にはできない。直接ドライバー失敗（例えば Agent 作成や使用不能な `--session-id`）は `dsh: <message>` を stderr に書き、1 で終了し、`--json` モードでは `final` イベントなしの `error` イベントも発行する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | The `headless-runner` plugin: run flow, session resolution, output contract, exit mapping |
-| [`src/startup.ts`](src/startup.ts) | The `headless-startup` provider: task positional, `--session-id`, `--json`, and `--help` |
-| [`src/json-stream.ts`](src/json-stream.ts) | The `--json` projection: event vocabulary, commit-point emission, string bounding |
-| [`cordis.patch.yml`](cordis.patch.yml) | The one-shot patch over `dsh-base` |
-| [`tests/headless.spec.ts`](tests/headless.spec.ts) | Run flow, aggregation, flush, session adoption, and exit mapping |
-| [`tests/json-stream.spec.ts`](tests/json-stream.spec.ts) | Projection ordering, commit-point emission, bounding, and disposal |
-| [`tests/startup.spec.ts`](tests/startup.spec.ts) | Command-line parsing over a real Loader tree |
+| [`src/index.ts`](src/index.ts) | `headless-runner` プラグイン: 実行フロー、セッション解決、出力規約、終了コードマッピング |
+| [`src/startup.ts`](src/startup.ts) | `headless-startup` プロバイダー: タスク位置引数、`--session-id`、`--json`、`--help` |
+| [`src/json-stream.ts`](src/json-stream.ts) | `--json` 射影: イベント語彙、コミットポイントの発行、文字列バウンディング |
+| [`cordis.patch.yml`](cordis.patch.yml) | `dsh-base` への単発パッチ |
+| [`tests/headless.spec.ts`](tests/headless.spec.ts) | 実行フロー、集約、フラッシュ、セッション採用、終了コードマッピング |
+| [`tests/json-stream.spec.ts`](tests/json-stream.spec.ts) | 射影の順序、コミットポイントの発行、バウンディング、破棄 |
+| [`tests/startup.spec.ts`](tests/startup.spec.ts) | 実 Loader ツリー上のコマンドライン解析 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when you want to go deeper into the shared core, the sibling GUI, or the command-line handoff.
+共有コア、兄弟 GUI、またはコマンドラインハンドオフをより深く知りたいときにこれらのページを読む。
 
-- [Bundle package map](../README.md) — the surfaces built on the same core.
-- [dsh-base](../base/README.md) — the shared core headless runs on.
-- [dsh-web-app](../web-app/README.md) — the interactive browser sibling for multi-turn work.
-- [dsh-cmdline](../../boot/cmdline/README.md) — how the launcher hands the command line to the app.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-headless) — every accepted config field and its source declaration.
+- [バンドルパッケージマップ](../README.md) — 同じコア上に構築されたサーフェス。
+- [dsh-base](../base/README.md) — headless が実行される共有コア。
+- [dsh-web-app](../web-app/README.md) — マルチターン作業のための対話的ブラウザ兄弟。
+- [dsh-cmdline](../../boot/cmdline/README.md) — ランチャーがコマンドラインをアプリに渡す方法。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-headless) — 受け入れられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the runner submits the task as an ordinary user message and the composed base and headless rows own the prompts and tools.
+なし。ランナーはタスクを通常のユーザーメッセージとして送信し、構成された base と headless の行がプロンプトとツールを所有する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-The runner adds nothing to the request prefix; it only drives one user message through the composed tree.
+ランナーはリクエストプレフィックスに何も追加しない。構成されたツリーを通して 1 つのユーザーメッセージを駆動するだけである。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits tell you when headless does not fit and what it needs from the `dsh` launcher. They are current package constraints, not a general CLI comparison or a task backlog.
+これらの制限は、headless がいつ適合しないか、`dsh` ランチャーに何を必要とするかを示す。これらは現在のパッケージ制約であり、一般的な CLI 比較やタスクバックログではない。
 
-- **One task per run** — after the task is answered the process exits; there is no interactive follow-up, so split multi-step work into separate runs.
-- **Final background-job settlement may be absent from persisted history** — process teardown can end Session routing or close its writer before an owned job settles, including normal completion and signal shutdown; the [job lifecycle contract](../../../docs/subsystems/jobs.md#session-lifecycle-records) defines how consumers retain incomplete intervals.
-- **Runs through the `dsh` launcher** — starting the headless profile another way fails at startup, because only the launcher can request the process exit.
-- **No pre-token heartbeat** — in default mode stderr stays silent until the provider emits a non-empty reasoning delta; a delayed first token exposes no earlier progress signal.
-- **Reasoning enters stderr logs** — in default mode, redirection and supervisors may retain substantially more and potentially sensitive model output; route stderr to a controlled sink when needed.
-- **Default stdout carries only the final answer** — a run without an assistant message prints an empty stdout line and exits 1; intermediate tool output is not printed unless you opt into `--json`.
-- **Adoption is cwd-, ownership-, and preset-scoped** — `--session-id` refuses a Session recorded in another working directory, one that recorded no working directory, one that is a subagent or forked session, or one that runs under an agent preset this profile does not compose or whose preset record is malformed, and requires the composed Session query and persistence services; an identity already live in the process is refused too, because the runner cannot own an exclusive run interval over it.
-- **The event stream is a projection, not the log** — `--json` caps every string except the terminal `final` at 8 KiB and omits events the projection does not model, so it is not a lossless copy of the Session log.
+- **1 実行 1 タスク** — タスクに回答するとプロセスは終了する。対話的なフォローアップはないため、マルチステップの作業は別々の実行に分割する。
+- **最終バックグラウンドジョブの決済が永続化履歴にない場合がある** — プロセスのティアダウンが、所有ジョブの決済前に Session ルーティングを終了させたりライターを閉じたりし得る。通常の完了とシグナルシャットダウンを含む。不完全な区間をコンシューマーがどう保持するかは[ジョブライフサイクル規約](../../../docs/subsystems/jobs.md#session-lifecycle-records)が定義する。
+- **`dsh` ランチャー経由で実行** — 別の方法で headless プロファイルを起動すると起動時に失敗する。プロセス終了を要求できるのはランチャーだけだからである。
+- **トークン前のハートビートなし** — 既定モードではプロバイダーが空でない推論デルタを発行するまで stderr は沈黙する。最初のトークンが遅れると、それ以前の進捗シグナルは露出しない。
+- **推論が stderr ログに入る** — 既定モードでは、リダイレクトやスーパーバイザーが実質的により多く、潜在的に機微なモデル出力を保持し得る。必要に応じて stderr を制御されたシンクにルーティングする。
+- **既定の stdout は最終回答のみを運ぶ** — アシスタントメッセージのない実行は空の stdout 行を表示して 1 で終了する。`--json` を選ばない限り中間のツール出力は表示されない。
+- **採用は cwd、所有権、プリセットでスコープされる** — `--session-id` は別の作業ディレクトリで記録された Session、作業ディレクトリを記録していない Session、サブエージェントまたはフォークされた Session、このプロファイルが構成しないエージェントプリセットで実行される Session、またはプリセット記録が不正な Session を拒否し、構成された Session クエリと永続化サービスを必要とする。プロセス内で既にライブの識別子も拒否される。ランナーはそれに対して排他的な実行区間を所有できないからである。
+- **イベントストリームは射影であり、ログではない** — `--json` は終端の `final` を除くすべての文字列を 8 KiB に上限し、射影がモデル化しないイベントを省略する。そのため Session ログのロスレスコピーではない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

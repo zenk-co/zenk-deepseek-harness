@@ -1,32 +1,32 @@
-# Defensive patterns
+# 防御的パターン
 
-English | [中文](general.zh.md)
+日本語 | [English](general.en.md) | [中文](general.zh.md)
 
-Hard-won bug-class rules: each pattern below is a class of defect that actually shipped or nearly shipped here, stated as the rule that prevents its recurrence. Read this before writing lifecycle, concurrency, subprocess, or teardown code. Test-tier counterparts (real entry path, world-verification, resource ownership) are in [testing.md](../testing.md); the type-level definitions these rules refer to live in [subsystems/](../subsystems/README.md).
+苦労して得たバグクラスのルール: 以下の各パターンは、ここで実際に出荷された、または出荷されかけた欠陥のクラスであり、その再発を防ぐルールとして述べられている。ライフサイクル、並行性、サブプロセス、またはティアダウンのコードを書く前にこれを読むこと。テスト層の対応物(実際のエントリパス、世界の検証、リソースの所有権)は [testing.md](../testing.md) にあり、これらのルールが参照する型レベルの定義は [subsystems/](../subsystems/README.md) にある。
 
-## Report orthogonal outcomes independently
+## 直交する結果は独立して報告する
 
-A result can be several things at once — a process can time out AND exit 0 because it trapped the signal. Surface each independent fact (`timedOut`, `signal`, `exitCode`) on its own; never nest one flag's report inside another's branch, or a caller reads a cut-short run as a clean success.
+1 つの結果は同時に複数のものでありうる — プロセスはシグナルを捕捉したためにタイムアウトしつつ exit 0 することがある。各独立した事実(`timedOut`、`signal`、`exitCode`)をそれぞれ単独で表面化する。あるフラグの報告を別の分岐の内側に入れ子にしてはならない。そうしないと、呼び出し元は途中で切られた実行をクリーンな成功として読む。
 
-A reviewer checks the reporting shape rather than the killing mechanism: can each fact be true independently, and is each one readable without entering another condition's branch? The boundary is the report — how the process is signalled or how long it is given is a separate decision.
+レビュアーは kill の仕組みではなく報告の形を確認する: 各事実は独立して真になりうるか、それぞれが別の条件の分岐に入らずに読めるか？ 境界は報告である — プロセスにどうシグナルを送るか、どれだけの時間を与えるかは別の決定である。
 
-## Honor public contracts on BOTH sides
+## 公開契約は両側で守る
 
-When an implementation receives several representations of one outcome, normalize them before returning through the public API. `LlmAdapter.stream()` implementations may throw or emit `finish {kind:'error'|'aborted'}`, but `LlmRuntime.stream()` exposes model-request failures only as terminal finish chunks; middleware and consumer defects remain thrown. This keeps consumers from guessing whether a caught exception came from the provider, a wrapper, chunk logging, or their own assembly. Document the normalized contract where the type is defined; exercise every source form through the real consumer.
+実装が 1 つの結果の複数の表現を受け取る場合、公開 API を通じて返す前にそれらを正規化する。`LlmAdapter.stream()` の実装は throw するか `finish {kind:'error'|'aborted'}` を発行する可能性があるが、`LlmRuntime.stream()` はモデル要求の失敗を終端の finish チャンクとしてのみ公開し、ミドルウェアとコンシューマーの欠陥は throw されたままである。これにより、コンシューマーは捕捉した例外がプロバイダー、ラッパー、チャンクログ、自らの組み立てのどれに由来するかを推測せずに済む。正規化された契約はその型が定義されている場所に文書化し、すべてのソース形式を実際のコンシューマーを通じて検証する。
 
-The judged condition is whether a consumer can name the source of a failure from the public API alone. Internal helpers stay free to throw: the requirement binds the boundary the consumer crosses, not every function behind it.
+判定条件: コンシューマーが公開 API だけから失敗の出所を名指しできるか。内部ヘルパーは自由に throw してよい。この要件はコンシューマーが越える境界を拘束するのであり、その背後のすべての関数を拘束するのではない。
 
-## Async state is not synchronous state
+## 非同期状態は同期状態ではない
 
-`agent.followup()` has no per-message completion or result; a background job's completion races turn boundaries; `reader.close()` fires for both EOF and disposal. Never treat `agent/status` or `whenIdle()` as the result of one follow-up: several queued follow-ups, steering, and injected work may share one `running` interval, while cancellation or disposal can discard unstarted items. An automation caller that truly owns a run must define its interval explicitly—for example, from its message's durable inbox receipt through the next whole-agent `idle`—and describe any selected output as interval-wide rather than causally attributed to that message. The guard cuts both ways: if the awaited transition can never occur, the wait hangs, so handle the "nothing to wait for" branch explicitly.
+`agent.followup()` にはメッセージ単位の完了や結果がない。バックグラウンドジョブの完了はターン境界と競合する。`reader.close()` は EOF と破棄の両方で発火する。`agent/status` や `whenIdle()` を 1 つのフォローアップの結果として扱ってはならない。キューに入った複数のフォローアップ、steering、注入された作業が 1 つの `running` 区間を共有することがあり、キャンセルや破棄は未開始の項目を捨てることがあるからだ。実行を真に所有する自動化の呼び出し元は、その区間を明示的に定義しなければならない — 例えば、そのメッセージの永続インボックス受領から次のエージェント全体の `idle` まで — 、選択した出力はそのメッセージに因果的に帰属させるのではなく区間全体のものとして記述する。このガードは両刃である: 待機する遷移が決して起こり得ない場合、待機はハングするため、「待つものが何もない」分岐を明示的に処理する。
 
-The judged condition is whether an agent can observe a per-unit completion the API does not define. Where the interval genuinely belongs to the caller, it is the caller that states the interval and the output scope; a shared `running` flag is never that statement.
+判定条件: エージェントが API の定義しないユニット単位の完了を観測できるか。区間が真に呼び出し元に属する場合、区間と出力範囲を述べるのは呼び出し元である。共有の `running` フラグがその記述になることは決してない。
 
-## Timing does not carry correctness
+## タイミングは正しさを担わない
 
-Correctness comes from explicit call points and explicit state, never from where a callback lands in the event loop. A `microtask`, `setTimeout`, or `queueMicrotask` that decides whether work is correct races the rest of the program: it holds under a light load and silently fails under a busy one or when batching changes. React code follows the same rule — an effect never supplies a "just after render" ordering that the design should have made explicit.
+正しさは明示的な呼び出し点と明示的な状態から来るのであって、コールバックがイベントループのどこに着地するかからは決して来ない。作業が正しいかどうかを決める `microtask`、`setTimeout`、`queueMicrotask` はプログラムの残りと競合する: 軽い負荷では成り立ち、高負荷時やバッチングが変わったときに黙って失敗する。React のコードも同じルールに従う — effect は、設計が明示すべきだった「レンダー直後」の順序付けを決して供給しない。
 
-The judged condition is whether correctness depends on "that callback already ran" instead of on a named call point or state machine. Two boundaries: a test's timeout budget waits for a failure and is not timing-dependent correctness, and a deliberate delay that only paces user-visible work is not this rule. There is no developer-side exception; a genuine need for a timing technique goes to the domain owner.
+判定条件: 正しさが、名前付きの呼び出し点や状態機械ではなく「そのコールバックがすでに実行された」に依存しているか。2 つの境界: テストのタイムアウト予算は失敗を待つものでありタイミング依存の正しさではない、またユーザー可視の作業のテンポを取るだけの意図的な遅延はこのルールの対象ではない。開発者側の例外はない。タイミング技法への真の必要性はドメインオーナーに持ち込む。
 
 ```ts
 // The order is written into the code: dispose the old store, then build its successor.
@@ -43,13 +43,13 @@ queueMicrotask(() => { if (!ready) refresh() })   // assumes the microtask runs 
 setTimeout(() => setMounted(true), 0)             // waits for a render that was never sequenced
 ```
 
-The wrong form fails intermittently: a dropped refresh or a state that never syncs, reproducing only under load.
+誤った形は断続的に失敗する: 落とされた refresh、または決して同期しない状態として、負荷時にのみ再現する。
 
-## Optional inputs state both behaviors
+## オプション入力は両方の動作を述べる
 
-An optional parameter states what the callee does when it is present and when it is absent, so a caller reads both behaviors from the contract instead of inferring one from a defensive operator. Accumulating `?.` is the signal: each one substitutes for a decision about whether the field should exist at all.
+オプションのパラメーターは、それが存在するときと存在しないときに呼び出し先が何をするかを述べるため、呼び出し元は防御的演算子から一方を推測するのではなく、契約から両方の動作を読む。`?.` の蓄積はそのシグナルである: 各 `?.` は、そのフィールドがそもそも存在すべきかについての決定の代用になっている。
 
-The judged condition is whether `?.` replaces a determination that a field exists rather than handling a genuinely optional hop on a known value. The requirement binds the interface contract: both branches state their return value and their side effects, and the contract is where the caller reads them. There is no exception channel — a call site that cannot state both behaviors is a review blocker, not a style preference.
+判定条件: `?.` が、既知の値上の真にオプションのホップを扱うのではなく、フィールドが存在するという決定を置き換えているか。この要件はインターフェース契約を拘束する: 両方の分岐が戻り値と副作用を述べ、呼び出し元は契約からそれらを読む。例外チャネルはない — 両方の動作を述べられない呼び出し箇所はレビューのブロッカーであり、スタイルの好みではない。
 
 ```ts
 // Both behaviors are in the contract: no options object means "unknown", not "skip".
@@ -66,13 +66,13 @@ function resolve(input: ResolveInput): Resolution {
 const value = a?.b?.c?.d ?? fallback   // four layers of fallback hide whether d should exist
 ```
 
-The wrong form keeps the contract vague and swallows the error, so the next caller adds another fallback on top.
+誤った形は契約を曖昧なままにし、エラーを飲み込むため、次の呼び出し元がさらにフォールバックを重ねる。
 
-## One value states one fact
+## 1 つの値は 1 つの事実を述べる
 
-An unknown value, an empty collection or string, and a genuinely absent field are three different facts and take three representations. One `undefined` or `null` never stands for several of them, and a consumer that must act differently on each discriminates explicitly instead of collapsing them at the boundary.
+不明な値、空のコレクションまたは文字列、真に存在しないフィールドは 3 つの異なる事実であり、3 つの表現を取る。1 つの `undefined` や `null` がそれらのいくつかを代表することは決してなく、それぞれに異なる動作をしなければならないコンシューマーは、境界でそれらを潰すのではなく明示的に区別する。
 
-The judged condition is whether a single "no value" carries more than one semantic: not yet queried, queried and empty, and cannot be determined. A discriminated union or an explicit enum value is the ordinary implementation, documented where the type is defined in [core.md](../subsystems/core.md#repo-wide-type-patterns).
+判定条件: 単一の「値なし」が複数のセマンティクスを持ち運んでいるか: まだ問い合わせていない、問い合わせて空だった、決定できない。判別可能なユニオンまたは明示的な enum 値が通常の実装であり、その型が定義されている場所([core.md](../subsystems/core.md#repo-wide-type-patterns))に文書化される。
 
 ```ts
 type ValueState<T> = { kind: 'unknown' } | { kind: 'empty' } | { kind: 'value'; value: T }
@@ -82,13 +82,13 @@ type ValueState<T> = { kind: 'unknown' } | { kind: 'empty' } | { kind: 'value'; 
 return null   // means "not queried", "queried, nothing there", and "cannot tell", all at once
 ```
 
-The wrong form leaves the caller unable to distinguish the cases, so UI states, cache policy, and retry decisions all go wrong.
+誤った形は、呼び出し元がケースを区別できなくするため、UI 状態、キャッシュポリシー、リトライの決定がすべて誤る。
 
-## A new active/current singleton is refused
+## 新しい active/current シングルトンは拒否される
 
-No new global `active` or `current` singleton is introduced, and existing ones are migrated out. A globally unique selection is a design statement this codebase does not make: several views of one piece of data each hold their own reference or key.
+新しいグローバルな `active` または `current` シングルトンは導入せず、既存のものは移行して排除する。グローバルに一意な選択は、このコードベースがしない設計上の表明である: 1 つのデータの複数のビューが、それぞれ独自の参照またはキーを持つ。
 
-The judged condition is whether the change introduces a globally unique selected-state field. The replacement shape is one piece of data with several views over it, each view carrying its own reference. There is no default exception; where the concept genuinely exists once per service, a service or instance field expressed through `inject` carries it, never a module-level field.
+判定条件: その変更がグローバルに一意な選択状態フィールドを導入しているか。置き換えの形は、1 つのデータの上に複数のビューがあり、各ビューが独自の参照を持つものである。デフォルトの例外はない。概念がサービスごとに 1 回真に存在する場合、`inject` を通じて表現されるサービスまたはインスタンスのフィールドがそれを持ち運び、モジュールレベルのフィールドは決して持たない。
 
 ```ts ignore-check
 // Each view holds the key it renders; nothing global decides what is "current".
@@ -99,13 +99,13 @@ function ConversationView({ sessionKey }: { sessionKey: SessionKey }) { /* … *
 let activeTabId: TabId | undefined   // module-level; every component reads the same one
 ```
 
-The wrong form makes independent instances interfere with each other, and no reviewer can audit which view owns the focus.
+誤った形は、独立したインスタンス同士を干渉させ、どのビューがフォーカスを所有するかをレビュアーが監査できなくする。
 
-## Shared state has one owner
+## 共有状態には 1 つのオーナーがいる
 
-Shared state hangs on a service or an instance, so its owner is a named object with a lifecycle. A module-level cache, a singleton, a global `WeakMap`, or a `Symbol.for` / `globalThis` / `window.__X__` bypass hides that owner and outlives every teardown.
+共有状態はサービスまたはインスタンスに掛かり、そのオーナーはライフサイクルを持つ名前付きのオブジェクトである。モジュールレベルのキャッシュ、シングルトン、グローバル `WeakMap`、または `Symbol.for` / `globalThis` / `window.__X__` のバイパスは、そのオーナーを隠し、あらゆるティアダウンより長生きする。
 
-The judged condition: name the service or instance that owns the value; if no owner can be named, the owner is decided before the implementation. The boundary is that a field on a service or instance may be read by any number of injected consumers, and passing that value across domains goes through the existing interface rather than a global namespace. There is no default exception; a genuine need for a global lookup key goes to the domain owner together with its reclamation policy.
+判定条件: その値を所有するサービスまたはインスタンスを名指しせよ。オーナーを名指しできない場合、実装の前にオーナーを決める。境界は、サービスまたはインスタンス上のフィールドを任意の数の注入されたコンシューマーが読んでよいことであり、その値をドメイン間で渡す場合はグローバル名前空間ではなく既存のインターフェースを通る。デフォルトの例外はない。グローバルなルックアップキーへの真の必要性は、その回収ポリシーとともにドメインオーナーに持ち込む。
 
 ```ts
 // The shared value hangs on the session service instance; consumers inject it.
@@ -119,13 +119,13 @@ const sessions = ctx.get('sessions')   // one owner, lifetime tied to the servic
 globalThis.__dshCache = new Map()   // shared across instances, reclaimed never
 ```
 
-The wrong form lets instances overwrite each other, makes reclamation timing unknowable, and leaks state between tests.
+誤った形は、インスタンス同士が上書きし合うことを許し、回収のタイミングを知り得なくし、テスト間で状態を漏らす。
 
-## A business capability owns itself
+## ビジネスケイパビリティは自らを所有する
 
-A business capability lives in its own package and attaches through a registration surface — a registry, `slots.inject`, a waterfall, or an event subscription. A runtime, controller, manager, or gateway carries generic orchestration: it may hold the registry structure and the disposal lifecycle, while the entries are written by the packages that own them, and it never hardcodes a central table of business rows.
+ビジネスケイパビリティは独自のパッケージに住み、登録サーフェス — レジストリ、`slots.inject`、ウォーターフォール、またはイベント購読 — を通じてアタッチする。ランタイム、コントローラー、マネージャー、またはゲートウェイは汎用的なオーケストレーションを持ち運ぶ: レジストリ構造と破棄ライフサイクルを保持してよいが、エントリはそれらを所有するパッケージが書き、ビジネス行の中央テーブルをハードコードすることは決してない。
 
-The judged condition is whether the capability declares and registers itself, with the center layer only forwarding and managing lifetime rather than making business decisions. The boundary is that the center layer holds the registry structure and the disposal lifecycle while the entries come from the owning packages. One exception: pure infrastructure — logging, transport, storage — does not attach through a business registration surface. A new branch in a center layer must explain why it cannot live in the owning package.
+判定条件: ケイパビリティが自らを宣言・登録し、中央層はビジネス上の決定を行うのではなく転送とライフタイム管理のみを行うか。境界は、中央層がレジストリ構造と破棄ライフサイクルを保持し、エントリは所有パッケージから来ることである。1 つの例外: 純粋なインフラストラクチャ — ログ、トランスポート、ストレージ — はビジネス登録サーフェスを通じてアタッチしない。中央層の新しい分岐は、なぜ所有パッケージに住めないのかを説明しなければならない。
 
 ```ts
 // The business package registers its own slot and handlers in its apply.
@@ -144,38 +144,38 @@ export function apply(ctx: Context): void {
 if (pluginName === 'ui-attachment') { /* business branch inside the manager */ }
 ```
 
-The wrong form makes every new capability edit the center layer, which becomes the change bottleneck and the conflict hotspot.
+誤った形は、新しいケイパビリティごとに中央層を編集させることになり、中央層が変更のボトルネックとコンフリクトのホットスポットになる。
 
-## Changes carry performance evidence
+## 変更にはパフォーマンスの証拠を添える
 
-A change that can move the cost of a hot path measures the code it touched before and after and reports the numbers with their conditions. The three metrics are runtime, peak memory, and steady-state memory, measured in one environment on one input; the granularity is the changed path, not a whole-machine score. Reporting that "nothing got slower overall" is not evidence, and a path that improved elsewhere does not excuse a regression here — an optimised first paint still has to answer for `append`.
+ホットパスのコストを動かしうる変更は、触れたコードを変更前後で測定し、数値をその条件とともに報告する。3 つの指標はランタイム、ピークメモリ、定常状態メモリであり、1 つの環境で 1 つの入力に対して測定する。粒度は変更されたパスであり、マシン全体のスコアではない。「全体として遅くなっていない」という報告は証拠ではなく、他の場所で改善したパスはここのリグレッションを免罪しない — 最適化された初回描画も `append` について説明しなければならない。
 
-The judged condition: under one environment and one input, any of the three metrics is significantly worse on the changed path.
+判定条件: 1 つの環境と 1 つの入力の下で、3 つの指標のいずれかが変更されたパスで有意に悪化していること。
 
-The baseline is the same path without the change under measurement — normally the native implementation that carries no measurement hook, not the previous implementation. Comparing old against new with the same hook attached on both sides dilutes the difference until it disappears: both sides pay the same overhead, so the measurement reports "no change" while both are slow.
+ベースラインは、測定対象の変更なしの同じパスである — 通常は測定フックを持たないネイティブ実装であり、以前の実装ではない。両側に同じフックを付けて新旧を比較すると、差が薄まって消える: 両側が同じオーバーヘッドを払うため、測定は「変化なし」を報告する一方で両方とも遅い。
 
-Measurement is owned by [benchmarks/](../../benchmarks/AGENTS.md), one directory per measured user path, and its scenarios are the entry point:
+測定は [benchmarks/](../../benchmarks/AGENTS.md) が所有し、測定されるユーザーパスごとに 1 ディレクトリで、そのシナリオがエントリポイントである:
 
 ```sh
 # Run the owning scenario before and after the change; the numbers go into the PR.
 pnpm run test:bench
 ```
 
-Package-local diagnostics stay beside their owner with the `.perf.ts` suffix and do not join `test:bench`. The CI gate is `pnpm run check:ci:bench` (job `node 24 / benchmarks`), which publishes a scaled report — that gate is an alert, not a pass: a regression there is located by re-running the owning scenario and profiling segments locally to find which part slowed and which change introduced it. Retained-memory claims use `pnpm run test:bench:memory 4g|8g`, which reruns its listed files under an unchanged budget in a swapless cgroup.
+パッケージローカルの診断は `.perf.ts` サフィックスを付けてそのオーナーの隣に留まり、`test:bench` には加わらない。CI ゲートは `pnpm run check:ci:bench`(ジョブ `node 24 / benchmarks`)で、スケーリングされたレポートを発行する — そのゲートはアラートであり、合格ではない: そこのリグレッションは、所有シナリオを再実行し、ローカルでセグメントをプロファイリングして、どの部分が遅くなりどの変更がそれを導入したかを見つけることで特定する。保持メモリの主張には `pnpm run test:bench:memory 4g|8g` を使用する。これはスワップなしの cgroup 内で変更されない予算の下、リストされたファイルを再実行する。
 
-Boundaries: edits that touch no runtime path — comments, documentation, test-only code — need no measurement, and production performance code is not benchmark instrumentation to be deleted opportunistically (`performance.now()` and `scheduler.yield()` are part of production decode and encode chunk scheduling). An architectural change that genuinely costs performance states the measured cost and the reason, and the domain owner approves it; "the layering needed it" is not a self-service reason. Record the command, the numbers, the environment, and the input size so the baseline can be rebuilt.
+境界: ランタイムパスに触れない編集 — コメント、ドキュメント、テスト専用コード — は測定を必要とせず、プロダクションのパフォーマンスコードは、機会があれば削除すべきベンチマーク計装ではない(`performance.now()` と `scheduler.yield()` はプロダクションの decode と encode のチャンクスケジューリングの一部である)。真にパフォーマンスを犠牲にするアーキテクチャ変更は、測定されたコストとその理由を述べ、ドメインオーナーが承認する。「レイヤリングがそれを必要とした」はセルフサービス的な理由ではない。ベースラインを再構築できるよう、コマンド、数値、環境、入力サイズを記録する。
 
 ```text
 CI benchmark reported green, so the change is accepted as performance-neutral.
 ```
 
-That form ships a real regression in a path the benchmark does not model.
+その形は、ベンチマークがモデル化していないパスに実際のリグレッションを出荷する。
 
-## Migrations preserve behavior
+## マイグレーションは動作を保つ
 
-A migration or a package split keeps externally observable behavior equal: error codes, diagnostics, data-flow order, and UI timing are compared item by item. Moving code is preferred over deleting and rewriting it; a rewrite suits code whose semantics are changing anyway, and then the change lists its differences. A package or export-path change is a carrier change rather than a behavior change, and a behavior change is its own change.
+マイグレーションまたはパッケージ分割は、外部から観察可能な動作を等しく保つ: エラーコード、診断、データフローの順序、UI のタイミングを項目ごとに比較する。コードの移動は、削除して書き直すより優先される。書き直しは、どのみちセマンティクスが変わるコードに適しており、その場合変更はその差分を列挙する。パッケージまたはエクスポートパスの変更は動作変更ではなくキャリアの変更であり、動作変更はそれ自体で 1 つの変更である。
 
-The judged condition is the item-by-item comparison of observable behavior before and after. Where full equality is impossible, the change states the differing items and how each is verified, and the domain owner approves. A defect found during a migration is fixed as its own change rather than folded into the move.
+判定条件: 変更前後の観察可能な動作の項目ごとの比較。完全な等価が不可能な場合、変更は異なる項目とそれぞれの検証方法を述べ、ドメインオーナーが承認する。マイグレーション中に見つかった欠陥は、移動に折り込むのではなく、それ自体の変更として修正する。
 
 ```sh
 # The move keeps paths and error codes; the reference updates are the whole diff.
@@ -187,19 +187,19 @@ git mv packages/old/src/endpoint.ts packages/new/src/endpoint.ts
 throw new EndpointError('not found')   // was: return { ok: false, code: 'not_found' }
 ```
 
-The wrong form buries behavior changes inside a move, so review cannot separate the relocation from the semantics and regressions cannot be localized.
+誤った形は動作変更を移動の中に埋めるため、レビューが移転とセマンティクスを分離できず、リグレッションを特定できない。
 
-## Dispose must reach quiescence, not just request it
+## Dispose は要求するだけでなく静止に到達しなければならない
 
-Await child exit after killing or aborting. Optional notifications may stop early; resources and listeners needed for completion or final persistence must survive until consumers settle. See the [Cordis ownership checks](../../.agents/skills/cordis-styling-nitpicking/SKILL.md#p0-cleanup-dependency-released-before-consumer-completion).
+kill または abort の後に子の終了を待つ。オプションの通知は早く停止してよいが、完了または最終永続化に必要なリソースとリスナーは、コンシューマーが決着するまで生存しなければならない。[Cordis 所有権チェック](../../.agents/skills/cordis-styling-nitpicking/SKILL.md#p0-cleanup-dependency-released-before-consumer-completion)を参照。
 
-The judged condition is whether teardown awaits actual quiescence or only requests it. The boundary is work with no owner to await — a detached, unobserved task — which the teardown is not obliged to track; anything the component started and can still observe must be awaited before it reports completion.
+判定条件: ティアダウンが実際の静止を待つのか、要求するだけなのか。境界は、待つべきオーナーのない作業 — デタッチされ観測されないタスク — であり、ティアダウンはそれを追跡する義務を負わない。コンポーネントが開始し、依然として観測できるものは、完了を報告する前に待たなければならない。
 
-## Contain callback exceptions in the dispatcher
+## ディスパッチャーでコールバック例外を封じ込める
 
-Catch and report each listener's exception without rejecting the dispatch promise or starving later listeners. The listener's owner must handle state it mutates under the [error-handling rules](../../.agents/skills/dsh-error-handling/SKILL.md#catch-recover-or-stop); catching alone does not restore state.
+各リスナーの例外を捕捉して報告し、dispatch の Promise を reject したり後続のリスナーを枯渇させたりしない。リスナーのオーナーは、[エラーハンドリングルール](../../.agents/skills/dsh-error-handling/SKILL.md#catch-recover-or-stop)の下で自身が変更する状態を処理しなければならない。捕捉だけでは状態は復元されない。
 
-The judged condition is whether a throwing listener can reject the dispatch promise or prevent later listeners from running. The boundary is the caller's own await: an error the dispatcher deliberately propagates to the operation that requested it is not a containment failure.
+判定条件: throw するリスナーが dispatch の Promise を reject できるか、または後続のリスナーの実行を妨げられるか。境界は呼び出し元自身の await である: ディスパッチャーがそれを要求した操作へ意図的に伝播するエラーは、封じ込めの失敗ではない。
 
 ```ts
 async function dispatch(listeners: ((event: string) => Promise<void>)[], event: string): Promise<void> {
@@ -209,14 +209,14 @@ async function dispatch(listeners: ((event: string) => Promise<void>)[], event: 
 }
 ```
 
-## Never hand untrusted output the ambient environment or predictable paths
+## 信頼できない出力に周囲の環境や予測可能なパスを渡さない
 
-Spawned commands get a scrubbed env (drop `*KEY*`/`*SECRET*`/`*TOKEN*`/`*PASSWORD*`) so harness credentials cannot leak into output, `env`, or spill files. Temp/spill files use a private (0700) dir, random names, and exclusive owner-only opens (`'wx'`, `0o600`) — predictable world-readable paths invite symlink races and disclosure.
+スポーンされるコマンドはスクラブされた環境変数を受け取る(`*KEY*`/`*SECRET*`/`*TOKEN*`/`*PASSWORD*` を除外する)ため、harness の資格情報が出力、`env`、またはスピルファイルに漏れることはない。一時/スピルファイルはプライベート(0700)ディレクトリ、ランダム名、オーナー専用の排他オープン(`'wx'`、`0o600`)を使用する — 世界から読める予測可能なパスはシンボリックリンク競合と開示を招く。
 
-The judged condition is whether spawned processes inherit the ambient environment or write somewhere another process can predict and replace. The boundary is trusted, in-process code with no external input, which the rule does not govern.
+判定条件: スポーンされたプロセスが周囲の環境を継承するか、別のプロセスが予測して置き換えられる場所に書き込むか。境界は、外部入力のない信頼されたプロセス内コードであり、このルールはそれを統治しない。
 
-## Unlink link-shaped paths
+## リンク形状のパスは unlink する
 
-A path that may be a symlink or Windows junction is removed with `lstatSync().isSymbolicLink()` then `unlinkSync`: unlink deletes only the link and refuses a real directory, so it never follows the link into its target. Windows `rmSync(link)` throws `ERR_FS_EISDIR` on a junction; recursive deletion may descend through one into its target. Reserve recursive `rmSync` for known real directories.
+シンボリックリンクまたは Windows ジャンクションである可能性のあるパスは、`lstatSync().isSymbolicLink()` の後 `unlinkSync` で削除する: unlink はリンクのみを削除し、実ディレクトリを拒否するため、リンクをたどってそのターゲットに入ることは決してない。Windows の `rmSync(link)` はジャンクションで `ERR_FS_EISDIR` を throw する。再帰的削除はジャンクションを通じてそのターゲットへ降りていく可能性がある。再帰的な `rmSync` は既知の実ディレクトリ用に取っておく。
 
-The judged condition is whether the removal primitive can follow a link into its target. The boundary is a path the code created itself in a directory it owns, where a plain recursive removal is already known to be safe.
+判定条件: 削除プリミティブがリンクをたどってそのターゲットに入りうるか。境界は、コード自身が所有するディレクトリ内で自ら作成したパスであり、そこでは素の再帰削除がすでに安全と分かっている。

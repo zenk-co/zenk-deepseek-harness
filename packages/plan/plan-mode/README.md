@@ -1,39 +1,39 @@
 ---
-description: "Plan mode for users and maintainers choosing, configuring, or debugging the per-agent planning feature with deployment guidance, a /plan command, and a user-reviewed exit."
+description: "エージェントごとの計画機能を選択、設定、デバッグするユーザーとメンテナー向けの Plan モード。デプロイのガイダンス、`/plan` コマンド、ユーザーレビュー付きの終了を備える。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-plan-mode
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Plan mode asks an agent to explore and design before execution, then presents the finished plan for your approval. Enter it with `/plan`, optionally with a message or ordered image and file attachments; leave with `/plan off`, approve the review to continue, or return feedback for more planning. Deployment-defined guidance controls planning behavior, but every tool remains available, so use sandbox mode and approval prompts for enforced limits. The active state survives session resume and forks. Choose it when you want a reviewed plan before the agent acts.
+Plan モードは、エージェントに実行前に探索と設計を求め、その後完成した計画を承認のために提示します。`/plan` で開始し、任意でメッセージや順序付きの画像・ファイル添付を付けられます。離脱は `/plan off`、レビューを承認して続行、フィードバックを返してさらに計画を進める、のいずれかです。デプロイ定義のガイダンスが計画動作を制御しますが、すべてのツールは引き続き利用可能なため、強制力のある制限には sandbox モードと承認プロンプトを使用してください。アクティブ状態はセッションの再開とフォークをまたいで存続します。エージェントが行動する前にレビュー済みの計画を望む場合に選びます。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送りされた作業](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-When plan mode is active, the agent works under your instructions and presents its plan for review instead of executing right away. The common path: configure the guidance text, enter plan mode with `/plan`, and review the finished plan when the agent calls `exit_plan_mode`.
+Plan モードがアクティブなとき、エージェントはあなたの指示の下で作業し、すぐに実行する代わりにレビューのために計画を提示します。一般的な流れ: ガイダンステキストを設定し、`/plan` で Plan モードに入り、エージェントが `exit_plan_mode` を呼び出したら完成した計画をレビューします。
 
-### When to choose it
+### いつ選択するか
 
-Choose plan mode when the agent should explore and design before executing and you want to approve the plan first. It does not restrict the agent: every tool stays callable, so use sandbox mode and approval prompts when you need enforced limits. Skip it when the agent should act on your requests immediately, without a planning phase.
+エージェントが実行前に探索と設計を行い、計画を先に承認したい場合に Plan モードを選びます。これはエージェントを制限しません。すべてのツールは呼び出し可能なままなので、強制力のある制限が必要な場合は sandbox モードと承認プロンプトを使用してください。計画フェーズなしでエージェントがあなたのリクエストにすぐ行動すべき場合はスキップします。
 
-### Minimal configuration
+### 最小構成
 
-The only required configuration is the guidance text the agent follows while planning; anything else you add fails at load.
+唯一必須の設定は、計画中にエージェントが従うガイダンステキストです。それ以外を追加するとロード時に失敗します。
 
 ```yaml
 - name: '@deepseek-ai/dsh-plan-mode'
@@ -43,160 +43,160 @@ The only required configuration is the guidance text the agent follows while pla
       plan through exit_plan_mode.
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `section` | required | Guidance rendered as the `plan:policy` prompt section while plan mode is active |
+| `section` | 必須 | Plan モードがアクティブな間、`plan:policy` プロンプトセクションとしてレンダリングされるガイダンス |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-plan-mode) is the exhaustive source for every accepted field and its JSDoc.
+生成される [設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-plan-mode) が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源です。
 
 <a id="model-and-human-interactions"></a>
-### Entering and leaving plan mode
+### Plan モードへの出入り
 
-Type `/plan` to enter plan mode, or `/plan <message>` to enter with an instruction — the message becomes your next request under plan guidance. Type `/plan off` to leave plan mode directly; it also cancels a plan-mode entry that has not taken effect yet.
+`/plan` と入力すると Plan モードに入り、`/plan <message>` で指示付きで入ります — メッセージは Plan ガイダンスの下での次のリクエストになります。`/plan off` と入力すると Plan モードから直接離脱します。まだ有効になっていない Plan モードの開始もキャンセルします。
 
-You can attach images and generic files to a `/plan` message, and they are included with your instruction in selection order. `/plan off` with attachments is rejected before the mode changes, so the draft and cards remain available. The `/plan` command is available wherever slash commands are supported, such as the Web client.
+`/plan` メッセージには画像と汎用ファイルを添付でき、選択順に指示とともに含まれます。添付付きの `/plan off` はモードが変わる前に拒否されるため、下書きとカードは利用可能なままです。`/plan` コマンドは、Web クライアントなどスラッシュコマンドがサポートされる場所ならどこでも利用できます。
 
-### The reviewed exit
+### レビュー付きの終了
 
-When the agent has a finished plan, it calls `exit_plan_mode` with the plan written as markdown and starting with a heading. You review that exact plan and choose `Approve` to leave plan mode, or `Keep planning` to send the agent back with feedback.
+エージェントが計画を完成させると、markdown として書かれ見出しで始まる計画を伴って `exit_plan_mode` を呼び出します。あなたはその正確な計画をレビューし、`Approve` を選ぶと Plan モードを離れ、`Keep planning` を選ぶとフィードバックを付けてエージェントを差し戻します。
 
-Choosing `Keep planning` (optionally with free-text feedback) sends the agent back to revise the plan; closing the review to type a message instead ends the agent's turn, and your next message starts the next request. If no interactive review is available, `exit_plan_mode` cannot run and you can still leave plan mode with `/plan off`.
+`Keep planning`（任意で自由記述のフィードバック付き）を選ぶと、エージェントは計画の修正に戻されます。レビューを閉じて代わりにメッセージを入力するとエージェントのターンが終了し、次のメッセージが次のリクエストを開始します。対話型レビューが利用できない場合、`exit_plan_mode` は実行できず、`/plan off` で Plan モードを離れられます。
 
-### Observing plan state
+### Plan 状態の観察
 
-Interfaces can show whether plan mode is active and whether a mode change you requested is still waiting to take effect. The state is the same in every tab and survives restarts.
+インターフェースは、Plan モードがアクティブかどうか、および要求したモード変更がまだ有効化を待っているかどうかを表示できます。状態はすべてのタブで同じで、再起動をまたいで存続します。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the package and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではパッケージの背後にある設計判断を説明し、それを実現するコードを指し示します。観測可能な動作は [このパッケージを使う](#use-this-package) で完全に説明されています。
 
-### Design philosophy
+### 設計哲学
 
-Plan mode is a product package, not a capability seam: there is no swappable backend, so the state, guidance, command, and exit tool live in one place. The durable stance is one log-only whole-value-replace event, never a live mirror, so resume, fork, and compaction recover it by folding the log. Guidance is a soft layer — the package registers one prompt section and one tool, and restrains through text rather than filtering capabilities.
+Plan モードは capability seam ではなく製品パッケージです。差し替え可能なバックエンドはないため、状態、ガイダンス、コマンド、終了ツールが 1 か所にあります。永続的なスタンスはログ専用の全体値置換イベント 1 つで、ライブミラーは決して使いません。そのため再開、フォーク、コンパクションはログを畳み込むことでそれを回復します。ガイダンスはソフトなレイヤーです — パッケージはプロンプトセクション 1 つとツール 1 つを登録し、ケイパビリティをフィルタリングせずテキストを通じて制約します。
 
-### Durable state and step-boundary appends
+### 永続状態とステップ境界の追記
 
-The package persists one log-only whole-value event, `plan/mode`, and the last logged value is the state. A mode change appends immediately when no turn is open; during an open turn it stays pending until the next accepted in-turn pre-step — the only append point while an agent runs — and an append failure cannot block the turn. The `set`/`get` service methods and their exact return states live in [`src/index.ts`](src/index.ts) and read the registered `plan` projection; the first dependent access fails explicitly when the registry or key is absent.
+パッケージはログ専用の全体値イベント `plan/mode` を 1 つ永続化し、最後にログされた値が状態です。モード変更はターンが開いていないときは即座に追記され、開いたターン中は次に受け入れられたターン内 pre-step — エージェント実行中の唯一の追記ポイント — まで保留のままで、追記失敗がターンをブロックすることはできません。`set`/`get` サービスのメソッドとその正確な戻り状態は [`src/index.ts`](src/index.ts) にあり、登録された `plan` 投影を読み取ります。最初の依存アクセスは、レジストリまたはキーが欠けている場合に明示的に失敗します。
 
-### The `/plan` command
+### `/plan` コマンド
 
-The command child activates only when a commands service is composed. It maps bare `/plan` to active, the exact argument `off` to inactive without model input, and any other non-empty argument to active plus the trimmed text submitted through `agent.steer()` as the next step's ordinary logged user message. Admitted image and file blocks keep their selection order in that message; `/plan off` with attachments fails before any mode change. Entry points other than the command may drive `ctx.planMode` directly; the exact branch handling is in [`src/index.ts`](src/index.ts).
+このコマンドチャイルドは commands サービスが構成されている場合にのみアクティブになります。素の `/plan` をアクティブに、正確な引数 `off` をモデル入力なしの非アクティブに、その他の非空引数をアクティブと、`agent.steer()` を通じて次のステップの通常のログ済みユーザーメッセージとして送信されるトリム済みテキストにマップします。受け入れられた画像とファイルのブロックはそのメッセージ内で選択順を保ちます。添付付きの `/plan off` はモード変更の前に失敗します。コマンド以外のエントリーポイントは `ctx.planMode` を直接駆動できます。正確な分岐処理は [`src/index.ts`](src/index.ts) にあります。
 
-### The exit tool
+### 終了ツール
 
-`exit_plan_mode` stays registered while plan mode is inactive, so entering or leaving changes only the prompt section, never the request tool catalog. An approved review records a silent pending exit that the next accepted in-turn pre-step appends, keeping plan guidance for the rest of the current tool batch. Without a user-questions channel, or after a service reload while the review is pending, the call fails closed and `/plan off` remains the manual escape.
+`exit_plan_mode` は Plan モードが非アクティブの間も登録されたままなので、入退室はプロンプトセクションだけを変え、リクエストのツールカタログは決して変えません。承認されたレビューはサイレントな保留終了を記録し、次の受け入れられたターン内 pre-step がそれを追記するため、現在のツールバッチの残りの間は Plan ガイダンスが保たれます。user-questions チャネルがない場合、またはレビューが保留中のままサービスがリロードされた後は、呼び出しはフェイルクローズし、`/plan off` が手動の脱出手段として残ります。
 
-### Session projection unit
+### セッション投影ユニット
 
-When `ctx.sessionProjections` is composed, the package registers the `plan` unit through optional injection. The unit turns logged `/plan` command runs into a candidate target, commits the logged state on `plan/mode`, and derives `{ active, pending }` for `view`, where `pending` is true only while an unsettled or successful selection differs from the logged state — a pure replay quantity recoverable from the log alone. The key merges into `SessionProjectionMap` from [`src/types.ts`](src/types.ts); the framework drives the unit, and unloading the plugin fiber unregisters the key. Plan-mode reads require this unit and the `turnBoundary` unit, and fail explicitly if the registry or either key is absent.
+`ctx.sessionProjections` が構成されている場合、パッケージは任意注入を通じて `plan` ユニットを登録します。このユニットはログされた `/plan` コマンド実行を候補ターゲットに変え、`plan/mode` でログ済み状態をコミットし、`view` のために `{ active, pending }` を導出します。ここで `pending` は、未決着または成功した選択がログ済み状態と異なる間だけ true です — ログのみから回復可能な純粋なリプレイ量です。キーは [`src/types.ts`](src/types.ts) の `SessionProjectionMap` にマージされます。フレームワークがユニットを駆動し、プラグインファイバーのアンロードがキーを登録解除します。Plan モードの読み取りにはこのユニットと `turnBoundary` ユニットが必要で、レジストリまたはいずれかのキーが欠けている場合は明示的に失敗します。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, the `ctx.planMode` service, `plan:policy` section, `/plan` command, `exit_plan_mode` tool |
-| [`src/types.ts`](src/types.ts) | The `plan` projection-key declaration and `PlanProjection` wire value |
-| [`src/client.ts`](src/client.ts) | Client-namespace re-export of the types outlet |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `Config` スキーマ、`ctx.planMode` サービス、`plan:policy` セクション、`/plan` コマンド、`exit_plan_mode` ツール |
+| [`src/types.ts`](src/types.ts) | `plan` 投影キー宣言と `PlanProjection` wire 値 |
+| [`src/client.ts`](src/client.ts) | types outlet のクライアント名前空間再エクスポート |
 
-The review intent carries the originating tool-call id, so the Web client can reopen the same submitted plan after the review closes. The complete Markdown remains in the existing native call or PTC dispatch log.
+レビュー意図は発信元のツール呼び出し id を運ぶため、Web クライアントはレビューが閉じた後に同じ提出済み計画を再度開けます。完全な Markdown は既存のネイティブ呼び出しまたは PTC ディスパッチログに残ります。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the subsystem semantics to the generated catalogs and the design decision.
+パッケージレベルの契約では足りないときにこれらのページを読んでください。サブシステムのセマンティクスから生成カタログと設計決定へと進みます。
 
-- [Plan mode subsystem reference](../../../docs/subsystems/plan.md) — how plan mode behaves, its configuration, and the exit tool's contract.
-- [plan/ package map](../README.md) — the group and its single package.
-- [exit_plan_mode tool catalog entry](../../../docs/tool-catalog.md#deepseek-aidsh-plan-mode) — the exact schema the model receives.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-plan-mode) — every accepted config field and its meaning.
-- [archived Plan-specific collaboration state](../../../.agents/notes/archived/simplification/2026-07-22-plan-specific-collaboration-state.md) — the design decision behind plan mode.
+- [Plan モードサブシステムリファレンス](../../../docs/subsystems/plan.md) — Plan モードの動作、その設定、終了ツールの契約。
+- [plan/ パッケージマップ](../README.md) — グループとその唯一のパッケージ。
+- [exit_plan_mode ツールカタログ項目](../../../docs/tool-catalog.md#deepseek-aidsh-plan-mode) — モデルが受け取る正確なスキーマ。
+- [生成設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-plan-mode) — 受け付けられるすべての設定フィールドとその意味。
+- [アーカイブ済み Plan 固有コラボレーション状態](../../../.agents/notes/archived/simplification/2026-07-22-plan-specific-collaboration-state.md) — Plan モードの背後の設計決定。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Plan policy system prompt
+### Plan ポリシーシステムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-While plan mode is active, the model sees the deployment's exact `section` text at first-party prompt order 500; inactive mode contributes no text.
+Plan モードがアクティブな間、モデルはファーストパーティのプロンプト順序 500 でデプロイの正確な `section` テキストを見ます。非アクティブモードはテキストを寄与しません。
 
-##### Configuration example
+##### 設定例
 
 ```markdown
 You are in plan mode. Explore and design before presenting the complete plan through exit_plan_mode.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Inactive mode adds no tokens; active mode adds the configured section to every request.
+非アクティブモードはトークンを追加しません。アクティブモードはすべてのリクエストに設定されたセクションを追加します。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The section is stable within plan mode, but entering or leaving changes the system prompt from first-party order 500 onward.
+セクションは Plan モード内で安定していますが、入退室はファーストパーティ順序 500 以降のシステムプロンプトを変えます。
 
-### Human command
+### 人間のコマンド
 
-#### What the model sees
+#### モデルが見るもの
 
-`/plan`, `/plan off`, and their terminal results stay outside model history. A non-empty suffix other than the exact `off` argument becomes one user message through `agent.steer()` after plan mode is selected: admitted image and file blocks in selection order, then the trimmed text block. Bare `/plan` with admitted attachments steers one user message containing only those blocks. An active `/plan off` selection contributes the standard logged user-switch notice only when the last request header described plan mode; cancelling a pending entry contributes none because no request observed it.
+`/plan`、`/plan off` とそれらのターミナル結果はモデル履歴の外にとどまります。正確な `off` 引数以外の非空サフィックスは、Plan モードが選択された後に `agent.steer()` を通じて 1 つのユーザーメッセージになります。受け入れられた画像とファイルのブロックが選択順に、その後にトリム済みのテキストブロック。受け入れられた添付付きの素の `/plan` は、それらのブロックのみを含む 1 つのユーザーメッセージをステアします。アクティブな `/plan off` 選択は、最後のリクエストヘッダーが Plan モードを記述していた場合にのみ標準のログ済みユーザースイッチ通知を寄与します。保留中の開始のキャンセルは、どのリクエストもそれを観測していないため何も寄与しません。
 
-#### Token effect
+#### トークンへの影響
 
-The optional message costs the same history tokens as submitting that content separately. Bare `/plan` without attachments and `/plan off` add none; bare `/plan` with attachments has the normal image and file-handle cost. A narrated active exit adds the small retained switch notice.
+任意のメッセージは、そのコンテンツを別途送信するのと同じ履歴トークンのコストです。添付なしの素の `/plan` と `/plan off` は何も追加しません。添付付きの素の `/plan` は通常の画像とファイルハンドルのコストです。ナレーション付きのアクティブ終了は、小さな保持スイッチ通知を追加します。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The user block is append-only conversation growth. Entering or leaving plan mode changes the earlier policy section; a narrated exit notice is appended after the reusable request prefix.
+ユーザーブロックは追記専用の会話成長です。Plan モードへの入退室は以前のポリシーセクションを変えます。ナレーション付き終了通知は、再利用可能なリクエストプレフィックスの後に追記されます。
 
-### Exit tool schema and review exchange
+### 終了ツールスキーマとレビュー交換
 
-#### What the model sees
+#### モデルが見るもの
 
-The [`exit_plan_mode` schema](../../../docs/tool-catalog.md#deepseek-aidsh-plan-mode) remains available in both states; execution outside plan mode fails, while an approved in-mode review returns the canonical `{ approved: true }` value and renders the existing confirmation text. Rejection remains a failed call carrying review feedback. A dismissed review returns `{ approved: false }`, renders a note that the user will reply, and concludes the turn without another model request.
+[`exit_plan_mode` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-plan-mode) は両方の状態で利用可能なままです。Plan モード外での実行は失敗し、承認されたモード内レビューは正準の `{ approved: true }` 値を返し、既存の確認テキストをレンダリングします。拒否はレビューフィードバックを運ぶ失敗呼び出しのままです。却下されたレビューは `{ approved: false }` を返し、ユーザーが返信する旨のノートをレンダリングし、別のモデルリクエストなしでターンを終了します。
 
-#### Token effect
+#### トークンへの影響
 
-The stable schema is paid according to ToolRuntime mode, and each plan argument and review result remains in conversation history.
+安定したスキーマは ToolRuntime モードに従って支払われ、各 plan 引数とレビュー結果は会話履歴に残ります。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Mode transitions do not change the tool catalog; plan arguments and review results extend the conversation normally.
+モード遷移はツールカタログを変えません。plan 引数とレビュー結果は通常どおり会話を拡張します。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送りされた作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits describe when plan mode does not behave as you might expect or needs extra care. They are current package constraints, not a roadmap.
+これらの制限は、Plan モードが期待どおりに動作しない、または特別な注意が必要な場合を説明します。これらは現在のパッケージ制約であり、ロードマップではありません。
 
-- **Guidance, not enforcement** — plan mode restrains through text only; deployments that need enforced restrictions configure sandbox mode and approval policy independently.
-- **Pending selections are process-local** — a selection made after the turn's final accepted pre-step is lost if the process exits before another accepted in-turn pre-step; the UI must reapply it.
-- **No creation-time plan option** — forked agents inherit logged plan state, while newly spawned agents begin inactive.
-- **Live children cannot open the review** — a child owned by another live agent fails the `exit_plan_mode` call and is told to include the unresolved decision in its final result; durable fork lineage alone does not prevent a session resumed as a runtime root from opening the review.
-- **One specialized review renderer** — only the Web UI has a `plan-review` presentation; another interaction provider presents the same request through its generic option flow.
+- **ガイダンスであり強制ではない** — Plan モードはテキストを通じてのみ制約します。強制力のある制限が必要なデプロイは sandbox モードと承認ポリシーを独立に設定します。
+- **保留中の選択はプロセスローカル** — ターンの最後に受け入れられた pre-step の後に行われた選択は、別の受け入れられたターン内 pre-step の前にプロセスが終了すると失われます。UI がそれを再適用する必要があります。
+- **作成時の plan オプションなし** — フォークされたエージェントはログ済みの plan 状態を継承し、新しく生成されたエージェントは非アクティブで開始します。
+- **ライブチャイルドはレビューを開けない** — 別のライブエージェントが所有するチャイルドは `exit_plan_mode` 呼び出しに失敗し、未解決の決定を最終結果に含めるよう指示されます。永続的なフォーク系統だけでは、ランタイムルートとして再開されたセッションがレビューを開くことを妨げません。
+- **特殊化されたレビューレンダラーは 1 つ** — Web UI だけが `plan-review` プレゼンテーションを持ちます。別の interaction プロバイダーは同じリクエストを汎用オプションフローを通じて提示します。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Note.
+この開発ノートはメンテナー向けの作業コンテキストです。未決定の設計上の問いと方向性を扱います。明示的に非権威です — 出荷される動作、制限、受け入れられた根拠は、上のセクション、パッケージコード、リンクされた Agent Note にあります。
 
-#### Future: a second collaboration mode
+#### 将来: 2 つ目のコラボレーションモード
 
-The design note rejected a generic named-mode registry because the product shipped only `plan`; a future collaboration state would establish a shared seam only from two concrete cases, and any extraction must keep `plan/mode`'s log-only fold, the boundary append, and the reviewed exit intact.
+設計ノートは汎用の名前付きモードレジストリを却下しました。製品が出荷したのは `plan` のみだったためです。将来のコラボレーション状態は 2 つの具体的なケースからのみ共有シームを確立し、抽出する場合は `plan/mode` のログ専用畳み込み、境界追記、レビュー付き終了を無傷に保たなければなりません。
 
 </details>

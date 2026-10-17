@@ -1,25 +1,25 @@
 ---
-description: "Records a persistence type transition and its compatibility acknowledgement."
+description: "永続化型遷移とその互換性承認を記録する。"
 kind: persistence-change
 ---
 
 # 2026-09-12-auto-review-error-metadata
 
-English | [中文](2026-09-12-auto-review-error-metadata.zh.md)
+日本語 | [English](2026-09-12-auto-review-error-metadata.en.md) | [中文](2026-09-12-auto-review-error-metadata.zh.md)
 
-## Summary
+## 概要
 
-Adds optional structured error metadata to persisted PTC dispatches and an optional user-facing reason to persisted native tool errors. Both additions retain the Session format version.
+永続化済み PTC ディスパッチにオプショナルな構造化エラーメタデータを、永続化済みネイティブツールエラーにオプショナルなユーザー向け理由を追加する。どちらの追加もセッション形式バージョンを維持する。
 
-## Table of Contents
+## 目次
 
-- [Declaration](#declaration)
-- [Compatibility](#compatibility)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [宣言](#declaration)
+- [互換性](#compatibility)
+- [検証](#verification)
+- [開発ノート](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -37,16 +37,16 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-Existing tool/ptc-dispatch events can omit error, and existing tool/result errors can omit reason. PTC dispatch events do not enter model history; native tool-result replay projects data.message and does not include error metadata. Older readers can ignore these additions without changing model replay. Current Web readers accept absent reasons and only display Auto review denial details when the recorded error identity matches. Permission mode remains a string in the existing event; selecting auto introduces no declared persistence-type change. No header, event envelope, or existing value type changes, and no adjacent migration is required.
+既存の tool/ptc-dispatch イベントは error を省略でき、既存の tool/result エラーは reason を省略できる。PTC ディスパッチイベントはモデル履歴に入らず、ネイティブツール結果リプレイは data.message を投影し、エラーメタデータを含めない。古いリーダーはモデルリプレイを変更せずにこれらの追加を無視できる。現在の Web リーダーは存在しない理由を受け入れ、記録済みエラー ID が一致する場合にのみ Auto review 拒否の詳細を表示する。権限モードは既存イベント内の文字列のままであり、auto の選択は宣言済み永続化型変更を導入しない。ヘッダー、イベントエンベロープ、既存値型の変更はなく、隣接マイグレーションも不要である。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-pnpm exec vitest run scripts/persistence-changes.spec.ts scripts/persistence-schema.spec.ts passed 64 tests. Focused permission, Auto review, tool execution, agent-loop, subagent inheritance, and TypeScript SDK owner tests passed 390 tests across 10 files, including native and PTC denial metadata. uv run --python 3.10 --group test --project python/sdk pytest python/sdk/tests/test_client.py -k preserves_auto_review_errors passed 1 test. The persistence preview classified only the two optional additions and required no version bump.
+pnpm exec vitest run scripts/persistence-changes.spec.ts scripts/persistence-schema.spec.ts が64テスト通過した。対象を絞った権限、Auto review、ツール実行、エージェントループ、サブエージェント継承、TypeScript SDK 所有者テストは10ファイル390テスト通過し、ネイティブおよび PTC 拒否メタデータを含む。uv run --python 3.10 --group test --project python/sdk pytest python/sdk/tests/test_client.py -k preserves_auto_review_errors が1テスト通過した。永続化プレビューは2つのオプショナル追加のみを分類し、バージョン上げを要求しなかった。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
-None.
+なし。

@@ -5,31 +5,31 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Let the model operate the local desktop through an already installed Cua Driver. Mount this package with the computer-use service to expose the driver's own tool descriptions, arguments, and results through MCP. Installation and desktop permissions remain with Cua Driver, and no driver activates by default. The provider reserves computer use until its connection and tools finish closing; callers coordinate concurrent Sessions themselves.
+インストール済みの Cua Driver を通じてモデルにローカルデスクトップを操作させます。このパッケージを computer-use サービスと共にマウントすると、ドライバー独自のツール説明、引数、結果を MCP 経由で公開します。インストールとデスクトップ権限は Cua Driver 側に残り、既定で有効になるドライバーはありません。プロバイダーは接続とツールが閉じ切るまで computer use を予約します。同時実行セッションの調整は呼び出し側で行ってください。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-Choose this provider when Cua Driver is already installed and configured on the same machine as DSH. The [upstream installation and permissions guide](https://github.com/trycua/cua/blob/cua-driver-rs-v0.28.0/libs/cua-driver/README.md) owns platform setup.
+DSH と同じマシンに Cua Driver がインストール・設定済みの場合にこのプロバイダーを選びます。プラットフォームのセットアップは[上流のインストール・権限ガイド](https://github.com/trycua/cua/blob/cua-driver-rs-v0.28.0/libs/cua-driver/README.md)に属します。
 
-### Minimal configuration
+### 最小設定
 
-Add these rows to a composition that already provides tools and system-prompt services. Screenshots also require an attachment store and a model route declaring image input.
+ツールとシステムプロンプトサービスを提供する構成に次の行を追加します。スクリーンショットにはアタッチメントストアと画像入力を宣言するモデルルートも必要です。
 
 ```yaml
 - name: '@deepseek-ai/dsh-computer-use'
@@ -46,27 +46,27 @@ Add these rows to a composition that already provides tools and system-prompt se
 | `toolCallTimeoutMs` | MCP client default | Per-call timeout override in milliseconds |
 | `reconnect` | MCP client policy | Optional reconnection overrides |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-computer-use-cua-driver-mcp) lists accepted fields. The [MCP client](../../mcp/mcp-client/README.md) owns timeout and reconnection defaults.
+生成済みの[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-experimental-computer-use-cua-driver-mcp)は受け付けるフィールドを列挙します。タイムアウトと再接続の既定値は [MCP クライアント](../../mcp/mcp-client/README.md) に属します。
 
-### Activation and ownership
+### 有効化と所有権
 
-The provider registers as `cua-driver-mcp` before connecting. A second computer-use provider fails activation, including another instance of this package. Failed initialization or initial tool discovery rejects this entry and releases its registration after cleanup. Later disconnects retain the registration while the MCP client reconnects or exhausts its attempt budget; unload the entry to release it.
+プロバイダーは接続前に `cua-driver-mcp` として登録します。2 つ目の computer-use プロバイダーは有効化に失敗します。このパッケージの別インスタンスも含みます。初期化失敗や初期ツール検出の失敗はこのエントリーを拒否し、クリーンアップ後に登録を解放します。以降の切断では、MCP クライアントの再接続中や試行予算の使い切り中は登録を保持します。解放にはエントリーをアンロードしてください。
 
-The model sees tools under the fixed `mcp__cua-driver-mcp__` namespace. Tool names, descriptions, input schemas, canonical results, and image admission follow the existing [MCP bridge](../../mcp/mcp-client/README.md). There is no additional DSH action catalog or provider-selection tool.
+モデルには `mcp__cua-driver-mcp__` 固定名前空間のツールが見えます。ツール名、説明、入力スキーマ、正規結果、画像許容は既存の [MCP ブリッジ](../../mcp/mcp-client/README.md) に従います。追加の DSH アクションカタログやプロバイダー選択ツールはありません。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-[`src/index.ts`](src/index.ts) groups the computer-use reservation and owned MCP child into one ordered effect. Child teardown finishes before the reservation disposer runs, including during failed activation. The MCP client owns credential scrubbing, subprocess termination, tool synchronization, cancellation, and durable image projection.
+[`src/index.ts`](src/index.ts) は computer-use 予約と所有 MCP 子プロセスを 1 つの順序付き effect にまとめます。子プロセスのティアダウンは、有効化失敗時も含め、予約 disposer より先に完了します。認証情報スクラブ、サブプロセス終了、ツール同期、キャンセル、 durable 画像プロジェクションは MCP クライアントに属します。
 
-### Verify an installed driver
+### インストール済みドライバーの検証
 
-From the repository root, opt into the live compatibility test with the absolute path of a Cua Driver executable. It discovers tools, calls `check_permissions` with `prompt: false`, and verifies teardown. On macOS, `--direct` runs the runtime in the MCP process using the launching host's permissions; omit `DSH_COMPUTER_USE_MCP_ARGS` to use the default `["mcp"]` arguments.
+リポジトリルートから、Cua Driver 実行ファイルの絶対パスでライブ互換性テストにオプトインします。ツールを検出し、`prompt: false` で `check_permissions` を呼び、ティアダウンを検証します。macOS では `--direct` が起動ホストの権限で MCP プロセス内にランタイムを実行します。既定の `["mcp"]` 引数を使う場合は `DSH_COMPUTER_USE_MCP_ARGS` を省略します。
 
 ```sh
 DSH_COMPUTER_USE_MCP_EXECUTABLE=/absolute/path/to/cua-driver \
@@ -88,35 +88,35 @@ pnpm run test:e2e packages/experimental/computer-use-cua-driver-mcp/tests/instal
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Cua Driver tools and screenshots
+### Cua Driver ツールとスクリーンショット
 
-#### What the model sees
+#### モデルが見るもの
 
-The installed driver's advertised tool descriptions and input schemas appear under `mcp__cua-driver-mcp__<tool>` names. Successful calls retain ordered text and admitted screenshots; unsupported image routes receive the MCP bridge's diagnostic text. Tool calls and projected results enter the Session log through the normal execution pipeline.
+インストール済みドライバーが宣伝するツール説明と入力スキーマが `mcp__cua-driver-mcp__<tool>` 名で現れます。成功呼び出しは順序付きテキストと許容スクリーンショットを保持します。未対応画像ルートには MCP ブリッジの診断テキストが届きます。ツール呼び出しと投影結果は通常の実行パイプラインでセッションログに入ります。
 
-#### Token effect
+#### トークン効果
 
-Registered schemas enter model requests, and tool arguments, text results, and admitted images add context until compaction. Canonical inline image bytes stay outside Session events; durable attachment references identify model-visible images.
+登録スキーマがモデルリクエストに入り、ツール引数、テキスト結果、許容画像がコンパクションまでコンテキストを加えます。正規インライン画像バイトはセッションイベント外に留まります。durable アタッチメント参照がモデル可視画像を識別します。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Unchanged tool discovery preserves the tool-definition prefix. Catalog changes can invalidate reuse from the first changed schema onward; appended tool results preserve the preceding request prefix.
+不変のツール検出はツール定義プレフィックスを保持します。カタログ変更は最初の変更スキーマ以降の再利用を無効化することがあります。追加のツール結果は直前のリクエストプレフィックスを保持します。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-This provider relies on the installed driver and the MCP bridge's supported capabilities.
+このプロバイダーはインストール済みドライバーと MCP ブリッジの対応ケイパビリティに依存します。
 
-- Desktop access requires upstream installation and platform permissions; plugin activation alone does not prove that every desktop action is permitted.
-- Sessions share one desktop. Run one computer-use workflow at a time or coordinate them externally; the registration does not serialize Session actions.
-- Driver upgrades can change the discovered catalog. The provider has no runtime driver switching, dedicated desktop permission UI, or DSH action abstraction.
-- Startup deadlines and rich-result restrictions follow the [MCP client's limitations](../../mcp/mcp-client/README.md#known-limitations-and-deferred-work).
+- デスクトップアクセスには上流のインストールとプラットフォーム権限が必要です。プラグイン有効化だけではすべてのデスクトップアクションが許可されることは証明されません。
+- セッションは 1 つのデスクトップを共有します。一度に 1 つの computer-use ワークフローを実行するか、外部で調整してください。登録はセッションアクションを直列化しません。
+- ドライバー更新で検出カタログが変わることがあります。プロバイダーにはランタイムのドライバー切替え、専用デスクトップ権限 UI、DSH アクション抽象化はありません。
+- 起動期限とリッチ結果制限は [MCP クライアントの制限](../../mcp/mcp-client/README.md#known-limitations-and-deferred-work) に従います。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

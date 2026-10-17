@@ -1,46 +1,46 @@
-# Glossary
+# 用語集
 
-English | [中文](glossary.zh.md)
+日本語 | [English](glossary.en.md) | [中文](glossary.zh.md)
 
-Domain vocabulary for DeepSeek Harness uses one canonical term per concept. Terms link to their entries with standard Markdown anchors; implementation detail stays in package READMEs and Agent Notes.
+DeepSeek Harness の領域語彙は概念ごとに正規用語を 1 件使う。用語は標準 Markdown アンカーでその項目にリンクし、実装詳細はパッケージ README とエージェントノートに置く。
 
 ## capability-seam
 
-- **seam** — a *swappable capability* with three roles: a **Service Definition** (the Cordis `Service` that owns its `ctx.<key>` and vocabulary types — an abstract class such as `ShellExecutor`, or a concrete registry such as `WebRuntime`, never a TypeScript `interface`), one or more **Service Providers**, and one or more **Consumers** that inject the service. `packages/shell` is the canonical example: `dsh-shell` (Service Definition), `dsh-bash-local` / `dsh-bash-sandbox` (providers), and `dsh-tool-bash` (Consumer). Roles normally occupy separate packages when they evolve independently, but a package may own multiple roles when they are one concern (`dsh-user-approval` owns the approval seam's Service Definition and its concrete implementation in one package). The seam is the complete capability, never one role; reserve the term for that meaning and name a constituent by its role, class, service, contract, or extension point.
+- **seam** — 3 役割を持つ*交換可能ケイパビリティ*。**Service Definition**（`ctx.<key>` と語彙型を所有する Cordis `Service`。`ShellExecutor` のような抽象クラス、または `WebRuntime` のような具象レジストリであり、TypeScript `interface` ではない）、1 件以上の **Service Provider**、そのサービスを注入する 1 件以上の **Consumer** である。`packages/shell` が正規例である。`dsh-shell`（Service Definition）、`dsh-bash-local` / `dsh-bash-sandbox`（プロバイダー）、`dsh-tool-bash`（Consumer）である。役割は独立に進化する場合に通常別パッケージを占めるが、1 関心事である場合は 1 パッケージが複数役割を所有し得る（`dsh-user-approval` は承認シームの Service Definition とその具象実装を 1 パッケージに所有する）。シームは完全なケイパビリティであり、1 役割ではない。その意味にのみ用語を取っておき、構成要素は役割・クラス・サービス・契約・拡張点で名指しする。
 
 ## agent-scope
 
-- **scope** — the unit of per-agent registration: a contribution (tool, prompt section, variable, restriction, listener) is either *global* (visible to every agent) or *scoped* (owned by exactly one [scope key](#scope-key)). Two levels, flat: scoped registrations do not inherit down to subagents; subtree behavior is expressed with [lineage](#lineage) data, never scope structure.
-- **scope key** — the opaque identity a scope is keyed by, compared by object identity. The harness convention: a live agent is the key of its own scope. <a id="scope-key"></a>
-- **agent context (`agent.ctx`)** — the agent's scoped context; registrations through it are scope-visible AND scope-lifetime (one fact drives both), and listeners on it participate in that agent's scope-filtered dispatches. Registry-subject events may remain deliberately unfiltered under their own event contracts.
-- **scope carrier** — the `thisArg` a scope-filtered dispatch carries (built by `scopeTarget`); its filter admits untagged listeners plus the subject's own. A *subject-less* carrier (no key) admits untagged listeners only.
-- **scoped dispatch** — the rule: an event about one agent's activity dispatches with that agent's carrier. Events about a registry itself (a tool was added) are *registry-subject* and stay unfiltered.
-- **shadowing** — most-specific-wins name resolution: a scoped tool/section/variable replaces its same-named global twin for that scope alone. The per-agent persona and per-agent tool-variant mechanism.
-- **restriction / scope-local registration** — a restriction (`tools.restrict`) filters the GLOBAL tool set for one scope (compose by intersection); scope-local registrations are merged after that filter. A filtered-away global tool is absent from the prompt AND refuses execution, indistinguishably from a nonexistent one.
-- **setup window** — the creation slot where a creator composes an agent's scoped world (`CreateAgentOptions.setup`): after the scope and agent object exist but before the agent or session is published, `agent/created` fires, or the first prompt is assembled. Setup registers; it never drives the agent.
-- **lineage** — parent/child facts carried as data (`parentSession`, durable `delegationDepth`, runtime `subagentDepth`); never affects visibility. <a id="lineage"></a>
+- **scope** — エージェントごとの登録単位。寄与（ツール・プロンプト節・変数・制限・リスナー）は*グローバル*（すべてのエージェントに見える）または*スコープ付き*（ちょうど 1 件の[スコープキー](#scope-key)が所有する）のいずれかである。2 階層で平坦である。スコープ付き登録はサブエージェントに継承されず、部分木動作はスコープ構造ではなく [lineage](#lineage) データで表す。
+- **scope key** — スコープのキーとなる不透明同一性であり、オブジェクト同一性で比較する。ハーネス規約ではライブエージェントが自身のスコープのキーである。<a id="scope-key"></a>
+- **agent context (`agent.ctx`)** — エージェントのスコープ付きコンテキストであり、それ経由の登録はスコープ可視かつスコープ寿命である（1 事実が両方を駆動する）。その上のリスナーはそのエージェントのスコープ絞り込み配送に参加する。レジストリ主題イベントは自イベント契約下で意図的に未絞り込みのまま残り得る。
+- **scope carrier** — スコープ絞り込み配送が運ぶ `thisArg`（`scopeTarget` が構築する）。その絞り込みは無タグリスナーと主題自身を受け入れる。*主題なし*運び手（キーなし）は無タグリスナーのみを受け入れる。
+- **scoped dispatch** — 規則。1 エージェントの活動についてのイベントはそのエージェントの運搬手で配送する。レジストリ自体についてのイベント（ツール追加）は*レジストリ主題*であり未絞り込みのままである。
+- **shadowing** — 最特定優先の名前解決。スコープ付きツール/節/変数は同名グローバル双子をそのスコープに限り置換する。エージェントごとの persona とエージェントごとのツール変種の仕組みである。
+- **restriction / scope-local registration** — 制限（`tools.restrict`）は 1 スコープ用にグローバルツール集合を絞り込む（積集合で合成する）。スコープローカル登録はその絞り込み後に統合される。絞り落とされたグローバルツールはプロンプトに現れず、実行も拒否され、存在しないものと区別できない。
+- **setup window** — 作成者がエージェントのスコープ付き世界を合成する作成枠（`CreateAgentOptions.setup`）。スコープとエージェントオブジェクトは存在するが、エージェントやセッションはまだ公開されておらず、`agent/created` が発火する前、または最初のプロンプトが組み立てられる前である。setup は登録し、エージェントを駆動しない。
+- **lineage** — データとして運ぶ親子事実（`parentSession`、耐久性のある `delegationDepth`、ランタイム `subagentDepth`）。可視性に影響しない。<a id="lineage"></a>
 
 ## goal
 
-- **goal** — one durable completion objective attached to an existing session, with a revisioned `active` / `paused` / `blocked` / `complete` phase and a goal-round cap; `blocked` retains a policy code and explanation. A goal is state, not a scheduler or a separate conversation; the session log remains its source of truth.
-- **goal round** — one continuation cycle admitted for the current goal. The same-session driver materializes a goal round as one goal-sourced [turn](#turn), which can contain zero or more steps; unrelated human turns in the same session do not consume the goal-round cap. <a id="goal-round"></a>
-- **goal activation** — process-local permission for a continuation consumer to admit another goal round. Activation is either `armed` or `disarmed`; it is deliberately absent from durable replay, so resume and fork require a later human-authorized resume mutation through `/goal` or the model tool before automatic work.
+- **goal** — 既存セッションに付く 1 件の耐久性のある完了目標であり、改訂付き `active` / `paused` / `blocked` / `complete` 段階とゴールラウンド上限を持つ。`blocked` はポリシーコードと説明を保持する。ゴールは状態であり、scheduler でも別の会話でもない。セッションログがその信頼源のままである。
+- **goal round** — 現行ゴールに許された 1 件の継続周期。同一セッション駆動器はゴールラウンドをゴール由来の 1 [ターン](#turn)として実体化し、0 件以上のステップを含み得る。同セッションの無関係人間ターンはゴールラウンド上限を消費しない。<a id="goal-round"></a>
+- **goal activation** — 継続コンシューマーがさらにゴールラウンドを許すためのプロセスローカル許可である。有効化は `armed` または `disarmed` のいずれかであり、耐久再実行から意図的に外されるため、再開と fork は `/goal` またはモデルツール経由の後の人間承認再開変更を要求してから自動作業する。
 
 ## human command
 
-- **human command** — a slash-prefixed instruction interpreted and executed by a human-facing adapter through `ctx.commands`, without becoming a model message. It is distinct from a model-facing tool and from shell command execution through `ctx.shell`.
-- **command plane** — discovery, parsing, dispatch, cancellation, and result rendering owned by UI adapters and command plugins. Command output is UI state unless the handler separately mutates a durable domain.
-- **goal command** — the `/goal` human command contributed by `dsh-command-goal`; it observes or mutates the current goal directly while the goal domain owns every durable, model-visible record.
+- **human command** — `ctx.commands` 経由で人間向け適合器が解釈実行するスラッシュ付き指示であり、モデルメッセージにならない。モデル向けツールとも、`ctx.shell` 経由のシェルコマンド実行とも異なる。
+- **command plane** — UI 適合器とコマンドプラグインが所有する検出・解析・配送・キャンセル・結果描画である。コマンド出力はハンドラーが別途耐久領域を変更しない限り UI 状態である。
+- **goal command** — `dsh-command-goal` が寄与する `/goal` 人間コマンドであり、現行ゴールを直接観測または変更する一方、ゴール領域がすべての耐久・モデル可視記録を所有する。
 
 ## loop hierarchy
 
-- **turn** — one drain of admitted input in a session, ending after the model and its tools stop or a terminal policy intervenes. <a id="turn"></a>
-- **step** — one model request plus the tool executions caused by its response; a turn contains zero or more steps. <a id="step"></a>
-- **round** — an outer policy iteration containing a turn, such as a [goal round](#goal-round) or one fresh-agent Ralph attempt. Round counters belong to that policy and do not count every turn in a session. <a id="round"></a>
-- **exchange** — consecutive [turns](#turn) from a turn whose first [step](#step) admits human input until the next such turn; turns woken by notices, such as settled subagents, goal rounds, or schedules, stay in the preceding exchange. Chat's next-message folding keeps the latest exchange expanded. <a id="exchange"></a>
+- **turn** — セッション内の許容入力の 1 排出であり、モデルとそのツールが停止するか終端ポリシーが介入して終わる。<a id="turn"></a>
+- **step** — 1 件のモデル要求とその応答が起こしたツール実行であり、ターンは 0 件以上のステップを含む。<a id="step"></a>
+- **round** — ターンを含む外側ポリシー反復であり、[ゴールラウンド](#goal-round)や fresh-agent Ralph 試行 1 件などである。ラウンド計数はそのポリシーに属し、セッション内のすべてのターンを数えない。<a id="round"></a>
+- **exchange** — 最初の[ステップ](#step)が人間入力を許容するターンから次のその種ターンまでの連続[ターン](#turn)である。解決済みサブエージェント・ゴールラウンド・schedule などで起こされたターンは前 exchange に残る。チャットの次メッセージ折り畳みは最新 exchange を展開したままにする。<a id="exchange"></a>
 
 ## Ralph
 
-- **Ralph loop** — one foreground fresh-agent workflow run toward an immutable objective. It is a model-facing tool policy composed from workflow and subagent primitives, not a same-session goal, agent-loop mode, scheduler, or generic workflow-script feature. <a id="ralph-loop"></a>
-- **Ralph round** — one fresh child session in a [Ralph loop](#ralph-loop). The child receives no parent or prior-child conversation seed; the shared workspace and one bounded [Ralph handoff](#ralph-handoff) carry cross-round state. <a id="ralph-round"></a>
-- **Ralph handoff** — the normalized bounded structured report passed from one continuing Ralph round to the next, containing status, summary, evidence, next steps, and blocker text. It supplements the shared workspace rather than replacing it as authority. <a id="ralph-handoff"></a>
+- **Ralph loop** — 不変目標に向けた 1 件の前景 fresh-agent ワークフロー実行である。ワークフローとサブエージェント primitives から合成されたモデル向けツールポリシーであり、同一セッションゴール、エージェントループモード、scheduler、汎用ワークフロースクリプト機能ではない。<a id="ralph-loop"></a>
+- **Ralph round** — [Ralph loop](#ralph-loop) 内の 1 件の fresh 子セッションである。子は親や以前の子の会話 seed を受け取らず、共有ワークスペースと 1 件の有界 [Ralph handoff](#ralph-handoff) がラウンド間状態を運ぶ。<a id="ralph-round"></a>
+- **Ralph handoff** — 継続する Ralph ラウンドから次へ渡される正規化された有界の構造化報告であり、状態・要約・証拠・次手順・ blocker 文を含む。権威としての共有ワークスペースを置換するのではなく補う。<a id="ralph-handoff"></a>

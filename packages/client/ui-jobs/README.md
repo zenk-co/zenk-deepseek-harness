@@ -1,96 +1,96 @@
 ---
-description: "The session-header background-job list: expandable streaming output panels, running/finished sections, and static rows for settled jobs without retained output."
+description: "セッションヘッダーのバックグラウンドジョブリスト。展開可能なストリーミング出力パネル、実行中・完了済み区分、保持出力のない確定ジョブの静的行。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-jobs
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-client-ui-jobs` shows the session's background jobs in one header control, with lifecycle, elapsed time, progress, and terminal detail. Live jobs and settled jobs with retained output offer expandable output panels; collapsing stops the stream. Live rows lead with a ticking duration, followed by kind and status. Settled rows fold under a section heading; those without retained output, including subagents whose answers went to the model, stay static.
+`dsh-client-ui-jobs` はセッションのバックグラウンドジョブを 1 つのヘッダーコントロールに表示し、ライフサイクル、経過時間、進捗、終端詳細を伴う。ライブジョブと保持出力付き確定ジョブは展開可能な出力パネルを提供する。折りたたみでストリームを停止する。ライブ行は刻む所要時間を先頭に、種類と状態が続く。確定行は区分見出しの下に畳まれる。保持出力のないもの（回答がモデルに渡ったサブエージェントを含む）は静的なままである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Load the plugin through the web-app manifest; it renders nothing until the session can see at least one job, so an ordinary conversation never grows a control for a capability it is not using.
+web-app マニフェストを通じてプラグインを読み込む。セッションが少なくとも 1 つのジョブを見られるようになるまで何も描画しないため、通常の会話が使用していないケイパビリティのためにコントロールを増やすことはない。
 
-### One row per job
+### ジョブごとに 1 行
 
-The `job.list` stream `ctx.jobs` mirrors is the single roster: each `JobView` row carries lifecycle, duration, the live `progress` line or the terminal `detail`, and its retained byte count — a live job, or a settled one with retained output, is what makes a row expandable. There is no second roster to join.
+`ctx.jobs` がミラーする `job.list` ストリームが唯一の名簿である。各 `JobView` 行はライフサイクル、所要時間、ライブの `progress` 行または終端の `detail`、保持バイト数を運ぶ。ライブジョブまたは保持出力付き確定ジョブが行を展開可能にする。結合すべき 2 つ目の名簿はない。
 
-Running job rows also carry a two-press stop control: the first press arms it, the confirming press within three seconds calls `ctx.jobs.kill`, and the row converges through the roster stream (`stopping`, then the settled section, whose detail carries `cancelled by the user`). The kill claims nothing in the model's notice ledger, so the owning agent still receives the standard completion notice — the model is told the user stopped its task rather than left to infer it ([reference](../../jobs/tool-jobs/README.md)). The settled section folds behind its count while live work exists and can be cleared client-side.
+実行中ジョブ行は 2 度押し停止コントロールも運ぶ。1 度目が武装し、3 秒以内の確認押しで `ctx.jobs.kill` を呼び、行は名簿ストリームを通じて収束する（`stopping`、次に確定区分。その詳細は `cancelled by the user` を運ぶ）。kill はモデルの通知台帳に何も要求しないため、所有エージェントは依然として標準完了通知を受け取る。モデルは推測に任されるのではなくユーザーがタスクを停止したと知らされる（[リファレンス](../../jobs/tool-jobs/README.md)）。確定区分はライブ作業がある間は件数の背後に畳まれ、クライアント側で消去できる。
 
-### The expanded panel
+### 展開パネル
 
-Expanding an observable row opens that job's output observation stream from `ctx.jobs` (installed by `dsh-api-job-controller`) into an embedded terminal panel. The panel copies the command (not the output), wraps commands and output lines in full, scrolls its output inside a fixed height instead of folding, and draws no run-state dot of its own — the row above carries the state. Retention gaps and stream interruptions render as notices above the panel.
+観察可能な行の展開は、そのジョブの出力観察ストリームを `ctx.jobs`（`dsh-api-job-controller` がインストール）から埋め込み端末パネルに開く。パネルはコマンドをコピーする（出力はしない）。コマンドと出力行を完全に折り返し、出力を折りたたまず固定高さの中でスクロールし、独自の実行状態ドットを描かない。状態は上の行が運ぶ。保持隙間とストリーム中断はパネル上部の通知として描画される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-One slot entry in the header actions band (after the preset label) renders the trigger; its popover uses a body-mounted `MenuSurface` with fixed positioning so dock panels and clipping ancestors cannot cover it. The shared anchoring hook tracks scrolling, resizing, and panel-size changes. All data arrives through `ctx.jobs` — the component holds no transport state. The roster follows the mount: one `useEffect` keeps the session's `job.list` stream open while the control lives. Observation follows visibility: another `useEffect` opens the stream for the expanded row's job and closes it on collapse, unmount, or popover close.
+ヘッダーアクション帯の 1 つのスロットエントリー（プリセットラベル後）がトリガーを描画する。そのポップオーバーは固定配置の本体マウント `MenuSurface` を使い、ドックパネルや切り取り祖先がそれを覆えないようにする。共有固定フックはスクロール、リサイズ、パネル寸法変更を追跡する。すべてのデータは `ctx.jobs` を通じて到着する。コンポーネントは転送状態を持たない。名簿はマウントに従う。1 つの `useEffect` がコントロール存命中にセッションの `job.list` ストリームを開いたままにする。観察は可視性に従う。別の `useEffect` が展開行ジョブのストリームを開き、折りたたみ、アンマウント、ポップオーバー閉鎖で閉じる。
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/client/JobListAction.tsx`](src/client/JobListAction.tsx) | The job list: sections, durations, panels |
-| [`src/client/index.ts`](src/client/index.ts) | Slot registration and the dictionaries |
-| [`src/client/locales.ts`](src/client/locales.ts) | The `job` namespace copy (zh source of truth) |
+| [`src/client/JobListAction.tsx`](src/client/JobListAction.tsx) | ジョブリスト。区分、所要時間、パネル |
+| [`src/client/index.ts`](src/client/index.ts) | スロット登録と辞書 |
+| [`src/client/locales.ts`](src/client/locales.ts) | `job` 名前空間の対訳（zh が正本） |
 
-Background-job rows follow the [standard menu edge geometry](../../../docs/ui-radius.md#nested-hover); controls inside a filled running row retain compact corners.
+バックグラウンドジョブ行は[標準メニュー辺形状](../../../docs/ui-radius.md#nested-hover)に従う。塗り実行中行の内部コントロールは緊密な角を保持する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [`dsh-api-job-controller`](../../api/job-controller/README.md) — the `job.list` and `job.follow` streams, the `job.kill` Remote, and the `ctx.jobs` service behind the rows, the panel, and the stop control.
-- [`dsh-jobs`](../../jobs/jobs/README.md) — the registry contract that owns the ring and projection semantics.
-- [`dsh-client-ui-primitives`](../ui-primitives/README.md) — the `TerminalBlock` surface the panel configures.
+- [`dsh-api-job-controller`](../../api/job-controller/README.md) — 行、パネル、停止コントロールの背後にある `job.list` と `job.follow` ストリーム、`job.kill` リモート、`ctx.jobs` サービス。
+- [`dsh-jobs`](../../jobs/jobs/README.md) — リングと射影意味を所有する registry 契約。
+- [`dsh-client-ui-primitives`](../ui-primitives/README.md) — パネルが設定する `TerminalBlock` サーフェス。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package renders host-observed state and live output for a human and touches no prompt, message, schema, stream, or tool result. The model's own view of the same work stays with [`dsh-tool-jobs`](../../jobs/tool-jobs/README.md).
+なし。このパッケージは人間向けにホスト観察状態とライブ出力を描画するだけであり、プロンプト、メッセージ、スキーマ、ストリーム、ツール結果に触れない。同じ作業に対するモデル自身のビューは [`dsh-tool-jobs`](../../jobs/tool-jobs/README.md) にある。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; the package never assembles or sends provider requests.
+なし。このパッケージはプロバイダー要求を組み立てず送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits define current package constraints, not a task backlog.
+これらの制限は現在のパッケージ制約を定義し、タスクバックログではない。
 
-- **Channel labels are not rendered** — stdout and stderr chunks concatenate into one stream; per-channel tinting is a presentation follow-up.
+- **チャネルラベルは描画されない** — stdout と stderr チャンクは 1 つのストリームに連結される。チャネルごとの色分けは表示上の追い作業である。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

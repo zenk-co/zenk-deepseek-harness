@@ -3,20 +3,20 @@ kind: upgrade-guide
 description: "The Automation tasks optional bundle is removed; the Web composition mounts Schedule itself."
 ---
 
-# Automation tasks bundle removed
+# Automation tasks バンドルの削除
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更内容
 
-In v0.2.0-rc.2, switching on Automation tasks in the Plugins page appended `@deepseek-ai/dsh-experimental-schedule-bundle` to `dsh.profile.bundles` in `$DSH_HOME/profiles/<name>/package.json`. That bundle inserted the `time-context`, `schedule`, and `ui-schedule` rows.
+v0.2.0-rc.2 では、Plugins ページで Automation tasks をオンにすると `$DSH_HOME/profiles/<name>/package.json` 内の `dsh.profile.bundles` に `@deepseek-ai/dsh-experimental-schedule-bundle` が追加された。そのバンドルは `time-context`、`schedule`、`ui-schedule` 行を挿入した。
 
-The next release removes the bundle. `@deepseek-ai/dsh-web-app` mounts `schedule` and `ui-schedule` in every Web profile, and the `standard`, `cordis`, and `ptc` presets declare the clock reading and the four `schedule_*` tools; `minimal` declares neither ([details](../../../subsystems/schedule.md)).
+次回リリースでバンドルを削除する。`@deepseek-ai/dsh-web-app` はすべての Web プロファイルに `schedule` と `ui-schedule` をマウントし、`standard`、`cordis`、`ptc` プリセットは時計読み取りと 4 つの `schedule_*` ツールを宣言する。`minimal` はどちらも宣言しない ([詳細](../../../subsystems/schedule.md))。
 
-Loading a profile removes `@deepseek-ai/dsh-experimental-schedule-bundle` from its `dsh.profile.bundles` and rewrites `package.json`; other manifest fields are kept. Stored tasks and delivery records stay on disk and remain in use.
+プロファイル読み込みは `dsh.profile.bundles` から `@deepseek-ai/dsh-experimental-schedule-bundle` を削除し `package.json` を書き換える。他のマニフェストフィールドは保持される。保存済みタスクと配信記録はディスクに残り、引き続き使用される。
 
-## Migration
+## 移行手順
 
-1. Start `dsh` once with each affected profile; no manual edit is needed. A profile directory that another tool writes must drop the entry from `dsh.profile.bundles` itself.
-2. Keep overrides on `schedule` and `ui-schedule` in `cordis.patch.yml` or a `--patch` overlay; the Web composition carries those rows. A top-level override on `time-context` no longer matches a row, because the clock row belongs to the presets ([time-context](../../../../packages/context/time-context/README.md)); delete it.
-3. Confirm: `dsh.profile.bundles` no longer lists the bundle, the Plugins page shows no failed Automation tasks entry, and the sidebar shows Automation tasks with the previously stored reminders.
+1. 影響を受ける各プロファイルで `dsh` を一度起動する。手動編集は不要である。別ツールが書き込むプロファイルディレクトリは `dsh.profile.bundles` からそのエントリを自ら落とさなければならない。
+2. `schedule` と `ui-schedule` へのオーバーライドは `cordis.patch.yml` または `--patch` オーバーレイに残す。Web 構成がそれらの行を持つ。時計行はプリセットに属するため、トップレベルの `time-context` へのオーバーライドは行に一致しなくなる。削除する ([time-context](../../../../packages/context/time-context/README.md))。
+3. 確認: `dsh.profile.bundles` がバンドルを列挙せず、Plugins ページに失敗した Automation tasks エントリが無く、サイドバーに以前保存したリマインダー付き Automation tasks が表示される。

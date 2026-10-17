@@ -5,41 +5,41 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-client-ui-voice-input
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This optional browser plugin adds an outline microphone icon between the model selector and Send. When recognition is ready, clicking it opens a recording toolbar with measured audio levels, Cancel and Stop. The waveform stays shorter than the recording buttons. Stopping transcribes into the draft. Recognition preferences and model preparation live in plugin settings; language choices come from the selected provider.
+この任意ブラウザープラグインはモデルセレクターと Send の間に輪郭マイクアイコンを追加します。認識準備完了時、クリックは測定音声レベル付きの録音ツールバーを開き、Cancel と Stop を持ちます。波形は録音ボタンより短いままです。停止は下書きに文字起こしします。認識設定とモデル準備はプラグイン設定に存在します。言語選択は選択プロバイダー由来です。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-Enable the [voice input bundle](../voice-input-bundle/README.md) from Plugins. After cache inspection, missing models trigger a setup prompt with Go to setup and Later actions. Go to setup opens bundle details; Download and prepare starts installation there. Intact cached models need no prompt or repeated installation. Before recognition is ready, guidance appears only on click, with no microphone tooltip. Clicking the microphone opens the same guidance dialog; its action opens the voice bundle details without recording or downloading. Cache inspection, preparation in progress, failures and disconnected services instead offer navigation to status, progress or error details. The dialog moves focus to its navigation action and keeps Tab traversal inside it; Later or Escape restores the previous focus without changing or submitting the draft. Before preparation, local providers can show their estimated disk, memory and setup-time requirements. The preparation summary starts collapsed; expand it to inspect completed, current and pending steps. Once ready, click the microphone, allow access and click Stop to transcribe. Cancel or Escape discards capture. Recognition feedback stays inside the toolbar. Provider and language preferences are saved from bundle details through the Settings service. Browser microphone access requires HTTPS or loopback and operating-system permission.
+Plugins から[音声入力バンドル](../voice-input-bundle/README.md)を有効化します。キャッシュ検査後、不足モデルは Go to setup と Later アクション付きのセットアップ案内を起動します。Go to setup はバンドル詳細を開きます。Download and prepare はそこで導入を開始します。無事なキャッシュ済みモデルは案内も繰返し導入も不要です。認識準備前、案内はクリック時のみ現れ、マイクツールチップはありません。マイクのクリックは同じ案内ダイアログを開きます。そのアクションは録音や取得なしに音声バンドル詳細を開きます。キャッシュ検査、準備進行中、失敗、切断サービスは代わりに状態、進行、エラー詳細への案内を提供します。ダイアログはフォーカスを案内アクションに移動し、Tab 移動を内部に保ちます。Later または Escape は下書き変更や送信なしに prior フォーカスを復元します。準備前、ローカルプロバイダーは推定ディスク、メモリー、セットアップ時間要件を表示できます。準備概要は折畳み開始です。展開して完了、現行、保留手順を検査します。準備完了後、マイクをクリックし、アクセスを許可して Stop をクリックすると文字起こしします。Cancel または Escape は収録を破棄します。認識フィードバックはツールバー内に留まります。プロバイダーと言語設定はバンドル詳細から Settings サービス経由で保存されます。ブラウザーマイクアクセスは HTTPS またはループバックと OS 権限が必要です。
 
-Use the native **Input device** selector in bundle details to follow the system default or select a browser microphone. System default shows the current device name when available. While bundle details are active, the selected input's live level remains visible at the right of the field; selecting another input restarts the preview for that device. Hiding or leaving the page, or disabling the plugin, releases the preview, including late permission grants. The browser remembers the device for subsequent recordings independently of Host recognition settings. Device insertion and removal refresh the options without interrupting an available selected input. A disconnected selection retains its name and position as a disabled option with an Unavailable label. Reconnecting while the page is active restores its preview; choosing another input removes the unavailable option. Interrupted recordings require an explicit restart. Permission denial keeps other choices accessible; an explicitly selected device never silently falls back to another input.
+バンドル詳細のネイティブ **Input device** セレクターでシステム既定に従うか、ブラウザーマイクを選択します。システム既定は利用可能時現行デバイス名を表示します。バンドル詳細有効中、選択入力のライブレベルはフィールド右に可視のままです。別入力選択はそのデバイス向けプレビューを再開します。ページの非表示や離脱、プラグイン無効化は遅延権限付与も含めプレビューを解放します。ブラウザーはホスト認識設定と独立に以降録音向けデバイスを記憶します。デバイス挿抜は利用可能な選択入力を中断せず選択肢を更新します。切断選択は名前と位置を保持し、Unavailable ラベル付き無効選択肢として残ります。ページ有効中の再接続はプレビューを復元します。別入力選択は不可用選択肢を除去します。中断録音は明示再開が必要です。権限拒否は他選択を利用可能に保ちます。明示選択デバイスは黙って別入力にフォールバックしません。
 
-Before downloading or retrying, **Model download source** offers Automatic and the origins advertised by the Host. SenseVoice normally offers Hugging Face and HF-Mirror; a fixed private deployment exposes only its configured origin. Manual selection uses only that source, while Automatic preserves the provider’s comparison and fallback policy. The choice is retained for retries in the current card, without changing deployment configuration or recognition preferences. Source controls are unavailable during preparation and hidden when resources are ready.
+ダウンロードや再試行前、**Model download source** は Automatic とホスト宣伝オリジンを提供します。SenseVoice は通常 Hugging Face と HF-Mirror を提供します。固定非公開配置は設定済みオリジンのみ公開します。手動選択はそのソースのみ使い、Automatic はプロバイダーの比較とフォールバック方針を保持します。選択は現行カードの再試行に保持され、配置設定や認識設定は変えません。ソース制御は準備中利用不可であり、リソース準備完了時は非表示です。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Maintainer details — click to expand</summary>
 
-Native MediaRecorder captures audio and Web Audio converts it to the Host PCM format after flushing the final recorder chunks. Input-level previews use Web Audio without creating a MediaRecorder. Window blur during the microphone permission request does not cancel capture; blur during recording does. Capture failures immediately end the recording UI and offer retry inside the toolbar. Cancellation, failure and plugin disposal share one resource-release promise; the plugin retains ownership until AudioContext closure settles. The original editor selection carries a draft revision: changed drafts retain the transcript for explicit insertion or discard beside the microphone. Session changes, hiding the page during capture and plugin disposal invalidate late results and release tracks. One plugin-owned readiness subscription serves the composer, installation prompt and details. These views use the existing Slot lifecycle and own no preparation tasks.
+ネイティブ MediaRecorder は音声を収録し、Web Audio は最終レコーダーチャンクのフラッシュ後にホスト PCM 形式に変換します。入力レベルプレビューは MediaRecorder 作成なしに Web Audio を使います。マイク権限要求中のウィンドウブラーは収録をキャンセルしません。録音中のブラーはキャンセルします。収録失敗は直ちに録音 UI を終了し、ツールバー内に再試行を提供します。キャンセル、失敗、プラグイン破棄は 1 つのリソース解放 promise を共有します。プラグインは AudioContext 閉鎖確定まで所有権を保持します。元エディター選択は下書きリビジョンを運びます。変更下書きは明示挿入または破棄向けにマイク脇に transcript を保持します。セッション変更、収録中のページ非表示、プラグイン破棄は遅延結果を無効化しトラックを解放します。1 つのプラグイン所有準備購読が作曲者、導入案内、詳細に役立ちます。これらビューは既存スロットライフサイクルを使い、準備タスクを所有しません。
 
 </details>
 
@@ -53,24 +53,24 @@ Native MediaRecorder captures audio and Web Audio converts it to the Host PCM fo
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
 None, as recordings and preparation remain outside model requests; ordinary user submission owns any later text.
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-No direct effect; ordinary submission owns the message content.
+直接効果なし。通常提出がメッセージ内容を所有します。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- No automatic send, always-on microphone, wake word, streaming captions or speech synthesis. “Local” means the Host machine, which can differ from the browser’s machine.
+- 自動送信、常時マイク、ウェイクワード、ストリーミング字幕、音声合成はありません。「ローカル」はホストマシンを意味し、ブラウザーマシンと異なることがあります。
 
 -----
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Maintainer details — click to expand</summary>

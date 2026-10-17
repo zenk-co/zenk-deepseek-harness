@@ -1,33 +1,33 @@
 ---
-description: "Whole-log conversation counts and wall times for clients and maintainers choosing, composing, or debugging the sessionStats projection unit."
+description: "クライアントやメンテナーが sessionStats プロジェクション単位を選択・構成・デバッグするための、ログ全体の会話カウントとウォール時間。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-stats
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package gives clients whole-session turn and step counts plus LLM, tool, first-token, and decode wall times through the public `sessionStats` value. The figures come from the complete durable log, so paging and compaction do not change them. Use it when a client must display consistent conversation statistics across reloads and reduced history. When whole-session statistics are unavailable, clients can use window-scoped counting instead.
+このパッケージは、公開 `sessionStats` 値を通じて、セッション全体のターン数とステップ数に加え、LLM・ツール・初回トークン・デコードのウォール時間を提供する。数値は耐久性のある完全なログから算出されるため、ページングやコンパクションで変化しない。リロードや履歴削減を越えて一貫した会話統計を表示しなければならない場合に使う。セッション全体の統計が利用できない場合、クライアントは代わりにウィンドウ単位の計数を使える。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the plugin beside the session store and the projection registry when clients should display whole-session conversation figures that survive paging and compaction. The unit registers only when the registry is present.
+ページングやコンパクションを越えて残るセッション全体の会話数値をクライアントに表示する場合は、セッションストアとプロジェクションレジストリのそばにこのプラグインをマウントする。この単位はレジストリが存在する場合にのみ登録される。
 
-### Composition
+### 構成
 
 ```yaml
 - name: '@deepseek-ai/dsh-session'
@@ -35,98 +35,98 @@ Mount the plugin beside the session store and the projection registry when clien
 - name: '@deepseek-ai/dsh-session-stats'
 ```
 
-### What the figures mean
+### 数値の意味
 
-| Field | Meaning |
+| フィールド | 意味 |
 |---|---|
-| `turns` | Distinct turns with at least one closed step; rejected or empty turns are uncounted |
-| `steps` | Closed steps — completed, failed, cancelled, and max-tokens steps all count |
-| `llmMs` | Summed model wall time over steps that assembled a message |
-| `toolMs` | Summed matched `tool/call` → `tool/result` wall time |
-| `ttftMs` / `ttftSteps` | Summed first-token latency and the steps carrying it |
-| `decodeMs` / `decodeTokens` | Summed decode wall time and provider output tokens over usage-reporting steps |
+| `turns` | クローズ済みステップを 1 件以上含む個別ターン数。拒否・空ターンは数えない |
+| `steps` | クローズ済みステップ数。完了・失敗・キャンセル・max-tokens のステップをすべて数える |
+| `llmMs` | メッセージを組み立てたステップ上のモデルウォール時間の合計 |
+| `toolMs` | 対応する `tool/call` → `tool/result` ウォール時間の合計 |
+| `ttftMs` / `ttftSteps` | 初回トークン遅延の合計とそれを持つステップ数 |
+| `decodeMs` / `decodeTokens` | 使用量報告ステップ上のデコードウォール時間とプロバイダー出力トークンの合計 |
 
-Every field is 0 until its first contributing event; the composed registry always serves the key, so clients read the value rather than key presence. Clients render whole-log figures through the projection seam's snapshot and change feed; the reference consumer is the web chat stats strip, whose window fold mirrors these field names as its no-unit fallback.
+すべてのフィールドは最初の寄与イベントまで 0 であり、構成済みレジストリは常にキーを提供するため、クライアントはキーの有無ではなく値を読む。クライアントはプロジェクションシームのスナップショットと変更フィードを通じてログ全体の数値を描画する。参照コンシューマーは Web チャットの統計ストリップであり、そのウィンドウ折り畳みは単位なしフォールバックとしてこれらのフィールド名を反映する。
 
-### Failures and recovery
+### 失敗と回復
 
-The unit is inert without the projection registry: `inject` keeps the fiber pending and nothing registers, so other assemblies lack the `sessionStats` key. Unmounting the plugin removes the key, because registrations are effects on the mounting fiber. A crash-interrupted step counts after the session reloads, when crash recovery appends its synthetic `step/end`.
+この単位はプロジェクションレジストリなしでは不活性である。`inject` はファイバーを保留のままにし、何も登録されないため、他の構成には `sessionStats` キーがない。プラグインのアンマウントはキーを除去する。登録はマウントファイバー上のエフェクトであるためである。クラッシュで中断されたステップはセッション再読み込み後に数えられる。クラッシュ回復が合成 `step/end` を追記するためである。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the fold behind the figures; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節では数値の背後にある折り畳みを説明する。観測可能な動作はすべて[このパッケージを使う](#use-this-package)で扱う。
 
-### Design concept
+### 設計概念
 
-The unit is a pure fold over committed session events: `step/end` is the counted step event because the agent loop appends exactly one per entered step in a `finally`, so completed, failed, cancelled, and max-tokens steps all land one. Counting assembled assistant messages instead would overcount max-tokens usage-host messages (empty content, excluded from the surface) and undercount cancelled steps (aborted before the message assembles). The wall-time folds mirror the client window fold field by field.
+この単位はコミット済みセッションイベント上の純粋な折り畳みである。`step/end` が数えられるステップイベントなのは、エージェントループが入ったステップごとに `finally` でちょうど 1 件追記するためであり、完了・失敗・キャンセル・max-tokens のステップがすべて 1 件ずつ着地する。組み立て済みアシスタントメッセージを数えると、max-tokens の usage-host メッセージ（空内容で surface から除外）を過大計数し、キャンセル済みステップ（メッセージ組み立て前に中断）を過小計数する。ウォール時間の折り畳みはクライアントのウィンドウ折り畳みをフィールドごとに対応付ける。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `inject`, unit registration on the mounting fiber |
-| [`src/projection.ts`](src/projection.ts) | The fold: state shape, per-event transitions, wire view |
-| [`src/types.ts`](src/types.ts) | One home of the `sessionStats` projection-key declaration and field types |
+| [`src/index.ts`](src/index.ts) | プラグイン入口。マウントファイバー上への `inject` と単位登録 |
+| [`src/projection.ts`](src/projection.ts) | 折り畳み。状態形状、イベントごとの遷移、ワイヤービュー |
+| [`src/types.ts`](src/types.ts) | `sessionStats` プロジェクションキー宣言とフィールド型の単一ホーム |
 
-### Data model
+### データモデル
 
-The fold state holds the eight totals plus in-flight boundaries: `lastTurn` (turn of the last counted `step/end`), `openStep` (the open step's boundary facts, closed by its `assistant/message`), and `pendingCalls` (tool dispatch times by callId). The wire view is a strict subset — the eight totals — so the persisted-cache state schema extends the view schema with the boundary fields.
+折り畳み状態は 8 件の合計に加えて処理中境界を保持する。`lastTurn`（最後に数えた `step/end` のターン）、`openStep`（開いたステップの境界事実で、その `assistant/message` により閉じる）、`pendingCalls`（callId ごとのツール配送時刻）である。ワイヤービューは厳密な部分集合（8 件の合計のみ）であり、永続キャッシュの状態スキーマは境界フィールドでビュースキーマを拡張する。
 
-### Fold rules
+### 折り畳み規則
 
-- Uninteresting events return the same state reference; the registry's `Object.is` gate keeps the change feed quiet.
-- First-token latency records the first non-empty delta chunk and survives an in-step `llm/retry`.
-- Decode time and tokens accrue only over steps carrying both a first token and a valid provider usage report; malformed usage is ignored like the window fold guards node usage.
-- Tool time pairs `tool/call` → `tool/result` by callId; unresolved calls are dropped at `turn/end` because results land within their turn, and a callId colliding with an `Object` prototype name reads as unmatched.
+- 無関係なイベントは同一の状態参照を返す。レジストリの `Object.is` ゲートが変更フィードを静かに保つ。
+- 初回トークン遅延は最初の非空デルタチャンクを記録し、ステップ内 `llm/retry` を越えて残る。
+- デコード時間とトークンは初回トークンと有効なプロバイダー使用量報告の両方を持つステップ上でのみ加算する。不正な使用量はウィンドウ折り畳みがノード使用量を守るのと同様に無視される。
+- ツール時間は callId で `tool/call` → `tool/result` を対応付ける。未解決呼び出しは `turn/end` で破棄される。結果はそのターン内に着地するためであり、`Object` プロトタイプ名と衝突する callId は不一致として読まれる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the unit's contract is not enough. They move from the registry that drives units to adjacent session packages.
+単位の契約だけでは足りない場合にこれらのページを読む。単位を駆動するレジストリから隣接セッションパッケージへ進む。
 
-- [Session projection subsystem](../../../docs/subsystems/session-projection.md) — the registry that drives units and serves snapshot and change-feed values.
-- [Session projection registry package](../session-projection/README.md) — the registry contract units register against.
-- [Session package map](../README.md) — adjacent persistence, projection, title, and telemetry packages.
+- [Session projection サブシステム](../../../docs/subsystems/session-projection.md) — 単位を駆動しスナップショットと変更フィード値を提供するレジストリ。
+- [Session projection レジストリパッケージ](../session-projection/README.md) — 単位が登録するレジストリ契約。
+- [Session パッケージマップ](../README.md) — 隣接する永続化・プロジェクション・タイトル・テレメトリーパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the sessionStats unit folds already-logged step boundaries into a client-facing read model and registers nothing model-facing.
+なし。sessionStats 単位は既にログ化されたステップ境界をクライアント向け読み取りモデルに折り畳むだけで、モデル向けには何も登録しないためである。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; the package never assembles or sends provider requests.
+なし。このパッケージはプロバイダーリクエストを組み立てたり送信したりしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the figures describe and when the unit is absent. They are current package constraints.
+数値が何を記述するかと単位が不在となる場合をこれらの制限が定義する。これらは現行パッケージ制約である。
 
-- **Steps count work attempted, not visible output** — a step that failed before producing visible content still closes with `step/end` and counts; a step interrupted by a crash counts after the session reloads, when crash recovery appends its synthetic `step/end`.
-- **A cancelled step is counted but untimed** — no assistant message assembles, so its partial stream time enters no wall-time figure; a max-tokens usage-host message conversely contributes model time the surface does not show.
-- **Counts are log-scoped, not surface-scoped** — steps whose messages were later compacted away stay counted; the figures describe the whole session, not the current model-visible surface.
-- **Mounted only where the projection registry is composed** — other assemblies serve no `sessionStats` key, and their consumers fall back to window-scoped counting.
+- **ステップ数は試行した作業を数え、可視出力を数えない** — 可視内容を出す前に失敗したステップも `step/end` で閉じて数えられ、クラッシュで中断されたステップはセッション再読み込み後に数えられる。クラッシュ回復が合成 `step/end` を追記するためである。
+- **キャンセル済みステップは数えるが計時しない** — アシスタントメッセージが組み立てられないため、その部分ストリーム時間はウォール時間のいずれにも入らない。逆に max-tokens の usage-host メッセージは surface に現れないモデル時間を寄与する。
+- **カウントはログ範囲であり surface 範囲ではない** — 後にコンパクションで除去されたメッセージのステップも数えたままである。数値は現行モデル可視 surface ではなくセッション全体を記述する。
+- **プロジェクションレジストリを構成した場所にのみマウントされる** — 他の構成は `sessionStats` キーを提供せず、そのコンシューマーはウィンドウ単位計数にフォールバックする。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

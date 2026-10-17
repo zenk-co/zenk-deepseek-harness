@@ -1,46 +1,46 @@
-# XLSX fuzz diagnostics
+# XLSX ファズ診断
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Generate spreadsheet files with Openpyxl and XlsxWriter, then compare the source XLSX adapter against independently recorded cell values, formulas, and unsupported-content categories. This explicit diagnostic campaign retains failures and exits nonzero; it is not part of the default unit suite.
+Openpyxl と XlsxWriter で表計算ファイルを生成し、ソース XLSX アダプターを独立に記録されたセル値、数式、未対応コンテンツ区分と比較する。この明示的な診断キャンペーンは失敗を保持し非ゼロ終了する。既定ユニットスイートの一部ではない。
 
-## Run a campaign
+## キャンペーンの実行
 
-Install workspace dependencies and use a Python interpreter with Openpyxl, XlsxWriter, and Pillow. In PowerShell, set `$excelFuzzPython` to that interpreter's executable path. Run from the repository root with a new output directory:
+ワークスペース依存をインストールし、Openpyxl、XlsxWriter、Pillow を備えた Python インタープリターを使う。PowerShell で `$excelFuzzPython` にそのインタープリター実行パスを設定する。リポジトリルートから新しい出力ディレクトリで実行する。
 
 ```powershell
 & $excelFuzzPython packages/client/ui-sidebar-documentpreview/tests/fuzz/generate.py .artifacts/excel-fuzz-new --seed 4863 --random-cases 400
 pnpm exec tsx packages/client/ui-sidebar-documentpreview/tests/fuzz/run.client.ts .artifacts/excel-fuzz-new
 ```
 
-The seed controls feature combinations, values, and byte mutations. ZIP metadata is fixed; reproducibility also requires the writer versions recorded in `manifest.json`. The generator validates internal relationship targets and reloads oracle cells with Openpyxl before classifying a workbook as valid. Rejected candidates remain in `generatorErrors`; random byte mutations are classified separately.
+シードは機能組み合わせ、値、バイト変異を制御する。ZIP メタデータは固定である。再現性には `manifest.json` に記録された writer バージョンも必要である。ジェネレーターは内部関係ターゲットを検証し、ブックを有効と分類する前に Openpyxl で oracle セルを再読み込みする。拒否された候補は `generatorErrors` に残る。ランダムバイト変異は別に分類される。
 
-Replay selected cases from an existing corpus:
+既存コーパスから選択ケースを再実行する。
 
 ```sh
 pnpm exec tsx packages/client/ui-sidebar-documentpreview/tests/fuzz/run.client.ts .artifacts/excel-fuzz-new --only openpyxl-table --report table.json
 ```
 
-The runner gives each input a disposable-worker deadline of 10 seconds and checks input immutability, cell values, formula caches, and notice ordering/uniqueness. `--timeout-ms` changes that diagnostic deadline. Reports retain every outcome; `repros/` contains representative failures with fewer feature combinations, not a claim of globally minimal inputs. Accepted damaged ZIPs are informational and need separate inspection.
+ランナーは各入力に使い捨てワーカー期限 10 秒を与え、入力不変性、セル値、数式キャッシュ、通知順序・一意性を検査する。`--timeout-ms` はその診断期限を変更する。レポートはすべての結果を保持する。`repros/` は機能組み合わせの少ない代表的失敗を含み、全体最小入力の主張ではない。受け入れられた破損 ZIP は情報であり、別途検査が必要である。
 
-## Compare an older adapter
+## 古いアダプターとの比較
 
-`--baseline-ref <commit-or-ref> --report baseline.json` reads that revision's `xlsx.ts` from Git and disables notice comparisons. It still uses the current dependency versions and shared conversion helpers; it cannot reproduce an unpatched ExcelJS baseline after installing the patch. Retain reports from the original dependency state or run that revision in a separate checkout. The temporary baseline module is removed after its worker exits. This compares source parsing, not FortuneSheet browser rendering or the shipped Web profile.
+`--baseline-ref <commit-or-ref> --report baseline.json` はそのリビジョンの `xlsx.ts` を Git から読み、通知比較を無効化する。現在の依存バージョンと共有変換ヘルパーはそのまま使う。パッチ導入後にパッチなし ExcelJS baseline を再現できない。元の依存状態のレポートを保持するか、そのリビジョンを別のチェックアウトで実行する。一時 baseline モジュールはワーカー終了後に除去される。これはソース構文解析の比較であり、FortuneSheet ブラウザー描画や出荷 Web プロファイルの比較ではない。
 
-## Retained regressions
+## 保持された回帰
 
-The [OPC fixtures](../fixtures/excel-opc/) contain five isolated failures copied from the seed 4863 corpus and a combined Openpyxl workbook. Openpyxl 3.1.5 produces comments, Tables, namespace-prefix and part-name cases; XlsxWriter 3.2.9 produces the relative-target case. The combined workbook adds chart, conditional formatting, frozen headings, hidden rows/columns/sheet, a merge, styles, a hyperlink, literal XML-looking text, and a formula, then applies `sheet-prefix` and `sheet-filename` mutations. Openpyxl independently validates the saved inputs. Unit and browser tests read these committed bytes without Python.
+[OPC フィクスチャ](../fixtures/excel-opc/)はシード 4863 コーパスから複写された 5 つの分離失敗と結合 Openpyxl ブックを含む。Openpyxl 3.1.5 はコメント、テーブル、名前空間接頭辞と部品名ケースを生成する。XlsxWriter 3.2.9 は相対ターゲットケースを生成する。結合ブックは図、条件付き書式、固定見出し、非表示行・列・シート、結合、スタイル、ハイパーリンク、XML 風リテラルテキスト、数式を追加し、次に `sheet-prefix` と `sheet-filename` 変異を適用する。Openpyxl は保存済み入力を独立に検証する。ユニットとブラウザーテストは Python なしにこれらのコミット済みバイトを読む。
 
-The [XML fixtures](../fixtures/excel-xml/) retain one XlsxWriter 3.2.9 workbook and seven equivalent encodings: UTF-16 worksheet or metadata XML, relocated workbook/styles/shared strings, CDATA text, and relocated worksheet/drawing directories. Each retains a formula cache, Unicode and XML-looking text, comment, Table, styles, merge, frozen headings, hidden content, and all four notice categories. When upgrading ExcelJS, compare the complete preview and comment/Table metadata through both Node and browser entries, then run `apps/web/tests/excel-opc.e2e.ts` against the built Worker. Keep original corpus reports; save replay results under a new `--report` name and inspect ZIP directory integrity separately from independent-reader acceptance.
+[XML フィクスチャ](../fixtures/excel-xml/)は 1 つの XlsxWriter 3.2.9 ブックと 7 つの等価符号化を保持する。すなわち UTF-16 ワークシートまたはメタデータ XML、再配置されたブック・スタイル・共有文字列、CDATA テキスト、再配置されたワークシート・描画ディレクトリである。各々は数式キャッシュ、Unicode と XML 風テキスト、コメント、テーブル、スタイル、結合、固定見出し、非表示内容、4 つの通知区分すべてを保持する。ExcelJS 更新時は Node とブラウザー両エントリーを通じて完全プレビューとコメント・テーブルメタデータを比較し、次にビルド済み Worker に対して `apps/web/tests/excel-opc.e2e.ts` を実行する。元のコーパスレポートを保持する。再実行結果は新しい `--report` 名で保存し、ZIP ディレクトリ完全性を独立リーダー受容とは別に検査する。
 
-The [opening fixtures](../excel-opening-fixture.ts) derive Strict URI aliases, root-target and part-name case variants, and orphan DrawingML from the combined Openpyxl file. These transformations retain cell data and run through both parser entries, full preview comparison, and the shipped browser Worker. Ambiguous ASCII case-equivalent entries are rejected; non-ASCII names remain distinct.
+[opening フィクスチャ](../excel-opening-fixture.ts)は結合 Openpyxl ファイルから Strict URI 別名、ルートターゲットと部品名の大文字小文字変種、孤立 DrawingML を導出する。これらの変換はセルデータを保持し、両パーサーエントリー、完全プレビュー比較、出荷ブラウザー Worker を通じて実行される。曖昧な ASCII 大文字小文字等価エントリーは拒否される。非 ASCII 名は区別されたままである。
 
-Run the Node and browser-bundle parser regressions:
+Node とブラウザーバンドルのパーサー回帰を実行する。
 
 ```sh
 pnpm exec vitest run packages/client/ui-sidebar-documentpreview/tests/excel-opening.client.spec.ts packages/client/ui-sidebar-documentpreview/tests/excel-opc.client.spec.ts packages/client/ui-sidebar-documentpreview/tests/excel-xml.client.spec.ts
 ```
 
-Fuzz reports record each input's SHA-256, whether it opened, and the worktree status. `validOpened` and `validRejected` separate opening failures from value differences; strict exit status still rejects either defect. Known 1904 time/duration offsets and empty-string formula-cache differences remain diagnostic failures. Corrupt inputs accepted by the parser remain informational.
+ファズレポートは各入力の SHA-256、開けたかどうか、ワークツリー状態を記録する。`validOpened` と `validRejected` は開放失敗と値差異を分離する。厳密終了状態はどちらの欠陥も拒否する。既知の 1904 時刻・期間オフセットと空文字数式キャッシュ差異は診断失敗のままである。パーサーが受け入れた破損入力は情報のままである。
 
-Maintain the ExcelJS patch with `pnpm patch` and `pnpm patch-commit` against the published package. Installed dependency trees contain generated launchers that must not enter the patch. Validate patch application in a fresh `pnpm patch --edit-dir <new-directory>` extraction before relying on tests against a cached installation.
+ExcelJS パッチは公開パッケージに対して `pnpm patch` と `pnpm patch-commit` で保守する。インストール済み依存ツリーはパッチに入れてはならない生成ランチャーを含む。キャッシュ済みインストールに対するテストに頼る前に、新しい `pnpm patch --edit-dir <new-directory>` 展開でパッチ適用を検証する。

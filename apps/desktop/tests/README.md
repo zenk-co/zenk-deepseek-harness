@@ -1,88 +1,88 @@
-# Desktop local update verification
+# Desktop ローカル更新検証
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Local download and mandatory-dialog evidence is separate from production backend integration, visual acceptance, and installed-application upgrades. Run the command in the [Desktop README](../README.md) to produce a fresh isolated report.
+ローカルダウンロードと必須ダイアログのエビデンスは、本番バックエンド統合、視覚的受け入れ、インストール済みアプリケーションのアップグレードとは別です。新しく分離されたレポートを生成するには [Desktop README](../README.md) のコマンドを実行してください。
 
-Installed qualification can opt into `DSH_DESKTOP_UPDATE_JOURNAL_DIR`, an absolute directory outside the installation tree that both versions retain. Each main process flushes a separate JSONL file with its installed version, state transitions, and manual-operation milestones. Raw diagnostics and request data are excluded; storage errors propagate. The [journal decision](../../../.agents/notes/implemented/testing/2026-09-14-desktop-installed-update-journal.md) defines evidence limits. Unit and main-entry tests cover the journal; a signed installed upgrade is still unverified.
+インストール済みの適格性確認は `DSH_DESKTOP_UPDATE_JOURNAL_DIR` を任意で利用できます。これはインストールツリーの外にある絶対ディレクトリで、両方のバージョンが保持します。各メインプロセスは、自身のインストール済みバージョン、状態遷移、手動操作のマイルストーンを含む別々の JSONL ファイルをフラッシュします。生の診断情報とリクエストデータは除外されます。ストレージエラーは伝播します。[journal の決定](../../../.agents/notes/implemented/testing/2026-09-14-desktop-installed-update-journal.md) がエビデンスの限界を定義します。単体テストとメインエントリーテストがジャーナルをカバーします。署名済みのインストール済みアップグレードはまだ検証されていません。
 
-## Table of Contents
+## 目次
 
-- [Native overlay visibility](#verification-overlay)
-- [Evidence](#verification-evidence)
-- [Manual walkthrough](#verification-interactive)
-- [Open verification](#verification-open)
+- [ネイティブオーバーレイの可視性](#verification-overlay)
+- [エビデンス](#verification-evidence)
+- [手動ウォークスルー](#verification-interactive)
+- [未検証の項目](#verification-open)
 
 <a id="verification-overlay"></a>
 
-## Native overlay visibility
+## ネイティブオーバーレイの可視性
 
-On macOS, reuse the cached Electron runtime after compiling the Desktop Host sources:
+macOS では、Desktop Host のソースをコンパイルした後、キャッシュされた Electron ランタイムを再利用します:
 
 ```sh
 pnpm exec tsc -b apps/desktop/tsconfig.host.json
 apps/desktop/.desktop-build/targets/mac-arm64/electron/Electron.app/Contents/MacOS/Electron apps/desktop/tests/fixtures/update-overlay-visibility.mjs
 ```
 
-The fixture owns a unique profile and writes `result.json` under `.desktop-build/qualification/update-overlay-*`. It compares native visibility, unfiltered parent content, and listener cleanup with the owner-local expected output for parent hide/show and document readiness while the parent is hidden. It uses no network, product login, or dsh Host. This qualifies native window restoration rather than the full first-login flow.
+このフィクスチャは独自のプロファイルを持ち、`.desktop-build/qualification/update-overlay-*` の下に `result.json` を書き込みます。親ウィンドウの hide/show と、親が隠れている間の document readiness について、ネイティブの可視性、フィルターされていない親コンテンツ、リスナーのクリーンアップをオーナーローカルの期待出力と比較します。ネットワーク、製品ログイン、dsh Host は使用しません。これは完全な初回ログインフローではなく、ネイティブウィンドウの復元を適格性確認するものです。
 
 <a id="verification-interactive"></a>
 
-## Manual walkthrough
+## 手動ウォークスルー
 
-For actual installation, publication after startup, failure/retry, and restart evidence, use the [installed-update operator checklist](installed-update/README.md). The interactive runner below intercepts installation and is a different qualification.
+実際のインストール、起動後の公開、失敗/リトライ、再起動のエビデンスには、[インストール済みアップデート運用チェックリスト](installed-update/README.md) を使用してください。以下の対話型ランナーはインストールをインターセプトするため、別の適格性確認です。
 
-With Host, client, and Desktop artifacts built, run `node --import tsx apps/desktop/scripts/test-workspace-updates.ts --interactive` from the repository root on Windows. The actual workspace stays open with a separate control window. Its menus select ordinary or mandatory updates, hold and release downloads, inject download failures, and queue or clear test tasks. Select a failure before starting the download. After installation approval and task shutdown, a fixture message reports the intercepted installer call; acknowledging it ends the walkthrough. Closing the control window also exits. Each run owns a private profile and loopback server; payloads are not installers. Restart the command for a fresh round. Omitting `--interactive` runs the automated scenarios with their 120-second deadline and automatic exit; interactive downloads have a ten-minute network deadline.
+Host、client、Desktop の成果物をビルドした状態で、Windows ではリポジトリルートから `node --import tsx apps/desktop/scripts/test-workspace-updates.ts --interactive` を実行します。実際のワークスペースは開いたまま、別のコントロールウィンドウが表示されます。そのメニューで通常または必須のアップデートを選択し、ダウンロードの保留と解放、ダウンロード失敗の注入、テストタスクのキュー投入またはクリアができます。ダウンロードを開始する前に失敗を選択してください。インストール承認とタスクのシャットダウン後、フィクスチャメッセージがインターセプトされたインストーラー呼び出しを報告します。これを承認するとウォークスルーが終了します。コントロールウィンドウを閉じても終了します。各実行はプライベートプロファイルとループバックサーバーを所有し、ペイロードはインストーラーではありません。新しいラウンドにはコマンドを再起動してください。`--interactive` を省略すると、120 秒の期限と自動終了付きで自動シナリオが実行されます。対話型のダウンロードには 10 分のネットワーク期限があります。
 
 <a id="verification-evidence"></a>
 
-## Evidence
+## エビデンス
 
-The local command builds Desktop and executes Electron 44 with the actual HTTP updater, policy client, sandboxed preload, and mandatory renderer. It records each scenario and preserves its report under `.desktop-build/qualification/local-updater-*`. The installer call, external browser, and clipboard are observation substitutes; downloaded bytes are not an executable installer.
+ローカルコマンドは Desktop をビルドし、実際の HTTP アップデーター、ポリシークライアント、サンドボックス化された preload、必須レンダラーとともに Electron 44 を実行します。各シナリオを記録し、そのレポートを `.desktop-build/qualification/local-updater-*` の下に保存します。インストーラー呼び出し、外部ブラウザ、クリップボードは観測の代替です。ダウンロードされたバイトは実行可能なインストーラーではありません。
 
-Packaging supervision fixtures control their Git metadata and use real file hashes with inert child processes. Git-head and worktree changes still refuse packaging; concurrent tests cannot change the fixture’s recorded Git inputs.
+パッケージング監視フィクスチャは自身の Git メタデータを制御し、不活性な子プロセスとともに実際のファイルハッシュを使用します。Git head とワークツリーの変更は依然としてパッケージングを拒否します。並行テストはフィクスチャの記録された Git 入力を変更できません。
 
-| Layer | Observed result |
+| レイヤー | 観測された結果 |
 |---|---|
-| Ordinary updater | Same/older-version rejection, user-authorized full download, SHA-512 rejection, interrupted transfer, stalled-feed/download deadlines, explicit retry, coalesced requests, same-address feed replacement, readiness, and separate install handoff pass |
-| Mandatory policy | Flattened `40005`, exact release headers, guest requests, no-force validation, failure retention, interval/backoff, timeout, and disposal regressions pass |
-| Ordinary scheduling | Fake-clock regressions with the real coordinator verify bounded jitter/backoff, manual joins, success reset, no automatic download retry, wall-clock independence, and disposal. Main-entry tests verify focus/resume throttling, immediate explicit checks, and quit cleanup |
-| Actual mandatory window | Text-only server content, an embedded Windows shell frame with no additional native window and an enabled main window, Escape blocking, direct download, same-modal task confirmation, deferral, recovery-only page actions, navigation/copy feedback, and fresh policy clearance pass; a focused test verifies close-to-exit without clearing policy |
-| Actual ordinary dialog | Isolated preload, 380px card, 24px corners, black primary button, parent blur, Escape cancellation retaining readiness, and task-warning approval with recorded installation handoff pass |
-| Unlocked Windows interaction | OS-level clicks and screenshots of the actual mandatory renderer confirm Escape blocking, user-started download, readiness, red policy-error feedback, and modal clearance with the parent enabled again. A fixture-provided native task-warning dialog returns to readiness on deferral; task activity is simulated, not a full Host workload |
-| Main entry | A known block refuses plugin mutations and recovery without stopping the Host; fresh success closes the block; packaged policy ignores environment overrides; installer failure after a clean stop restores the Host before another confirmation and retains mandatory blocking |
-| Host task protection | The actual controller with substituted composition detects running agents, queued turns/steps, and global and agent jobs; API reads do not warn. Admission locking returns 503 for new requests, drains existing requests, and rechecks tasks; unlock restores admission |
-| Visible output | Chinese mandatory-dialog DOM expectation and ordinary update presentation expectation pass; account-row component tests cover progress and persistent retry |
-| Packaging configuration | Metadata embeds the configured application ID and policy; the built pre-pack hook rejects an HTTP policy origin without running packaging or upload |
+| 通常アップデーター | 同一/旧バージョンの拒否、ユーザー承認による完全ダウンロード、SHA-512 拒否、中断された転送、停止したフィード/ダウンロードの期限、明示的リトライ、合流されたリクエスト、同一アドレスのフィード差し替え、ready、別個のインストール引き渡しがパス |
+| 必須ポリシー | 平坦化された `40005`、正確なリリースヘッダー、ゲストリクエスト、no-force 検証、失敗の保持、インターバル/バックオフ、タイムアウト、破棄のリグレッションがパス |
+| 通常スケジューリング | 実際のコーディネーターによるフェイククロックのリグレッションが、有界のジッター/バックオフ、手動参加、成功リセット、自動ダウンロードリトライなし、ウォールクロック非依存、破棄を検証。メインエントリーテストはフォーカス/レジュームのスロットリング、即時の明示的チェック、終了時クリーンアップを検証 |
+| 実際の必須ウィンドウ | テキストのみのサーバーコンテンツ、追加のネイティブウィンドウのない埋め込み Windows シェルフレームと有効なメインウィンドウ、Escape のブロック、直接ダウンロード、同一モーダルのタスク確認、延期、回復専用のページアクション、ナビゲーション/コピーのフィードバック、新鮮なポリシークリアランスがパス。フォーカスされたテストがポリシーをクリアせずに終了まで閉じることを検証 |
+| 実際の通常ダイアログ | 分離された preload、380px カード、24px コーナー、黒のプライマリボタン、親のブラー、ready を保った Escape キャンセル、記録されたインストール引き渡し付きのタスク警告承認がパス |
+| アンロックされた Windows 操作 | 実際の必須レンダラーへの OS レベルのクリックとスクリーンショットが、Escape ブロック、ユーザー開始のダウンロード、ready、赤いポリシーエラーフィードバック、親が再度有効化されたモーダルクリアランスを確認。フィクスチャ提供のネイティブタスク警告ダイアログは延期時に ready に戻る。タスクアクティビティはシミュレートされ、完全な Host ワークロードではない |
+| メインエントリー | 既知のブロックが Host を停止せずにプラグイン変更と回復を拒否。新鮮な成功がブロックを閉じる。パッケージ化されたポリシーは環境オーバーライドを無視。クリーン停止後のインストーラー失敗は、別の確認の前に Host を復元し、必須ブロッキングを保持 |
+| Host タスク保護 | 構成を置換された実際のコントローラーが、実行中のエージェント、キューされたターン/ステップ、グローバルおよびエージェントジョブを検出。API 読み取りは警告しない。アドミッションロッキングは新規リクエストに 503 を返し、既存のリクエストをドレインし、タスクを再チェック。アンロックがアドミッションを復元 |
+| 可視出力 | 中国語の必須ダイアログ DOM 期待値と通常アップデート表示期待値がパス。アカウント行のコンポーネントテストが進行状況と永続的リトライをカバー |
+| パッケージング設定 | メタデータが設定されたアプリケーション ID とポリシーを埋め込む。ビルドされたプリパックフックが、パッケージングやアップロードを実行せずに HTTP ポリシーオリジンを拒否 |
 
-The focused dialog, main-entry, settings, and sidebar run passes 119 regression cases. Five carrier tests cover all statements, branches, functions, and lines of the shared update-status source. The real-Electron command passes 17 scenarios and captures ordinary-ready, task-warning, and mandatory-error dialogs. These isolated checks do not certify the complete workspace or a release. Full-repository gate results and environment limitations remain separate from this focused evidence.
+集中ダイアログ、メインエントリー、設定、サイドバーの実行は 119 のリグレッションケースをパスします。5 つのキャリアテストが、共有アップデートステータスソースのすべての文、分岐、関数、行をカバーします。実際の Electron コマンドは 17 のシナリオをパスし、通常 ready、タスク警告、必須エラーのダイアログをキャプチャします。これらの分離されたチェックは完全なワークスペースやリリースを認定するものではありません。全リポジトリのゲート結果と環境の制限は、この集中的なエビデンスとは別のままです。
 
-Chromium headless shell revision 1228 is installed in the ignored `.desktop-build/playwright` directory. The assembled settings and sidebar browser suites pass 18 cases. The [Desktop workspace browser scenario](../../web/tests/desktop-updates.e2e.ts) passes both Chinese and English cases, captures six screenshots per locale, and verifies bottom-row placement, compact progress with duplicate-click rejection, a top-toggle badge, persistent red retry with error tooltip, and a separate ready action. The presentation function, Host Web composition, client plugins, and CSS are real; the Desktop carrier is substituted. These cases do not exercise Electron IPC, menus, task authorization, or installation.
+Chromium headless shell revision 1228 は無視される `.desktop-build/playwright` ディレクトリにインストールされています。アセンブルされた設定とサイドバーブラウザのスイートは 18 のケースをパスします。[Desktop ワークスペースブラウザシナリオ](../../web/tests/desktop-updates.e2e.ts) は中国語と英語の両方のケースをパスし、ロケールごとに 6 つのスクリーンショットをキャプチャし、最下行の配置、重複クリック拒否付きのコンパクトな進行状況、トップトグルのバッジ、エラーツールチップ付きの永続的な赤いリトライ、別個の ready アクションを検証します。プレゼンテーション関数、Host Web 構成、クライアントプラグイン、CSS は実物です。Desktop キャリアは置換されています。これらのケースは Electron IPC、メニュー、タスク承認、インストールを実行しません。
 
-The [built Host scenario](fixtures/host-update-qualification.mjs) uses the actual profile Loader, standard agent preset, task services, and Node background processes. It verifies queued turns/steps, a running model request, pending questions/approvals, global and agent jobs in running/stopping states, admission locking without cancellation, restored admission, and rejected inspection after Host disposal. Only model responses and human answers are substituted. Two independent invocations pass concurrently with private profiles and session data; all owned agents, jobs, and Hosts finish before a success report is written.
+[ビルド済み Host シナリオ](fixtures/host-update-qualification.mjs) は、実際のプロファイル Loader、標準エージェントプリセット、タスクサービス、Node バックグラウンドプロセスを使用します。キューされたターン/ステップ、実行中のモデルリクエスト、保留中の質問/承認、実行/停止状態のグローバルおよびエージェントジョブ、キャンセルなしのアドミッションロッキング、復元されたアドミッション、Host 破棄後の拒否された検査を検証します。置換されるのはモデル応答と人間の回答のみです。2 つの独立した呼び出しが、プライベートプロファイルとセッションデータで並行してパスします。所有されるすべてのエージェント、ジョブ、Host は、成功レポートが書き込まれる前に終了します。
 
-The [Electron workspace runner](../scripts/test-workspace-updates.ts) executes a private copy of the compiled main entry with the real preload, workspace, and separate Host process. It acknowledges the first-run notice and drives renderer buttons through Electron input events and Chromium debugger input for the embedded Windows frame. The private application reuses the prepared target runtime resources. Ten scenarios pass, covering menu feedback, download failure and retry, separate installation confirmation, real confirmation-time task creation, deferral, mandatory blocking, and actual Host teardown timeout. Both ordinary and mandatory failures restore a replacement Host and require fresh installation confirmation; recovery does not clear mandatory policy. Delivery uses a local server and installation is intercepted; these are not signed installed-app results.
+[Electron ワークスペースランナー](../scripts/test-workspace-updates.ts) は、実際の preload、ワークスペース、別個の Host プロセスとともに、コンパイルされたメインエントリーのプライベートコピーを実行します。初回実行通知を承認し、Electron 入力イベントと埋め込み Windows フレーム用の Chromium デバッガー入力を通じてレンダラーのボタンを操作します。プライベートアプリケーションは、準備されたターゲットランタイムリソースを再利用します。10 のシナリオがパスし、メニューフィードバック、ダウンロード失敗とリトライ、別個のインストール確認、実際の確認時タスク作成、延期、必須ブロッキング、実際の Host ティアダウンタイムアウトをカバーします。通常と必須の両方の失敗が、置換 Host を復元し、新鮮なインストール確認を要求します。回復は必須ポリシーをクリアしません。配信はローカルサーバーを使用し、インストールはインターセプトされます。これらは署名済みインストール済みアプリの結果ではありません。
 
-The [Windows signature runner](../scripts/test-windows-update-signature.mjs) uses the installed electron-builder metadata generator and `NsisUpdater` verifier with the public release certificate and real executable inputs. Matching publisher attributes pass; the same valid signature with a different expected publisher and an unsigned executable are rejected. A missing-publisher negative control confirms that verification is skipped. Unit regressions cover DN escaping, incomplete identities, and explicit or host-default Windows targets; removing the publisher configuration fails both metadata cases. This check does not download, install, or sign an artifact.
+[Windows 署名ランナー](../scripts/test-windows-update-signature.mjs) は、インストール済みの electron-builder メタデータジェネレーターと `NsisUpdater` 検証器を、公開リリース証明書と実際の実行可能入力で使用します。一致する publisher 属性はパスし、異なる期待 publisher を持つ同じ有効な署名と、署名のない実行可能ファイルは拒否されます。publisher 欠落のネガティブコントロールが、検証がスキップされることを確認します。単体リグレッションは DN エスケープ、不完全な ID、明示的または host デフォルトの Windows ターゲットをカバーします。publisher 設定を削除すると両方のメタデータケースが失敗します。このチェックは成果物のダウンロード、インストール、署名を行いません。
 
-The [signed-download runner](../scripts/test-signed-updates.mjs) connects real Electron HTTP, `NsisUpdater`, Windows Authenticode, and the built coordinator. Four scenarios pass: valid-hash wrong-publisher rejection, valid-hash unsigned rejection, corrupt-transfer rejection before signature verification, and explicit retry to signed readiness with separate installation handoff. Rejected executable caches are empty, automatic checks issue no retry request, prepared downloads are retained, and original inputs keep their SHA-512. The synthetic feed and test application adapter do not establish installed-version compatibility; no installer or Host starts.
+[署名済みダウンロードランナー](../scripts/test-signed-updates.mjs) は、実際の Electron HTTP、`NsisUpdater`、Windows Authenticode、ビルドされたコーディネーターを接続します。4 つのシナリオがパスします。有効ハッシュ・誤 publisher の拒否、有効ハッシュ・署名なしの拒否、署名検証前の破損転送の拒否、署名済み ready への明示的リトライと別個のインストール引き渡し。拒否された実行可能ファイルのキャッシュは空で、自動チェックはリトライリクエストを発行せず、準備されたダウンロードは保持され、元の入力は SHA-512 を保ちます。合成フィードとテストアプリケーションアダプターはインストール済みバージョンの互換性を確立しません。インストーラーも Host も起動しません。
 
-With an old installer and both original blockmaps, the same runner additionally verifies single-range and multipart-range reconstruction, missing-old-blockmap fallback, and rejected-range fallback. Reconstructed executables pass SHA-512 and Authenticode checks. Request records distinguish differential payload bytes from full downloads; a full fallback cannot satisfy a differential-success assertion. These loopback results do not certify CDN Range support or an installed application's cache.
+古いインストーラーと両方の元の blockmap を使う場合、同じランナーはさらに単一レンジとマルチパートレンジの再構成、古い blockmap 欠落時のフォールバック、拒否されたレンジのフォールバックを検証します。再構成された実行可能ファイルは SHA-512 と Authenticode チェックをパスします。リクエストレコードは差分ペイロードバイトと完全ダウンロードを区別します。完全フォールバックは差分成功のアサーションを満たすことはできません。これらのループバック結果は CDN の Range サポートやインストール済みアプリケーションのキャッシュを認定しません。
 
 <a id="verification-open"></a>
 
-## Open verification
+## 未検証の項目
 
-The following items are not passing evidence and must remain visible during review:
+以下の項目はパスしたエビデンスではなく、レビュー中も可視のままにしておく必要があります:
 
-- Electron `capturePage()` captures individual windows. Windows interactive observations include composed dialogs and native menu selection, but cross-platform Figma/layout acceptance and a complete recording remain unverified. The automated workspace runner invokes the menu handler directly.
-- The development launcher encounters a dangling optional Linux ARM64 dependency junction in this Windows checkout; the qualification runners link the existing dependency graph directly and do not validate that launcher's projection.
-- The fixture does not execute an installer, overwrite an installed application, or establish that a new version starts successfully. Signed Windows and macOS installed-version qualification remains required for release.
-- Two isolated Windows test installers pass signed-package inspection, including their embedded feed configuration. Installed startup, failure/retry, automatic restart, and data retention remain operator verification; file inspection does not certify a release.
-- Live policy origins, gateway behavior, rate limits, approved page origins, and deployed policy configuration are pending backend integration. Local responses are not proof of a live service.
-- Policy, updater feed, and updater download stalls reach their real deadlines and recover. Injected download-write `ENOSPC` is covered; actual volume exhaustion and installed-upgrade disk pressure remain unverified. Differential download and publisher rejection are verified through real Electron downloads, but not yet in a newly packaged application's installed-upgrade path.
-- Native clipboard writing passes on Windows. Default-browser launch is attempted, but destination verification stops because the automation tool cannot reliably identify the current URL. macOS browser and clipboard integration remain unverified.
-- Mandatory and ordinary failures use localized summaries and folded diagnostics; copy failure reveals a selectable address. Ordinary error tooltips show summaries rather than raw diagnostics. Installed Windows/macOS attention, notification permission, and focus-mode behavior remain unverified.
-- Full `doc-sync` encounters Windows file-symlink `EPERM` in the documentation-site test. This is not an updater failure and does not make the full documentation gate green.
+- Electron `capturePage()` は個々のウィンドウをキャプチャします。Windows の対話型観測は合成ダイアログとネイティブメニュー選択を含みますが、クロスプラットフォームの Figma/レイアウト受け入れと完全な記録は未検証のままです。自動ワークスペースランナーはメニューハンドラーを直接呼び出します。
+- 開発ランチャーはこの Windows チェックアウトで、ぶら下がったオプションの Linux ARM64 依存関係ジャンクションに遭遇します。適格性確認ランナーは既存の依存関係グラフを直接リンクし、そのランチャーの投影を検証しません。
+- フィクスチャはインストーラーを実行せず、インストール済みアプリケーションを上書きせず、新しいバージョンが正常に起動することを確立しません。署名済み Windows および macOS のインストール済みバージョン適格性確認は、リリースのために依然として必要です。
+- 2 つの分離された Windows テストインストーラーが、埋め込まれたフィード設定を含め、署名済みパッケージ検査をパスします。インストール済みの起動、失敗/リトライ、自動再起動、データ保持はオペレーター検証のままです。ファイル検査はリリースを認定しません。
+- ライブのポリシーオリジン、ゲートウェイの動作、レート制限、承認されたページオリジン、デプロイされたポリシー設定はバックエンド統合待ちです。ローカル応答はライブサービスの証明ではありません。
+- ポリシー、アップデーターフィード、アップデーターダウンロードの停止は実際の期限に達して回復します。注入されたダウンロード書き込み `ENOSPC` はカバーされています。実際のボリューム枯渇とインストール済みアップグレードのディスクプレッシャーは未検証のままです。差分ダウンロードと publisher 拒否は実際の Electron ダウンロードを通じて検証されていますが、新しくパッケージ化されたアプリケーションのインストール済みアップグレードパスではまだです。
+- ネイティブクリップボード書き込みは Windows でパスします。デフォルトブラウザの起動は試行されますが、自動化ツールが現在の URL を確実に識別できないため、宛先検証はそこで停止します。macOS のブラウザとクリップボード統合は未検証のままです。
+- 必須と通常の失敗はローカライズされたサマリーと折り畳まれた診断を使用します。コピー失敗は選択可能なアドレスを表示します。通常のエラーツールチップは生の診断ではなくサマリーを表示します。インストール済み Windows/macOS の注意喚起、通知権限、フォーカスモードの動作は未検証のままです。
+- 完全な `doc-sync` はドキュメントサイトのテストで Windows のファイルシンボリックリンク `EPERM` に遭遇します。これはアップデーターの失敗ではなく、完全なドキュメントゲートをグリーンにするものでもありません。

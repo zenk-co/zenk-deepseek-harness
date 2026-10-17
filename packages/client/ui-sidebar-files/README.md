@@ -1,77 +1,77 @@
 ---
-description: "The right Sidebar's file-tree tab type for the dsh web client: the session workspace root listed one level at a time over the wire, opening files into the Sidebar by resource address."
+description: "dsh Web クライアント用右サイドバーのファイルツリータブ種別。セッションワークスペースルートを有線上で 1 階層ずつ一覧し、ファイルをリソースアドレスでサイドバーに開く。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-sidebar-files
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Browse a Session's workspace tree and open files in Sidebar previews. The root and expanded directories refresh automatically from direct-entry watches; manual reload remains available. The tab is reached from the guide and claims no resource address.
+セッションのワークスペースツリーを閲覧し、ファイルをサイドバー preview で開く。ルートと展開済みディレクトリは直接入口監視から自動更新され、手動再読み込みも利用可能である。タブは案内から到達し、リソースアドレスを主張しない。
 
-## Table of Contents
+## 目次
 
-- [What it registers](#what-it-registers)
-- [The tree](#the-tree)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [登録内容](#what-it-registers)
+- [ツリー](#the-tree)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="what-it-registers"></a>
-## What it registers
+## 登録内容
 
-The `workspace.files` command opens or focuses the file page in the focused pane; from the conversation it uses the current Session's active dock pane. A guide gives way to the file page, and repeated opens retain one file page per pane. Desktop defaults to Mod+P. The guide entry displays the effective shortcut; Windows and macOS Web use the [shortcut service’s platform defaults](../shortcuts/README.md); Linux Web leaves this command unbound by default.
+`workspace.files` コマンドは集中 pane のファイルページを開くか集中する。会話からは現行セッションの活性 dock pane を使う。案内はファイルページに譲り、繰り返しオープンは pane ごとにファイルページ 1 件を保持する。Desktop は既定で Mod+P である。案内入口は実効 shortcut を表示する。Windows と macOS Web は[shortcut サービスの平台既定値](../shortcuts/README.md)を使い、Linux Web は既定でこのコマンドを無束縛のままにする。
 
-- **The type** — `ctx.sidebarRightTabs.register(...)` with kind `files`, id `@deepseek-ai/dsh-client-ui-sidebar-files`, band `builtin`, no patterns, and one guide entry (order 10, its title and description from the `sidebarFiles` namespace, its glyph a yellow folder) that opens the type.
-- **The body** — the keyed `sidebar.right.pane.tab` seat under that id: a header row under the strip, then the tree. The shared [`PathLabel`](../ui-primitives/README.md#component-catalog) displays the root path with subdued directories and a primary final segment. A clipped path retains its trailing characters with a left-edge fade; hovering reveals the full path. The reload control and the Session-scoped `sidebar.right.tab.files.actions` list stay at its right, with the displayed root passed as `absolutePath`; [`ui-open-in-app`](../ui-open-in-app/README.md) contributes the workspace directory opener.
-- **The chip title** — the keyed `sidebar.right.pane.tab.title` seat under that id: a shared `FileTypeIcon` folder glyph at 16px before the type's label. The tree's own rows never draw this sheet.
+- **種別** — 種類 `files`、id `@deepseek-ai/dsh-client-ui-sidebar-files`、band `builtin`、pattern なし、案内入口 1 件（順序 10、その題名と説明は `sidebarFiles` 名前空間から、その glyph は黄 folder）で `ctx.sidebarRightTabs.register(...)` し、その種別を開く。
+- **本体** — その id 配下のキー付き `sidebar.right.pane.tab` 席。帯下のヘッダー行、次にツリーである。共有 [`PathLabel`](../ui-primitives/README.md#component-catalog) は抑制ディレクトリと primary 最終区分でルートパスを表示する。切り詰めパスは左端 fade 付きで末尾文字を保持し、ホバーは全パスを現す。再読み込み制御とセッションスコープの `sidebar.right.tab.files.actions` 一覧はその右に残り、表示ルートを `absolutePath` として渡す。[`ui-open-in-app`](../ui-open-in-app/README.md) はワークスペースディレクトリオープナーを寄与する。
+- **chip 題名** — その id 配下のキー付き `sidebar.right.pane.tab.title` 席。種別ラベルの前に 16px 共有 `FileTypeIcon` folder glyph である。ツリー自体の行はこの sheet を描かない。
 
-Source files under `src/client/`: `definition.tsx` (the type), `store.ts` (what it keeps), `face.ts` (Remote reads and watches), `directory-node.ts` (open directories and their lifetimes), `FilesBody.tsx` (what it draws, with its ordering and failure-line helpers), `FilesTitle.tsx` (the chip title), `locales.ts` (what it says), and `index.ts` (the wiring).
+`src/client/` 配下のソースファイル。`definition.tsx`（種別）、`store.ts`（保持内容）、`face.ts`（リモート読み取りと監視）、`directory-node.ts`（開いたディレクトリとその寿命）、`FilesBody.tsx`（描画内容とその順序・失敗行ヘルパー）、`FilesTitle.tsx`（chip 題名）、`locales.ts`（文言）、`index.ts`（配線）である。
 
 <a id="the-tree"></a>
-## The tree
+## ツリー
 
-The root is the session's working directory, read from `useSessions().byId[sessionId].cwd`. Filesystem roots such as `/` and Windows drive roots are valid tree roots. Every level is keyed by absolute path; a child's path is its parent's joined with the entry name by `/`. A level is listed when it is first expanded, through `remote.workspaceFiles.list(sessionId, absolutePath)` on the `@deepseek-ai/dsh-api-workspace-files` namespace; the adapter keeps the listing's entries and truncation flag and drops its workspace-relative path. Rows are ordered directories first, then by natural, case-insensitive name; dotfiles are shown like any other entry.
+ルートはセッション作業ディレクトリであり、`useSessions().byId[sessionId].cwd` から読む。`/` や Windows drive ルートのようなファイルシステムルートは有効なツリールートである。すべての階層は絶対パスでキー付けされ、子のパスは入口名を `/` で結合した親のものである。階層は最初に展開されたときに `@deepseek-ai/dsh-api-workspace-files` 名前空間上の `remote.workspaceFiles.list(sessionId, absolutePath)` 経由で一覧される。適合器は一覧の入口と切詰旗を保持し、そのワークスペース相対パスを落とす。行はディレクトリ優先、次に自然・大文字小文字不区別の名前順であり、dotfile は他の入口と同様に表示される。
 
-| Entry type | Row |
+| 入口種別 | 行 |
 |---|---|
-| `directory` | Toggles; reopening lists again and restores still-present expanded descendants. Displayed entries remain cached while collapsed. |
-| `file` | Opens `dsh-resource://file/session/<sessionId>/<encoded path relative to the root>`, built by `fileAddressFor` from `@deepseek-ai/dsh-util-workspace-path` from the entry's absolute path and the tree's root, through `useTabInfo().tab.actions.openResource`, landing in the tab's own pane. |
-| `other` | Shown greyed and not clickable, so the directory is reported whole. |
+| `directory` | 切替。再オープンは再一覧し、残存する展開済み子孫を復元する。表示済み入口は折り畳み中も cache されたままである。 |
+| `file` | `dsh-resource://file/session/<sessionId>/<ルート相対の符号化パス>` を開く。入口絶対パスとツリールートから `@deepseek-ai/dsh-util-workspace-path` 由来の `fileAddressFor` が構築し、`useTabInfo().tab.actions.openResource` 経由でタブ自体の pane に着地する。 |
+| `other` | 灰色表示でクリック不可であり、ディレクトリを全体として報告する。 |
 
-A level cut by the endpoint's entry cap ends with a marker; an empty level says so; a level that failed shows one line per code — `workspace-file/not-found`, `outside-workspace`, `not-directory` — and the transport's own message otherwise. Reload refreshes the root and expanded levels in place, retaining displayed entries during reads instead of resetting the whole tree; collapsed levels are fetched again when they next open. A session without a working directory shows a single line instead of a tree.
+端点の入口上限で切れた階層は marker で終わり、空階層はその旨を述べ、失敗した階層は code ごとに 1 行（`workspace-file/not-found`、`outside-workspace`、`not-directory`）を示し、それ以外は転送自体のメッセージである。再読み込みはルートと展開済み階層をその場で更新し、読み取り中は表示済み入口を保持してツリー全体を reset しない。折り畳み済み階層は次に開くときに再取得される。作業ディレクトリのないセッションはツリーの代わりに 1 行を示す。
 
-State lives in the type's own store, bucketed by tab id: `root`, `levels` (loading / ready / failed per absolute path), `expanded`, `autoRefresh`, and `scrollTop`, which the body tracks locally while scrolling and commits once when it unmounts. Because the store outlives the body, switching to another sidebar tab and back remounts the tree with its levels intact and its scroll offset restored. The owner's `signal` ends a bucket: on abort the tab is forgotten, and neither a listing that settles afterwards nor the unmount's offset commit writes anything.
+状態は種別自体の store にあり、タブ id ごとに bucket 化される。`root`、`levels`（絶対パスごとの読み込み中/準備完了/失敗）、`expanded`、`autoRefresh`、`scrollTop` であり、body は scroll 中に局所追跡し、unmount 時に 1 回 commit する。store は body より長生きするため、他サイドバータブへの切替と復帰は階層を保ったままツリーを再マウントし、scroll offset を復元する。所有者の `signal` は bucket を終える。中断時にタブは忘れられ、その後に解決する一覧も unmount の offset commit も何も書かない。
 
-Each open `DirectoryNode` owns its target watch for the Tab lifetime; collapse closes that node and its hidden descendants. Expansion changes during ancestor restoration update the store and pending nodes, so restored descendants follow the latest expansion preferences. Automatic refresh defaults to enabled; its separate toggle is hidden while state, labels, styles, and toggle logic remain. Changes received during a directory read or its completion remain pending for another refresh.
+開いた各 `DirectoryNode` はタブ寿命の間その対象監視を所有する。折り畳みはそのノードと隠れた子孫を閉じる。祖先復元中の展開変更は store と保留ノードを更新するため、復元子孫は最新の展開設定に従う。自動更新は既定で有効であり、その別トグルは状態・ラベル・様式・トグル logic が残ったまま隠される。ディレクトリ読み取り中やその完了時に受けた変更は別更新用に保留のまま残る。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package draws a workspace file tree in the browser and registers nothing model-facing.
+なし。このパッケージはブラウザーにワークスペースファイルツリーを描くだけで、モデル向けには何も登録しないためである。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; directory listings travel over the Remote and assemble no model request.
+なし。ディレクトリ一覧はリモート上を運ばれ、モデル要求を組み立てない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
-- **Listing only.** No search, artifact filter, drag-and-drop, rename, context menu, or current-file highlight.
-- **One root.** The tree is rooted at the session's working directory; there is no way to browse above it, and the Host refuses paths outside the workspace root anyway.
+- **一覧のみ。** 検索、成果物絞り込み、ドラッグ＆ドロップ、改名、context メニュー、現行ファイル強調はない。
+- **単一ルート。** ツリーはセッション作業ディレクトリに根差し、その上を閲覧する方法はなく、ホストはワークスペースルート外パスをいずれにせよ拒否する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
-The page refresh shortcut refreshes the focused file tree through its ordinary directory reader. The reload control displays the effective binding on hover and keyboard focus.
+ページ更新 shortcut は通常のディレクトリ読み手経由で集中ファイルツリーを更新する。再読み込み制御はホバーとキーボードフォーカスで実効束縛を表示する。
 
 </details>

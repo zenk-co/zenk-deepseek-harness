@@ -1,72 +1,72 @@
 ---
-description: "Discover tab of the Web Plugins page: search configured plugin market indexes, read an entry, and install it."
+description: "Web プラグインページの検出タブ。設定済みプラグインマーケット索引の検索、エントリ閲覧、インストール。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-plugin-market
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Discover is the second tab of the **Plugins** page, after **Installed**. It lists the bundles that plugin market indexes offer; users manage index sources, switch between markets, search, filter by category and label, sort, open an entry's page, and install an entry after confirming it. The Host [`pluginMarket`](../../boot/plugin-market/README.md) service fetches and validates indexes; this package only presents them.
+Discover は**プラグイン**ページの第 2 タブであり、**インストール済み**の次である。プラグインマーケット索引が提供するバンドルを一覧し、ユーザーは索引ソースの管理、マーケット切替、検索、カテゴリとラベルによる絞り込み、並べ替え、エントリページのオープン、確認後のエントリインストールを行う。ホスト [`pluginMarket`](../../boot/plugin-market/README.md) サービスが索引の取得と検証を行い、このパッケージは表示のみを担う。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Open **Plugins** and select **Discover**. With no index source, the tab shows an empty state whose **Add index source** button opens the **Index sources** dialog. The dialog lists each source by market title, or by host before the first read, with its URL, the error of its last failed read, and a remove button, and keeps a notice that indexes come from third parties. A refused URL keeps the draft and says why: an unsupported scheme, credentials, or fragment; a URL already listed; or a deployment that cannot save sources. A newly added source becomes the selected market.
+**プラグイン**を開き **Discover** を選ぶ。索引ソースがない場合、タブは空状態を表示し、その **索引ソースを追加**ボタンが**索引ソース**ダイアログを開く。ダイアログは各ソースをマーケット題名で、初回読み取り前はホストで一覧し、URL、最終失敗読み取りのエラー、除去ボタンを示し、索引が第三者由来である旨の注意を保つ。拒否された URL は下書きを保持し理由を述べる。未対応スキーム・資格情報・フラグメント、既出一覧 URL、またはソースを保存できない配置である。新規追加ソースが選択マーケットになる。
 
-The toolbar holds the market menu, which switches markets and ends with **Manage index sources…**; the search field; a **Labels** menu with multi-select checkmarks when the market declares labels; the **Sort** menu; and a refresh button. Category pills, with **All** first, follow when the market declares categories.
+ツールバーにはマーケットメニュー（マーケットを切り替え、末尾に**索引ソースを管理…**）、検索欄、マーケットがラベルを宣言する場合に複数選択チェックマーク付き**ラベル**メニュー、**並べ替え**メニュー、更新ボタンがある。マーケットがカテゴリを宣言する場合、**すべて**を先頭とするカテゴリピルが続く。
 
-Each card shows the icon, localized title, label tags, a one-line description, and the default version, author, and publish date, with one action: **Install** for an installable entry; a disabled **Install** whose tooltip says no version is compatible with the running DSH when the plugin has no default version and its highest version is neither compatible nor exempted; or **Installed**, **Update available**, or **Provided by DSH**, which switches to the Installed tab and opens that bundle's page when that tab lists it. Selecting a card opens the entry's page with its full description, compatibility notice, and the default version's facts: author; homepage and source code repository, as links that open in a new tab, with the package directory beside the repository; the npm package and registry, or the Git repository, full commit, and directory; publish date; category; labels; and market. A **Versions** list follows in descending SemVer order; each row tags the recommended, prerelease, installed, incompatible, and exempted versions and offers **Install** for any other version installation accepts, except for a bundle DSH provides. The page's back link returns to the list with its search, filters, and sort intact.
+各カードはアイコン・ローカライズ済み題名・ラベルタグ・1 行説明・既定バージョン・作者・公開日を示し、操作は 1 件である。インストール可能エントリの**インストール**、既定バージョンがなく最高バージョンも互換性がなく免除もない場合に実行中 DSH と互換バージョンがない旨をツールチップで示す無効**インストール**、または**インストール済み**・**更新あり**・**DSH 提供**であり、そのタブがそのバンドルを一覧する場合にインストール済みタブへ切り替えてバンドルページを開く。カードを選ぶとエントリページが開き、全説明・互換性通知・既定バージョンの事実（作者、ホームページとソースコードリポジトリを新規タブで開くリンクとしてリポジトリそばにパッケージディレクトリ付き、npm パッケージとレジストリまたは Git リポジトリ・完全コミット・ディレクトリ、公開日、カテゴリ、ラベル、マーケット）を示す。**バージョン**一覧が降順 SemVer で続き、各行は推奨・プレリリース・インストール済み・非互換・免除バージョンにタグ付けし、DSH 提供バンドルを除きインストール受付可能な他バージョンに**インストール**を提供する。ページの戻りリンクは検索・絞り込み・並べ替えを保ったまま一覧に戻る。
 
-**Install** chooses the default version and opens a confirmation dialog with the entry's icon, title, that version, the author, its source facts, an exemption notice when one applies, and a trust notice. Confirming opens the Plugins install dialog at its check screen with the entry's exact spec and registry; there is no spec form, and a refusal offers **Retry**. The registry an entry names applies to that install only.
+**インストール**は既定バージョンを選び、エントリのアイコン・題名・そのバージョン・作者・ソース事実・該当時の免除通知・信頼通知を持つ確認ダイアログを開く。確認はエントリの正確な仕様とレジストリでプラグインインストールダイアログをその確認画面で開く。仕様フォームはなく、拒否は**再試行**を提供する。エントリが指名するレジストリはそのインストールのみに適用される。
 
-The Host [`pluginMarket.search`](../../boot/plugin-market/README.md#use-this-package) matches, filters, orders, and pages; the tab sends the search text 250 ms after typing stops. Search matches names, authors, keywords, and every language of titles, descriptions, categories, and labels, fuzzily. Label filters must all match. **Sort** offers **Best match** while there is search text, **Default order**, **Publish date**, and each declared sort key, which starts in its declared direction; a directed sort adds a row that reverses it. Typing switches **Default order** to **Best match**, and clearing the text switches back. Categories, labels, and sort keys are listed by localized title. The list loads 50 entries and adds 50 with each **Show more**.
+ホスト [`pluginMarket.search`](../../boot/plugin-market/README.md#use-this-package) が一致・絞り込み・順序付け・ページングを行い、タブは入力停止 250 ms 後に検索文を送る。検索は名前・作者・キーワード・題名・説明・カテゴリ・ラベルの全言語にあいまいに一致する。ラベル絞り込みはすべて一致しなければならない。**並べ替え**は検索文がある間の**最適一致**、**既定順**、**公開日**、宣言済み並べ替えキーごと（宣言方向で開始、方向付き並べ替えはそれを反転する行を追加）を提供する。入力は**既定順**を**最適一致**に切り替え、文消去は戻す。カテゴリ・ラベル・並べ替えキーはローカライズ済み題名で一覧される。一覧は 50 件読み込み、**さらに表示**ごとに追加 50 件である。
 
-Reading a market shows card skeletons. A failed read shows a short sentence with **Retry**, the Host's reason appears under the source in **Index sources**, and keeps the market's last listing; a failed read of the source list shows **Retry** in place of the tab. Discover re-reads sources on `plugin-market/changed` and connection reset, and recomputes installation status on `plugin-manager/changed`.
+マーケット読み取りはカードスケルトンを表示する。失敗した読み取りは**再試行**付き短文を表示し、ホスト理由は**索引ソース**内のソース下に現れ、マーケットの最終一覧を保持する。ソース一覧の読み取り失敗はタブの代わりに**再試行**を表示する。Discover は `plugin-market/changed` と接続リセットでソースを再読し、`plugin-manager/changed` でインストール状態を再計算する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-The plugin registers the `discover` entry, labelled **Discover**, into `plugins.tab`, the tab slot that [`ui-plugin-manager`](../ui-plugin-manager/README.md) declares; the owner props provide `install({ spec, registry?, title, version })` and `openPackage(name)`; Discover passes the entry's localized title and the chosen version. A React-free controller owns source reads, source edits, and the selected index's query and loaded pages in a snapshot store; selecting another market starts from the initial query. Later pages send the first page's `fetchedAt`, and a page from a replaced document reloads the list once; a second replacement fails the read. The listing keeps the query its results answer, so the empty-state wording follows the shown results while a new query loads or after it fails, and **Retry** repeats the read that failed: the first pages of a query or the next page. A change to the profile's bundles reloads every loaded page to refresh installation status, and a filter or sort key the index no longer declares leaves the query. The unsent search text, the open entry, and the confirmation are component state. Pure helpers in `presentation.ts` derive the query order from the text, drop undeclared ids, order declarations with `Intl.Collator` in the active UI language, and list source facts. Icons load lazily with `referrerpolicy="no-referrer"` and fall back to the default artwork.
+プラグインは `discover` エントリ（表示 **Discover**）を [`ui-plugin-manager`](../ui-plugin-manager/README.md) が宣言するタブスロット `plugins.tab` に登録する。所有者 props は `install({ spec, registry?, title, version })` と `openPackage(name)` を提供し、Discover はエントリのローカライズ済み題名と選んだバージョンを渡す。React なしコントローラーがソース読み取り・ソース編集・選択索引のクエリと読み込み済みページをスナップショットストアに所有し、他マーケットの選択は初期クエリから開始する。後続ページは先頭ページの `fetchedAt` を送り、置換済み文書からのページは一覧を 1 回再読み込みし、2 回目の置換は読み取りを失敗させる。一覧は結果が答えるクエリを保持するため、新クエリ読み込み中や失敗後の空状態文言は表示結果に従い、**再試行**は失敗した読み取り（クエリ先頭ページまたは次ページ）を繰り返す。プロファイルバンドル変更は全読み込み済みページを再読してインストール状態を更新し、索引が宣言しなくなった絞り込み・並べ替えキーはクエリから外れる。未送信検索文・開いたエントリ・確認はコンポーネント状態である。`presentation.ts` の純粋ヘルパーは文からクエリ順序を導出し、未宣言 id を落とし、宣言を活性 UI 言語の `Intl.Collator` で順序付けし、ソース事実を一覧する。アイコンは `referrerpolicy="no-referrer"` で遅延読み込みし、既定アートワークにフォールバックする。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package renders Host data in the browser and adds nothing to model requests.
+なし。このパッケージはホストデータをブラウザーに描画するだけで、モデルリクエストに何も追加しないためである。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None.
+なし。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **No upgrade action** — an available update is shown as a status only.
-- **Remote icons** — URL icons are requested by the browser, which discloses the user's IP address to the image host. When the Web UI is served over HTTPS, the browser blocks or upgrades `http:` icons from an `http:` index, and a failed icon shows the default artwork.
+- **更新操作なし** — 利用可能な更新は状態表示のみである。
+- **リモートアイコン** — URL アイコンはブラウザーが要求し、ユーザー IP アドレスを画像ホストに開示する。Web UI が HTTPS 提供の場合、ブラウザーは `http:` 索引からの `http:` アイコンをブロックまたは更新し、失敗アイコンは既定アートワークを表示する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,33 +1,33 @@
 ---
-description: "Browse Session persistence-type changes across every captured DSH alpha/RC tag and validate the historical snapshots offline."
+description: "キャプチャ済みのすべての DSH alpha/RC タグにわたる Session 永続化型の変更を閲覧し、履歴スナップショットをオフラインで検証する。"
 ---
 
-# Persistence changes across DSH prereleases
+# DSH プレリリース間の永続化変更
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This archive provides an approximate historical view of 26 DSH alpha/RC tags and their 25 adjacent transitions. Each release includes a short explanation, source tag, before/after digests, and complete snapshots of changed types for reading and format validation. It does not establish historical runtime compatibility or replace [current-source acknowledgements](../README.md).
+このアーカイブは、26 件の DSH alpha/RC タグと隣接する 25 件の遷移について、おおよその履歴ビューを提供する。各リリースには短い説明、ソースタグ、変更前後のダイジェスト、および読み取りと形式検証のための変更型の完全なスナップショットが含まれる。履歴ランタイム互換性を確立するものでも、[現行ソースの承認](../README.md)を置き換えるものでもない。
 
-## Table of Contents
+## 目次
 
-- [Archived releases](#releases)
-- [Files and scope](#files)
-- [Extraction and limitations](#extraction)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [アーカイブ済みリリース](#releases)
+- [ファイルとスコープ](#files)
+- [抽出と制限](#extraction)
+- [検証](#verification)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="releases"></a>
-## Archived releases
+## アーカイブ済みリリース
 
-The [manifest](manifest.json) records every DSH alpha/RC tag captured on 2026-09-12: 16 have release records, and the earliest 10 are tag-only. Entries follow semantic-version order; absent tags are not invented. The first entry establishes the historical starting point, so its change count includes every root.
+[マニフェスト](manifest.json)は 2026-09-12 にキャプチャされたすべての DSH alpha/RC タグを記録している。16 件にリリース記録があり、最初の 10 件はタグのみである。エントリはセマンティックバージョン順に並び、存在しないタグは捏造しない。最初のエントリが履歴の起点となるため、その変更数にはすべてのルートが含まれる。
 
 <!-- persistence-release-index:start -->
 
-| Tag | Source date (UTC) | Session version | Roots / types | Changed roots |
+| タグ | ソース日付 (UTC) | Session バージョン | ルート / 型 | 変更ルート |
 |---|---|---|---|---|
 | [dsh-v0.0.1-rc.1](dsh-v0.0.1-rc.1.md) | 2026-08-10 | 0 | 42 / 341 | 42 |
 | [dsh-v0.0.1-rc.2](dsh-v0.0.1-rc.2.md) | 2026-08-11 | 0 | 47 / 374 | 45 |
@@ -59,45 +59,45 @@ The [manifest](manifest.json) records every DSH alpha/RC tag captured on 2026-09
 <!-- persistence-release-index:end -->
 
 <a id="files"></a>
-## Files and scope
+## ファイルとスコープ
 
-Each tag has an English/Chinese record with `kind: persistence-release`, a pairing sidecar, and `.schema.json`. Its machine declaration contains the tag, immediate predecessor, observed writer version, and each changed root’s before/after digest. The first snapshot contains every root; later snapshots retain only changed roots that remain present and all their reachable types. Deletions use a null after value; unchanged releases retain empty changes and snapshots.
+各タグには `kind: persistence-release` の英語/中国語レコード、ペアリング用サイドカー、`.schema.json` がある。そのマシン宣言にはタグ、直前の先行タグ、観測されたライターバージョン、および変更された各ルートの変更前後ダイジェストが含まれる。最初のスナップショットにはすべてのルートが含まれ、以降のスナップショットは残存する変更ルートと到達可能なすべての型のみを保持する。削除は null の変更後値を使い、無変更のリリースは空の変更とスナップショットを保持する。
 
-Snapshots cover the logical Session header, physical JSONL header, event envelope, and every first-party event and transitive reference at that tag. Type counts include only definitions reachable after normalization. Historical source references retain file paths without line numbers.
+スナップショットは論理 Session ヘッダー、物理 JSONL ヘッダー、イベントエンベロープ、およびそのタグ時点のすべてのファーストパーティ製イベントと推移的参照を対象とする。型数には正規化後に到達可能な定義のみが含まれる。履歴ソース参照は行番号なしのファイルパスを保持する。
 
-These retrospective records are validated separately from the current acknowledgement chain in the parent directory. Current-rule classifications of old changes are reading aids: historical version 0 did contain structural changes without version increases. A backfilled record cannot authorize a current PR to omit acknowledgement or a required version increase.
+これらの遡及レコードは親ディレクトリの現行承認チェーンとは別に検証される。旧変更に対する現行ルールの分類は読み取り補助である。履歴バージョン 0 にはバージョン引き上げを伴わない構造変更が含まれていた。バックフィル記録は、現行 PR が承認の省略や必要なバージョン引き上げを正当化できない。
 
 <a id="extraction"></a>
-## Extraction and limitations
+## 抽出と制限
 
-Reconstruction used source at each tag, TypeScript 6.0.3, and the merged [schema extractor](../../../scripts/persistence-schema.ts). The only extraction adaptation omits a redundant `object` member from intersections of early concrete event records. Existing `any` / `unknown` remain opaque; no additional opaque types were substituted for unresolved references. Release schema JSON retains historical identifiers; terminology checks still apply to authored records and current schemas.
+再構成には各タグ時点のソース、TypeScript 6.0.3、およびマージ済みの[スキーマ抽出器](../../../scripts/persistence-schema.ts)を用いた。唯一の抽出適応は、初期の具象イベントレコードのインターセクションから冗長な `object` メンバーを省くことである。既存の `any` / `unknown` は不透明なまま残し、未解決参照のために追加の不透明型で置換していない。リリーススキーマ JSON は履歴識別子を保持する。用語チェックは作成済みレコードと現行スキーマに依然適用される。
 
-The first 22 tags legitimately declare optional `surfaceOp` on surface events. Historical parsing preserves that optionality; current-source parsing still requires the field. Earlier `SessionHeader.version: number` declarations also remain intact, with actual writer version constants recorded separately. A broad `number` declaration cannot supply that constant.
+最初の 22 タグは surface イベント上の任意 `surfaceOp` を正当に宣言している。履歴パースはその任意性を保持し、現行ソースのパースは引き続きそのフィールドを必須とする。初期の `SessionHeader.version: number` 宣言もそのまま残し、実際のライターバージョン定数は別途記録する。広い `number` 宣言はその定数を提供できない。
 
-The captured tags use writer versions 0, 2, and 3; no tag uses writer version 1.
+キャプチャしたタグはライターバージョン 0、2、3 を使い、ライターバージョン 1 を使うタグはない。
 
-Digests describe normalized reconstructed types, not verbatim source text or reproduction of the original toolchain. Summaries provide rough structural context; old applications were not replayed, complete codec behavior was not validated, and migration safety was not proved. An unchanged digest does not establish unchanged behavior.
+ダイジェストは正規化され再構成された型を記述し、逐語的なソーステキストや元ツールチェインの再現ではない。要約はおおよその構造的文脈を提供する。旧アプリケーションは再実行せず、完全なコーデック動作は検証せず、移行の安全性は証明していない。無変更のダイジェストは動作の無変更を確立しない。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-All 26 snapshots passed canonical-graph, root-digest, and reachable-type-digest validation. The release-archive check reads only the manifest, records, and snapshots in this tree, without Git, network access, or old-version checkouts; it validates manifest coverage, predecessors, before/after values, snapshot type completeness, and bilingual machine declarations.
+26 件すべてのスナップショットが正規グラフ、ルートダイジェスト、到達可能型ダイジェストの検証に合格した。リリースアーカイブのチェックはこのツリー内のマニフェスト、レコード、スナップショットのみを読み、Git、ネットワークアクセス、旧バージョンチェックアウトなしで、マニフェストの対象範囲、先行タグ、変更前後の値、スナップショットの型完全性、バイリンガルのマシン宣言を検証する。
 
 ```sh
 pnpm run verify-persistence-releases
 pnpm run doc-sync
 ```
 
-The marker-delimited index, inventory cells, and structural-change facts are generated from the snapshots. Default verification rejects stale facts. Run `pnpm run verify-persistence-releases --write` to refresh those regions and pairing records after validating all machine data; authored summaries, source evidence, machine declarations, and schema files are preserved.
+マーカー区切りのインデックス、インベントリセル、構造変更ファクトはスナップショットから生成される。既定の検証は古いファクトを拒否する。すべてのマシンデータを検証した後、それらの領域とペアリングレコードを更新するには `pnpm run verify-persistence-releases --write` を実行する。作成済みの要約、ソース証拠、マシン宣言、スキーマファイルは保持される。
 
-Tag completeness is relative to the manifest’s captured scope; offline checks do not discover later tags automatically. Standard documentation checks validate pairing records and Markdown links. The [format template](../../../.agents/skills/dsh-doc/templates/persistence-release.md) defines each record’s fields.
+タグ完全性はマニフェストのキャプチャ範囲に対する相対であり、オフライン検査は後発タグを自動検出しない。標準ドキュメント検査はペアリングレコードと Markdown リンクを検証する。[形式テンプレート](../../../.agents/skills/dsh-doc/templates/persistence-release.md)は各レコードのフィールドを定義する。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

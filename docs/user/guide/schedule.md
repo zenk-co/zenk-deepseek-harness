@@ -1,79 +1,79 @@
-# Schedule reminders
+# スケジュールリマインダー
 
-English | [中文](schedule.zh.md)
+日本語 | [English](schedule.en.md) | [中文](schedule.zh.md)
 
-## Summary
+## 概要
 
-Create reminders in a conversation, then inspect active and inactive tasks and edit an active task's name, instruction, and run time from the Automation tasks page. Daily reminders follow a saved local time and time zone; fixed-rate reminders follow elapsed intervals. Delivered one-shot tasks remain available until you explicitly delete them.
+会話の中でリマインダーを作成し、その後 “自動化タスク” ページでアクティブなタスクと非アクティブなタスクを確認し、アクティブなタスクの名前、指示、実行時間を編集できる。毎日のリマインダーは保存されたローカル時刻とタイムゾーンに従い、固定間隔のリマインダーは経過間隔に従う。配信済みのワンショットタスクは、明示的に削除するまで利用可能なままである。
 
-## Table of Contents
+## 目次
 
-- [Create reminders](#create-reminders)
-- [Inspect and delete tasks](#manage-tasks)
-- [Edit an active task](#edit-timing)
-- [Timing and delivery reference](#timing-and-delivery)
-- [Further Exploration](#further-exploration)
+- [リマインダーを作成する](#create-reminders)
+- [タスクを確認・削除する](#manage-tasks)
+- [アクティブなタスクを編集する](#edit-timing)
+- [タイミングと配信のリファレンス](#timing-and-delivery)
+- [さらに調べる](#further-exploration)
 
 <a id="create-reminders"></a>
-## Create reminders
+## リマインダーを作成する
 
-The shipped Web profile includes the Host Schedule service and the Automation tasks page. Configure a model provider before asking it to create reminders.
+出荷済みの Web プロファイルには Host の Schedule サービスと “自動化タスク” ページが含まれる。リマインダーの作成を依頼する前にモデルプロバイダーを構成する。
 
-The `standard`, `cordis`, and `ptc` presets declare the four reminder tools and the clock context that gives the model the current time and the browser's zone, so those presets provide `schedule_create`, `schedule_list`, `schedule_update`, and `schedule_delete`; the `minimal` preset declares neither. A delegated subagent sees none of the four tools, because the presets' delegation rows deny them; a call that reaches one anyway is refused.
+`standard`、`cordis`、`ptc` の各プリセットは 4 つのリマインダーツールと、モデルに現在時刻とブラウザーのゾーンを与えるクロックコンテキストを宣言する。したがってこれらのプリセットは `schedule_create`、`schedule_list`、`schedule_update`、`schedule_delete` を提供し、`minimal` プリセットはどちらも宣言しない。委譲されたサブエージェントは 4 つのツールをどれも見られない。プリセットの委譲行がそれらを拒否するためであり、仮に届いた呼び出しも拒否される。
 
-Ask the model to create, list, edit, or delete reminders. It uses `schedule_create`, `schedule_list`, `schedule_update`, and `schedule_delete` (update changes one reminder in place and keeps its id and saved delivery records); the Automation tasks page's New action opens a New Session for a creation instead, with the request already written in its composer. Supported choices are a one-time delay in positive whole seconds, an absolute date and time, a fixed interval of at least one minute, a daily local time with an IANA time zone, a weekly local time with an IANA time zone and ISO weekdays from Monday 1 through Sunday 7, or a five-field cron expression with an explicit IANA time zone, stored in canonical form.
+モデルにリマインダーの作成、一覧、編集、削除を依頼する。モデルは `schedule_create`、`schedule_list`、`schedule_update`、`schedule_delete` を使う（update は 1 つのリマインダーをその場で変更し、id と保存済みの配信記録を保つ）。“自動化タスク” ページの “新規” アクションは、代わりに作成用の新しい Session を開き、リクエストがそのコンポーザーにすでに書き込まれている。サポートされる指定は、正の整数秒によるワンショット遅延、絶対日時、少なくとも 1 分の固定間隔、IANA タイムゾーン付きの毎日のローカル時刻、IANA タイムゾーンと月曜 1 から日曜 7 までの ISO 曜日を伴う毎週のローカル時刻、または明示的な IANA タイムゾーンを伴う 5 フィールドの cron 式（正規化された形式で保存される）である。
 
-For example, ask: “Remind me every day at 23:00 in Asia/Shanghai to check the weather.” Open Automation tasks and select the created reminder. Check that its frequency shows a daily rule and the requested zone, not Once. A one-time reminder does not become recurring after delivery.
+たとえば「毎日 23:00 に Asia/Shanghai で天気を確認するようリマインドして」と依頼する。“自動化タスク” を開いて作成されたリマインダーを選択する。頻度が “一度きり” ではなく、毎日のルールと要求したゾーンを表示していることを確認する。ワンショットのリマインダーは配信後に繰り返しにならない。
 
 <a id="manage-tasks"></a>
-## Inspect and delete tasks
+## タスクを確認・削除する
 
-Open Automation tasks from the sidebar to view reminders across Sessions without activating their conversations. Search by the stored task name, the instruction, or the task's internal Session id, and filter by the single All, Enabled, or Inactive status row. An idle, unarchived Session row whose Session has at least one active task shows a clock mark; an archived row keeps that cell blank, with its live status on the hover card only. A long hover on a Session row with active tasks lists up to two of those tasks with their frequency and their next run as a device-zone time with its relative duration. The open Session's header shows an icon-only reminder clock while active reminders exist: it opens the sole task's details directly, or a list of the Session's reminders otherwise.
+サイドバーから “自動化タスク” を開くと、会話をアクティブにせずに Session をまたいでリマインダーを確認できる。保存されたタスク名、指示、またはタスクの内部 Session id で検索し、単一の “すべて”“有効”“非アクティブ” のステータス行でフィルタリングする。アイドル状態でアーカイブされていない Session 行は、その Session にアクティブなタスクが 1 つ以上あると時計マークを表示する。アーカイブされた行はそのセルを空のままにし、ライブの状態はホバーカードにのみ表示する。アクティブなタスクを持つ Session 行の長いホバーでは、それらのタスクを最大 2 つ、頻度と、デバイスのタイムゾーンでの次回実行（相対時間付き）とともに一覧する。開いている Session のヘッダーは、アクティブなリマインダーが存在する間、アイコンのみのリマインダー時計を表示する。これはタスクが 1 つだけの場合はその詳細を直接開き、そうでなければその Session のリマインダー一覧を開く。
 
-Select a task to open Rules, then choose Records to load the newest 20 saved records. Each saved record reads as one compact row: a clock glyph, the occurrence time in the task's saved zone (the browser's zone for a one-shot or interval task), and the saved instruction when one was stored. Records without a saved instruction never show the current instruction in its place. Load older records adds the next page. Records follow newest-first saved order even if the clock moves backward; they do not describe model execution results. The original Session entry sits in the detail tab strip, so it stays visible while the Rules view scrolls. Unmodified Left/Right arrows and Home/End switch the focused tabs; Alt, Ctrl, Meta, and Shift combinations are not intercepted. Refreshing the task preserves the selected tab.
+タスクを選択して “ルール” を開き、次に “記録” を選択して最新 20 件の保存済み記録を読み込む。各保存済み記録は 1 つのコンパクトな行として表示される。時計のグリフ、タスクの保存ゾーン（ワンショットまたは間隔タスクではブラウザーのゾーン）での発生日時、保存された指示がある場合はその指示である。保存された指示のない記録に、現在の指示が代わりに表示されることは決してない。“古い記録を読み込む” は次のページを追加する。記録は時計が巻き戻っても保存された新しい順を保つ。モデルの実行結果を表すものではない。元の Session のエントリは詳細のタブストリップにあり、“ルール” ビューをスクロールしても表示され続ける。修飾なしの左右の矢印と Home/End はフォーカスされたタブを切り替える。Alt、Ctrl、Meta、Shift との組み合わせはインターセプトされない。タスクを更新すると選択したタブが保持される。
 
-An empty record view means a successful query returned no saved records. Loading, request failure, a missing task, and an invalid older-record cursor have separate messages. Use Retry delivery records after a failed request or missing-task response; use Refresh delivery records after an invalid cursor to reload the newest page. Previously loaded records may remain visible with a warning while a request fails. A new latest delivery refreshes the newest page. Late responses for a task or view you have left do not replace the current view.
+記録ビューが空であることは、成功したクエリが保存済み記録を返さなかったことを意味する。読み込み中、リクエスト失敗、タスクの欠落、無効な古い記録カーソルにはそれぞれ別のメッセージがある。リクエスト失敗またはタスク欠落の応答の後は “配信記録を再試行” を使う。無効なカーソルの後は “配信記録を更新” を使って最新ページを読み込み直す。リクエストが失敗している間も、以前に読み込まれた記録が警告付きで表示されたままになることがある。新しい最新の配信は最新ページを更新する。離れたタスクやビューへの遅延応答は現在のビューを置き換えない。
 
-For tasks without saved history, only an existing latest receipt can be shown until new deliveries add records; later deliveries do not recover the missing history or clear its notice. Unsaved earlier records and instruction snapshots cannot be recovered, and the current instruction is not substituted for a missing saved instruction. The earlier-history notice appears only when the Host marks earlier records unavailable; new tasks with no deliveries show the empty state without that notice.
+保存履歴のないタスクでは、新しい配信が記録を追加するまで、既存の最新レシートだけを表示できる。後の配信は欠落した履歴を回復せず、その通知もクリアしない。保存されなかった以前の記録と指示のスナップショットは回復できず、欠落した保存指示の代わりに現在の指示が使われることもない。以前の履歴の通知は、Host が以前の記録を利用不可とマークした場合にのみ現れる。配信のない新しいタスクは、その通知なしの空状態を表示する。
 
-Active tasks participate in scheduling. Inactive tasks do not schedule another delivery. A one-time task becomes inactive after its reminder is durably written to the conversation inbox; choose All tasks or Inactive to find it. The conversation-header catalog and model `schedule_list` show only active reminders, so disappearance from those views does not mean the retained task was deleted.
+アクティブなタスクはスケジューリングに参加する。非アクティブなタスクは次の配信をスケジュールしない。ワンショットタスクは、リマインダーが会話の受信箱に永続的に書き込まれた後に非アクティブになる。“すべてのタスク” または “非アクティブ” を選択して見つける。会話ヘッダーのカタログとモデルの `schedule_list` はアクティブなリマインダーのみを表示するので、それらのビューから消えても、保持されたタスクが削除されたことを意味しない。
 
-The Linked session entry in the detail tab strip opens the original conversation when its metadata is ready and the Session is available and unarchived. Otherwise the entry is disabled with a reason. The task details and deletion action remain available even when its original Session cannot open. Browsing tasks does not unarchive Sessions.
+詳細のタブストリップの “リンクされたセッション” エントリは、メタデータの準備ができていて Session が利用可能かつアーカイブされていない場合に元の会話を開く。そうでなければエントリは理由付きで無効になる。タスクの詳細と削除アクションは、元の Session を開けない場合でも利用可能なままである。タスクの閲覧は Session のアーカイブを解除しない。
 
-Choose Delete task and confirm to stop future delivery and remove the task from the list, including for an inactive task. Deletion removes the task together with its saved delivery records, so the task's saved history is gone. Confirming the deletion closes the panel or tab that asked for it and reports the outcome in one app-wide notice — deleted, or a failure that leaves the task in place to retry; it does not remove the original conversation or retract a message already queued there. The row stays visible until a successful query confirms the remaining tasks. If a query fails, Retry reloads the catalog; the error is not an empty successful result.
+“タスクを削除” を選択して確認すると、将来の配信を停止し、タスクを一覧から削除する。非アクティブなタスクでも同様である。削除はタスクを保存済みの配信記録ごと削除するので、タスクの保存履歴は失われる。削除を確認すると、それを要求したパネルまたはタブが閉じられ、アプリ全体の 1 つの通知で結果が報告される——削除されたか、タスクをそのまま残して再試行できる失敗かである。元の会話を削除したり、すでにそこへキューされたメッセージを取り消したりはしない。行は成功したクエリが残りのタスクを確認するまで表示されたままである。クエリが失敗した場合は “再試行” がカタログを読み込み直す。エラーは空の成功結果ではない。
 
 <a id="edit-timing"></a>
-## Edit an active task
+## アクティブなタスクを編集する
 
-In Automation tasks, select an active task and open Rules to edit its name, instruction, and run time. Inactive tasks are read-only, and edits stay in a local draft until you choose Save changes. Editing keeps the task id, original conversation, latest delivery receipt, and all saved delivery records.
+“自動化タスク” でアクティブなタスクを選択し “ルール” を開いて、名前、指示、実行時間を編集する。非アクティブなタスクは読み取り専用で、編集は “変更を保存” を選択するまでローカルドラフトに留まる。編集はタスク id、元の会話、最新の配信レシート、およびすべての保存済み配信記録を保つ。
 
-- Daily and Weekly: edit Time and Time zone; a weekly rule also toggles Weekday. A clock row shows whole seconds, an untouched row keeps a stored millisecond value for its submit, and the stored IANA zone is kept. A changed rule selects its first future occurrence using the DST rules below.
-- Every: choose Every N hours, Every N minutes, or Every N seconds and enter the quantity in the unit the row states; the smallest accepted interval is 1 hour, 1 minute, or 60 seconds for that unit, and the submitted interval is whole seconds. A changed interval starts from the Host's accepted-save time, with the first target one new interval later. Time zones do not affect this elapsed interval.
-- One-shot After/At: edit separate Date and Time rows and Time zone. The initial zone is the record's stored zone, or this device's zone when the record stores none, and the seeded clock names the same stored instant; a one-shot rule that stored no zone shows one hint stating that the selected zone interprets the entered date and time. Changing the zone keeps those clock values and changes the instant. A changed target saves as At with the same task id. The zone is not retained as recurrence metadata.
+- Daily と Weekly: “時刻” と “タイムゾーン” を編集する。毎週のルールでは “曜日” も切り替える。時計行は整数秒を表示し、未変更の行は送信時に保存されたミリ秒値を保ち、保存された IANA ゾーンは維持される。変更されたルールは、以下の夏時間ルールを使って最初の将来の発生を選ぶ。
+- Every: “N 時間ごと”“N 分ごと”“N 秒ごと” を選び、行が示す単位で数量を入力する。その単位で受け付ける最小間隔は 1 時間、1 分、または 60 秒で、送信される間隔は整数秒である。変更された間隔は Host が保存を受理した時刻から始まり、最初のターゲットは新しい間隔 1 つ分後になる。タイムゾーンはこの経過間隔に影響しない。
+- ワンショットの After/At: 別々の “日付” と “時刻” の行、および “タイムゾーン” を編集する。初期ゾーンは記録に保存されたゾーン、記録が保存していない場合はこのデバイスのゾーンで、シードされた時計値は同じ保存済み時点を表す。ゾーンを保存していないワンショットルールは、入力された日時を選択したゾーンが解釈することを述べるヒントを 1 つ表示する。ゾーンを変更するとそれらの時計値は保たれ、時点が変わる。変更されたターゲットは同じタスク id で At として保存される。ゾーンは繰り返しのメタデータとして保持されない。
 
-The rows change only a local draft. Save changes submits the name, instruction, and the complete rule in one update, and a save bar appears while the draft differs from the stored task; Cancel restores the stored values. The Repeat menu offers Weekly, Monday to Friday, Every day, Every N hours, Every N minutes, Every N seconds, Once, and Custom (cron), and the Host accepts any of them, so a one-shot After may save as At. An equivalent normalized rule performs no write or target reset: the same Every interval does not restart its timing, and an unchanged one-shot target preserves After or At. The rows are disabled while a save is in flight. Leaving the card does not roll back a Host write already begun.
+各行はローカルドラフトのみを変更する。“変更を保存” は名前、指示、完全なルールを 1 回の更新で送信し、ドラフトが保存済みタスクと異なる間は保存バーが表示される。“キャンセル” は保存された値を復元する。“繰り返し” メニューは、毎週、月曜から金曜、毎日、N 時間ごと、N 分ごと、N 秒ごと、一度きり、カスタム（cron）を提供し、Host はいずれも受け付ける。そのためワンショットの After が At として保存されることがある。正規化後に等価なルールは書き込みもターゲットのリセットも行わない。同じ Every 間隔はタイミングを再起動せず、変更されていないワンショットターゲットは After または At を保つ。保存の実行中は行が無効になる。カードを離れても、すでに始まった Host の書き込みはロールバックされない。
 
-A catalog refresh keeps the fields you have edited and takes every other field from the refreshed record, so a concurrent change to another field survives an unsaved edit. Invalid input is reported and blocks Save. If delivery or another edit changed the task, a conflict prevents overwriting that change; retry to edit the latest rule. An accepted update refreshes the catalog. A rejected or unconfirmed update is distinct from a catalog-loading error: use Retry to reload the catalog, not to repeat an acknowledged update. If the update itself cannot be confirmed, check the task before retrying. Late responses after closing details or switching tasks do not replace the current view.
+カタログのリフレッシュは、編集したフィールドを保持し、他のすべてのフィールドをリフレッシュされた記録から取る。そのため別フィールドへの並行変更は未保存の編集を経て生き残る。無効な入力は報告され、保存をブロックする。配信または別の編集がタスクを変更した場合、競合がその変更の上書きを防ぐ。再試行して最新のルールを編集する。受理された更新はカタログをリフレッシュする。拒否された、または未確認の更新はカタログ読み込みエラーとは別である。“再試行” はカタログを読み込み直すために使い、確認済みの更新を繰り返すためには使わない。更新自体を確認できない場合は、再試行の前にタスクを確認する。詳細を閉じた後やタスクを切り替えた後の遅延応答は現在のビューを置き換えない。
 
 <a id="timing-and-delivery"></a>
-## Timing and delivery reference
+## タイミングと配信のリファレンス
 
-Reminders remain stored when their Session is not open. While the Host runs, it restores the original Session when a reminder becomes due and queues a follow-up without interrupting current work. Restarting checks stored tasks and sends an overdue one-shot or only the latest missed occurrence of each recurring task. Closing the Host stops scheduling until it starts again. Due recurring tasks for the same Session can share one message.
+リマインダーは、その Session が開かれていなくても保存され続ける。Host の実行中は、リマインダーが期限になると元の Session を復元し、現在の作業を中断せずにフォローアップをキューする。再起動は保存されたタスクを確認し、期限超過のワンショット、または繰り返しタスクごとに直近に逃した発生 1 つだけを送信する。Host を閉じると、再び起動するまでスケジューリングが停止する。同じ Session の期限到来した繰り返しタスクは 1 つのメッセージを共有できる。
 
-Fixed-rate reminders stay aligned to creation until their interval changes; a changed interval aligns to the accepted-save time. Daily reminders instead follow the saved local time and IANA zone. A daily local time or date that does not exist is skipped; an overlapping time uses the earlier instant once that day. An absolute-time request rejects a nonexistent local time and chooses the earlier instant during an overlap. The browser supplies its zone for interpreting natural-language requests; naming a zone explicitly avoids ambiguity. Task details keep a saved wall-clock rule's zone in its frequency text and show every next target as a device-zone clock; a one-shot task stores only the UTC instant, so its timestamps use the browser's zone.
+固定間隔のリマインダーは、間隔が変わるまで作成時に整合したままである。変更された間隔は保存受理時刻に整合する。毎日のリマインダーは代わりに保存されたローカル時刻と IANA ゾーンに従う。存在しない毎日のローカル時刻や日付はスキップされ、重複する時刻はその日のうちに早い方の時点を 1 回使う。絶対時刻のリクエストは存在しないローカル時刻を拒否し、重複時には早い方の時点を選ぶ。ブラウザーは自然言語リクエストの解釈のために自身のゾーンを提供する。ゾーンを明示的に指定すると曖昧さを避けられる。タスクの詳細は、保存された壁時計ルールのゾーンを頻度テキストに保ち、次のターゲットをすべてデバイスゾーンの時計として表示する。ワンショットタスクは UTC の時点のみを保存するため、そのタイムスタンプはブラウザーのゾーンを使う。
 
-Saved delivery records confirm messages persisted in the conversation inbox, not that the model completed the requested work. Failed inbox persistence or task writes add no saved record. A crash or task-write failure after inbox persistence can leave a delivered message unrecorded and repeat a delivery; exactly-once delivery is not guaranteed. This is not an execution history or an external notification channel.
+保存済みの配信記録は、会話の受信箱に永続化されたメッセージを確認するものであり、モデルが要求された作業を完了したことを確認するものではない。受信箱の永続化またはタスク書き込みが失敗した場合、保存記録は追加されない。受信箱の永続化後にクラッシュやタスク書き込みの失敗が起きた場合、配信済みメッセージが記録されないまま配信が繰り返されることがある。exactly-once 配信は保証されない。これは実行履歴でも外部通知チャネルでもない。
 
-Saved records are pruned when an acknowledgment is appended: the Host keeps the records whose acknowledgment time falls inside the configured `deliveryHistoryDays` window, measured back from the appended receipt's `deliveredAt`, and at most the newest `deliveryHistoryRecords` records. The latest receipt always survives, and a pruned window marks earlier records unavailable. The Host keeps the retained history in memory and rewrites the full task row for each acknowledgment. Pagination limits returned record count, not the retained history or instruction bytes.
+保存済み記録は、確認応答が追記されるときに枝刈りされる。Host は、確認応答時刻が設定された `deliveryHistoryDays` のウィンドウ内（追記されたレシートの `deliveredAt` から遡って計測）にある記録を、最新の `deliveryHistoryRecords` 件まで保持する。最新レシートは常に生き残り、枝刈りされたウィンドウは以前の記録を利用不可とマークする。Host は保持された履歴をメモリに置き、確認応答ごとにタスク行全体を書き直す。ページネーションは返される記録数を制限するもので、保持される履歴や指示のバイト数を制限するものではない。
 
-Pause and a new Session for each run are not supported. Name, instruction, and run-time editing is available to the model through `schedule_update`, which changes the reminder in place and keeps its id and saved delivery records, and to the Automation tasks page against the selected task's binding; neither is a cross-Session relay workflow. Reminders recorded only in an older Session log are not scheduled automatically; recreate the ones you still need. Previously deleted task records are not reconstructed.
+一時停止と実行ごとの新しい Session はサポートされない。名前、指示、実行時間の編集は、モデルには `schedule_update` を通じて利用でき（リマインダーをその場で変更し、id と保存済み配信記録を保つ）、“自動化タスク” ページには選択されたタスクのバインディングに対して利用できる。どちらも Session をまたぐ中継ワークフローではない。古い Session ログにのみ記録されたリマインダーは自動的にスケジュールされない。まだ必要なものは作り直す。以前に削除されたタスクの記録は再構築されない。
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Schedule reference](../../../packages/schedule/schedule/README.md) documents exact timing selectors, persistence, and delivery limits.
-- [Automation tasks page reference](../../../packages/client/ui-schedule/README.md) describes the global page and conversation-header catalog.
+- [Schedule リファレンス](../../../packages/schedule/schedule/README.md) は正確なタイミングセレクター、永続化、配信の制限を記述する。
+- [自動化タスクページのリファレンス](../../../packages/client/ui-schedule/README.md) はグローバルページと会話ヘッダーのカタログを説明する。
 
-## Dev Note
+## 開発者ノート
 
-None.
+なし。

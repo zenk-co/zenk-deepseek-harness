@@ -1,34 +1,34 @@
 ---
-description: "Plugin market index format 1 validation and install arguments for DSH readers and index generators."
+description: "DSH 読手と索引生成子用の插件市場索引形式 1 検証と導入引数。"
 kind: "package-library"
 ---
 
 # dsh-plugin-market-index
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Validator without runtime dependencies for format 1 of the plugin market index, the single JSON file that lists installable DSH bundles with their display metadata. [The format Agent Note](../../../.agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md) defines the document; this package is its executable rule set. DSH's [`dsh-plugin-market`](../../boot/plugin-market/README.md) reads indexes with it, and index generators validate their output with it before publishing.
+插件市場索引の形式 1 用の実行時依存なし検証子。導入可能 DSH bundle を表示附属とともに列挙する単一 JSON 文件である。[形式 Agent Note](../../../.agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md) が文書を定め、この包はその実行規則集合である。DSH の [`dsh-plugin-market`](../../boot/plugin-market/README.md) はそれで索引を読み、索引生成子は公表前にそれで出力を検証する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
+- [このパッケージを使う](#use-this-package)
 - [API](#api)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しの作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-It is a library, not a service or plugin: no `ctx`, no registrations, no state, no I/O.
+服務でも插件でもない蔵書である。`ctx` なし、登録なし、状態なし、入出力なし。
 
-Parse the fetched document as JSON, then pass the value and the URL it was read from to `parseMarketIndex`. The first violated rule throws `MarketIndexError` with the JSON path of the offending value. A successful result drops members the format does not define, fills absent `metadata` groups, `keywords`, `labels`, `sortKeys`, and `engines` with empty values, orders each plugin's `versions` by descending SemVer precedence, and replaces each relative `icon` reference with its absolute URL.
+取ってきた文書を JSON として構文解析し、値と読んだ URL を `parseMarketIndex` に渡す。最初に破った規則が違反値の JSON 経路付き `MarketIndexError` を送出する。成功結果は形式が定めない員を落とし、欠けた `metadata` 群、`keywords`、`labels`、`sortKeys`、`engines` を空値で満たし、各插件の `versions` を降順 SemVer 先後で順序付け、各相対 `icon` 参照を絶対 URL に置換する。
 
-Install one version with `marketInstallTarget(name, version)`: it returns the exact pnpm spec, `name@version` for npm and a commit-pinned `git+https` URL with an optional `path:` parameter for Git, and the registry to ask first when the version names one.
+`marketInstallTarget(name, version)` で版 1 つを導入する。厳密 pnpm 仕様を返し、npm 用は `name@version`、Git 用は任意 `path:` 媒介子付き確定固定 `git+https` URL であり、版が名指す場合は先に問う登録所も返す。
 
 -----
 
@@ -39,36 +39,36 @@ Install one version with `marketInstallTarget(name, version)`: it returns the ex
 import { MarketIndexError, marketInstallTarget, parseMarketIndex } from '@deepseek-ai/dsh-plugin-market-index'
 ```
 
-| Export | Role |
+| 表出 | 役割 |
 |---|---|
-| `parseMarketIndex(value, indexUrl)` | Validated `MarketIndex`; throws `MarketIndexError` for the first violated rule. |
-| `marketInstallTarget(name, version)` | `{ spec, registry? }` that installs that exact version. |
-| `MarketIndexError` | Validation failure carrying `path` and `reason`. |
-| `MAX_INLINE_ICON_BYTES` | Largest decoded payload of an inline `data:` icon, 32 KiB. |
-| `MarketIndex`, `MarketPlugin`, `MarketVersion`, `MarketEngines`, `MarketSource`, `MarketRepository`, `MarketIndexMetadata`, `MarketPluginMetadata`, `MarketDeclaration`, `MarketSortKeyDeclaration`, `MarketInstallTarget` | Validated record types. |
+| `parseMarketIndex(value, indexUrl)` | 検証済み `MarketIndex`。最初に破った規則に `MarketIndexError` を送出する。 |
+| `marketInstallTarget(name, version)` | その厳密版を導入する `{ spec, registry? }`。 |
+| `MarketIndexError` | `path` と `reason` を運ぶ検証失敗。 |
+| `MAX_INLINE_ICON_BYTES` | 行内 `data:` 図標の最大復号荷。32 KiB。 |
+| `MarketIndex`, `MarketPlugin`, `MarketVersion`, `MarketEngines`, `MarketSource`, `MarketRepository`, `MarketIndexMetadata`, `MarketPluginMetadata`, `MarketDeclaration`, `MarketSortKeyDeclaration`, `MarketInstallTarget` | 検証済み記録型。 |
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-plugin-market`, whose `plugin_market` tool returns validated plugins to the model.
+`dsh-plugin-market` 経由で間接的に関わり、その `plugin_market` 道具が検証済み插件を模型に返す。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None of its own. The tool result that carries plugins owns its request's cache behavior.
+自身のものはなし。插件を運ぶ道具結果がその要求の緩衝動作を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しの作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Generator obligations are unchecked** — the validator cannot verify that `name`, `version`, `publishTimestamp`, `engines.dsh`, or display fields match the package they describe, or that the package declares a bundle.
-- **No size bound** — the caller bounds the document before parsing it.
+- **生成子義務は未検査** — 検証子は `name`、`version`、`publishTimestamp`、`engines.dsh`、表示項目が述べる包と合うか、包が bundle を宣言するかを検証できない。
+- **寸法上限なし** — 呼出者は構文解析前に文書を限る。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業背景 — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

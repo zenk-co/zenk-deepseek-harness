@@ -1,18 +1,18 @@
-# Get started with the Python SDK
+# Python SDK 入門
 
-English | [中文](python-sdk.zh.md)
+日本語 | [English](python-sdk.en.md) | [中文](python-sdk.zh.md)
 
-This tutorial installs the published Python SDK, runs the shipped standalone minimal profile, and shows how to customize the same `dsh` profile from your own program.
+このチュートリアルでは公開 Python SDK をインストールし、出荷済みスタンドアロン最小プロファイルを動かし、同じ `dsh` プロファイルを自分のプログラムからカスタマイズする方法を示す。
 
-## Prerequisites
+## 前提条件
 
-- Python 3.10 or newer
+- Python 3.10 以降
 - Git
-- Linux x64, Linux arm64, macOS 14 or newer on arm64, or Windows x64
-- A DeepSeek-compatible API endpoint and credential
-- An isolated workspace and an isolated Harness home
+- Linux x64、Linux arm64、arm64 上の macOS 14 以降、または Windows x64
+- DeepSeek 互換 API エンドポイントと資格情報
+- 分離されたワークスペースと分離された Harness ホーム
 
-## Install the SDK
+## SDK のインストール
 
 <div>
 <a id="linux-and-macos"></a>
@@ -39,11 +39,11 @@ python -m pip install deepseek-harness-sdk
 
 :::
 
-The installation includes a matching native runtime wheel and the `dsh` command. Normal SDK execution needs no system Node.js. Repository contributors who build the artifacts should use the [Python contributor workflow](../../../python/development.md).
+インストールには対応ネイティブランタイム wheel と `dsh` コマンドが含まれる。通常の SDK 実行にシステム Node.js は不要である。成果物をビルドするリポジトリ貢献者は[Python 貢献者ワークフロー](../../../python/development.md)を使うべきである。
 
-## Run the checked-in example
+## チェックイン済み例の実行
 
-Export the credential and, when needed, a compatible proxy endpoint:
+資格情報をエクスポートし、必要に応じて互換プロキシエンドポイントを指定する:
 
 <div>
 <a id="linux-and-macos-1"></a>
@@ -64,7 +64,7 @@ $env:DEEPSEEK_API_KEY = "sk-your-key-here"
 
 :::
 
-Run one task with explicit workspace and home paths:
+明示のワークスペースとホームパスで 1 件のタスクを動かす:
 
 <div>
 <a id="linux-and-macos-2"></a>
@@ -91,9 +91,9 @@ python python/sdk/examples/minimal.py `
 
 :::
 
-The script prints the final assistant response. The selected home receives the generated `sdk-minimal` profile, installed plugins, and uncompressed JSONL session logs under `sessions/`. The example and SDK never silently read `~/.dsh`.
+スクリプトは最終アシスタント応答を表示する。選択されたホームは、生成された `sdk-minimal` プロファイル、インストール済みプラグイン、`sessions/` 配下の非圧縮 JSONL セッションログを受け取る。例と SDK が黙って `~/.dsh` を読むことは決してない。
 
-## Use the SDK in your program
+## 自分のプログラムで SDK を使う
 
 ```python
 from pathlib import Path
@@ -118,11 +118,11 @@ with DeepSeekHarness(
 print(result.final_response)
 ```
 
-The SDK starts the bundled `dsh --profile sdk-minimal` process lazily and reuses it until context-manager exit. The profile, its persistent patch, the home patch, and any ordered `patches` tuple form the application configuration. There is no separate Python runtime bin or complete-config option.
+SDK はバンドルされた `dsh --profile sdk-minimal` プロセスを遅延起動し、コンテキストマネージャー終了まで再利用する。プロファイル、その永続パッチ、ホームパッチ、順序付き `patches` タプルがアプリケーション構成を形作る。別の Python ランタイム bin や完全設定オプションはない。
 
-## Install or define plugins
+## プラグインのインストールと定義
 
-Use `dsh plugin` for dependencies and bundle layers that should persist in this home:
+このホームに残すべき依存関係とバンドル層には `dsh plugin` を使う:
 
 <div>
 <a id="linux-and-macos-3"></a>
@@ -145,14 +145,14 @@ dsh plugin --profile sdk-minimal add file:C:/work/my-plugin-bundle
 
 :::
 
-The first command initializes the shipped standalone profile. The second forwards package management to `pnpm`, then records any installed package that exports a `dsh.bundle` layer. Install `pnpm` only for this management command; launching the installed SDK does not need it. Edit `$DSH_HOME/profiles/sdk-minimal/cordis.patch.yml` for persistent row changes, or pass patch files from Python for per-launch changes.
+最初のコマンドは出荷済みスタンドアロンプロファイルを初期化する。2 件目はパッケージ管理を `pnpm` に転送し、`dsh.bundle` 層をエクスポートするインストール済みパッケージを記録する。この管理コマンドのためだけに `pnpm` をインストールする。インストール済み SDK の起動にそれは不要である。永続行変更は `$DSH_HOME/profiles/sdk-minimal/cordis.patch.yml` を編集し、起動単位変更は Python からパッチファイルを渡す。
 
-Another `profile` is valid when it includes `@deepseek-ai/dsh-sdk-app` or another JSON-RPC server row. Missing server rows, unresolved plugins, and invalid patches fail during startup instead of falling back to another composition.
+`@deepseek-ai/dsh-sdk-app` または別の JSON-RPC サーバー行を含む場合、別の `profile` も有効である。サーバー行欠落、未解決プラグイン、無効パッチは、別の合成へのフォールバックではなく起動中に失敗する。
 
 <a id="opt-in-to-str_replace_editor"></a>
-### Opt in to `str_replace_editor`
+### `str_replace_editor` へのオプトイン
 
-The bundled runtime includes `str_replace_editor`, but `sdk-minimal` omits it from the default Cordis tree. To use it, save this configuration as `editor.patch.yml`; `insert` adds the editor using the existing filesystem provider:
+バンドルランタイムは `str_replace_editor` を含むが、`sdk-minimal` は既定 Cordis ツリーからそれを省く。使うには、この設定を `editor.patch.yml` として保存する。`insert` は既存ファイルシステムプロバイダーを使ってエディターを追加する:
 
 ```yaml
 - insert:
@@ -160,26 +160,26 @@ The bundled runtime includes `str_replace_editor`, but `sdk-minimal` omits it fr
       name: '@deepseek-ai/dsh-tool-str-replace-editor'
 ```
 
-Pass `patches=("/absolute/path/to/editor.patch.yml",)` when constructing `DeepSeekHarness(profile="sdk-minimal", ...)`, or put the patch in `$DSH_HOME/profiles/sdk-minimal/cordis.patch.yml` for persistent configuration. On the next runtime launch, model requests include `str_replace_editor` beside the default tools. The local filesystem provider uses the runtime working directory for relative paths; like the minimal shell, it does not confine access to that directory. The same patch works with the standard `sdk` profile.
+`DeepSeekHarness(profile="sdk-minimal", ...)` 構築時に `patches=("/absolute/path/to/editor.patch.yml",)` を渡すか、永続設定として `$DSH_HOME/profiles/sdk-minimal/cordis.patch.yml` にパッチを置く。次回ランタイム起動時、モデルリクエストは既定ツールに並んで `str_replace_editor` を含む。ローカルファイルシステムプロバイダーは相対パスにランタイム作業ディレクトリを使い、最小シェル同様そのディレクトリへのアクセス隔離はしない。同じパッチは標準 `sdk` プロファイルでも動く。
 
-## Understand the minimal profile
+## 最小プロファイルの理解
 
-| Property | Value |
+| プロパティ | 値 |
 |---|---|
-| System prompt | `DSH_SYSTEM_PROMPT`, falling back to `You are a helpful software engineer assistant.` |
-| Model in `minimal.py` | `--model`, then `DSH_MODEL`, then `deepseek-v4-flash` |
-| Model-facing tools | Persistent `bash` on Linux/macOS or `pwsh` on Windows, `read_image`, and `working_directory` |
-| Shell timeout | 300 seconds |
-| Optional runtime context | Absent |
-| Context compaction | Automatic; summarizes older history through an additional model request |
-| Session persistence | Uncompressed JSONL under `<dsh_home>/sessions` |
+| システムプロンプト | `DSH_SYSTEM_PROMPT`、フォールバックは `You are a helpful software engineer assistant.` |
+| `minimal.py` 内モデル | `--model`、次に `DSH_MODEL`、次に `deepseek-v4-flash` |
+| モデルに面したツール | Linux/macOS では永続 `bash`、Windows では `pwsh`、`read_image`、`working_directory` |
+| シェルタイムアウト | 300 秒 |
+| 任意ランタイムコンテキスト | なし |
+| コンテキスト圧縮 | 自動。追加モデルリクエストで古い履歴を要約する |
+| セッション永続化 | `<dsh_home>/sessions` 配下の非圧縮 JSONL |
 
-The profile's sole bundle inserts the complete tree over an empty root and does not include `dsh-base`; later base-profile tools therefore cannot appear implicitly. It contains the SDK protocol, one environment-configured DeepSeek adapter, local execution, and persistence, while text file tools, settings, managed credentials, OTel telemetry, Web tools, subagents, and local instruction discovery are absent. The [DeepSeek session-log contributor](../../../packages/session/session-log-deepseek/README.md) uploads unaccepted log events with DeepSeek requests by default, at most `maxBytes` (8 MiB) per request; set `session-log-deepseek.enabled: false` in a profile patch to disable it. It pins `danger-full-access`, so the platform-selected persistent shell can modify any path visible to the runtime; use a disposable checkout or container.
+プロファイルの唯一バンドルは完全ツリーを空ルート上に挿入し、`dsh-base` を含まない。後の base プロファイルツールは暗黙に現れえない。SDK プロトコル、環境設定 DeepSeek アダプター 1 件、ローカル実行、永続化を含み、テキストファイルツール・設定・管理資格情報・OTel テレメトリー・Web ツール・サブエージェント・ローカル指示探索は不在である。[DeepSeek セッションログ貢献者](../../../packages/session/session-log-deepseek/README.md)は既定で未受理ログイベントを DeepSeek リクエストと共にアップロードし、1 リクエスト最大 `maxBytes` (8 MiB)。無効化にはプロファイルパッチで `session-log-deepseek.enabled: false` を設定する。`danger-full-access` を固定するため、プラットフォーム選択永続シェルはランタイムに見える任意パスを変更できる。使い捨てチェックアウトかコンテナーを使う。
 
-Image reading requires an image-capable route. Automatic compaction preserves the complete Session log; see the [bundle reference](../../../packages/bundle/sdk-minimal/README.md) for model and storage effects. SDK prompt text does not execute `/compact` or other slash commands.
+画像読み取りには画像対応ルートが必要である。自動圧縮は完全 Session ログを保持する。モデルと記憶域効果は[バンドルリファレンス](../../../packages/bundle/sdk-minimal/README.md)を見る。SDK プロンプト文は `/compact` や他のスラッシュコマンドを実行しない。
 
-The installed wheel still packages the full `web` profile and frontend assets. Run `dsh web` against an explicit `DSH_HOME` when a Python SDK deployment also needs the browser application; `web` is a separate CLI application and cannot serve a Python SDK client.
+インストール済み wheel は依然として完全 `web` プロファイルとフロントエンド資産を同梱する。Python SDK デプロイでもブラウザーアプリケーションが必要な場合は明示 `DSH_HOME` で `dsh web` を動かす。`web` は別の CLI アプリケーションであり、Python SDK クライアントに仕えることはできない。
 
-Use a fresh home when profiles, plugins, credentials, settings, and sessions must be isolated. Use a fresh session id for independent work; reuse a harness, home, and id only to continue the same durable conversation and session-owned resources.
+プロファイル・プラグイン・資格情報・設定・セッションを分離すべき場合は fresh ホームを使う。独立作業には fresh セッション id を使う。同一耐久会話とセッション所有リソースを継続する場合のみハーネス・ホーム・id を再利用する。
 
-The [bundle reference](../../../packages/bundle/sdk-minimal/README.md) owns the exact tree, and the [example reference](../../../python/sdk/examples/README.md) owns the runnable program. The [Python SDK reference](../../../python/sdk/README.md) covers lifecycle, results, notifications, and low-level behavior; the [dsh CLI reference](../../../apps/cli/reference/README.md) covers profile layering.
+[バンドルリファレンス](../../../packages/bundle/sdk-minimal/README.md)が正確なツリーを、[例リファレンス](../../../python/sdk/examples/README.md)が実行可能プログラムを所有する。[Python SDK リファレンス](../../../python/sdk/README.md)はライフサイクル・結果・通知・低レベル動作を扱い、[dsh CLI リファレンス](../../../apps/cli/reference/README.md)はプロファイル層化を扱う。

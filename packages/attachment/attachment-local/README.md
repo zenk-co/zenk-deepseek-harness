@@ -1,152 +1,151 @@
 ---
-description: "Local storage for your attached images below DSH_HOME, for users and maintainers choosing or debugging where image attachments are kept."
+description: "DSH_HOME 配下にある添付画像のローカルストレージ。画像添付の保存場所を選択またはデバッグするユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-attachment-local
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Store images and generic file attachments durably below `DSH_HOME` on the machine running DSH. Images are validated, normalized for model requests, and cached per route; generic files are preserved byte-for-byte without admission limits. Identical bytes are stored once even when uploads use different display names, reads verify file length and content, and admitted images remain readable if limits later tighten. The shipped `dsh` composition uses this package without configuration. Objects remain local to one machine and are never deleted automatically.
+DSH を実行しているマシンの `DSH_HOME` 配下に、画像と汎用ファイルの添付を永続的に保存する。画像は検証され、モデルリクエスト向けに正規化され、ルートごとにキャッシュされる。汎用ファイルは受け入れ制限なしでバイト単位のまま保存される。同一のバイト列は、アップロードが異なる表示名を使っても一度だけ保存され、読み取りはファイル長と内容を検証し、受け入れ済みの画像は後で制限が厳しくなっても読み取り可能なままである。出荷済みの `dsh` コンポジションは本パッケージを構成なしで使用する。オブジェクトは 1 つのマシンにローカルなままで、自動的に削除されることはない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-In the default composition, images and generic files attached to prompts or commands are stored on this machine automatically. If you compose your own setup, mounting this plugin provides durable attachments.
+既定のコンポジションでは、プロンプトやコマンドに添付された画像と汎用ファイルはこのマシンに自動的に保存される。独自の構成を組む場合は、このプラグインをマウントすると永続的な添付が得られる。
 
-### Minimal configuration
+### 最小構成
 
-Mount the plugin with no required configuration. The defaults below define what you can attach; the generated configuration catalog is the exhaustive source for every field.
+必須の構成なしでプラグインをマウントする。以下の既定値が、何を添付できるかを定義する。生成される構成カタログが、すべてのフィールドの網羅的な情報源である。
 
 ```yaml
 - name: '@deepseek-ai/dsh-attachment-local'
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `dshHome` | resolved | Explicit harness home; omitted follows `$DSH_HOME`, then `~/.dsh` |
-| `maxImageBytes` | `20 MiB` | Maximum encoded source bytes accepted for one image |
-| `maxImagesPerMessage` | `20` | Maximum image count accepted in one submitted message |
-| `maxMessageImageBytes` | `200 MiB` | Maximum aggregate encoded source bytes in one submitted message |
-| `maxImagePixels` | `64,000,000` | Maximum source width multiplied by height |
-| `maxImageDimension` | `8192` | Maximum source width or height |
-| `normalizedImageMaxPixels` | `2048 × 2048` | Total-pixel budget of the stored normalized image |
-| `normalizedImageMaxDimension` | `8192` | Maximum long edge after applying the total-pixel budget |
-| `normalizedImageMaxBytes` | `4 MiB` | Encoded-byte target; the smallest quality-ladder output is kept when none fits |
-| `imageCompressionConcurrency` | `2` | FIFO limit for concurrent normalization and request transforms |
+| `dshHome` | 解決済み | 明示的な harness ホーム。省略時は `$DSH_HOME`、次に `~/.dsh` に従う |
+| `maxImageBytes` | `20 MiB` | 1 つの画像として受け入れるエンコード済みソースバイトの最大値 |
+| `maxImagesPerMessage` | `20` | 1 つの送信メッセージで受け入れる画像数の最大値 |
+| `maxMessageImageBytes` | `200 MiB` | 1 つの送信メッセージ内のエンコード済みソースバイトの合計最大値 |
+| `maxImagePixels` | `64,000,000` | ソースの幅 × 高さの最大値 |
+| `maxImageDimension` | `8192` | ソースの幅または高さの最大値 |
+| `normalizedImageMaxPixels` | `2048 × 2048` | 保存される正規化画像の総ピクセル予算 |
+| `normalizedImageMaxDimension` | `8192` | 総ピクセル予算を適用した後の長辺の最大値 |
+| `normalizedImageMaxBytes` | `4 MiB` | エンコード後バイトの目標値。どれも収まらない場合は品質ラダーの最小出力が保持される |
+| `imageCompressionConcurrency` | `2` | 並行する正規化とリクエスト変換の FIFO 制限 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-attachment-local) is the exhaustive source for every accepted field and its JSDoc.
+生成される[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-attachment-local)が、受け付けるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### Where your images are stored and how long they last
+### 画像の保存場所と保存期間
 
-Attached images are kept below `<DSH_HOME>/attachments/v1` on this machine. Stored images are never deleted automatically, identical images are stored only once, and a later tightening of the limits never makes already-saved images unreadable. If your images must be readable from another machine, this package is not the right fit.
+添付画像はこのマシンの `<DSH_HOME>/attachments/v1` 配下に保持される。保存された画像は自動的に削除されることはなく、同一の画像は一度だけ保存され、後で制限が厳しくなってもすでに保存済みの画像が読み取り不能になることはない。画像を別のマシンから読める必要がある場合、本パッケージは適切な選択ではない。
 
-### What happens when you attach an image
+### 画像を添付すると何が起きるか
 
-Attach an image and its source limits, media, dimensions, and pixels are checked before it is normalized and saved. EXIF orientation is applied, metadata and color profiles are removed, transparency is preserved, and the raster is reduced under a total-pixel budget plus a long-edge cap. Alpha images use WebP and opaque images use JPEG on the shared 85/75/60 quality ladder; the smallest output is retained when every candidate exceeds the byte target. An accepted image reappears in history and later turns, including after restart; the selected model route receives a cached request version and, when its filesystem maps the host object, a read-only execution-world path.
+画像を添付すると、正規化して保存する前に、ソースの制限、メディア種別、寸法、ピクセル数が確認される。EXIF の向きが適用され、メタデータとカラープロファイルが除去され、透明性が保持され、ラスターは総ピクセル予算と長辺の上限の下に縮小される。アルファ付き画像は WebP を、不透明な画像は JPEG を使い、共有の 85/75/60 品質ラダーに従う。すべての候補がバイト目標を超える場合は最小の出力が保持される。受け入れられた画像は、再起動後も含め、履歴と以降のターンに再び現れる。選択されたモデルルートはキャッシュされたリクエスト版を受け取り、そのファイルシステムがホストオブジェクトをマップする場合は読み取り専用の実行ワールドパスも受け取る。
 
-### What can go wrong
+### 何がうまくいかないことがあるか
 
-An image can be refused when you attach it: unsupported format, over the byte, pixel, or per-side dimension limits, or bytes that do not match their declared type. On a later read, an image that was deleted or corrupted on disk fails with a clear error. Each failure carries a stable code so the client and protocol adapters can explain it in their own words.
+画像は添付時に拒否されることがある。サポートされない形式、バイト数、ピクセル数、辺ごとの寸法の制限超過、または宣言された型と一致しないバイト列である。後の読み取りでは、ディスク上で削除または破損した画像が明確なエラーで失敗する。各失敗は安定したコードを運び、クライアントとプロトコルアダプターが独自の言葉で説明できる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the durability and verification design behind the storage, and the write and read paths that realize it; observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションはストレージの背後にある耐久性と検証の設計、およびそれを実現する書き込みと読み取りのパスを説明する。観測可能な挙動は[このパッケージを使う](#use-this-package)で完全にカバーされている。
 
-### Design decisions
+### 設計上の決定
 
-- **Durability by fsync chain, not existence.** A synced file alone does not survive a crash when its directory entry never reached storage, so the write path syncs every ancestor entry to a process-proven boundary before a reference can reach a session checkpoint.
-- **Normalize once, project per route.** Admission persists one provider-independent normalized attachment; request projection derives deterministic variants without rewriting durable history.
-- **Lazy alpha-routed encoding.** Alpha images use WebP and opaque images use JPEG; quality candidates run in 85/75/60 order, and the smallest output is retained when none meets the encoded-byte target.
-- **Limits are write-time policy.** Byte, total-pixel, and per-side dimension limits bind admission only, so tightening them later never makes admitted history unreadable.
+- **存在ではなく fsync 連鎖による耐久性。** 同期されたファイルだけでは、そのディレクトリエントリがストレージに到達していなければクラッシュを生き残れない。そのため書き込みパスは、参照がセッションチェックポイントに到達できる前に、すべての祖先エントリをプロセスが証明済みの境界まで同期する。
+- **一度だけ正規化し、ルートごとに投影する。** 受け入れはプロバイダー非依存の正規化済み添付を 1 つ永続化し、リクエスト投影は永続履歴を書き換えずに決定論的なバリアントを導出する。
+- **遅延するアルファ別ルーティングのエンコード。** アルファ付き画像は WebP を、不透明な画像は JPEG を使う。品質候補は 85/75/60 の順に実行され、どれもエンコード後バイトの目標を満たさない場合は最小の出力が保持される。
+- **制限は書き込み時のポリシーである。** バイト数、総ピクセル数、辺ごとの寸法の制限は受け入れ時にのみ拘束するため、後で厳しくしても受け入れ済みの履歴は読み取り不能にならない。
 
-### Write and read paths
+### 書き込みと読み取りのパス
 
-Objects land at `<DSH_HOME>/attachments/v1/objects/<sha256-prefix>/<sha256>`; equal bytes deduplicate to one object and one `sha256:` id. Before the first write, the process syncs every ancestor directory of the home down to the filesystem root once, so a directory another process created but has not yet synced is never mistaken for a safe boundary. Writes then stage bytes in `v1/tmp`, sync the temporary file, publish with an atomic exclusive hard link, and sync the publication directories — on Windows, filesystem metadata journaling owns entry durability. Once the save resolves, the reported reference is durable.
+オブジェクトは `<DSH_HOME>/attachments/v1/objects/<sha256-prefix>/<sha256>` に着地する。等しいバイト列は 1 つのオブジェクトと 1 つの `sha256:` id に重複排除される。最初の書き込みの前に、プロセスはホームのすべての祖先ディレクトリをファイルシステムのルートまで一度同期する。そのため別のプロセスが作成したがまだ同期していないディレクトリが安全な境界と誤認されることはない。書き込みは次にバイト列を `v1/tmp` にステージングし、一時ファイルを同期し、アトミックな排他ハードリンクで公開し、公開先ディレクトリを同期する。Windows ではファイルシステムのメタデータジャーナリングがエントリの耐久性を担う。保存が解決した時点で、報告される参照は耐久性を持つ。
 
-Admission accepts up to 20 images and 200 MiB of source bytes per message; one source may use up to 20 MiB, 64 million pixels, and 8192 pixels per side. It applies orientation, removes metadata and color profiles, and normalizes under a 2048×2048 total-pixel budget, an 8192-pixel long edge, and a 4 MiB encoded-byte target. Extreme aspect ratios therefore retain their short-edge resolution. Clean single-frame 8-bit sRGB/sRGBA PNG, JPEG, or WebP input already within those limits passes through byte-identically; GIF, animation, metadata, orientation, 16-bit PNG, and incompatible color spaces force conversion.
+受け入れはメッセージごとに最大 20 枚の画像と 200 MiB のソースバイトを受け付ける。1 つのソースは最大 20 MiB、6400 万ピクセル、辺ごと 8192 ピクセルを使える。向きを適用し、メタデータとカラープロファイルを除去し、2048×2048 の総ピクセル予算、8192 ピクセルの長辺、4 MiB のエンコード後バイト目標の下に正規化する。したがって極端な縦横比でも短辺の解像度を保つ。それらの制限内にあるクリーンな単一フレーム 8 ビット sRGB/sRGBA の PNG、JPEG、WebP 入力はバイト単位でそのまま通る。GIF、アニメーション、メタデータ、向き、16 ビット PNG、非互換の色空間は変換を強制される。
 
-Request versions live below `<DSH_HOME>/cache/attachments/request-images/`, resolved by `dshCachePath`; an explicit `dshHome` setting applies to both cache and durable storage. Clearing this cache between requests preserves durable attachments, and later reads regenerate the variants. `readImageRequest` scales without enlargement to the route-chosen target, resizing by the long edge only so the encoder derives the short edge as the route predicts, then applies a separate encoded-byte target through the same alpha routing and quality ladder. Its cache identity includes the attachment id, transform version, target dimensions, byte target, and fixed encoder settings; cached bytes are header-probed for format, 8-bit sRGB/sRGBA, dimensions, and alpha facts, and a mismatch regenerates the entry. Concurrent callers share one transform and cache write, while cancellation stops shared work only when no waiter remains. `imageHostPath` derives the normalized object's host path, and the mounted filesystem may map that path into its execution world without writing it to durable history.
+リクエスト版は `<DSH_HOME>/cache/attachments/request-images/` 配下に置かれ、`dshCachePath` で解決される。明示的な `dshHome` 設定はキャッシュと耐久ストレージの両方に適用される。このキャッシュをリクエスト間でクリアしても耐久添付は保たれ、以降の読み取りがバリアントを再生成する。`readImageRequest` は拡大せずにルートが選んだターゲットまでスケールし、長辺のみでリサイズするためエンコーダーはルートが予測するとおりに短辺を導出し、次に同じアルファ別ルーティングと品質ラダーを通じて別のエンコード後バイト目標を適用する。そのキャッシュアイデンティティには、添付 id、変換バージョン、ターゲット寸法、バイト目標、固定のエンコーダー設定が含まれる。キャッシュされたバイト列はヘッダーを調べて形式、8 ビット sRGB/sRGBA、寸法、アルファの事実を確認し、不一致はエントリを再生成する。同時呼び出し元は 1 つの変換とキャッシュ書き込みを共有し、キャンセルは待機者が残っていない場合にのみ共有作業を停止する。`imageHostPath` は正規化オブジェクトのホストパスを導出し、マウントされたファイルシステムはそのパスを耐久履歴に書き込むことなく実行ワールドへマップできる。
 
-Generic-file bytes have one canonical object at `<DSH_HOME>/attachments/v1/file-objects/<digest-prefix>/<digest>`. Each reference path at `<DSH_HOME>/attachments/v1/files/<digest-prefix>/<digest>/<name>` is a read-only hard link, so different names for equal bytes do not duplicate disk content. `readFileStream` reads the reference path in bounded chunks and verifies the complete digest and recorded byte count before a consumer can finish successfully. A missing, changed, or truncated object fails its consumer instead of producing a complete export with different bytes.
+汎用ファイルのバイト列は `<DSH_HOME>/attachments/v1/file-objects/<digest-prefix>/<digest>` に 1 つの正規オブジェクトを持つ。`<DSH_HOME>/attachments/v1/files/<digest-prefix>/<digest>/<name>` の各参照パスは読み取り専用のハードリンクであるため、等しいバイト列に対する異なる名前がディスク内容を重複させることはない。`readFileStream` は参照パスを有界のチャンクで読み取り、コンシューマーが正常に完了できる前に完全なダイジェストと記録されたバイト数を検証する。欠落、変更、または切り詰められたオブジェクトは、異なるバイト列の完全なエクスポートを生成するのではなく、そのコンシューマーを失敗させる。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `LocalAttachmentStore`, `Config` schema, defaults |
-| [`src/store.ts`](src/store.ts) | Content-addressed write and verified read: staging, hard-link publish, fsync chain, digest verification |
-| [`src/file-store.ts`](src/file-store.ts) | Verbatim streamed file writes, verified streamed reads, and safe stored filenames |
-| [`src/normalization.ts`](src/normalization.ts) + [`src/encoding.ts`](src/encoding.ts) | Provider-independent normalization and bounded format/quality candidates |
-| [`src/request-image.ts`](src/request-image.ts) | Route-specific request transforms, cache identity, and singleflight |
-| [`src/image.ts`](src/image.ts) | Full raster decode and metadata verification |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: `LocalAttachmentStore`、`Config` スキーマ、既定値 |
+| [`src/store.ts`](src/store.ts) | 内容アドレス指定の書き込みと検証済み読み取り: ステージング、ハードリンク公開、fsync 連鎖、ダイジェスト検証 |
+| [`src/file-store.ts`](src/file-store.ts) | そのままのストリーム書き込み、検証済みストリーム読み取り、安全な保存ファイル名 |
+| [`src/normalization.ts`](src/normalization.ts) + [`src/encoding.ts`](src/encoding.ts) | プロバイダー非依存の正規化と有界の形式/品質候補 |
+| [`src/request-image.ts`](src/request-image.ts) | ルート固有のリクエスト変換、キャッシュアイデンティティ、singleflight |
+| [`src/image.ts`](src/image.ts) | ラスターの完全デコードとメタデータ検証 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-For the full service contract and payload types, read the subsystem reference; for the capability this storage backs, read the seam package.
+完全なサービス契約とペイロード型はサブシステムリファレンスで、このストレージが支えるケイパビリティは seam パッケージで読む。
 
-- [Attachment subsystem reference](../../../docs/subsystems/attachment.md) — service contract, payload types, and the `ctx.attachments` Cordis surface.
-- [Attachment seam package](../attachment/README.md) — the image attachment capability this storage backs.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-attachment-local) — every accepted config field and its source declaration.
-- [Home paths resolution](../../util/home-paths/README.md) — how `DSH_HOME` resolves from explicit config, environment, and the user home.
+- [Attachment サブシステムリファレンス](../../../docs/subsystems/attachment.md) — サービス契約、ペイロード型、`ctx.attachments` Cordis サーフェス。
+- [Attachment seam パッケージ](../attachment/README.md) — このストレージが支える画像添付ケイパビリティ。
+- [生成される構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-attachment-local) — 受け付けるすべての構成フィールドとそのソース宣言。
+- [ホームパスの解決](../../util/home-paths/README.md) — `DSH_HOME` が明示的構成、環境、ユーザーホームからどう解決されるか。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through request descriptors. A mapped execution filesystem lets the model see each image's identity, dimensions, media type, read-only process path, writable-copy extension, and normalization warning alongside the request bytes. Generic files project as text handles naming their identity and read-only process path; when no mapping exists, the handle states that the execution environment cannot read the file.
+間接的。リクエスト記述子を通じて。マップされた実行ファイルシステムにより、モデルはリクエストバイト列とともに、各画像のアイデンティティ、寸法、メディア種別、読み取り専用のプロセスパス、書き込み可能コピーの拡張子、正規化の警告を見られる。汎用ファイルは、そのアイデンティティと読み取り専用プロセスパスを名指すテキストハンドルとして投影される。マッピングが存在しない場合、ハンドルは実行環境がそのファイルを読めないことを述べる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Normalization and request projection are deterministic. An unchanged attachment and route policy reuse identical cached request bytes on later turns; execution-world path mapping can change descriptor text without changing those bytes or their `variantId`.
+正規化とリクエスト投影は決定論的である。変更のない添付とルートポリシーは以降のターンで同一のキャッシュ済みリクエストバイト列を再利用する。実行ワールドのパスマッピングは、それらのバイト列やその `variantId` を変えずに記述子のテキストを変えることがある。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
+これらの制限はこのストレージにできることとできないことを記述する。現在のパッケージの制約である。
 
-These limits describe what this storage can and cannot do; they are current package constraints.
-
-- **Images are kept forever** — stored images are never deleted automatically, and nothing collects unreferenced objects.
-- **Local to this machine** — images live on the machine that runs the harness; other hosts cannot read them.
-- **Animated GIF becomes static** — normalization retains only the first frame; animation is outside the version-one image contract.
-- **Encoder output is versioned** — the installed Sharp/libvips build pins normalization and request bytes; an encoder or transform-version upgrade re-addresses future variants while existing objects remain valid.
+- **画像は永久に保持される** — 保存された画像は自動的に削除されることはなく、参照されていないオブジェクトを回収するものもない。
+- **このマシンにローカル** — 画像は harness を実行するマシンにあり、他のホストからは読めない。
+- **アニメーション GIF は静止になる** — 正規化は最初のフレームのみを保持する。アニメーションはバージョン 1 の画像契約の外にある。
+- **エンコーダー出力はバージョン付き** — インストールされた Sharp/libvips ビルドが正規化とリクエストのバイト列を固定する。エンコーダーまたは変換バージョンのアップグレードは将来のバリアントのアドレスを変え、既存のオブジェクトは有効なままである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: undecided directions and open questions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and the package code.
+この開発者ノートはメンテナー向けの作業コンテキストであり、未決定の方向性と未解決の問いを示す。明示的に非権威である。出荷済みの挙動と制限は、上記のセクションとパッケージのコードにある。
 
-#### Future: retention and remote storage
+#### 将来: 保持とリモートストレージ
 
-Retention and garbage collection are deferred because resumed and forked sessions may share immutable objects, and a backend serving remote runtimes or shared storage would need its own durability proof. Both directions are undecided; the local storage currently retains every object under `DSH_HOME`.
+保持とガベージコレクションは先送りされている。再開されたセッションとフォークされたセッションが不変オブジェクトを共有することがあり、リモートランタイムや共有ストレージにサービスするバックエンドには独自の耐久性の証明が必要になるためである。どちらの方向も未決定であり、ローカルストレージは現在 `DSH_HOME` 配下のすべてのオブジェクトを保持している。
 
 </details>

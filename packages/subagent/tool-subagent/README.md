@@ -1,37 +1,37 @@
 ---
-description: "Model-facing subagent delegation tool for users and maintainers configuring, composing, or debugging delegation over a subagent provider."
+description: "サブエージェントプロバイダー上での委任を構成・合成・デバッグするユーザーとメンテナー向けの、モデルに面するサブエージェント委任ツール。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-subagent
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to give an agent a named tool that delegates work to a configured backend. Every call starts a managed activation and returns a child id; the runtime owns completion notices and cleanup. Local children support messages and restoration, while external backends execute one task and return their final answer through the completion notice. Supported backends can expose approved child LLM routes. Each instance can select a child preset and depth limit.
+このパッケージは、構成済みのバックエンドへ作業を委任する名前付きツールをエージェントに与える。呼び出しごとに管理されたアクティベーションが開始され、子 id が返る。完了通知とクリーンアップはランタイムが所有する。ローカルの子はメッセージと復元をサポートし、外部バックエンドは 1 つのタスクを実行して最終回答を完了通知で返す。対応するバックエンドは承認済みの子 LLM ルートを公開できる。各インスタンスは子プリセットと深度制限を選択できる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The optional `cwd` argument selects the child's initial working directory. Relative paths resolve against the caller's current directory; omission inherits it. Existing children retain their own directories when the caller changes directory.
+省略可能な `cwd` 引数は子の初期作業ディレクトリを選択する。相対パスは呼び出し元の現在のディレクトリを基準に解決され、省略するとそれを継承する。呼び出し元がディレクトリを変更しても、既存の子は自身のディレクトリを保持する。
 
-Mount one instance per delegation target, each with a distinct `toolName`. The tool exists exactly while its provider does, so sibling load order and provider reloads never strand it.
+委任先ごとに 1 つのインスタンスを、それぞれ異なる `toolName` でマウントする。ツールはそのプロバイダーが存在する間だけ存在するため、兄弟のロード順やプロバイダーのリロードがツールを宙に浮かせることはない。
 
-### Minimal configuration
+### 最小構成
 
-Load the subagent service, an in-process or remote backend, and this tool; then name the provider. This composition exposes a `subagent` tool that delegates to the `spawn` backend:
+サブエージェントサービス、インプロセスまたはリモートのバックエンド、そしてこのツールをロードし、プロバイダーを指定する。次のコンポジションは `spawn` バックエンドへ委任する `subagent` ツールを公開する:
 
 ```yaml
 - name: '@deepseek-ai/dsh-subagent'
@@ -42,211 +42,211 @@ Load the subagent service, an in-process or remote backend, and this tool; then 
     toolName: subagent
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定 | 意味 |
 |---|---|---|
-| `provider` | required | Provider name on `ctx.subagents` (e.g. `spawn`, `fork`, `acp`) |
-| `toolName` | `subagent` | Model-facing tool name; distinct for every loaded instance |
-| `modelSelectionSettings` | `false` | Sample the Host's exact-route authorization preference for each top-level Session; a standing preset observes matching Sessions, while direct Agent setup passes its Session explicitly; requires provider `agentOptions` support |
-| `agentOptions` | — | Configured child `provider`, `model`, adapter-owned `reasoningEffort`, and positive `maxTokens` defaults; requires provider `agentOptions` support and overlays any provider-owned route defaults |
-| `agentPreset` | — | Default independent child preset id; requires in-process spawn |
-| `allowedAgentPresets` | — | Non-empty preset-id allowlist exposed as the model's optional `agent_preset` enum; must include `agentPreset` when both are set |
-| `maxDepth` | Host setting (`1`) | Absolute delegation-depth cap (`0` forbids delegation); `'provider-managed'` sends no cap to an out-of-process provider |
+| `provider` | 必須 | `ctx.subagents` 上のプロバイダー名（例: `spawn`、`fork`、`acp`） |
+| `toolName` | `subagent` | モデルに面するツール名。ロードされたインスタンスごとに異なること |
+| `modelSelectionSettings` | `false` | 各トップレベルセッションで Host の厳密ルート認可プリファレンスをサンプリングする。常駐プリセットは一致するセッションを観測し、直接の Agent セットアップは自身のセッションを明示的に渡す。プロバイダーの `agentOptions` サポートが必要 |
+| `agentOptions` | — | 構成済みの子 `provider`、`model`、アダプター所有の `reasoningEffort`、正の `maxTokens` の既定。プロバイダーの `agentOptions` サポートが必要で、プロバイダー所有のルート既定を上書きする |
+| `agentPreset` | — | 既定の独立子プリセット id。インプロセスの spawn が必要 |
+| `allowedAgentPresets` | — | モデルの省略可能な `agent_preset` enum として公開される、空でないプリセット id の許可リスト。両方を設定する場合は `agentPreset` を含めなければならない |
+| `maxDepth` | Host 設定（`1`） | 委任深度の絶対上限（`0` は委任を禁止）。`'provider-managed'` はアウトオブプロセスのプロバイダーに上限を送らない |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-subagent) is the exhaustive source for every accepted field and its JSDoc.
+生成された[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-subagent)が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### Managed delegation
+### 管理された委任
 
-Every call returns `started subagent <childId>` after the runtime accepts the child. It does not wait for the child's result. The activation owns the work independently of the completed tool call; the runtime sends a completion notice and releases execution resources.
+すべての呼び出しは、ランタイムが子を受け入れた後に `started subagent <childId>` を返す。子の結果を待つことはない。アクティベーションは完了したツール呼び出しとは独立に作業を所有し、ランタイムが完了通知を送り、実行リソースを解放する。
 
-Every backend’s completion notice carries its final answer. Local Spawn and Fork children can also send messages, accept more work through `send_message` while active, or resume after settling. Codex, Claude Code, ACP, and DSH SDK backends do not accept follow-up messages.
+すべてのバックエンドの完了通知は最終回答を運ぶ。ローカルの Spawn と Fork の子はメッセージも送信でき、アクティブな間は `send_message` で追加の作業を受け付け、決着後は再開できる。Codex、Claude Code、ACP、DSH SDK のバックエンドはフォローアップメッセージを受け付けない。
 
-`maxDepth` caps recursion (`0` forbids delegation); omission reads the current Host `subagent.maxDepth` setting, initially `1`, at each delegation. A numeric depth requires a provider with the `depthLimit` capability; `'provider-managed'` leaves the budget to an out-of-process provider. The tool stays visible at the cap; each attempted start checks the calling agent's current depth and rejects with an errored result.
+`maxDepth` は再帰を上限で抑える（`0` は委任を禁止）。省略すると、各委任時に現在の Host の `subagent.maxDepth` 設定（初期値 `1`）を読む。数値の深度は `depthLimit` ケイパビリティを持つプロバイダーを必要とし、`'provider-managed'` は予算をアウトオブプロセスのプロバイダーに委ねる。上限に達してもツールは見えたままで、開始の試行ごとに呼び出し元エージェントの現在の深度を確認し、エラー結果で拒否する。
 
 <a id="selecting-a-child-preset"></a>
-### Selecting a child preset
+### 子プリセットの選択
 
-Set `agentPreset` to give every child an independent preset by default. Set `allowedAgentPresets` to let the model choose an id through `agent_preset`; without this allowlist, the model cannot override the configured choice. Only in-process spawn supports these options; fork and external backends reject them.
+`agentPreset` を設定すると、既定で子ごとに独立したプリセットが与えられる。`allowedAgentPresets` を設定すると、モデルが `agent_preset` で id を選択できる。この許可リストがない場合、モデルは構成済みの選択を上書きできない。これらのオプションに対応するのはインプロセスの spawn のみで、fork と外部バックエンドは拒否する。
 
-The configured default and allowlist must name declared presets. A tool inside a preset checks these ids and reads their descriptions during Agent initialization; a Host-mounted tool performs this check when it loads. This check does not activate candidate presets. Activation failures reject the selected preset when the child is composed. Without either selection field, the tool does not require the preset service. An omitted model choice uses the configured `agentPreset`, or joins the parent's current preset revision when no default is configured. Any explicit id mounts the currently available revision, even when it matches the parent's id.
+構成済みの既定と許可リストは宣言済みのプリセットを指名しなければならない。プリセット内のツールは Agent 初期化時にこれらの id を確認し、その説明を読む。Host にマウントされたツールはロード時にこの確認を行う。この確認は候補プリセットをアクティベートしない。アクティベーションの失敗は、子がコンポーズされるときに選択されたプリセットを拒否する。どちらの選択フィールドもない場合、ツールはプリセットサービスを必要としない。モデルの選択が省略された場合は構成済みの `agentPreset` を使い、既定が構成されていない場合は親の現在のプリセットリビジョンに加わる。明示的な id は、親の id と一致する場合でも、現在利用可能なリビジョンをマウントする。
 
-Compose persona and tools in the [preset plugin list](../../preset/agent-preset-registry/README.md). Tool configuration containing `persona` or `toolFilter` fails at load with a migration error. Local children use the shared [preset restoration rules](../subagent/README.md#restoring-child-composition).
+ペルソナとツールは[プリセットプラグイン一覧](../../preset/agent-preset-registry/README.md)でコンポーズする。`persona` または `toolFilter` を含むツール構成は、ロード時に移行エラーで失敗する。ローカルの子は共有の[プリセット復元ルール](../subagent/README.md#restoring-child-composition)を使う。
 
-### Selecting a child LLM
+### 子 LLM の選択
 
-Set `modelSelectionSettings: true` to sample the Host's `subagent-model-selection` preference when each fresh top-level Session is composed. A restored Session without a recorded policy remains disabled, including an explicitly empty restore. When enabled, the non-empty exact provider/model route list is recorded in the Session, inherited by child Sessions, and unchanged by later settings edits. The tool then exposes optional `provider`, `model`, and `reasoning_effort` fields and registers the shared `list_subagent_models` tool. This mode requires a backend that advertises `agentOptions`; both in-process backends and DSH SDK support it, while ACP, Codex, and Claude Code reject it rather than ignore it.
+`modelSelectionSettings: true` を設定すると、新しいトップレベルセッションがコンポーズされるたびに Host の `subagent-model-selection` プリファレンスをサンプリングする。記録されたポリシーのない復元セッションは、明示的に空の復元も含めて無効のままである。有効な場合、空でない厳密な provider/model ルートリストがセッションに記録され、子セッションに継承され、その後の設定編集では変わらない。ツールは省略可能な `provider`、`model`、`reasoning_effort` フィールドを公開し、共有の `list_subagent_models` ツールを登録する。このモードは `agentOptions` を advertise するバックエンドを必要とする。インプロセスの両バックエンドと DSH SDK はこれをサポートし、ACP、Codex、Claude Code は無視するのではなく拒否する。
 
-A call supplies `provider` and `model` together, or supplies only an effort when configured, parent, or provider-owned defaults provide the route. Static `provider.agentRouteDefaults`, when present, form the provider/model baseline; tool configuration and model fields overlay it before route-aware effort merging and exact-route preflight. Providers without these defaults use compatible values from the parent's latest logged request, then the parent's creation options before its first request, while retaining the configured `maxTokens`. Changing the route without an explicit effort clears the inherited route-owned effort, so the selected model resolves its default. The live LLM adapter validates the effective route before child creation. Catalog membership remains advisory, so a model can use an unlisted id when its adapter accepts it.
+呼び出しは `provider` と `model` を一緒に渡すか、構成済み・親・プロバイダー所有の既定がルートを提供する場合は effort のみを渡す。静的な `provider.agentRouteDefaults` がある場合は provider/model のベースラインを形成し、ツール構成とモデルフィールドがルート対応の effort マージと厳密ルートのプリフライトの前にそれを上書きする。これらの既定を持たないプロバイダーは、親の最新の記録済みリクエストの互換値を使い、最初のリクエスト前は親の作成オプションを使う。構成済みの `maxTokens` は保持される。明示的な effort なしでルートを変更すると、継承されたルート所有の effort がクリアされるため、選択されたモデルは自身の既定を解決する。ライブ LLM アダプターは子の作成前に実効ルートを検証する。カタログのメンバーシップは助言にとどまるため、モデルはアダプターが受け入れるならリストにない id を使える。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the tool mirrors provider lifecycle and settles runs; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションは、ツールがプロバイダーのライフサイクルをどのように反映し、実行を決着させるかを説明する。観測可能な挙動は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design concept
+### 設計構想
 
-One instance is one provider plus one tool name. The plugin mirrors provider lifecycle: it registers the tool when the named provider appears and disposes it when the provider leaves, so sibling load order and HMR replacement cannot strand a dangling tool. Direct Agent setup passes its unpublished Session explicitly and awaits installation before publication. A standing preset with model or preset selection receives each matching Agent through `agent/created`, validates preset references, selects any model policy from its Session, and awaits installation through its Context; installation failure rejects creation. A numeric `maxDepth` or configured LLM selection the provider cannot enforce fails the mount instead of the first delegation. At most one instance in a tool scope may own model selection because `list_subagent_models` has a global name.
+1 つのインスタンスは 1 つのプロバイダーと 1 つのツール名である。プラグインはプロバイダーのライフサイクルを反映する: 指名されたプロバイダーが現れるとツールを登録し、プロバイダーが去ると破棄するため、兄弟のロード順や HMR 置き換えが宙に浮いたツールを残すことはない。直接の Agent セットアップは未公開のセッションを明示的に渡し、公開前に設置を待つ。モデル選択またはプリセット選択を行う常駐プリセットは、`agent/created` を通じて一致する各 Agent を受け取り、プリセット参照を検証し、そのセッションからモデルポリシーを選択し、その Context を通じて設置を待つ。設置の失敗は作成を拒否する。プロバイダーが強制できない数値の `maxDepth` や構成済み LLM 選択は、最初の委任ではなくマウントを失敗させる。`list_subagent_models` はグローバル名を持つため、ツールスコープ内でモデル選択を所有できるのは最大 1 インスタンスである。
 
-### Activation ownership
+### アクティベーションの所有権
 
-The tool calls `ctx.subagents.startActivation()` with parent delivery selected. The runtime owns startup cancellation, execution, outcome reporting, and cleanup. A startup failure is an errored tool result; failures after publication arrive through the completion notice, with diagnostics and partial output preserved by the runtime.
+ツールは親への配送を選択して `ctx.subagents.startActivation()` を呼ぶ。起動のキャンセル、実行、結果の報告、クリーンアップはランタイムが所有する。起動の失敗はエラーの付いたツール結果になり、公開後の失敗は完了通知を通じて届き、診断と部分的な出力はランタイムが保全する。
 
-### Result acknowledgement
+### 結果の確認応答
 
-The canonical tool result is `{ kind: 'activation', subagentId }`. It contains no execution Promise or final output; programmatic consumers that need to await results use the subagent service directly.
+正規のツール結果は `{ kind: 'activation', subagentId }` である。実行 Promise や最終出力は含まない。結果を待つ必要があるプログラム的コンシューマーはサブエージェントサービスを直接使う。
 
-### Context-sensitive wording
+### コンテキストに応じた文言
 
-The tool's description derives from `provider.inheritsParentContext`: a fresh child gets "it does not see this conversation" wording, a forked child gets "it does not see the current in-flight turn" wording, so the model never restates or omits context that does not exist.
+ツールの説明は `provider.inheritsParentContext` から導出される: 新しい子には「この会話を見ない」という文言、フォークされた子には「現在実行中のターンを見ない」という文言が与えられるため、モデルが存在しないコンテキストを言い直したり省略したりすることはない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Tool registration, provider lifecycle mirroring, activation requests |
-| [`src/preset-selection.ts`](src/preset-selection.ts) | Configured preset validation, model allowlist, and description guidance |
-| [`src/model-selection.ts`](src/model-selection.ts) | Request/config merge and live LLM route preflight |
-| [`src/model-selection-settings.ts`](src/model-selection-settings.ts) | Host-owned opt-in setting sampled for new Sessions |
-| [`src/model-selection-state.ts`](src/model-selection-state.ts) | Session event that records and inherits the sampled decision |
-| [`src/list-models.ts`](src/list-models.ts) | `list_subagent_models` runtime discovery tool |
+| [`src/index.ts`](src/index.ts) | ツール登録、プロバイダーライフサイクルの反映、アクティベーション要求 |
+| [`src/preset-selection.ts`](src/preset-selection.ts) | 構成済みプリセットの検証、モデル許可リスト、説明ガイダンス |
+| [`src/model-selection.ts`](src/model-selection.ts) | リクエスト/設定のマージとライブ LLM ルートのプリフライト |
+| [`src/model-selection-settings.ts`](src/model-selection-settings.ts) | 新しいセッションのためにサンプリングされる Host 所有のオプトイン設定 |
+| [`src/model-selection-state.ts`](src/model-selection-state.ts) | サンプリングされた決定を記録・継承するセッションイベント |
+| [`src/list-models.ts`](src/list-models.ts) | `list_subagent_models` ランタイム探索ツール |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough; they move from the tool's runtime behavior to the seam it delegates over and the adjacent child tools.
+パッケージレベルの契約では足りないときにこれらのページを読むこと。ツールの実行時の挙動から、委任が跨るシームと隣接する子ツールへ進む。
 
-- [Subagent subsystem](../../../docs/subsystems/subagent.md) — providers, activations, results, and continuation.
-- [dsh-tool-subagent-control](../tool-subagent-control/README.md) — messaging, interrupt, and listing tools for continuable children.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-subagent) — the default schema and backend-specific wording.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-subagent) — every accepted config field.
-- [Historical model-selected subagent routes](../../../.agents/notes/archived/feature/2026-08-18-model-selected-subagent-routes.md) — selection policy, inheritance, discovery, and the fork restriction.
+- [サブエージェントサブシステム](../../../docs/subsystems/subagent.md) — プロバイダー、アクティベーション、結果、継続。
+- [dsh-tool-subagent-control](../tool-subagent-control/README.md) — 継続可能な子のためのメッセージング、中断、一覧ツール。
+- [生成されたツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-subagent) — 既定のスキーマとバックエンド固有の文言。
+- [生成された構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-subagent) — 受け付けられるすべての構成フィールド。
+- [歴史的なモデル選択サブエージェントルート](../../../.agents/notes/archived/feature/2026-08-18-model-selected-subagent-routes.md) — 選択ポリシー、継承、探索、fork の制限。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Tool schema
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The generated default [`subagent` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-subagent) appears under the configured tool name while its provider exists. An enabled Session policy adds `provider`, `model`, and `reasoning_effort` plus route guidance; the backend must support `agentOptions`. `allowedAgentPresets` adds the `agent_preset` enum and guidance from the presets' display descriptions. Context inheritance and continuation support determine the task and follow-up descriptions. A tool restriction removes both the schema and its `tool:<toolName>` guidance section.
+生成された既定の [`subagent` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-subagent)が、プロバイダーの存在中は構成済みのツール名で現れる。有効なセッションポリシーは `provider`、`model`、`reasoning_effort` とルートガイダンスを追加し、バックエンドは `agentOptions` をサポートしなければならない。`allowedAgentPresets` は `agent_preset` enum とプリセットの表示説明からのガイダンスを追加する。コンテキストの継承と継続サポートがタスクとフォローアップの説明を決める。ツール制限はスキーマと、その `tool:<toolName>` ガイダンスセクションの両方を除去する。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost per parent request; LLM selection adds three parameters, while preset selection adds one enum parameter and preset descriptions. Each tool instance adds one schema and one short system-prompt section.
+親リクエストごとに固定のスキーマコスト。LLM 選択は 3 つのパラメーターを追加し、プリセット選択は 1 つの enum パラメーターとプリセットの説明を追加する。ツールインスタンスごとに 1 つのスキーマと 1 つの短いシステムプロンプトセクションが追加される。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while provider instances and their configuration are unchanged. Adapter catalog changes do not alter the definition; a child route override may prevent a fork child from reusing the inherited parent prefix.
+プロバイダーインスタンスとその構成が変わらない間はプレフィックス安定。アダプターのカタログ変更は定義を変えない。子ルートのオーバーライドは、fork の子が継承した親プレフィックスを再利用できなくすることがある。
 
-### Model selection and discovery
+### モデルの選択と探索
 
-#### What the model sees
+#### モデルが見るもの
 
-A settings-controlled instance whose Session carries a policy exposes the child LLM selection fields and `list_subagent_models`. Calls reject while the optional `ctx.llm` service is unavailable. Discovery returns only registered providers and advertised models in the exact route policy; an unauthorized provider is rejected before its adapter catalog is called, and an exact lookup must be allowed before it resolves the model's reasoning efforts and default. Execution independently enforces the same policy.
+設定で制御され、セッションがポリシーを運ぶインスタンスは、子 LLM 選択フィールドと `list_subagent_models` を公開する。省略可能な `ctx.llm` サービスが利用できない間は呼び出しが拒否される。探索は登録済みプロバイダーと、厳密ルートポリシー内で advertise されたモデルのみを返す。認可されていないプロバイダーはそのアダプターカタログが呼ばれる前に拒否され、厳密検索はモデルの reasoning effort と既定を解決する前に許可されなければならない。実行も同じポリシーを独立に強制する。
 
-#### Token effect
+#### トークンへの影響
 
-One fixed discovery schema is present in enabled compositions. Directory contents enter the transcript only when the model calls the tool.
+有効なコンポジションには固定の探索スキーマが 1 つ存在する。ディレクトリの内容はモデルがツールを呼び出したときにのみトランスクリプトへ入る。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The schema is prefix-stable across adapter registration and catalog changes. Each discovery result is appended after the reusable prefix.
+スキーマはアダプター登録とカタログ変更をまたいでプレフィックス安定である。各探索結果は再利用可能なプレフィックスの後に追記される。
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-Visible delegation tools share one guidance paragraph, listing tools in name order and instructing the model to start independent delegations together and keep working while they run, and to end its turn instead of sleeping or polling when only waiting for their results remains. Hidden or unavailable tools are omitted; no guidance appears when none are visible. With both `subagent` and `subagent_fork` visible, the text is:
+可視の委任ツールは 1 つのガイダンス段落を共有する。段落はツールを名前順に列挙し、モデルに独立した委任をまとめて開始して実行中も有用な作業を続けること、結果を待つだけになったらスリープやポーリングではなくターンを終了することを指示する。非表示または利用不可のツールは省略され、可視のツールが 1 つもないときはガイダンスが現れない。`subagent` と `subagent_fork` の両方が可視のとき、テキストは次のとおり:
 
-##### Tool-guidance section
+##### ツールガイダンスセクション
 
 ```markdown
 Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-At most one short delegation paragraph per parent request, listing the tool names visible to that request.
+親リクエストごとに最大 1 つの短い委任段落。そのリクエストに見えるツール名を列挙する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the visible tool names are unchanged; adding or removing a visible tool changes the paragraph.
+可視のツール名が変わらない間はプレフィックス安定。可視ツールの追加・削除は段落を変える。
 
-### Runtime depth context
+### ランタイム深度コンテキスト
 
-#### What the model sees
+#### モデルが見るもの
 
-When the calling agent reaches or exceeds a visible tool's effective numeric depth cap, an optional runtime-context snapshot tells it to do the work directly. The cap is resolved again at each request, including after settings changes or session resume. Hidden tools and `provider-managed` limits contribute no depth text. For a child at depth one with a cap of one:
+呼び出し元エージェントが可視ツールの実効数値深度上限に達するか超えると、省略可能なランタイムコンテキストスナップショットが、作業を直接行うよう伝える。上限は設定変更やセッション再開の後も含め、リクエストごとに再解決される。非表示ツールと `provider-managed` の制限は深度テキストを寄与しない。深度 1、上限 1 の子の場合:
 
-##### Depth-limit notice
+##### 深度制限の通知
 
 ```markdown
 Delegation depth for `subagent`: current 1, maximum 1, remaining levels 0. Do not call `subagent` at this depth; carry out the work directly.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-One short contribution per capped tool joins the user-role runtime-context snapshot. Unchanged snapshots are not appended again; agents below the cap receive no additional text. `includeRuntimeContext: false` suppresses this notice without changing runtime depth enforcement.
+上限付きツールごとに 1 つの短い寄与が user ロールのランタイムコンテキストスナップショットに加わる。変更のないスナップショットは再び追記されず、上限未満のエージェントは追加テキストを受け取らない。`includeRuntimeContext: false` はランタイムの深度強制を変えずにこの通知を抑制する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Depth changes do not alter the system prompt or tool schemas. Updated runtime context appends after existing history; the provider still enforces the cap if the model attempts delegation.
+深度の変化はシステムプロンプトやツールスキーマを変えない。更新されたランタイムコンテキストは既存の履歴の後に追記される。モデルが委任を試みても、プロバイダーは依然として上限を強制する。
 
-### Start result
+### 開始結果
 
-#### What the model sees
+#### モデルが見るもの
 
-The call retains the task description and prompt. Success returns `started subagent <childId>`; startup rejection returns an error. Child execution details are delivered separately from this acknowledgement.
+呼び出しはタスクの説明とプロンプトを保持する。成功は `started subagent <childId>` を返し、起動の拒否はエラーを返す。子の実行の詳細はこの確認応答とは別に配送される。
 
-#### Token effect
+#### トークンへの影響
 
-The prompt and acknowledgement remain in parent history until compaction; child working context remains in the child.
+プロンプトと確認応答はコンパクションまで親の履歴に残る。子の作業コンテキストは子にとどまる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ。新たに可視になった内容は再利用可能なリクエストプレフィックスに続くため、既存の KV キャッシュエントリーを無効化しない。
 
-### Completion delivery
+### 完了の配送
 
-#### What the model sees
+#### モデルが見るもの
 
-Answer delivery follows the managed delegation rules above. The returned child id identifies subsequent control and catalog operations; only backends with continuation support accept follow-up messages.
+回答の配送は上記の管理された委任ルールに従う。返された子 id は以降の制御とカタログ操作を識別する。継続サポートを持つバックエンドだけがフォローアップメッセージを受け付ける。
 
-#### Token effect
+#### トークンへの影響
 
-Messages and completion notices append to parent history independently of the start acknowledgement. The tool result itself contains no final output.
+メッセージと完了通知は開始の確認応答とは独立に親の履歴へ追記される。ツール結果自体は最終出力を含まない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ。新たに可視になった内容は再利用可能なリクエストプレフィックスに続くため、既存の KV キャッシュエントリーを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what this tool does not return or enforce; they are current package constraints.
+これらの制限が、このツールが返さないもの・強制しないものを定義する。これらは現在のパッケージ制約である。
 
-- **This tool does not wait for results** — use the completion notice or child messages. Programmatic result waiting belongs to the subagent service.
-- **Shipped fork tools cannot select a child LLM route** — they inherit the parent's provider and model to keep the copied conversation prefix eligible for KV Cache reuse. Re-enable selection only when route changes preserve reuse or expose a bounded recomputation cost.
-- **Depth limits are fixed per instance** — independently named tools can set different caps. LLM selection requires an enabled per-Session preference and a provider that advertises `agentOptions`; both in-process providers and DSH SDK advertise it, while ACP, Codex, and Claude Code reject it rather than ignore it.
+- **このツールは結果を待たない** — 完了通知または子のメッセージを使うこと。プログラム的な結果待ちはサブエージェントサービスに属する。
+- **同梱の fork ツールは子 LLM ルートを選択できない** — コピーされた会話プレフィックスを KV キャッシュ再利用の対象に保つため、親のプロバイダーとモデルを継承する。ルート変更が再利用を保つか、有界の再計算コストを示す場合にのみ選択を再有効化すること。
+- **深度制限はインスタンスごとに固定** — 独立に命名されたツールは異なる上限を設定できる。LLM 選択は有効なセッションごとのプリファレンスと `agentOptions` を advertise するプロバイダーを必要とする。インプロセスの両プロバイダーと DSH SDK は advertise し、ACP、Codex、Claude Code は無視するのではなく拒否する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

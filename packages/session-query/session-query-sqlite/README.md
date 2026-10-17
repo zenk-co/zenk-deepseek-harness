@@ -1,37 +1,37 @@
 ---
-description: "The SQLite FTS5 full-text search backend for session history, for deployments and maintainers choosing, configuring, or debugging full-text search over the query service."
+description: "セッション履歴のための SQLite FTS5 全文検索バックエンド。クエリサービスの上で全文検索を選択、構成、デバッグするデプロイ担当者とメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-query-sqlite
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to add ranked SQLite FTS5 search across session history, either across sessions or within one session, with cursor pagination. It indexes live and persisted history in a separate derived database, so searches reflect current state without modifying the session-persistence store. Exact reads, filters, and traces remain available through the same query API. Search is opt-in in shipped compositions; configure `openAt` to open the index at startup, on first search, or never. Results match tokens and phrases rather than arbitrary substrings, and each index path has a single process owner.
+本パッケージを使うと、セッション履歴をまたぐ検索と単一セッション内の検索の両方に、カーソルページネーション付きの順位付けされた SQLite FTS5 検索を追加できる。ライブ履歴と永続化履歴を別の派生データベースにインデックスするため、検索はセッション永続化ストアを変更せずに現在の状態を反映する。正確な読み取り、フィルター、トレースは同じクエリ API から引き続き利用できる。出荷済みのコンポジションでは検索はオプトインであり、`openAt` を構成してインデックスを起動時に開くか、初回検索時に開くか、決して開かないかを選ぶ。結果は任意の部分文字列ではなくトークンとフレーズに一致し、各インデックスパスはプロセス 1 つだけが所有する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this package when a composition needs ranked full-text search over session history — for example the Web content search or `/resume` prior-work retrieval. The common path is explicit: mount the plugin, give it a dedicated database path, and call `ctx.sessionQuery.searchSessions` or `searchEvents` from code.
+セッション履歴に対する順位付け全文検索を必要とするコンポジション——たとえば Web のコンテンツ検索や `/resume` の過去作業の取得——に本パッケージをマウントする。一般的な手順は明示的である。プラグインをマウントし、専用のデータベースパスを与え、コードから `ctx.sessionQuery.searchSessions` または `searchEvents` を呼び出す。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it when you want full-text recall over prior sessions with ranking and paging. Choose it together with `dsh-session-query` and the session service; a persistence backend is optional but recommended so persisted history is searchable after restarts. Avoid pointing `path` at the session-persistence database — this package owns a separate derived index.
+過去のセッションに対する、順位付けとページングを伴う全文検索が欲しいときに選ぶ。`dsh-session-query` と session サービスと一緒に選ぶ。永続化バックエンドは任意だが、再起動後も永続化履歴を検索できるよう推奨される。`path` をセッション永続化データベースに向けないこと。本パッケージは別の派生インデックスを所有する。
 
-### Minimal configuration
+### 最小構成
 
 ```yaml
 - name: '@deepseek-ai/dsh-session'
@@ -40,121 +40,120 @@ Choose it when you want full-text recall over prior sessions with ranking and pa
     path: /absolute/path/to/session-search.db
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `path` | required | Dedicated derived-index SQLite path, or `:memory:`; missing paths are created owner-only on POSIX |
-| `openAt` | `startup` | `startup` opens at activation; `first-search` defers the SQLite module until the first search; `never` disables full-text search while inherited reads stay available |
-| `journalMode` | `wal` | `wal`, `delete`, `truncate`, or `persist` |
-| `defaultLimit` | `20` | Page size when a request omits `limit` |
-| `maxLimit` | `100` | Largest accepted request page size |
-| `snippetChars` | `240` | Maximum snippet length in Unicode code points |
-| `readWindowMax` | `50` | Maximum `before`/`after` raw events for the inherited `readEvent()` |
-| `persistedReadConcurrency` | `4` | Concurrent persisted-log reads for inherited batch reads |
-| `preparedSessionCacheSize` | `5` | Cold prepared-Session observations the inherited `observeSession` reader retains for reuse |
+| `path` | 必須 | 専用の派生インデックスの SQLite パス、または `:memory:`。存在しないパスは POSIX では所有者のみが読める形で作成される |
+| `openAt` | `startup` | `startup` はアクティベーション時に開く。`first-search` は初回検索まで SQLite モジュールの読み込みを遅延する。`never` は継承した読み取りを利用可能なまま全文検索を無効化する |
+| `journalMode` | `wal` | `wal`、`delete`、`truncate`、または `persist` |
+| `defaultLimit` | `20` | リクエストが `limit` を省略した場合のページサイズ |
+| `maxLimit` | `100` | 受け付ける最大のリクエストページサイズ |
+| `snippetChars` | `240` | スニペットの最大長（Unicode コードポイント） |
+| `readWindowMax` | `50` | 継承した `readEvent()` の `before`/`after` 生イベントの最大数 |
+| `persistedReadConcurrency` | `4` | 継承したバッチ読み取りの永続化ログ同時読み取り数 |
+| `preparedSessionCacheSize` | `5` | 継承した `observeSession` リーダーが再利用のために保持するコールドな prepared-Session 観測数 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-session-query-sqlite) is the exhaustive source for every accepted field and its JSDoc.
+生成される[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-session-query-sqlite)が、受け付けるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### Search behavior
+### 検索の挙動
 
-`searchSessions` searches the whole corpus and groups results by each session's strongest matching event; `searchEvents` searches one logical session. Queries are literal phrases: they are trimmed and whitespace-normalized, and FTS5 syntax such as quotes, `OR`, `NEAR`, and `*` is treated as data, never as executable query syntax. Metadata filters (session id, cwd, created-at, parent, availability, event seq/time/type/surface) narrow results before ranking. All `current`, `shadowed`, and `log-only` events are searchable by default; pass a surface filter to narrow.
+`searchSessions` はコーパス全体を検索し、各セッションの最も強く一致したイベントで結果をグループ化する。`searchEvents` は 1 つの論理セッションを検索する。クエリはリテラルフレーズである。前後の空白が除去され空白が正規化され、引用符、`OR`、`NEAR`、`*` などの FTS5 構文はデータとして扱われ、実行可能なクエリ構文には決してならない。メタデータフィルター（session id、cwd、created-at、parent、availability、イベントの seq/time/type/surface）は順位付けの前に結果を絞り込む。`current`、`shadowed`、`log-only` のすべてのイベントは既定で検索可能であり、surface フィルターを渡して絞り込める。
 
-Ranking is deterministic: more actual FTS5 highlighted-match spans first, then shorter documents, with event time, session id, and seq breaking ties. Results carry plain-text snippets bounded by `snippetChars` Unicode code points, with no provider-specific numeric score. Pages continue through an opaque `SessionSearchCursor` bound to the exact normalized request; a cursor becomes stale when its relevant corpus changes (`SESSION_QUERY_STALE_CURSOR`), and a within-session cursor survives changes to unrelated sessions while a cross-session cursor does not.
+順位付けは決定論的である。実際の FTS5 ハイライト一致スパンが多いもの、次に短いドキュメントが先に来て、イベント時刻、session id、seq がタイブレークする。結果は `snippetChars` コードポイントで区切られたプレーンテキストのスニペットを運び、プロバイダー固有の数値スコアは持たない。ページは正規化された正確なリクエストに束縛された不透明な `SessionSearchCursor` で継続する。カーソルは関連するコーパスが変わると陳腐化し（`SESSION_QUERY_STALE_CURSOR`）、セッション内カーソルは無関係なセッションの変更を越えて生き残るが、セッションをまたぐカーソルはそうでない。
 
-The `unicode61` tokenizer matches tokens and phrases, not arbitrary substrings: `AI` does not match the token `BRAID`. Use `ctx.sessionQuery.filterEvents()` with a `text` clause when a literal whitespace-flexible substring scan is required.
+`unicode61` トークナイザーはトークンとフレーズに一致し、任意の部分文字列には一致しない。`AI` はトークン `BRAID` に一致しない。リテラルの空白柔軟な部分文字列スキャンが必要な場合は、`text` 句を伴う `ctx.sessionQuery.filterEvents()` を使う。
 
-### When to defer or disable search
+### 検索を遅延または無効化するとき
 
-With `openAt: first-search`, the service activates without importing `node:sqlite` or opening the index, deferring SQLite's experimental warning until the first actual search; an invalid database fails that first search instead of service activation. With `openAt: never`, full-text search is off for the deployment: `searchSessions` and `searchEvents` fail with `SESSION_QUERY_SEARCH_DISABLED` before any request normalization, while every inherited exact read, filter, and trace keeps working. Requests that exceed the compiled-predicate budget (14 combined predicates across sessions, 13 within a session) or SQLite's portable 32,766-binding limit fail with `SESSION_QUERY_INVALID_FILTER` before statement preparation.
+`openAt: first-search` では、サービスは `node:sqlite` をインポートせず、インデックスも開かずにアクティベートし、SQLite の実験的機能の警告を最初の実際の検索まで遅延する。無効なデータベースはサービスのアクティベーションではなくその初回検索を失敗させる。`openAt: never` では、そのデプロイで全文検索が無効になる。`searchSessions` と `searchEvents` はリクエストの正規化の前に `SESSION_QUERY_SEARCH_DISABLED` で失敗し、継承した正確な読み取り、フィルター、トレースはすべて動作し続ける。コンパイル済み述語の予算（セッションをまたいで述語 14 個、セッション内で 13 個）または SQLite の可搬な 32,766 バインド制限を超えるリクエストは、ステートメントの準備前に `SESSION_QUERY_INVALID_FILTER` で失敗する。
 
-### Failures and recovery
+### 失敗と回復
 
-Typed `SessionQueryError` failures carry stable codes: `SESSION_QUERY_SEARCH_DISABLED` when search is configured off; `SESSION_QUERY_INDEX_FAILED` when the index cannot open or reconcile; `SESSION_QUERY_SESSION_NOT_FOUND` when a search target is absent; `SESSION_QUERY_STALE_CURSOR` when the corpus changed between pages — retry the complete search call; and `SESSION_QUERY_INVALID_CURSOR` for a cursor that does not belong to this request. Cancellation is honored between synchronous SQLite calls; a statement already executing on the JavaScript thread cannot be interrupted.
+型付きの `SessionQueryError` の失敗は安定したコードを運ぶ。検索が無効に構成されている場合は `SESSION_QUERY_SEARCH_DISABLED`、インデックスを開けない、または整合できない場合は `SESSION_QUERY_INDEX_FAILED`、検索対象が存在しない場合は `SESSION_QUERY_SESSION_NOT_FOUND`、ページ間でコーパスが変わった場合は `SESSION_QUERY_STALE_CURSOR`（検索呼び出し全体を再試行する）、そしてこのリクエストに属さないカーソルには `SESSION_QUERY_INVALID_CURSOR` である。キャンセルは同期 SQLite 呼び出しの間で尊重される。JavaScript スレッドで既に実行中のステートメントは中断できない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the backend and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションはバックエンドの背後にある設計判断を説明し、それを実現するコードを指し示す。観測可能な挙動は[このパッケージを使う](#use-this-package)で完全にカバーされている。
 
-### Design philosophy
+### 設計方針
 
-The backend is built on one separation and three commitments:
+バックエンドは 1 つの分離と 3 つの確約の上に成り立つ:
 
-- **Derived index, never the source store.** The FTS rows live in a dedicated disposable database; the session-persistence database is never opened here.
-- **Live-preferred observation.** One serialized state machine compares persistence snapshot revisions, reads only new or changed logs through short-lived read handles, and reconciles in one transaction, so a search reflects the newest stable state.
-- **Generation-bound cursors.** Every corpus change bumps a generation; cursors carry the generation they were created under and fail stale rather than returning a shifted page.
-- **Literal phrases as data.** Caller query text is quoted into one FTS5 phrase so query syntax stays inert, and reserved highlight markers are stripped from documents before indexing.
+- **派生インデックスであり、ソースストアには決してならない。** FTS 行は専用の使い捨て可能なデータベースにあり、セッション永続化データベースはここでは決して開かれない。
+- **ライブ優先の観測。** 1 つの直列化されたステートマシンが永続化スナップショットのリビジョンを比較し、短命な読み取りハンドルを通じて新規または変更されたログだけを読み、1 つのトランザクションで整合させる。そのため検索は最新の安定した状態を反映する。
+- **世代に束縛されたカーソル。** コーパスの変更のたびに世代が上がり、カーソルは作成時の世代を運び、ずれたページを返す代わりに陳腐化として失敗する。
+- **データとしてのリテラルフレーズ。** 呼び出し元のクエリテキストは 1 つの FTS5 フレーズに引用されるためクエリ構文は不活性のままとなり、予約されたハイライトマーカーはインデックス前にドキュメントから除去される。
 
-The design history lives in the [SQLite FTS5 session search note](../../../.agents/notes/archived/feature/2026-07-10-sqlite-session-query-provider.md) and the [unified service decision](../../../.agents/notes/archived/architecture/2026-07-23-unified-session-query-service.md).
+設計の経緯は [SQLite FTS5 セッション検索のノート](../../../.agents/notes/archived/feature/2026-07-10-sqlite-session-query-provider.md)と[統合サービスの決定](../../../.agents/notes/archived/architecture/2026-07-23-unified-session-query-service.md)にある。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service: config, openAt lifecycle, serialized reconciliation, query execution, cursors |
-| [`src/query.ts`](src/query.ts) | Request normalization, parameterized predicates, snippets, predicate and binding budgets |
-| [`src/schema.ts`](src/schema.ts) | Database schema, application-id ownership, in-place reset, owner-only file creation |
+| [`src/index.ts`](src/index.ts) | サービス: 構成、openAt ライフサイクル、直列化された整合、クエリ実行、カーソル |
+| [`src/query.ts`](src/query.ts) | リクエストの正規化、パラメーター化された述語、スニペット、述語とバインドの予算 |
+| [`src/schema.ts`](src/schema.ts) | データベーススキーマ、アプリケーション id の所有権、その場でのリセット、所有者のみのファイル作成 |
 
-### Index lifecycle
+### インデックスのライフサイクル
 
-Persisted FTS rows live in a dedicated derived database and survive restarts; live sessions use connection-local TEMP tables that shadow the durable base for the same session and reveal it again when the live owner detaches. Both tables retain the exact inherited cut in numeric `seed_length`; reconstructed headers expose only `isSeeded`, while the cut participates in live fingerprints and persisted source revisions. Each search runs one serialized observation: list persistence snapshots, compare per-session revisions with the indexed rows, read only new or changed logs through a read handle (balancing an interrupted final turn in memory, never writing back), extract semantic documents, and commit the reconciliation in one transaction before running the query. Repeated queries and unchanged reopens read nothing; switching stores or observing new, changed, deleted, or externally repaired sources reconciles on the next stable observation. Source or transaction failure commits nothing and the next search retries.
+永続化された FTS 行は専用の派生データベースにあり、再起動を越えて生き残る。ライブセッションは接続ローカルの TEMP テーブルを使い、同じセッションの永続ベースをシャドウし、ライブ所有者がデタッチすると再びそれを現す。どちらのテーブルも継承された正確なカットを数値の `seed_length` に保持し、再構築されたヘッダーは `isSeeded` のみを公開する一方、カットはライブフィンガープリントと永続化ソースリビジョンに参加する。各検索は 1 回の直列化された観測を実行する。永続化スナップショットを列挙し、セッションごとのリビジョンをインデックス済み行と比較し、読み取りハンドルを通じて新規または変更されたログだけを読み（中断された最終ターンをメモリ内で釣り合わせ、書き戻しはしない）、意味論的ドキュメントを抽出し、クエリを実行する前に 1 つのトランザクションで整合をコミットする。繰り返しのクエリと変更のない再オープンは何も読まない。ストアの切り替えや、新規、変更、削除、外部修復されたソースの観測は、次の安定した観測で整合する。ソースまたはトランザクションの失敗は何もコミットせず、次の検索が再試行する。
 
-### Schema ownership
+### スキーマの所有権
 
-The database carries an application id and schema version 8. Opening refuses a file owned by another application or a canonical database, rejects unknown user tables, and only a recognized incompatible derived schema resets in place — so an unrelated or session-persistence database is never touched. On POSIX filesystems, missing directories and database files are created owner-only (`0700` and `0600` before the process umask). Exactly one service in one process owns a derived-index path; generations and TEMP shadow state are connection-owned.
+データベースはアプリケーション id とスキーマバージョン 8 を備える。オープン時には、別のアプリケーションが所有するファイルや正規のデータベースを拒否し、未知のユーザーテーブルを拒否し、認識された非互換の派生スキーマのみをその場でリセットする。したがって無関係なデータベースやセッション永続化データベースに触れることは決してない。POSIX ファイルシステムでは、存在しないディレクトリとデータベースファイルは所有者のみが読める形（プロセスの umask 適用前は `0700` と `0600`）で作成される。1 プロセス内の厳密に 1 つのサービスが派生インデックスパスを所有し、世代と TEMP シャドウ状態は接続が所有する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared query service to the type-level contract and the design evidence.
+パッケージレベルの契約で足りない場合はこれらのページを読む。共有クエリサービスから型レベルの契約と設計の証拠へと進む。
 
-- [Session Query subsystem reference](../../../docs/subsystems/session-query.md) — the full type-level contract this backend implements.
-- [dsh-session-query](../session-query/README.md) — the service definition: exact reads, filters, and traces this backend inherits.
-- [dsh-tool-session-query](../../experimental/tool-session-query/README.md) — the model-facing consumer that calls these search methods.
-- [SQLite FTS5 session search](../../../.agents/notes/archived/feature/2026-07-10-sqlite-session-query-provider.md) — search semantics, reconciliation, and the tokenizer decision.
-- [JSONL session persistence](../../session/session-persistence-jsonl/README.md) — the authoritative Session store this disposable index observes; keep its root separate from this package's database path.
+- [Session Query サブシステムリファレンス](../../../docs/subsystems/session-query.md) — このバックエンドが実装する完全な型レベルの契約。
+- [dsh-session-query](../session-query/README.md) — サービス定義: このバックエンドが継承する正確な読み取り、フィルター、トレース。
+- [dsh-tool-session-query](../../experimental/tool-session-query/README.md) — これらの検索メソッドを呼び出すモデル向けのコンシューマー。
+- [SQLite FTS5 セッション検索](../../../.agents/notes/archived/feature/2026-07-10-sqlite-session-query-provider.md) — 検索の意味論、整合、トークナイザーの決定。
+- [JSONL セッション永続化](../../session/session-persistence-jsonl/README.md) — この使い捨てインデックスが観測する権威ある Session ストア。そのルートは本パッケージのデータベースパスと分けておくこと。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the search backend returns hits only to callers and registers nothing model-facing.
+なし。検索バックエンドはヒットを呼び出し元にのみ返し、モデル向けのものは何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。本パッケージはプロバイダーリクエストを組み立てたり送信したりしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
+これらの制限は、このパッケージが不向きになる、または特別な運用上の注意を要する状況を定義する。一般的な SQLite の比較やタスクバックログではなく、現在のパッケージの制約である。
 
-These limits define when this package is a poor fit or needs special operational care. They are current package constraints, not a general SQLite comparison or a task backlog.
-
-- **No caller authorization** — this is a trusted context-wide service; a model tool or UI must enforce its own access policy.
-- **Synchronous query execution** — `DatabaseSync` blocks the JavaScript thread during MATCH execution and cannot interrupt a statement already running.
-- **Token recall, not arbitrary substrings** — the `unicode61` tokenizer does not match substrings inside a larger token; use `filterEvents()` for literal scans.
-- **Single-owner derived index** — one service in one process must own each index path; external writers and multi-process sharing are unsupported.
+- **呼び出し元の認可はない** — これはコンテキスト全体で信頼されるサービスである。モデルツールや UI が独自のアクセスポリシーを適用しなければならない。
+- **同期クエリ実行** — `DatabaseSync` は MATCH の実行中に JavaScript スレッドをブロックし、すでに実行中のステートメントを中断できない。
+- **トークンの再現であり、任意の部分文字列ではない** — `unicode61` トークナイザーはより大きなトークン内の部分文字列に一致しない。リテラルスキャンには `filterEvents()` を使う。
+- **単一所有者の派生インデックス** — 1 プロセス内の 1 つのサービスが各インデックスパスを所有しなければならない。外部ライターと複数プロセスでの共有はサポートされない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発者ノートはメンテナー向けの作業コンテキストであり、決定されていない未解決の設計上の問いと方向性を示す。明示的に非権威である。出荷済みの挙動、制限、受け入れ済みの根拠は、上記のセクション、パッケージのコード、およびリンクされた Agent Note にある。
 
-#### Future: alternate tokenizers and search providers
+#### 将来: 代替トークナイザーと検索プロバイダー
 
-The `unicode61` tokenizer choice trades substring recall for index size and two-character token support; the trigram alternative was measured and rejected. Switching tokenizers or adding another search backend would change indexed recall and require its own reconciliation and generation story.
+`unicode61` トークナイザーの選択は、部分文字列の再現性をインデックスサイズと 2 文字トークンのサポートと引き換えにしている。trigram の代替案は計測され、却下された。トークナイザーを切り替えたり別の検索バックエンドを追加したりすると、インデックスされる再現性が変わり、独自の整合と世代の仕組みが必要になる。
 
 </details>

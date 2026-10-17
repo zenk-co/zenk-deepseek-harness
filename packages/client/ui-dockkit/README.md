@@ -1,115 +1,115 @@
 ---
-description: "Docking layout kit for the dsh web client: a split tree of tabbed panes with invertible operations, planners, a linear history, and the components that render and drive it."
+description: "dsh Web クライアントのためのドッキングレイアウトキット: 可逆な操作、プランナー、線形履歴を備えたタブ付きペインの分割ツリーと、それをレンダリングし駆動するコンポーネント。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-dockkit
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-A docking layout kit: a split tree of tabbed panes with invertible operations, and the components that render and drive it. The Harness Web client is its first embedder; nothing in here knows that.
+ドッキングレイアウトキット: 可逆な操作を備えたタブ付きペインの分割ツリーと、それをレンダリングし駆動するコンポーネント。Harness Web クライアントが最初の埋め込み先だが、ここにあるものはそれを知らない。
 
-> **Internal engine.** This package is published because the Sidebar links it statically, not as a stable API: its exports — `LayoutState`, `LayoutOp`, the planners, `DockIntents`, `DockLabels`, `DockMode` — may change in any release, and none of them appears in a service interface (`ctx.sidebarRight` exposes operations, never layout snapshots or operation logs).
+> **内部エンジン。** このパッケージは安定した API としてではなく、Sidebar がそれを静的にリンクするために公開されている。そのエクスポート — `LayoutState`、`LayoutOp`、プランナー群、`DockIntents`、`DockLabels`、`DockMode` — はどのリリースでも変更される可能性があり、いずれもサービスインターフェースには現れない(`ctx.sidebarRight` が公開するのは操作であり、レイアウトスナップショットや操作ログではない)。
 
-## Table of Contents
+## 目次
 
-- [The two layers](#the-two-layers)
-- [Embedding it](#embedding-it)
-- [Interaction rules worth keeping](#interaction-rules-worth-keeping)
-- [Build shape](#build-shape)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [2 つの層](#the-two-layers)
+- [埋め込む](#embedding-it)
+- [保持すべきインタラクションルール](#interaction-rules-worth-keeping)
+- [ビルド形態](#build-shape)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="the-two-layers"></a>
-## The two layers
+## 2 つの層
 
-**The engine** is pure logic — no UI framework, no DOM, no host concepts.
+**エンジン**は純粋なロジックである — UI フレームワークも DOM もホストの概念もない。
 
-- A normalized recursive split tree: `nodes` keyed by id, `rootId` for the docked root, `floats` bottom-to-top. `PaneId`, `SplitId`, and `TabId` are branded strings: only a `Mint` (or the kit's own DOM round trip) produces one, so a pane, a split, and a tab never stand in for one another or for a bare string. A floating panel is not a second concept — it is a pane whose `host` is `'float'`, capacity one tab, drawn without a tab strip.
-- `applyOp(state, op)` returns the next state **and the operations that undo it**. Inverses are captured when an operation runs, because by undo time the pre-operation state is gone.
-- Every operation carries the ids it creates, so `replay(initial, ops)` reproduces the same tree. The engine reads no clock and no random source.
-- `Sequencer` keeps a linear history with one entry per intent: the operations one gesture or command produced step back and forward together, a run of consecutive focus-only entries steps as one, and a new entry after stepping back drops the forward branch.
-- `planSettle` is the opt-in rule that keeps every docked pane populated after an intent: panes an intent emptied are merged away, and an emptied root pane is reseeded through the embedder's factory — withholding the factory keeps the merge and leaves the root pane empty. An embedder that wants empty panes simply does not call it, or calls it without a factory. `planDropTab` takes the same factory: with one, a sole tab released on its own pane's edge splits and the factory's tab backfills the pane it vacates (the dragged tab stays focused); without one that release changes nothing.
-- `DockController` is the intent layer and an observable source (`subscribe` + `getSnapshot`, whose reference only changes when the layout does).
+- 正規化された再帰的な分割ツリー: id をキーとする `nodes`、ドッキングされたルートの `rootId`、下から上への `floats`。`PaneId`、`SplitId`、`TabId` はブランド付き文字列である。それを作り出すのは `Mint`(またはキット自身の DOM ラウンドトリップ)だけなので、ペイン、スプリット、タブが互いや裸の文字列の代わりになることはない。フローティングパネルは別の概念ではない — `host` が `'float'` であるペインであり、容量は 1 タブで、タブストリップなしで描画される。
+- `applyOp(state, op)` は次の状態**とそれを元に戻す操作**を返す。逆操作は操作の実行時に捕捉される。undo の時点では操作前の状態が失われているからだ。
+- すべての操作は自身が作成した id を持ち運ぶため、`replay(initial, ops)` は同じツリーを再現する。エンジンは時計も乱数源も読まない。
+- `Sequencer` はインテントごとに 1 エントリの線形履歴を保持する。1 つのジェスチャーまたはコマンドが生成した操作は一緒に前後にステップし、連続するフォーカスのみのエントリの並びは 1 つとしてステップし、戻った後の新しいエントリはフォワードブランチを破棄する。
+- `planSettle` は、インテントの後もすべてのドッキング済みペインに中身を保つオプトインのルールである。インテントが空にしたペインはマージされて消え、空になったルートペインは埋め込み側のファクトリーを通じて再シードされる — ファクトリーを渡さない場合はマージのみが行われ、ルートペインは空のままになる。空のペインを望む埋め込み側は、単にこれを呼ばないか、ファクトリーなしで呼ぶ。`planDropTab` は同じファクトリーを受け取る。それがある場合、自分のペインの端で離された唯一のタブは分割を起こし、ファクトリーのタブが空いたペインを補充する(ドラッグされたタブはフォーカスを保つ)。ない場合、そのリリースは何も変えない。
+- `DockController` はインテント層であり、オブザーバブルソースである(`subscribe` + `getSnapshot`。その参照はレイアウトが変わったときにのみ変化する)。
 
-**The components** render a layout snapshot and report settled intents — one per gesture, never a drag frame. A drag previews in local state while the gesture's own facts stay in its closure; on release the net result leaves through one `DockIntents` call — a strip release reports the caret slot as drawn, the dragged chip counted, and `planPlaceTab` turns that into the reorder or the move. That is what lets an embedder record exactly one history entry per gesture. The strip follows the WAI-ARIA tabs pattern with manual activation: the selected chip is in the tab order; Left and Right (wrapping), Home, and End move focus between chips without selecting; Enter or Space selects the focused chip through the same intent as a click. A chip is a capsule carrying one control, its close; the context menu (a secondary press on the chip) carries the same close plus the embedder's items — a menu that would hold no item at all never shows — and renders in a portal positioned against the chip because the chip box clips its overflow on purpose (see below). After the chips sits the add control, which asks the embedder (`DockIntents.addTab`) to seat its seeded tab; the embedder's `canAddTab(paneId)` decides per pane whether the control is drawn at all. Copying a tab has no kit control — it is the embedder's API — and floating is the drag released clear of the surface.
+**コンポーネント**はレイアウトスナップショットをレンダリングし、確定したインテントを報告する — ジェスチャーごとに 1 つで、ドラッグフレームは決して報告しない。ドラッグはローカル状態でプレビューし、ジェスチャー自身の事実はそのクロージャーに留まる。リリース時に最終結果が 1 回の `DockIntents` 呼び出しを通じて出ていく — ストリップのリリースは、描画されたとおりのキャレットスロットと、数えられたドラッグ中のチップを報告し、`planPlaceTab` がそれを並べ替えまたは移動に変換する。これにより、埋め込み側はジェスチャーごとに正確に 1 つの履歴エントリを記録できる。ストリップは手動アクティベーションの WAI-ARIA タブパターンに従う。選択されたチップはタブオーダーに入る。Left と Right(ラップあり)、Home、End は選択せずにチップ間でフォーカスを移動する。Enter または Space は、クリックと同じインテントを通じてフォーカスされたチップを選択する。チップは 1 つのコントロール(そのクローズ)を載せたカプセルである。コンテキストメニュー(チップへのセカンダリ押下)は同じクローズと埋め込み側の項目を持ち — 項目を 1 つも持たないメニューは決して表示されない — 、チップボックスが意図的にオーバーフローをクリップするため(後述)、チップに位置合わせされたポータルでレンダリングされる。チップの後には追加コントロールが座り、埋め込み側(`DockIntents.addTab`)にそのシードされたタブを配置するよう求める。埋め込み側の `canAddTab(paneId)` が、コントロールを描画するかどうかをペインごとに決める。タブのコピーにキットのコントロールはない — それは埋め込み側の API である — 、フローティングはサーフェスから離してリリースしたドラッグである。
 
-Tab context menus show the close action name without a shortcut hint: they act on the clicked tab, while shortcuts can target another focused pane. An unmodified Escape dismisses the foreground tab menu without closing the tab and returns focus from a menu item to its tab without drawing a focus outline. Tab and arrow navigation retain the tab’s visible focus indicator. Composition and held-key repeats do not dismiss it.
+タブのコンテキストメニューは、ショートカットのヒントなしでクローズアクション名を表示する。それらはクリックされたタブに作用する一方、ショートカットは別のフォーカスされたペインを対象にできるからだ。修飾なしの Escape は、タブを閉じずにフォアグラウンドのタブメニューを閉じ、フォーカスアウトラインを描かずにメニュー項目からそのタブへフォーカスを戻す。タブと矢印のナビゲーションは、タブの可視のフォーカスインジケーターを保持する。コンポジションとキー押しっぱなしのリピートはそれを閉じない。
 
 <a id="embedding-it"></a>
-## Embedding it
+## 埋め込む
 
-Everything host-specific arrives through props:
+ホスト固有のものはすべて props を通じて届く:
 
-| Contract | Carries |
+| 契約 | 持ち運ぶもの |
 |---|---|
-| `DockLabels` | every rendered string, already localized, accessible names included |
-| `TabRenderer` | one tab's body (`renderTab`), drawn flush to the pane's edges and the unbordered strip's bottom edge with the insets it chooses, and optionally what its chip or panel header shows as a title (`renderTabTitle`, falling back to the record's `title`); the embedder dispatches on `tab.kind` |
-| `DockIntents` | the settled results of every gesture |
+| `DockLabels` | レンダリングされるすべての文字列。すでにローカライズ済みで、アクセシブル名も含む |
+| `TabRenderer` | 1 つのタブの本体(`renderTab`)。ペインの端と、ボーダーのないストリップの下端に、自ら選んだインセットでぴったり描画される。オプションで、そのチップまたはパネルヘッダーがタイトルとして表示するもの(`renderTabTitle`。レコードの `title` にフォールバック)。埋め込み側が `tab.kind` でディスパッチする |
+| `DockIntents` | すべてのジェスチャーの確定した結果 |
 
-`DockController` satisfies `DockIntents` as written, so an embedding can pass it to `DockLayout` for retained Sidebar layouts or `DockSurface` for recursive split trees. An embedder that routes through its own store implements the same method names instead. Three props carry control policy rather than gestures: `canSplit` (surface-wide, the pane budget; disables the split control with `splitPaneDisabled`), `canAddTab(paneId)` (per pane, omits the add control; leave it out to draw one in every pane), and `canCloseTab(tabId)` (per tab, withholds the chip's close control and the menu's close item together; leave it out to keep every tab closable). Hiding the add control moves nothing else in the strip, and a withheld close moves nothing in the chip — the close control paints over the title's end rather than beside it. A pane's lone chip whose close is withheld draws quiet — no capsule, no hover fill — since there is nothing to select against and nothing to do to it. The kit adds one policy of its own, the room rule below, which disables a pane's split control with `splitPaneNarrow`; `onRoom(fits)` reports its readings so an embedder splitting programmatically can honour the same rule.
+`DockController` は書かれたまま `DockIntents` を満たすため、埋め込みはそれを、保持型の Sidebar レイアウトには `DockLayout` へ、再帰的な分割ツリーには `DockSurface` へ渡せる。独自のストアを通す埋め込み側は、代わりに同じメソッド名を実装する。3 つの props はジェスチャーではなく制御ポリシーを持ち運ぶ: `canSplit`(サーフェス全体、ペイン予算。`splitPaneDisabled` で分割コントロールを無効化)、`canAddTab(paneId)`(ペインごと、追加コントロールを省略。省略するとすべてのペインに描画)、`canCloseTab(tabId)`(タブごと、チップのクローズコントロールとメニューのクローズ項目を一緒に差し控える。省略するとすべてのタブを閉じられる)。追加コントロールを隠してもストリップ内の他のものは動かず、差し控えられたクローズはチップ内の何も動かさない — クローズコントロールはタイトルの終端の隣ではなく上に描画される。クローズが差し控えられたペインの唯一のチップは、静かに描画される — カプセルもホバー塗りもない — 。対して選択するものも、それに対してできることもないからだ。キットは独自のポリシーを 1 つ追加する。後述の余地ルールで、`splitPaneNarrow` でペインの分割コントロールを無効化する。`onRoom(fits)` はその読み取りを報告するため、プログラムで分割する埋め込み側も同じルールを守れる。
 
-`dropZones="horizontal"` offers two half-pane hints; once budget or width forbids another split, the whole body accepts a move. A hint is a dashed card inset 8px inside its region, showing the zone's glyph and `labels.dropZone[zone]`; the preview layer covers all tab-body content, while the card under the pointer takes the accent and its neighbour stays a quiet outline. `minPaneFraction` sets the preview minimum, and `planResizeSplit` accepts the same minimum for the committed operation. The Sidebar uses 0.2 and enforces two panes in its own store. The generic engine retains its tree and other split directions. `hideSplitWhenBlocked` hides a blocked split control — pane budget spent or pane too narrow — instead of rendering it disabled; its default is false.
+`dropZones="horizontal"` は 2 つの半ペインヒントを提供する。予算または幅がさらなる分割を許さなくなると、本体全体が移動を受け入れる。ヒントは、その領域の内側に 8px インセットされた破線カードで、ゾーンのグリフと `labels.dropZone[zone]` を表示する。プレビューレイヤーはすべてのタブ本体コンテンツを覆い、ポインターの下のカードがアクセントを取り、その隣は静かなアウトラインのままである。`minPaneFraction` はプレビューの最小値を設定し、`planResizeSplit` は確定された操作に対して同じ最小値を受け入れる。Sidebar は 0.2 を使用し、自身のストアで 2 ペインを強制する。汎用エンジンはそのツリーと他の分割方向を保持する。`hideSplitWhenBlocked` は、ブロックされた分割コントロール — ペイン予算を使い切った、またはペインが狭すぎる — を無効としてレンダリングする代わりに隠す。デフォルトは false。
 
-A tab's `kind` is an opaque string. Seeded tabs are factories (`DockControllerOptions`), so what a fresh pane contains is the embedder's decision, not this package's. Content identity is the pair (`kind`, `contentId`): `findContentTab(state, contentId, kind?)` finds the tab showing it anywhere and `findPaneContentTab(state, paneId, contentId, kind?)` within one pane, and `planOpenContent` focuses that tab instead of opening another unless told `revealIfOpened: false`; an explicit `index` seats a new tab at a strip slot rather than at the end.
+タブの `kind` は不透明な文字列である。シードされたタブはファクトリー(`DockControllerOptions`)であり、新しいペインが何を含むかは埋め込み側の決定であり、このパッケージのものではない。コンテンツの同一性は組(`kind`, `contentId`)である。`findContentTab(state, contentId, kind?)` はそれを表示しているタブをどこからでも見つけ、`findPaneContentTab(state, paneId, contentId, kind?)` は 1 つのペイン内で見つける。`planOpenContent` は `revealIfOpened: false` を指定されない限り、別のタブを開く代わりにそのタブにフォーカスする。明示的な `index` は、新しいタブを末尾ではなくストリップのスロットに配置する。
 
-`DockLayout`, used by the Sidebar, keeps each tab in a stable DOM cell across selection, pane moves and floating. It accepts one docked pane or two horizontal panes; CSS Grid resolves their widths. `keepMounted(tab)` retains visited bodies and `active` controls Session visibility without reparenting content.
+Sidebar が使用する `DockLayout` は、選択、ペイン移動、フローティングを通じて各タブを安定した DOM セルに保つ。1 つのドッキングされたペインまたは 2 つの水平ペインを受け入れ、CSS Grid がその幅を解決する。`keepMounted(tab)` は訪問済みの本体を保持し、`active` はコンテンツを親変更せずにセッションの可視性を制御する。
 
-`DockSurface` is the docked area for the separate recursive renderer. Chrome around it — a rail, a collapsed presentation, any history controls — belongs to the embedder, which reads `state.expanded` and decides; the kit ships no undo/redo control of its own. Surface-wide controls the embedder does want on the surface go through the `chrome` prop, which the kit places at the far end of the top-right pane's tab strip (the last child of every row split, the first of every column split), so a surface needs no header row of its own. `FloatLayer` owns its own gestures and positions panels in viewport coordinates, so it may be mounted anywhere, including a portal. Both float renderers keep the header at least 20px below the Windows caption (20px below the viewport top in native fullscreen), including newly opened and restored panels. Dragging and resizing start at the displayed position.
+`DockSurface` は、別個の再帰レンダラーのためのドッキング領域である。その周りのクローム — レール、折りたたみ表示、任意の履歴コントロール — は埋め込み側に属し、`state.expanded` を読んで決定する。キットは自前の undo/redo コントロールを出荷しない。埋め込み側がサーフェス上に置きたいサーフェス全体のコントロールは `chrome` prop を通り、キットはそれを右上ペインのタブストリップの末端(すべての行分割の最後の子、すべての列分割の最初)に配置するため、サーフェスは自前のヘッダー行を必要としない。`FloatLayer` は独自のジェスチャーを所有し、パネルをビューポート座標で配置するため、ポータルを含めどこにでもマウントできる。両方のフロートレンダラーは、新しく開かれたパネルと復元されたパネルを含め、ヘッダーを Windows キャプションの少なくとも 20px 下(ネイティブフルスクリーンではビューポート上端の 20px 下)に保つ。ドラッグとリサイズは表示されている位置で開始する。
 
 <a id="interaction-rules-worth-keeping"></a>
-## Interaction rules worth keeping
+## 保持すべきインタラクションルール
 
-The split control accepts localized tooltip text, separate effective keys through `splitPaneKeys`, and an ARIA combination from its embedder. Close controls receive their keys through `closeTabKeys`. A disabled control has a keyboard-focusable wrapper that explains the pane-budget or width restriction. Docked and floating pane containers can receive programmatic focus without entering the normal tab sequence or drawing a focus outline; their controls retain their own keyboard focus indicators. Tab navigation and selection use unmodified keys and leave composition input to its owner.
+分割コントロールは、ローカライズされたツールチップテキスト、`splitPaneKeys` を通じた別々の実効キー、埋め込み側からの ARIA の組み合わせを受け入れる。クローズコントロールは `closeTabKeys` を通じてキーを受け取る。無効化されたコントロールには、ペイン予算または幅の制限を説明するキーボードでフォーカス可能なラッパーがある。ドッキングおよびフローティングのペインコンテナは、通常のタブシーケンスに入らずフォーカスアウトラインも描かずにプログラムによるフォーカスを受け取れる。そのコントロールは独自のキーボードフォーカスインジケーターを保持する。タブのナビゲーションと選択は修飾なしのキーを使用し、コンポジション入力をその所有者に委ねる。
 
-These are not stylistic; each one fixes a defect found in a real browser.
+これらはスタイル上のものではない。それぞれが実際のブラウザで見つかった不具合を修正する。
 
-- **Capture the pointer** when a gesture starts. Without it any scroll container the pointer crosses can claim the gesture, which the browser reports as a cancelled pointer and an abandoned drag. Capture is hardening — the window listeners carry the gesture either way, so an environment without the API still works.
-- **The chips give way; the strip's end controls never do.** The chip box is the strip's one shrinking part (`flex: 0 1 auto; min-width: 0; overflow-x: auto`): chips shrink down to an 80px floor and then scroll on the wheel with no scrollbar drawn, and the box fades its chips out over 24px at each side that hides some (`data-dockkit-strip-scroll`, written from the box's scroll reading after each commit, scroll, and resize). Whenever the active tab or the row of chips changes, the box scrolls so the active chip stands clear of the fade band; a chip already in view moves nothing. A chip's title is never ellipsized: `TabTitle` reads its text against its box and sets `data-dockkit-tab-clipped` while the text is wider, which fades the text out over its last 16px. A chip's close control shows while the chip is active, hovered, or holds focus, over the title's last 14px, which fade under it, so the chip is the same width either way. The two slots beside the active chip draw no hairline, so the filled capsule stands between bare chips. The add, split, and chrome controls are `flex: none`, so they keep their width and place in any pane at least as wide as they are (about 130px with the chrome, 72px without). The surface's `min-width: 0` and the pane's `overflow: hidden` stop a body's longest unwrapped line from widening the pane past its box, which is what carried the controls and the body's scrollbar off-screen.
-- **The chip box scrolls, but never claims a gesture.** A horizontal scroller would take press-and-move for itself and cancel the pointer; the box, the chips, and the strip set `touch-action: none` and the gesture captures the pointer, so a press-and-move on a chip is a drag and only the wheel scrolls the box.
-- **A split needs room for two working halves.** A pane splits into equal halves, so each half must hold what cannot shrink: the strip's fixed part — measured as the strip's width minus the chip box and the fill, which is the padding, the gaps, and every control that pane draws (its own chrome included, so the top-right pane asks more) — plus one chip at its minimum — `.tab` declares `min-width: 80px` on a content-box, so its footprint is 80px plus 10px + 10px of padding, 100px, read from a rendered chip's computed style (the stylesheet figure when none can be read); the divider between the halves takes its rendered thickness (0 — its hairline paints over the seam without taking layout room, so a body's own rules run unbroken past it). A column split, which only an edge drop makes, needs each half to hold the strip (34px) plus a 48px body: one 13px secondary line at 1.6 line-height inside 12px of the body's own insets — the pane body itself is unpadded, so a tab's body reaches the strip's bottom edge and the pane's edges and draws its own. `halvesFit` in `geometry.ts` is the arithmetic; `measure.ts` reads the rectangles after every commit and whenever the surface resizes, because the layout state carries fractions, never pixels, and the engine's planners stay that way. A pane without room keeps its split control, disabled with `splitPaneNarrow` (hidden instead under `hideSplitWhenBlocked`), and offers no edge drop zone for that axis (the release is then not a move). Under `hideSplitWhenBlocked` the split control's own footprint — its box plus the strip's gap — is left out of the fixed part: hiding the control sheds exactly that footprint from the strip, so a reading that counted it would flip with the control's visibility and re-render forever; leaving it out is also what the half being asked about would carry, since a half too narrow to split hides its own control. A pane the user narrows afterwards — a divider or the embedder's column dragged — keeps its size: the rule only decides its next split.
-- **Focus lands on click, not on press.** A state change between `pointerdown` and the first `pointermove` rebuilds the pressed subtree, and a replaced element cancels the pointer. It also keeps a drag from recording a redundant focus operation first. Clicks on the chips, the strip's controls, and the embedder's chrome stop at the strip: the intent each reports already decides the active pane, or is the embedder's own, so the pane's click-to-focus records nothing extra. A floating panel's grip and corner report through their gesture the same way — a press released in place is a click that raises the panel, and a drag records only the move or resize, whose operation raises it — while a press on the panel's body raises it directly. A click on the pane that is active already, a click or key on that pane's selected chip, or a press on the panel that is active and on top already, changes nothing and records nothing.
-- **A control nested inside a draggable chip stops its own press.** Otherwise the press starts a drag, captures the pointer, and the nested control's click never lands.
-- **Emphasis takes the platform's accent, never `--dsw-alias-brand-primary`.** This platform binds `brand-primary` to its near-black (light) or near-white (dark) foreground, so the drop caret and the drop-zone hint use `--dsw-alias-brand-primary-new-colorprimary-new-color`, as the trajectory views do; a hovered divider takes the caption label ink instead, reading as a handle rather than a highlight. A floating panel draws no border — the menu's shadow (`--dsw-elevation-prominent`) outlines it — and the active panel gets no heavier frame: it is already on top and casts the same shadow; a darker frame around it read as a defect.
+- **ジェスチャー開始時にポインターをキャプチャする。** これがないと、ポインターが横切る任意のスクロールコンテナがジェスチャーを要求でき、ブラウザはそれをキャンセルされたポインターと放棄されたドラッグとして報告する。キャプチャは強化策である — どちらにせよウィンドウリスナーがジェスチャーを運ぶため、この API のない環境でも動作する。
+- **チップは譲り、ストリップの端のコントロールは決して譲らない。** チップボックスはストリップの唯一の縮む部分である(`flex: 0 1 auto; min-width: 0; overflow-x: auto`)。チップは 80px の下限まで縮み、その後スクロールバーを描かずにホイールでスクロールする。ボックスは、一部を隠している各側でチップを 24px にわたってフェードアウトする(`data-dockkit-strip-scroll` は、各コミット、スクロール、リサイズの後でボックスのスクロール読み取りから書き込まれる)。アクティブタブまたはチップの並びが変わるたびに、ボックスはアクティブチップがフェード帯から離れて見えるようにスクロールする。すでに見えているチップは何も動かさない。チップのタイトルは決して省略記号化されない。`TabTitle` はそのテキストをボックスと比較して読み取り、テキストがより広い間 `data-dockkit-tab-clipped` を設定し、それがテキストの最後の 16px にわたってフェードアウトさせる。チップのクローズコントロールは、チップがアクティブ、ホバー中、またはフォーカスを保持している間、タイトルの最後の 14px の上に表示され、その下のテキストはフェードするため、チップの幅はどちらでも同じである。アクティブチップの両隣のスロットはヘアラインを描かないため、塗りつぶされたカプセルが裸のチップの間に立つ。追加、分割、クロームのコントロールは `flex: none` であるため、それらと同じかそれより広い任意のペインで幅と位置を保つ(クロームありで約 130px、なしで 72px)。サーフェスの `min-width: 0` とペインの `overflow: hidden` は、本体の最長の折り返されない行がペインをそのボックスより広げるのを防ぐ。これがコントロールと本体のスクロールバーを画面外に運んでいたものである。
+- **チップボックスはスクロールするが、ジェスチャーを決して要求しない。** 水平スクローラーは press-and-move を自身のために取り、ポインターをキャンセルしてしまう。ボックス、チップ、ストリップは `touch-action: none` を設定し、ジェスチャーがポインターをキャプチャするため、チップ上の press-and-move はドラッグとなり、ボックスをスクロールするのはホイールだけである。
+- **分割には 2 つの機能する半分のための余地が必要である。** ペインは均等な半分に分割されるため、各半分は縮まないものを保持できなければならない: ストリップの固定部分 — ストリップの幅からチップボックスとフィルを引いたものとして測定される。フィルとはパディング、ギャップ、およびそのペインが描くすべてのコントロール(自身のクロームも含むため、右上ペインはより多くを要求する)である — に加えて、最小サイズのチップ 1 つ — `.tab` は content-box で `min-width: 80px` を宣言するため、その占有面積は 80px にパディングの 10px + 10px を加えた 100px であり、レンダリングされたチップの computed style から読み取られる(読み取れない場合はスタイルシートの値)。半分同士の間のディバイダーはそのレンダリングされた太さ(0 — そのヘアラインはレイアウトの余地を取らずに継ぎ目に重ねて描かれるため、本体自身のルールはそれを越えて途切れずに走る)を取る。エッジドロップでのみ作られる列分割では、各半分がストリップ(34px)と 48px の本体を保持する必要がある: 本体自身のインセット 12px の内側に、line-height 1.6 の 13px のセカンダリー行が 1 行 — ペイン本体自体はパディングされないため、タブの本体はストリップの下端とペインの端に達し、自ら描画する。`geometry.ts` の `halvesFit` がその算術であり、`measure.ts` は各コミットの後およびサーフェスがリサイズするたびに矩形を読み取る。レイアウト状態は分数を持ち運び、決してピクセルを持ち運ばず、エンジンのプランナーもそのままであるからだ。余地のないペインは分割コントロールを保持し、`splitPaneNarrow` で無効化され(`hideSplitWhenBlocked` の下では代わりに隠される)、その軸のエッジドロップゾーンを提供しない(その場合のリリースは移動ではない)。`hideSplitWhenBlocked` の下では、分割コントロール自身の占有面積 — そのボックスとストリップのギャップ — は固定部分から除外される: コントロールを隠すと正確にその占有面積がストリップから削られ、それを数えた読み取りはコントロールの可視性とともに反転して永久に再レンダリングしてしまう。それを除外することは、問い合わせている半分が持ち運ぶものと一致する。狭すぎて分割できない半分は自身のコントロールを隠すからである。ユーザーが後で狭めたペイン — ディバイダーまたは埋め込み側の列がドラッグされた — はサイズを保つ。このルールはその次の分割のみを決定する。
+- **フォーカスは press ではなく click で着地する。** `pointerdown` と最初の `pointermove` の間の状態変化が押されたサブツリーを再構築し、置き換えられた要素はポインターをキャンセルする。また、ドラッグが先に冗長なフォーカス操作を記録するのを防ぐ。チップ、ストリップのコントロール、埋め込み側のクロームへのクリックはストリップで止まる。それぞれが報告するインテントがすでにアクティブペインを決めているか、埋め込み側自身のものであるため、ペインの click-to-focus は余分なものを記録しない。フローティングパネルのグリップとコーナーも同じように自身のジェスチャーを通じて報告する — その場で離された押下はパネルを持ち上げるクリックであり、ドラッグは移動またはリサイズのみを記録し、その操作がパネルを持ち上げる — 。一方、パネル本体への押下は直接持ち上げる。すでにアクティブなペインへのクリック、そのペインの選択されたチップへのクリックまたはキー、すでにアクティブで最上位にあるパネルへの押下は、何も変更せず何も記録しない。
+- **ドラッグ可能なチップに入れ子になったコントロールは自身の押下を止める。** そうでなければ押下がドラッグを開始してポインターをキャプチャし、入れ子のコントロールのクリックが決して着地しない。
+- **強調はプラットフォームのアクセントを取り、決して `--dsw-alias-brand-primary` を取らない。** このプラットフォームは `brand-primary` をそのほぼ黒(ライト)またはほぼ白(ダーク)のフォアグラウンドに束縛するため、ドロップキャレットとドロップゾーンヒントは、トラジェクトリービューと同様に `--dsw-alias-brand-primary-new-colorprimary-new-color` を使用する。ホバーされたディバイダーは代わりにキャプションラベルのインクを取り、ハイライトではなくハンドルとして読める。フローティングパネルはボーダーを描かない — メニューのシャドウ(`--dsw-elevation-prominent`)がその輪郭を作る — 、アクティブパネルはより重いフレームを得ない: すでに最上位にあり同じシャドウを落とすからだ。その周りのより暗いフレームは不具合として読まれた。
 
 <a id="build-shape"></a>
-## Build shape
+## ビルド形態
 
-The package is statically linked: tsdown's `staticLinked` preset emits one browser ESM bundle at `lib/index.js` (every bare specifier stays an import, sourcemaps chain to the sources) and ships the stylesheet under `lib/` at its `src`-relative path, and the Web shell resolves the package name and bundles that artifact itself, so vite stays the only owner of class hashing. One consequence is load-bearing — the kit keeps **one** stylesheet, `dockkit.module.css`, because a consumer de-duplicates injected sheets by file name and a collision would drop one silently.
+このパッケージは静的にリンクされる。tsdown の `staticLinked` プリセットが `lib/index.js` に 1 つのブラウザー ESM バンドルを出力し(すべてのベア指定子は import のままで、ソースマップはソースへ連鎖する)、スタイルシートを `src` 相対のパスで `lib/` の下に出荷する。Web シェルがパッケージ名を解決してその成果物を自らバンドルするため、クラスハッシュの唯一の所有者は vite のままである。1 つの帰結は重要である — キットは **1 つ** のスタイルシート `dockkit.module.css` を保つ。コンシューマーは注入されたシートをファイル名で重複排除するため、衝突があると一方が黙って落ちてしまうからだ。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side docking layout engine and component set that registers nothing model-facing.
+なし。このパッケージはブラウザー側のドッキングレイアウトエンジンとコンポーネント群であり、モデルに提示されるものは何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダー要求を組み立てることも送信することもない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Size semantics are deliberately small**: fractional weights with one minimum-size clamp. No snap, priority, or preferred size, so the cascading-squeeze behaviour of a full splitview is absent.
-- **Touch is untuned.** Gestures are pointer-based and `touch-action` is set where a scroller would otherwise interfere, but no touch-specific tuning has been done.
-- **Accessibility is incomplete**: no `separator` role on dividers and no keyboard route to split, move, or float.
-- **No published stylesheet contract.** Consumers get hashed module class names; the kit exposes no theming API beyond the `--dsw-*` custom properties it reads.
+- **サイズのセマンティクスは意図的に小さい**: 1 つの最小サイズクランプを伴う分数ウェイト。スナップ、優先度、希望サイズはないため、完全な splitview のカスケードスクイーズ挙動は存在しない。
+- **タッチは調整されていない。** ジェスチャーはポインターベースで、スクローラーが干渉する箇所では `touch-action` が設定されているが、タッチ固有の調整は行われていない。
+- **アクセシビリティは不完全である**: ディバイダーに `separator` ロールがなく、分割、移動、フローティングへのキーボード経路もない。
+- **公開されたスタイルシート契約はない。** コンシューマーが得るのはハッシュ化されたモジュールクラス名である。キットは自身が読む `--dsw-*` カスタムプロパティ以外にテーマ API を公開しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
-Menus use the shared `MenuSurface` material, including the macOS backing for background blur; custom content follows the [menu rules](../../../docs/web-styling.md#component-rules).
+メニューは共有の `MenuSurface` マテリアルを使用し、背景ブラー用の macOS バッキングも含む。カスタムコンテンツは[メニュールール](../../../docs/web-styling.md#component-rules)に従う。
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
-The embedder supplies effective close keycaps and ARIA combinations for tab and floating close controls. Close controls expose the same tooltip on hover and keyboard focus. Tab close tooltips stay hidden while their pane's context menu is open.
+埋め込み側が、タブとフローティングのクローズコントロールのための実効クローズキーキャップと ARIA の組み合わせを提供する。クローズコントロールは、ホバーとキーボードフォーカスで同じツールチップを公開する。タブのクローズツールチップは、そのペインのコンテキストメニューが開いている間は非表示のままである。
 
 </details>

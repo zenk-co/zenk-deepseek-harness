@@ -3,7 +3,8 @@
 
 # Fiber
 
-A fiber is one loaded plugin instance: its lifecycle state, validated config, and registered effects. `ctx.fiber` is the current fiber, and `ctx.effect()` delegates to it.
+日本語 | [English](fiber.en.md) | [中文](fiber.zh.md)
+fiber は、ロードされた 1 つのプラグインインスタンスである。そのライフサイクル状態、検証済み設定、登録済みエフェクトからなる。`ctx.fiber` は現在の fiber であり、`ctx.effect()` はそれに委譲する。
 
 ### ctx.effect(execute, label?)
 
@@ -25,14 +26,14 @@ effect(execute: () => SyncEffect, label?: string): Disposable<Promise<void>>
 effect(execute: () => Effect, label?: string): AsyncDisposable<Promise<void>>
 ```
 
-Register a cleanup-aware effect on this fiber.
+この fiber にクリーンアップ対応のエフェクトを登録する。
 
-`execute` runs immediately; the disposers it produces are collected and run (in reverse order) either when the returned disposer is called or when the fiber unloads, whichever comes first. Calling the disposer twice is a no-op. Throws `CordisError('INACTIVE_EFFECT')` if the fiber is already disposed, and `TypeError` if `execute` returns an invalid shape.
+`execute` は即座に実行される。それが生成するディスポーザーは収集され、返されたディスポーザーが呼ばれたとき、または fiber がアンロードされたときの早い方で（逆順に）実行される。ディスポーザーを 2 回呼んでも何も起きない。fiber がすでに破棄されている場合は `CordisError('INACTIVE_EFFECT')` を、`execute` が無効な形状を返した場合は `TypeError` をスローする。
 
-- `execute` — the effect body; see `Effect` for accepted shapes.
-- `label` — effect label shown in `getEffects()` diagnostics.
+- `execute` — エフェクト本体。受け入れられる形状は `Effect` を参照。
+- `label` — `getEffects()` 診断に表示されるエフェクトラベル。
 
-**Returns** a disposer that tears the effect down and settles once done.
+**戻り値** エフェクトを解体し、完了すると確定するディスポーザー。
 
 [Source](../../vendor/cordis/src/fiber.ts#L415)
 
@@ -43,15 +44,15 @@ Register a cleanup-aware effect on this fiber.
 fiber: Fiber
 ```
 
-The fiber (plugin runtime instance) that owns this context.
+このコンテキストを所有する fiber（プラグインランタイムインスタンス）。
 
 [Source](../../vendor/cordis/src/fiber.ts#L12)
 
-## The Fiber class
+## Fiber クラス
 
-Runtime instance of one plugin application.
+1 つのプラグインアプリケーションのランタイムインスタンス。
 
-A fiber tracks dependency state, validated config, lifecycle effects, and cleanup for the plugin context returned by `ctx.plugin()`.
+fiber は、`ctx.plugin()` が返すプラグインコンテキストの依存関係状態、検証済み設定、ライフサイクルエフェクト、クリーンアップを追跡する。
 
 [Source](../../vendor/cordis/src/fiber.ts#L184)
 
@@ -62,7 +63,7 @@ A fiber tracks dependency state, validated config, lifecycle effects, and cleanu
 public uid: number | null
 ```
 
-Unique id within the registry; 0 for the root fiber, `null` once disposed.
+レジストリ内で一意の id。ルート fiber は 0、破棄後は `null`。
 
 [Source](../../vendor/cordis/src/fiber.ts#L186)
 
@@ -73,7 +74,7 @@ Unique id within the registry; 0 for the root fiber, `null` once disposed.
 public readonly ctx: Context
 ```
 
-The context this fiber's plugin runs in (extends the parent context).
+この fiber のプラグインが実行されるコンテキスト（親コンテキストを拡張する）。
 
 [Source](../../vendor/cordis/src/fiber.ts#L188)
 
@@ -84,7 +85,7 @@ The context this fiber's plugin runs in (extends the parent context).
 public config: any
 ```
 
-The validated plugin config (updated by `update()`).
+検証済みのプラグイン設定（`update()` で更新される）。
 
 [Source](../../vendor/cordis/src/fiber.ts#L190)
 
@@ -95,7 +96,7 @@ The validated plugin config (updated by `update()`).
 public state
 ```
 
-Current lifecycle state; transitions emit `internal/status`.
+現在のライフサイクル状態。遷移は `internal/status` を発行する。
 
 [Source](../../vendor/cordis/src/fiber.ts#L194)
 
@@ -106,7 +107,7 @@ Current lifecycle state; transitions emit `internal/status`.
 public readonly dispose: () => Promise<void>
 ```
 
-Dispose this fiber: unload the plugin, then settle once cleanup finished.
+この fiber を破棄する。プラグインをアンロードし、クリーンアップが終わると確定する。
 
 [Source](../../vendor/cordis/src/fiber.ts#L196)
 
@@ -117,7 +118,7 @@ Dispose this fiber: unload the plugin, then settle once cleanup finished.
 public store: Dict<Impl> | undefined
 ```
 
-Snapshot of required service implementations while loaded; `undefined` otherwise.
+ロード中の必須サービス実装のスナップショット。それ以外は `undefined`。
 
 [Source](../../vendor/cordis/src/fiber.ts#L198)
 
@@ -128,7 +129,7 @@ Snapshot of required service implementations while loaded; `undefined` otherwise
 public inertia: Promise<void> | undefined
 ```
 
-The in-flight load/unload transition, if one is currently running.
+実行中のロード／アンロード遷移（現在進行中の場合）。
 
 [Source](../../vendor/cordis/src/fiber.ts#L200)
 
@@ -139,7 +140,7 @@ The in-flight load/unload transition, if one is currently running.
 get name()
 ```
 
-The plugin's display name, inherited from the nearest named ancestor, else `'root'`.
+プラグインの表示名。最も近い名前付き祖先から継承し、なければ `'root'`。
 
 [Source](../../vendor/cordis/src/fiber.ts#L336)
 
@@ -155,9 +156,9 @@ The plugin's display name, inherited from the nearest named ancestor, else `'roo
 assertActive()
 ```
 
-Throw if the fiber has already been disposed.
+fiber がすでに破棄されている場合にスローする。
 
-**Returns** nothing when the fiber is still active.
+**戻り値** fiber がまだアクティブな場合は何も返さない。
 
 [Source](../../vendor/cordis/src/fiber.ts#L351)
 
@@ -181,14 +182,14 @@ effect(execute: () => SyncEffect, label?: string): Disposable<Promise<void>>
 effect(execute: () => Effect, label?: string): AsyncDisposable<Promise<void>>
 ```
 
-Register a cleanup-aware effect on this fiber.
+この fiber にクリーンアップ対応のエフェクトを登録する。
 
-`execute` runs immediately; the disposers it produces are collected and run (in reverse order) either when the returned disposer is called or when the fiber unloads, whichever comes first. Calling the disposer twice is a no-op. Throws `CordisError('INACTIVE_EFFECT')` if the fiber is already disposed, and `TypeError` if `execute` returns an invalid shape.
+`execute` は即座に実行される。それが生成するディスポーザーは収集され、返されたディスポーザーが呼ばれたとき、または fiber がアンロードされたときの早い方で（逆順に）実行される。ディスポーザーを 2 回呼んでも何も起きない。fiber がすでに破棄されている場合は `CordisError('INACTIVE_EFFECT')` を、`execute` が無効な形状を返した場合は `TypeError` をスローする。
 
-- `execute` — the effect body; see `Effect` for accepted shapes.
-- `label` — effect label shown in `getEffects()` diagnostics.
+- `execute` — エフェクト本体。受け入れられる形状は `Effect` を参照。
+- `label` — `getEffects()` 診断に表示されるエフェクトラベル。
 
-**Returns** a disposer that tears the effect down and settles once done.
+**戻り値** エフェクトを解体し、完了すると確定するディスポーザー。
 
 [Source](../../vendor/cordis/src/fiber.ts#L415)
 
@@ -203,9 +204,9 @@ Register a cleanup-aware effect on this fiber.
 getEffects()
 ```
 
-Return metadata for currently registered effects.
+現在登録されているエフェクトのメタデータを返す。
 
-**Returns** one `EffectMeta` tree per labeled live effect.
+**戻り値** ラベル付きのライブエフェクトごとに 1 つの `EffectMeta` ツリー。
 
 [Source](../../vendor/cordis/src/fiber.ts#L568)
 
@@ -221,9 +222,9 @@ Return metadata for currently registered effects.
 async await()
 ```
 
-Wait for current lifecycle work and rethrow startup errors.
+現在のライフサイクル作業を待ち、スタートアップエラーを再スローする。
 
-**Returns** this fiber, once it has settled into a stable state.
+**戻り値** 安定した状態に落ち着いた時点のこの fiber。
 
 [Source](../../vendor/cordis/src/fiber.ts#L704)
 
@@ -239,9 +240,9 @@ Wait for current lifecycle work and rethrow startup errors.
 async restart()
 ```
 
-Dispose and immediately reload this plugin with its current config.
+このプラグインを破棄し、現在の設定で即座に再ロードする。
 
-**Returns** a promise resolving once the reload settled.
+**戻り値** リロードが確定すると解決する promise。
 
 [Source](../../vendor/cordis/src/fiber.ts#L718)
 
@@ -262,22 +263,22 @@ Dispose and immediately reload this plugin with its current config.
 update(config: any, noSave = false)
 ```
 
-Validate and apply new config, then restart the plugin.
+新しい設定を検証して適用し、プラグインを再起動する。
 
-Runs the `internal/update` waterfall first, so update hooks (and HMR) can veto or replace the restart.
+最初に `internal/update` ウォーターフォールを実行するので、更新フック（および HMR）が再起動を拒否または置換できる。
 
-- `config` — the new raw config; validated before anything restarts.
-- `noSave` — hint for persistence hooks not to write the change back.
+- `config` — 新しい生の設定。何かが再起動する前に検証される。
+- `noSave` — 永続化フックに変更を書き戻さないよう促すヒント。
 
-**Returns** nothing; the restart runs behind the `internal/update` waterfall.
+**戻り値** なし。再起動は `internal/update` ウォーターフォールの背後で実行される。
 
 [Source](../../vendor/cordis/src/fiber.ts#L736)
 
 ## Effect
 
-Effect body result accepted by `ctx.effect()` and plugin startup.
+`ctx.effect()` とプラグイン起動が受け入れるエフェクト本体の結果。
 
-Either a single disposer, a promise of one, or a (possibly async) iterable yielding several — generator effects register each yielded disposer as it is produced.
+単一のディスポーザー、その promise、または複数を生み出す（非同期でもよい）反復可能オブジェクトのいずれか。ジェネレーターエフェクトは、生み出された各ディスポーザーを生成時に登録する。
 
 ```ts cordis-catalog
 /**
@@ -296,9 +297,9 @@ type Effect<T = any> =
 
 ## Disposable
 
-Function returned by an effect to release resources during disposal.
+破棄中にリソースを解放するためにエフェクトが返す関数。
 
-Disposers run in reverse registration order when the owning fiber unloads; they may be async, in which case unloading awaits them.
+ディスポーザーは所有 fiber のアンロード時に逆登録順で実行される。非同期でもよく、その場合アンロードはそれらを待つ。
 
 ```ts cordis-catalog
 /**
@@ -314,7 +315,7 @@ type Disposable<T = any> = () => T
 
 ## EffectMeta
 
-Tree node used to expose nested effect labels for diagnostics.
+診断のためにネストされたエフェクトラベルを公開するツリーノード。
 
 ```ts cordis-catalog
 /** Tree node used to expose nested effect labels for diagnostics. */
@@ -330,7 +331,7 @@ interface EffectMeta {
 
 ## CordisError
 
-Framework error with a stable machine-readable code.
+安定した機械可読コードを持つフレームワークエラー。
 
 ```ts cordis-catalog
 /** Framework error with a stable machine-readable code. */
@@ -356,7 +357,7 @@ namespace CordisError {
 
 ## ValidationError
 
-Error raised when plugin configuration fails standard-schema validation.
+プラグイン設定が standard-schema 検証に失敗したときに発生するエラー。
 
 ```ts cordis-catalog
 /** Error raised when plugin configuration fails standard-schema validation. */

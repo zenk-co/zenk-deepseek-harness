@@ -1,18 +1,18 @@
 ---
 kind: upgrade-guide
-description: "Custom title routes require registered adapters and reasoning efforts in increasing order."
+description: "カスタムタイトルルートは登録済みアダプターと昇順のリーズニングエフォートを必要とする。"
 ---
 
-# Prepare custom title routes
+# カスタムタイトルルートを準備する
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-Model-backed session titles prepare their requests through `ctx.llm.prepareCall()`. Compositions that serve title routes only through `llm/stream` middleware must also register an adapter. Custom adapters must list selectable reasoning efforts from least to greatest, rather than in arbitrary display order. Title policy selects the first entry through a configuration function. Existing concrete `prepareCall()` inputs remain valid.
+モデルベースのセッションタイトルは `ctx.llm.prepareCall()` 経由でリクエストを準備する。タイトルルートを `llm/stream` ミドルウェア経由でのみ提供する構成もアダプターを登録しなければならない。カスタムアダプターは選択可能なリーズニングエフォートを任意の表示順ではなく、最小から最大へ並べて列挙しなければならない。タイトルポリシーは設定関数を通じて最初のエントリーを選択する。既存の具体的な `prepareCall()` 入力は引き続き有効である。
 
-## Migration
+## 移行
 
-1. Register the title route with `ctx.llm.registerAdapter()`. Replay compositions can configure the existing `llm-replay` plugin's `providers` list.
-2. In the adapter's model metadata, order `reasoning.efforts` from least to greatest selectable effort. Apply the same order to replay models' `reasoningEfforts`. Keep the configured default independent of list order. Omit reasoning metadata when the route has no selectable controls.
-3. Generate a title and check that `session/title-llm-request` records the selected effort and a provider title is saved. Existing Session records without that optional field remain readable.
+1. タイトルルートを `ctx.llm.registerAdapter()` で登録する。リプレイ構成では既存 `llm-replay` プラグインの `providers` リストを設定できる。
+2. アダプターのモデルメタデータで `reasoning.efforts` を選択可能な最小エフォートから最大へ順序付ける。リプレイモデルの `reasoningEfforts` にも同じ順序を適用する。設定済みデフォルトはリスト順から独立に保つ。ルートに選択可能なコントロールがない場合はリーズニングメタデータを省略する。
+3. タイトルを生成し、`session/title-llm-request` が選択されたエフォートを記録し、プロバイダータイトルが保存されることを確認する。その任意フィールドのない既存セッションレコードも引き続き読める。

@@ -1,16 +1,16 @@
 # DeepSeek Harness Python SDK
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Python subprocess SDK for driving DeepSeek Harness over newline-delimited JSON-RPC on stdio. Install `deepseek-harness-sdk`; it installs the exact same-version `deepseek-harness-runtime-bin` wheel for the current platform.
+stdio 上の改行区切り JSON-RPC で DeepSeek Harness を操作するための Python サブプロセス SDK。`deepseek-harness-sdk` をインストールします。これは現在のプラットフォーム向けの同一バージョンの `deepseek-harness-runtime-bin` wheel もインストールします。
 
 ```sh
 python -m pip install deepseek-harness-sdk
 ```
 
-## Optional Office operations
+## 任意の Office 操作
 
-Download the Office runtime explicitly, then call the local API without an agent, Session, model request, API key, or Harness home:
+Office ランタイムを明示的にダウンロードすると、エージェント、セッション、モデルリクエスト、API キー、Harness ホームなしでローカル API を呼び出せます:
 
 ```py
 from deepseek_harness_runtime import download_office
@@ -22,15 +22,15 @@ workbook = recalculate("forecast.xlsx", "calculated.xlsx")
 preview = render_images("report.docx", "report-preview", pages=[1])
 ```
 
-The output file or image directory must not exist. Successful outputs belong to the caller; Kit removes failed outputs. `OfficeOptions` supplies operation limits and font preferences. Results expose typed paths, missing fonts, and image metadata. `OfficeError` retains CLI failure codes; malformed results raise `SdkProtocolError`. Recalculation does not verify business logic or Excel fidelity. Ctrl+C waits for CLI cleanup; a second interrupt forces termination and may leave partial output. Windows requires an absolute `SystemRoot` and a shared console for Ctrl+C delivery.
+出力ファイルまたは画像ディレクトリは存在してはなりません。成功した出力は呼び出し元のもので、Kit は失敗した出力を削除します。`OfficeOptions` は操作の制限とフォント設定を指定します。結果は型付きパス、欠落フォント、画像メタデータを公開します。`OfficeError` は CLI の失敗コードを保持し、不正な結果は `SdkProtocolError` を発生させます。再計算はビジネスロジックや Excel の忠実性を検証しません。Ctrl+C は CLI のクリーンアップを待ちます。2 回目の割り込みは強制終了し、部分的な出力を残すことがあります。Windows では Ctrl+C 配信のために絶対パスの `SystemRoot` と共有コンソールが必要です。
 
-The authoring environment is independently optional through `deepseek_harness_runtime.download_primary_runtime()`. See the [runtime reference](../sdk-runtime/README.md) for cache selection, resource activation, and download behavior. SDK startup and Office operations never acquire missing resources automatically.
+オーサリング環境は `deepseek_harness_runtime.download_primary_runtime()` を通じて独立に任意です。キャッシュ選択、リソースのアクティベーション、ダウンロード動作については[ランタイムリファレンス](../sdk-runtime/README.md)を参照してください。SDK の起動と Office 操作が欠落したリソースを自動的に取得することは決してありません。
 
-## Start a runtime
+## ランタイムを起動する
 
-The Python SDK has no separate application entrypoint. It launches the bundled `dsh` CLI with `--profile sdk`; the selected profile owns the JSON-RPC server, agent composition, credentials, persistence, tools, and shutdown behavior.
+Python SDK に別個のアプリケーションエントリーポイントはありません。バンドルされた `dsh` CLI を `--profile sdk` で起動します。選択されたプロファイルが JSON-RPC サーバー、エージェント構成、資格情報、永続化、ツール、シャットダウン動作を所有します。
 
-Every launch requires an explicit Harness home. Pass `dsh_home` or provide a non-empty `DSH_HOME` in the child environment. The SDK deliberately never discovers `~/.dsh`.
+すべての起動には明示的な Harness ホームが必要です。`dsh_home` を渡すか、子プロセス環境で空でない `DSH_HOME` を提供してください。SDK は意図的に `~/.dsh` を探索しません。
 
 ```py
 from deepseek_harness import DeepSeekHarness
@@ -48,9 +48,9 @@ with DeepSeekHarness(
 print(result.final_response)
 ```
 
-`DeepSeekHarness` starts lazily and reuses its runtime until `close()` or context-manager exit. The initial profile handshake has an independent 30-second default bound through `initialize_timeout_seconds`; ordinary turns remain unbounded unless `request_timeout_seconds` is set. A timeout names the selected profile and includes retained runtime diagnostics. `cwd` is the agent workspace; `runtime_cwd` independently selects the subprocess working directory. Both become absolute before launch. `provider`, `model`, optional `reasoning_effort`, and optional positive `max_tokens` are sent during JSON-RPC initialization. `base_url` and `api_key` explicitly override `DEEPSEEK_BASE_URL` and `DEEPSEEK_API_KEY` in the child environment.
+`DeepSeekHarness` は遅延起動し、`close()` またはコンテキストマネージャーの終了までそのランタイムを再利用します。初期プロファイルハンドシェイクには `initialize_timeout_seconds` による独立したデフォルト 30 秒の上限があります。通常のターンは `request_timeout_seconds` が設定されない限り無制限のままです。タイムアウトは選択されたプロファイルを名指し、保持されたランタイム診断を含みます。`cwd` はエージェントのワークスペースで、`runtime_cwd` はサブプロセスの作業ディレクトリを独立に選択します。どちらも起動前に絶対パスになります。`provider`、`model`、任意の `reasoning_effort`、任意の正の `max_tokens` は JSON-RPC 初期化時に送信されます。`base_url` と `api_key` は子プロセス環境の `DEEPSEEK_BASE_URL` と `DEEPSEEK_API_KEY` を明示的に上書きします。
 
-`harness.resume_session(saved_session_id)` restores persisted history and returns a `Session` ready for `run()`. Save the original session id and reuse its `dsh_home` and workspace. Restoration preserves the stored directory, repairs an interrupted final turn, and sends no new input. Missing, unreadable, incompatible, or occupied sessions raise without creating a replacement. `start_session(id)` only opens a lazy handle; it does not request persisted restoration. This API does not restore shell, browser, or other external processes.
+`harness.resume_session(saved_session_id)` は永続化された履歴を復元し、`run()` の準備ができた `Session` を返します。元のセッション ID を保存し、その `dsh_home` とワークスペースを再利用してください。復元は保存されたディレクトリを保ち、中断された最終ターンを修復し、新しい入力を送信しません。存在しない、読み取り不能、非互換、または使用中のセッションは、代替を作成せずに例外を発生させます。`start_session(id)` は遅延ハンドルを開くだけで、永続化された復元を要求しません。この API はシェル、ブラウザー、その他の外部プロセスを復元しません。
 
 ```py
 with DeepSeekHarness(dsh_home="/absolute/path/to/saved-home") as harness:
@@ -58,9 +58,9 @@ with DeepSeekHarness(dsh_home="/absolute/path/to/saved-home") as harness:
     result = session.run("Continue the task.")
 ```
 
-## Customize plugins
+## プラグインをカスタマイズする
 
-Persistent customization belongs to a `dsh` profile. Initialize the shipped SDK profile and install an external bundle with the runtime wheel's `dsh` command:
+永続的なカスタマイズは `dsh` プロファイルに属します。出荷済みの SDK プロファイルを初期化し、ランタイム wheel の `dsh` コマンドで外部バンドルをインストールします:
 
 ```sh
 export DSH_HOME=/absolute/path/to/isolated-dsh-home
@@ -68,9 +68,9 @@ dsh --profile sdk --dump-default-config >/dev/null
 dsh plugin --profile sdk add file:/absolute/path/to/my-plugin-bundle
 ```
 
-The `file:` form installs the local bundle into the profile package tree, where its peer imports reach the bundled installation fallback. The profile manifest records installed dependencies and ordered bundle layers; its `$DSH_HOME/profiles/sdk/cordis.patch.yml` is the persistent user patch. `dsh plugin` needs `pnpm` only when managing external packages. Running the SDK does not require system Node.js.
+`file:` 形式はローカルバンドルをプロファイルのパッケージツリーにインストールし、そこではそのピアインポートがバンドル済みインストールのフォールバックに到達します。プロファイルマニフェストはインストール済み依存関係と順序付きバンドルレイヤーを記録し、その `$DSH_HOME/profiles/sdk/cordis.patch.yml` が永続的なユーザーパッチです。`dsh plugin` が `pnpm` を必要とするのは外部パッケージを管理するときだけです。SDK の実行にシステムの Node.js は必要ありません。
 
-For an invocation-specific change, pass one or more patch files. They become absolute and are forwarded in order after the profile and home patch layers:
+呼び出し固有の変更には、1 つ以上のパッチファイルを渡します。それらは絶対パスになり、プロファイルとホームのパッチレイヤーの後に順序どおり転送されます:
 
 ```py
 with DeepSeekHarness(
@@ -81,20 +81,20 @@ with DeepSeekHarness(
     result = harness.run("Make the requested code change.")
 ```
 
-`profile` may select another existing profile, but that composition must retain `@deepseek-ai/dsh-sdk-app` or another `@deepseek-ai/dsh-sdk-jsonrpc-server` row. Misconfiguration fails during CLI boot or SDK initialization; there is no complete-config fallback. `dsh_bin` may select another `dsh` executable while preserving the same profile grammar. Arbitrary argv replacement remains an internal fake-runtime test adapter, not public API.
+`profile` は別の既存プロファイルを選択できますが、そのコンポジションは `@deepseek-ai/dsh-sdk-app` または別の `@deepseek-ai/dsh-sdk-jsonrpc-server` 行を保持しなければなりません。設定ミスは CLI のブート時または SDK の初期化時に失敗します。完全な設定へのフォールバックはありません。`dsh_bin` は同じプロファイル文法を保ったまま別の `dsh` 実行ファイルを選択できます。任意の argv 置換は内部の fake-runtime テストアダプターのままであり、公開 API ではありません。
 
-`provider` selects a provider route registered by the chosen Cordis composition; `model` is the model id resolved by that adapter. `reasoning_effort` is an optional non-empty adapter-owned identifier for that exact route; omission preserves the model's own default. `max_tokens` is an optional positive per-request output-token cap for the root agent and its in-process descendants; omission leaves the provider default in control. Initialization rejects a missing adapter, unavailable model, or unsupported effort before a prompt runs. Compaction summaries keep the separate limit configured by their compaction plugin. The bundled default composition registers `deepseek-official`. A custom composition can mount `llm-pi-ai`, configure provider-specific credentials/endpoints there, and select any provider/model present in pi-ai's installed catalog.
+`provider` は選択された Cordis コンポジションが登録したプロバイダールートを選択します。`model` はそのアダプターが解決するモデル ID です。`reasoning_effort` はその正確なルートに対する、アダプター所有の任意の空でない識別子です。省略時はモデル自身のデフォルトが保たれます。`max_tokens` はルートエージェントとそのインプロセス子孫に対する、任意の正のリクエストごとの出力トークン上限です。省略時はプロバイダーのデフォルトが支配します。初期化は、プロンプトが実行される前に、欠落したアダプター、利用不能なモデル、または未対応のエフォートを拒否します。コンパクションのサマリーは、それぞれのコンパクションプラグインが設定する別の制限を保ちます。バンドルされたデフォルトコンポジションは `deepseek-official` を登録します。カスタムコンポジションは `llm-pi-ai` をマウントし、そこでプロバイダー固有の資格情報/エンドポイントを設定し、pi-ai のインストール済みカタログに存在する任意のプロバイダー/モデルを選択できます。
 
-The shipped `sdk-minimal` profile is a standalone explicit tree rather than an overlay on `dsh-base`. Select it with `profile="sdk-minimal"`; the ordinary `model` argument is the sole runtime model selection, including for model ids outside the adapter's advisory catalog. It provides a platform-selected persistent shell, `read_image`, `working_directory`, local execution, JSONL sessions, and automatic compaction. Text file tools, settings, managed credentials, telemetry, Web tools, and the full default tool roster remain available through the separate full `sdk` and `web` profiles. SDK prompt text does not execute `/compact`.
+出荷済みの `sdk-minimal` プロファイルは、`dsh-base` 上のオーバーレイではなく、独立した明示的なツリーです。`profile="sdk-minimal"` で選択します。通常の `model` 引数が唯一のランタイムモデル選択であり、アダプターの参考カタログ外のモデル ID も含みます。プラットフォームが選択する永続シェル、`read_image`、`working_directory`、ローカル実行、JSONL セッション、自動コンパクションを提供します。テキストファイルツール、設定、管理された資格情報、テレメトリー、Web ツール、完全なデフォルトツール名簿は、別個の完全な `sdk` プロファイルと `web` プロファイルを通じて引き続き利用できます。SDK のプロンプトテキストは `/compact` を実行しません。
 
-## Results and notifications
+## 結果と通知
 
-`Session.run()` owns an activity interval from its prompt's durable inbox receipt through the next whole-agent idle and returns `RunResult(session_id, final_response, finish_reason, events, notifications)`. `final_response` is the last committed root-session assistant text in the interval. `finish_reason` is the `kind` of the last root-session `turn/end`, such as `completed`, `max-tokens`, or `error`, and is `None` when no turn ended. A `turn/end` without a string `data.reason.kind` violates the protocol and raises `SdkProtocolError`.
+`Session.run()` は、プロンプトの永続インボックス受領から次のエージェント全体のアイドルまでのアクティビティ区間を所有し、`RunResult(session_id, final_response, finish_reason, events, notifications)` を返します。`final_response` はその区間で最後にコミットされたルートセッションのアシスタントテキストです。`finish_reason` は最後のルートセッション `turn/end` の `kind` (たとえば `completed`、`max-tokens`、`error`) で、ターンが終了しなかった場合は `None` です。文字列の `data.reason.kind` を持たない `turn/end` はプロトコル違反であり、`SdkProtocolError` を発生させます。
 
-`HarnessClient` retains discovered subagent ancestry for the runtime process lifetime. During `Session.run()`, `RunResult.notifications` and `on_notification` receive the root session and known descendants in wire order. `RunResult.events` contains root-session events only, so descendant output cannot replace the root response. The low-level `session_prompt()` returns the queued message id immediately; callers that bypass `Session.run()` own the later activity boundary.
+`HarnessClient` は発見されたサブエージェントの系譜をランタイムプロセスの寿命の間保持します。`Session.run()` の間、`RunResult.notifications` と `on_notification` はルートセッションと既知の子孫をワイヤ順で受け取ります。`RunResult.events` はルートセッションのイベントのみを含むため、子孫の出力がルートの応答を置き換えることはできません。低レベルの `session_prompt()` はキューイングされたメッセージ ID を直ちに返します。`Session.run()` を迂回する呼び出し元は、その後のアクティビティ境界を自ら所有します。
 
-The selected home stores profiles, plugins, and every profile-owned durable resource. The full `sdk` profile uses its credentials, settings, and session stores; `sdk-minimal` uses JSONL session storage and stores images under `$DSH_HOME/attachments/v1`, with request-image cache under `$DSH_HOME/cache/attachments`. Use a fresh home when those resources must be isolated, and a fresh session id for independent work. Reusing both a harness and session id continues the durable conversation and session-owned resources.
+選択されたホームはプロファイル、プラグイン、プロファイル所有のすべての永続リソースを保存します。完全な `sdk` プロファイルはその資格情報、設定、セッションストアを使い、`sdk-minimal` は JSONL セッションストレージを使い、画像は `$DSH_HOME/attachments/v1` に、リクエスト画像キャッシュは `$DSH_HOME/cache/attachments` に保存します。それらのリソースを分離する必要がある場合は新しいホームを、独立した作業には新しいセッション ID を使ってください。ハーネスとセッション ID の両方を再利用すると、永続的な会話とセッション所有のリソースが継続します。
 
-See the [Python tutorial](../../docs/user/guide/python-sdk.md), [runnable example](examples/README.md), and [runtime wheel reference](../sdk-runtime/README.md).
+[Python チュートリアル](../../docs/user/guide/python-sdk.md)、[実行可能な例](examples/README.md)、[ランタイム wheel リファレンス](../sdk-runtime/README.md)を参照してください。
 
-`Session.get_working_directory()` reads the effective working directory; `set_working_directory(path)` changes it and returns the validated absolute path. Both create an unknown Session without running a model turn. Relative paths use that Session's current directory. Origin metadata, permissions, and existing processes remain unchanged. The low-level client provides the same methods with a leading `session_id` argument.
+`Session.get_working_directory()` は有効な作業ディレクトリを読み取り、`set_working_directory(path)` はそれを変更して検証済みの絶対パスを返します。どちらもモデルターンを実行せずに未知のセッションを作成します。相対パスはそのセッションの現在のディレクトリを使用します。オリジンメタデータ、権限、既存のプロセスは変わらないままです。低レベルクライアントは、先頭に `session_id` 引数を取る同じメソッドを提供します。

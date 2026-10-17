@@ -1,14 +1,14 @@
-# LSP navigation
+# LSP ナビゲーション
 
-English | [中文](lsp.zh.md)
+日本語 | [English](lsp.en.md) | [中文](lsp.zh.md)
 
-The LSP seam — a [capability seam](../glossary.md#capability-seam) exposing semantic code navigation on one `ctx.lsp` service, split across packages: Service Definition ([dsh-lsp](../../packages/lsp/lsp), `ctx.lsp` + the provider registry), a generic Service Provider ([dsh-lsp-stdio](../../packages/lsp/lsp-stdio), a configured stdio language-server host), and Consumer ([dsh-tool-lsp](../../packages/lsp/tool-lsp), the `lsp` tool schema). LSP is **one optional capability**, not part of the agent-loop spine — so its vocabulary lives here, not in [core.md](core.md). A provider swap does not change how the model asks for navigation.
+LSP シームは、1 つの `ctx.lsp` サービス上で意味論的なコードナビゲーションを公開する[ケイパビリティシーム](../glossary.md#capability-seam)であり、パッケージをまたいで分割される。Service Definition（[dsh-lsp](../../packages/lsp/lsp)、`ctx.lsp` + プロバイダーレジストリ）、汎用 Service Provider（[dsh-lsp-stdio](../../packages/lsp/lsp-stdio)、構成済み stdio 言語サーバーホスト）、Consumer（[dsh-tool-lsp](../../packages/lsp/tool-lsp)、`lsp` ツールスキーマ）である。LSP は **1 つの省略可能なケイパビリティ**であり、agent-loop の背骨の一部ではない —— その語彙は [core.md](core.md) ではなくここにある。プロバイダーの差し替えは、モデルがナビゲーションを要求する方法を変えない。
 
-Source: [`packages/lsp/lsp/src/types.ts`](../../packages/lsp/lsp/src/types.ts)
+ソース: [`packages/lsp/lsp/src/types.ts`](../../packages/lsp/lsp/src/types.ts)
 
-## Operations and coordinates
+## 操作と座標
 
-The seam and model expose exactly four semantic queries; the union is closed, so adding one is a compile-enforced change across the seam, providers, and the tool. Positions and ranges are zero-based UTF-16, matching the protocol; the model-facing tool owns the one-based cursor convention and converts on the way in and out.
+シームとモデルはちょうど 4 つの意味論クエリを公開する。ユニオンは閉じているので、1 つ追加することはシーム、プロバイダー、ツールにまたがるコンパイル強制の変更である。位置と範囲はゼロベースの UTF-16 で、プロトコルに一致する。モデルに面するツールが 1 ベースのカーソル規約を所有し、入り口と出口で変換する。
 
 ```ts type-equiv
 /**
@@ -37,9 +37,9 @@ interface LspRange {
 }
 ```
 
-## Request
+## リクエスト
 
-Every field is required: `workspaceRoot` is caller-supplied, `languageId` comes from the provider's registration (not the request), and consumers own timeouts and result limits — so no field needs implementation defaulting and there is no `resolve()` step. The provider receives the caller's request plus the derived `languageId`, which only synchronizes the transient document and never participates in selection.
+すべてのフィールドが必須である。`workspaceRoot` は呼び出し側が供給し、`languageId` はプロバイダーの登録から来る（リクエストからではない）。タイムアウトと結果上限はコンシューマーが所有する —— したがってどのフィールドも実装側のデフォルトを必要とせず、`resolve()` ステップも存在しない。プロバイダーは呼び出し側のリクエストと導出された `languageId` を受け取る。`languageId` は一時ドキュメントを同期させるだけで、選択には関与しない。
 
 ```ts type-equiv
 /**
@@ -71,9 +71,9 @@ interface LspProviderQuery extends LspQueryRequest {
 }
 ```
 
-## Result
+## 結果
 
-A CLOSED discriminated union: navigation operations normalize to `locations`, `hover` to content or `null`. Consumers `switch` on `kind` to exhaustiveness so a new arm breaks compilation until handled. `findReferences` always includes declarations — the provider enforces this internally, so callers get no flag. The `locations` variant carries `resolvedWorkspaceUri`, the provider's canonical workspace `file:` URI. A caller relativizing location URIs uses that coordinate rather than applying host-platform path rules to the possibly-symlinked request root.
+閉じた判別可能ユニオンである。ナビゲーション操作は `locations` に、`hover` はコンテンツまたは `null` に正規化される。コンシューマーは `kind` で網羅的に `switch` するので、新しいアームは処理されるまでコンパイルを壊す。`findReferences` は常に宣言を含む —— プロバイダーが内部でこれを強制するので、呼び出し側にフラグはない。`locations` バリアントは `resolvedWorkspaceUri`、すなわちプロバイダーの正規のワークスペース `file:` URI を運ぶ。位置 URI を相対化する呼び出し側は、シンボリックリンクかもしれないリクエストルートにホストプラットフォームのパス規則を適用するのではなく、その座標を使う。
 
 ```ts type-equiv
 /** One resolved location: a document URI and the range within it. */
@@ -111,9 +111,9 @@ type LspQueryResult =
   | { readonly kind: 'hover'; readonly hover: LspHover | null }
 ```
 
-## Provider and service
+## プロバイダーとサービス
 
-A provider owns a stable branded `id` and an exclusive lowercase leading-dot extension map. `registerProvider` reserves the id and every extension atomically — an invalid or conflicting registration publishes nothing — and its disposer releases all reservations. Selection is per query and order-independent; no match throws `LspError` `LSP_UNAVAILABLE`. The seam exposes no protocol types, process/document controls, or generic JSON-RPC escape hatch.
+プロバイダーは安定したブランド付きの `id` と、排他的な小文字・先頭ドットの拡張子マップを所有する。`registerProvider` は id とすべての拡張子をアトミックに予約し —— 無効または競合する登録は何も公開しない —— その disposer がすべての予約を解放する。選択はクエリごとで順序に依存しない。一致しない場合は `LspError` `LSP_UNAVAILABLE` を throw する。このシームはプロトコル型、プロセス/ドキュメント制御、汎用 JSON-RPC エスケープハッチを公開しない。
 
 ```ts type-equiv
 /**
@@ -162,7 +162,7 @@ interface LspService {
 }
 ```
 
-`LspProviderId` is the seam's branded id (`Branded<'LspProviderId'>` from [dsh-brand](../../packages/util/brand)); `LspError` extends `HarnessError` with stable codes such as `LSP_INVALID_PROVIDER`, `LSP_CONFLICT`, `LSP_UNAVAILABLE`, `LSP_DISPOSED`, `LSP_UNSUPPORTED_OPERATION`, and `LSP_MALFORMED_RESPONSE`, which callers route on instead of parsing `message`.
+`LspProviderId` はこのシームのブランド付き id（[dsh-brand](../../packages/util/brand) の `Branded<'LspProviderId'>`）である。`LspError` は `HarnessError` を拡張し、`LSP_INVALID_PROVIDER`、`LSP_CONFLICT`、`LSP_UNAVAILABLE`、`LSP_DISPOSED`、`LSP_UNSUPPORTED_OPERATION`、`LSP_MALFORMED_RESPONSE` などの安定したコードを持ち、呼び出し側は `message` を解析する代わりにこれでルーティングする。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -170,13 +170,13 @@ interface LspService {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxlsp--lspservice"></a>
 
 ### `ctx.lsp` — `LspService`
 
-The LSP capability seam (`ctx.lsp`). Owns provider registration/selection and normalized query execution; exposes exactly the four operations and no protocol escape hatch.
+LSP ケイパビリティシーム（`ctx.lsp`）。プロバイダーの登録/選択と正規化クエリ実行を所有し、ちょうど 4 つの操作を公開して、プロトコルエスケープハッチを持たない。
 
 ```ts cordis-catalog
 /**
@@ -198,5 +198,5 @@ registerProvider(provider: LspProvider): () => void
 query(request: LspQueryRequest, signal?: AbortSignal): Promise<LspQueryResult>
 ```
 
-Source: [`packages/lsp/lsp/src/types.ts`](../../packages/lsp/lsp/src/types.ts)
+ソース: [`packages/lsp/lsp/src/types.ts`](../../packages/lsp/lsp/src/types.ts)
 <!-- END GENERATED cordis-surface -->

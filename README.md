@@ -1,34 +1,34 @@
 # DeepSeek Harness
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-DeepSeek Harness (`dsh`) is an open-source agent harness developed by [DeepSeek AI](https://deepseek.com).
+DeepSeek Harness（`dsh`）は [DeepSeek AI](https://deepseek.com) が開発したオープンソースのエージェントハーネスである。
 
-It is built on an **everything-is-a-plugin** architecture and powered by [Cordis](https://github.com/cordiverse/cordis), whose design is described in [_A Programming Paradigm for Spatiotemporal Composability_](https://arxiv.org/abs/2608.25512).
+**everything-is-a-plugin** アーキテクチャ上に構築され、[Cordis](https://github.com/cordiverse/cordis) に駆動される。その設計は [_A Programming Paradigm for Spatiotemporal Composability_](https://arxiv.org/abs/2608.25512) で説明されている。
 
-Documentation: [https://deepseek-harness.github.io/deepseek-harness/](https://deepseek-harness.github.io/deepseek-harness/)
+ドキュメント: [https://deepseek-harness.github.io/deepseek-harness/](https://deepseek-harness.github.io/deepseek-harness/)
 
-## Developer preview
+## 開発者プレビュー
 
-DeepSeek Harness is in _developer preview_ and iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
+DeepSeek Harness は _開発者プレビュー_ 段階にあり、急速に反復されている。**互換性を壊す変更が行われる。**
 
-Review the [safety notice](SAFETY.md) before running the project.
+プロジェクトを実行する前に[安全通知](SAFETY.md)を確認すること。
 
-## Run
+## 実行
 
-### Run from `npm`
+### `npm` から実行する
 
-Install `Node.js`, then run:
+`Node.js` をインストールしてから実行する:
 
 ```sh
 npx @deepseek-ai/dsh web
 ```
 
-The command starts the Web UI at `http://127.0.0.1:3080` by default and opens it in the default browser for a local launch. An SSH launch only prints the host URL because the SSH client or editor owns the local forwarded address. Pass `--no-open` to run the server without opening a browser. See [Web UI guide](docs/user/guide/index.md).
+このコマンドはデフォルトで `http://127.0.0.1:3080` に Web UI を起動し、ローカル起動ではデフォルトブラウザーで開く。SSH 起動では、SSH クライアントまたはエディターがローカル転送アドレスを所有するため、ホスト URL のみ出力する。ブラウザーを開かずにサーバーを実行するには `--no-open` を渡す。[Web UI ガイド](docs/user/guide/index.md)を参照。
 
-### Run from source
+### ソースから実行する
 
-To run from a repository checkout:
+リポジトリチェックアウトから実行するには:
 
 ```sh
 git clone https://github.com/deepseek-ai/deepseek-harness.git
@@ -38,27 +38,27 @@ pnpm run build
 pnpm dsh web
 ```
 
-`pnpm run build` prepares the repository artifacts. `pnpm dsh web` uses those built artifacts without rebuilding.
+`pnpm run build` はリポジトリアーティファクトを準備する。`pnpm dsh web` は再ビルドせずにそのビルド済みアーティファクトを使用する。
 
-## Community and support
+## コミュニティとサポート
 
-- Submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
-- Add the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic to your plugin repository for discoverability.
-- Join <a href="https://discord.gg/4MrtZUhpxg">DeepSeek Harness Discord community</a>.
+- [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) を通じてフィードバックやバグ報告を送信する。
+- 検出可能性のため、プラグインリポジトリに [`dsh-plugin`](https://github.com/topics/dsh-plugin) トピックを追加する。
+- <a href="https://discord.gg/4MrtZUhpxg">DeepSeek Harness Discord コミュニティ</a>に参加する。
 
-## Contributing
+## 貢献
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md) を参照。
 
-## Development
+## 開発
 
-Start with the [development guide](docs/development.md) and [architecture documentation](docs/architecture.md).
+[開発ガイド](docs/development.md)と[アーキテクチャ文書](docs/architecture.md)から始めること。
 
-`pnpm run dev:web` builds, serves, and rebuilds client bundles on source edits in one terminal, and `make help` lists the matching Make targets for Web and Desktop; the guide's application commands section owns the full table.
+`pnpm run dev:web` は 1 つのターミナルでビルド、提供、ソース編集時のクライアントバンドル再ビルドを行い、`make help` は Web と Desktop 用の対応する Make ターゲットを一覧する。完全な表はガイドのアプリケーションコマンド節が所有する。
 
-For agents, follow [AGENTS.md](AGENTS.md).
+エージェントは [AGENTS.md](AGENTS.md) に従うこと。
 
-## Citation
+## 引用
 
 ```bibtex
 @misc{deepseek-harness2026,
@@ -70,8 +70,8 @@ For agents, follow [AGENTS.md](AGENTS.md).
 }
 ```
 
-## License
+## ライセンス
 
 [MIT](LICENSE)
 
-Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+サードパーティ依存とそのライセンスは [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) で開示されている。

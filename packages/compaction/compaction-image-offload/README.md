@@ -1,108 +1,108 @@
 ---
-description: "The image offload executor for deployments composing compaction: what happens when an image-capable route rejects a request as over its image budget."
+description: "コンパクションを構成する配置向け画像 offload 実行器。画像対応経路が画像予算超過として要求を拒否した場合に何が起きるか。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-compaction-image-offload
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Image-heavy conversations continue when older images exceed a model route's budget. The plugin permanently replaces those images with text naming each attachment and its available read-only path, then retries without spending the provider retry budget. Later requests retain that choice across route changes, resume, and replay. Token accounting follows the logged selections, and provider cache reuse ends at the first changed message.
+古い画像がモデル経路の予算を超えても画像の多い会話は続く。このプラグインはそれらの画像を各添付とその利用可能な読み取り専用パスを指名するテキストに恒久的に置換し、プロバイダー再試行予算を消費せずに再試行する。以降の要求は経路変更・再開・再実行を越えてその選択を保持する。トークン計量はログ化選択に従い、プロバイダーキャッシュ再利用は最初の変更メッセージで終わる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin in every composition that runs the agent loop with an image-capable route. The shipped `dsh` base does. Without it, an `IMAGE_OFFLOAD_REQUIRED` failure reaches ordinary recovery and ends the turn as an error. The plugin has no configuration: the DeepSeek adapter enforces its file-mode and inline-fallback budgets, the pi-ai adapter its base64 bound, and each reports the count it needs offloaded.
+画像対応経路でエージェントループを実行するすべての構成にこのプラグインをマウントする。出荷 `dsh` 基盤はそうしている。これなしでは `IMAGE_OFFLOAD_REQUIRED` 失敗が通常回復に届き、ターンを誤差として終える。このプラグインに設定はない。DeepSeek 適合器はファイルモードとインライン代替の予算を強制し、pi-ai 適合器は base64 上限を強制し、各々が offload 必要数を報告する。
 
-### Minimal configuration
+### 最小設定
 
 ```yaml
 - name: '@deepseek-ai/dsh-compaction-image-offload'
 ```
 
-### What you can observe
+### 観測できること
 
-Each decision appends one `image/offload` event identifying the selected occurrences by current message-event sequence and depth-first image index. The message events and surface node identities remain unchanged. An agent retry follows a fresh `request/header` identifying a new message series. Summary retries remain inside the same compaction bracket.
+各決定は現行メッセージイベントシーケンスと深さ優先画像索引で選んだ出現を特定する `image/offload` イベントを 1 件追記する。メッセージイベントと surface ノード同一性は変わらない。エージェント再試行は新しいメッセージ系列を特定する fresh `request/header` に続く。要約再試行は同一コンパクション括弧内に残る。
 
-### Failures and recovery
+### 失敗と回復
 
-The plugin acts only on `IMAGE_OFFLOAD_REQUIRED` failures that carry `offloadImages`. It walks the surface in model request order, skips assistant nodes and images already marked, and marks that many occurrences. When nothing remains to offload it delegates on the `agent/request-error` waterfall, so downstream recovery or the ordinary turn error applies. The retry spends no provider retry budget and logs no `llm/retry` event. Cancellation before recording a selection delegates without adding an `image/offload` event; cancellation after a committed selection stops retry but preserves the omission.
+このプラグインは `offloadImages` を運ぶ `IMAGE_OFFLOAD_REQUIRED` 失敗にのみ働く。モデル要求順に surface を歩き、アシスタントノードと既に印付けされた画像を省き、その件数の出現に印付ける。offload 対象が残らない場合は `agent/request-error` ウォーターフォールに委譲するため、下流回復または通常ターン誤差が適用される。再試行はプロバイダー再試行予算を消費せず、`llm/retry` イベントをログ化しない。選択記録前のキャンセルは `image/offload` イベントを追加せずに委譲し、コミット済み選択後のキャンセルは再試行を止めるが省略を保持する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This package owns the event declaration, reference validation, immutable image projection, selection, and retry policy. It registers `imageOffloadProjection` with Session before accepting image-offload events. The same browser-safe definition is exported from `./projection` for detached replay; the installed format catalog assembles it for offline readers. Missing registration rejects live restore, and unloading a used definition blocks further message derivation. Token measurement folds the same selections without replacement shadow prices.
+このパッケージはイベント宣言・参照検証・不変画像プロジェクション・選択・再試行ポリシーを所有する。画像 offload イベント受付の前に `imageOffloadProjection` を Session に登録する。同一のブラウザー安全定義は分離再実行用に `./projection` からエクスポートされ、設置済み形式カタログはオフライン読み手用にそれを組み立てる。欠落登録はライブ復元を拒否し、使用済み定義の unload は以降のメッセージ導出を阻む。トークン計測は置換 shadow 価格なしで同一選択を折り畳む。
 
-Summary failures use the synchronous `compaction/summary-error` waterfall. The plugin selects only the supplied summary region and returns true after recording an omission. The compaction backend re-derives and re-prices that region before retrying; each retry omits additional retained occurrences, so recovery ends when none remain. Cancellation and unrelated selection changes reject the summary. Recorded omissions survive later failure or cancellation.
+要約失敗は同期 `compaction/summary-error` ウォーターフォールを使う。このプラグインは提供された要約領域のみを選び、省略記録後に true を返す。コンパクションバックエンドは再試行前にその領域を再導出・再価格付けする。各再試行は追加の保持出現を省略するため、残りがなくなった時点で回復は終わる。キャンセルと無関係選択変更は要約を拒否する。記録済み省略は以降の失敗やキャンセルを越えて残る。
 
-The pure projection rejects invalid or repeated image references before Session commits the event, and this executor retains no separate mutable offload state.
+純粋プロジェクションは Session がイベントをコミットする前に無効または重複の画像参照を拒否し、この実行器は別途可変 offload 状態を保持しない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Dedicated image-offload events](../../../.agents/notes/implemented/architecture/2026-09-10-image-offload-events.md) — durable selections, ownership, and rejected alternatives.
-- [compaction seam](../compaction/README.md) — the neighboring summary and text-pruning operations.
-- [compaction-tool-result-pruner](../compaction-tool-result-pruner/README.md) — the sibling executor that trims tool outputs while preserving image selections.
-- [dsh-llm](../../llm/llm/README.md) — `ImageBlock.offloaded`, `IMAGE_OFFLOAD_REQUIRED`, and the placeholder projection.
-- [llm-deepseek adapter](../../llm/llm-deepseek/README.md) and [llm-pi-ai adapter](../../llm/llm-pi-ai/README.md) — the route budgets that report offload counts.
+- [専用画像 offload イベント](../../../.agents/notes/implemented/architecture/2026-09-10-image-offload-events.md) — 耐久性のある選択、所有権、却下された代替案。
+- [compaction シーム](../compaction/README.md) — 隣接する要約とテキスト刈り込み操作。
+- [compaction-tool-result-pruner](../compaction-tool-result-pruner/README.md) — 画像選択を保持しながらツール出力を刈る兄弟実行器。
+- [dsh-llm](../../llm/llm/README.md) — `ImageBlock.offloaded`、`IMAGE_OFFLOAD_REQUIRED`、プレースホルダープロジェクション。
+- [llm-deepseek 適合器](../../llm/llm-deepseek/README.md)と [llm-pi-ai 適合器](../../llm/llm-pi-ai/README.md) — offload 数を報告する経路予算。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Offloaded request images
+### Offload された要求画像
 
-#### What the model sees
+#### モデルが見るもの
 
-Every selected image occurrence reaches the model as placeholder text (`offloadedImageText`) naming the attachment and its available read-only path; unselected occurrences stay images. Selections persist across requests. A new tool read may introduce a new occurrence of the same attachment without restoring the old one.
+選ばれたすべての画像出現は添付とその利用可能な読み取り専用パスを指名するプレースホルダーテキスト（`offloadedImageText`）としてモデルに届き、未選択の出現は画像のままである。選択は要求を越えて残る。新しいツール読み取りは古いものを復元せずに同一添付の新しい出現を導入し得る。
 
-#### Token effect
+#### トークン効果
 
-An offloaded occurrence costs its placeholder text instead of visual tokens. The token meter applies the logged selections when pricing each node. Reference-only heuristic counts exclude offload metadata.
+offload された出現は視覚トークンの代わりにそのプレースホルダーテキストを費やす。トークンメーターは各ノード価格付けにログ化選択を適用する。参照専用ヒューリスティック数は offload メタデータを除外する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-A selection turns earlier images into placeholder text, so provider cache reuse ends at the first changed image for that request. The selected occurrences remain omitted afterwards.
+選択は以前の画像をプレースホルダーテキストに変えるため、その要求のプロバイダーキャッシュ再利用は最初の変更画像で終わる。選ばれた出現はその後省略されたままである。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Offloaded images never return automatically** — a larger budget, a larger route, or compaction lowering the total leaves the marks in place; recovery is the read-only path in the placeholder.
-- **Every offload costs one failed attempt** — nothing plans an offload before dispatch; the route's rejection is the signal, which matches the planned move to provider-reported uncacheable images.
-- **A temporary small budget offloads permanently** — a Files outage that forces the inline fallback, or a temporary switch to a small-budget route, offloads images a later route would have sent.
+- **Offload された画像は自動で戻らない** — 予算拡大、大きな経路、合計を下げるコンパクションでも印は残り、回復はプレースホルダー内の読み取り専用パスである。
+- **すべての offload は失敗試行 1 件を費やす** — 配送前に offload を計画するものはなく、経路の拒否が信号であり、プロバイダー報告の uncacheable 画像への計画移行と一致する。
+- **一時的な小予算は恒久的に offload する** — インライン代替を強制する Files 障害、または小予算経路への一時切替は、後の経路が送れたはずの画像を offload する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is non-authoritative working context: notes for maintainers and open questions. Shipped behavior and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発メモは非権威の作業コンテキストである。メンテナー向け記録と未解決の問いである。出荷動作と受容済み根拠は上節、パッケージコード、リンク済みエージェントノートにある。
 
-- The route-local byte checks that produce `IMAGE_OFFLOAD_REQUIRED` are provisional: once the provider reports uncacheable images itself, the adapters map that report to a count and this executor stays as it is.
+- `IMAGE_OFFLOAD_REQUIRED` を生む経路ローカルバイト検査は暫定である。プロバイダーが uncacheable 画像を自ら報告するようになれば、適合器はその報告を件数に対応付け、この実行器はそのまま残る。
 
 </details>

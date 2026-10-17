@@ -1,25 +1,25 @@
 ---
-description: "Records a persistence type transition and its compatibility acknowledgement."
+description: "永続化型の遷移とその互換性の確認応答を記録する。"
 kind: persistence-change
 ---
 
 # 2026-09-16-session-format-v4
 
-English | [中文](2026-09-16-session-format-v4.zh.md)
+日本語 | [English](2026-09-16-session-format-v4.en.md) | [中文](2026-09-16-session-format-v4.zh.md)
 
-## Summary
+## 概要
 
-Advances the declared SessionHeader.version from 3 to 4 for the finalized V4 writer, records first-class tool-role results and producer-owned sources, and adds the forked variant to turn/end.reason. Adds developer-role Session changes with name-only tool additions bound to historical request headers, tool removals, and deferred-loading schema markers.
+確定した V4 ライターのために宣言済みの SessionHeader.version を 3 から 4 に進め、ファーストクラスの tool ロール結果と producer 所有のソースを記録し、turn/end.reason に forked バリアントを追加する。name のみのツール追加を履歴の request ヘッダーに束縛する developer ロールの Session 変更、ツール削除、deferred-loading スキーママーカーも追加する。
 
-## Table of Contents
+## 目次
 
-- [Declaration](#declaration)
-- [Compatibility](#compatibility)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [宣言](#declaration)
+- [互換性](#compatibility)
+- [検証](#verification)
+- [開発メモ](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -85,36 +85,36 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-The tool-role declaration changes ten event roots because inbox entries, message events, compaction summaries, title requests, team messages, and PTC dispatches embed the shared `Message` or `ContentBlock` declarations. Removing `tool-result` from that union and specializing message roles changes those reachable schemas without adding ten independent event protocols. The `turn/end` change separately records the forked reason; `SessionHeader` records the version increase.
+tool ロールの宣言は 10 個のイベントルートを変更する。inbox エントリー、message イベント、compaction サマリー、title リクエスト、team メッセージ、PTC ディスパッチが共有の `Message` または `ContentBlock` 宣言を埋め込んでいるためである。その union から `tool-result` を削除し、message ロールを特化することは、10 個の独立したイベントプロトコルを追加することなく、それらの到達可能なスキーマを変更する。`turn/end` の変更は forked 理由を別途記録し、`SessionHeader` はバージョン増加を記録する。
 
-The [native V4 validation decision](../../.agents/notes/implemented/architecture/2026-09-17-native-v4-read-validation.md) owns the reader admission required by these current fields.
+[native V4 検証の決定](../../.agents/notes/implemented/architecture/2026-09-17-native-v4-read-validation.md)が、これらの現在のフィールドが必要とするリーダー受理を所有する。
 
-The V3-to-V4 migration lifts released user-role tool results into tool-role messages with a required toolCallId and optional isError. Tool-result wrappers leave the content-block union. The migration preserves every admitted source event and inherited cut, and appends missing parent subagent/catalog records from retained direct-child logs in the same persistence root. Historical body restoration requires an explicit child-evidence set, including an empty set when no children are available to backfill. Missing, multiple, or unknown-version child descriptors skip that child’s backfill; conflicting identities, timestamps, or modes refuse migration without publication. Existing catalog facts remain. Historical read opens prepare the result in memory. Write opens revalidate child membership and revisions before publishing the current successor beside unchanged predecessor files. Delivery-generation checks keep historical acknowledgements from becoming active V4 watermarks. V3 readers refuse the newer generation. The finalized transition adds forked to turn/end.reason; exact-cut forks append child-owned error results and closers after the inherited marker. V4 admits checked not-started fork results with deterministic branch-specific IDs and wording; released V0–V3 validators and recorded predecessor generations remain unchanged.
+V3 から V4 へのマイグレーションは、リリース済みの user ロールのツール結果を、必須の toolCallId とオプションの isError を持つ tool ロールメッセージへ持ち上げる。tool-result ラッパーは content-block union を離れる。このマイグレーションは受理されたすべてのソースイベントと継承されたカットを保持し、同じ永続化ルート内の保持された直接子ログから欠落した親 subagent/カタログレコードを追記する。履歴の body 復元は明示的な子エビデンスセットを必要とし、バックフィルできる子がない場合は空のセットを含む。欠落、複数、または unknown-version の子記述子はその子のバックフィルをスキップする。矛盾するアイデンティティ、タイムスタンプ、またはモードは公開なしでマイグレーションを拒否する。既存のカタログの事実は残る。履歴 read オープンは結果をメモリ内で準備する。write オープンは、変更されていない前任ファイルの隣に現在の後継を公開する前に、子メンバーシップとリビジョンを再検証する。配信世代チェックは履歴の確認応答がアクティブな V4 ウォーターマークになることを防ぐ。V3 リーダーはより新しい世代を拒否する。確定した遷移は turn/end.reason に forked を追加する。exact-cut フォークは継承されたマーカーの後に子所有のエラー結果とクローザーを追記する。V4 はチェックされた not-started フォーク結果を決定論的なブランチ固有の ID と文言で受理する。リリース済みの V0–V3 バリデータと記録済みの前任世代は変わらない。
 
-The `request/header` schema also records the retired `system` key as forbidden. This declaration captures the existing native-reader refusal without changing stored data or prompt reconstruction; later permitting a value requires compatibility review for a same-version change, or an explicit version bump, instead of being classified as an ordinary optional-field addition.
+`request/header` スキーマはさらに、退役した `system` キーを禁止として記録する。この宣言は、保存データやプロンプト再構成を変えずに、既存の native-reader の拒否を捕捉する。後で値を許可するには、通常のオプションフィールド追加として分類するのではなく、同一バージョン変更の互換性レビューまたは明示的なバージョンアップが必要である。
 
-Producer-owned sources replace released plugin wrappers through the [V3-to-V4 migration](../../packages/session/session-format-v3-to-v4/README.md#v3-to-v4-specification). The frozen rename table and collision rules preserve source fields and event coordinates; unknown producer attribution retains every own JSON property. Native read and write opens validate source fields before exposing the Session. Existing V4 files do not rerun the incoming migration edge.
+producer 所有のソースは [V3-to-V4 マイグレーション](../../packages/session/session-format-v3-to-v4/README.md#v3-to-v4-specification)を通じてリリース済みのプラグインラッパーを置き換える。凍結されたリネームテーブルと衝突規則はソースフィールドとイベント座標を保持する。未知の producer 帰属は自身のすべての JSON プロパティを保持する。native の read と write のオープンは Session を公開する前にソースフィールドを検証する。既存の V4 ファイルは incoming マイグレーションエッジを再実行しない。
 
-The core-owned user source property records the attribution-preservation policy; tmux-context qualifies its location attribution while retaining producer-local duplicate suppression. Auto Review and the compaction summarizer use request-only user inputs, removing their active source registrations without removing historical migration support. These inputs cannot be written as durable Session messages. Catalog formatVersion 2 stores the policy metadata; it does not change the Session version or rewrite frozen schema records. System, model, and tool sources retain their strict semantic rules.
+core 所有の user source プロパティは帰属保持ポリシーを記録する。tmux-context は producer ローカルの重複抑制を保持しつつ、その location 帰属を修飾する。Auto Review と compaction サマライザーは request-only のユーザー入力を使用し、履歴マイグレーションサポートを削除せずにそれらのアクティブなソース登録を削除する。これらの入力は耐久性のある Session メッセージとして書き込むことができない。Catalog formatVersion 2 はポリシーメタデータを格納し、Session バージョンを変更せず、凍結されたスキーマレコードを書き換えない。system、model、tool の各ソースはその厳格なセマンティクスルールを保持する。
 
-Developer events retain their original role and require an open step. Each addition stores toolName; developer/message.headerSeq identifies an earlier known request/header containing exactly one complete matching ToolSchema. All additions in one event share that historical header revision, while removal-only and other developer messages omit headerSeq. Native and Session admission reject absent, forward, non-header, unknown-header, ambiguous, incomplete-definition and retired inline-definition forms without interpreting unknown ignorable records or dropping unrelated JSON metadata. Same-name replacement, restart, fork, surface replacement and compaction retain historical schema identity without consulting the latest header or registry. Generic sourceEventSeqs remains independent. Developer sources use the same recorded attribution-preservation policy as user sources. The optional deferLoading marker is independent of addition history. No shipped profile emits developer records; provider serialization, automatic emission and UI support remain deferred.
+developer イベントは元のロールを保持し、開いているステップを必要とする。各追加は toolName を格納し、developer/message.headerSeq は完全に一致する 1 つの ToolSchema を含む以前の既知の request/header を識別する。1 つのイベント内のすべての追加はその履歴ヘッダーリビジョンを共有し、削除のみおよびその他の developer メッセージは headerSeq を省略する。native と Session の受理は、欠落、前方参照、非ヘッダー、未知ヘッダー、曖昧、不完全定義、退役したインライン定義の形式を、未知の無視可能レコードを解釈せず、無関係な JSON メタデータを落とさずに拒否する。同名置換、再起動、フォーク、サーフェス置換、compaction は、最新のヘッダーやレジストリを参照せずに履歴スキーマアイデンティティを保持する。汎用の sourceEventSeqs は独立したままである。developer ソースは user ソースと同じ記録済み帰属保持ポリシーを使う。オプションの deferLoading マーカーは追加履歴と独立である。出荷されるプロファイルは developer レコードを emit しない。プロバイダーシリアライズ、自動 emit、UI サポートは先送りのままである。
 
-The PTC producer writes `source.kind: 'ptc-mode'`. The V3-to-V4 edge retains `tools-code-mode` and `tools-ptc` as historical plugin lookup keys and maps both to that current kind. The source policy reserves `ptc-mode` against attribution-only qualification.
+PTC プロデューサーは `source.kind: 'ptc-mode'` を書き込む。V3-to-V4 エッジは `tools-code-mode` と `tools-ptc` を履歴のプラグインルックアップキーとして保持し、両方をその現在の kind にマップする。ソースポリシーは帰属のみの修飾に対して `ptc-mode` を予約する。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-The focused Session, agent-loop, Session Controller, V4, chat-view, and compaction suites passed 1,523 tests across 63 files after integration of exact-cut forks. V4 fork tests retain original IDs and text across encoding, decoding, and restoration, reject malformed results, and validate nested inherited cuts. The tool-role migration tests and SDK snapshot refresh also passed in the originating change; the built Python runtime sdk-snapshot scenario passed, and focused pi-ai and auto-review coverage passed 351 tests with 100% coverage of the three affected modules.
+exact-cut フォークの統合後、フォーカスされた Session、agent-loop、Session Controller、V4、chat-view、compaction の各スイートは 63 ファイルにわたる 1,523 テストに合格した。V4 フォークテストはエンコード、デコード、復元を通じて元の ID とテキストを保持し、不正な結果を拒否し、ネストされた継承カットを検証する。tool ロールマイグレーションのテストと SDK スナップショットのリフレッシュも発端の変更で合格した。ビルド済み Python ランタイムの sdk-snapshot シナリオが合格し、フォーカスされた pi-ai と auto-review のカバレッジが影響を受ける 3 モジュールの 100% カバレッジで 351 テストに合格した。
 
-The generated request-header reservation regression and existing retired-syntax and Session surface tests passed 65 tests across three files. The generated field retains optional `never`; the current classifier marks permitting an optional string as requiring compatibility review, while the native reader still refuses the retired key.
+生成された request-header 予約のリグレッションと既存の退役構文および Session サーフェスのテストは 3 ファイルにわたる 65 テストに合格した。生成されたフィールドはオプションの `never` を保持する。現在の分類器はオプション文字列の許可を互換性レビューが必要とマークし、native リーダーは依然として退役キーを拒否する。
 
-The producer-source and request-input checks pass 447 tests across 12 files, including provider equality, request-only type rejection, user-attribution retention, source migration, and native source admission. Comparing the generated inventories with the tool-role parent reports four changed roots and 447 unchanged type fingerprints.
+producer ソースと request 入力のチェックは 12 ファイルにわたる 447 テストに合格し、プロバイダー等価性、request-only 型の拒否、user 帰属の保持、ソースマイグレーション、native ソースの受理を含む。生成されたインベントリを tool ロールの親と比較すると、4 つの変更されたルートと 447 の変更されていない型フィンガープリントが報告される。
 
-The focused Session, V4 and request-input suite passes 884 tests across 38 files, with 100% statements, branches, functions and lines for the complete V3-to-V4 package and Session surface. Coverage includes historical same-name schema binding, compound additions/removals, malformed references and definitions, unknown-header refusal, opaque unknown records, metadata preservation, forks, replacements, compaction references, and native plain/zstd read/write admission without rewriting the generation.
+フォーカスされた Session、V4、request 入力のスイートは 38 ファイルにわたる 884 テストに合格し、完全な V3-to-V4 パッケージと Session サーフェスについて 100% の statements、branches、functions、lines を達成する。カバレッジには、履歴の同名スキーマバインディング、複合的な追加/削除、不正な参照と定義、未知ヘッダーの拒否、不透明な未知レコード、メタデータ保持、フォーク、置換、compaction 参照、および世代を書き換えない native の plain/zstd read/write 受理が含まれる。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
-None.
+なし。

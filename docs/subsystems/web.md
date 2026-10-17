@@ -1,18 +1,18 @@
-# Web Access
+# Web アクセス
 
-English | [中文](web.zh.md)
+日本語 | [English](web.en.md) | [中文](web.zh.md)
 
-The web access seam — a [capability seam](../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) that spans **two operations** (search and fetch) on one `ctx.web` service, split across packages: Service Definition ([dsh-web](../../packages/web/web), `ctx.web` + the provider registries), Service Providers ([dsh-web-search-exa](../../packages/web/web-search-exa), [dsh-web-search-perplexity](../../packages/web/web-search-perplexity), [dsh-web-search-deepseek](../../packages/web/web-search-deepseek), [dsh-web-fetch-http](../../packages/web/web-fetch-http)), and Consumer ([dsh-tool-web](../../packages/web/tool-web), the `web_search`/`web_fetch` tool schemas). Web is **one optional capability**, not part of the agent-loop spine — so its vocabulary lives here, not in [core.md](core.md). A search-provider swap does not change how the model asks for a query, and a fetch-provider swap does not change how the model asks for a URL.
+Web アクセスシームは、1 つの `ctx.web` サービス上の **2 つの操作** (search と fetch) にまたがる[ケイパビリティシーム](../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md)であり、パッケージをまたいで分割されている: Service Definition ([dsh-web](../../packages/web/web)、`ctx.web` + プロバイダーレジストリ)、Service Providers ([dsh-web-search-exa](../../packages/web/web-search-exa)、[dsh-web-search-perplexity](../../packages/web/web-search-perplexity)、[dsh-web-search-deepseek](../../packages/web/web-search-deepseek)、[dsh-web-fetch-http](../../packages/web/web-fetch-http))、Consumer ([dsh-tool-web](../../packages/web/tool-web)、`web_search`/`web_fetch` ツールスキーマ)。Web は **1 つのオプションのケイパビリティ**であり、agent-loop の背骨の一部ではない — その語彙は [core.md](core.md) ではなくここに置かれる。検索プロバイダーの交換はモデルがクエリを要求する方法を変えず、fetch プロバイダーの交換はモデルが URL を要求する方法を変えない。
 
-Source: [`packages/web/web/src/types.ts`](../../packages/web/web/src/types.ts)
+ソース: [`packages/web/web/src/types.ts`](../../packages/web/web/src/types.ts)
 
-## Why one capability has two operations
+## なぜ 1 つのケイパビリティに 2 つの操作があるのか
 
-Search and fetch share no request schema and no business logic, but they are deliberately one `ctx.web` middle layer: one provider-selection policy owner, one abort/error vocabulary, and one product-facing "how this harness reaches the web" configuration API. The cost is the parallel `searchX`/`fetchX` method pairs on the service; that parallelism is intentional, not a missed extraction. Providers register **capabilities** (a `WebSearchProvider` or `WebFetchProvider`), not tools; the model-facing names, schemas, prompt guidance, and presentation all live in the single `dsh-tool-web` consumer.
+search と fetch はリクエストスキーマもビジネスロジックも共有しないが、意図的に 1 つの `ctx.web` 中間層とされている: 1 つのプロバイダー選択ポリシーオーナー、1 つのアボート/エラー語彙、1 つの製品向け「このハーネスがどのように Web に到達するか」構成 API である。コストは、サービス上の並行する `searchX`/`fetchX` メソッドペアである。その並行性は意図的なものであり、見落とされた抽出ではない。プロバイダーはツールではなく**ケイパビリティ** (`WebSearchProvider` または `WebFetchProvider`) を登録する。モデル向けの名前、スキーマ、プロンプトガイダンス、プレゼンテーションはすべて単一の `dsh-tool-web` コンシューマーに存在する。
 
-## Search request and result
+## 検索リクエストと結果
 
-Each seam request carries exactly one `query`. The `dsh-tool-web` consumer accepts a required `queries` array and fans it out into separate seam requests; a one-item array performs one search. `maxResults` is a consumer-owned bound (`dsh-tool-web`'s `searchMaxResults` config, default `8`) passed through the seam and enforced on the way back — if a provider over-returns, the seam truncates `sources[]` and sets `truncated`.
+各シームリクエストは正確に 1 つの `query` を運ぶ。`dsh-tool-web` コンシューマーは必須の `queries` 配列を受け取り、それを個別のシームリクエストにファンアウトする。1 要素の配列は 1 回の検索を実行する。`maxResults` はコンシューマー所有の境界 (`dsh-tool-web` の `searchMaxResults` 構成、既定 `8`) であり、シームを通して渡され、戻りで強制される — プロバイダーが多く返しすぎた場合、シームは `sources[]` を切り詰めて `truncated` を設定する。
 
 ```ts type-equiv
 /**
@@ -68,7 +68,7 @@ interface WebSearchSource {
 }
 ```
 
-## Fetch request and result
+## Fetch リクエストと結果
 
 ```ts type-equiv
 /**
@@ -82,7 +82,7 @@ interface WebFetchRequest {
 }
 ```
 
-HTTP status is part of the fetched resource state, not automatically a failure: a successful network fetch of a `404`/`500` returns a `WebFetchResult` with the status code and a bounded decoded body. `url` is the final URL after allowed redirects. `WebError` is reserved for failures to safely retrieve or represent the resource.
+HTTP ステータスは取得したリソース状態の一部であり、自動的な失敗ではない: `404`/`500` のネットワークフェッチ成功は、ステータスコードと境界付きのデコード済みボディを伴う `WebFetchResult` を返す。`url` は許可されたリダイレクト後の最終 URL である。`WebError` はリソースを安全に取得または表現できなかった失敗のために予約されている。
 
 ```ts type-equiv
 /**
@@ -118,25 +118,25 @@ type WebFetchBody =
   | { readonly kind: 'text'; readonly content: string }
 ```
 
-## Provider availability
+## プロバイダーの可用性
 
-A provider's `available(): boolean` is a cheap LOCAL check (credential presence, parseable config) and **must not make network calls**. It is an input to execution-time selection, not a health system: `search()`/`fetch()` read it to pick a usable provider, and a selection failure surfaces as the structured `WebError` the caller routes on — which carries the branchable detail (the missing id or ambiguous candidate set) in its code and message.
+プロバイダーの `available(): boolean` は安価なローカルチェック (クレデンシャルの存在、パース可能な構成) であり、**ネットワーク呼び出しを行ってはならない**。これは実行時選択への入力であり、ヘルスシステムではない: `search()`/`fetch()` は使用可能なプロバイダーを選ぶためにこれを読み、選択の失敗は呼び出し元がルーティングする構造化 `WebError` として表面化する — 分岐可能な詳細 (欠落した ID または曖昧な候補集合) をコードとメッセージに運ぶ。
 
-Selection never depends on registration, config, or HMR order: a capability has an explicit provider id (config `searchProvider`/`fetchProvider`, or the matching env var feeding the same field), or auto-selects when exactly one usable provider is registered; multiple usable providers with no configured id is `WEB_PROVIDER_AMBIGUOUS`, not first-wins.
+選択は登録、構成、HMR の順序に決して依存しない: ケイパビリティは明示的なプロバイダー ID (構成 `searchProvider`/`fetchProvider`、または同じフィールドに給する対応する環境変数) を持つか、使用可能なプロバイダーがちょうど 1 つ登録されている場合に自動選択する。構成された ID なしで複数の使用可能なプロバイダーがある場合は `WEB_PROVIDER_AMBIGUOUS` であり、先勝ちではない。
 
-## Fetch network policy
+## Fetch ネットワークポリシー
 
-The shipped Cordis, Code, and Standard presets expose `web_fetch` in every sandbox and approval mode without per-call confirmation. File sandbox presets do not govern Web network access. A deployment that needs confirmation must add a `tools/pre-execute` policy or disable fetch.
+同梱の Cordis、Code、Standard プリセットは、呼び出しごとの確認なしで、すべてのサンドボックスと承認モードで `web_fetch` を公開する。ファイルサンドボックスプリセットは Web ネットワークアクセスを統治しない。確認を必要とするデプロイメントは `tools/pre-execute` ポリシーを追加するか、fetch を無効化する必要がある。
 
-The HTTP provider resolves each actual request, rejects non-public answers including private IPv4 reached through the active DNS64 prefix, pins the validated address set, and repeats enforcement for each same-origin redirect. A cross-origin redirect requires a new tool call and fresh public-address validation. These checks prevent SSRF access to non-public destinations but do not stop a model from sending data to a public URL.
+HTTP プロバイダーは各実際のリクエストを解決し、アクティブな DNS64 プレフィックスを通して到達するプライベート IPv4 を含む非公開の応答を拒否し、検証済みアドレス集合をピン留めし、同一オリジンのリダイレクトごとに強制を繰り返す。クロスオリジンのリダイレクトには新しいツール呼び出しと新たな公開アドレス検証が必要である。これらのチェックは非公開宛先への SSRF アクセスを防ぐが、モデルが公開 URL にデータを送ることを止めるものではない。
 
-## Errors
+## エラー
 
-`WebError extends HarnessError` ([core.md](core.md) error taxonomy) with a `code: string` (open, like every other seam's error — `LlmError`, `SubagentError`), not a closed union: a provider may raise its own codes without editing `dsh-web`, and consumers must tolerate an unknown code. The codes split by owner. Seam-neutral codes are raised by the shared `WebRuntime` contract: `WEB_PROVIDER_UNAVAILABLE`, `WEB_PROVIDER_CONFIGURED_MISSING`, `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`, `WEB_PROVIDER_AMBIGUOUS`, `WEB_DUPLICATE_PROVIDER` (a registration-time programming error, the analogue of `LlmRuntime`'s `DUPLICATE_ADAPTER`), `WEB_ABORTED`, and `WEB_PROVIDER_ERROR` (the catch-all for a provider's own failure surfaced through the seam, including network/transport failure — DNS, connection refused, TLS). Fetch-transport codes are owned by the `dsh-web-fetch-http` implementation and a different fetch backend need not raise them: `WEB_INVALID_URL`, `WEB_BLOCKED_URL`, `WEB_REDIRECT_BLOCKED`, `WEB_FETCH_TOO_LARGE`, `WEB_FETCH_TIMEOUT`, `WEB_UNSUPPORTED_CONTENT_TYPE`.
+`WebError extends HarnessError` ([core.md](core.md) のエラー分類) は `code: string` (他のすべてのシームのエラー — `LlmError`、`SubagentError` — と同様にオープン) を持ち、閉じたユニオンではない: プロバイダーは `dsh-web` を編集せずに独自のコードを上げてよく、コンシューマーは未知のコードを許容しなければならない。コードはオーナーごとに分かれる。シーム中立のコードは共有 `WebRuntime` 契約によって上げられる: `WEB_PROVIDER_UNAVAILABLE`、`WEB_PROVIDER_CONFIGURED_MISSING`、`WEB_PROVIDER_CONFIGURED_UNAVAILABLE`、`WEB_PROVIDER_AMBIGUOUS`、`WEB_DUPLICATE_PROVIDER` (登録時のプログラミングエラーで、`LlmRuntime` の `DUPLICATE_ADAPTER` に相当)、`WEB_ABORTED`、および `WEB_PROVIDER_ERROR` (シームを通して表面化するプロバイダー自身の失敗 — ネットワーク/トランスポートの失敗 (DNS、接続拒否、TLS) を含む — の catch-all)。Fetch トランスポートのコードは `dsh-web-fetch-http` 実装が所有し、別の fetch バックエンドがそれらを上げる必要はない: `WEB_INVALID_URL`、`WEB_BLOCKED_URL`、`WEB_REDIRECT_BLOCKED`、`WEB_FETCH_TOO_LARGE`、`WEB_FETCH_TIMEOUT`、`WEB_UNSUPPORTED_CONTENT_TYPE`。
 
-## The service
+## サービス
 
-`WebRuntime` registers search and fetch providers, rejects duplicate ids with `WEB_DUPLICATE_PROVIDER`, and resolves providers at execution time with structured selection errors. The local fetch backend accepts only HTTP(S), rejects credentials, resolves each hostname once, rejects any answer set containing a non-public IPv4 or IPv6 destination or an active-prefix NAT64 translation to non-public IPv4, pins the request connection to the validated addresses, repeats those checks for every same-origin redirect hop, caps redirects, bytes, characters, and time, and decodes the body; the tool owns presentation.
+`WebRuntime` は search と fetch のプロバイダーを登録し、重複 ID を `WEB_DUPLICATE_PROVIDER` で拒否し、実行時に構造化された選択エラーでプロバイダーを解決する。ローカル fetch バックエンドは HTTP(S) のみを受け入れ、クレデンシャルを拒否し、各ホスト名を 1 度解決し、非公開の IPv4 または IPv6 宛先、あるいは非公開 IPv4 へのアクティブプレフィックス NAT64 変換を含む応答集合を拒否し、リクエスト接続を検証済みアドレスにピン留めし、同一オリジンのリダイレクトホップごとにそれらのチェックを繰り返し、リダイレクト、バイト、文字、時間を制限し、ボディをデコードする。プレゼンテーションはツールが所有する。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

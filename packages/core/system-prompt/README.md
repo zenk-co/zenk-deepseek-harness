@@ -1,36 +1,36 @@
 ---
-description: "System-prompt assembly for users and maintainers adding prompt sections, variables, tool-schema sources, or configuring the model-facing prompt."
+description: "プロンプトセクション、変数、ツールスキーマソースを追加したり、モデル向けプロンプトを設定したりするユーザーとメンテナー向けのシステムプロンプトアセンブリ。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-system-prompt
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-system-prompt` lets agents receive one ordered system prompt and the available tool schemas for each model step. Use it to add prompt sections, dynamic runtime facts, reusable variables, or tool schemas, or to control the fixed harness identity, deployment persona, runtime context, and model-facing tool order. Agent-scoped contributions override same-named global defaults without affecting other agents. Invalid complete-prompt combinations and unresolved variables fail assembly instead of sending a malformed prompt.
+`dsh-system-prompt` は、エージェントが各モデルステップに対して 1 つの順序付きシステムプロンプトと利用可能なツールスキーマを受け取れるようにします。プロンプトセクション、動的ランタイムファクト、再利用可能な変数、ツールスキーマの追加や、固定の harness アイデンティティ、デプロイのペルソナ、ランタイムコンテキスト、モデル向けツール順の制御に使用します。エージェントスコープのコントリビューションは同名のグローバルデフォルトを上書きし、他のエージェントには影響しません。無効な完全プロンプトの組み合わせや未解決の変数は、不正なプロンプトを送信するのではなくアセンブリを失敗させます。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送りされた作業](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount `dsh-system-prompt` wherever agents run: it provides `ctx.systemPrompt`, the registry every prompt contribution lands in. Contributions are scoped — registering through `agent.ctx` affects that agent alone and shadows a same-named global.
+エージェントが動作するすべての場所で `dsh-system-prompt` をマウントします。これはすべてのプロンプトコントリビューションが入るレジストリである `ctx.systemPrompt` を提供します。コントリビューションはスコープ付きです — `agent.ctx` を通じた登録はそのエージェントのみに影響し、同名のグローバルをシャドウします。
 
 <a id="configure-the-prompt"></a>
-### Configure the prompt
+### プロンプトの設定
 
-The config owns the fixed opener, runtime context, deployment persona prefix and suffix, and tool order; everything else comes from registered contributions.
+設定は固定の冒頭文、ランタイムコンテキスト、デプロイのペルソナプレフィックスとサフィックス、ツール順を所有します。それ以外はすべて登録されたコントリビューションから来ます。
 
 ```yaml
 - name: '@deepseek-ai/dsh-system-prompt'
@@ -41,19 +41,19 @@ The config owns the fixed opener, runtime context, deployment persona prefix and
     toolOrder: ['<unlisted-tools>']
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `includeHarnessIdentity` | `true` | Include the fixed `You are an AI agent powered by DeepSeek Harness.` first-party opener at order −1000. Set false only when a compatibility deployment owns the complete system prompt. |
-| `includeRuntimeContext` | `true` | Include optional ordered dynamic runtime context in assembly |
-| `personaPrefix` | `''` | Global persona prefix template at order `0`, before first-party guidance |
-| `personaSuffix` | `''` | Global `deployment:persona-suffix` template at order `10200`, after first-party guidance |
-| `toolOrder` | — | Explicit model-facing tool order with one `'<unlisted-tools>'` rest entry |
+| `includeHarnessIdentity` | `true` | 順序 −1000 で固定の `You are an AI agent powered by DeepSeek Harness.` ファーストパーティ冒頭文を含めます。互換デプロイが完全なシステムプロンプトを所有する場合にのみ false に設定します。 |
+| `includeRuntimeContext` | `true` | アセンブリにオプションの順序付き動的ランタイムコンテキストを含めます |
+| `personaPrefix` | `''` | 順序 `0` のグローバルペルソナプレフィックステンプレート。ファーストパーティガイダンスの前 |
+| `personaSuffix` | `''` | 順序 `10200` のグローバル `deployment:persona-suffix` テンプレート。ファーストパーティガイダンスの後 |
+| `toolOrder` | — | モデル向けツール順を明示。`'<unlisted-tools>'` の残余エントリーを 1 つだけ持つ |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-system-prompt) is the exhaustive source for every accepted field. A `toolOrder` list without exactly one rest entry or with duplicates fails at load; a listed name with no registered tool rejects every `assemble()`.
+生成される [設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-system-prompt) が、受け付けられるすべてのフィールドの網羅的な情報源です。`toolOrder` リストが残余エントリーをちょうど 1 つ持たない場合や重複がある場合はロード時に失敗し、登録済みツールのない記載名はすべての `assemble()` を拒否します。
 
-### Contribute a prompt section
+### プロンプトセクションを提供する
 
-Sections carry static or context-resolved text with an `order`; they are concatenated in ascending order and equal orders use code-unit name order. Repository-owned contributors resolve centrally allocated positions through `ctx.systemPrompt.getSectionOrder(name)`; runtime-context contributors use `getContextOrder(name)`. External contributions may use any finite order. A `complete: true` section becomes the exact complete prompt after assembly; more than one effective complete section makes assembly fail.
+セクションは静的またはコンテキスト解決されたテキストを `order` とともに運びます。それらは昇順で連結され、同じ order ではコード単位の名前順になります。リポジトリ所有のコントリビューターは `ctx.systemPrompt.getSectionOrder(name)` を通じて中央で割り当てられた位置を解決し、ランタイムコンテキストのコントリビューターは `getContextOrder(name)` を使用します。外部コントリビューションは任意の有限の order を使用できます。`complete: true` のセクションはアセンブリ後に正確な完全プロンプトになります。有効な完全セクションが 2 つ以上あるとアセンブリは失敗します。
 
 ```text
 ctx.systemPrompt.section({
@@ -63,128 +63,128 @@ ctx.systemPrompt.section({
 })
 ```
 
-Set `interpolate: false` on a section or dynamic context to preserve its text literally, including `{{…}}` groups in generated tool documentation or directory names. Other contributions interpolate variables by default.
+セクションまたは動的コンテキストで `interpolate: false` を設定すると、生成されたツールドキュメントやディレクトリ名に含まれる `{{…}}` グループも含め、そのテキストが文字通りに保たれます。その他のコントリビューションはデフォルトで変数を補間します。
 
-`refreshContext(assembly, context)` refreshes registered runtime facts after pre-step and route preparation. It preserves accepted sections, tools, variables, and contexts contributed only by the assembly waterfall, applies current optional-context suppression, and restores missing required entries. Put changing facts in context providers; registered context text is read again before admission.
+`refreshContext(assembly, context)` は、pre-step とルート準備の後に登録されたランタイムファクトを更新します。アセンブリ waterfall のみが提供した受け入れ済みのセクション、ツール、変数、コンテキストを保持し、現在のオプションコンテキスト抑制を適用し、欠落した必須エントリーを復元します。変化するファクトはコンテキストプロバイダーに入れてください。登録済みのコンテキストテキストはアドミッションの前に再度読み取られます。
 
-### Contribute a prompt variable
+### プロンプト変数を提供する
 
-Variables are referenced from section or context text as `{{name}}` and resolved at each assembly; scoped variables shadow a same-named global for that agent. The loop supplies `provider` and `model`; plugins can register the facts they own. The working-directory service supplies directory text as literal user context.
+変数はセクションまたはコンテキストのテキストから `{{name}}` として参照され、各アセンブリで解決されます。スコープ付き変数はそのエージェントの同名グローバルをシャドウします。ループが `provider` と `model` を供給し、プラグインは自身が所有するファクトを登録できます。作業ディレクトリサービスはディレクトリテキストをリテラルのユーザーコンテキストとして供給します。
 
 ```text
 ctx.systemPrompt.variable('response_language', () => 'English')
 ```
 
-Custom persona templates must not depend on a built-in `{{cwd}}` variable: the loop does not register it, so unresolved references fail prompt assembly before any model request. Remove the `Your working directory is {{cwd}}.` clause from home, profile, or invocation `personaSuffix` settings and preset `suffix` fields, preserving unrelated text. Omit or clear an otherwise empty suffix. The [working-directory service](../../session/working-directory/README.md) supplies the required current-directory context.
+カスタムペルソナテンプレートは組み込みの `{{cwd}}` 変数に依存してはなりません。ループはそれを登録しないため、未解決の参照はモデルリクエストの前にプロンプトアセンブリを失敗させます。home、profile、invocation の `personaSuffix` 設定や preset の `suffix` フィールドから `Your working directory is {{cwd}}.` 節を削除し、無関係なテキストは保持してください。それ以外が空のサフィックスは省略するかクリアします。[作業ディレクトリサービス](../../session/working-directory/README.md) が必要な現在ディレクトリのコンテキストを供給します。
 
-### Contribute tool schemas
+### ツールスキーマを提供する
 
-Tool-schema providers are evaluated per assembly and contribute the model-visible `ToolSchema` set; `ToolRuntime` registers itself automatically, so most tools need no manual wiring here. A provider returns the post-restriction visible set plus the pre-restriction name universe used by `toolOrder`.
+ツールスキーマプロバイダーはアセンブリごとに評価され、モデル可視の `ToolSchema` セットを提供します。`ToolRuntime` は自動的に自身を登録するため、ほとんどのツールはここで手動の配線を必要としません。プロバイダーは制限後の可視セットと、`toolOrder` が使用する制限前の名前ユニバースを返します。
 
-### Suppress runtime context
+### ランタイムコンテキストを抑制する
 
-`suppressRuntimeContext()` removes optional dynamic context for the calling scope without disabling the owning services. Contributions marked `required` remain visible. Multiple suppressors compose; optional context returns when none remains.
+`suppressRuntimeContext()` は、所有サービスを無効化せずに呼び出しスコープのオプションの動的コンテキストを削除します。`required` とマークされたコントリビューションは可視のままです。複数のサプレッサーは合成され、オプションコンテキストはどれも残らなくなると戻ります。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the package realizes the behavior above; the observable contract is covered in [Use this package](#use-this-package).
+このセクションでは、このパッケージが上記の動作をどのように実現するかを説明します。観測可能な契約は [このパッケージを使う](#use-this-package) で説明されています。
 
-### Design concept
+### 設計概念
 
-The package is a registry plus a cooperative assembly pipeline. One `assemble()` call merges the global layer with the requested scope's layer, detaches tool parameters, canonicalizes section order by number and then name, runs the scope-filtered `system-prompt/assemble` waterfall, restores an effective complete section as the sole prompt section, and applies any active runtime-context suppressor. Sections and dynamic contexts are separate inputs: sections become prompt text, while contexts become sourced user-role snapshots in model history under the loop. Tool schemas are part of the assembly by design — "what the model is told it can do" is one coherent thing, even though adapters transmit schemas as a separate wire field.
+このパッケージはレジストリと協調的アセンブリパイプラインです。1 回の `assemble()` 呼び出しは、グローバル層を要求されたスコープの層とマージし、ツールパラメーターを分離し、セクション順を番号、次に名前で正規化し、スコープフィルタリングされた `system-prompt/assemble` waterfall を実行し、有効な完全セクションを唯一のプロンプトセクションとして復元し、アクティブなランタイムコンテキストサプレッサーを適用します。セクションと動的コンテキストは別々の入力です。セクションはプロンプトテキストになり、コンテキストはループの下でモデル履歴内のソース付き user ロールスナップショットになります。ツールスキーマは設計上アセンブリの一部です — 「モデルができることとして伝えられるもの」は 1 つの首尾一貫したものであり、アダプターはスキーマを別の wire フィールドとして送信します。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `SystemPrompt` service, config, assembly pipeline, `renderPrompt` |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `SystemPrompt` サービス、設定、アセンブリパイプライン、`renderPrompt` |
 
-### Assembly and rendering
+### アセンブリとレンダリング
 
-Assembly resolves and renders in two stages: `assemble()` returns sections with resolved-but-uninterpolated text, the ordered tool schemas, and every registered variable resolved against the context, while `renderPrompt()` interpolates `{{variable}}` references unless a section sets `interpolate: false`, drops empty sections, and joins with blank lines — strictly, an unknown reference, a registered-but-valueless reference, or a malformed complete group throws, because a malformed prompt is worse than a loud failure. `toolOrder` canonicalizes the collected tools before the waterfall (registration order is a plugin-load artifact); a waterfall listener that mutates the list owns the determinism of what it emits.
+アセンブリは 2 段階で解決とレンダリングを行います。`assemble()` は解決済みだが未補間のテキストを持つセクション、順序付きツールスキーマ、コンテキストに対して解決されたすべての登録変数を返し、`renderPrompt()` はセクションが `interpolate: false` を設定していない限り `{{variable}}` 参照を補間し、空のセクションを削除し、空行で結合します — 厳密には、未知の参照、登録済みだが値のない参照、または不正な完全グループはスローします。不正なプロンプトは大音量の失敗よりも悪いからです。`toolOrder` は waterfall の前に収集されたツールを正規化します（登録順はプラグインロードの産物です）。リストを変更する waterfall リスナーは、それが出力するものの決定性を所有します。
 
-### Scoping
+### スコープ
 
-Scoped sections, variables, and tool providers shadow globals for one agent, and the assembly waterfall dispatches scope-filtered. Registry-change notifications (`system-prompt/change`) are deliberately unfiltered because a global change affects every scope.
+スコープ付きセクション、変数、ツールプロバイダーは 1 つのエージェントのグローバルをシャドウし、アセンブリ waterfall はスコープフィルタリングしてディスパッチします。レジストリ変更通知（`system-prompt/change`）は、グローバルの変更がすべてのスコープに影響するため、意図的にフィルタリングされません。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-The package-level contract is enough for most consumers; read these when you need the surrounding domain.
+ほとんどのコンシューマーにはパッケージレベルの契約で十分です。周辺ドメインが必要なときにこれらを読んでください。
 
-- [System-prompt subsystem](../../../docs/subsystems/system-prompt.md) — the exact cross-package types and generated service API.
-- [tools package](../tools/README.md) — the tool registry whose schemas flow into assembly.
-- [Prompt variables Agent Note](../../../.agents/notes/implemented/architecture/2026-07-05-prompt-variables-and-tool-guidance-ownership.md) — who owns which prompt facts.
-- [First-party prompt order Agent Note](../../../.agents/notes/archived/architecture/2026-08-25-sparse-first-party-prompt-section-orders.md) — the sparse named order allocation.
-- [Core group map](../README.md) — how the core packages compose.
+- [システムプロンプトサブシステム](../../../docs/subsystems/system-prompt.md) — 正確なクロスパッケージ型と生成されるサービス API。
+- [tools パッケージ](../tools/README.md) — スキーマがアセンブリに流れ込むツールレジストリ。
+- [Prompt variables Agent Note](../../../.agents/notes/implemented/architecture/2026-07-05-prompt-variables-and-tool-guidance-ownership.md) — どのプロンプトファクトを誰が所有するか。
+- [First-party prompt order Agent Note](../../../.agents/notes/archived/architecture/2026-08-25-sparse-first-party-prompt-section-orders.md) — 疎な名前付き order 割り当て。
+- [Core グループマップ](../README.md) — コアパッケージの構成方法。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-First-party sections render the harness identity, deployment persona prefix (including the model-name introduction), reusable instructions (including the generated tools SDK and structured-output guidance), then the environment-bearing suffix: harness source (`10000`), Web surface (`10100`), and deployment persona suffix (`10200`). External section orders and assembly listeners remain authoritative. `includeHarnessIdentity: false` omits only that fixed opener. Empty sections disappear; scoped sections and variables can shadow globals for one agent. The `system-prompt/assemble` waterfall determines the delivered prompt and tool schemas unless one effective section declares itself complete — that exact section then becomes the whole system prompt while the waterfall's contexts, tools, and variables remain. The rendered prompt reaches the model as a system-role message of derived history — surface node 0, or the latest system node after an in-history update — neither the loop request nor `request/header` carries a separate `system` field. If the complete rendering is empty, the loop clears every active system node through logged empty replacements, so no older prompt remains in model history. Ordered dynamic contexts are separate from sections and become sourced user-role snapshots only when present; `includeRuntimeContext: false` or a scoped suppressor removes optional contributions while required operational context remains.
+ファーストパーティセクションは、harness アイデンティティ、デプロイのペルソナプレフィックス（モデル名の導入を含む）、再利用可能な指示（生成される tools SDK と構造化出力のガイダンスを含む）、次に環境を運ぶサフィックスをレンダリングします。harness ソース（`10000`）、Web サーフェス（`10100`）、デプロイのペルソナサフィックス（`10200`）です。外部のセクション order とアセンブリリスナーは引き続き権威です。`includeHarnessIdentity: false` はその固定の冒頭文のみを省略します。空のセクションは消えます。スコープ付きセクションと変数は 1 つのエージェントのグローバルをシャドウできます。`system-prompt/assemble` waterfall は、有効なセクションの 1 つが自身を complete と宣言しない限り、配信されるプロンプトとツールスキーマを決定します — その場合、その正確なセクションがシステムプロンプト全体になり、waterfall のコンテキスト、ツール、変数は残ります。レンダリングされたプロンプトは派生履歴の system ロールメッセージとしてモデルに届きます — サーフェスノード 0、または履歴内更新後の最新 system ノードです — ループリクエストも `request/header` も別の `system` フィールドを運びません。完全なレンダリングが空の場合、ループはログに記録される空の置換によってすべてのアクティブな system ノードをクリアするため、古いプロンプトはモデル履歴に残りません。順序付き動的コンテキストはセクションとは別で、存在する場合にのみソース付き user ロールスナップショットになります。`includeRuntimeContext: false` またはスコープ付きサプレッサーは、必須の運用コンテキストを残したままオプションのコントリビューションを削除します。
 
-##### Harness identity
+##### Harness アイデンティティ
 
 ```markdown
 You are an AI agent powered by DeepSeek Harness.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Identity is a fixed per-request cost when enabled. Persona prefixes, suffixes, and plugin text are repeated per request and scale with their rendered content.
+アイデンティティは有効時、リクエストごとの固定コストです。ペルソナのプレフィックス、サフィックス、プラグインテキストはリクエストごとに繰り返され、レンダリングされる内容に比例します。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while identity, persona, variables, section text, and order render identically: an unchanged rendering leaves the system nodes untouched unless an incapable route or a new request series must consolidate retained in-history prompts. Without `systemPromptUpdate`, non-empty prompt text is consolidated at the first system node through logged per-node replacements, so a head rewrite loses prefix reuse from its first changed token; when the prepared call declares `systemPromptUpdate: 'in-history'`, the agent loop appends a non-empty changed prompt after the cached history inside a continuing request series, so the prefix through that history stays reusable ([decision rule](../agent-loop/README.md#understand-the-implementation)). With the same model, persona prefix, tools, and preceding instructions, different source paths, local Web URLs, or persona suffix values leave the reusable first-party prefix unchanged. Persona prefix changes can alter the early prefix. Any change may invalidate reuse from the first changed token; provider cache sharing and measured hit rates are not guaranteed.
+アイデンティティ、ペルソナ、変数、セクションテキスト、order が同一にレンダリングされる間はプレフィックス安定です。変更のないレンダリングは system ノードをそのままにします — ただし、能力のないルートや新しいリクエストシリーズが保持された履歴内プロンプトを統合しなければならない場合を除きます。`systemPromptUpdate` なしでは、空でないプロンプトテキストはログに記録されるノードごとの置換によって最初の system ノードで統合されるため、先頭の書き換えは最初に変わったトークンからのプレフィックス再利用を失います。準備された呼び出しが `systemPromptUpdate: 'in-history'` を宣言する場合、エージェントループは継続するリクエストシリーズ内でキャッシュ済み履歴の後に空でない変更済みプロンプトを追記するため、その履歴までのプレフィックスは再利用可能なままです（[決定ルール](../agent-loop/README.md#understand-the-implementation)）。同じモデル、ペルソナプレフィックス、ツール、先行する指示であれば、異なるソースパス、ローカル Web URL、ペルソナサフィックスの値でも、再利用可能なファーストパーティプレフィックスは変わりません。ペルソナプレフィックスの変更は先頭のプレフィックスを変え得ます。あらゆる変更は最初に変わったトークンからの再利用を無効化する可能性があります。プロバイダーのキャッシュ共有と実測ヒット率は保証されません。
 
-### Tool schemas
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-For shipped tools, the model receives the per-agent-visible subset of the [generated tool schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tools), ordered by configuration or lexicographically after restrictions and assembly interception. Extensions can contribute additional definitions through the same registry. Sections and schema providers are separate assembly inputs. A restriction does not remove a section registration: tool-guidance plugins use `text({ scope })` and `ctx.tools.get(name, scope)` to return empty text or select applicable fragments. Arbitrary static sections are not automatically rewritten.
+同梱ツールについて、モデルは [生成ツールスキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tools) のエージェントごとに可視のサブセットを受け取り、制限とアセンブリ傍受の後に設定順または辞書順で並びます。エクステンションは同じレジストリを通じて追加の定義を提供できます。セクションとスキーマプロバイダーは別々のアセンブリ入力です。制限はセクション登録を削除しません。ツールガイダンスプラグインは `text({ scope })` と `ctx.tools.get(name, scope)` を使用して空のテキストを返すか、該当するフラグメントを選択します。任意の静的セクションは自動的に書き換えられません。
 
-#### Token effect
+#### トークンへの影響
 
-Schema tokens repeat on every request. Restricting a tool removes its entire schema cost for that agent but not a separate prompt section; reordering changes cache shape but not semantic content.
+スキーマトークンはリクエストごとに繰り返されます。ツールを制限するとそのエージェントのスキーマコスト全体が削除されますが、別個のプロンプトセクションは削除されません。並べ替えはキャッシュの形を変えますが、意味内容は変わりません。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the visible schema set, rendering, and order are unchanged. Registration, restriction, or reordering may invalidate reuse from the first changed schema token.
+可視のスキーマセット、レンダリング、順序が変わらなければプレフィックス安定です。登録、制限、並べ替えは、最初に変わったスキーマトークンからの再利用を無効化する可能性があります。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送りされた作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when prompt assembly needs special care. They are current package constraints, not a task backlog.
+これらの制限は、プロンプトアセンブリに特別な注意が必要な場合を定義します。これらは現在のパッケージ制約であり、タスクバックログではありません。
 
-- **Deployment-authored prompt text is config/composition only** — this plugin owns the global persona prefix and suffix defaults, creator plugins may register agent-scoped shadows, and other sections come from the plugin that owns the fact; there is no end-user prompt-editing API.
-- **No inline escape syntax in interpolated text** — use `interpolate: false` when a whole section must preserve literal braces.
-- **`toolOrder` misconfiguration surfaces at prompt assembly (the first turn), not at boot** — only shape violations throw at config load.
+- **デプロイが書くプロンプトテキストは設定/構成のみ** — このプラグインはグローバルなペルソナプレフィックスとサフィックスのデフォルトを所有し、作成側プラグインはエージェントスコープのシャドウを登録でき、その他のセクションはそのファクトを所有するプラグインから来ます。エンドユーザー向けのプロンプト編集 API はありません。
+- **補間テキストにインラインエスケープ構文はない** — セクション全体でリテラルの中括弧を保持する必要がある場合は `interpolate: false` を使用します。
+- **`toolOrder` の設定ミスは起動時ではなくプロンプトアセンブリ（最初のターン）で表面化する** — 設定ロード時にスローされるのは形状違反のみです。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

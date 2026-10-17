@@ -1,58 +1,58 @@
 ---
-description: "Browse the commands available in the current window and find them by action, English alias, or key"
+description: "現在のウィンドウで利用可能なコマンドを閲覧し、操作・英語別名・キーで探す"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-shortcuts
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Browse the commands available in the current window and find them by action, English alias, or key. Open the reference from General Settings or Mod+/. Record, clear, or restore application bindings; fixed input actions remain read-only.
+現在のウィンドウで利用可能なコマンドを閲覧し、操作・英語別名・キーで探す。一般設定または Mod+/ からリファレンスを開く。アプリケーション束縛を記録・クリア・復元する。固定入力アクションは読み取り専用のままである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-The Web app bundle mounts this package together with `shortcuts`. The reference shows only registered commands and existing fixed input actions. Desktop shows the effective device keys; commands without a Web default show No shortcut. The Settings entry and Mod+/ open the same single dialog, titled “Keyboard shortcuts” in English and “快捷键” in Chinese. Its 480×600 CSS-pixel card shrinks to fit smaller windows; the header and search remain above an internally scrolling list. The search field receives focus on open without changing its border color. Automatic entry and return focus in the reference, recorder, and reset confirmation omit outlines, including returns after Escape and application close shortcuts. Containers remain outline-free, and Tab and directional navigation retain their visible focus indicators. The Settings entry follows Coding Tools and is labeled “Edit shortcuts”, with an “Open from anywhere” shortcut tooltip, and uses a filled button with the same standard radius as adjacent settings controls and no dropdown icon and reads the same effective binding for its tooltip and `aria-keyshortcuts`; both are absent without a binding.
+Web アプリバンドルはこのパッケージを `shortcuts` と共にマウントする。リファレンスは登録済みコマンドと既存固定入力アクションのみを示す。Desktop は実効デバイスキーを示し、Web 既定を持たないコマンドは No shortcut を示す。Settings 入口と Mod+/ は同じ単一ダイアログを開き、英語題は “Keyboard shortcuts”、中国語題は “快捷键” である。その 480×600 CSS ピクセルカードは小さいウィンドウに収まるよう縮み、ヘッダーと検索は内部スクロール一覧の上に残る。検索フィールドは開いた時点でフォーカスを受け、境界色は変えない。リファレンス・レコーダー・リセット確認における自動入口と復帰フォーカスはアウトラインを省き、Escape 後やアプリケーション終了ショートカット後の復帰を含む。コンテナーはアウトラインなしのままであり、Tab と方向ナビゲーションは可視フォーカス指示を保持する。Settings 入口は Coding Tools に続き “Edit shortcuts” と表示され、“Open from anywhere” ショートカットツールチップ付きであり、隣接設定制御と同じ標準角丸の filled ボタンを使い、ドロップダウンアイコンなしであり、ツールチップと `aria-keyshortcuts` に同じ実効束縛を読む。どちらも束縛なしでは不在である。
 
-`Mod+/` opens the reference when no modal is open or Settings is in front, and closes it when the reference is in front. While the reference is in front, the Settings command cannot open or close Settings. Held-key repeats are ignored. Recording, pending writes, and a nested confirmation prevent the reference shortcut from closing the dialog.
+`Mod+/` は、モーダルが開いていないか Settings が前面の場合にリファレンスを開き、リファレンスが前面の場合にそれを閉じる。リファレンスが前面の間、Settings コマンドは Settings を開閉できない。保持キー反復は無視される。記録中・書き込み待ち・入れ子確認はリファレンスショートカットによるダイアログ終了を防ぐ。
 
-Core actions follow a fixed product order, independent of plugin registration, unloading, or remounting. Desktop's font-size actions follow Open settings, with Increase before Decrease. Stopping the current response ends the Message input group and remains read-only. Extension commands outside that order follow the core actions in stable command ID order; other fixed actions retain their groups.
+中核操作は固定製品順序に従い、プラグイン登録・アンロード・再マウントとは独立である。Desktop のフォントサイズ操作は Open settings に続き、Increase が Decrease の前である。現行応答の停止は Message 入力グループを終え、読み取り専用のままである。その順序外の拡張コマンドは安定コマンド ID 順で中核操作に続き、他の固定操作はグループを保持する。
 
-Search matches an ordered subsequence within one label, English alias, or key combination, ignoring case. Each matching command appears once. Search relevance takes precedence; equal matches retain the display order. Application and fixed-action rows remain 42 CSS pixels high during normal display and recording; long command names are truncated. Application rows show command names and binding controls without availability subtitles or reason tooltips, including conflicting and invalid bindings. Commands that cannot execute remain silent. Both platforms show each editable row’s complete key combination in one settings-control grey block with secondary ink. Fixed actions use unboxed tertiary text, cannot enter recording, and do not highlight on hover. Group titles align with command labels.
+検索は 1 つの表示名・英語別名・キー組み合わせ内の順序付き部分列に一致し、大文字小文字を無視する。各一致コマンドは 1 回だけ現れる。検索関連度が優先し、同点一致は表示順を保持する。アプリケーションと固定アクション行は通常表示と記録中いずれも高さ 42 CSS ピクセルのままである。長いコマンド名は切り詰められる。アプリケーション行は、競合や無効束縛を含め、利用可否字幕や理由ツールチップなしにコマンド名と束縛制御を示す。実行できないコマンドは黙ったままである。両プラットフォームとも、各編集可能行の完全キー組み合わせを 1 つの設定制御 grey ブロックに secondary ink で示す。固定操作は箱なし tertiary テキストを使い、記録に入れず、ホバーで強調しない。グループ題はコマンド表示名に整列する。
 
-Hover an application row to highlight its rounded surface and reveal the edit icon; keyboard focus also reveals the icon. Clicking anywhere on the row starts its inline recorder. Unbound commands omit the inline Remove action. Windows and macOS Desktop record one or two overlapping non-modifier keys with optional modifiers; a third key rejects the draft. Releasing the first key saves the current combination, so sequential A then B records only A. Saving rejects combinations occupied by editable or fixed actions, including overlapping single-key and two-key bindings. The dialog close control exits recording. The recorder keeps the same height as key badges and uses a neutral grey border with secondary text. Other environments retain Escape cancellation and Tab navigation. Saving and cancellation return focus to the dialog. Clicking blank dialog space outside the inline editor closes it and discards any held combination; clicking its status text preserves the draft. macOS Web can record Option+Command+N reported as a dead key; composition and ordinary accent input remain protected. Remove clears the binding; Restore Default removes only that command’s override. System toasts announce successful writes and failures; a rejected combination marks the recorder with an error border. Release its non-modifier keys to record another combination without clicking; modifiers may remain held. Repeated identical errors leave a visible toast and its dismissal time unchanged; different errors and successful writes replace it immediately. An error can appear again after dismissal. Failed writes retain recorder focus and the draft for Retry Save or another recording. Configuration or command-catalog changes require review before a draft can be retried. Read failures disable editing and identify the active bindings and affected document in a system toast: Web uses the current origin’s localStorage entry `dsh.keybindings.v1`; Desktop uses `userData/keybindings.json`. Back up and repair damaged data before reloading the page or restarting Harness; upgrade Harness for a document written by a newer version. Restore All never overwrites unreadable data. The footer shows Restore All Defaults and the current runtime/platform’s override count, including removed bindings and commands that are not currently mounted. Search does not change the count. At zero overrides, the count is hidden and the action is disabled. Its confirmation initially focuses Cancel; cancellation returns focus to Restore All Defaults, including when opened from the recorder. Confirming restores only this profile. A stale revision closes the confirmation and requires another confirmation against the latest configuration; a failed write retains the accepted bindings and allows retry.
+アプリケーション行へのホバーは丸み表面を強調して編集アイコンを明かし、キーボードフォーカスもアイコンを明かす。行上のどこをクリックしてもそのインラインレコーダーが始まる。未束縛コマンドはインライン Remove 操作を省く。Windows と macOS Desktop は任意修飾子付き 1〜2 重複非修飾キーを記録し、3 キー目はドラフトを拒否する。最初のキーの解放は現行組み合わせを保存するため、A 次に B の順次入力は A のみ記録する。保存は、重複単一キーと 2 キー束縛を含め、編集可能または固定操作が占有する組み合わせを拒否する。ダイアログ終了制御は記録を抜ける。レコーダーはキーバッジと同じ高さを保ち、中立 grey 境界と secondary テキストを使う。他環境は Escape キャンセルと Tab ナビゲーションを保持する。保存とキャンセルはダイアログにフォーカスを戻す。インラインエディター外の空白ダイアログ空間のクリックはそれを閉じて保持組み合わせを破棄し、その状態テキストのクリックはドラフトを保持する。macOS Web は dead key として報告される Option+Command+N を記録でき、composition と通常アクセント入力は保護のままである。Remove は束縛をクリアし、Restore Default はそのコマンドの上書きのみ除去する。システムトーストは成功書き込みと失敗を通知する。拒否された組み合わせはレコーダーにエラー境界で印付けする。クリックせず別の組み合わせを記録するには非修飾キーを解放し、修飾子は保持したままでよい。繰り返し同一エラーは可視トーストとその非表示時刻を不変のままにし、異なるエラーと成功書き込みは直ちに置換する。エラーは非表示後に再び現れうる。失敗書き込みは Retry Save や別記録のためレコーダーフォーカスとドラフトを保持する。設定やコマンドカタログの変更はドラフト再試行前にレビューを要する。読み取り失敗は編集を無効化し、有効束縛と影響文書をシステムトーストで特定する。Web は現行オリジンの localStorage 項目 `dsh.keybindings.v1` を使い、Desktop は `userData/keybindings.json` を使う。ページ再読み込みや Harness 再起動の前に損傷データをバックアップして修復し、新しい版が書いた文書には Harness を上げて対応する。Restore All は読み取り不可データを決して上書きしない。フッターは Restore All Defaults と現行ランタイム/プラットフォームの上書き数を示し、除去束縛と現在マウントされていないコマンドを含む。検索は数を変えない。ゼロ上書きでは数は隠れ、操作は無効である。その確認は最初 Cancel にフォーカスし、キャンセルはレコーダーから開いた場合を含め Restore All Defaults にフォーカスを戻す。確定はこのプロファイルのみ復元する。古いリビジョンは確認を閉じ、最新設定に対する別確認を要する。失敗書き込みは受理済み束縛を保持して再試行を許す。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The General Settings entry and shell overlay share one declared interaction store. Catalog and configuration updates arrive through injected observable hooks; recording and persistence use injected service callbacks. The shared modal primitive owns top-layer Escape, Tab traversal, and restoration to the invoking control.
+一般設定入口とシェルオーバーレイは 1 つの宣言済み対話ストアを共有する。カタログと設定更新は注入観測フック経由で届き、記録と永続化は注入サービスコールバックを使う。共有モーダルプリミティブは最上層 Escape、Tab 移動、起動制御への復元を所有する。
 
-All fixed actions come from the service's observable fixed catalog. Conversation and approval plugins contribute their own actions; this integration contributes shared menu actions. Rows follow locale updates and disappear when their registration is disposed.
+すべての固定操作はサービスの観測可能固定カタログ由来である。会話と承認プラグインは独自操作を寄与し、この統合は共有メニュー操作を寄与する。行はロケール更新に追従し、登録破棄で消える。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
 - [Web Client](../../../docs/subsystems/web-client.md)
 - [UI primitives](../ui-primitives/README.md)
@@ -61,27 +61,27 @@ All fixed actions come from the service's observable fixed catalog. Conversation
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+なし。このパッケージはブラウザー側 UI プラグイン層であり、モデルに面した登録は一切ない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Loading or unloading command owners invalidates an open recording draft even when saved overrides are unchanged; review the current bindings before retrying.
-- Key recording uses physical positions with US-layout key names. Browser combinations are limited by the [shortcut service](../shortcuts/README.md). Only mounted feature owners contribute approval and double-Escape stop rows.
+- 開いた記録ドラフトは、保存済み上書き不変でもコマンド所有者のロードやアンロードで無効になる。再試行前に現行束縛をレビューする。
+- キー記録は US 配置キー名の物理位置を使う。ブラウザー組み合わせは[ショートカットサービス](../shortcuts/README.md)で制限される。マウント済み機能所有者のみ承認と二重 Escape 停止行を寄与する。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

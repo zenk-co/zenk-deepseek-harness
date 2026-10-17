@@ -1,42 +1,42 @@
 ---
-description: "The feedback package group: user feedback on sessions and assistant messages, for users and maintainers choosing, composing, or debugging feedback capture."
+description: "フィードバックパッケージグループ: セッションとアシスタントメッセージに対するユーザーフィードバック。フィードバック取得の選択、構成、デバッグを行うユーザーとメンテナー向け。"
 kind: "package-group"
 ---
 
-# feedback/ — recorded human feedback
+# feedback/ — 記録される人のフィードバック
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The feedback group collects human opinions about the harness's work: users can submit a free-text remark about a whole session, and rate or annotate individual assistant messages. Neither kind of feedback reaches the model — these are signals about the output, never input to it. Users record a session remark with the `/feedback` command; product surfaces read and change per-message ratings through the `messageFeedback` service. The two packages are independent: session remarks and per-message ratings do not interact. This page maps the group; the package READMEs and the [feedback subsystem page](../../docs/subsystems/feedback.md) own the per-package contracts.
+フィードバックグループはハーネスの仕事に対する人の意見を集める。ユーザーはセッション全体への自由形式の所感を記録でき、個々のアシスタントメッセージに評価や注釈を付けられる。どちらのフィードバックもモデルには届かない。これらは出力への信号であり、入力ではない。ユーザーは `/feedback` コマンドでセッション所感を記録し、`messageFeedback` サービス経由で製品サーフェイスがメッセージごとの評価を読み書きする。2つのパッケージは独立している。セッション所感とメッセージごとの評価は相互作用しない。このページはグループを対応付ける。パッケージごとの契約はパッケージ README と [フィードバックサブシステムページ](../../docs/subsystems/feedback.md) が所有する。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発ノート](#dev-note)
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-| Package | Role |
+| パッケージ | 役割 |
 |---|---|
-| [`command-feedback`](command-feedback/README.md) | Session-level feedback: the `/feedback` command, the `sessionFeedback` Remote behind the Web dialog, and the fixed category taxonomy, all without a model turn |
-| [`message-feedback`](message-feedback/README.md) | Per-message ratings, categories, and notes, served to product surfaces through the `messageFeedback` service |
+| [`command-feedback`](command-feedback/README.md) | セッションレベルのフィードバック: モデルターンを伴わない `/feedback` コマンド、Web ダイアログ背後の `sessionFeedback` Remote、固定の分類体系 |
+| [`message-feedback`](message-feedback/README.md) | メッセージごとの評価、分類、ノート。製品サーフェイスに `messageFeedback` サービス経由でサーブされる |
 
-Session remarks are a one-way signal: recording one is safe at any point in a conversation and never changes what the model sees. With a feedback-gated sharing policy, recording a session remark is what releases the session for sharing.
+セッション所感は一方向の信号である。会話のどの時点でも安全に記録でき、モデルが見る内容を変えない。フィードバック連携の共有ポリシーでは、セッション所感の記録がそのセッションを共有可能にする。
 
-Per-message ratings and notes are stored with the session, survive restarts, and never appear in model history or telemetry.
+メッセージごとの評価とノートはセッションとともに保存され、再起動を超えて残り、モデル履歴やテレメトリーに現れない。
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Feedback subsystem](../../docs/subsystems/feedback.md) — the message-feedback types, service contract, and Web consumer.
-- [Session telemetry subsystem](../../docs/subsystems/session-telemetry.md) — the sharing policy disclosed by the `/feedback` acknowledgement.
-- [Anonymous user identity](../identity/README.md) — the per-harness-home id embedded in the feedback acknowledgement.
+- [Feedback サブシステム](../../docs/subsystems/feedback.md) — メッセージフィードバック型、サービス契約、Web 消費者。
+- [セッションテレメトリーサブシステム](../../docs/subsystems/session-telemetry.md) — `/feedback` 承認が開示する共有ポリシー。
+- [匿名ユーザー ID](../identity/README.md) — フィードバック承認に埋め込まれるハーネスホームごとの ID。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
-None.
+なし。

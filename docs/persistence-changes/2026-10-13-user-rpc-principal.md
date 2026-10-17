@@ -1,25 +1,25 @@
 ---
-description: "Records a persistence type transition and its compatibility acknowledgement."
+description: "永続化型遷移とその互換性承認を記録する。"
 kind: persistence-change
 ---
 
 # 2026-10-13-user-rpc-principal
 
-English | [中文](2026-10-13-user-rpc-principal.zh.md)
+日本語 | [English](2026-10-13-user-rpc-principal.en.md) | [中文](2026-10-13-user-rpc-principal.zh.md)
 
-## Summary
+## 概要
 
-Adds an optional principal to the user-rpc message source for prompts submitted by a caller other than the owner.
+所有者以外の呼び出し元が投入したプロンプト向けに、user-rpc メッセージソースにオプショナルなプリンシパルを追加する。
 
-## Table of Contents
+## 目次
 
-- [Declaration](#declaration)
-- [Compatibility](#compatibility)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [宣言](#declaration)
+- [互換性](#compatibility)
+- [検証](#verification)
+- [開発ノート](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -45,16 +45,16 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-Owner prompts omit the field, so their sources and every existing Session log are unchanged; an absent principal means the owner. A reader that predates the field ignores it and treats the message as an ordinary user message, because the kind stays 'user'. A current reader of an older log finds no principal and treats every message as the owner's. The field is not part of any model request: provider adapters read only the model-visible message content. SESSION_FORMAT_VERSION does not change.
+所有者のプロンプトはこのフィールドを省略するため、そのソースと既存のすべてのセッションログは不変である。プリンシパルが存在しないことは所有者を意味する。このフィールドより前のリーダーはそれを無視し、種別が 'user' のままであるため通常のユーザーメッセージとして扱う。古いログに対する現在のリーダーはプリンシパルを見つけられず、すべてのメッセージを所有者のものとして扱う。このフィールドはモデルリクエストの一部ではない。プロバイダーアダプターはモデル可視メッセージ内容のみを読む。SESSION_FORMAT_VERSION は変更しない。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-pnpm exec vitest run packages/api/session-controller/tests/remote-access.host.spec.ts packages/subagent/subagent/tests/control.spec.ts packages/api/session-controller/tests/session-cold.host.spec.ts: non-owner prompts persist source.principal in agent/inbox/spliced, owner and existing time-zone sources stay byte-identical; all tests passed.
+pnpm exec vitest run packages/api/session-controller/tests/remote-access.host.spec.ts packages/subagent/subagent/tests/control.spec.ts packages/api/session-controller/tests/session-cold.host.spec.ts: 所有者以外のプロンプトは agent/inbox/spliced に source.principal を永続化し、所有者および既存のタイムゾーンソースはバイト同一のままである。すべてのテストが通過した。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
-None.
+なし。

@@ -1,107 +1,107 @@
 ---
-description: "Experimental Chrome DevTools inspection for Host and browser Client Cordis runtimes, including Console evaluation, Sources, Network capture, Elements trees, and a CDP-independent query API."
+description: "Host とブラウザー Client の Cordis ランタイム向けの実験的 Chrome DevTools 検査。Console 評価、Sources、Network キャプチャ、Elements ツリー、CDP 非依存のクエリ API を含む。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-experimental-inspector
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Inspect one running dsh Host and its browser Clients in Chrome DevTools: Host and Client Console contexts, Host Sources and debugging, captured Host fetches, and a shared Cordis tree, with all CDP state in a Worker.
+実行中の 1 つの dsh Host とそのブラウザー Client を Chrome DevTools で検査する: Host と Client の Console コンテキスト、Host の Sources とデバッグ、キャプチャされた Host の fetch、共有の Cordis ツリー。すべての CDP 状態は Worker にある。
 
-The optional [Developer Tools bundle](../inspector-profile/README.md) enables both NodeJS Inspector and Session Log, including Host fetch capture. Web startup does not require or accept `--inspect`.
+オプションの[開発者ツールバンドル](../inspector-profile/README.md)は、Host の fetch キャプチャを含む NodeJS Inspector と Session Log の両方を有効にする。Web の起動は `--inspect` を要求も受け付けもしない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Runtime layout](#runtime-layout)
-- [Configuration](#configuration)
-- [Observation API](#observation-api)
-- [Cordis tree inspection](#cordis-tree-inspection)
-- [Host fetch capture](#host-fetch-capture)
-- [Security](#security)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [ランタイムレイアウト](#runtime-layout)
+- [設定](#configuration)
+- [観測 API](#observation-api)
+- [Cordis ツリー検査](#cordis-tree-inspection)
+- [Host の fetch キャプチャ](#host-fetch-capture)
+- [セキュリティ](#security)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-For trusted local development, `pnpm run demo:inspector` explicitly mounts the source overlay through the normal Web profile. The Host prints a debugging URL; Chrome is required to inspect that target. Fetch capture includes secrets, and the local debugging endpoint permits arbitrary code execution.
+信頼されたローカル開発では、`pnpm run demo:inspector` が通常の Web プロファイルを通じてソース overlay を明示的にマウントする。Host はデバッグ URL を出力し、そのターゲットを検査するには Chrome が必要である。fetch キャプチャには秘密情報が含まれ、ローカルのデバッグエンドポイントは任意のコード実行を許す。
 
-The bundle sets `experimental-inspector` to `disabled: false` with `captureFetch: true`. The Host's optional `--inspect` argument hook only opens an external Chrome window; it does not control whether the Inspector runs.
+バンドルは `experimental-inspector` を `disabled: false` に、`captureFetch: true` とともに設定する。Host のオプションの `--inspect` 引数フックは外部 Chrome ウィンドウを開くだけで、Inspector が実行されるかどうかは制御しない。
 
-When this component is enabled, **Ctrl/Cmd+Shift+.** toggles **NodeJS Inspector** in the full-width bottom panel without requiring a selected Session. Drag its top edge to resize it, taking space from the content above; the selected height is retained across collapse and navigation. The focused divider also accepts Up/Down, Home and End. Its iframe loads on the first open and remains mounted while collapsed and across Session or main-panel navigation; unloading the component resets it. The X button and shortcut restore the opening control's focus when that control remains connected. The iframe automatically connects to this Host and opens Console; the manual Connection panel is omitted. Each embedded frontend shows Host and only its embedding page's Client in Console, Sources and the Cordis tree. The printed `devtools://` URL shows all Clients.
+このコンポーネントが有効なとき、**Ctrl/Cmd+Shift+.** が全幅の下部パネルで **NodeJS Inspector** をトグルする。Session の選択は不要である。上端をドラッグしてサイズを変更でき、上のコンテンツからスペースを取る。選択した高さは折りたたみとナビゲーションをまたいで保持される。フォーカスされた divider は Up/Down、Home、End も受け付ける。その iframe は最初のオープンでロードされ、折りたたみ中も Session やメインパネルのナビゲーションをまたいでもマウントされたまま残り、コンポーネントのアンロードでリセットされる。X ボタンとショートカットは、開いたコントロールが接続されたままの場合、そのコントロールにフォーカスを戻す。iframe は自動的にこの Host に接続し Console を開く。手動の Connection パネルは省略される。各埋め込みフロントエンドは Console、Sources、Cordis ツリーで Host と、その埋め込みページの Client だけを表示する。出力される `devtools://` URL はすべての Client を表示する。
 
-The Host serves the mirrored DevTools frontend at the application-relative `inspector/devtools/devtools_app.html` path, using the existing Web login. The `inspector/devtools` prefix redirects to that entry; GET and HEAD serve files, missing resources return 404, and other methods return 405. Its `cdp` WebSocket route authenticates the same browser session and forwards only to this Inspector's Worker page target. The bottom panel supplies its claimed `clientSourceId` to the entry and automatic WebSocket endpoint; the selection follows that logical Client across reconnects. An absent selector includes all Clients, an unavailable selected Client leaves Host visible, and empty or repeated selectors reject the upgrade with 400. Explicit `ws` or `wss` query parameters override the automatic endpoint, including its selection.
+Host はミラーリングされた DevTools フロントエンドを、アプリケーション相対の `inspector/devtools/devtools_app.html` パスで、既存の Web ログインを使って提供する。`inspector/devtools` プレフィックスはそのエントリーにリダイレクトする。GET と HEAD はファイルを提供し、存在しないリソースは 404 を返し、その他のメソッドは 405 を返す。その `cdp` WebSocket ルートは同じブラウザーセッションを認証し、この Inspector の Worker ページターゲットにのみ転送する。下部パネルは、その主張する `clientSourceId` をエントリーと自動 WebSocket エンドポイントに渡す。選択は再接続をまたいでその論理 Client に追随する。セレクターがなければすべての Client を含み、選択された Client が利用できない場合は Host が見えたままになる。空または繰り返しのセレクターはアップグレードを 400 で拒否する。明示的な `ws` または `wss` クエリパラメーターは、その選択も含めて自動エンドポイントを上書きする。
 
-The build compiles the official `chrome-devtools-frontend@1.0.1638082` TypeScript sources with the root workspace's pinned [Vite dependency](../../../package.json). This npm snapshot is an ancestor of the Chromium 150 release branch, not an exact copy of its later stable release. The [source configuration](scripts/devtools/source.ts) and package manifest fix the version. Normal npm installation supplies the source and toolchain; building needs no appspot access, browser download, browser launch, or PAK extraction. Neither workspace installation nor published-package installation runs a DevTools download hook.
+ビルドは公式の `chrome-devtools-frontend@1.0.1638082` TypeScript ソースを、ルートワークスペースにピン留めされた [Vite 依存](../../../package.json)でコンパイルする。この npm スナップショットは Chromium 150 リリースブランチの祖先であり、その後の安定版リリースの正確なコピーではない。[ソース設定](scripts/devtools/source.ts)とパッケージマニフェストがバージョンを固定する。通常の npm インストールがソースとツールチェーンを供給し、ビルドには appspot アクセス、ブラウザーのダウンロード、ブラウザーの起動、PAK 抽出のいずれも不要である。ワークスペースインストールも公開パッケージインストールも DevTools ダウンロードフックを実行しない。
 
-The [distribution build](scripts/build-devtools.ts) emits ESM entries, shared chunks, explicit Workers, injected scripts, and runtime assets into `lib/devtools`. It preserves original module-relative resource URLs, including deployment prefixes. CSS text modules, image variables, and minimal English locale constants replace GN-generated inputs without modifying npm sources. The frontend uses English UIStrings directly from upstream modules, with no translation files or dictionary generator. Other language preferences resolve to English. All upstream panels, including Lighthouse, remain included. Memory retains its parser Worker; Performance records Host CPU. Published packages contain the built assets, integrity manifest, and Chromium license, not the build-time npm source or Vite dependencies.
+[配布ビルド](scripts/build-devtools.ts)は ESM エントリー、共有チャンク、明示的な Worker、注入スクリプト、ランタイムアセットを `lib/devtools` に出力する。デプロイプレフィックスを含む、元のモジュール相対リソース URL を保持する。CSS テキストモジュール、画像変数、最小限の英語ロケール定数が、npm ソースを変更せずに GN 生成の入力を置き換える。フロントエンドはアップストリームモジュールから英語 UIStrings を直接使う。翻訳ファイルも辞書ジェネレーターもない。他の言語設定は英語に解決される。Lighthouse を含むすべてのアップストリームパネルが含まれたままである。Memory は自身のパーサー Worker を保持し、Performance は Host CPU を記録する。公開パッケージにはビルド済みアセット、整合性マニフェスト、Chromium ライセンスが含まれ、ビルド時の npm ソースや Vite 依存は含まれない。
 
-The frontend uses browser runtime adapters and excludes Node-only transports at build time, without an import map. Its same-origin connection bootstrap precedes the application entry. The bottom panel adds `disableLocaleInfoBar=true`; the bootstrap sets DevTools' own `disable-locale-info-bar` preference without changing its language. Updating the frontend requires changing the npm pin and source configuration together, then rerunning the panel and Worker checks; incompatible source edits fail the build.
+フロントエンドはブラウザーランタイムアダプターを使い、ビルド時に Node 専用トランスポートを除外する。import map は使わない。その同一オリジン接続ブートストラップはアプリケーションエントリーに先行する。下部パネルは `disableLocaleInfoBar=true` を追加し、ブートストラップは DevTools 自身の `disable-locale-info-bar` 設定を、その言語を変えずに設定する。フロントエンドの更新には npm ピンとソース設定を同時に変更し、パネルと Worker のチェックを再実行する必要がある。互換性のないソース編集はビルドを失敗させる。
 
 <a id="runtime-layout"></a>
-## Runtime layout
+## ランタイムレイアウト
 
-The Worker never accesses live Cordis objects: the shared Host/Client collector projects them into validated snapshots before transport. Cordis owns plugin composition, `ctx.inspector` registration, bootstrap injection, and disposal. A late-loading Client fetches its bootstrap through an authenticated Host route, which the Host registers before it starts the Worker: a request waits for Worker readiness and then receives the bootstrap, or `503` when startup fails; an aborted request stops waiting. When the platform cannot run the Worker and reports Node's `ERR_FEATURE_UNAVAILABLE_ON_PLATFORM`, such as the browser preview's Worker host, the Host logs one warning and the plugin still starts with only that route, which answers `503`; it provides no `ctx.inspector`, DevTools routes, bootstrap injection, or `devtools://` URL. Any other startup error still rejects the plugin. Bootstrap transport and source-setup failures warn and retain connection-reset recovery for both injected and fetched startup; invalid bootstrap data or service-registration failures reject startup. Source replacement joins old service-consumer cleanup before claiming another source, and unloading an active plugin cancels its pending bootstrap refresh.
+Worker は live な Cordis オブジェクトに決してアクセスしない。共有の Host/Client コレクターが、トランスポート前にそれらを検証済みスナップショットへ射影する。Cordis はプラグイン構成、`ctx.inspector` 登録、ブートストラップ注入、破棄を所有する。遅れてロードされる Client は、Host が Worker を開始する前に登録する認証済み Host ルートを通じてブートストラップを取得する。リクエストは Worker の準備完了を待ってからブートストラップを受け取るか、起動失敗時は `503` を受け取る。中断されたリクエストは待機を止める。プラットフォームが Worker を実行できず、Node の `ERR_FEATURE_UNAVAILABLE_ON_PLATFORM`（ブラウザープレビューの Worker ホストなど）を報告する場合、Host は警告を 1 回ログし、プラグインはそのルートだけを備えて起動する。そのルートは `503` を返し、`ctx.inspector`、DevTools ルート、ブートストラップ注入、`devtools://` URL を提供しない。その他の起動エラーは依然としてプラグインをリジェクトする。ブートストラップのトランスポートとソースセットアップの失敗は警告し、注入された起動と取得された起動の両方で接続リセットからの回復を保つ。無効なブートストラップデータやサービス登録の失敗は起動をリジェクトする。ソースの置き換えは、別のソースをクレームする前に古いサービス Consumer のクリーンアップに参加し、アクティブなプラグインのアンロードは保留中のブートストラップリフレッシュをキャンセルする。
 
-The Host plugin starts the Worker and connects a dedicated `MessagePort`. The Client uses injected or fetched browser-source parameters to open an authenticated WebSocket directly to the Worker; it receives no DevTools URL. Chrome DevTools connects to the Worker's CDP WebSocket. A private `node:inspector.Session` per DevTools connection attaches from the Worker to the Host main thread, so Host debugging remains available while Host JavaScript is paused.
+Host プラグインは Worker を起動し、専用の `MessagePort` を接続する。Client は注入または取得したブラウザーソースパラメーターを使って、Worker への認証済み WebSocket を直接開く。DevTools URL は受け取らない。Chrome DevTools は Worker の CDP WebSocket に接続する。DevTools 接続ごとのプライベートな `node:inspector.Session` が Worker から Host メインスレッドにアタッチするため、Host の JavaScript が一時停止している間も Host のデバッグが利用できる。
 
-The source tree follows those execution environments: `client/` and `host/` provide mirrored adapter entry paths, `worker/` contains only Worker-thread orchestration and Chrome protocol state, and `shared/` contains environment-independent Cordis and network models, normalized realm backend interfaces, and the internal bridge protocol. Worker-side Client and Host adapters are mirrored under `worker/realms/`; a Client adapter in that directory still executes in the Worker.
+ソースツリーはこれらの実行環境に従う。`client/` と `host/` はミラーリングされたアダプターのエントリーパスを提供し、`worker/` は Worker スレッドのオーケストレーションと Chrome プロトコル状態のみを含み、`shared/` は環境非依存の Cordis とネットワークのモデル、正規化された realm バックエンドインターフェース、内部ブリッジプロトコルを含む。Worker 側の Client と Host のアダプターは `worker/realms/` の下にミラーリングされる。そのディレクトリにある Client アダプターも Worker 内で実行される。
 
-Host and Client producers send internal observation records rather than CDP messages. Records contain a source generation, sequence, source-clock timestamp, topic, and JSON payload. The Worker validates every process or network frame, owns source state and retention, and translates recognized topics to standard CDP domains.
+Host と Client のプロデューサーは CDP メッセージではなく内部観測レコードを送る。レコードはソース世代、シーケンス、ソースクロックのタイムスタンプ、トピック、JSON ペイロードを含む。Worker はすべてのプロセスまたはネットワークのフレームを検証し、ソース状態と保持を所有し、認識されたトピックを標準 CDP ドメインに翻訳する。
 
-Client sources declare typed Runtime, Console, and read-only Sources capabilities. `Runtime.enable` publishes only the default Host execution context and one synthetic context for every connected Client included in that DevTools connection; Node's internal and additional VM contexts are not listed. Selecting a Client context routes evaluation, property access, function calls, promise awaiting, and object release to that browser realm. Client Console arguments use the same session-local object table, while `Debugger.enable` publishes the built `lib/client.js` catalog and `Debugger.getScriptSource` reads bounded content chunks. Source-map URLs come from the loaded script's `sourceMappingURL` trailer, including combo URLs and deployment prefixes. Client-script breakpoints, step, and call frames remain unsupported; target-wide pause and resume control the Host debugger only.
+Client ソースは型付きの Runtime、Console、読み取り専用 Sources ケイパビリティを宣言する。`Runtime.enable` はデフォルトの Host 実行コンテキストと、その DevTools 接続に含まれる接続済み Client ごとに 1 つの合成コンテキストだけを公開する。Node の内部コンテキストと追加の VM コンテキストは列挙されない。Client コンテキストを選択すると、評価、プロパティアクセス、関数呼び出し、promise の await、オブジェクトの解放がそのブラウザー realm にルーティングされる。Client の Console 引数は同じセッションローカルのオブジェクトテーブルを使い、`Debugger.enable` はビルド済みの `lib/client.js` カタログを公開し、`Debugger.getScriptSource` は有界のコンテンツチャンクを読む。ソースマップ URL は、ロードされたスクリプトの `sourceMappingURL` トレーラー（combo URL とデプロイプレフィックスを含む）から来る。Client スクリプトのブレークポイント、ステップ、コールフレームは引き続きサポートされず、ターゲット全体の一時停止と再開は Host デバッガーのみを制御する。
 
-A Client synchronously closes its source on `pagehide` and reconnects with the same logical identity on `pageshow` after a cached-page restore. Switching a live page to the background does not disconnect it. Closed generations cannot publish delayed execution contexts or script catalogs.
+Client は `pagehide` で同期的にソースを閉じ、キャッシュされたページからの復元後に `pageshow` で同じ論理 identity で再接続する。live なページをバックグラウンドに切り替えても切断されない。閉じた世代は遅延した実行コンテキストやスクリプトカタログを公開できない。
 
-Both plugin faces run the same browser-safe Cordis collector. It converts reachable Context and Fiber objects into a versioned `CordisTreeSnapshot`; the Worker stores that CDP-independent representation and projects each Host or Client source into the Elements panel.
+両方のプラグインフェイスは同じブラウザーセーフな Cordis コレクターを実行する。それは到達可能な Context と Fiber のオブジェクトをバージョン付きの `CordisTreeSnapshot` に変換し、Worker がその CDP 非依存の表現を保存して、各 Host または Client ソースを Elements パネルに射影する。
 
 <a id="configuration"></a>
-## Configuration
+## 設定
 
-The Host plugin injects `webServer` and `connection` and accepts these fields:
+Host プラグインは `webServer` と `connection` を注入し、以下のフィールドを受け付ける:
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---:|---|
-| `host` | `127.0.0.1` | Worker endpoint bind address; only loopback is accepted |
-| `port` | `9230` | First Worker endpoint port; occupied ports advance upward, while `0` requests an OS-assigned port |
-| `clientOrigins` | `[]` | Additional exact browser origins accepted by `/ingest`; loopback origins remain accepted |
-| `captureFetch` | `true` | Wrap `globalThis.fetch` and publish every later call |
-| `maxRequestBodyBytes` | 8 MiB | Per-request captured request-body prefix |
-| `maxResponseBodyBytes` | 32 MiB | Per-request captured response-body prefix |
-| `maxBodyChunkBytes` | 48 KiB | Raw bytes carried by one body record before base64 encoding |
-| `maxJournalBytes` | 256 MiB | Worker-retained request and response body bytes |
-| `maxRetainedRequests` | `2000` | Active and completed requests retained by the Worker |
-| `maxSourceFrameBytes` | 128 KiB | Encoded source-frame limit |
-| `maxSourceRecordsPerFrame` | `128` | Records in one source batch |
-| `maxQueuedRecords` | `2048` | Per-producer records waiting for transport |
-| `maxQueuedBytes` | 16 MiB | Per-producer queued encoded bytes |
-| `startupTimeoutMs` | 10 seconds | Worker readiness deadline |
-| `stopTimeoutMs` | 5 seconds | Graceful Worker shutdown deadline before termination |
-| `clientReconnectBaseMs` | 250 ms | First Client reconnect backoff cap |
-| `clientReconnectMaxMs` | 5 seconds | Maximum Client reconnect backoff cap |
-| `clientRuntimeTimeoutMs` | 30 seconds | Deadline for one Worker-to-Client Runtime or Sources command |
-| `queryTimeoutMs` | 10 seconds | Deadline for one non-CDP semantic query |
-| `maxClientRuntimeObjects` | `10000` | Live Client object handles retained per DevTools connection |
-| `maxClientRuntimeProperties` | `2000` | Property descriptors returned by one Client object inspection |
-| `maxClientSourceBytes` | 8 MiB | Maximum encoded bytes read from one Client script or source map |
-| `maxCordisNodes` | `2048` | Context and Fiber nodes admitted from one realm snapshot before truncation |
-| `maxDisconnectedCordisTrees` | `8` | Last disconnected realm trees retained as non-live snapshots |
+| `host` | `127.0.0.1` | Worker エンドポイントのバインドアドレス。受け付けられるのは loopback のみ |
+| `port` | `9230` | 最初の Worker エンドポイントポート。占有されたポートは上へ進み、`0` は OS 割り当てポートを要求する |
+| `clientOrigins` | `[]` | `/ingest` が受け付ける追加の正確なブラウザーオリジン。loopback オリジンは引き続き受け付けられる |
+| `captureFetch` | `true` | `globalThis.fetch` をラップし、以降のすべての呼び出しを公開する |
+| `maxRequestBodyBytes` | 8 MiB | リクエストごとにキャプチャされるリクエストボディのプレフィックス |
+| `maxResponseBodyBytes` | 32 MiB | リクエストごとにキャプチャされるレスポンスボディのプレフィックス |
+| `maxBodyChunkBytes` | 48 KiB | base64 エンコード前に 1 つのボディレコードが運ぶ生バイト |
+| `maxJournalBytes` | 256 MiB | Worker が保持するリクエストとレスポンスのボディバイト |
+| `maxRetainedRequests` | `2000` | Worker が保持するアクティブおよび完了済みリクエスト |
+| `maxSourceFrameBytes` | 128 KiB | エンコードされたソースフレームの制限 |
+| `maxSourceRecordsPerFrame` | `128` | 1 つのソースバッチ内のレコード数 |
+| `maxQueuedRecords` | `2048` | トランスポートを待つプロデューサーごとのレコード数 |
+| `maxQueuedBytes` | 16 MiB | プロデューサーごとにキューに入れられたエンコード済みバイト |
+| `startupTimeoutMs` | 10 秒 | Worker 準備完了の期限 |
+| `stopTimeoutMs` | 5 秒 | 終了前のグレースフルな Worker シャットダウンの期限 |
+| `clientReconnectBaseMs` | 250 ms | 最初の Client 再接続バックオフの上限 |
+| `clientReconnectMaxMs` | 5 秒 | Client 再接続バックオフの最大上限 |
+| `clientRuntimeTimeoutMs` | 30 秒 | Worker から Client への 1 つの Runtime または Sources コマンドの期限 |
+| `queryTimeoutMs` | 10 秒 | 1 つの非 CDP セマンティッククエリの期限 |
+| `maxClientRuntimeObjects` | `10000` | DevTools 接続ごとに保持される live な Client オブジェクトハンドル |
+| `maxClientRuntimeProperties` | `2000` | 1 回の Client オブジェクト検査が返すプロパティ記述子 |
+| `maxClientSourceBytes` | 8 MiB | 1 つの Client スクリプトまたはソースマップから読むエンコード済みバイトの最大値 |
+| `maxCordisNodes` | `2048` | 切り詰め前に 1 つの realm スナップショットから受け入れる Context と Fiber ノード数 |
+| `maxDisconnectedCordisTrees` | `8` | 非 live スナップショットとして保持される最後の切断済み realm ツリー数 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-inspector) is the exhaustive source for accepted fields and their declarations.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-experimental-inspector)が、受け付けられるフィールドとその宣言の網羅的なソースである。
 
-The Host logs a `devtools://` URL after the Worker listens. The same Worker serves `/json`, `/json/list`, `/json/version`, the target WebSocket under `/devtools/page/<id>`, and the Client source at `/ingest`.
+Host は Worker がリッスンを開始した後に `devtools://` URL をログする。同じ Worker が `/json`、`/json/list`、`/json/version`、`/devtools/page/<id>` 配下のターゲット WebSocket、および `/ingest` の Client ソースを提供する。
 
 <a id="observation-api"></a>
-## Observation API
+## 観測 API
 
-Both plugin faces provide the same service:
+両方のプラグインフェイスは同じサービスを提供する:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -115,66 +115,66 @@ ctx.inspector.publish(topic, jsonPayload)
 await ctx.inspector.cordis.getTree()
 ```
 
-Publishing validates lossless JSON and schedules delivery without waiting for the Worker. Each source has a bounded queue. Overflow is reported as a sequence gap and never delays the observed application operation. `cordis.getTree()` reads the Worker's latest detached semantic snapshot without creating a CDP session or enabling Runtime, Debugger, or Sources.
+Publish はロスレス JSON を検証し、Worker を待たずに配信をスケジュールする。各ソースは有界キューを持つ。オーバーフローはシーケンスギャップとして報告され、観測対象のアプリケーション操作を決して遅延させない。`cordis.getTree()` は CDP セッションを作成したり Runtime、Debugger、Sources を有効にしたりせずに、Worker の最新のデタッチされたセマンティックスナップショットを読む。
 
 <a id="cordis-tree-inspection"></a>
-## Cordis tree inspection
+## Cordis ツリー検査
 
-The Elements document has fixed `<host>` and `<clients>` containers. `<host>` contains the Host root Context; `<clients>` contains one `<client>` per Client source, and each `<client>` contains that realm's root Context. The Cordis root Fiber is omitted. After removing Cordis service-call `shadow` wrappers, every other Fiber is a child of `fiber.parent`, owns exactly one Context child for `fiber.ctx`, and carries only `uid="<Cordis Fiber.uid>"`; Context elements have no attributes. Context-only `extend()`, `isolate()`, and `intercept()` layers remain direct Context descendants.
+Elements ドキュメントは固定の `<host>` と `<clients>` コンテナーを持つ。`<host>` は Host のルート Context を含み、`<clients>` は Client ソースごとに 1 つの `<client>` を含み、各 `<client>` はその realm のルート Context を含む。Cordis のルート Fiber は省略される。Cordis のサービス呼び出し `shadow` ラッパーを取り除いた後、他のすべての Fiber は `fiber.parent` の子であり、`fiber.ctx` 用の Context の子をちょうど 1 つ持ち、`uid="<Cordis Fiber.uid>"` のみを運ぶ。Context 要素は属性を持たない。Context のみの `extend()`、`isolate()`、`intercept()` レイヤーは直接の Context 子孫のままである。
 
-Host and Client publish the same nested `CordisTreeSnapshot` type. Context and Fiber nodes carry opaque object handles for realm-local object lookup; Fiber nodes additionally carry Cordis `uid`. The Worker composes those realm snapshots into one `{ host, clients }` inspection tree. It assigns `BackendNodeId` values per source generation; each DevTools connection assigns its own `NodeId` values; `DOM.resolveNode` asks the owning Host or Client Runtime for a connection-local `RemoteObjectId`. `DOM.requestNode` maps that object id back to the same Elements node. `ctx.inspector.cordis.getTree()` and `DSHInspector.getCordisTree` read the detached consumer-neutral tree without routing handles or CDP ids.
+Host と Client は同じネストされた `CordisTreeSnapshot` 型を公開する。Context と Fiber ノードは realm ローカルのオブジェクト検索のための不透明オブジェクトハンドルを運び、Fiber ノードはさらに Cordis の `uid` を運ぶ。Worker はそれらの realm スナップショットを 1 つの `{ host, clients }` 検査ツリーに構成する。ソース世代ごとに `BackendNodeId` 値を割り当て、各 DevTools 接続は自身の `NodeId` 値を割り当てる。`DOM.resolveNode` は所有する Host または Client の Runtime に接続ローカルの `RemoteObjectId` を尋ねる。`DOM.requestNode` はそのオブジェクト id を同じ Elements ノードに逆マップする。`ctx.inspector.cordis.getTree()` と `DSHInspector.getCordisTree` は、ハンドルや CDP id をルーティングせずに、デタッチされた Consumer 中立のツリーを読む。
 
-Node delivery is depth-limited per DevTools connection: `DOM.getDocument` serves three document levels when the caller omits `depth`, withheld levels advertise `childNodeCount`, and expansion fetches them through `DOM.requestChildNodes` (`depth: -1` for a whole subtree). Repeated expansion requests deliver only missing child lists, preserving existing frontend node objects and deeper loaded descendants. NodeIds leaving through `DOM.performSearch`, `DOM.requestNode`, or `DOM.pushNodesByBackendIdsToFrontend` first push the not-yet-sent ancestor levels as `DOM.setChildNodes` events.
+ノード配信は DevTools 接続ごとに深さ制限される。呼び出し元が `depth` を省略した場合、`DOM.getDocument` は 3 つのドキュメントレベルを提供し、保留されたレベルは `childNodeCount` を通知し、展開は `DOM.requestChildNodes` を通じてそれらを取得する（サブツリー全体には `depth: -1`）。繰り返しの展開リクエストは欠落した子リストのみを配信し、既存のフロントエンドノードオブジェクトと深くロードされた子孫を保持する。`DOM.performSearch`、`DOM.requestNode`、`DOM.pushNodesByBackendIdsToFrontend` から出ていく NodeIds は、まず未送信の祖先レベルを `DOM.setChildNodes` イベントとしてプッシュする。
 
-Sources publish complete snapshots, while the Worker compares stable backend node identities before notifying DevTools. Unchanged snapshots emit no DOM event. Changes to a known node's undelivered child list send only `DOM.childNodeCountUpdated`; expanding it fetches the complete current child list. Delivered child lists receive node-level insertion and removal events, inserted-node payloads withhold their subtree, and sibling reordering replaces only that parent's children. Attribute changes target delivered nodes only. Re-fetching a document replaces its delivered depth; `DOM.describeNode` does not attach nodes to the frontend tree. Existing `NodeId` values and unaffected Elements expansion remain stable.
+ソースは完全なスナップショットを公開し、Worker は DevTools に通知する前に安定したバックエンドノード identity を比較する。変更されていないスナップショットは DOM イベントを発しない。既知のノードの未配信子リストへの変更は `DOM.childNodeCountUpdated` のみを送り、それを展開すると完全な現在の子リストを取得する。配信済みの子リストはノードレベルの挿入と削除のイベントを受け取り、挿入ノードのペイロードはそのサブツリーを保留し、兄弟の並べ替えはその親の子のみを置き換える。属性の変更は配信済みノードのみを対象とする。ドキュメントを再取得すると配信済みの深さが置き換わる。`DOM.describeNode` はノードをフロントエンドツリーにアタッチしない。既存の `NodeId` 値と影響を受けていない Elements の展開は安定したままである。
 
-When a Client disconnects, its Console execution context and live object ids are destroyed immediately, removing it from Console's context selector. With disconnected-tree retention enabled, Elements keeps the last tree and adds the boolean `disconnected` attribute to its `<client>` element. Reconnection keeps the logical source id, creates a new synthetic CDP context id for the new transport generation, and removes the attribute when its complete snapshot replaces the stale tree. Attribute changes arrive incrementally without refreshing DevTools. The Client retains its logical id in `sessionStorage` and claims it through Web Locks for the page lifetime, so refresh reuses the id while a duplicated live tab receives a new one. The Worker retains at most `maxDisconnectedCordisTrees` such snapshots; zero removes them immediately.
+Client が切断すると、その Console 実行コンテキストと live オブジェクト id は即座に破棄され、Console のコンテキストセレクターから取り除かれる。切断ツリー保持が有効な場合、Elements は最後のツリーを保ち、その `<client>` 要素に真偽値の `disconnected` 属性を追加する。再接続は論理ソース id を保ち、新しいトランスポート世代に新しい合成 CDP コンテキスト id を作成し、その完全なスナップショットが古いツリーを置き換えると属性を削除する。属性の変更は DevTools をリフレッシュせずに段階的に届く。Client は論理 id を `sessionStorage` に保持し、ページのライフタイムにわたって Web Locks を通じてそれをクレームするため、リフレッシュは id を再利用し、複製された live タブは新しい id を受け取る。Worker はそのようなスナップショットを最大 `maxDisconnectedCordisTrees` 個保持し、0 なら即座に削除する。
 
 <a id="host-fetch-capture"></a>
-## Host fetch capture
+## Host の fetch キャプチャ
 
-Fetch capture is on by default and records the complete URL, all request and response headers, request body, response body, status, timing, errors, and cancellation. It does not redact credentials, cookies, query values, or payloads. Body capture reads clones; the caller receives the original Response as soon as the original fetch resolves.
+fetch キャプチャはデフォルトで有効であり、完全な URL、すべてのリクエスト/レスポンスヘッダー、リクエストボディ、レスポンスボディ、ステータス、タイミング、エラー、キャンセルを記録する。認証情報、Cookie、クエリ値、ペイロードをマスクしない。ボディキャプチャはクローンを読むため、呼び出し元は元の fetch が解決するとすぐに元の Response を受け取る。
 
-The configured body limits bound retention rather than select fields: capture keeps the prefix and marks the result truncated. `Network.getRequestPostData` and `Network.getResponseBody` read the Worker's retained bytes. `Network.streamResourceContent` returns the buffered prefix and adds later response bytes to `Network.dataReceived` for that DevTools connection, which drives live Response and EventStream views. Direct Undici Client/Dispatcher calls and fetch references retained before plugin activation are outside this observer.
+設定されたボディ制限はフィールドの選択ではなく保持を制限する。キャプチャはプレフィックスを保ち、結果を切り詰め済みとしてマークする。`Network.getRequestPostData` と `Network.getResponseBody` は Worker が保持するバイトを読む。`Network.streamResourceContent` はバッファー済みプレフィックスを返し、その DevTools 接続の `Network.dataReceived` に以降のレスポンスバイトを追加する。これが live な Response と EventStream ビューを駆動する。直接の Undici Client/Dispatcher 呼び出しと、プラグイン有効化より前に保持された fetch 参照はこのオブザーバーの対象外である。
 
-After response headers arrive, a caller-side abort can stop the observer's clone; captured bytes remain available through `Network.getResponseBody`, capture metadata records the error and truncation, and CDP emits `Network.loadingFinished` because fetch returned a Response. A fetch rejection before response headers emits `Network.loadingFailed`, with `canceled: true` for an abort.
+レスポンスヘッダーが到着した後、呼び出し元側の abort はオブザーバーのクローンを停止できる。キャプチャ済みバイトは `Network.getResponseBody` を通じて利用可能なままで、キャプチャメタデータがエラーと切り詰めを記録し、fetch が Response を返したため CDP は `Network.loadingFinished` を発する。レスポンスヘッダーより前の fetch リジェクトは `Network.loadingFailed` を発し、abort の場合は `canceled: true` を伴う。
 
 <a id="security"></a>
-## Security
+## セキュリティ
 
-Client selection limits one DevTools connection's realm sessions, DOM projection and diagnostic queries; it does not stop collection or change the shared observation API. It is a display filter, not authorization: a trusted debugging user can open an unfiltered connection, and Host evaluation retains its existing authority.
+Client の選択は、1 つの DevTools 接続の realm セッション、DOM 射影、診断クエリを制限する。収集を停止したり、共有の観測 API を変えたりはしない。これは表示フィルターであり認可ではない。信頼されたデバッグユーザーはフィルターなしの接続を開くことができ、Host の評価は既存の権限を保持する。
 
-The CDP target grants arbitrary code execution in both Host and connected Client realms through `Runtime.evaluate`; Host Debugger operations provide additional control. Full fetch capture includes secrets. The Worker therefore accepts only a `127.0.0.1` bind address. Client ingest additionally requires a random WebSocket subprotocol token injected by the Host and rejects non-loopback origins unless explicitly configured. The CDP socket itself has no token; loopback binding is its only access control.
+CDP ターゲットは `Runtime.evaluate` を通じて Host と接続済み Client realm の両方に任意のコード実行を許し、Host の Debugger 操作はさらなる制御を提供する。完全な fetch キャプチャには秘密情報が含まれる。したがって Worker は `127.0.0.1` のバインドアドレスのみを受け付ける。Client の ingest はさらに、Host が注入するランダムな WebSocket サブプロトコルトークンを必要とし、明示的に構成されない限り非 loopback オリジンを拒否する。CDP ソケット自体はトークンを持たず、loopback バインドがその唯一のアクセス制御である。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this developer-only inspector observes runtime activity without changing model requests.
+なし。この開発者専用 Inspector はモデルリクエストを変えずにランタイムアクティビティを観測する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストの組み立てや送信を行わない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Memory and Performance inspect the Host** — Memory captures the Host heap; Performance records Host CPU samples. Client Runtime contexts do not expose browser heap snapshots or rendering traces.
-- **The same-origin relay runs on the Host main thread** — pausing Host JavaScript also pauses this relay. Use the printed direct Worker DevTools endpoint for breakpoint debugging and resume control.
-- **Client active debugging is unsupported** — Console events, Runtime evaluation, RemoteObject access, and read-only `lib/client.js` Sources work. Client-script debugger requests return explicit unsupported errors; target-wide pause and resume control the Host only.
-- **Client Sources expose the Inspector bundle only** — other page scripts are not cataloged by this package.
-- **Client evaluation uses page JavaScript** — page Content Security Policy can block dynamic evaluation, and the synthetic context does not provide DevTools command-line helpers or native REPL declaration semantics.
-- **Client identity arbitration requires Web Locks** — browsers without that API retain reconnect and refresh identity through `sessionStorage`, but cannot distinguish two simultaneously live tabs copied from the same storage state.
-- **Fetch interception covers `globalThis.fetch`** — direct Undici APIs and fetch references retained before activation are not observed.
-- **Body cloning has cost** — full capture tees request and response streams up to the configured limits and can increase memory and I/O pressure. The retained-body limit does not include buffering inside the stream tee, including an oversized source chunk or data queued for a slower application reader.
-- **No automatic Worker restart** — an unexpected Worker exit fails the current Inspector instance; lifecycle recovery belongs to a later change.
+- **Memory と Performance は Host を検査する** — Memory は Host ヒープをキャプチャし、Performance は Host の CPU サンプルを記録する。Client Runtime コンテキストはブラウザーのヒープスナップショットやレンダリングトレースを公開しない。
+- **同一オリジンリレーは Host メインスレッドで動作する** — Host の JavaScript を一時停止するとこのリレーも一時停止する。ブレークポイントデバッグと再開制御には、出力された直接の Worker DevTools エンドポイントを使う。
+- **Client のアクティブデバッグはサポートされない** — Console イベント、Runtime 評価、RemoteObject アクセス、読み取り専用 `lib/client.js` Sources は動作する。Client スクリプトのデバッガーリクエストは明示的な unsupported エラーを返す。ターゲット全体の一時停止と再開は Host のみを制御する。
+- **Client Sources が公開するのは Inspector バンドルのみ** — 他のページスクリプトはこのパッケージではカタログ化されない。
+- **Client の評価はページの JavaScript を使う** — ページの Content Security Policy が動的評価をブロックしうる。また合成コンテキストは DevTools のコマンドラインヘルパーやネイティブ REPL の宣言セマンティクスを提供しない。
+- **Client identity の調停には Web Locks が必要** — その API を持たないブラウザーは `sessionStorage` を通じて再接続とリフレッシュの identity を保つが、同じストレージ状態からコピーされた 2 つの同時 live タブを区別できない。
+- **fetch のインターセプトは `globalThis.fetch` を対象とする** — 直接の Undici API と有効化より前に保持された fetch 参照は観測されない。
+- **ボディのクローンにはコストがある** — 完全キャプチャは設定された制限までリクエストとレスポンスのストリームを tee し、メモリと I/O の負荷を増やしうる。保持ボディ制限にはストリーム tee 内部のバッファリング（大きすぎるソースチャンクや、遅いアプリケーションリーダーのためにキューに入れられたデータなど）は含まれない。
+- **自動 Worker 再起動はない** — 予期しない Worker の終了は現在の Inspector インスタンスを失敗させる。ライフサイクル回復は後の変更に属する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

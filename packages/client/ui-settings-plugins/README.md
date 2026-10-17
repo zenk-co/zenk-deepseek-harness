@@ -1,79 +1,79 @@
 ---
-description: "Built-in plugins settings section for the dsh web client: the Settings navigation entry and the tab chrome that feature-owned tabs register into."
+description: "dsh web client 用組込插件設定節。設定誘導項目と機能所有札が登録する札外装。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-settings-plugins
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use the **Built-in plugins** settings section to inspect the plugins this deployment ships. The section is a shell: it owns the navigation entry and the tab row, and every tab in it is registered by another plugin — the read-only inventory ships one. Configuring a built-in plugin happens on the sidebar's Plugins page, where each official plugin's own companion package registers its page.
+配備が出荷する插件を調べるには**組込插件**設定節を使う。この節は殻であり、誘導項目と札行を所有し、その中の各札は他插件が登録する — 読取専用目録が 1 つを出荷する。組込插件の設定は側欄の插件頁で行い、各公式插件自身の同伴包がその頁を登録する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに探る](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しの作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Open **Built-in plugins** in Settings. [ui-settings-plugin-inventory](../ui-settings-plugin-inventory/README.md) contributes the inventory as the section's one tab, shown as the page itself; a second registered tab turns the row into tabs. A deployment whose composition contributes no tab shows the section's empty line.
+設定で**組込插件**を開く。[ui-settings-plugin-inventory](../ui-settings-plugin-inventory/README.md) は目録を節唯一の札として寄与し、頁自体として示される。登録札 2 件目がその行を札群にする。札を寄与しない組み立ての配備は節の空行を示す。
 
-To contribute a tab, register into `settings.plugins.tab` with an `id`, an `order`, and a localized `label`; the section renders the entries in order and mounts a tab on its first selection. Feature copy stays in the registering plugin's dictionary.
+札を寄与するには `id`、`order`、地域化 `label` で `settings.plugins.tab` に登録する。節は項目を順に描き、初選択で札を載せる。機能文案は登録插件の辞書にあるままである。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The section declares `settings.plugins.tab`, a root list slot whose labels become ordered tabs; a lone contribution renders as the page itself, and a tab stays mounted after its first selection so search and the inventory snapshot survive switching. The section's `inject` projects the slot's ledger into ordered rows whose labels follow the active locale, cached until the ledger version or the locale revision moves. The Host half is an empty `apply`, present only so the package holds a Loader row the client module system serves the browser half for.
+この節は `settings.plugins.tab` を宣言する。これは表示が順序札になる根一覧溝であり、単独寄与は頁自体として描かれ、札は初選択後に載ったままであるため探索と目録 snapshot は切替を生き残る。節の `inject` は溝台帳を順序行に投影し、表示は有効地域に従い、台帳版または地域改訂が動くまで緩衝される。Host 側は空 `apply` であり、包が Loader 行を持つためだけにあり、client 単位系が browser 側を給仕する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに探る
 
-- [ui-settings-plugin-inventory](../ui-settings-plugin-inventory/README.md) — the read-only inventory tab.
-- [ui-settings](../ui-settings/README.md) — the domain base declaring `settings.section`.
-- [ui-plugin-manager](../ui-plugin-manager/README.md) — the Plugins page where official plugins are configured.
-- [ui-settings-shell](../ui-settings-shell/README.md), [ui-settings-agent-loop](../ui-settings-agent-loop/README.md), [ui-settings-subagent](../ui-settings-subagent/README.md), [ui-settings-web-search](../ui-settings-web-search/README.md) — the official configuration pages, one companion package each.
+- [ui-settings-plugin-inventory](../ui-settings-plugin-inventory/README.md) — 読取専用目録札。
+- [ui-settings](../ui-settings/README.md) — `settings.section` を宣言する領域基盤。
+- [ui-plugin-manager](../ui-plugin-manager/README.md) — 公式插件を設定する插件頁。
+- [ui-settings-shell](../ui-settings-shell/README.md)、[ui-settings-agent-loop](../ui-settings-agent-loop/README.md)、[ui-settings-subagent](../ui-settings-subagent/README.md)、[ui-settings-web-search](../ui-settings-web-search/README.md) — 公式設定頁。同伴包ごとに 1 つ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side settings surface that registers no model surface.
+なし。この包は模型面を登録しない browser 側設定面であるため。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージは提供子要求を組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しの作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **The section has no tab of its own** — it renders its empty line until a feature plugin registers one; the shell cannot fill the section alone.
+- **節は自身札を持たない** — 機能插件が 1 つを登録するまで空行を描く。殻だけでは節を満たせない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業背景 — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

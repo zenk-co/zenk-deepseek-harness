@@ -1,52 +1,52 @@
 ---
-description: "The schedule package group: Host-owned scheduled reminders and task management."
+description: "schedule パッケージグループ: Host 所有のスケジュール済みリマインダーとタスク管理。"
 kind: "package-group"
 ---
 
-# schedule/ — Host-owned reminders
+# schedule/ — Host 所有のリマインダー
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Create one-shot, fixed-rate, daily, weekly, or cron reminders for a conversation and keep them across Host restarts. Inspect active and inactive tasks without opening their original Sessions. Use Schedule for reminder creation and delivery, and the Automation tasks page for cross-Session inspection and confirmed deletion. Due reminders arrive as ordinary follow-up messages in the original conversation, not email, SMS, or push notifications.
+会話向けにワンショット、固定間隔、日次、週次、cron のリマインダーを作成し、Host 再起動を超えて保持する。有効・無効のタスクを元の Session を開かずに点検する。リマインダーの作成と配送には Schedule を使い、セッション横断の点検と確認済み削除には自動化タスクページを使う。期限到来のリマインダーはメール、SMS、プッシュ通知ではなく、元の会話に通常のフォローアップメッセージとして届く。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-Choose this package for persistent reminder management.
+永続的なリマインダー管理にはこのパッケージを選ぶこと。
 
 | Package | Role |
 |---|---|
-| [`schedule/`](schedule/README.md) | Host-owned reminder persistence, scheduling, inspection, and explicit deletion |
-| [`tool-schedule/`](tool-schedule/README.md) | Preset-scoped `schedule_create`, `schedule_list`, `schedule_update`, and `schedule_delete` tools over the Host `ctx.schedule` service |
+| [`schedule/`](schedule/README.md) | Host 所有のリマインダー永続化、スケジューリング、点検、明示的な削除 |
+| [`tool-schedule/`](tool-schedule/README.md) | ホスト `ctx.schedule` サービス上のプリセットスコープ `schedule_create`、`schedule_list`、`schedule_update`、`schedule_delete` 各ツール |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Schedule subsystem](../../docs/subsystems/schedule.md) — task records, latest receipts, timing, and delivery contracts.
-- [Generated tool catalog](../../docs/tool-catalog.md#deepseek-aidsh-tool-schedule) — the `schedule_create`/`schedule_list`/`schedule_update`/`schedule_delete` schemas a mounting preset contributes.
-- [Schedule user guide](../../docs/user/guide/schedule.md) — create reminders and inspect active or inactive tasks.
-- [Web task page and reminder catalog](../client/ui-schedule/README.md) — browser inspection of tasks and confirmed deletion.
+- [スケジュールサブシステム](../../docs/subsystems/schedule.md) — タスク記録、最新受領、時刻規定、配送契約。
+- [生成ツールカタログ](../../docs/tool-catalog.md#deepseek-aidsh-tool-schedule) — マウントプリセットが寄与する `schedule_create`/`schedule_list`/`schedule_update`/`schedule_delete` スキーマ。
+- [スケジュールユーザーガイド](../../docs/user/guide/schedule.md) — リマインダーの作成と有効・無効タスクの点検。
+- [Web タスクページとリマインダーカタログ](../client/ui-schedule/README.md) — タスクのブラウザー点検と確認済み削除。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

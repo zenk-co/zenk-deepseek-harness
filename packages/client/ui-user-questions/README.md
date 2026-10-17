@@ -1,131 +1,131 @@
 ---
-description: "Web ask_user_question feature for the dsh web client: the attached question card, timed wait, drafts, late replies, and the plan-review approval card."
+description: "dsh Web クライアントの ask_user_question 機能: 添付式質問カード、時間制限付き待機、下書き、遅延応答、および plan-review 承認カード。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-user-questions
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The Web client shows an agent's question beside the chat input. Users choose options, enter text, skip questions, and submit one answer batch. A timed card counts down; focus pauses it, editing or `Take time` holds it, and expiry lets the agent continue while the question stays answerable. Closing a card linked to a tool call hides it; its tool row reopens it and later shows recorded answers. The Host preserves the question across restart, while this browser preserves unfinished input across reload.
+Web クライアントはエージェントの質問をチャット入力欄の横に表示する。ユーザーはオプションを選び、テキストを入力し、質問をスキップし、1 つの回答バッチを送信する。時間制限付きカードはカウントダウンする。フォーカスでそれを一時停止し、編集または `Take time` で保留し、期限切れで質問を回答可能なままエージェントが続行できる。ツール呼び出しにリンクされたカードを閉じるとそれは非表示になる。ツール行がそれを再度開き、後で記録された回答を表示する。Host は再起動をまたいで質問を保存し、このブラウザーはリロードをまたいで未完了の入力を保存する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-When the agent asks a question, the attached card temporarily occupies the composer seat: answer each question, navigate with the pager, or skip it. A first choice marked “Recommended” starts selected, but remains an unsubmitted draft and does not pause a timed countdown. Clicking a single-select choice advances immediately. Enter on a focused option attempts to submit the batch without selecting that option; missing answers return to the first incomplete question. Enter in a text answer continues the flow, while Shift+Enter breaks a line instead (during IME composition Enter only confirms the input candidate without advancing).
+エージェントが質問すると、添付式カードが一時的にコンポーザーの席を占める: 各質問に回答し、ページャーで移動し、またはスキップする。「Recommended」とマークされた最初の選択肢は選択済みで始まるが、未送信の下書きのままで、時間制限付きカウントダウンを一時停止しない。単一選択の選択肢をクリックすると即座に進む。フォーカスされた選択肢で Enter を押すと、その選択肢を選択せずにバッチの送信を試みる。答えがない場合は最初の未完了の質問に戻る。テキスト回答で Enter を押すとフローを続行し、Shift+Enter は代わりに改行する (IME 変換中は Enter は入力候補を確定するだけで進まない)。
 
-### Answering
+### 回答する
 
-A multi-select draft keeps its selected labels while the user opens or edits the custom answer, so its submitted item may carry both `selected` and `custom`; a single-select custom answer remains exclusive. Question detail reuses the assistant-output `MarkdownText` primitive, including its GFM rendering and untrusted-content policy. The capped card keeps its title, navigation, and submission actions fixed while long detail and choices share an internal scroll region. "Skip" retains other drafts and emits the existing blank `{ selected: [] }` result for that item. Close is not an answer: a question the Host named by tool call only leaves the composer seat, and its `ask_user_question` tool call row brings the panel back; a request that carries no tool call has no row to return from, so closing it rejects the whole wait as `ASK_CANCELLED`.
+複数選択の下書きは、ユーザーがカスタム回答を開いたり編集したりする間も選択済みラベルを保持するので、送信される項目は `selected` と `custom` の両方を運ぶことがある。単一選択のカスタム回答は排他のままである。質問の詳細はアシスタント出力の `MarkdownText` プリミティブを再利用し、その GFM レンダリングと untrusted-content ポリシーを含む。上限付きのカードはタイトル、ナビゲーション、送信アクションを固定したまま、長い詳細と選択肢が内部のスクロール領域を共有する。「Skip」は他の下書きを保持し、その項目について既存の空の `{ selected: [] }` 結果を emit する。クローズは回答ではない: Host がツール呼び出しで名指しした質問はコンポーザーの席を離れるだけで、その `ask_user_question` ツール呼び出し行がパネルを戻す。ツール呼び出しを運ばないリクエストには戻る行がないので、それを閉じると待機全体を `ASK_CANCELLED` として拒否する。
 
-### Reading a settled question back
+### 確定した質問を読み返す
 
-Each late reply is shown once, including when it opens a new Turn. Replies follow normal Chat process grouping and whole-Turn folding. Expand the containing Turn and work group to read a reply that has been folded away.
+各遅延応答は一度表示される。新しい Turn を開く場合も含む。応答は通常の Chat プロセスグルーピングと Turn 全体の折りたたみに従う。折りたたまれた応答を読むには、それを含む Turn と作業グループを展開する。
 
-A question that already settled opens as a read-only card: the same pager over the recorded answers, marked `Answered`. Every option and text field is disabled, Skip and the submit action are gone, a question the user skipped says so in place of its empty answer, and a free-text field appears only where the recorded answer used one. Closing it removes the card, and the tool call row builds another from the same record.
+すでに確定した質問は読み取り専用カードとして開く: 記録された回答に対する同じページャーで、`Answered` とマークされる。すべての選択肢とテキストフィールドは無効化され、Skip と送信アクションはなくなり、ユーザーがスキップした質問は空の回答の代わりにそう表示し、自由記述フィールドは記録された回答がそれを使った場所にのみ現れる。それを閉じるとカードが削除され、ツール呼び出し行が同じレコードから別のカードを構築する。
 
-### The plan-review card
+### plan-review カード
 
-A `plan-review` intent — set by `dsh-plan-mode` on the `exit_plan_mode` review — renders a compact approval card: a `Plan review` strip with a `View full plan` link, the plan title and a two-line plain-text summary, and `Request changes` / `Approve` actions. The strip uses the shared warning dot and changes it to the ongoing loader while either action settles. The complete plan opens in the sidebar through the link or its permanent Chat card. Approve answers with the asker's approval label; `Request changes` rejects the wait as `ASK_CANCELLED`, returning the composer for the user's feedback without submitting an approval. The card has no separate refusal button.
+`plan-review` インテント — `dsh-plan-mode` が `exit_plan_mode` レビューで設定する — はコンパクトな承認カードをレンダリングする: `View full plan` リンク付きの `Plan review` ストリップ、プランのタイトルと 2 行のプレーンテキスト要約、および `Request changes` / `Approve` アクション。ストリップは共有の警告ドットを使用し、どちらかのアクションが確定する間は進行中のローダーに変える。完全なプランはリンクまたは常設の Chat カードからサイドバーで開く。Approve は質問者の承認ラベルで回答する。`Request changes` は待機を `ASK_CANCELLED` として拒否し、承認を送信せずにユーザーのフィードバックのためにコンポーザーを返す。カードには別個の拒否ボタンはない。
 
-### Failure and recovery
+### 失敗と回復
 
-An answer field autofocuses only when its answer channel is ready and no countdown exists. Manual focus and blur during the claim handshake are retained: the countdown starts paused only if the answer surface still has focus when the remaining duration arrives.
+回答フィールドが自動フォーカスされるのは、その回答チャネルが準備完了でカウントダウンが存在しない場合のみである。クレームハンドシェイク中の手動フォーカスとブラーは保持される: カウントダウンが一時停止で始まるのは、残り時間が届いたときに回答サーフェスが依然としてフォーカスを持っている場合のみである。
 
-Returning a local answer does not release its foreground claim: the Host closes that stream after accepting the waterfall outcome. The plugin owns the claim through this delivery interval. Explicit delegation releases it before calling the next answerer, and plugin disposal cancels any remaining claims.
+ローカル回答を返してもそのフォアグラウンドクレームは解放されない: Host はウォーターフォールの結果を受け入れた後にそのストリームを閉じる。プラグインはこの配信区間を通じてクレームを所有する。明示的な委任は次の回答者を呼ぶ前にそれを解放し、プラグインの dispose は残っているクレームをすべてキャンセルする。
 
-The card has two sources. A live Host request creates it and carries the answer back. For a timed request, the Client first opens the question-owned `attachWait` stream and derives a local deadline from its remaining-duration frame. The card remains live while that first frame is pending. The claim lasts until the request settles or the Client disconnects, including while the panel is hidden. The card owns the countdown; at zero it rejects with `ASK_TIMED_OUT` and stays available. Once the projection lists the call as continued, answers use the `answer` Remote method. Card removal follows the projection, and plugin teardown releases its requests and claims.
+カードには 2 つのソースがある。ライブの Host リクエストがそれを作成し、回答を戻す。時間制限付きリクエストでは、Client がまず質問所有の `attachWait` ストリームを開き、その残り時間フレームからローカルの期限を導出する。カードはその最初のフレームが保留中の間はライブのままである。クレームはリクエストが確定するか Client が切断するまで、パネルが非表示の間も含めて持続する。カウントダウンはカードが所有し、0 で `ASK_TIMED_OUT` で拒否し、回答可能なまま残る。プロジェクションが呼び出しを continued としてリストすると、回答は `answer` Remote メソッドを使用する。カードの削除はプロジェクションに従い、プラグインの teardown がそのリクエストとクレームを解放する。
 
-A submission through the pending request is sent, not confirmed: when another browser settled the same request first, the gateway drops the late outcome silently. The card therefore keeps its draft until the projection closes it, and if the call turns continued while a submission is in flight, the controls re-arm with a hint so the same draft goes through the Remote path. An accepted Remote answer steers the agent at its nearest step. While its steer waits in the durable Inbox, the editable card closes and the question row shows the submitted answers read-only, including after a browser reconnect. Multiple pending steers are admitted together at that boundary; an active tool wait must finish before the agent can read them. Discarding a pending steer leaves the question answerable, and the user can reopen its row to submit again. A second answer while the first remains pending reports `REPLY_QUEUED`. Pristine focus freezes this browser's remaining countdown and blur resumes that remainder. The first answer mutation changes the local wait to indefinite, and `Take time` does the same explicitly. Those choices persist with this browser's draft across Session navigation and, for tool-call-keyed requests, reload. Another browser has its own countdown and can still settle the shared request; the Host projection remains the authority for whether the question is open or continued.
+保留中リクエストを通じた送信は送信されるのであって確認されるのではない: 別のブラウザーが同じリクエストを先に確定した場合、ゲートウェイは遅れた結果を黙って破棄する。したがってカードはプロジェクションがそれを閉じるまで下書きを保持し、送信が進行中に呼び出しが continued になった場合は、コントロールがヒント付きで再武装し、同じ下書きが Remote 経路を通る。受け入れられた Remote 回答はエージェントをその最近傍のステップで steer する。そのステアが永続 Inbox で待っている間、編集可能なカードは閉じ、質問行は送信された回答を読み取り専用で表示する。ブラウザー再接続後も同様である。複数の保留中ステアはその境界でまとめて admit される。エージェントがそれらを読むにはアクティブなツール待機が終了していなければならない。保留中ステアを破棄すると質問は回答可能なまま残り、ユーザーはその行を再度開いて再送信できる。最初の回答が保留中に 2 つ目の回答を行うと `REPLY_QUEUED` を報告する。クリーンなフォーカスはこのブラウザーの残りカウントダウンを凍結し、ブラーがその残りを再開する。最初の回答変更でローカル待機は無期限になり、`Take time` も明示的に同じことをする。これらの選択はこのブラウザーの下書きとともに Session ナビゲーションをまたいで、ツール呼び出しキーのリクエストではリロードをまたいで持続する。別のブラウザーは独自のカウントダウンを持ち、共有リクエストを依然として確定できる。質問が open か continued かについては Host のプロジェクションが権威のままである。
 
-Each Session and pending request has an independent draft in browser storage. A tool-call-keyed request restores unfinished input after Session navigation, page reload, or browser restart; progress that no longer matches the question batch is ignored. An unnamed legacy request has a unique card key and cannot be restored after reload. A hidden panel keeps its draft for the next opening; a mounted closed card clears its own draft, and the next mounted card prunes drafts no live card owns. Drafts do not synchronize to another browser or device; the Host-projected question does.
+各 Session と保留中リクエストはブラウザーストレージに独立した下書きを持つ。ツール呼び出しキーのリクエストは Session ナビゲーション、ページリロード、ブラウザー再起動の後に未完了の入力を復元する。質問バッチと一致しなくなった進捗は無視される。名前のないレガシーリクエストは一意のカードキーを持ち、リロード後に復元できない。非表示のパネルは次の開封のために下書きを保持する。マウントされた閉じたカードは自身の下書きをクリアし、次にマウントされるカードはどのライブカードも所有しない下書きを剪定する。下書きは別のブラウザーやデバイスに同期しない。Host が投影する質問は同期する。
 
-A browser that reconnects while the tool call is open receives the pending request again and can still complete it with the remaining time. A Session reopened after the agent or process ended shows the card as continued; submitting resumes the Session's root agent and enters the answer as a new user turn.
+ツール呼び出しが開いている間に再接続するブラウザーは保留中リクエストを再度受け取り、残り時間でそれを完了できる。エージェントまたはプロセスが終了した後に再オープンされた Session はカードを continued として表示する。送信すると Session のルートエージェントが再開し、回答が新しいユーザー Turn として入力される。
 
-Settled question replies remain compact in chat history. A caret marks the bubble as a disclosure; clicking it reopens the read-only question and answer details, and never reopens the settled tool call for a second submission. Its copy action writes each question with the answer the user gave, the same text whether the bubble is open or closed.
+確定した質問の応答はチャット履歴でコンパクトなままである。キャレットがバブルをディスクロージャーとしてマークし、クリックすると読み取り専用の質問と回答の詳細が再度開き、確定したツール呼び出しを 2 度目の送信のために開き直すことは決してない。そのコピーアクションは各質問をユーザーが与えた回答とともに書き出し、バブルが開いていても閉じていても同じテキストになる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The package is one ownership rule: rendering a question is a host UI capability, having the tool is an agent capability, so the `tool-ask-user` row belongs to the presets that want it (and to the TUI composition, which has no presets).
+このパッケージは 1 つの所有権ルールである: 質問のレンダリングは Host UI のケイパビリティであり、ツールを持つことはエージェントのケイパビリティなので、`tool-ask-user` 行はそれを望むプリセットに属する (そしてプリセットを持たない TUI コンポジションにも属する)。
 
-### Reopening a panel
+### パネルを再度開く
 
-This package fills `userQuestionPanels`, the optional capability `dsh-client-ui-tool` declares for its `ask_user_question` row. `reveal(sessionId, callId)` republishes that call's card as the last equal-precedence pending interaction, so the composer seat shows it again, and returns `false` when this Client holds no card for the call — a legacy unkeyed request, another browser's question, or a card the projection already closed. Whether a question still takes an answer comes from the `userQuestions` Session projection, which the row reads directly, so the capability carries no state of its own.
+このパッケージは、`dsh-client-ui-tool` がその `ask_user_question` 行のために宣言するオプションのケイパビリティ `userQuestionPanels` を満たす。`reveal(sessionId, callId)` はその呼び出しのカードを最後の同等優先度の保留中インタラクションとして再パブリッシュし、コンポーザーの席に再び表示させ、この Client がその呼び出しのカードを保持していない場合 — レガシーのキーなしリクエスト、別のブラウザーの質問、またはプロジェクションがすでに閉じたカード — は `false` を返す。質問が依然として回答を受け付けるかどうかは、行が直接読む `userQuestions` Session プロジェクションから来るので、ケイパビリティは自身の状態を持たない。
 
-`review(sessionId, callId, record)` builds a card from the questions and answers the row parsed out of its own transcript, because the projection lists only answerable calls. That card has no answer channel and no countdown, the projection sweep leaves it alone, and closing it removes it rather than parking it in the registry. A call that still holds a live card shows the live one, so a stale copy never replaces a standing request; for the same reason a review card renders the record itself and takes only the page position from a draft its live card left behind.
+`review(sessionId, callId, record)` は、行が自身のトランスクリプトからパースした質問と回答からカードを構築する。プロジェクションは回答可能な呼び出しのみをリストするためである。そのカードには回答チャネルもカウントダウンもなく、プロジェクションスイープはそれを放置し、それを閉じるとレジストリに駐車するのではなく削除する。ライブカードをまだ保持している呼び出しはライブのものを表示するので、stale なコピーが常設リクエストを置き換えることはない。同じ理由で、レビューカードはレコード自体をレンダリングし、ページ位置のみをライブカードが残した下書きから取る。
 
-### Intent surface election
+### インテントサーフェスの選択
 
-The card accepts one question declaring the intent, carrying the plan as `detail`, and offering the named approve label, with at most one alternative and no multi-select. Its secondary action returns to the composer for change requests. Larger choices and multi-select questions remain in the generic flow. A plan review exposes `conversation.plan-review.actions` with its request key, full text, and optional invocation identity; the plan plugin opens logged plans from history and unlogged reviews as temporary sidebar previews, and opening a document does not answer or dismiss the review.
+カードはインテントを宣言する 1 つの質問を受け付け、プランを `detail` として運び、名指しされた承認ラベルを提供し、代替は最大 1 つで複数選択はない。そのセカンダリアクションは変更リクエストのためにコンポーザーに戻る。より大きな選択と複数選択の質問はジェネリックフローに残る。プランレビューはリクエストキー、全文、オプションの呼び出し同一性を持つ `conversation.plan-review.actions` を公開する。プランプラグインは履歴からログ済みプランを、未ログのレビューを一時的なサイドバープレビューとして開き、ドキュメントを開いてもレビューに回答したり却下したりしない。
 
-### Copy and locale
+### コピーとロケール
 
-Composer chrome copy (pager, buttons, placeholders, validation feedback) is bilingual: the plugin registers zh/en dictionaries under the `question` namespace of `dsh-client-locale` and hands the entry its bound translator plus the locale snapshot source through the inject face, so a locale switch re-renders a mounted composer. Question and option text arrives from the model and renders verbatim; carrier failure messages also display untranslated.
+コンポーザーのクロームコピー (ページャー、ボタン、プレースホルダー、検証フィードバック) はバイリンガルである: プラグインは `dsh-client-locale` の `question` 名前空間に zh/en 辞書を登録し、entry に束縛されたトランスレーターとロケールスナップショットソースを inject フェイスを通して渡すので、ロケール切り替えでマウント済みのコンポーザーが再レンダリングされる。質問と選択肢のテキストはモデルから届き逐語的にレンダリングされる。キャリアの失敗メッセージも未翻訳のまま表示される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the composer host, the tool seam, and the plan-mode consumer.
+これらのページはコンポーザーホスト、ツールシーム、プランモードコンシューマーをカバーする。
 
-- [ui-conversation](../ui-conversation/README.md) — the chat surface owning the `conversation.composer` slot.
-- [ui-tool](../ui-tool/README.md) — the tool call transcript whose `ask_user_question` row reopens a hidden panel.
-- [tool-ask-user](../../interaction/tool-ask-user/README.md) — the model-facing tool whose schema and answers this UI renders.
-- [ui-plan](../ui-plan/README.md) — the plan-mode surface that sets the `plan-review` intent.
-- [user-questions](../../interaction/user-questions/README.md) — the Host-side question seam and its answerer waterfall.
+- [ui-conversation](../ui-conversation/README.md) — `conversation.composer` スロットを所有するチャットサーフェス。
+- [ui-tool](../ui-tool/README.md) — その `ask_user_question` 行が非表示のパネルを再度開くツール呼び出しトランスクリプト。
+- [tool-ask-user](../../interaction/tool-ask-user/README.md) — この UI がそのスキーマと回答をレンダリングするモデル向けツール。
+- [ui-plan](../ui-plan/README.md) — `plan-review` インテントを設定するプランモードサーフェス。
+- [user-questions](../../interaction/user-questions/README.md) — Host 側の質問シームとその回答者ウォーターフォール。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-tool-ask-user`, whose model-visible schema and answer rendering this package presents in the Web client.
+間接的に、`dsh-tool-ask-user` を通して。このパッケージはそのモデル可視スキーマと回答レンダリングを Web クライアントに提示する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; `dsh-tool-ask-user` owns the model-visible tool call and result.
+直接的な無効化はない。モデル可視のツール呼び出しと結果は `dsh-tool-ask-user` が所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define question-card ownership and cross-client behavior; they are current package constraints.
+これらの制限は質問カードの所有権とクライアント間の動作を定義する。それらは現在のパッケージ制約である。
 
-- **Unsubmitted drafts are local to one browser** — Session navigation, page reload, and browser restart preserve them, but another browser or device reconstructs only the Host-stored question.
-- **One request owns the question card at a time** — later pending requests remain in the session snapshot and become visible after the earlier request resolves.
-- **Questions appear in the active Session composer** — durable pending questions do not add a separate sidebar inbox; reopen the owning Session to answer one.
+- **未送信の下書きは 1 つのブラウザーにローカル** — Session ナビゲーション、ページリロード、ブラウザー再起動はそれらを保存するが、別のブラウザーやデバイスは Host 保存の質問のみを再構築する。
+- **一度に 1 つのリクエストが質問カードを所有する** — 後続の保留中リクエストはセッションスナップショットに留まり、先のリクエストが解決した後に可視になる。
+- **質問はアクティブな Session のコンポーザーに現れる** — 永続的な保留中質問は別のサイドバー受信箱を追加しない。回答するには所有する Session を再度開く。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>
 
-The Host Session projection is authoritative for durable timed questions. Browser storage only preserves unfinished input and never creates or keeps a question open.
+Host の Session プロジェクションは永続的な時間制限付き質問の権威である。ブラウザーストレージは未完了の入力のみを保存し、質問を作成したり開いたままにしたりすることは決してない。

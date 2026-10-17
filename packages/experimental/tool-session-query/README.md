@@ -1,186 +1,186 @@
 ---
-description: "Workspace-authorized model-facing session history tools for agent developers and maintainers choosing, configuring, or debugging prior-session search, tracing, and event reads."
+description: "ワークスペース認可付きのモデル向けセッション履歴ツール。過去セッションの検索、トレース、イベント読み取りを選択、構成、デバッグするエージェント開発者とメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-session-query
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use the experimental `dsh-tool-session-query` tools to let a model search earlier sessions, inspect event matches, trace session or event relationships, and read exact event data. Its five read-only tools return cursor-free text and authorize cross-session access only when the target session's `cwd` exactly matches the caller's; callers without a `cwd` can inspect only themselves. Search excludes the caller session and asks the model to narrow its query when the deployment result cap is reached. The package is opt-in, and enabling it adds fixed guidance plus five tool schemas to every model request.
+実験的な `dsh-tool-session-query` ツールを使うと、モデルが以前のセッションを検索し、イベントの一致を検査し、セッションやイベントの関係をトレースし、正確なイベントデータを読めるようになる。その 5 つの読み取り専用ツールはカーソルなしのテキストを返し、ターゲットセッションの `cwd` が呼び出し元のものと完全に一致する場合にのみクロスセッションアクセスを認可する。`cwd` のない呼び出し元は自分自身だけを検査できる。検索は呼び出し元セッションを除外し、デプロイの結果上限に達したときはモデルにクエリを絞るよう求める。このパッケージはオプトインであり、有効にすると固定ガイダンスと 5 つのツールスキーマがすべてのモデルリクエストに追加される。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this package when the agent should be able to search its own prior sessions and inspect their relationships and events. The common path is explicit: mount the plugin over `ctx.sessionQuery` (backed by `dsh-session-query-sqlite`), then let the model call the tools.
+エージェントが自身の過去セッションを検索し、その関係とイベントを検査できるようにしたいときにこのパッケージをマウントする。一般的な手順は明示的である。`ctx.sessionQuery`（`dsh-session-query-sqlite` に支えられる）の上にプラグインをマウントし、モデルにツールを呼ばせる。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it when a deployment wants model-driven retrieval of prior work — for example a coding agent that searches what it did in earlier sessions before starting a task. Avoid it when only programmatic retrieval is needed: `ctx.sessionQuery` itself serves code callers without the model-facing schema, prompt, and authorization layer.
+デプロイが以前の作業のモデル駆動の検索を望む場合 — たとえば、タスクを始める前に以前のセッションで何をしたかを検索するコーディングエージェント — にこれを選ぶ。プログラムによる検索だけが必要な場合は避ける。`ctx.sessionQuery` 自体が、モデル向けスキーマ、プロンプト、認可レイヤーなしでコード呼び出し元に奉仕する。
 
-### Configuration
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `maxSearchResults` | `100` | Maximum authorized hits returned by one search call |
-| `searchTimeoutMs` | `30000` | Cooperative deadline attached to both full-text search tools |
+| `maxSearchResults` | `100` | 1 回の検索呼び出しが返す認可済みヒットの最大数 |
+| `searchTimeoutMs` | `30000` | 両方の全文検索ツールに付随する協調的な期限 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-session-query) is the exhaustive source for every accepted field and its JSDoc.
+生成された [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-session-query) が、受け入れられるすべてのフィールドとその JSDoc の網羅的なソースである。
 
-### What the model can do
+### モデルにできること
 
-| Tool | What the model gets |
+| ツール | モデルが得るもの |
 |---|---|
-| `session_search` | Sessions matching a literal query, ranked, with title and best-match excerpt; always omits the caller session |
-| `session_event_search` | Events matching a literal query inside one authorized session; for the current session it stops before the step that invoked it |
-| `session_trace` | The authorized ancestor chain and descendant tree of one session; unauthorized boundaries appear as markers without hidden ids |
-| `session_event_trace` | One event's positional replacements and cited source-event relationships |
-| `session_event_read` | One full unabridged event as JSON, plus optional neighboring event summaries |
+| `session_search` | リテラルクエリに一致するセッションをランク付けして、タイトルとベストマッチ抜粋付きで返す。常に呼び出し元セッションを省略する |
+| `session_event_search` | 1 つの認可済みセッション内でリテラルクエリに一致するイベント。現在のセッションでは、それを呼び出したステップより前で停止する |
+| `session_trace` | 1 つのセッションの認可済み祖先チェーンと子孫ツリー。認可されていない境界は隠し id のないマーカーとして現れる |
+| `session_event_trace` | 1 つのイベントの位置的な置換と、引用されたソースイベント関係 |
+| `session_event_read` | 1 つの完全な省略なしのイベントを JSON として、および任意で隣接イベントのサマリー |
 
-Workspace authority is conservative: cross-session access requires exact `cwd` equality between target and caller session, and a caller without `cwd` can inspect only itself. Requested parent ids are deduplicated and authority-checked before search; missing and cross-workspace guesses behave identically. Search results are cursor-free: a capped result asks the model to narrow its query, and never exposes provider cursors, offsets, page sizes, or a model-controlled limit. Timestamps at the tool boundary are timezone-qualified ISO 8601 and become inclusive epoch-millisecond filters.
+ワークスペース認可は保守的である。クロスセッションアクセスにはターゲットと呼び出し元セッションの `cwd` の完全一致が必要で、`cwd` のない呼び出し元は自分自身だけを検査できる。要求された親 id は重複排除され、検索前に認可チェックされる。存在しない推測とクロスワークスペースの推測は同じように振る舞う。検索結果はカーソルなしである。上限に達した結果はモデルにクエリを絞るよう求め、プロバイダーのカーソル、オフセット、ページサイズ、モデルが制御する上限を決して公開しない。ツール境界のタイムスタンプはタイムゾーン修飾付き ISO 8601 で、包含的なエポックミリ秒フィルターになる。
 
-### Failures and recovery
+### 失敗と回復
 
-Every trusted query-service call crosses one error sanitizer: caller cancellation is preserved exactly, corpus and provider diagnostics go to the internal log, and unsafe or unprintable failures fall back to the fixed `SESSION_QUERY_TOOL_FAILED` code and message. Local argument-validation and authorization errors keep their precise tool-owned messages (`SESSION_QUERY_TOOL_UNAUTHORIZED` for a target outside the caller workspace). The package performs no byte or character truncation and does not import a spill backend; deployments that need bounded inline output mount `@deepseek-ai/dsh-spill-policy`, which can replace oversized rendered text while retaining the complete result.
+すべての信頼されたクエリサービス呼び出しは 1 つのエラーサニタイザーを通過する。呼び出し元のキャンセルは正確に保持され、コーパスとプロバイダーの診断は内部ログに行き、安全でないまたは出力不能な失敗は固定の `SESSION_QUERY_TOOL_FAILED` コードとメッセージにフォールバックする。ローカルの引数検証と認可のエラーは、ツール所有の正確なメッセージを保つ（呼び出し元ワークスペース外のターゲットには `SESSION_QUERY_TOOL_UNAUTHORIZED`）。このパッケージはバイトや文字の切り捨てを行わず、spill バックエンドを import しない。有界のインライン出力が必要なデプロイは `@deepseek-ai/dsh-spill-policy` をマウントし、これは完全な結果を保持したまま過大なレンダリング済みテキストを置き換えられる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-This section explains the design decisions behind the tools and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節ではツール背後の設計判断とそれを実現するコードを説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱っている。
 
-### Design philosophy
+### 設計哲学
 
-The consumer is built on one separation and three commitments:
+このコンシューマーは 1 つの分離と 3 つの約束の上に成り立っている:
 
-- **Narrow read-only tools.** Five tools with flat snake-case schemas, each teaching one follow-up step; no cursor, offset, page-size, or model-controlled limit ever reaches the model.
-- **Authority derived from the caller, never the model.** Caller identity comes from `ToolExecution.exec.agent`; workspace is exact-string `cwd` equality, re-checked against the header observed with each result.
-- **One model-boundary sanitizer.** Every trusted `ctx.sessionQuery` call goes through the service boundary, which preserves cancellation and contains diagnostic and classification failures.
-- **No second truncation format.** Results stay complete; the generic spill policy owns bounded inline output.
+- **狭い読み取り専用ツール。** フラットなスネークケーススキーマを持つ 5 つのツールで、それぞれが 1 つのフォローアップステップを教える。カーソル、オフセット、ページサイズ、モデルが制御する上限がモデルに届くことはない。
+- **認可は呼び出し元から導かれ、モデルからは決して導かれない。** 呼び出し元の識別は `ToolExecution.exec.agent` から来る。ワークスペースは文字列完全一致の `cwd` で、各結果とともに観察されたヘッダーに対して再チェックされる。
+- **1 つのモデル境界サニタイザー。** すべての信頼された `ctx.sessionQuery` 呼び出しはサービス境界を通り、これはキャンセルを保持し、診断と分類の失敗を封じ込める。
+- **2 つ目の切り捨て形式はない。** 結果は完全なままで、有界のインライン出力は汎用 spill ポリシーが所有する。
 
-The design history lives in the [model-facing session query tools note](../../../.agents/notes/archived/feature/2026-07-24-model-facing-session-query-tools.md) and the [session-search-not-shipped-default note](../../../.agents/notes/archived/feature/2026-08-02-session-search-not-shipped-default.md).
+設計の経緯は [model-facing session query tools ノート](../../../.agents/notes/archived/feature/2026-07-24-model-facing-session-query-tools.md) と [session-search-not-shipped-default ノート](../../../.agents/notes/archived/feature/2026-08-02-session-search-not-shipped-default.md) にある。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config, prompt section, five tool registrations |
-| [`src/input.ts`](src/input.ts) | Model schemas, argument normalization, filter construction |
-| [`src/workspace-access.ts`](src/workspace-access.ts) | Caller identity, workspace authorization, title access, lineage projection |
-| [`src/service-boundary.ts`](src/service-boundary.ts) | Trusted calls and model-safe error translation |
-| [`src/operations.ts`](src/operations.ts) | The five operation workflows |
-| [`src/presentation.ts`](src/presentation.ts) | Text result rendering and tool-call cards |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: 設定、プロンプトセクション、5 つのツール登録 |
+| [`src/input.ts`](src/input.ts) | モデルスキーマ、引数正規化、フィルター構築 |
+| [`src/workspace-access.ts`](src/workspace-access.ts) | 呼び出し元の識別、ワークスペース認可、タイトルアクセス、系譜プロジェクション |
+| [`src/service-boundary.ts`](src/service-boundary.ts) | 信頼された呼び出しとモデル安全なエラー変換 |
+| [`src/operations.ts`](src/operations.ts) | 5 つの操作ワークフロー |
+| [`src/presentation.ts`](src/presentation.ts) | テキスト結果レンダリングとツール呼び出しカード |
 
-### Operation flow
+### 操作フロー
 
-Each executor derives the caller, normalizes the model's arguments into service filters, authorizes the target (or the requested parent ids) against the caller workspace, and collects results through the service boundary. Both search tools page internally through provider cursors while the observed generation stays valid, stopping at `maxSearchResults`; because one search consumes generation-bound provider cursors, the two search tools execute exclusively with sibling tool calls, while the three exact trace/read tools opt into parallel execution. Lineage output replaces unauthorized ancestor and descendant boundaries with markers containing no hidden session id.
+各エグゼキューターは呼び出し元を導出し、モデルの引数をサービスのフィルターに正規化し、ターゲット（または要求された親 id）を呼び出し元ワークスペースに対して認可し、サービス境界を通じて結果を収集する。両方の検索ツールは、観察されたジェネレーションが有効な間、プロバイダーカーソルを通じて内部的にページングし、`maxSearchResults` で停止する。1 つの検索がジェネレーションに紐づくプロバイダーカーソルを消費するため、2 つの検索ツールは兄弟ツール呼び出しと排他的に実行され、3 つの正確なトレース／読み取りツールは並列実行を選択する。系譜出力は、認可されていない祖先と子孫の境界を、隠しセッション id を含まないマーカーに置き換える。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the tool surface to the underlying service, the schema catalog, and the design evidence.
+パッケージレベルのコントラクトでは足りないときにこれらのページを読む。ツールサーフェスから、背後のサービス、スキーマカタログ、設計の証拠へ進む。
 
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-session-query) — the five tool schemas as the model sees them.
-- [dsh-session-query](../../session-query/session-query/README.md) — the service these tools call.
-- [dsh-session-query-sqlite](../../session-query/session-query-sqlite/README.md) — the full-text backend behind the two search tools.
-- [Session Query subsystem reference](../../../docs/subsystems/session-query.md) — the type-level contract under the tools.
-- [Model-facing session query tools](../../../.agents/notes/archived/feature/2026-07-24-model-facing-session-query-tools.md) — workspace authority, cursor-free results, and spill decisions.
+- [生成されたツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-session-query) — モデルが見るとおりの 5 つのツールスキーマ。
+- [dsh-session-query](../../session-query/session-query/README.md) — これらのツールが呼ぶサービス。
+- [dsh-session-query-sqlite](../../session-query/session-query-sqlite/README.md) — 2 つの検索ツール背後の全文バックエンド。
+- [Session Query サブシステムリファレンス](../../../docs/subsystems/session-query.md) — ツールの下にある型レベルのコントラクト。
+- [Model-facing session query tools](../../../.agents/notes/archived/feature/2026-07-24-model-facing-session-query-tools.md) — ワークスペース認可、カーソルなし結果、spill の決定。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### System prompt
+### システムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-The model receives one fixed prior-history guidance section.
+モデルは固定の事前履歴ガイダンスセクションを 1 つ受け取る。
 
-##### Prior-history guidance
+##### 事前履歴ガイダンス
 
 ```markdown
 Use session_search to find relevant work from prior sessions, or session_event_search to search earlier events in one session. Search results are cursor-free and workspace-scoped. Follow a useful hit with session_trace, session_event_trace, or session_event_read when you need lineage, relationships, or exact data.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-One fixed concise section is present on each request while the plugin is mounted.
+プラグインがマウントされている間、各リクエストに固定の簡潔なセクションが 1 つ存在する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the plugin and guidance text are unchanged.
+プラグインとガイダンステキストが変わらない間はプレフィックス安定。
 
-### Tool schemas
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The model sees the generated [`session_search`, `session_event_search`, `session_trace`, `session_event_trace`, and `session_event_read` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-session-query). Search filters add fixed schema tokens, while cursors, workspace paths, output pagination, and model-controlled result limits remain absent.
+モデルは生成された [`session_search`、`session_event_search`、`session_trace`、`session_event_trace`、`session_event_read` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-session-query) を見る。検索フィルターは固定のスキーマトークンを追加するが、カーソル、ワークスペースパス、出力ページネーション、モデルが制御する結果上限は存在しないままである。
 
-#### Token effect
+#### トークンへの影響
 
-Five fixed read-only schemas are sent on each request while visible.
+可視の間、各リクエストに 5 つの固定の読み取り専用スキーマが送信される。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while tool visibility and definitions are unchanged.
+ツールの可視性と定義が変わらない間はプレフィックス安定。
 
-### Tool results
+### ツール結果
 
-#### What the model sees
+#### モデルが見るもの
 
-Each successful call emits one plain-text block. Search results include titles and best-match excerpts; traces include all authorized relationships; event reads include unabridged target JSON. The generic spill policy may replace oversized inline text with its preview, opaque locator, and retrieval hint.
+成功した各呼び出しは 1 つのプレーンテキストブロックを発行する。検索結果はタイトルとベストマッチ抜粋を含み、トレースはすべての認可された関係を含み、イベント読み取りは省略なしのターゲット JSON を含む。汎用 spill ポリシーは、過大なインラインテキストをそのプレビュー、不透明なロケーター、取得ヒントで置き換えることがある。
 
-#### Token effect
+#### トークンへの影響
 
-Results are data-dependent and remain in logged tool history until compaction; `maxSearchResults` bounds search-hit count.
+結果はデータ依存で、compaction までログされたツール履歴に残る。`maxSearchResults` が検索ヒット数を制限する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only result text follows the reusable request prefix and does not invalidate earlier cache entries.
+追記専用の結果テキストは再利用可能なリクエストプレフィックスに続き、以前のキャッシュエントリを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this package is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+これらの制限は、このパッケージが適さない、または特別な運用上の注意が必要な状況を定義する。現在のパッケージ制約であり、タスクバックログではない。
 
-- **Search caps without continuation** — search returns at most the deployment cap and asks the model to narrow its query when more matches exist; there is no continuation token.
-- **Conservative workspace identity** — workspace identity is exact-string `cwd` equality, so symlink-equivalent paths do not share authority.
-- **Inline payloads without the spill policy** — custom compositions without the generic spill policy accept complete trace and event payloads inline.
+- **継続なしの検索上限** — 検索は最大でデプロイ上限を返し、さらに一致があるときはモデルにクエリを絞るよう求める。継続トークンはない。
+- **保守的なワークスペースアイデンティティ** — ワークスペースアイデンティティは文字列完全一致の `cwd` なので、シンボリックリンク等価のパスは認可を共有しない。
+- **spill ポリシーなしのインラインペイロード** — 汎用 spill ポリシーのないカスタム構成は、完全なトレースとイベントペイロードをインラインで受け入れる。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発者ノートはメンテナー向けの作業コンテキストである。すなわち、未決の設計上の問いと決定されていない方向性である。これは明示的に非権威である。出荷済みの動作、制限、受け入れられた根拠は、上の節、パッケージコード、リンクされた Agent Notes にある。
 
-#### Future: broader workspace semantics
+#### 将来: より広いワークスペースセマンティクス
 
-Exact-string `cwd` equality is deliberately conservative; symlink-aware or canonical-path workspace identity would change which sessions share authority and is undecided.
+文字列完全一致の `cwd` は意図的に保守的である。シンボリックリンクを考慮した、または正規化パスのワークスペースアイデンティティは、どのセッションが認可を共有するかを変えることになり、未決定である。
 
 </details>

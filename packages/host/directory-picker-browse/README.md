@@ -1,121 +1,121 @@
 ---
-description: "In-app browsing backend of the directory-picker seam: one-level directory listing and child-directory creation for the web GUI host, serving remote clients too."
+description: "directory-picker シームのアプリ内ブラウズバックエンド: Web GUI ホスト向けの 1 階層ディレクトリ一覧と子ディレクトリ作成。リモートクライアントにも提供する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-host-directory-picker-browse
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Users who cannot reach an OS chooser still pick a workspace directory through `dsh-host-directory-picker-browse`: it provides one-level directory listing and child-directory creation over Node's standard library, and nothing renders on the host display — so it serves the remote clients the native backend cannot reach. Listings return directories only, name-sorted, with symlink-to-directory following and a host-owned `hidden` flag; creation is non-recursive and validates a single path segment. One composition row also fills the workspace flow's directory holes with the in-app **Select Workspace Directory** dialog.
+OS チューザーに届かないユーザーは `dsh-host-directory-picker-browse` でワークスペースディレクトリを選ぶ。Node 標準ライブラリー上の 1 階層ディレクトリ一覧と子ディレクトリ作成を提供し、ホストディスプレイには何も描画しない — そのためネイティブバックエンドが届かないリモートクライアントに提供する。一覧はディレクトリのみを名前整列で返し、ディレクトリへのシンボリックリンクをたどり、ホスト所有の `hidden` フラグを付ける。作成は非再帰であり、単一パス部分を検証する。1 構成行はワークスペースフローのディレクトリ穴をアプリ内 **Select Workspace Directory** ダイアログでも埋める。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Compose this backend when a workspace directory must be chosen without an OS chooser — remote browsers, SSH-forwarded sessions, or unattended hosts. The workspace flow drives `directoryPicker/list` and `directoryPicker/createDirectory`; both primitives answer from the host filesystem.
+OS チューザーなしにワークスペースディレクトリを選ばなければならないときにこのバックエンドを構成する — リモートブラウザー、SSH 転送セッション、無人ホストである。ワークスペースフローは `directoryPicker/list` と `directoryPicker/createDirectory` を駆動する。両プリミティブはホストファイルシステムから答える。
 
-### Listing a directory
+### ディレクトリの一覧
 
-`list(path?)` returns one directory level: name-sorted child directories with their absolute paths, a `hidden` flag (dot-prefixed on POSIX), a `home` anchor, and `crumbs` — the root-to-target ancestor chain where every crumb is a jump target and the root is labeled by its full path. An absent path lists the host account's home directory. One call returns at most `maxEntries` rows (config, default 1,000 — the bound GitHub's web UI applies to directory listings), and a cut level reports `truncated: true` so the client can say the level is incomplete. Symlinks to directories are followed; broken and cyclic links are skipped.
+`list(path?)` は 1 ディレクトリ階層を返す。名前整列の子ディレクトリとその絶対パス、`hidden` フラグ (POSIX ではドット始まり)、`home` アンカー、`crumbs` — すべての crumb がジャンプ対象であり、ルートは完全パスでラベル付けされるルートから対象への祖先鎖である。パス省略時はホストアカウントのホームディレクトリを一覧する。1 呼び出しは最大 `maxEntries` 行を返す (設定、既定 1,000 — GitHub Web UI がディレクトリ一覧に適用する上限)。切られた階層は `truncated: true` を報告するため、クライアントは階層が不完全と言える。ディレクトリへのシンボリックリンクはたどる。壊れたリンクと循環リンクはスキップされる。
 
-### Creating a directory
+### ディレクトリの作成
 
-`createDirectory(path, name)` creates one child directory under an existing parent. It is non-recursive — a missing parent is a real failure, not a level to invent — and rejects anything but a single non-blank path segment (`name` must not contain separators and must not be `.` or `..`).
+`createDirectory(path, name)` は既存親配下に子ディレクトリを 1 件作る。非再帰である — 欠落した親は発明すべき階層ではなく真の失敗である — 単一の非空白パス部分以外を拒否する (`name` は区切りを含んではならず、`.` や `..` であってはならない)。
 
-### Observable failures
+### 観測可能な失敗
 
-Both primitives refuse a path that is not fully qualified — relative forms, and on Windows the rooted drive-less forms (`\foo`, `/foo`) and incomplete UNC prefixes that `isAbsolute` accepts — with `directory-unreadable` or `directory-create-failed`, instead of resolving it under the host process working directory. Creation of an existing child answers `directory-exists`. A caller's `AbortSignal` stops an in-flight scan, so a disconnect or timeout does not leave the scan outliving the caller.
+両プリミティブは完全修飾でないパスを拒否する — 相対形、Windows では `isAbsolute` が受け入れるルート付きドライブレス形 (`\foo`、`/foo`) と不完全 UNC 接頭辞 — をホストプロセス作業ディレクトリ配下に解決せず `directory-unreadable` または `directory-create-failed` で拒否する。既存子の作成は `directory-exists` で答える。呼び出し元の `AbortSignal` は進行中走査を止めるため、切断やタイムアウトが呼び出し元を過ぎて走査を残さない。
 
-### Configuration
+### 構成
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `maxEntries` | `1,000` | Complete-result bound of one listing level; hidden rows count toward it |
+| `maxEntries` | `1,000` | 1 一覧階層の完全結果上限。隠し行も数える |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-host-directory-picker-browse) is the exhaustive source for every accepted field and its JSDoc.
+生成済み[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-host-directory-picker-browse)が受け付ける全フィールドとその JSDoc の網羅的な情報源である。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-### Design concept
+### 設計コンセプト
 
-The backend streams one directory level through a bounded name-sorted window so memory stays O(maxEntries) no matter how many children the directory holds: a cut level keeps the name-sorted head, hidden rows count against the bound, only windowed candidates are probed, and the level reports `truncated: true`. Window insertion is binary with an O(1) full-window tail rejection, so an oversized level costs O(1) per candidate past the head instead of a window scan.
+バックエンドは 1 ディレクトリ階層を制限付き名前整列ウィンドウで流すため、メモリーはディレクトリが何子を持とうと O(maxEntries) のままである。切られた階層は名前整列 head を保ち、隠し行は上限に数え、ウィンドウ入り候補のみ調査し、階層は `truncated: true` を報告する。ウィンドウ挿入は O(1) 完全ウィンドウ末尾拒否付き二分であり、大きすぎる階層は head 過ぎの候補ごとにウィンドウ走査ではなく O(1) で済む。
 
-### The fully-qualified fence
+### 完全修飾フェンス
 
-`fullyQualified` rejects any path that does not name one fixed filesystem location regardless of process state: POSIX-absolute on POSIX; on Windows only drive-qualified (`C:\…`) or complete UNC (`\\server\share…`) forms. Rooted drive-less forms and incomplete UNC prefixes pass `isAbsolute` yet still resolve against the process's current drive, so the backend refuses them rather than rebasing a wire value.
+`fullyQualified` はプロセス状態にかかわらず 1 件の固定ファイルシステム位置を名指さないパスをすべて拒否する。POSIX では POSIX 絶対。Windows ではドライブ修飾 (`C:\…`) または完全 UNC (`\\server\share…`) 形のみである。ルート付きドライブレス形と不完全 UNC 接頭辞は `isAbsolute` を通過するが依然プロセスの現在ドライブに対して解決されるため、バックエンドはワイヤー値をリベースせずに拒否する。
 
-### Abort and probing
+### 中断と調査
 
-Every filesystem await races the caller's signal (`raceAbort`), so a stalled network filesystem cannot keep a departed caller's request alive; an abandoned read's late settlement is swallowed. Symlink enterability is decided by a `stat` probe — failure means not enterable — and a windowed broken symlink is not backfilled from beyond the window, because an eviction already marked the level truncated.
+すべてのファイルシステム await は呼び出し元シグナルと競合する (`raceAbort`) ため、停止したネットワークファイルシステムは去った呼び出し元の要求を生かし続けられない。捨てられた読み取りの遅延確定は飲み込む。シンボリックリンクの進入可否は `stat` 調査で決まる — 失敗は進入不可を意味する — ウィンドウ入りした壊れシンボリックリンクはウィンドウ外から補充されない。追い出しが既に階層を切り詰め済みと印付けたためである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `BrowseDirectoryPicker` service: listing, creation, bounded window, error mapping |
+| [`src/index.ts`](src/index.ts) | `BrowseDirectoryPicker` サービス: 一覧、作成、制限ウィンドウ、エラー対応付け |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these when the backend contract is not enough: the seam definition first, then the decision record and the native alternative.
+バックエンド契約では足りないときにこれらを読むこと。まずシーム定義、次に決定記録とネイティブ代替へ進む。
 
-- [Directory-picker seam](../directory-picker/README.md) — the `browse` capability contract and the typed error vocabulary.
-- [Directory-picker capability seam decision](../../../.agents/notes/archived/architecture/2026-07-28-directory-picker-capability-seam.md) — the policy decisions behind listing and creation.
-- [Native backend](../directory-picker-native/README.md) — the OS-chooser alternative for local operators.
-- [Adaptive chooser](../directory-picker-auto/README.md) — boot-time resolution between the two backends.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-host-directory-picker-browse) — every accepted config field and its source declaration.
+- [Directory-picker シーム](../directory-picker/README.md) — `browse` ケイパビリティ契約と型付きエラー語彙。
+- [Directory-picker ケイパビリティシーム決定](../../../.agents/notes/archived/architecture/2026-07-28-directory-picker-capability-seam.md) — 一覧と作成背後のポリシー決定。
+- [ネイティブバックエンド](../directory-picker-native/README.md) — ローカルオペレーター向け OS チューザー代替。
+- [適応チューザー](../directory-picker-auto/README.md) — 両バックエンド間の起動時解決。
+- [生成済み設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-host-directory-picker-browse) — 受け付ける全設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the GUI-host picking backend registers nothing model-facing.
+なし。GUI ホスト選択バックエンドはモデル向けに何も登録しないためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てず送らない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the browse interaction is incomplete or intentionally unscoped. They are current package constraints, not a task backlog.
+これらの制限は browse 操作が不完全または意図的に対象外の箇所を定める。現在のパッケージ制約であり、タスクバックログではない。
 
-- **Windows hidden attribute is not read** — Node dirents do not expose `FILE_ATTRIBUTE_HIDDEN`, so `hidden` means dot-prefixed on every platform until a native probe is worth its cost.
-- **No drive-root enumeration** — on Windows the ancestry stops at the drive root; crossing drives waits for the browser UI's path-entry affordance rather than an enumeration primitive here.
-- **Whole-filesystem scope** — there is no per-deployment browse-root restriction; `workspace.create` accepts arbitrary paths, so a root here would be UX scoping rather than a security boundary.
+- **Windows 隠し属性は読まない** — Node dirent は `FILE_ATTRIBUTE_HIDDEN` を公開しないため、ネイティブ調査に見合うコストになるまで全プラットフォームで `hidden` はドット始まりを意味する。
+- **ドライブルート列挙なし** — Windows では祖先はドライブルートで止まる。ドライブ横断はここでの列挙プリミティブではなくブラウザー UI のパス入力 affordance を待つ。
+- **全ファイルシステム範囲** — デプロイメントごとの browse ルート制限はない。`workspace.create` は任意パスを受け入れるため、ここのルートはセキュリティ境界ではなく UX 範囲付けになる。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

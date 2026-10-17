@@ -1,49 +1,49 @@
 ---
-description: "Package map for the plan group: the plan-mode feature that guides the agent to explore and design before executing, for users and maintainers navigating the group."
+description: "plan グループのパッケージマップ: 実行前に探索と設計へ導く計画モード機能。グループを行き来するユーザーとメンテナー向け。"
 kind: "package-group"
 ---
 
-# plan/ — plan collaboration state
+# plan/ — 計画協調状態
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `plan/` group provides plan mode: while it is active, the agent explores and designs before executing, guided by instructions the deployment writes, and presents the finished plan for your approval before carrying it out. You can enter and leave plan mode with the `/plan` command and approve the plan or send the agent back to keep planning. Plan mode guides rather than restricts: every tool stays available, and limits such as sandbox mode and approval prompts are configured separately. The group contains one package, `plan-mode`.
+`plan/` グループは計画モードを提供する。有効な間、エージェントは実行前に探索と設計を行い、配備が書いた指示に導かれ、完成した計画を実行前に承認向けに提示する。`/plan` コマンドで計画モードに出入りでき、計画を承認するか、計画継続へエージェントを差し戻せる。計画モードは導くものであり、制限しない。すべてのツールは利用可能なままであり、サンドボックスモードや承認プロンプトなどの制限は別に設定する。このグループは `plan-mode` 1 パッケージからなる。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-One package provides the whole plan-mode feature; the subsystem reference owns the exhaustive contracts.
+計画モード機能全体を 1 パッケージが提供する。網羅的な契約はサブシステム参照が所有する。
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`plan-mode/`](plan-mode/README.md) | Provides plan mode: `/plan` enters and leaves it, deployment guidance steers the agent while planning, and `exit_plan_mode` presents the finished plan for your review | `ctx.planMode` |
+| [`plan-mode/`](plan-mode/README.md) | 計画モードを提供する。`/plan` で出入りし、計画中のエージェントを配備ガイダンスが導き、`exit_plan_mode` が完成計画をレビュー向けに提示する | `ctx.planMode` |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Start with the subsystem reference for the shared vocabulary, then read the design note for the decisions.
+共有語彙はサブシステム参照から始め、次に決定の設計 Note を読むこと。
 
-- [Plan mode subsystem reference](../../docs/subsystems/plan.md) — how plan mode works, its configuration, and the exit tool's behavior.
-- [Plan-specific collaboration state](plan-mode/README.md) — the design decision behind plan mode.
+- [計画モードサブシステム参照](../../docs/subsystems/plan.md) — 計画モードの動作、その設定、終了ツールの挙動。
+- [計画専用の協調状態](plan-mode/README.md) — 計画モードの背後にある設計決定。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

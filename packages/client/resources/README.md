@@ -1,44 +1,45 @@
 ---
-description: "Client resource model: protocol-registered providers turn URL addresses into live values that any slot component reads through the useResource standard hook."
+description: "クライアントリソースモデル。プロトコル登録されたプロバイダーが URL アドレスをライブ値に変え、任意のスロットコンポーネントが標準 useResource フックを通じて読む。"
 kind: "package-reference"
 ---
+
 # @deepseek-ai/dsh-client-resources
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use client resources when a component knows live data only by URL address, such as a tab record, link, or mention, while another client package owns the data. Resource addresses use `dsh-resource://<type>/…`; protocols that need a scope encode it in the path. Components receive the current value and later updates through the public `useResource` hook. Unsupported protocols and non-resource schemes, such as `sidebar://guide`, resolve to no resource.
+コンポーネントがタブレコード、リンク、メンションのようなライブデータを URL アドレスでのみ知り、データは別のクライアントパッケージが所有する場合にクライアントリソースを使う。リソースアドレスは `dsh-resource://<type>/…` を使う。スコープが必要なプロトコルはそれをパスに符号化する。コンポーネントは公開 `useResource` フックを通じて現在値と後の更新を受け取る。`sidebar://guide` のような未対応プロトコルと非リソーススキームはリソースなしに解決される。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-  - [Read a resource](#read-a-resource)
-  - [Provide a protocol](#provide-a-protocol)
-  - [Hold a resource open](#hold-a-resource-open)
-- [Understand the implementation](#understand-the-implementation)
-  - [Lifecycle](#lifecycle)
-  - [Failures](#failures)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+  - [リソースを読む](#read-a-resource)
+  - [プロトコルを提供する](#provide-a-protocol)
+  - [リソースを開いたままにする](#hold-a-resource-open)
+- [実装を理解する](#understand-the-implementation)
+  - [ライフサイクル](#lifecycle)
+  - [失敗](#failures)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Nothing needs configuration to mount: the plugin provides `ctx.resources` and contributes the `resource` root keyed hook through `ctx.slots.provideRoot`, so every slot component receives it whatever its scope.
+マウントに設定は不要である。プラグインは `ctx.resources` を提供し、`ctx.slots.provideRoot` を通じて `resource` ルートのキーフックを寄与するため、すべてのスロットコンポーネントはスコープに関わらずそれを受け取る。
 
 <a id="read-a-resource"></a>
-### Read a resource
+### リソースを読む
 
-Every slot component receives `useResource` in its props. `useResource<P>(address)` names the protocol as the type argument and returns `{ status, value, failure }`: `none` when no provider is registered for the address's protocol (or the address is not a `dsh-resource://` URL), `loading` while the provider has not yielded, `live` with the latest `ok` frame's value, and `failed` when the latest frame reported a failure, with that failure beside the last value. Subscribing through the hook is what holds the resource open; a component that mounts while another holder keeps the resource alive reads the latest value at once.
+すべてのスロットコンポーネントは props に `useResource` を受け取る。`useResource<P>(address)` は型引数でプロトコルを指定し、`{ status, value, failure }` を返す。アドレスのプロトコルにプロバイダーが登録されていない場合（またはアドレスが `dsh-resource://` URL でない場合）は `none`、プロバイダーがまだ yield していない間は `loading`、最新の `ok` フレームの値と共に `live`、最新フレームが失敗を報告した場合はその失敗を最後の値の脇に伴って `failed` になる。フックを通じた購読がリソースを開いたままにすることである。別の保持者がリソースを生かしている間にマウントしたコンポーネントは最新の値をただちに読む。
 
 <a id="provide-a-protocol"></a>
-### Provide a protocol
+### プロトコルを提供する
 
-The protocol's owning client package declares its value type in `ResourceProtocolMap` and registers one provider as an owned effect. `open` yields `RemoteResult` frames: the current content first and one frame per later change, with a failure as an `ok: false` frame rather than a throw; it must stop when `signal` aborts:
+プロトコルを所有するクライアントパッケージは `ResourceProtocolMap` に値型を宣言し、所有エフェクトとしてプロバイダーを 1 つ登録する。`open` は `RemoteResult` フレームを yield する。すなわち最初の現在内容と後の変更ごとに 1 フレームであり、失敗はスローではなく `ok: false` フレームである。`signal` が中止したら停止しなければならない。
 
 ```ts ignore-check
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -58,48 +59,48 @@ export function apply(ctx) {
 }
 ```
 
-A protocol has exactly one provider; a second registration throws. Registering a provider while addresses of its protocol are already held opens them; disposing it ends their streams and returns them to `none`.
+プロトコルごとにプロバイダーはちょうど 1 つである。2 つ目の登録はスローする。そのプロトコルのアドレスがすでに保持されている間にプロバイダーを登録するとそれらが開く。破棄するとそれらのストリームを終了して `none` に戻す。
 
 <a id="hold-a-resource-open"></a>
-### Hold a resource open
+### リソースを開いたままにする
 
-`ctx.resources.pin(address, signal)` keeps a resource open without subscribing, until `signal` aborts. The right Sidebar pins every open tab's address for the tab record's lifetime, so switching tabs unmounts the body without closing its stream and switching back reads the latest value. `ctx.resources.source(address)` is the bare observable behind the hook, for callers outside React.
+`ctx.resources.pin(address, signal)` は `signal` が中止するまで購読なしにリソースを開いたままにする。右サイドバーは開いているすべてのタブのアドレスをタブレコードの寿命の間ピン留めするため、タブ切り替えは本体をアンマウントしてもストリームを閉じず、切り戻しでは最新の値を読む。`ctx.resources.source(address)` はフックの背後にある素の observable であり、React 外の呼び出し元のためのものである。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <a id="lifecycle"></a>
-### Lifecycle
+### ライフサイクル
 
-One record per address holds a snapshot store, a holder count (hook subscribers plus pins), and the running stream's `AbortController`. The first holder opens the provider's stream; every later holder shares it; the last holder's release aborts the stream and resets the snapshot to idle (`loading` with a provider, `none` without). Records are kept for the page lifetime so `source()` stays reference-stable across React's render-then-subscribe window and a StrictMode remount.
+アドレスごとに 1 つのレコードがスナップショットストア、保持者数（フック購読者とピン）、実行中ストリームの `AbortController` を持つ。最初の保持者がプロバイダーのストリームを開き、後の保持者はそれを共有し、最後の保持者の解放がストリームを中止してスナップショットをアイドルにリセットする（プロバイダーありで `loading`、なしで `none`）。レコードはページ寿命の間保持されるため、`source()` は React のレンダー後購読ウィンドウや StrictMode 再マウントをまたいで参照安定のままである。
 
 <a id="failures"></a>
-### Failures
+### 失敗
 
-A failure is a frame, not a throw: a provider yields `{ ok: false, error }` and the resource turns `failed` with that error beside the last value; the next `ok` frame clears it. A stream that ends on its own keeps its last state. Frames that arrive after the release that aborted the stream are dropped, and the iterator is returned. A throw inside a provider's stream is a programming error and is not caught.
+失敗はスローではなくフレームである。プロバイダーは `{ ok: false, error }` を yield し、リソースはそのエラーを最後の値の脇に伴って `failed` になる。次の `ok` フレームがそれを晴らす。独力で終了したストリームは最後の状態を保つ。ストリームを中止した解放の後に到着したフレームは落とされ、イテレーターは返される。プロバイダーのストリーム内部のスローはプログラミングエラーであり、捕捉されない。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package moves values between browser plugins and registers nothing model-facing.
+なし。このパッケージはブラウザープラグイン間で値を移動するだけであり、モデル向けのものを何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; resource streams do not assemble model requests.
+なし。リソースストリームはモデル要求を組み立てない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Records live for the page lifetime** — an address's record stays in the registry after its last holder leaves; only its state is discarded. Memory grows with the number of distinct addresses ever read, not with reads.
-- **Providers own abort compliance** — the registry drops what a released stream still yields, but a provider that ignores `signal` keeps working until its next frame.
+- **レコードはページ寿命の間生きる** — アドレスのレコードは最後の保持者が去った後も registry に残る。破棄されるのはその状態のみである。メモリーは読み取り回数ではなく、読み取られたことのある異なるアドレス数と共に増える。
+- **プロバイダーが中止遵守を所有する** — registry は解放済みストリームがなお yield するものを落とすが、`signal` を無視するプロバイダーは次のフレームまで動作し続ける。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,39 +1,39 @@
 ---
-description: "Workspace entity registry (ctx.workspaceRegistry) for hosts choosing, mounting, or debugging durable workspace records and header-validated session membership."
+description: "ホストが永続ワークスペースレコードの選択・マウント・デバッグを行い、ヘッダー検証されたセッション所属を扱うための Workspace エンティティレジストリ (ctx.workspaceRegistry)。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-workspace
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to keep an ordered, persistent list of project directories and the sessions run in each directory. Hosts can build project sidebars, hide sessions from grouping without deleting their histories, and remove projects without deleting folders, files, or sessions. Re-adding a removed directory creates a fresh project; an existing project's sessions stay grouped when its directory disappears. Choose it for GUI or host workflows that need durable project grouping; it is invisible to models and adds no prompt or request-context cost, but requires session persistence and storage backends.
+このパッケージを使うと、プロジェクトディレクトリと各ディレクトリで実行されたセッションの、順序付けられた永続リストを保持できる。ホストはプロジェクトサイドバーを構築し、履歴を削除せずにセッションをグループ化から隠し、フォルダー、ファイル、セッションを削除せずにプロジェクトを削除できる。削除済みディレクトリを再追加すると新しいプロジェクトが作成され、既存プロジェクトのディレクトリが消えてもそのセッションはグループ化されたままである。永続的なプロジェクトグループ化を必要とする GUI やホストワークフローに適する。モデルには不可視で、プロンプトやリクエストコンテキストのコストを追加しないが、セッション永続化とストレージバックエンドを必要とする。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use this package to give the product a project list: named directories the user works in, the sessions that ran in each, a stable order, and a way to hide sessions without losing them or bring them back. The API contracts behind each action live in the implementation section.
+このパッケージを使うと、製品にプロジェクトリストを与えられる。すなわち、ユーザーが作業する名前付きディレクトリ、各ディレクトリで実行されたセッション、安定した順序、そしてセッションを失わずに隠したり元に戻したりする手段である。各操作の背後にある API 契約は実装セクションにある。
 
-### When to use it
+### いつ使うか
 
-Use it when the product shows a persistent workspace surface — a sidebar, session grouping, or automation that names directories and orders them. It is invisible to the model, so it adds no token or request cost. Skip it when there is no grouping surface; nothing else in the harness needs it.
+製品が永続的なワークスペースサーフェス (サイドバー、セッションのグループ化、ディレクトリに名前を付けて順序付けする自動化など) を表示する場合に使用する。モデルには不可視なので、トークンやリクエストのコストはかからない。グループ化サーフェスがない場合は不要であり、ハーネス内の他の何かがこれを必要とすることはない。
 
-### Setting up
+### セットアップ
 
-The package needs a session store, a session persistence backend, and the storage rows that keep its records. A minimal composition:
+このパッケージには、セッションストア、セッション永続化バックエンド、およびレコードを保持するストレージ行が必要である。最小構成:
 
 ```yaml
 - name: '@deepseek-ai/dsh-session'
@@ -46,11 +46,11 @@ The package needs a session store, a session persistence backend, and the storag
 - name: '@deepseek-ai/dsh-workspace'
 ```
 
-With these rows mounted, creating a project shows up in the list immediately and survives a restart; the first start also groups existing sessions by the directory they ran in. If a required peer is missing, the workspace feature stays unavailable until it is mounted.
+これらの行をマウントすると、プロジェクトの作成は即座にリストに現れ、再起動を生き延びる。初回起動時には、既存のセッションが実行されたディレクトリごとにグループ化される。必須のピアが欠けている場合、ワークスペース機能はそれがマウントされるまで利用できないままである。
 
-### Creating and ordering projects
+### プロジェクトの作成と並べ替え
 
-Create a project from any fully qualified directory that exists: filesystem roots such as `C:\` and ordinary directories are valid. Relative paths, Windows drive-relative paths such as `C:work`, missing paths, and files are rejected without creating a project; creating a project for a directory that already has one returns the existing project unchanged. Rename a project at any time, and move it to any position in the list:
+存在する完全修飾ディレクトリならどれからでもプロジェクトを作成できる。`C:\` のようなファイルシステムルートや通常のディレクトリは有効である。相対パス、`C:work` のような Windows のドライブ相対パス、存在しないパス、およびファイルは拒否され、プロジェクトは作成されない。既にプロジェクトがあるディレクトリに対して作成を行うと、既存プロジェクトが変更なしで返される。プロジェクトはいつでも名前を変更でき、リスト内の任意の位置へ移動できる:
 
 ```text
 // Host consumer code, after the composition above is loaded:
@@ -60,128 +60,128 @@ ctx.workspaceRegistry.list() // shows the project, newest first
 ```
 
 <a id="first-use-workspace"></a>
-### First-use Workspace
+### 初回使用の Workspace
 
-`initializeDefault(resolveDirectory)` initializes the default Workspace without creating a Session. Initial creation requires an empty Workspace registry and no live, persisted, or archived Session, including Sessions without a working directory. The registry checks persistent history directly; an empty visible sidebar is insufficient.
+`initializeDefault(resolveDirectory)` は、セッションを作成せずにデフォルト Workspace を初期化する。初回作成には、空の Workspace レジストリと、ライブ・永続化済み・アーカイブ済みのいずれのセッションも存在しないこと (作業ディレクトリを持たないセッションも含む) が必要である。レジストリは永続履歴を直接確認する。サイドバーの表示が空であるだけでは不十分である。
 
-The directory resolver runs inside the mutation queue only when creation is eligible. It returns an absolute path; the registry creates missing parent directories, canonicalizes the path, rechecks Session history, and commits the Workspace with its initialization marker, titled after the requested directory's final segment rather than the canonical one, so a symlink at that path does not retitle the Workspace after its target. An existing directory is reused; a file conflict or directory failure rejects initialization. The [Host controller](../../api/workspace-controller/README.md#first-use-workspace) supplies the Documents path policy.
+ディレクトリリゾルバーは、作成が可能な場合にのみ変更キューの内部で実行される。これは絶対パスを返す。レジストリは不足している親ディレクトリを作成し、パスを正規化し、セッション履歴を再確認し、初期化マーカー付きで Workspace をコミットする。タイトルは正規化後のパスではなく要求されたディレクトリの最後のセグメントに由来するため、そのパス上のシンボリックリンクがリンク先に基づいて Workspace のタイトルを変えることはない。既存のディレクトリは再利用される。ファイルとの競合やディレクトリの障害は初期化を拒否する。[Host コントローラー](../../api/workspace-controller/README.md#first-use-workspace)が Documents パスポリシーを供給する。
 
-The first successful registration records its identity durably. Repeated calls return it without resolving a directory again; renaming keeps that identity, and deleting its registration does not permit another automatic creation. Directory or registration failure leaves initialization unset for retry. Directories created before a later failure remain on disk. Once directory resolution succeeds, caller cancellation does not roll back directory creation or registration. The [historical first-use decision](../../../.agents/notes/archived/feature/2026-09-20-default-workspace.md) explains this lifetime.
+最初に成功した登録は、その identity を永続的に記録する。以降の呼び出しはディレクトリを再度解決することなくそれを返す。名前を変更してもその identity は保たれ、登録を削除しても別の自動作成は許可されない。ディレクトリまたは登録の失敗は初期化を未設定のまま残し、再試行できる。後の障害より前に作成されたディレクトリはディスク上に残る。ディレクトリの解決が成功した後は、呼び出し元のキャンセルによってディレクトリ作成や登録がロールバックされることはない。[過去の初回使用の決定](../../../.agents/notes/archived/feature/2026-09-20-default-workspace.md)がこのライフタイムを説明する。
 
-### Grouping sessions under a project
+### プロジェクトの下へのセッションのグループ化
 
-A session joins the project of the directory it runs in: create a session in a project's directory and it appears under that project, newest first. A session can only belong to one project. A new session must have a recorded directory that resolves to the project's directory. Already-accounted sessions keep their project and order when their fully qualified recorded path is missing, including a dangling symlink; renaming or reordering the project does not remove that ownership. Missing headers, invalid recorded paths, existing mismatched directories, and filesystem failures other than ENOENT remain excluded. Keeping ownership does not recreate the directory or relax new-session attachment, so a fork can still fail to attach while the directory is missing.
+セッションは、それが実行されるディレクトリのプロジェクトに加わる。プロジェクトのディレクトリでセッションを作成すると、そのプロジェクトの下に新しい順で現れる。セッションは 1 つのプロジェクトにのみ属することができる。新しいセッションには、プロジェクトのディレクトリに解決される記録済みディレクトリが必要である。既にアカウント済みのセッションは、完全修飾された記録済みパスが存在しない場合 (ダングリングシンボリックリンクを含む) でも、プロジェクトと順序を保持する。プロジェクトの名前変更や並べ替えによってその所有関係が失われることはない。ヘッダーの欠落、無効な記録済みパス、既存の不一致ディレクトリ、および ENOENT 以外のファイルシステム障害は除外されたままである。所有関係の保持はディレクトリを再作成せず、新しいセッションのアタッチ条件も緩和しないため、ディレクトリが存在しない間はフォークのアタッチが失敗することがある。
 
-### Hiding and restoring sessions, and removing projects
+### セッションの非表示と復元、プロジェクトの削除
 
-Hide a session from the grouping when it should stop appearing there: it disappears from the visible list, while its session, history, and place in the project stay intact. A session with running work — its own turn, a running subagent, a background job, or an active reminder — is not hidden underneath that work: the registry refuses with the list of what runs, and a caller that asks to stop the work first has it stopped the way the user's own stop actions do, then hidden. Restore a hidden session when it should appear again: it returns to its recorded position under its project, or to the ungrouped sessions when it belongs to none, and continues the conversation from a regularly ended log. Remove a project when it is no longer needed: it leaves the list, and its folder, files, and session histories are never touched — those sessions become ungrouped. Adding the same directory again afterwards starts a fresh project without the old sessions.
+セッションをグループ化に表示させたくない場合は非表示にする。表示リストから消えるが、セッション本体、履歴、プロジェクト内の位置はそのまま保たれる。実行中の作業 (自身のターン、実行中のサブエージェント、バックグラウンドジョブ、アクティブなリマインダー) を持つセッションは、その作業の下に隠されることはない。レジストリは実行中のもののリストを添えて拒否し、先に作業の停止を要求した呼び出し元に対しては、ユーザー自身の停止操作と同じ方法で停止させてから非表示にする。非表示にしたセッションを再び表示させたいときは復元する。プロジェクトの下の記録済みの位置に戻り、どのプロジェクトにも属さない場合は未グループのセッションに戻り、正常に終了したログから会話を継続する。不要になったプロジェクトは削除する。リストから消えるが、そのフォルダー、ファイル、セッション履歴には一切触れない。それらのセッションは未グループになる。その後で同じディレクトリを再度追加すると、古いセッションのない新しいプロジェクトが開始される。
 
-Workspace registration does not establish ownership of its directory. A future destructive filesystem action must be separately named, explicitly confirmed, and enforce ownership and safety checks.
+Workspace の登録は、そのディレクトリの所有権を確立するものではない。将来の破壊的なファイルシステム操作は、別途名前を付け、明示的に確認を求め、所有権と安全性のチェックを実施しなければならない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the feature and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、この機能の背後にある設計判断を説明し、それを実現するコードを示す。観察可能な動作は[このパッケージを使う](#use-this-package)で網羅されている。
 
-### Design philosophy
+### 設計思想
 
-- **One record per canonical path.** `fs.realpath` is the single uniqueness canon: paths are stored canonicalized, so a symlink to an owned directory collides, and uniqueness is string equality of canonical paths.
-- **Membership starts from the recorded account.** The header index validates ordered `sessionIds`; missing-directory candidates retain their account, while other invalid candidates are filtered on read and pruned by the next mutation. The strict canonical-path index used for history bootstrap includes existing directories only.
-- **Header-only reads.** Bootstrap and attach validation read `SessionHeader` fields only; event bodies are never loaded.
-- **Two-write mutations with an explicit marker.** Create and delete persist a `pendingMutation` marker before the record/order pair can diverge, so startup completes exactly the interrupted operation and unmarked divergence fails loud as corruption.
-- **Serialized writes.** Registry operations run on one operation chain; entity mutations go through `table.update` on the domain write chain, stamping `updatedAt` and deciding membership at their chain slot.
+- **正規化パスごとに 1 レコード。** `fs.realpath` が唯一の一意性基準である。パスは正規化して保存されるため、所有ディレクトリへのシンボリックリンクは衝突し、一意性は正規化パスの文字列等価性である。
+- **所属は記録済みアカウントから始まる。** ヘッダーインデックスは順序付き `sessionIds` を検証する。ディレクトリ欠落の候補はアカウントを保持し、その他の無効な候補は読み取り時にフィルタリングされ、次の変更で除かれる。履歴ブートストラップに使用される厳密な正規化パスインデックスには、既存のディレクトリのみが含まれる。
+- **ヘッダーのみの読み取り。** ブートストラップとアタッチの検証は `SessionHeader` フィールドのみを読み取る。イベント本体は決してロードされない。
+- **明示的マーカー付きの 2 回書き込みの変更。** 作成と削除は、レコードと順序のペアが分岐し得る前に `pendingMutation` マーカーを永続化する。そのため起動時に中断された操作が正確に完了し、マーカーのない分岐は破損として明示的に失敗する。
+- **直列化された書き込み。** レジストリ操作は 1 本の操作チェーンで実行される。エンティティの変更はドメイン書き込みチェーン上の `table.update` を経由し、`updatedAt` を刻印し、自分のチェーンスロットで所属を決定する。
 
-### API behavior
+### API の動作
 
-The API has two owners: `WorkspaceRegistry` creates, orders, and deletes projects, manages their Session accounting, and pins, unpins, archives, or restores Sessions; the `Workspace` entity exposes the display title, directory status, and Session projection. Pinning requires a known, unarchived Session; archiving clears its pin in the same durable write, and restoring does not restore that pin. Per-method contracts live in [src/index.ts](src/index.ts) and [src/entity.ts](src/entity.ts).
+API には 2 つのオーナーがある。`WorkspaceRegistry` はプロジェクトを作成・並べ替え・削除し、そのセッションアカウントを管理し、セッションをピン留め・ピン解除・アーカイブ・復元する。`Workspace` エンティティは表示タイトル、ディレクトリ状態、およびセッションの射影を公開する。ピン留めには既知の未アーカイブセッションが必要である。アーカイブは同じ永続書き込みでそのピンをクリアし、復元はそのピンを復元しない。メソッドごとの契約は [src/index.ts](src/index.ts) と [src/entity.ts](src/entity.ts) にある。
 
-Archive admission is a capability seam over two Host events this package declares and dispatches: `workspace/session-activity` (waterfall) asks the composed providers what still runs for a Session, and `workspace/session-stop` (parallel) asks them to stop it. `archiveSession(sessionId)` asks the activity waterfall once and rejects a non-empty answer with `WorkspaceActiveSessionError`, whose `activity` lists each family with its items — the keys are the providers' own, merged into `SessionActivityKindMap`, which this package leaves empty; `archiveSession(sessionId, { stopActivity: true })` skips the activity check, writes the archive, and then dispatches the stop event, so the durable archive set already gates every wake the stops induce; a rejecting provider is logged and the archive stays. The call resolves once every provider's stop request was issued, while the stopped work settles on its own. Both questions come after the existence check and never for an already archived id. The shipped providers are the Agent registry (the running turn), the job registry seam (owned jobs), the Subagent runtime (running descendants), and the Schedule plugin (active reminders); a composition without providers archives freely.
+アーカイブの受付は、このパッケージが宣言してディスパッチする 2 つの Host イベントを介したケイパビリティシームである。`workspace/session-activity` (waterfall) は構成されたプロバイダーに、セッションでまだ実行中のものを問い合わせ、`workspace/session-stop` (parallel) はそれらに停止を要求する。`archiveSession(sessionId)` はアクティビティ waterfall に 1 回問い合わせ、空でない応答を `WorkspaceActiveSessionError` で拒否する。その `activity` は各ファミリーをその項目と共に列挙する。キーはプロバイダー自身のもので、`SessionActivityKindMap` にマージされる (このパッケージはこれを空のままにする)。`archiveSession(sessionId, { stopActivity: true })` はアクティビティチェックをスキップし、アーカイブを書き込み、その後で停止イベントをディスパッチする。そのため、永続アーカイブセットが停止によって引き起こされるすべてのウェイクを既にゲートしている。拒否するプロバイダーはログに記録され、アーカイブは残る。呼び出しは、すべてのプロバイダーの停止要求が発行されると解決し、停止された作業は独自に決着する。どちらの問い合わせも存在チェックの後に行われ、既にアーカイブ済みの id に対して行われることはない。出荷済みのプロバイダーは、Agent レジストリ (実行中のターン)、job レジストリのケイパビリティシーム (所有ジョブ)、Subagent ランタイム (実行中の子孫)、および Schedule プラグイン (アクティブなリマインダー) である。プロバイダーのない構成は自由にアーカイブできる。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `WorkspaceRegistry` service, header index, bootstrap, operation serialization |
-| [`src/entity.ts`](src/entity.ts) | Package-private `Workspace` implementation and its single `mutate` write path |
-| [`src/spec.ts`](src/spec.ts) | Domain declaration: record schema, registry state, `defineDomain` spec |
-| [`src/types.ts`](src/types.ts) | Public `Workspace` interface and `WorkspaceId` brand |
-| [`src/paths.ts`](src/paths.ts) | The `realpath` uniqueness canon |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: `WorkspaceRegistry` サービス、ヘッダーインデックス、ブートストラップ、操作の直列化 |
+| [`src/entity.ts`](src/entity.ts) | パッケージプライベートな `Workspace` 実装とその単一の `mutate` 書き込みパス |
+| [`src/spec.ts`](src/spec.ts) | ドメイン宣言: レコードスキーマ、レジストリ状態、`defineDomain` スペック |
+| [`src/types.ts`](src/types.ts) | 公開 `Workspace` インターフェースと `WorkspaceId` ブランド |
+| [`src/paths.ts`](src/paths.ts) | `realpath` による一意性基準 |
 
-### Durable shape
+### 永続データの形
 
-The registry opens the `workspace` domain (version 2): a `workspaces` table keyed by `WorkspaceId` plus one global state holding `workspaceIds` (the authoritative display order), `archivedSessionIds`, `pinnedSessionIds`, the optional `defaultWorkspaceId` first-use identity, and the optional `pendingMutation` marker. Archive and pin sets contain Session id strings, default to empty, and carry no per-entry objects or timestamps; the pin array keeps the most recently pinned id first. Archiving clears the pin in the same global-state write without changing Workspace membership. Unarchive runs no session-existence probe, because dropping an id from the set cannot introduce an unknown one, while archive verifies the session before adding it.
+レジストリは `workspace` ドメイン (バージョン 2) を開く。`WorkspaceId` をキーとする `workspaces` テーブルと、`workspaceIds` (権威ある表示順序)、`archivedSessionIds`、`pinnedSessionIds`、オプションの `defaultWorkspaceId` 初回使用 identity、およびオプションの `pendingMutation` マーカーを保持する 1 つのグローバル状態である。アーカイブとピンのセットは Session id 文字列を含み、デフォルトは空で、エントリごとのオブジェクトやタイムスタンプを持たない。ピン配列は最も最近ピン留めされた id を先頭に保つ。アーカイブは同じグローバル状態の書き込みでピンをクリアし、Workspace の所属は変えない。アンアーカイブはセッション存在プローブを実行しない。セットから id を除いても未知の id が導入されることはないためである。一方、アーカイブは追加前にセッションを検証する。
 
-### Lifecycle
+### ライフサイクル
 
-On start, the registry opens the domain, completes a marked mutation if one is pending, validates stored state — duplicate paths, duplicate session accounts, and order drift all fail loud — and, when not yet initialized, bootstraps history from persisted headers before writing the initialized marker last, so an interrupted bootstrap resumes safely. A fresh empty registry is real once initialized; it never re-bootstraps.
+起動時に、レジストリはドメインを開き、マーカー付きの変更が保留中であればそれを完了させ、保存された状態を検証し (パスの重複、セッションアカウントの重複、順序のずれはすべて明示的に失敗する)、まだ初期化されていない場合は永続化されたヘッダーから履歴をブートストラップしてから最後に初期化済みマーカーを書き込む。そのため、中断されたブートストラップは安全に再開される。新しく空のレジストリも、初期化されれば実在する。再ブートストラップは決して行われない。
 
-### Failure and recovery
+### 障害と回復
 
-A create or delete whose second write fails rolls the cache and the prior order back; when both the operation and its rollback fail, the durable marker still names the interrupted operation and the next startup completes or rolls it back. A committed delete whose marker cleanup fails still reports success, and the next startup clears the marker idempotently.
+2 回目の書き込みが失敗した作成または削除は、キャッシュと以前の順序をロールバックする。操作とそのロールバックの両方が失敗した場合でも、永続マーカーが中断された操作を指し示しており、次の起動がそれを完了させるかロールバックする。コミット済みの削除でマーカーのクリーンアップが失敗しても成功が報告され、次の起動がマーカーを冪等にクリアする。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when this package's view is not enough: the subsystem reference is the authoritative feature contract, and the Agent Notes record why projects start from session history and why removal is non-destructive.
+このパッケージの説明だけでは不十分な場合に、以下のページを読む。サブシステムリファレンスは権威ある機能契約であり、Agent Note はプロジェクトがセッション履歴から始まる理由と削除が非破壊的である理由を記録している。
 
-- [Workspace subsystem](../../../docs/subsystems/workspace.md) — the feature contract for projects and their sessions, and the generated API for the workspace service.
-- [Workspace package map](../README.md) — the group's single package and its repository position.
-- [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — why project records use the domain data form.
-- [Workspace UI product-flow Agent Note](../../../.agents/notes/archived/feature/2026-07-25-workspace-ui-product-flow.md) — how the first start builds projects from session history and how the GUI orders them.
-- [historical Workspace registration deletion decision](../../../.agents/notes/archived/feature/2026-07-27-workspace-registration-deletion.md) — why removing a project never deletes its folder or sessions.
+- [Workspace サブシステム](../../../docs/subsystems/workspace.md) — プロジェクトとそのセッションの機能契約、および workspace サービスの生成 API。
+- [Workspace パッケージマップ](../README.md) — このグループの唯一のパッケージと、そのリポジトリ内の位置。
+- [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — プロジェクトレコードがドメインデータ形式を使用する理由。
+- [Workspace UI product-flow Agent Note](../../../.agents/notes/archived/feature/2026-07-25-workspace-ui-product-flow.md) — 初回起動がセッション履歴からプロジェクトを構築する方法と、GUI がそれらを並べる方法。
+- [過去の Workspace 登録削除の決定](../../../.agents/notes/archived/feature/2026-07-27-workspace-registration-deletion.md) — プロジェクトの削除がフォルダーやセッションを決して削除しない理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Workspace records and session accounts
+### ワークスペースレコードとセッションアカウント
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing. `ctx.workspaceRegistry` serves workspace records to host-side consumers only: the package registers no tools, injects no prompts, and writes no session events, so no request field ever carries this package's data.
+何もない。`ctx.workspaceRegistry` はワークスペースレコードをホスト側のコンシューマーにのみ提供する。このパッケージはツールを登録せず、プロンプトを注入せず、セッションイベントも書き込まない。そのため、どのリクエストフィールドにもこのパッケージのデータが含まれることはない。
 
-#### Token effect
+#### トークンへの影響
 
-Zero direct tokens on every request.
+すべてのリクエストで直接トークンはゼロである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Independent of live requests: the package never touches a request prefix, so it cannot invalidate provider cache reuse.
+ライブリクエストとは無関係である。このパッケージはリクエストプレフィックスに一切触れないため、プロバイダーのキャッシュ再利用を無効化することはない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the project list is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+これらの制限は、プロジェクトリストが適さない、または特別な運用上の注意を必要とする場合を定義する。これらは現在のパッケージの制約であり、タスクバックログではない。
 
-- **Removal never deletes data** — removing a project leaves its folder, files, and session histories in place; those sessions become ungrouped, and session deletion or folder removal are separate, absent capabilities.
-- **Missing paths retain recorded ownership, not verified symlink history** — a removed symlink and an incorrect but missing absolute cwd cannot be distinguished from existing records; both preserve an already-accounted id. No unaccounted session is assigned by this exception, and an account already removed from storage is not reconstructed.
-- **External changes are seen late** — if another process deletes or damages a directory, the project reflects it only at the next refresh or restart.
-- **Archive and unarchive enforce different session checks** — a restore only drops an id from the archive set, so an entry whose session is gone still unarchives and leaves no unknown referent; a restore of an id that is not archived resolves without writing, while `archiveSession` rejects a session that is neither live nor persisted.
-- **The activity check and the archive write are not one atomic step** — a turn that starts between the providers' answer and the durable write is hidden while running, and every model step whose `agent/pre-step` precedes the write still runs with its tool calls; the API Session Controller's gate ends the first step proposed after the write as `blocked`, so the exposure is bounded by that write's latency, in practice one model step.
-- **Re-adding a directory starts fresh** — after removal, adding the same directory again creates a new project with an empty session list; the old sessions do not come back automatically.
+- **削除がデータを消すことはない** — プロジェクトを削除しても、そのフォルダー、ファイル、セッション履歴はそのまま残る。それらのセッションは未グループになり、セッション削除やフォルダー削除は別個の、存在しないケイパビリティである。
+- **欠落パスは記録済みの所有関係を保持するが、検証済みのシンボリックリンク履歴は保持しない** — 削除されたシンボリックリンクと、誤っているが存在しない絶対 cwd は、既存のレコードと区別できない。どちらも既にアカウント済みの id を保持する。この例外によって未アカウントのセッションが割り当てられることはなく、ストレージから既に除かれたアカウントが再構築されることもない。
+- **外部の変更は遅れて反映される** — 別のプロセスがディレクトリを削除または破損した場合、プロジェクトに反映されるのは次のリフレッシュまたは再起動時のみである。
+- **アーカイブとアンアーカイブでは異なるセッションチェックが適用される** — 復元はアーカイブセットから id を除くだけなので、セッションが消えているエントリでもアンアーカイブされ、未知の参照先を残さない。アーカイブされていない id の復元は書き込みなしで解決するが、`archiveSession` はライブでも永続化済みでもないセッションを拒否する。
+- **アクティビティチェックとアーカイブ書き込みは 1 つのアトミックなステップではない** — プロバイダーの応答と永続書き込みの間に開始されたターンは、実行中に非表示になり、`agent/pre-step` が書き込みより前にあるすべてのモデルステップは、そのツール呼び出しと共に実行される。API Session Controller のゲートは、書き込み後に提案された最初のステップを `blocked` として終了させるため、露出はその書き込みのレイテンシーによって制限され、実際にはモデル 1 ステップ分である。
+- **ディレクトリの再追加は新規に始まる** — 削除後に同じディレクトリを再度追加すると、空のセッションリストを持つ新しいプロジェクトが作成される。古いセッションは自動的に戻らない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発者ノートはメンテナー向けの作業コンテキストである。すなわち未解決の問いと未決定の方向性である。これは明示的に非権威である。出荷済みの動作、制限、および受け入れられた根拠は、上記のセクション、パッケージコード、およびリンクされた Agent Note にある。
 
-#### Open: the `create(path, title?)` title parameter
+#### 未解決: `create(path, title?)` の title パラメーター
 
-The `title` parameter has no production caller since the gateway's create-by-name branch was removed; a code TODO proposes dropping the parameter and its `@param` clause together ([note](../../../.agents/notes/archived/simplification/2026-07-31-one-route-to-add-a-workspace.md)).
+ゲートウェイの名前指定作成ブランチが削除されて以来、`title` パラメーターには本番の呼び出し元がない。コードの TODO が、パラメーターとその `@param` 節をまとめて削除することを提案している ([note](../../../.agents/notes/archived/simplification/2026-07-31-one-route-to-add-a-workspace.md))。
 
 </details>

@@ -1,18 +1,18 @@
 ---
 kind: upgrade-guide
-description: "JobId now identifies one background execution across registry lifetimes."
+description: "JobId はレジストリーのライフタイムを越えて 1 つのバックグラウンド実行を識別するようになった。"
 ---
 
-# Background job ids identify one execution
+# バックグラウンドジョブ ID は 1 つの実行を識別する
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-The job registry returns `<kind>-<short-uuid>` instead of `<kind>-N`; the suffix is 16 lowercase UUID hex characters. The same `JobId` appears in live controls, `job/registered`, and `job/settled`; lifecycle records no longer carry `executionId`. The identifier remains owner-authorized. Existing Session histories remain unchanged and do not resume their jobs.
+ジョブレジストリーは `<kind>-N` ではなく `<kind>-<short-uuid>` を返す。サフィックスは 16 文字の小文字 UUID 16 進数である。同じ `JobId` がライブ制御、`job/registered`、`job/settled` に現れ、ライフサイクルレコードはもはや `executionId` を運ばない。識別子は引き続き所有者認可のままである。既存のセッション履歴は変わらず、そのジョブを再開しない。
 
-## Migration
+## 移行
 
-1. Pass the exact id returned by a start result or `jobs.list()` to `job_output` and `job_kill`; use `job_output` with `wait: true` to wait. Remove code that constructs an id from the kind and an ordinal.
-2. Pair SDK lifecycle events by `data.jobId`. Remove imports of `JobExecutionId` and code that maps it to a process-local `jobId`.
-3. Verify a new job's registration and settlement contain the same `jobId`, and a later registry instance issues a different one.
+1. 開始結果や `jobs.list()` が返した正確な ID を `job_output` と `job_kill` に渡す。待機には `wait: true` 付き `job_output` を使う。種別と序数から ID を組み立てるコードを削除する。
+2. SDK ライフサイクルイベントを `data.jobId` で対応付ける。`JobExecutionId` のインポートと、それをプロセス内 `jobId` に対応付けるコードを削除する。
+3. 新しいジョブの登録と確定が同じ `jobId` を含み、後のレジストリーインスタンスが異なるものを発行することを検証する。

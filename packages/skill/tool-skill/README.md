@@ -1,41 +1,41 @@
 ---
-description: "The model-facing skill catalog and loader tool for users and maintainers understanding what agents see, or configuring the session skill catalog."
+description: "エージェントが見るものを理解したり、セッションのスキルカタログを設定したりするユーザーとメンテナー向けの、モデルに面するスキルカタログとローダーツール。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-skill
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Agents can discover and load skills during a session. Before the first request, when model-invocable skills exist and the `skill` tool is visible, they receive a durable catalog of available skill names and capped descriptions, and can use the `skill` tool to load full instructions. Users can invoke a user-invocable skill with `/name`, which injects the same instructions into that step. Catalog changes append a complete replacement, including an empty catalog that retires old names; configure `catalogDescriptionMaxLength` to limit each description.
+エージェントはセッション中にスキルを発見してロードできる。最初のリクエストの前に、モデルから呼び出し可能なスキルが存在し、`skill` ツールが見えている場合、利用可能なスキル名と上限付き説明の永続カタログを受け取り、`skill` ツールで完全な指示をロードできる。ユーザーは `/name` でユーザー呼び出し可能なスキルを呼び出せ、同じ指示がそのステップに注入される。カタログの変更は完全な置換を追記する。これには古い名前を廃止する空のカタログも含まれる。`catalogDescriptionMaxLength` を設定して各説明を制限できる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Skill discovery, catalog updates, and explicit skill invocation use the Session's current working directory.
+スキルの発見、カタログの更新、明示的なスキル呼び出しは、セッションの現在の作業ディレクトリを使用する。
 
-Mount the plugin alongside the skill registry to give agents a session skill catalog and the `skill` loader tool. It requires `ctx.agents`, `ctx.tools`, and `ctx.skills`.
+スキルレジストリと一緒にプラグインをマウントすると、エージェントにセッションのスキルカタログと `skill` ローダーツールが与えられる。これには `ctx.agents`、`ctx.tools`、`ctx.skills` が必要である。
 
-### When to choose it
+### 選ぶべきとき
 
-Use it when agents should discover and load skills during a session. Skip it when skill loading is handled by another consumer or not needed at all — without it, providers and the registry still work, but nothing renders a catalog or a tool for the model.
+エージェントがセッション中にスキルを発見してロードすべきときに使う。スキルのロードが別のコンシューマーに処理される場合や、全く不要な場合は省略する — これがなくてもプロバイダーとレジストリは動作するが、カタログやモデル向けのツールをレンダリングするものは何もない。
 
-### Mount and configure
+### マウントと設定
 
-Load the plugin together with the skill registry and at least one provider. The only configuration caps the normalized description length rendered in the catalog.
+スキルレジストリと少なくとも 1 つのプロバイダーと一緒にプラグインをロードする。唯一の設定は、カタログにレンダリングされる正規化済み説明の長さを制限する。
 
 ```yaml
 - name: '@deepseek-ai/dsh-skill'
@@ -43,77 +43,77 @@ Load the plugin together with the skill registry and at least one provider. The 
 - name: '@deepseek-ai/dsh-tool-skill'
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `catalogDescriptionMaxLength` | `500` | Maximum normalized description length rendered in the session catalog; minimum 3 |
+| `catalogDescriptionMaxLength` | `500` | セッションカタログにレンダリングされる正規化済み説明の最大長。最小 3 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-skill) is the exhaustive source for every accepted field.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-skill)が、受け入れられるすべてのフィールドの網羅的な情報源である。
 
-### What the model gets
+### モデルが得るもの
 
-- **A session catalog.** When model-invocable skills exist and the `skill` tool is visible, the agent receives a durable user-role message before its first request, listing each skill's name and a capped description; the message tells the model to load a skill with the tool before acting on it, and never to infer instructions from the summary alone.
-- **A loader tool.** The model calls `skill` with the exact skill name and receives the full instruction body plus resource guidance in a canonical `<skill_content>` block; the result is retained as ordinary tool history.
-- **Explicit user invocation.** A `/name` token in direct user input that names a user-invocable skill injects that skill's instructions into the step, without the model having to load it.
-- **Live catalog updates.** Later membership, description, or visibility changes append a complete replacement catalog; removing every skill appends an empty catalog that retires older names.
+- **セッションカタログ。** モデルから呼び出し可能なスキルが存在し、`skill` ツールが見えている場合、エージェントは最初のリクエストの前に永続的なユーザーロールメッセージを受け取り、各スキルの名前と上限付き説明が列挙される。このメッセージは、スキルに基づいて行動する前にツールでスキルをロードすること、要約だけから指示を推測してはならないことをモデルに伝える。
+- **ローダーツール。** モデルは正確なスキル名で `skill` を呼び出し、完全な指示本文とリソースガイダンスを正規の `<skill_content>` ブロックで受け取る。結果は通常のツール履歴として保持される。
+- **ユーザーによる明示的呼び出し。** 直接のユーザー入力内でユーザー呼び出し可能なスキルを名指す `/name` トークンは、そのスキルの指示をステップに注入する。モデルがロードする必要はない。
+- **ライブカタログ更新。** その後のメンバーシップ、説明、可視性の変更は、完全な置換カタログを追記する。すべてのスキルを削除すると、古い名前を廃止する空のカタログが追記される。
 
-### Observable success and failures
+### 観測可能な成功と失敗
 
-Loading a listed skill returns its full instructions; the model sees one canonical shape whether the load came from the tool or from a user's explicit invocation. An invalid name reports `Error: invalid skill name "<name>"`, an unknown name reports the skill is unknown or no longer available, and a skill disabled for model invocation reports it is not available for model invocation. The catalog is omitted entirely when no catalog was ever published and either no model-invocable skills exist or the `skill` tool is hidden or shadowed; after a catalog has been published, either visibility loss — the `skill` tool hidden or shadowed by a same-name scoped tool — or removal of every skill instead appends an empty catalog that retires older names.
+一覧にあるスキルをロードすると完全な指示が返る。ロードがツールから来たものでもユーザーの明示的呼び出しから来たものでも、モデルは同じ正規の形を見る。不正な名前は `Error: invalid skill name "<name>"` を報告し、未知の名前はスキルが未知またはもはや利用できないことを報告し、モデル呼び出しが無効化されたスキルはモデル呼び出しに利用できないことを報告する。カタログが一度も公開されておらず、かつモデルから呼び出し可能なスキルが存在しないか `skill` ツールが非表示またはシャドウされている場合、カタログは完全に省略される。カタログが公開された後に可視性が失われる (`skill` ツールが非表示になるか、同名のスコープ付きツールにシャドウされる) か、すべてのスキルが削除されると、代わりに古い名前を廃止する空のカタログが追記される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the catalog and the invocation boundary are built; the observable behavior is fully covered in [Use this package](#use-this-package) and the Model Experience section below.
+この節ではカタログと呼び出し境界がどのように構築されるかを説明する。観測可能な振る舞いは[このパッケージを使う](#use-this-package)と以下のモデル体験の節で完全に扱う。
 
-### Design concept
+### 設計概念
 
-The package is built on two ideas. First, the catalog is a durable projection, diffed by a digest over the published entries rather than the rendered prose, so the `<system-reminder>` framing can never force a republish and consumers never re-parse the `<available_skills>` block. Second, one canonical rendering serves both load paths — the tool result and the user-explicit injection — through `renderSkillContent` shared from `dsh-skill`, so the model sees the same `<skill_content>` shape regardless of who initiated the load.
+このパッケージは 2 つの考えに基づく。第一に、カタログは永続的な投影であり、レンダリングされた散文ではなく公開エントリーに対するダイジェストで差分を取るため、`<system-reminder>` の枠組みが再公開を強制することは決してなく、コンシューマーが `<available_skills>` ブロックを再解析することもない。第二に、ツール結果とユーザー明示的注入という 2 つのロード経路は、`dsh-skill` から共有される `renderSkillContent` を通じて単一の正規レンダリングを使用するため、モデルは誰がロードを開始したかにかかわらず同じ `<skill_content>` の形を見る。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: tool registration, catalog and gesture pre-step listeners, rendering and digest |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: ツール登録、カタログとジェスチャーのプリステップリスナー、レンダリングとダイジェスト |
 
-### Catalog lifecycle
+### カタログのライフサイクル
 
-At each eligible `agent/pre-step`, the plugin snapshots the calling session's skill catalog, applies exact `skill` tool visibility, filters to model-invocable skills, and compares a digest of the entries against the newest visible `skill-catalog` message in the session log. When the digest changed, it hands the `enter` decision a durable user-role message containing the complete replacement catalog; an empty replacement explicitly retires earlier names. An incomplete provider snapshot emits nothing and preserves the last-good view for the next pre-step. The visibility check compares against the exact tool definition this plugin registered, so a scoped same-name shadow removes both the schema and its guidance; the plugin works mounted globally or inside one agent's composition.
+対象となる各 `agent/pre-step` で、プラグインは呼び出し元セッションのスキルカタログをスナップショットし、正確な `skill` ツールの可視性を適用し、モデルから呼び出し可能なスキルへフィルタリングし、エントリーのダイジェストをセッションログ内で最新の可視 `skill-catalog` メッセージと比較する。ダイジェストが変わったとき、`enter` 決定に完全な置換カタログを含む永続ユーザーロールメッセージを渡す。空の置換は以前の名前を明示的に廃止する。不完全なプロバイダースナップショットは何も発行せず、次のプリステップのために最後の良好なビューを保持する。可視性チェックはこのプラグインが登録した正確なツール定義と比較するため、同名のスコープ付きシャドウはスキーマとそのガイダンスの両方を除去する。プラグインはグローバルにマウントしても、1 つのエージェントのコンポジション内にマウントしても動作する。
 
-### Invocation boundary
+### 呼び出し境界
 
-The `/name` gesture listener scans only claimed user messages: a whitespace-bounded token naming a user-invocable skill in the workspace catalog injects the same `<skill_content>` rendering as a `user`-role instructions context appended after every other injection. Unknown names and user-disabled skills stay ordinary prose. This is the only entry point for `disable-model-invocation` skills, which the catalog and the `skill` tool never expose.
+`/name` ジェスチャーリスナーはクレーム済みのユーザーメッセージのみをスキャンする。ワークスペースカタログ内のユーザー呼び出し可能なスキルを名指す空白区切りのトークンは、そのステップの他のすべての注入の後に追記される `user` ロールの指示コンテキストとして、同じ `<skill_content>` レンダリングを注入する。未知の名前とユーザーが無効化したスキルは通常の散文のままである。これは `disable-model-invocation` スキルの唯一の入口であり、カタログと `skill` ツールはそれらを決して公開しない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the registry vocabulary behind the catalog to the exact tool schema and the design rationale.
+パッケージレベルの契約では足りないときにこれらのページを読む。カタログ背後のレジストリ語彙から、正確なツールスキーマと設計根拠へと進む。
 
-- [Skill subsystem reference](../../../docs/subsystems/skills.md) — the registry and provider vocabulary behind the catalog.
-- [skill package](../skill/README.md) — the registry and the shared `renderSkillContent` rendering.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-skill) — the exact `skill` schema the model receives.
-- [User-explicit skill invocation Agent Note](../../../.agents/notes/archived/feature/2026-08-08-user-explicit-skill-invocation.md) — the `/name` gesture design.
+- [スキルサブシステムリファレンス](../../../docs/subsystems/skills.md) — カタログ背後のレジストリとプロバイダー語彙。
+- [skill パッケージ](../skill/README.md) — レジストリと共有される `renderSkillContent` レンダリング。
+- [生成ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-skill) — モデルが受け取る正確な `skill` スキーマ。
+- [ユーザー明示的スキル呼び出しの Agent Note](../../../.agents/notes/archived/feature/2026-08-08-user-explicit-skill-invocation.md) — `/name` ジェスチャーの設計。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Session catalog
+### セッションカタログ
 
-#### What the model sees
+#### モデルが見るもの
 
-If model-invocable skills exist and this exact `skill` tool is visible, the agent receives the catalog template below as a durable user-role message before the first request, with one data-dependent entry per sorted skill. Later membership, description, or visibility changes append a complete replacement using the same `<available_skills>` envelope; deleting every skill appends an empty envelope with an explicit instruction not to use older names. The template's closing sentence is the rule against double-loading: the user-explicit gesture boundary (the pre-step listener below) injects the same `renderSkillContent` output (shared from `@deepseek-ai/dsh-skill`) inline, and the catalog tells the model to follow that block instead of re-loading the skill through the tool; the replacement-catalog template carries the same anti-double-loading rule in both arms, including the emptied catalog.
+モデルから呼び出し可能なスキルが存在し、この正確な `skill` ツールが見えている場合、エージェントは最初のリクエストの前に以下のカタログテンプレートを永続ユーザーロールメッセージとして受け取り、ソートされたスキルごとに 1 つのデータ依存エントリーを持つ。その後のメンバーシップ、説明、可視性の変更は、同じ `<available_skills>` エンベロープを使う完全な置換を追記する。すべてのスキルを削除すると、古い名前を使わないよう明示的に指示する空のエンベロープが追記される。テンプレートの結びの文が二重ロードを禁じる規則である。ユーザー明示的ジェスチャー境界 (以下のプリステップリスナー) は、同じ `renderSkillContent` 出力 (`@deepseek-ai/dsh-skill` から共有) をインラインで注入し、カタログはモデルに、ツール経由でスキルを再ロードするのではなくそのブロックに従うよう伝える。置換カタログテンプレートは、空にされたカタログを含む両方の分岐で同じ二重ロード防止規則を運ぶ。
 
-##### Skill catalog template
+##### スキルカタログテンプレート
 
 ```markdown
 <system-reminder>
@@ -128,35 +128,35 @@ A user may also invoke a skill directly; its <skill_content> block then appears 
 </system-reminder>
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Repeated input cost scales with skill count and `catalogDescriptionMaxLength`; no initial catalog tokens are sent when the list is empty or the tool is hidden or shadowed. Each actual catalog change adds one retained complete replacement message.
+反復入力コストはスキル数と `catalogDescriptionMaxLength` に比例して増える。リストが空またはツールが非表示もしくはシャドウされている場合、初期カタログトークンは送信されない。実際のカタログ変更ごとに、1 つの保持された完全置換メッセージが追加される。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The initial durable catalog is appended after the existing reusable prefix. Dynamic changes are append-only history after that catalog, so earlier reusable tokens stay intact while each newly appended catalog and later turns form a new suffix. A new or resumed instance with a changed digest may affect cache reuse from the newly appended catalog position.
+初期の永続カタログは既存の再利用可能プレフィックスの後に追記される。動的な変更はそのカタログ以降の追記専用履歴であるため、以前の再利用可能トークンは無傷のまま、新しく追記されたカタログと以降のターンが新しいサフィックスを形成する。ダイジェストが変わった新規または再開インスタンスは、新しく追記されたカタログ位置からのキャッシュ再利用に影響しうる。
 
-### Tool schema
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The model sees the generated [`skill` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-skill).
+モデルは生成された [`skill` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-skill)を見る。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost per request where the tool is visible.
+ツールが見えているリクエストごとの固定スキーマコスト。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the tool definition and visibility are unchanged. Shadowing, restrictions, or plugin lifecycle changes may invalidate reuse from this schema.
+ツール定義と可視性が変わらない間はプレフィックス安定。シャドウ、制限、プラグインライフサイクルの変更により、このスキーマからの再利用が無効になりうる。
 
-### Tool result
+### ツール結果
 
-#### What the model sees
+#### モデルが見るもの
 
-A successful call uses the result template and the provider-managed, directory, URL, or opaque resource guidance below.
+成功した呼び出しは結果テンプレートと、以下のプロバイダー管理、ディレクトリ、URL、または不透明リソースのガイダンスを使用する。
 
-##### Skill result template
+##### スキル結果テンプレート
 
 ```markdown
 <skill_content name="<escaped-name>">
@@ -170,90 +170,90 @@ A successful call uses the result template and the provider-managed, directory, 
 </skill_content>
 ```
 
-##### Provider-managed resource guidance
+##### プロバイダー管理リソースガイダンス
 
 ```markdown
 Resources for this skill are managed by provider "<provider>".
 Load referenced resources only as needed.
 ```
 
-##### Directory resource guidance
+##### ディレクトリリソースガイダンス
 
 ```markdown
 Base directory for this skill: <path>
 Resolve relative paths mentioned by this skill against the base directory before using them. Load referenced resources only as needed.
 ```
 
-##### URL resource guidance
+##### URL リソースガイダンス
 
 ```markdown
 Base URL for this skill: <url>
 Resolve relative URLs mentioned by this skill against the base URL before using them. Load referenced resources only as needed.
 ```
 
-##### Opaque resource guidance
+##### 不透明リソースガイダンス
 
 ```markdown
 Resources for this skill: <description>
 Load referenced resources only as needed.
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Loaded instructions are data-dependent tool-result tokens, resent on later steps until compaction; no duplicate `agent.inject()` copy is made.
+ロードされた指示はデータ依存のツール結果トークンであり、コンパクションまで以降のステップで再送される。`agent.inject()` の複製コピーは作られない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用。新しく可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効にしない。
 
-### Tool errors
+### ツールエラー
 
-#### What the model sees
+#### モデルが見るもの
 
-Invalid or stale selections return exactly `Error: invalid skill name "<name>"`, `Error: skill "<name>" is unknown or no longer available`, or `Error: skill "<name>" is not available for model invocation`. Provider-thrown lookup text is data-dependent and receives the same `Error: <message>` wrapper.
+不正または古い選択は正確に `Error: invalid skill name "<name>"`、`Error: skill "<name>" is unknown or no longer available`、または `Error: skill "<name>" is not available for model invocation` を返す。プロバイダーが投げるルックアップテキストはデータ依存で、同じ `Error: <message>` ラッパーを受ける。
 
-#### Token effect
+#### トークンへの影響
 
-Only a failing call adds these retained tokens.
+失敗した呼び出しだけがこれらの保持トークンを追加する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用。新しく可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効にしない。
 
-### User-explicit invocation injection
+### ユーザー明示的呼び出しの注入
 
-#### What the model sees
+#### モデルが見るもの
 
-A whitespace-bounded `/name` token anywhere in a claimed user message, naming a user-invocable skill in the workspace catalog, injects that skill's full `<skill_content>` rendering (the exact result-template shape above) as a `user`-role instructions context appended after every other injection of that step — background first, the material to act on last. Only direct user input is scanned, the check runs on the loaded definition, and unknown or user-disabled names stay ordinary prose. This is the sole entry point for `disable-model-invocation` skills, which the catalog and the `skill` tool never expose; the catalog's closing sentence tells the model to follow the injected block instead of re-loading it.
+クレーム済みユーザーメッセージ内のどこかにある空白区切りの `/name` トークンが、ワークスペースカタログ内のユーザー呼び出し可能なスキルを名指すと、そのスキルの完全な `<skill_content>` レンダリング (上記の正確な結果テンプレートの形) を、そのステップの他のすべての注入の後に追記される `user` ロールの指示コンテキストとして注入する — 背景が先、行動対象の素材が最後。スキャンされるのは直接のユーザー入力だけで、チェックはロードされた定義に対して実行され、未知またはユーザー無効化の名前は通常の散文のままである。これは `disable-model-invocation` スキルの唯一の入口であり、カタログと `skill` ツールはそれらを決して公開しない。カタログの結びの文は、モデルに再ロードではなく注入されたブロックに従うよう伝える。
 
-#### Token effect
+#### トークンへの影響
 
-Each gesture adds one rendered skill body to that turn as injected context — the same size as the tool result for the same skill, paid deterministically at the user's request instead of at the model's discretion. Repeated gestures for one skill within one step inject once.
+各ジェスチャーはそのターンに 1 つのレンダリング済みスキル本文を注入コンテキストとして追加する — 同じスキルのツール結果と同じサイズで、モデルの裁量ではなくユーザーのリクエスト時に確定的に支払われる。1 ステップ内で 1 つのスキルに対するジェスチャーを繰り返しても 1 回だけ注入される。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; the injection lands after the reusable request prefix inside the step's message batch and does not invalidate existing KV-cache entries.
+追記専用。注入はステップのメッセージバッチ内で再利用可能なリクエストプレフィックスの後に着地し、既存の KV キャッシュエントリーを無効にしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the catalog or the loader is a poor fit. They are current package constraints, not a task backlog.
+これらの制限はカタログやローダーが不向きになる場合を定義する。現在のパッケージ制約であり、タスクバックログではない。
 
-- **The catalog omits `whenToUse`, source, and provider metadata** — routing is based only on name and a capped description; `whenToUse` remains provider metadata and is not rendered by the loaded wrapper either.
-- **Loaded instruction bodies have no size cap** — a provider can return a skill large enough to consume substantial next-step context; only catalog descriptions are truncated.
-- **Resources are guidance, not attachments** — the tool reports a base directory/URL/opaque hint but neither enumerates nor fetches referenced files for the model.
-- **Loading is one-shot text** — there is no partial, streaming, or cached-content handle when a remote provider is slow or a skill body is large.
-- **Catalog replacement is whole-list** — one changed name or description appends every visible summary; this keeps stale-name retirement explicit but costs tokens proportional to the catalog.
-- **Bodies are not versioned** — body-only edits do not change the catalog digest or notify the model; a later tool call reads the current provider content while earlier tool results remain historical facts.
+- **カタログは `whenToUse`、ソース、プロバイダーメタデータを省略する** — ルーティングは名前と上限付き説明にのみ基づく。`whenToUse` はプロバイダーメタデータのままで、ロードされたラッパーによってもレンダリングされない。
+- **ロードされた指示本文にサイズ上限がない** — プロバイダーは以降のステップのコンテキストを大量に消費するほど大きなスキルを返せる。切り詰められるのはカタログの説明だけである。
+- **リソースはガイダンスであり添付ではない** — ツールはベースディレクトリ/URL/不透明ヒントを報告するが、参照されたファイルをモデルのために列挙も取得もしない。
+- **ロードは一発のテキストである** — リモートプロバイダーが遅い場合やスキル本文が大きい場合の、部分、ストリーミング、キャッシュ済みコンテンツハンドルはない。
+- **カタログ置換はリスト全体である** — 1 つの名前または説明の変更が可視のすべての要約を追記する。これは古い名前の廃止を明示的に保つが、カタログに比例するトークンコストがかかる。
+- **本文はバージョン管理されない** — 本文のみの編集はカタログダイジェストを変えず、モデルに通知もしない。後のツール呼び出しは現在のプロバイダーコンテンツを読む一方、以前のツール結果は歴史的事実として残る。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,37 +1,37 @@
 ---
-description: "Operator checklist for a Windows installed update with a failed download, explicit retry, and retained evidence."
+description: "ダウンロード失敗、明示的な再試行、保持された証拠を伴う Windows インストール済みアップデートのオペレーターチェックリスト。"
 ---
 
-# Windows installed-update walkthrough
+# Windows インストール済みアップデートのウォークスルー
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Prepare a private test application and fresh test distribution namespace, then let the operator install, inject a fault, retry, and confirm restart. A local manifest or complete journal sequence does not certify an installer or preserved data. The installed-app steps below remain unverified until the operator performs them with verified packages.
+プライベートなテストアプリケーションと新しいテスト配布名前空間を準備し、その後、オペレーターにインストール、障害の注入、再試行、再起動の確認を行わせる。ローカルマニフェストや完全なジャーナルシーケンスは、インストーラーや保存されたデータを証明するものではない。以下のインストール済みアプリの手順は、オペレーターが検証済みパッケージで実施するまで未検証のままである。
 
-## Table of Contents
+## 目次
 
-- [Prepare materials](#prepare)
-- [Operator sequence](#sequence)
-- [Evidence and recovery](#evidence)
-- [Dev Note](#dev-note)
+- [材料を準備する](#prepare)
+- [オペレーターの手順](#sequence)
+- [証拠と復旧](#evidence)
+- [開発者ノート](#dev-note)
 
 <a id="prepare"></a>
 
-## Prepare materials
+## 材料を準備する
 
-From the repository root with dependencies installed, allocate a run with two increasing derived test versions. This writes only an ignored local manifest; it does not build, sign, upload, install, or read credentials.
+依存関係をインストールした状態のリポジトリルートから、増加する 2 つの派生テストバージョンで 1 回の実行を割り当てる。これは無視されるローカルマニフェストを書き込むだけで、ビルド、署名、アップロード、インストール、または資格情報の読み取りは行わない。
 
-The examples use base version `0.1.6-alpha.1`. Before creating new material, substitute the actual base, Asia/Shanghai date, and unused index according to the [release version rules](../../packaging/README.md#release-versions).
+例ではベースバージョン `0.1.6-alpha.1` を使用する。新しい材料を作成する前に、[リリースバージョンルール](../../packaging/README.md#release-versions)に従って、実際のベース、Asia/Shanghai の日付、未使用のインデックスに置き換える。
 
 ```powershell
 node --import tsx apps/desktop/scripts/prepare-installed-update.ts init 0.1.6-alpha.1.20260916.1 0.1.6-alpha.1.20260916.2
 ```
 
-Retain the returned `run.json` and reuse its random identity and `qualification/<id>` paths for both packages. The source commit and dirty-file list identify the starting checkout, not the contents of a later package. Record final build source identifiers and artifact hashes separately; do not regenerate the manifest midway through an update.
+返された `run.json` を保持し、そのランダムな識別子と `qualification/<id>` パスを両方のパッケージに再利用する。ソースコミットとダーティファイルのリストは開始時のチェックアウトを識別するものであり、後のパッケージの内容ではない。最終ビルドのソース識別子とアーティファクトハッシュは別々に記録する。アップデートの途中でマニフェストを再生成してはならない。
 
-Prepare fresh source resources with the repository's preparation-only workflow, then generate the shared bootstrap, two private version-bound runtime copies, and frozen application files. Replace `<run.json>` with the allocator's manifest path. Preparation-only builds and checks the source runtime but stops before signing; the other commands never invoke a signer or installer. These commands refuse to overwrite existing per-run outputs; retain partial material after an error instead of retrying over it.
+リポジトリの準備専用ワークフローで新しいソースリソースを準備し、次に共有ブートストラップ、2 つのプライベートなバージョン束縛ランタイムコピー、凍結されたアプリケーションファイルを生成する。`<run.json>` をアロケーターのマニフェストパスに置き換える。準備専用はソースランタイムをビルドしてチェックするが、署名の前で停止する。他のコマンドは署名者やインストーラーを決して呼び出さない。これらのコマンドは既存の実行ごとの出力の上書きを拒否する。エラーの後は部分的な材料を保持し、その上に再試行しない。
 
 ```powershell
 node apps/desktop/node_modules/pnpm/bin/pnpm.mjs --dir apps/desktop run prepare:package win-x64
@@ -40,93 +40,93 @@ node --import tsx apps/desktop/scripts/prepare-installed-update.ts runtime "<run
 node --import tsx apps/desktop/scripts/prepare-installed-update.ts application "<run.json>"
 ```
 
-Package both files from the generated `bootstrap` directory beside `lib/`, and set the package main entry to `qualification-bootstrap.mjs`. That entry validates the installed application ID and version before loading production main. It assigns Electron user/session data, Harness home, and journals under the operating system's application-data directory at `dsh-update-qualification/<id>/`; both versions use the same paths. The runtime copier changes only release-family package versions and matching dependency references, preserves third-party versions, and re-verifies both copied inventories and the untouched source. Its `runtime-preparation/result.json` records hashes and explicitly does not claim signing or startup qualification of the copied versions. These synthetic versions are test materials, not npm releases.
+生成された `bootstrap` ディレクトリから `lib/` の隣に両方のファイルをパッケージし、パッケージのメインエントリを `qualification-bootstrap.mjs` に設定する。そのエントリはプロダクションの main をロードする前にインストール済みアプリケーション ID とバージョンを検証する。オペレーティングシステムのアプリケーションデータディレクトリ配下の `dsh-update-qualification/<id>/` に Electron のユーザー/セッションデータ、Harness ホーム、ジャーナルを割り当てる。両方のバージョンは同じパスを使用する。ランタイムコピアはリリースファミリーのパッケージバージョンと対応する依存関係参照のみを変更し、サードパーティのバージョンを保持し、コピーされた両方のインベントリと未変更のソースを再検証する。その `runtime-preparation/result.json` はハッシュを記録し、コピーされたバージョンの署名や起動の適格性を主張しないことを明示する。これらの合成バージョンはテスト材料であり、npm リリースではない。
 
-The `application` command copies built main/preload modules, renderer files, and the prepared bootstrap into `application/files`, with SHA-256 values in `application/result.json`. It does not copy the app's root `.env.windows` or freeze `node_modules` and build tools. The [qualification builder configuration](../../scripts/installed-update-builder.ts) verifies this inventory and the selected private runtime, selects the shared frozen files and isolated package metadata, and preserves ordinary installer and signing hooks. Its tests substitute the signer and pass the pinned builder's configuration validator; they do not produce an installer. A separately authorized supervised build must still record dependency/tool inputs and verify final package contents and signatures.
+`application` コマンドは、ビルドされた main/preload モジュール、レンダラーファイル、準備されたブートストラップを `application/files` にコピーし、SHA-256 値を `application/result.json` に記録する。アプリのルート `.env.windows` をコピーせず、`node_modules` とビルドツールを凍結しない。[適格性ビルダー設定](../../scripts/installed-update-builder.ts)はこのインベントリと選択されたプライベートランタイムを検証し、共有の凍結ファイルと分離されたパッケージメタデータを選択し、通常のインストーラーフックと署名フックを保持する。そのテストは署名者を置き換え、固定されたビルダーの設定バリデーターを通る。インストーラーは生成しない。別途承認された監視付きビルドが、依存関係/ツールの入力を記録し、最終パッケージの内容と署名を検証しなければならないことに変わりはない。
 
-The [packaging entry](../../scripts/package-installed-update.ts) defaults to checks. A retained signing interlock rejects before credentials are loaded; it never clears that interlock. With no interlock, checks load `.env.windows`, validate prepared inputs, and launch no child. The shared builder requires a valid `DOWNLOAD_TEST_RELEASE_ID` from the [test release settings](../../publishing/README.md#upload-updates); qualification still publishes through the manifest’s separate `qualification/<id>` paths. Run this from the repository root with one exact version:
+[パッケージングエントリ](../../scripts/package-installed-update.ts)はデフォルトでチェックを行う。保持された署名インターロックは資格情報がロードされる前に拒否する。それはそのインターロックを決して解除しない。インターロックがなければ、チェックは `.env.windows` をロードし、準備された入力を検証し、子プロセスを起動しない。共有ビルダーは[テストリリース設定](../../publishing/README.md#upload-updates)からの有効な `DOWNLOAD_TEST_RELEASE_ID` を必要とする。適格性はマニフェストの別個の `qualification/<id>` パスを通じて公開される。これをリポジトリルートから 1 つの正確なバージョンで実行する:
 
 ```powershell
 node --import tsx apps/desktop/scripts/package-installed-update.ts "<run.json>" 0.1.6-alpha.1.20260916.1 --check
 ```
 
-Actual packaging remains unverified and requires separate hardware-recovery approval and a present operator. The `--execute` mode requires a terminal and an exact confirmation containing the version and run ID; there is no piped approval option. It rechecks the interlock and exclusively allocates that version's `packaging` directory. The supervised child builds only that version, disables publication, strips unrelated credentials, and stops on failure or a 15-minute overall deadline. This deadline does not bound individual CSP authentication attempts. Records retain source/tool hashes, redacted output, events, and artifact file hashes; an existing attempt or output refuses reuse. `builderCompleted` and a successful supervisor result do not establish package verification, signature acceptance, or installation success; `packageVerification` remains `pending` until those checks are performed independently.
+実際のパッケージングは未検証のままであり、別途のハードウェア復旧承認と同席するオペレーターを必要とする。`--execute` モードはターミナルと、バージョンと実行 ID を含む正確な確認を必要とする。パイプによる承認オプションはない。それはインターロックを再確認し、そのバージョンの `packaging` ディレクトリを排他的に割り当てる。監視された子プロセスはそのバージョンのみをビルドし、公開を無効化し、無関係な資格情報を除去し、失敗または 15 分の全体期限で停止する。この期限は個々の CSP 認証試行を制限しない。記録はソース/ツールのハッシュ、リダクトされた出力、イベント、アーティファクトファイルのハッシュを保持する。既存の試行または出力は再利用を拒否する。`builderCompleted` とスーパーバイザーの成功結果は、パッケージ検証、署名の受け入れ、インストール成功を確立しない。`packageVerification` はそれらのチェックが独立に実施されるまで `pending` のままである。
 
-Before the operator starts, supply both verified installers, generated metadata and blockmaps, packaging and signature records, the exact installed executable path, and fixed test feed URL. Both packages must use the same test identity, isolated data directories, and absolute external `DSH_DESKTOP_UPDATE_JOURNAL_DIR` on every launch, including an installer-triggered restart. A variable set only in the original launch terminal is insufficient. The [Windows signing rules](../../windows-signing/README.md#windows-ev-signing) still apply; a manifest never clears a signing interlock.
+オペレーターが開始する前に、2 つの検証済みインストーラー、生成されたメタデータとブロックマップ、パッケージングと署名の記録、正確なインストール済み実行可能ファイルパス、固定テストフィード URL を提供する。両方のパッケージは同じテスト識別子、分離されたデータディレクトリ、およびインストーラーが引き起こす再起動を含むすべての起動での絶対外部 `DSH_DESKTOP_UPDATE_JOURNAL_DIR` を使用しなければならない。元の起動ターミナルでのみ設定された変数では不十分である。[Windows 署名ルール](../../windows-signing/README.md#windows-ev-signing)は依然として適用される。マニフェストが署名インターロックを解除することは決してない。
 
-The Windows [read-only signature helper](../../scripts/installed-update-signature.mjs) uses the real updater verifier with a publisher derived from the trusted public certificate, then requires valid Authenticode and timestamp attributes and unchanged SHA-512. Verification children receive no inherited signing/upload secrets or PowerShell module-path overrides. The helper never loads `.env.windows`, signs a file, or executes the inspected executable. Signed-probe acceptance and unsigned-installer rejection have been observed locally; they do not certify either prepared version, package identity, or installation behavior.
+Windows [読み取り専用署名ヘルパー](../../scripts/installed-update-signature.mjs)は、信頼された公開証明書から導出されたパブリッシャーで実際の updater verifier を使用し、次に有効な Authenticode とタイムスタンプ属性、および変更されていない SHA-512 を要求する。検証の子プロセスは継承された署名/アップロードのシークレットや PowerShell モジュールパスのオーバーライドを受け取らない。このヘルパーは `.env.windows` をロードせず、ファイルに署名せず、検査された実行可能ファイルを実行しない。署名済みプローブの受け入れと未署名インストーラーの拒否はローカルで観察されている。それらはどちらの準備済みバージョン、パッケージ識別子、インストール動作を証明するものではない。
 
-The [package verifier](../../scripts/verify-installed-update-package.ts) checks the final installer before extracting it with a reviewed local 7-Zip executable. Supply absolute paths for the manifest, trusted public certificate, and tool; never select a tool extracted from the installer being verified. This command creates a fresh `verification/check-*` directory, preserves partial records, and fails immediately when the installer is absent:
+[パッケージ検証ツール](../../scripts/verify-installed-update-package.ts)は、レビュー済みのローカル 7-Zip 実行可能ファイルで抽出する前に最終インストーラーをチェックする。マニフェスト、信頼された公開証明書、ツールには絶対パスを指定する。検証対象のインストーラーから抽出されたツールを決して選択しない。このコマンドは新しい `verification/check-*` ディレクトリを作成し、部分的な記録を保持し、インストーラーが存在しない場合は即座に失敗する:
 
 ```powershell
 node --import tsx apps/desktop/scripts/verify-installed-update-package.ts "<run.json>" 0.1.6-alpha.1.20260916.1 "<public.cer>" "<reviewed-7za.exe>"
 ```
 
-The verifier checks actual archived application identity, entry, frozen application bytes, updater dependency versions, feed/cache/publisher configuration, and the bundled Harness runtime against prepared inputs; the mandatory test policy must be valid. It extracts the runtime from `app.asar` and checks executable signatures at their `app.asar.unpacked` paths. Changed runtime executables require separate signature checks; other runtime bytes must match the prepared bytes after electron-builder's dependency-manifest transformation. It rejects unsafe archive paths before extraction and records installer, application, and runtime-executable signatures. Before success, it rechecks installer, feed/blockmap, manifest, certificate, and tool hashes. `passed` covers these checks only: dependency bytes are not frozen, and installer registration, startup, upgrade, and data retention remain explicit manual checks. Real archive reading has been observed on a retained older package; complete signed-package verification for the prepared versions remains pending.
+検証ツールは、実際にアーカイブされたアプリケーション識別子、エントリ、凍結されたアプリケーションバイト、アップデーター依存関係バージョン、フィード/キャッシュ/パブリッシャー設定、バンドルされた Harness ランタイムを準備済み入力に対してチェックする。必須テストポリシーは有効でなければならない。`app.asar` からランタイムを抽出し、実行可能ファイルの署名をその `app.asar.unpacked` パスでチェックする。変更されたランタイム実行可能ファイルには別途の署名チェックが必要である。他のランタイムバイトは electron-builder の依存関係マニフェスト変換後、準備されたバイトと一致しなければならない。抽出前に安全でないアーカイブパスを拒否し、インストーラー、アプリケーション、ランタイム実行可能ファイルの署名を記録する。成功の前に、インストーラー、フィード/ブロックマップ、マニフェスト、証明書、ツールのハッシュを再確認する。`passed` はこれらのチェックのみを対象とする: 依存関係バイトは凍結されておらず、インストーラーの登録、起動、アップグレード、データ保持は明示的な手動チェックのままである。実際のアーカイブ読み取りは保持された古いパッケージで観察されている。準備されたバージョンの完全な署名済みパッケージ検証は保留のままである。
 
-Follow the separate [upload and publication procedure](publication/README.md). Leave the fixed feed absent for the 404 case, then publish version 1 for the same-version case. Keep version 2 metadata local until both cases finish in the installed version 1 application. Retain publication records and remote objects for diagnosis; do not delete a published feed to recreate an earlier case.
+別途の[アップロードと公開の手順](publication/README.md)に従う。404 のケースでは固定フィードを不在のままにする。次に同一バージョンのケースのためにバージョン 1 を公開する。両方のケースがインストール済みバージョン 1 アプリケーションで完了するまで、バージョン 2 のメタデータはローカルに保つ。診断のために公開記録とリモートオブジェクトを保持する。以前のケースを再現するために公開済みフィードを削除しない。
 
-The local `files` command accepts `<run.json>` and one exact run version. It reads that version's `installer/nightly.yml`, verifies the expected installer name, size, SHA-512, and nonempty external blockmap, and prints separate binary destinations and a fixed-feed body. Missing installers fail validation. It writes nothing and reads no credentials. Its `file-integrity-only` result cannot authorize upload or replace verification of signed package contents and application identity; those remain required before publication.
+ローカルの `files` コマンドは `<run.json>` と 1 つの正確な実行バージョンを受け入れる。そのバージョンの `installer/nightly.yml` を読み、期待されるインストーラー名、サイズ、SHA-512、空でない外部ブロックマップを検証し、別々のバイナリ宛先と固定フィードの本文を出力する。欠落したインストーラーは検証に失敗する。何も書き込まず、資格情報も読まない。その `file-integrity-only` 結果はアップロードを承認したり、署名済みパッケージ内容とアプリケーション識別子の検証を置き換えたりできない。それらは公開前に依然として必要である。
 
 <a id="sequence"></a>
 
-## Operator sequence
+## オペレーターの手順
 
-Proceed manually only after preparation passes. Use disposable test conversations and settings, never a production workspace or unsaved work.
+準備が通ってから手動で進む。使い捨てのテスト会話と設定を使用し、プロダクションワークスペースや未保存の作業を決して使わない。
 
-1. Install version 1. Record installer path, hash, signature result, and time. Start the installed shortcut and verify its executable path and displayed version; do not launch an unpacked build or development server.
-2. Confirm version 1 `started` and `workspace-ready` in a new journal. Create an identifiable test conversation and change a harmless setting; record expected values privately. Complete the two feed checks below and keep version 1 running.
-   - **Missing feed:** retain a timestamped GET of the configured fixed URL returning 404. Observe startup automatic checking without a disruptive dialog, then manually check: expect checking followed by failure, not “no updates,” and no download or installation. Save screenshots and journals before publishing anything.
-   - **Same-version feed:** after separate authorization, publish version 1 to that same URL and retain the complete 200 response, version, and SHA-512. Check manually in the still-running version 1: expect no available update and its current version, no download or installation, and no stale error indicator from the 404 case. Automatic no-update checking must remain quiet. Retain evidence before authorizing version 2.
-3. Authorize version 2 metadata publication at the existing fixed feed URL. Re-read that URL and verify version 2 and its binary hash. Preserve publication evidence after version 1 startup evidence.
-4. In version 1, check manually and confirm availability without automatic download. Prepare the reviewed [application-scoped fault and recovery](network/README.md). Never disable the adapter, VPN, shared proxy, remote-control connection, or domain-wide access.
-5. Click download and interrupt only the test application's transfer after progress begins. Capture one failure and persistent retry feedback; confirm no installation or silent retry. A connection failure before progress begins is a different observation and does not satisfy a transfer-interruption test.
-6. Remove the exact run-owned fault and verify recovery. Click retry yourself. Record progress, verification, and readiness. Expect a separate installation confirmation; download completion alone must not approve restart.
-7. Confirm installation. With active tasks, inspect the warning and explicitly authorize stopping them; without tasks, the confirmation must not claim tasks exist. Record the last version 1 window and let installation and restart finish without manually starting another instance.
-8. Verify the installed version 2 executable and displayed version. Check the conversation and setting from step 2 and capture the result. Find version 2 `started` and `workspace-ready` in the same external evidence directory. Report missing automatic restart separately from successful manual startup; one cannot substitute for the other.
+1. バージョン 1 をインストールする。インストーラーパス、ハッシュ、署名結果、時刻を記録する。インストール済みショートカットを起動し、その実行可能ファイルパスと表示バージョンを確認する。アンパックされたビルドや開発サーバーを起動しない。
+2. 新しいジャーナルでバージョン 1 の `started` と `workspace-ready` を確認する。識別可能なテスト会話を作成し、無害な設定を変更する。期待値を非公開で記録する。以下の 2 つのフィードチェックを完了し、バージョン 1 を実行したままにする。
+   - **欠落フィード:** 設定された固定 URL のタイムスタンプ付き GET が 404 を返すことを保持する。妨害的なダイアログなしで起動時の自動チェックを観察し、次に手動でチェックする: チェックに続いて失敗を期待し、「アップデートなし」ではなく、ダウンロードもインストールもないこと。何かを公開する前にスクリーンショットとジャーナルを保存する。
+   - **同一バージョンフィード:** 別途の承認の後、バージョン 1 を同じ URL に公開し、完全な 200 応答、バージョン、SHA-512 を保持する。まだ実行中のバージョン 1 で手動チェックする: 利用可能なアップデートなしとその現在バージョン、ダウンロードもインストールもなし、404 ケースからの古いエラーインジケーターもなしを期待する。自動のアップデートなしチェックは静かなままでなければならない。バージョン 2 を承認する前に証拠を保持する。
+3. 既存の固定フィード URL でバージョン 2 メタデータの公開を承認する。その URL を再読し、バージョン 2 とそのバイナリハッシュを検証する。バージョン 1 の起動証拠の後に公開証拠を保存する。
+4. バージョン 1 で手動チェックし、自動ダウンロードなしの可用性を確認する。レビュー済みの[アプリケーションスコープの障害と復旧](network/README.md)を準備する。アダプター、VPN、共有プロキシ、リモートコントロール接続、ドメイン全体のアクセスを決して無効化しない。
+5. ダウンロードをクリックし、進行が始まった後でテストアプリケーションの転送のみを中断する。1 つの失敗と持続的な再試行フィードバックをキャプチャする。インストールもサイレント再試行もないことを確認する。進行が始まる前の接続失敗は別の観察であり、転送中断テストを満たさない。
+6. 実行が所有する正確な障害を除去し、復旧を検証する。自分で再試行をクリックする。進行、検証、準備完了を記録する。別途のインストール確認を期待する。ダウンロード完了だけでは再起動を承認してはならない。
+7. インストールを確認する。アクティブなタスクがある場合、警告を検査し、それらを停止することを明示的に承認する。タスクがない場合、確認はタスクが存在すると主張してはならない。最後のバージョン 1 ウィンドウを記録し、手動で別のインスタンスを起動せずにインストールと再起動を完了させる。
+8. インストール済みバージョン 2 の実行可能ファイルと表示バージョンを検証する。ステップ 2 の会話と設定を確認し、その結果をキャプチャする。同じ外部証拠ディレクトリでバージョン 2 の `started` と `workspace-ready` を見つける。自動再起動の欠落を手動起動の成功とは別に報告する。一方が他方の代わりにはならない。
 
 <a id="evidence"></a>
 
-## Evidence and recovery
+## 証拠と復旧
 
-The intentional 404 is a check-failure case, not the later interrupted-download case. A browser response alone does not prove application behavior. Keep each observation's URL, UTC time, HTTP status, feed body/hash when present, screenshot, and journal snapshot together. The journal inspector does not certify the two feed cases or record raw HTTP diagnostics; the operator supplies those observations. A later successful manual check must recover without restarting the application.
+意図的な 404 はチェック失敗のケースであり、後の転送中断のケースではない。ブラウザの応答だけではアプリケーションの動作を証明しない。各観察の URL、UTC 時刻、HTTP ステータス、フィード本文/ハッシュ(存在する場合)、スクリーンショット、ジャーナルスナップショットを一緒に保持する。ジャーナル検査ツールは 2 つのフィードケースを証明せず、生の HTTP 診断を記録しない。それらの観察はオペレーターが提供する。後の成功した手動チェックは、アプリケーションを再起動せずに復旧しなければならない。
 
-Retain the manifest, build records, original feeds, binary hashes, publication receipts and readbacks, fault setup/removal evidence, screenshots, and all process journals. Installer logs and test data may contain private paths or content; review before sharing. The inspector is read-only and copies only milestone references, not raw diagnostics. Replace the directory placeholder and use the manifest's exact versions:
+マニフェスト、ビルド記録、元のフィード、バイナリハッシュ、公開の受領と読み戻し、障害の設定/除去の証拠、スクリーンショット、すべてのプロセスジャーナルを保持する。インストーラーログとテストデータにはプライベートなパスやコンテンツが含まれることがある。共有前にレビューする。検査ツールは読み取り専用で、マイルストーン参照のみをコピーし、生の診断はコピーしない。ディレクトリのプレースホルダーを置き換え、マニフェストの正確なバージョンを使用する:
 
 ```powershell
 node --import tsx apps/desktop/scripts/prepare-installed-update.ts inspect 0.1.6-alpha.1.20260916.1 0.1.6-alpha.1.20260916.2 "<journal-directory>"
 ```
 
-Exit 0 means the ordered journal milestones are present; exit 2 means missing milestones; exit 1 means input or command validation failed. A failure/retry sequence cannot combine different version 1 processes. A successor started before the original process quit is not counted; clock changes can leave evidence incomplete and require investigation. `recordedFlow: complete` is not overall acceptance. The report always requires independent operator checks for publication timing, network failure and recovery, installer completion and path, preserved data, and screenshots and confirmations.
+終了コード 0 は順序付けされたジャーナルマイルストーンが存在することを意味する。終了コード 2 は欠落したマイルストーンを意味し、終了コード 1 は入力またはコマンドの検証失敗を意味する。失敗/再試行シーケンスは異なるバージョン 1 プロセスを結合できない。元のプロセスが終了する前に開始された後継はカウントされない。時計の変更は証拠を不完全にし、調査を必要とすることがある。`recordedFlow: complete` は総合的な受け入れではない。レポートは常に、公開タイミング、ネットワーク障害と復旧、インストーラーの完了とパス、保存されたデータ、スクリーンショットと確認について、独立したオペレーターチェックを要求する。
 
-To retain a local journal snapshot and its report, use `collect` with the matching installed application's `dsh-update-qualification/<run-id>/journals` directory. It validates all selected records before creating a fresh `evidence/collection-*` under the material run. The copied journals and `report.json` describe the same in-memory snapshot, with SHA-256 values and `operatorAcceptance: pending`; original files are unchanged. Other files, settings, conversations, build output, and credentials are not collected. Keep their separately reviewed evidence alongside the report, not inside the journal directory.
+ローカルジャーナルスナップショットとそのレポートを保持するには、対応するインストール済みアプリケーションの `dsh-update-qualification/<run-id>/journals` ディレクトリで `collect` を使用する。これは材料実行の下に新しい `evidence/collection-*` を作成する前に、選択されたすべての記録を検証する。コピーされたジャーナルと `report.json` は同じインメモリスナップショットを記述し、SHA-256 値と `operatorAcceptance: pending` を持つ。元のファイルは変更されない。他のファイル、設定、会話、ビルド出力、資格情報は収集されない。それらの別途レビューされた証拠は、ジャーナルディレクトリの中ではなくレポートの隣に保持する。
 
 ```powershell
 node --import tsx apps/desktop/scripts/prepare-installed-update.ts collect "<run.json>" "<journal-directory>"
 ```
 
-Collection exit 0 means files were saved, even if the recorded flow is incomplete; inspect `report.json` before drawing conclusions. Failed writes retain partial output and a failure marker when storage permits. Repeated collection creates another directory without replacing earlier evidence. Inspection and collection reject partial tails, unknown fields or diagnostic values, files over 10 MiB, and snapshots over 50 MiB. Collect after the relevant actions settle; a live application can append records after the snapshot, and a racing partial append requires a later collection rather than truncating the original log. Real installed-app collection remains an operator step; tests use the actual journal writer with synthetic lifecycle actions.
+収集の終了コード 0 は、記録されたフローが不完全であっても、ファイルが保存されたことを意味する。結論を出す前に `report.json` を検査する。失敗した書き込みは、ストレージが許す場合、部分的な出力と失敗マーカーを保持する。繰り返しの収集は以前の証拠を置き換えずに別のディレクトリを作成する。検査と収集は、部分的な末尾、未知のフィールドや診断値、10 MiB を超えるファイル、50 MiB を超えるスナップショットを拒否する。関連するアクションが決着した後に収集する。ライブのアプリケーションはスナップショットの後に記録を追加することがあり、競合する部分的な追加は元のログを切り詰めるのではなく後の収集を必要とする。実際のインストール済みアプリの収集はオペレーターのステップのままである。テストは合成ライフサイクルアクションで実際のジャーナルライターを使用する。
 
-Use this report template; leave unobserved results pending:
+このレポートテンプレートを使用する。観察していない結果は pending のままにする:
 
-| Item | Evidence location | Result |
+| 項目 | 証拠の場所 | 結果 |
 |---|---|---|
-| Both installers and signatures verified | | pending |
-| Feed 404: automatic quiet failure and manual visible failure, no download | | pending |
-| Version 1 feed: no available update in running version 1, prior error cleared | | pending |
-| Version 1 running before version 2 publication | | pending |
-| Test-only fault and observed download failure | | pending |
-| Fault removed and explicit retry reached readiness | | pending |
-| Separate confirmation and installer completion | | pending |
-| Automatic restart into installed version 2 | | pending |
-| Test conversation and setting preserved | | pending |
-| Journals and screenshots retained | | pending |
-| Test network changes absent afterward | | pending |
+| 両方のインストーラーと署名を検証済み | | pending |
+| フィード 404: 自動の静かな失敗と手動の可視の失敗、ダウンロードなし | | pending |
+| バージョン 1 フィード: 実行中のバージョン 1 で利用可能なアップデートなし、以前のエラーがクリア | | pending |
+| バージョン 2 公開前にバージョン 1 が実行中 | | pending |
+| テスト専用の障害と観察されたダウンロード失敗 | | pending |
+| 障害を除去し、明示的な再試行が準備完了に到達 | | pending |
+| 別途の確認とインストーラーの完了 | | pending |
+| インストール済みバージョン 2 への自動再起動 | | pending |
+| テスト会話と設定が保存 | | pending |
+| ジャーナルとスクリーンショットを保持 | | pending |
+| テスト後のネットワーク変更が残っていない | | pending |
 
-Stop at the first failed prerequisite. Signing failure stops packaging and preserves its record; do not retry PIN authentication automatically. A feed mismatch stops the test before download. If a fault affects remote control, stop and restore only its owned change with the prepared recovery action. Do not uninstall, clear caches, delete evidence, or overwrite failed batches to make a later attempt appear successful. Allocate a new run for a clean attempt and retain the failed one.
+最初に失敗した前提条件で停止する。署名失敗はパッケージングを停止し、その記録を保持する。PIN 認証を自動で再試行しない。フィードの不一致はダウンロードの前にテストを停止する。障害がリモートコントロールに影響する場合、停止し、準備された復旧アクションでそれが所有する変更のみを復元する。後の試行が成功したように見せるために、アンインストール、キャッシュのクリア、証拠の削除、失敗したバッチの上書きをしない。クリーンな試行のために新しい実行を割り当て、失敗したものを保持する。
 
 <a id="dev-note"></a>
 
-## Dev Note
+## 開発者ノート
 
-Local allocation and journal inspection have automated tests. Signed package production, isolated network-fault tooling, late feed publication, installer-triggered restart, and this full operator sequence require separate qualification; this page does not report them as completed.
+ローカル割り当てとジャーナル検査には自動テストがある。署名済みパッケージの製造、分離されたネットワーク障害ツール、遅いフィード公開、インストーラーが引き起こす再起動、この完全なオペレーター手順は別途の適格性確認を必要とする。このページはそれらを完了済みとして報告しない。

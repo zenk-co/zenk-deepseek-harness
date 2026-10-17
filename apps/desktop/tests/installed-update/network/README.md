@@ -1,39 +1,39 @@
 ---
-description: "Operator-owned Windows network fault and recovery for one verified installed update test application."
+description: "1 つの検証済みインストール更新テストアプリケーション向けの運用者所有 Windows ネットワーク障害と復旧。"
 ---
 
-# Test-application network fault
+# テストアプリケーションのネットワーク障害
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Interrupt only the installed qualification application's outbound traffic, then remove that exact rule before retrying the update. The tools never disable an adapter, VPN, proxy, or firewall profile. Real traffic interruption remains an operator observation; tests substitute all firewall cmdlets.
+インストール済み認定アプリケーションの送信通信のみを遮断し、更新再試行の前にその正確な規則を除去する。ツールはアダプター・VPN・プロキシ・ファイアウォールプロファイルを決して無効にしない。実際の通信遮断は運用者の観測のままである。テストはすべてのファイアウォールコマンドレットを代用する。
 
-## Table of Contents
+## 目次
 
-- [Prepare](#prepare)
-- [Block and restore](#operate)
-- [Evidence and limitations](#evidence)
-- [Dev Note](#dev-note)
+- [準備](#prepare)
+- [遮断と復元](#operate)
+- [証拠と制限](#evidence)
+- [開発者ノート](#dev-note)
 
 <a id="prepare"></a>
 
-## Prepare
+## 準備
 
-Complete version 1 package verification and install that version through the [walkthrough](../README.md). Supply the installed executable, not the extracted payload. From the repository root, prepare its plan:
+バージョン 1 パッケージ検証を完了し、そのバージョンを[手順](../README.md)どおりにインストールする。展開済みペイロードではなく、インストール済み実行可能ファイルを指定すること。リポジトリルートからその計画を準備する:
 
 ```powershell
 node --import tsx apps/desktop/scripts/prepare-installed-update-network.ts "<run.json>" "<installed-test.exe>" "<verification/result.json>"
 ```
 
-The preparer requires version 1 identity and signature evidence, the exact test filename, and matching executable bytes. It resolves Windows short paths and refuses executables inside the material run. It exclusively writes `network-fault/plan.json` without changing network state. Retain the original plan; it identifies the one removable rule. Installation registration still requires independent operator verification.
+準備側はバージョン 1 の識別子と署名証拠・正確なテストファイル名・一致する実行可能ファイルバイトを要求する。Windows 短縮パスを解決し、材料実行内の実行可能ファイルを拒否する。ネットワーク状態を変えずに `network-fault/plan.json` のみを書き込む。元の計画を保持すること。除去可能な 1 規則を識別するものである。インストール登録は依然として独立した運用者検証を要する。
 
 <a id="operate"></a>
 
-## Block and restore
+## 遮断と復元
 
-These are pending manual steps, not a report of real firewall qualification. Use an administrator terminal and prepare a second terminal with the Restore command before blocking. Each invocation writes a new record. `Status` is the default and does not change firewall state. The execution-policy option affects only this PowerShell process; it does not change system policy.
+これらは実際のファイアウォール認定の報告ではなく、保留中の手動手順である。管理者ターミナルを使い、遮断の前に復元コマンド入りの 2 つ目のターミナルを準備する。各呼び出しは新しい記録を書く。`Status` は既定であり、ファイアウォール状態を変えない。実行方針オプションはこの PowerShell プロセスにのみ影響し、システム方針を変えない。
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File apps/desktop/scripts/installed-update-network.ps1 -Plan "<plan.json>" -Action Status
@@ -41,18 +41,18 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File apps/desktop/scripts/ins
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File apps/desktop/scripts/installed-update-network.ps1 -Plan "<plan.json>" -Action Restore
 ```
 
-Start Block, leave its confirmation waiting, then start the download. After positive progress, type the displayed `BLOCK <run-id>` confirmation. The script rechecks executable bytes and rule absence before creating one program-specific outbound block. Observe and capture an actual failed download; rule creation alone is insufficient. Run Restore and type `RESTORE <run-id>` to remove the matching rule, then click retry yourself. Status must report the rule absent. Never change unrelated rules to force a failure.
+遮断を開始し、その確認待ちを残したまま受け渡しを開始する。前向きの進捗の後、表示された `BLOCK <run-id>` 確認を入力する。スクリプトはプログラム固有送信遮断を 1 件作る前に実行可能ファイルバイトと規則不在を再確認する。実際の受け渡し失敗を観測して取得すること。規則作成だけでは不十分である。復元を実行して `RESTORE <run-id>` と入力し、一致する規則を除去してから自分で再試行を押す。状態報告は規則不在でなければならない。失敗を強い出すために無関係な規則を変えてはならない。
 
 <a id="evidence"></a>
 
-## Evidence and limitations
+## 証拠と制限
 
-The script flushes timestamped stages and final success/failure into `network-fault/records/<id>/events.jsonl`. It stops on errors and never retries or silently removes a rule after failed creation. Run Restore explicitly after any uncertain result. Recovery validates the rule's name, ownership description, direction, action, and exact program path; it does not require the executable to still exist. An absent rule is a safe no-op; a foreign matching rule is not removed.
+スクリプトは時刻付き段階と最終成否を `network-fault/records/<id>/events.jsonl` に流す。エラーで止まり、再試行も作成失敗後の黙った規則除去もしない。不確かな結果の後も復元を明示的に実行する。復旧は規則の名前・所有権説明・方向・動作・正確なプログラムパスを検証し、実行可能ファイルの現存を要求しない。不在の規則は安全な無操作であり、一致する外部規則は除去しない。
 
-Windows supports [program-specific outbound rules](https://learn.microsoft.com/en-us/windows/security/operating-system-security/network-security/windows-firewall/configure-with-command-line). Local policy, existing connections, and a download finishing before confirmation can prevent the intended interruption. A rule in PersistentStore does not prove effective traffic blocking. Keep the application open and observe its failure and subsequent successful retry; if either is absent, record the attempt as incomplete. The rule persists until removed, including across restart. Keep the plan and recovery terminal available; never install the update with the test rule still present.
+Windows は[プログラム固有送信規則](https://learn.microsoft.com/en-us/windows/security/operating-system-security/network-security/windows-firewall/configure-with-command-line)を支援する。ローカル方針・既存接続・確認前に終わる受け渡しは意図した遮断を妨げうる。PersistentStore 内の規則は実効通信遮断を証明しない。アプリケーションを開いたまま、その失敗と後続の成功再試行を観測すること。いずれかがなければ試行を不完全として記録する。規則は除去まで残り、再起動をまたぐ。計画と復旧用ターミナルを利用可能に保ち、テスト規則が残ったまま更新をインストールしないこと。
 
 <a id="dev-note"></a>
 
-## Dev Note
+## 開発者ノート
 
-Local plan validation and the actual PowerShell control flow have inert tests. Real rule creation, effective interruption, and recovery require the operator's authorized installed-app run.
+ローカル計画検証と実際の PowerShell 制御フローには不活性テストがある。実際の規則作成・実効遮断・復旧は運用者の認可済みインストールアプリ実行を要する。

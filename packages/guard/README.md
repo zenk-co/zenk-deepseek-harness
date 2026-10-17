@@ -1,51 +1,51 @@
 ---
-description: "Package map for the loop-hygiene guard family: the advisory repeat-tool reminder and the per-tool-call timeout policy, for users and maintainers choosing or composing the guards."
+description: "ループ衛生ガードファミリーのパッケージマップ: 助言的な繰り返しツールリマインダーとツール呼び出しごとのタイムアウトポリシー。ガードの選択や構成を行うユーザー向け。"
 kind: "package-group"
 ---
 
-# guard/ — loop-hygiene guard family
+# guard/ — ループ衛生ガードファミリー
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `guard/` group keeps the agent loop productive by watching for two common failure patterns. `repeat-tool-reminder` notices when the model repeats the exact same tool call and reminds it to change approach or finish, so a stuck loop stops burning time and tokens. `timeout-policy` puts a time limit on tool calls that declare one, so a hung call returns a clear timed-out error to the model instead of stalling the session. Both ship enabled in the `dsh` base bundle; a composition can tune or remove them.
+`guard/` グループは2つの代表的な失敗パターンを監視してエージェントループの健全性を保つ。`repeat-tool-reminder` はモデルがまったく同じツール呼び出しを繰り返したことに気づいて手法変更や終了を促すため、行き詰まったループが時間とトークンを浪費しなくなる。`timeout-policy` は制限を宣言したツール呼び出しに時間制限を付け、ハングした呼び出しがセッションを停滞させず明確なタイムアウトエラーをモデルに返す。どちらも `dsh` ベースバンドルで有効なまま出荷され、構成は調整や削除ができる。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-Two small plugins cover the two patterns; each README below explains when to keep, tune, or remove it.
+2つの小さなプラグインが2つのパターンを受け持つ。保持、調整、削除の判断は各 README が記述する。
 
-| Package | What it provides |
+| パッケージ | 提供内容 |
 |---|---|
-| [`repeat-tool-reminder/`](repeat-tool-reminder/README.md) | Reminds the model when it repeats the same tool call, so it changes approach or finishes |
-| [`timeout-policy/`](timeout-policy/README.md) | Times out tool calls that declare a limit, so the model gets a clear error instead of waiting forever |
+| [`repeat-tool-reminder/`](repeat-tool-reminder/README.md) | モデルが同じツール呼び出しを繰り返したら注意し、手法変更や終了を促す |
+| [`timeout-policy/`](timeout-policy/README.md) | 制限を宣言したツール呼び出しをタイムアウトさせ、無限待機の代わりに明確なエラーをモデルに返す |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Start with the tools subsystem reference for the tool-call pipeline, then the reminder's configuration and the timeout-library decision behind the policy.
+ツール呼び出しパイプラインはツールサブシステムリファレンスから、リマインダー設定とポリシーの背後にあるタイムアウトライブラリー決定はその次に読み進めること。
 
-- [Tools subsystem reference](../../docs/subsystems/tools.md) — the tool-call pipeline and decisions both guards build on.
-- [Generated configuration catalog](../../docs/config-catalog.md#deepseek-aidsh-repeat-tool-reminder) — every accepted field of the repeat-call reminder.
-- [Timeout deadline library Agent Note](../../.agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.md) — the timing/termination split `timeout-policy` enforces.
+- [Tools サブシステムリファレンス](../../docs/subsystems/tools.md) — 両ガードが構築するツール呼び出しパイプラインと決定。
+- [生成設定カタログ](../../docs/config-catalog.md#deepseek-aidsh-repeat-tool-reminder) — 繰り返し呼び出し注意の受け入れフィールドのすべて。
+- [タイムアウト期限ライブラリー Agent Note](../../.agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.md) — `timeout-policy` が強制するタイミング/終了分離。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

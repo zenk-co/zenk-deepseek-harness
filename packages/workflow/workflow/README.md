@@ -1,39 +1,39 @@
 ---
-description: "The workflow orchestration capability: run a model-written script that fans out subagents, for users and maintainers choosing or building on ctx.workflowEngine."
+description: "ワークフローオーケストレーションのケイパビリティ: サブエージェントをファンアウトするモデル作成のスクリプトを実行する。ctx.workflowEngine を選択または拡張するユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-workflow
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Run a plain-JavaScript orchestration script that fans work out to subagents and returns the script's final JSON value. Scripts can use `agent()`, `parallel()`, `pipeline()`, `phase()`, and `log()`; models normally access them through the `workflow` tool. Each run belongs to its caller, attributes every child to the invoking agent, resolves failures and cancellation without rejecting its result, and awaits script and child cleanup during disposal. The caller must supply an execution engine, allowing the isolation strategy to change without altering visible behavior.
+ワークをサブエージェントにファンアウトし、スクリプトの最終 JSON 値を返すプレーン JavaScript のオーケストレーションスクリプトを実行する。スクリプトは `agent()`、`parallel()`、`pipeline()`、`phase()`、`log()` を使用でき、モデルは通常 `workflow` ツールを通じてこれらにアクセスする。各実行は呼び出し元に属し、すべての子を呼び出し元エージェントに帰属させ、結果を reject せずに失敗とキャンセルを解決し、破棄時にスクリプトと子のクリーンアップを待機する。呼び出し元は実行エンジンを提供する必要があり、これにより可視の動作を変えずに分離戦略を変更できる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Run a workflow when a task decomposes into many independent pieces that one script should coordinate — an audit across many files, a migration, multi-angle research — and the model explicitly asks for workflow-style orchestration. For one or two delegations, prefer a plain subagent call.
+タスクが、1 つのスクリプトが調整すべき多数の独立した部分(多数ファイルの監査、移行、多角的なリサーチなど)に分解され、モデルが明示的にワークフロー形式のオーケストレーションを求める場合にワークフローを実行する。1 つか 2 つの委任には、通常のサブエージェント呼び出しを優先する。
 
-### The model-facing path
+### モデルに面する経路
 
-The model reaches the capability through the `workflow` tool from `dsh-tool-workflow`, which owns the call schema and result envelope; the engine supplies the execution underneath. A tool call submits `meta`, `script`, and optional `args` and returns `{ runId, agentsStarted, result }` when the run completes. The tool blocks the parent turn until the whole workflow settles, so the model sees one final outcome, never intermediate child messages.
+モデルは `dsh-tool-workflow` の `workflow` ツールを通じてこのケイパビリティに到達する。このツールが呼び出しスキーマと結果エンベロープを所有し、その下の実行はエンジンが提供する。ツール呼び出しは `meta`、`script`、オプションの `args` を送信し、実行が完了すると `{ runId, agentsStarted, result }` を返す。ツールはワークフロー全体が確定するまで親ターンをブロックするため、モデルが見るのは 1 つの最終結果のみで、中間の子メッセージは決して見えない。
 
-### Running a workflow script
+### ワークフロースクリプトの実行
 
-An orchestration script is a plain JavaScript body (not TypeScript) that runs with top-level `await` and ends with `return <json-value>`. The `meta` identity block and any `args` arrive as plain JSON data — never evaluated code. During execution the script calls the provided hooks: `agent(prompt, opts)` starts one subagent and resolves with its final text or, with a schema, a validated structured value; `parallel()` and `pipeline()` combine independent work; `phase()` and `log()` narrate progress for observers.
+オーケストレーションスクリプトはプレーン JavaScript の本体(TypeScript ではない)で、トップレベル `await` で実行され、`return <json-value>` で終わる。`meta` の識別ブロックと任意の `args` はプレーンな JSON データとして渡され、コードとして評価されることは決してない。実行中、スクリプトは提供されたフックを呼び出す: `agent(prompt, opts)` は 1 つのサブエージェントを起動し、その最終テキストで解決するか、スキーマを指定した場合は検証済みの構造化値で解決する。`parallel()` と `pipeline()` は独立した作業を組み合わせる。`phase()` と `log()` はオブザーバー向けに進捗を語る。
 
 ```text
 // Script body — runs with top-level await, ends with a JSON return value:
@@ -44,99 +44,99 @@ const reviews = await parallel([
 return { reviewed: reviews.length }
 ```
 
-When the script settles, the run's result resolves with the returned value, the stop reason, and the number of children started. A script that returns nothing yields `null`.
+スクリプトが確定すると、実行の結果は返り値、停止理由、起動された子の数で解決する。何も返さないスクリプトは `null` を生成する。
 
-### Programmatic runs
+### プログラムによる実行
 
-Plugin consumers can start a run directly: `ctx.workflowEngine.start({ script, meta, args?, parent, signal? })`. `parent` attributes every child to the invoking agent; `signal` cancels the run when aborted. `start()` validates the meta block and parses the script before a run exists, so a malformed request fails immediately with a violation list.
+プラグインのコンシューマーは実行を直接開始できる: `ctx.workflowEngine.start({ script, meta, args?, parent, signal? })`。`parent` はすべての子を呼び出し元エージェントに帰属させる。`signal` は abort されたときに実行をキャンセルする。`start()` は実行が存在する前に meta ブロックを検証しスクリプトをパースするため、不正なリクエストは違反リストとともに即座に失敗する。
 
-A returned run exposes `id`, `meta`, `result`, `cancel(reason?)`, and `dispose()`. The result never rejects: a script failure resolves with `stopReason: 'error'`, cancellation with `'cancelled'`. The caller owns the run — call `dispose()` on every path; it cancels remaining work and waits for script and child cleanup under the providers' lifecycle contracts.
+返された実行は `id`、`meta`、`result`、`cancel(reason?)`、`dispose()` を公開する。結果が reject されることは決してない: スクリプトの失敗は `stopReason: 'error'` で、キャンセルは `'cancelled'` で解決する。実行は呼び出し元が所有する。すべての経路で `dispose()` を呼び出すこと。これは残りの作業をキャンセルし、プロバイダーのライフサイクルコントラクトの下でスクリプトと子のクリーンアップを待機する。
 
-### Failures and recovery
+### 失敗と回復
 
-A script that does not parse, a malformed meta block, an unavailable provider route, or an unsupported per-run limit is rejected synchronously before a run exists; the `workflow` tool reports these as errors the model can correct from. During execution, hook misuse — bad arguments, unknown options, unsupported schemas, tripped caps — kills the script loudly rather than dissolving into a per-item `null`. An ordinary child failure is not an infrastructure error: `agent()` resolves `null` and the script decides how to handle it.
+パースできないスクリプト、不正な meta ブロック、利用できないプロバイダールート、サポートされない実行ごとの制限は、実行が存在する前に同期的に拒否される。`workflow` ツールはこれらを、モデルがそこから修正できるエラーとして報告する。実行中、フックの誤用(不正な引数、未知のオプション、サポートされないスキーマ、上限の超過)は、項目ごとの `null` に溶け込むのではなく、スクリプトを大きな音を立てて殺す。通常の子の失敗はインフラストラクチャエラーではない: `agent()` は `null` で解決し、スクリプトがその扱いを決める。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains how the capability is split and where the contracts live; observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、ケイパビリティがどのように分割され、コントラクトがどこにあるかを説明する。観察可能な動作は[このパッケージの使い方](#use-this-package)で完全に扱う。
 
-### Design concept
+### 設計の考え方
 
-The package separates the script, run, result, and event contracts from execution: any engine can implement `ctx.workflowEngine` behind the same vocabulary, and one engine serves a context at a time — loading a second engine fails loudly, so swapping engines means changing which engine plugin the composition loads. The `workflow/*` events are observe-only: payloads carry run identity snapshots, never the live run, so listeners cannot acquire cancellation or disposal authority.
+このパッケージは、スクリプト、実行、結果、イベントのコントラクトを実行から分離する。任意のエンジンが同じ語彙の背後で `ctx.workflowEngine` を実装でき、1 つのコンテキストに同時に 1 つのエンジンが提供する。2 つ目のエンジンのロードは大きな音を立てて失敗するため、エンジンの差し替えは構成がロードするエンジンプラグインを変えることを意味する。`workflow/*` イベントは観察専用である: ペイロードは実行 ID のスナップショットを運び、生きた実行を運ぶことは決してないため、リスナーがキャンセルや破棄の権限を得ることはできない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service definition, `workflow/*` event declarations, `WorkflowError` and its fatal flag |
-| [`src/types.ts`](src/types.ts) | Browser-safe vocabulary: `WorkflowMeta`, `WorkflowResult`, run and agent event info |
-| [`src/runtime-types.ts`](src/runtime-types.ts) | Host-only `WorkflowStartRequest` and `WorkflowRun` handles |
+| [`src/index.ts`](src/index.ts) | サービス定義、`workflow/*` イベント宣言、`WorkflowError` とその fatal フラグ |
+| [`src/types.ts`](src/types.ts) | ブラウザセーフな語彙: `WorkflowMeta`、`WorkflowResult`、実行とエージェントのイベント情報 |
+| [`src/runtime-types.ts`](src/runtime-types.ts) | Host 専用の `WorkflowStartRequest` と `WorkflowRun` ハンドル |
 
-### Lifecycle and ownership
+### ライフサイクルと所有権
 
-A run is holder-owned: engine-plugin unload prevents new starts but does not revoke accepted runs, and the caller must dispose every run it starts. `dispose()` cancels if needed and awaits script and child cleanup. The PTC engine aborts its managed process immediately; child disposal still follows each subagent provider's lifecycle contract.
+実行は保持者が所有する: エンジンプラグインのアンロードは新規開始を防ぐが、受け付け済みの実行を取り消すことはなく、呼び出し元は開始したすべての実行を破棄しなければならない。`dispose()` は必要に応じてキャンセルし、スクリプトと子のクリーンアップを待機する。PTC エンジンは管理対象プロセスを即座に abort する。子の破棄は引き続き各サブエージェントプロバイダーのライフサイクルコントラクトに従う。
 
-`workflow/start` and `workflow/end` pair the run; `workflow/phase` and `workflow/log` carry script narration; `workflow/agent-start` and `workflow/agent-end` pair each child call by `seq`. Every listener is independently contained: a throwing listener is logged without starving peers or changing execution, and each receives its own payload clone.
+`workflow/start` と `workflow/end` は実行をペアにし、`workflow/phase` と `workflow/log` はスクリプトの語りを運び、`workflow/agent-start` と `workflow/agent-end` は `seq` によって各子呼び出しをペアにする。すべてのリスナーは独立に封じ込められる: 例外をスローするリスナーは、他のリスナーを飢えさせたり実行を変えたりすることなくログされ、各リスナーは自身のペイロードクローンを受け取る。
 
-### Failure discipline
+### 失敗の規律
 
-`WorkflowError` carries a machine-routable code and a `fatal` flag; every code is fatal, and `parallel()` and `pipeline()` re-throw fatal errors instead of mapping the item to `null` — a typo'd option must kill the script loudly. Codes cover start failures, contract violations, exceeded caps, provider and result faults, unserializable values, and cancellation; the exact set and meanings live in [`src/index.ts`](src/index.ts).
+`WorkflowError` は機械がルーティングできるコードと `fatal` フラグを運ぶ。すべてのコードが fatal であり、`parallel()` と `pipeline()` は項目を `null` にマッピングする代わりに fatal エラーを再スローする。タイプミスのオプションはスクリプトを大きな音を立てて殺さなければならない。コードは開始の失敗、コントラクト違反、上限の超過、プロバイダーと結果の障害、シリアライズできない値、キャンセルをカバーする。正確な集合と意味は [`src/index.ts`](src/index.ts) にある。
 
-The per-item `null` is reserved for child-run failures and ordinary in-stage script errors, so a child that resolves normally with a non-completed stop reason is not an infrastructure exception: `agent()` returns `null`, letting the script handle an ordinary child failure.
+項目ごとの `null` は、子実行の失敗と通常のステージ内スクリプトエラーのために予約されている。したがって、完了以外の停止理由で正常に解決する子はインフラストラクチャ例外ではなく、`agent()` は `null` を返し、スクリプトが通常の子の失敗を扱えるようにする。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared workflow model to the current engine and the model-facing consumers.
+パッケージレベルのコントラクトでは足りない場合にこれらのページを読む。共有のワークフローモデルから、現在のエンジンとモデルに面するコンシューマーへと進む。
 
-- [Workflow subsystem](../../../docs/subsystems/workflow.md) — the full type vocabulary, start request, and event payloads.
-- [Group map](../README.md) — the workflow capability family and its packages.
-- [workflow tool](../tool-workflow/README.md) — the model-facing consumer that owns the call schema and result envelope.
-- [PTC workflow engine](../workflow-ptc/README.md) — the current execution engine and its isolation boundary.
-- [historical Dynamic workflows Agent Note](../../../.agents/notes/archived/feature/2026-07-05-dynamic-workflows.md) — the seam design and its decisions.
+- [Workflow サブシステム](../../../docs/subsystems/workflow.md) — 完全な型語彙、開始リクエスト、イベントペイロード。
+- [グループマップ](../README.md) — ワークフローケイパビリティファミリーとそのパッケージ。
+- [workflow ツール](../tool-workflow/README.md) — 呼び出しスキーマと結果エンベロープを所有する、モデルに面するコンシューマー。
+- [PTC ワークフローエンジン](../workflow-ptc/README.md) — 現在の実行エンジンとその分離境界。
+- [historical Dynamic workflows Agent Note](../../../.agents/notes/archived/feature/2026-07-05-dynamic-workflows.md) — シームの設計とその決定。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through its consumer `dsh-tool-workflow` and a workflow engine, which render the parent tool result and the child-agent requests.
+間接的に、コンシューマーの `dsh-tool-workflow` とワークフローエンジンを通じて。これらが親ツールの結果と子エージェントのリクエストをレンダリングする。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer and engine own any request-prefix changes.
+直接の無効化はない。リクエストプレフィックスの変更は、名前を挙げたコンシューマーとエンジンが所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the capability does not yet support. They are current constraints, not a task backlog.
+これらの制限は、ケイパビリティがまだサポートしていないものを定義する。現在の制約であり、タスクのバックログではない。
 
-- **Foreground collection only** — the caller owns one live run and awaits it; background start/poll, spill handles, and detached collection are deferred.
-- **No journaling or resume** — scripts, child progress, and intermediate values are not checkpointed, so a process restart cannot continue a run.
-- **No saved or nested workflows** — the capability starts caller-supplied scripts only, and a workflow script receives no `workflow()` hook for recursive orchestration.
-- **No token-budget vocabulary** — engines cap concurrency, items, and children, but neither the request nor the result accounts for model tokens across children.
-- **Runs are holder-owned, not service-tracked** — unloading the engine does not discover independent live handles; every consumer must dispose the run it started.
+- **フォアグラウンド収集のみ** — 呼び出し元は 1 つのライブ実行を所有して待機する。バックグラウンドの開始/ポーリング、スピルハンドル、デタッチ収集は先送りである。
+- **ジャーナリングや再開はなし** — スクリプト、子の進捗、中間値はチェックポイントされないため、プロセスの再起動で実行を継続できない。
+- **保存済みやネストされたワークフローはなし** — ケイパビリティは呼び出し元が提供するスクリプトのみを開始し、ワークフロースクリプトは再帰的オーケストレーション用の `workflow()` フックを受け取らない。
+- **トークン予算の語彙はなし** — エンジンは並行数、項目数、子の数を制限するが、リクエストも結果も子全体のモデルトークンを計算に入れない。
+- **実行は保持者所有であり、サービスが追跡しない** — エンジンのアンロードは独立したライブハンドルを発見しない。すべてのコンシューマーが、開始した実行を破棄しなければならない。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この Dev Note はメンテナー向けの作業コンテキストであり、まだ決定されていない方向性を示す。明示的に権威を持たない。出荷された動作、制限、受け入れられた根拠は、上記のセクション、パッケージコード、リンクされた Agent Note にある。
 
-Deferred directions: a background start/poll API with spill handles and detached collection; saved and nested workflows; and a token-budget vocabulary across children.
+先送りの方向性: スピルハンドルとデタッチ収集を伴うバックグラウンドの開始/ポーリング API、保存済みおよびネストされたワークフロー、子全体のトークン予算の語彙。
 
 </details>

@@ -1,143 +1,143 @@
 ---
-description: "The stdio JSON-RPC serving plugin for deployments that let out-of-process SDK clients open sessions and drive agents in a DeepSeek Harness runtime."
+description: "プロセス外の SDK クライアントが DeepSeek Harness ランタイムでセッションを開きエージェントを駆動できるようにするデプロイメントのための、stdio JSON-RPC サーブプラグイン。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-sdk-jsonrpc-server
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-sdk-jsonrpc-server` serves the SDK wire protocol over stdio so out-of-process clients can drive harness agents: it opens one session per `sessionId`, queues user prompts, and streams every session event and agent status transition back to the client. Mount it as the `jsonrpc` plugin in a Loader composition; the surrounding tree supplies everything else — agents, model adapters, persistence, and tools. Stdout carries only JSON-RPC frames, so a deployment must not compose a stdout logger. It answers `shutdown` by disposing the root runtime and exiting 0; the app bin owns EOF and signal exits.
+`dsh-sdk-jsonrpc-server` は SDK wire プロトコルを stdio 上で提供するため、プロセス外のクライアントが Harness エージェントを駆動できる: `sessionId` ごとに 1 つのセッションを開き、ユーザープロンプトをキューし、すべてのセッションイベントとエージェントステータス遷移をクライアントへストリーミングする。Loader コンポジションで `jsonrpc` プラグインとしてマウントする; 周囲のツリーが他のすべて — エージェント、モデルアダプター、永続化、およびツール — を供給する。stdout は JSON-RPC フレームのみを運ぶため、デプロイメントは stdout ロガーをコンポーズしてはならない。`shutdown` にはルートランタイムを破棄して 0 で終了することで答える; EOF とシグナルによる終了はアプリ bin が所有する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [本パッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 本パッケージを使う
 
-`session/resume` accepts a persisted `{ sessionId }` after initialization and returns `{}` once its Agent is ready. It loads history through `agents.resume()`, repairs an interrupted final turn, and preserves the stored origin and effective directory while applying the initialized model route. It sends no new input. Missing, unreadable, incompatible, or occupied sessions reject without creating a replacement. Prompts for an identity currently being restored wait for that restoration; shutdown drains pending restoration and releases its Agent. Historical events are retained in the log rather than streamed again as new notifications.
+`session/resume` は初期化後に永続化された `{ sessionId }` を受け付け、その Agent が準備完了すると `{}` を返す。`agents.resume()` を通じて履歴をロードし、中断された最終ターンを修復し、保存された origin と有効ディレクトリを保ちながら初期化されたモデルルートを適用する。新しい入力は送信しない。欠落、読み取り不能、互換性のない、または使用中のセッションは代替を作成せずに拒否する。現在復元中の ID へのプロンプトはその復元を待つ; shutdown は保留中の復元をドレインし、その Agent を解放する。過去のイベントは新しい通知として再ストリーミングされるのではなくログに保持される。
 
-`session/working-directory/get` accepts `{ sessionId }`; `session/working-directory/set` accepts `{ sessionId, path }`. Both return `{ cwd }` and create an unknown Session without starting a model turn. Reads recover missing directories through the working-directory service; changes preserve origin metadata and permissions, and reach the model through logged user context.
+`session/working-directory/get` は `{ sessionId }` を受け付ける; `session/working-directory/set` は `{ sessionId, path }` を受け付ける。どちらも `{ cwd }` を返し、未知の Session をモデルターンを開始せずに作成する。読み取りは working-directory サービスを通じて欠落ディレクトリを回復する; 変更は origin メタデータと権限を保ち、ログに記録されたユーザーコンテキストを通じてモデルへ到達する。
 
-Mount this plugin when a runtime must serve SDK clients: add it to a `cordis.yml` that composes the agent service, boot the runtime, and clients connect over stdio. The common path is explicit — the plugin needs the `agents` service; every other capability comes from the surrounding tree.
+ランタイムが SDK クライアントにサービス提供しなければならないときにこのプラグインをマウントする: agent サービスをコンポーズする `cordis.yml` にこれを追加し、ランタイムを起動すると、クライアントは stdio 経由で接続する。一般的な道筋は明示的である — プラグインは `agents` サービスを必要とし; 他のすべてのケイパビリティは周囲のツリーから来る。
 
-### Wiring
+### 配線
 
-The plugin creates one agent per `sessionId` on first use. A registered model adapter wins the route; an unowned `deepseek-official` route mounts the DeepSeek adapter, and any other unowned provider fails initialization. The selected adapter resolves the exact model and optional reasoning effort before initialization succeeds.
+プラグインは初回使用時に `sessionId` ごとに 1 つのエージェントを作成する。登録済みのモデルアダプターがルートを勝ち取る; 所有されていない `deepseek-official` ルートは DeepSeek アダプターをマウントし、その他の所有されていないプロバイダーは初期化を失敗させる。選択されたアダプターは初期化が成功する前に正確なモデルと省略可能な reasoning effort を解決する。
 
-### Configuration
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `maxTokensAsSuccess` | `false` | Report max-token turn/subagent termination as a successful SDK result |
+| `maxTokensAsSuccess` | `false` | 最大トークンでのターン/subagent 終了を成功した SDK 結果として報告する |
 
-The profile composition owns each root agent's tools. `input`, `output`, and `exit` are runtime-only transport hooks for tests; production uses process stdio and `process.exit`. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-sdk-jsonrpc-server) is the exhaustive source for every accepted field.
+プロファイルコンポジションが各ルートエージェントのツールを所有する。`input`、`output`、および `exit` はテスト用のランタイム専用トランスポートフックである; プロダクションはプロセス stdio と `process.exit` を使う。生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-sdk-jsonrpc-server)が、受け入れられるすべてのフィールドの網羅的な情報源である。
 
-### stdout is the protocol
+### stdout がプロトコルである
 
-Stdout carries only JSON-RPC frames, so clients can parse every byte; diagnostics belong on stderr. Keep stdout loggers out of the composed tree.
+stdout は JSON-RPC フレームのみを運ぶため、クライアントはすべてのバイトを解析できる; 診断は stderr に属する。stdout ロガーをコンポーズされたツリーに含めないこと。
 
-### What SDK clients can do
+### SDK クライアントができること
 
-`initialize` is the runtime-readiness boundary: when the server is mounted by a Loader composition, it waits for the current plugin tree to settle before replying, so async sibling capabilities such as initial MCP tool discovery are visible to the first prompt. The handshake returns the wire-stable identity `deepseek-harness-sdk-runtime`. The server validates the provider/model route and optional non-empty `reasoningEffort` through the selected adapter before it stores them; omission stores no effort, so the model retains its own default. An optional positive `maxTokens` becomes the request output cap of each SDK-created agent and its in-process descendants, while omission applies the selected adapter or provider route default. JSON-RPC requests may dispatch concurrently, so `session/prompt` rejects until one `initialize` has completed successfully; clients must await the handshake before sending prompts. An accepted prompt queues one identified user message and immediately returns `{ messageId }`; the server then streams every durable fact as `session.event` and every whole-agent lifecycle transition as `session.status`. It does not assign an assistant message or `turn/end` to a prompt, and independent requests may enqueue more work on the same session. Persistence roots and persona come from the surrounding composition.
+`initialize` はランタイム準備完了の境界である: サーバーが Loader コンポジションによってマウントされている場合、返信する前に現在のプラグインツリーが落ち着くのを待つため、初期 MCP ツール発見のような非同期の兄弟ケイパビリティが最初のプロンプトに可視になる。ハンドシェイクは wire で安定した identity `deepseek-harness-sdk-runtime` を返す。サーバーはプロバイダー/モデルのルートと省略可能な空でない `reasoningEffort` を、保存する前に選択されたアダプターを通じて検証する; 省略は effort を保存しないため、モデルは自身のデフォルトを保つ。省略可能な正の `maxTokens` は各 SDK 作成エージェントとそのプロセス内子孫のリクエスト出力上限になり、省略は選択されたアダプターまたはプロバイダールートのデフォルトを適用する。JSON-RPC リクエストは並行にディスパッチされうるため、`session/prompt` は 1 つの `initialize` が成功完了するまで拒否する; クライアントはプロンプトを送る前にハンドシェイクを await しなければならない。受け入れられたプロンプトは 1 つの識別されたユーザーメッセージをキューし、直ちに `{ messageId }` を返す; サーバーはその後、すべての永続的な事実を `session.event` として、すべての全エージェントライフサイクル遷移を `session.status` としてストリーミングする。プロンプトに assistant メッセージや `turn/end` を割り当てることはなく、独立したリクエストが同じセッションにより多くの作業をキューしてよい。永続化ルートと persona は周囲のコンポジションから来る。
 
-`session/wait` observes an existing SDK-owned session through managed descendant completion and any resulting root turns. It rejects unknown or retired roots, never creates a session, and responds after the root stays idle across the descendant check. Idle children with parked inbox messages remain resident but do not delay this response; later waking input can resume them. Session notifications emitted before completion precede the response on the stdio transport. A live Agent failure remains associated with that exact session until a later committed `turn/end` accounts for the outcome; otherwise the wait rejects, including when the failure preceded the wait request. Errors already represented by a terminal remain in Session events, and later successful activity clears an earlier live failure.
+`session/wait` は既存の SDK 所有セッションを、管理された子孫の完了とそれによって生じるルートターンを通じて観察する。未知または引退したルートを拒否し、セッションを決して作成せず、ルートが子孫チェックを通じてアイドルのままであった後に応答する。駐機された受信箱メッセージを持つアイドルの子は常駐したままであるが、この応答を遅延させない; 後で起こす入力がそれらを再開できる。完了前に emit されたセッション通知は stdio トランスポート上で応答に先行する。生きた Agent の失敗は、後でコミットされた `turn/end` が結果を説明するまで、その正確なセッションに関連付けられたままである; そうでなければ wait は拒否し、失敗が wait リクエストに先行した場合も含む。terminal によって既に表現されたエラーは Session イベントにとどまり、後の成功した活動が以前の生きた失敗をクリアする。
 
-### Shutdown and exit
+### シャットダウンと終了
 
-The plugin answers `shutdown`, flushes the response, disposes the root context so SDK-owned agents, subscriptions, and persistence reach quiescence, then exits 0. EOF and signal exits belong to the app bin, which also disposes the root context. Unloading only this plugin stops serving without exiting the process.
+プラグインは `shutdown` に答え、応答をフラッシュし、ルートコンテキストを破棄して SDK 所有のエージェント、サブスクリプション、および永続化が静止に到達するようにし、その後 0 で終了する。EOF とシグナルによる終了はアプリ bin に属し、それはルートコンテキストも破棄する。このプラグインのみのアンロードは、プロセスを終了せずにサービングを停止する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design behind the serving plugin; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションはサーブプラグインの背後の設計を説明する; 観察可能な挙動は[本パッケージを使う](#use-this-package)で完全に扱う。
 
-### Design concept
+### 設計概念
 
-The plugin is a thin presentation adapter: [`HarnessSdkJsonRpcServer`](src/server.ts) owns the protocol methods and notifications, while the transport and the named wire types come from `dsh-sdk-protocol`, shared with the client SDKs. It subscribes to session, agent, and subagent lifecycle events and forwards them as wire notifications; subagent completions are forwarded only when the service-snapshotted lifecycle `local` flag is true — provider names, child ids, and durable lineage never establish locality.
+プラグインは薄いプレゼンテーションアダプターである: [`HarnessSdkJsonRpcServer`](src/server.ts) がプロトコルメソッドと通知を所有し、トランスポートと名前付き wire 型はクライアント SDK と共有される `dsh-sdk-protocol` から来る。セッション、エージェント、および subagent のライフサイクルイベントを購読し、それらを wire 通知として転送する; subagent の完了は、サービスがスナップショットしたライフサイクルの `local` フラグが true の場合にのみ転送される — プロバイダー名、子 id、および永続的な系譜がローカル性を確立することは決してない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, stdio wiring, request dispatch, shared shutdown/exit task |
-| [`src/server.ts`](src/server.ts) | `HarnessSdkJsonRpcServer`: protocol methods, per-session agent creation, lifecycle subscriptions, teardown |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `Config` スキーマ、stdio 配線、リクエストディスパッチ、共有 shutdown/exit タスク |
+| [`src/server.ts`](src/server.ts) | `HarnessSdkJsonRpcServer`: プロトコルメソッド、セッションごとのエージェント作成、ライフサイクル購読、ティアダウン |
 
-### Request flow
+### リクエストフロー
 
-Each protocol method validates its inputs and resolves the owning state before acting — `initialize` stores the SDK route, `session/prompt` resolves the live agent+session pair and queues the message, and `shutdown` flushes the response, then disposes the root context to quiescence before exiting 0 — and a shared exit task guarantees that racing `shutdown` requests never dispose or exit twice. The dispatch lives in [src/index.ts](src/index.ts) and [src/server.ts](src/server.ts).
+各プロトコルメソッドは行為する前に自身の入力を検証し所有状態を解決する — `initialize` は SDK ルートを保存し、`session/prompt` は生きた agent+session ペアを解決してメッセージをキューし、`shutdown` は応答をフラッシュし、その後 0 で終了する前にルートコンテキストを静止まで破棄する — そして共有の exit タスクが、競合する `shutdown` リクエストが二重に破棄または終了しないことを保証する。ディスパッチは [src/index.ts](src/index.ts) と [src/server.ts](src/server.ts) にある。
 
-### Teardown
+### ティアダウン
 
-`server.shutdown()` closes descendant admission below its exact root Agents and drains their managed descendants child-first before releasing the root handles and adapter. It removes its subscriptions while unrelated parent trees and the surrounding context stay running when just this plugin is unloaded. A descendant drain failure is reported after the remaining root and adapter teardown completes. Protocol `shutdown` instead disposes the root fiber so persistence and the whole runtime reach quiescence before the process exits.
+`server.shutdown()` は自身の正確なルート Agent の下で子孫のアドミッションを閉じ、ルートハンドルとアダプターを解放する前に、管理された子孫を子優先でドレインする。ちょうどこのプラグインがアンロードされるとき、無関係の親ツリーと周囲のコンテキストは実行したまま、自身のサブスクリプションを除去する。子孫ドレインの失敗は、残りのルートとアダプターのティアダウンが完了した後に報告される。プロトコルの `shutdown` は代わりにルートファイバーを破棄し、プロセスが終了する前に永続化とランタイム全体が静止に到達するようにする。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the plugin contract is not enough. They move from the wire protocol to the clients and the runnable application.
+プラグインの契約では不十分なときにこれらのページを読む。wire プロトコルからクライアントと実行可能なアプリケーションへ進む。
 
-- [SDK wire protocol](../protocol/README.md) — the methods and payload shapes this plugin serves.
-- [TypeScript SDK client](../client/README.md) — the client that drives this plugin.
-- [SDK application bundle](../../bundle/sdk-app/README.md) — the `dsh --profile sdk` application that boots this plugin.
-- [Python SDK](../../../python/README.md) — the Python client that drives the same server.
-- [SDK runtime distribution decision](../../../.agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md) — why the packaged runtime serves a closed plugin tree.
+- [SDK wire プロトコル](../protocol/README.md) — このプラグインが提供するメソッドとペイロードの形。
+- [TypeScript SDK クライアント](../client/README.md) — このプラグインを駆動するクライアント。
+- [SDK アプリケーションバンドル](../../bundle/sdk-app/README.md) — このプラグインをブートする `dsh --profile sdk` アプリケーション。
+- [Python SDK](../../../python/README.md) — 同じサーバーを駆動する Python クライアント。
+- [SDK ランタイム配布の決定](../../../.agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md) — パッケージされたランタイムがクローズドなプラグインツリーを提供する理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### SDK user message
+### SDK ユーザーメッセージ
 
-#### What the model sees
+#### モデルが見るもの
 
-For each accepted `session/prompt`, text and durable content references enter one user message verbatim. Inline `SdkEncodedImageBlock` values are validated and committed through the composition's attachment store first, so the session log retains content-addressed image references rather than base64 bytes. This package adds no system-prompt prose or tool schema; those come from the other plugins in the composition.
+受け入れられた各 `session/prompt` について、テキストと永続的なコンテンツ参照が 1 つのユーザーメッセージにそのまま入る。インラインの `SdkEncodedImageBlock` 値は最初にコンポジションの添付ストアを通じて検証されコミットされるため、セッションログは base64 バイトではなくコンテンツアドレス指定の画像参照を保持する。このパッケージはシステムプロンプトの散文やツールスキーマを何も追加しない; それらはコンポジション内の他のプラグインから来る。
 
-#### Token effect
+#### トークンへの影響
 
-Data-dependent user-message tokens enter retained session history and are resent on later turns until another package compacts them. The JSON-RPC frames, session notifications, and server bookkeeping add zero model-context tokens.
+データ依存のユーザーメッセージトークンが保持されたセッション履歴に入り、別のパッケージが compaction するまで後のターンで再送される。JSON-RPC フレーム、セッション通知、およびサーバーのブックキーピングはモデルコンテキストのトークンをゼロ追加する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ; 新たに可視になった内容は再利用可能なリクエストプレフィックスに従い、既存の KV キャッシュエントリーを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the plugin needs special operational care. They are current package constraints, not a comparison with other serving approaches or a task backlog.
+これらの制限は、このプラグインが特別な運用上の注意を必要とする場合を定義する。それらは現在のパッケージ制約であり、他のサーブ手法との比較やタスクのバックログではない。
 
-- **The wire has no per-session close or prompt-cancel method** — SDK-created agents remain live until process shutdown.
-- **There is no per-prompt result** — `MessageId` identifies inbox admission only; clients that own an automation interval must define and observe that interval themselves.
-- **stdout purity is deployment-enforced** — a surrounding config can still load a stdout logger and corrupt the JSON-RPC channel; this plugin does not inspect or veto sibling loggers.
-- **Automatic adapter mounting is DeepSeek-specific** — `initialize` can reuse any pre-registered model adapter, but its only fallback mounts the DeepSeek adapter.
+- **wire にはセッション単位の close やプロンプトキャンセルのメソッドがない** — SDK 作成エージェントはプロセスのシャットダウンまで生きたままである。
+- **プロンプトごとの結果はない** — `MessageId` は受信箱へのアドミッションのみを識別する; オートメーション間隔を所有するクライアントはその間隔を自身で定義し観察しなければならない。
+- **stdout の純粋性はデプロイメントによって強制される** — 周囲の設定が stdout ロガーをロードして JSON-RPC チャネルを破壊しうる; このプラグインは兄弟ロガーを検査も拒否もしない。
+- **自動アダプターマウントは DeepSeek 固有である** — `initialize` は事前登録された任意のモデルアダプターを再利用できるが、その唯一のフォールバックは DeepSeek アダプターをマウントする。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-This Dev Note is working context for maintainers and is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the code. The single-executable runtime distribution pairs this plugin with the packaged `jsonrpc-demo` bin; keep the shutdown/exit contract consistent with the app bin, which owns EOF and signal exits. No other unresolved design questions are recorded.
+この開発メモはメンテナー向けの作業コンテキストであり、明示的に非権威である — 出荷済みの挙動と制限は上記のセクションとコードにある。単一実行ファイルのランタイム配布はこのプラグインをパッケージ済みの `jsonrpc-demo` bin と組み合わせる; shutdown/exit 契約を、EOF とシグナルによる終了を所有するアプリ bin と一致させておくこと。他の未解決の設計上の質問は記録されていない。
 
 </details>

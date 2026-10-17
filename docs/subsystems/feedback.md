@@ -1,12 +1,12 @@
-# Message Feedback
+# メッセージフィードバック
 
-English | [中文](feedback.zh.md)
+日本語 | [English](feedback.en.md) | [中文](feedback.zh.md)
 
-[`@deepseek-ai/dsh-message-feedback`](../../packages/feedback/message-feedback) owns editable feedback for individual assistant messages. The canonical Session log stores `feedback/message-put` and `feedback/message-delete`; the immutable Session-level remark remains `feedback/record`, owned by [`@deepseek-ai/dsh-command-feedback`](../../packages/feedback/command-feedback) together with the `FeedbackCategory` taxonomy both kinds of feedback file under. All three are log-only events that never enter model context.
+[`@deepseek-ai/dsh-message-feedback`](../../packages/feedback/message-feedback) は、個々の assistant メッセージに対する編集可能なフィードバックを所有する。正規のセッションログは `feedback/message-put` と `feedback/message-delete` を保存する。不変のセッションレベル備考は `feedback/record` のままで、2 種類のフィードバックが分類される `FeedbackCategory` 分類表とともに [`@deepseek-ai/dsh-command-feedback`](../../packages/feedback/command-feedback) が所有する。3 つともログのみのイベントであり、モデルコンテキストには決して入らない。
 
-Source: [`packages/feedback/message-feedback/src/types.ts`](../../packages/feedback/message-feedback/src/types.ts)
+ソース: [`packages/feedback/message-feedback/src/types.ts`](../../packages/feedback/message-feedback/src/types.ts)
 
-## Public types
+## 公開型
 
 ```ts type-equiv
 /** Opaque compare-and-set token for one exact feedback item revision. */
@@ -207,9 +207,9 @@ type MessageFeedbackDeleteResult =
   | MessageFeedbackRejected<MessageFeedbackSessionNotFound | MessageFeedbackVersionConflict>
 ```
 
-## Session feedback types
+## セッションフィードバック型
 
-Source: [`packages/feedback/command-feedback/src/types.ts`](../../packages/feedback/command-feedback/src/types.ts)
+ソース: [`packages/feedback/command-feedback/src/types.ts`](../../packages/feedback/command-feedback/src/types.ts)
 
 ```ts type-equiv
 /** One of the fixed feedback categories; the ids are durable log vocabulary. */
@@ -272,47 +272,47 @@ type SessionFeedbackRecordResult =
   | { readonly ok: false; readonly error: SessionFeedbackSessionNotFound }
 ```
 
-## Data and concurrency
+## データと並行性
 
-Current items are folded from canonical feedback events whose payload `sessionId` matches the owning Session. Each item carries a positive or negative rating, an optional note, an optional category, Host-assigned `createdAt`/`updatedAt` timestamps, and its own opaque version. Versions are compared only for equality and only against the addressed message; callers do not order or synthesize them.
+現在のアイテムは、ペイロードの `sessionId` が所有セッションと一致する正規フィードバックイベントから畳み込まれる。各アイテムは positive または negative の評価、オプションのノート、オプションのカテゴリー、Host が割り当てた `createdAt`/`updatedAt` タイムスタンプ、自身の不透明なバージョンを運ぶ。バージョンは等価性のためだけに、かつ対象メッセージに対してのみ比較される。呼び出し元はそれらを順序付けたり合成したりしない。
 
-`put` uses strict optimistic concurrency: every request for an existing item must match its current `ifVersion`, including a no-op (a put repeating the stored rating, note, and category). A conflict returns the authoritative current item (or `null`), so a caller can reconcile a lost response or a concurrent edit without another read. Deleting an already absent item succeeds. A per-Session queue serializes reads and mutations; cold mutations hold a persistence write handle across read, comparison, append, and flush. Matching no-ops append no event.
+`put` は厳密な楽観的並行性を使う。既存アイテムへのすべてのリクエストは、ノーオペレーション (保存済みの評価・ノート・カテゴリーを繰り返す put) を含め、現在の `ifVersion` と一致しなければならない。競合は権威ある現在のアイテム (または `null`) を返すので、呼び出し元は別の読み取りなしに、失われた応答や並行編集を調停できる。既に存在しないアイテムの削除は成功する。セッションごとのキューが読み取りとミューテーションを直列化する。コールドミューテーションは読み取り、比較、追記、フラッシュを通じて永続化書き込みハンドルを保持する。一致するノーオペレーションはイベントを追記しない。
 
-## Target and lifecycle authority
+## ターゲットとライフサイクルの権限
 
-A live owner's in-memory log supplies the target Session observation directly; cold reads use a `SessionPersistence.open(id, 'read')` handle, while mutations use a write handle. Neither path constructs a Session or Agent. A `stat(id)` preflight classifies definite absence; a read failure for a Session `stat` confirmed propagates as infrastructure failure. `put` accepts only a non-empty, append-origin `assistant/message` with the requested `MessageId`; replacement-origin, usage-only empty, and non-assistant records are not feedback targets.
+ライブオーナーのインメモリログが対象セッションの観測を直接供給する。コールド読み取りは `SessionPersistence.open(id, 'read')` ハンドルを使い、ミューテーションは書き込みハンドルを使う。どちらの経路もセッションやエージェントを構築しない。`stat(id)` の事前チェックが確実な不在を分類する。`stat` が確認したセッションの読み取り失敗はインフラストラクチャの失敗として伝播する。`put` は、要求された `MessageId` を持つ、空でない append 起源の `assistant/message` のみを受け入れる。置換起源、usage のみの空、assistant 以外のレコードはフィードバックの対象ではない。
 
-Fork seeds can contain parent feedback events, but their payload retains the parent `sessionId`, so they do not become current feedback for the child. Deleting an item appends a tombstone; earlier ratings and notes remain in the log.
+フォークのシードは親のフィードバックイベントを含みうるが、そのペイロードは親の `sessionId` を保持するため、子の現在のフィードバックにはならない。アイテムの削除はトゥームストーンを追記する。以前の評価とノートはログに残る。
 
-## Persistence and Remote contract
+## 永続化と Remote 契約
 
-Successful message-feedback mutations await canonical persistence: live operations append through the owning Session and require a participating `ctx.sessions.flush` listener; cold operations append and flush through their write handle. Persistence failures propagate rather than reporting success. `maxNoteBytes` is required and bounds note text by UTF-8 bytes; the Web Host composition sets `8192`. The package publishes the Host `messageFeedback.list`, `messageFeedback.put`, and `messageFeedback.delete` unary Remote contract through `TypertRemoteService` and `@Remote`; `command-feedback` publishes `sessionFeedback.record` the same way for Session-level remarks on live Sessions. The generated Cordis API below is the method-level authority.
+成功したメッセージフィードバックのミューテーションは正規の永続化を待つ。ライブ操作は所有セッションを通じて追記し、参加する `ctx.sessions.flush` リスナーを必要とする。コールド操作は自身の書き込みハンドルを通じて追記しフラッシュする。永続化の失敗は成功を報告せずに伝播する。`maxNoteBytes` は必須で、ノートテキストを UTF-8 バイト数で制限する。Web Host コンポジションは `8192` を設定する。このパッケージは Host の `messageFeedback.list`、`messageFeedback.put`、`messageFeedback.delete` の単項 Remote 契約を `TypertRemoteService` と `@Remote` を通じて公開し、`command-feedback` はライブセッションのセッションレベル備考のために `sessionFeedback.record` を同じ方法で公開する。以下の生成された Cordis API がメソッドレベルの権威である。
 
-Plugin disposal closes operation admission and drains accepted per-Session queue work.
+プラグインの破棄は操作の受け入れを閉じ、受け入れ済みのセッションごとのキューの作業を排出する。
 
-By default, [`session-log-deepseek`](../../packages/session/session-log-deepseek/README.md) carries feedback as part of the ordinary `dsh_session_log` suffix on subsequent eligible DeepSeek requests; a composition disables it with `enabled: false`. Recording feedback does not trigger an LLM request or a separate `dsh_feedback` upload. For non-DeepSeek routes, the [OTel backend](../../packages/session/session-telemetry-otel/README.md) can release the canonical prefix through recorded feedback. The command acknowledgement confirms recording and identifies the Session and anonymous user; it reports neither telemetry policy nor delivery.
+デフォルトでは、[`session-log-deepseek`](../../packages/session/session-log-deepseek/README.md) が、その後の適格な DeepSeek リクエストにおいて、通常の `dsh_session_log` サフィックスの一部としてフィードバックを運ぶ。コンポジションは `enabled: false` で無効化できる。フィードバックの記録は LLM リクエストや別個の `dsh_feedback` アップロードを引き起こさない。DeepSeek 以外のルートでは、[OTel バックエンド](../../packages/session/session-telemetry-otel/README.md)が記録されたフィードバックを通じて正規プレフィックスを解放できる。コマンドの確認応答は記録を確認し、セッションと匿名ユーザーを識別する。テレメトリポリシーも配信も報告しない。
 
-## Web surface
+## Web サーフェス
 
-[`@deepseek-ai/dsh-client-ui-message-feedback`](../../packages/client/ui-message-feedback) is the browser consumer. `@deepseek-ai/dsh-api-remotes` mounts the generated `messageFeedback` and `sessionFeedback` contributions, so the plugin calls `ctx.remote.messageFeedback` and `ctx.remote.sessionFeedback` and never touches the transport.
+[`@deepseek-ai/dsh-client-ui-message-feedback`](../../packages/client/ui-message-feedback) がブラウザー側のコンシューマーである。`@deepseek-ai/dsh-api-remotes` が生成された `messageFeedback` と `sessionFeedback` のコントリビューションをマウントするので、プラグインは `ctx.remote.messageFeedback` と `ctx.remote.sessionFeedback` を呼び、トランスポートには決して触れない。
 
-The controls are the `feedback` entry (order 10) of the `conversation.chat.assistant-actions` list slot, which `ui-conversation` declares and renders inside the finalized assistant message's IconActions row. `AssistantMessageNode` carries the optional `messageId` from the `assistant/message` event. The field is absent on interruption-frozen partials, and the render site skips the slot when it is absent. The strip renders once per turn, on the closing assistant message: the Host accepts every append-origin step message as a target, but earlier steps of a multi-step turn render tool rows rather than a rateable body, so the UI exposes a narrower set than the Host contract allows.
+コントロールは `conversation.chat.assistant-actions` リストスロットの `feedback` エントリー (order 10) である。このスロットは `ui-conversation` が宣言し、確定済み assistant メッセージの IconActions 行の内部に描画する。`AssistantMessageNode` は `assistant/message` イベントからのオプションの `messageId` を運ぶ。このフィールドは中断時に凍結されたパーシャルには存在せず、レンダリングサイトはそれが存在しない場合にスロットをスキップする。ストリップはターンごとに 1 回、締めくくりの assistant メッセージに描画される。Host は append 起源のすべてのステップメッセージを対象として受け入れるが、マルチステップターンの以前のステップは評価可能な本文ではなくツール行を描画するため、UI は Host 契約が許すより狭い集合のみを公開する。
 
-One `MessageFeedbackController` per Session backs every message control in that Session: a single `list` read seeds the whole transcript, deferred to first hover or focus rather than fired on mount. Each mutation sends the version that controller last observed as `ifVersion`; a `version-conflict` reply carries the authoritative item, so the controller reconciles from the reply instead of refetching. Mutations serialize per Session so a queued operation compares against the committed version. The injected `retract` operation rechecks the committed rating inside that queue and becomes a no-op after a concurrent change, so stale UI cannot bypass the dialog by recording a bare rating. A `connection/reset` refreshes only Sessions already read.
+セッションごとに 1 つの `MessageFeedbackController` が、そのセッション内のすべてのメッセージコントロールを支える。単一の `list` 読み取りがトランスクリプト全体をシードし、マウント時に発火するのではなく最初のホバーまたはフォーカスまで遅延される。各ミューテーションは、コントローラーが最後に観測したバージョンを `ifVersion` として送る。`version-conflict` の応答は権威あるアイテムを運ぶので、コントローラーは再取得せずに応答から調停する。ミューテーションはセッションごとに直列化されるため、キューに入った操作はコミット済みバージョンと比較する。注入された `retract` 操作はそのキュー内でコミット済みの評価を再チェックし、並行変更の後ではノーオペレーションになるので、古い UI が素の評価を記録してダイアログを迂回することはできない。`connection/reset` は既に読み取り済みのセッションのみを更新する。
 
-Either unrecorded rating opens the Session's feedback dialog, the `feedback-dialog` entry of `conversation.input.overlay`: the shared Modal card with seven category chips and a detail box. Submit puts the selected judgment carrying the chosen category and the trimmed description, or neither; success closes the dialog and shows the acknowledgement toast, while failure keeps the dialog and draft open and shows a warning toast. The same dialog opens for the Session from a bare `/feedback` — a decoration `ui-commands` routes as an `action` — and then records through `sessionFeedback.record`; `/feedback <text>` keeps the Host command path. Clicking a recorded rating retracts it without opening the dialog.
+未記録のいずれかの評価を選ぶと、そのセッションのフィードバックダイアログ — `conversation.input.overlay` の `feedback-dialog` エントリー — が開く。7 つのカテゴリーチップと詳細ボックスを備えた共有 Modal カードである。送信は、選択されたカテゴリーとトリムされた説明を伴う選択済みの判断を put するか、どちらも伴わない。成功はダイアログを閉じて確認トーストを表示し、失敗はダイアログと下書きを開いたままにして警告トーストを表示する。同じダイアログは、素の `/feedback` — `ui-commands` が `action` としてルーティングするデコレーション — からそのセッションに対して開き、その後 `sessionFeedback.record` を通じて記録する。`/feedback <text>` は Host コマンド経路を保つ。記録済みの評価をクリックすると、ダイアログを開かずに撤回する。
 
-## Boundaries and limitations
+## 境界と制限
 
-- The operation queue is process-local; cold writer exclusion relies on the selected persistence provider.
-- Deletion removes the current item, not earlier note text from the append-only log or an already delivered suffix.
-- A request in the narrow interval after live detach but before the persistence catalog materializes the header can receive `session-not-found`; callers retry after retirement materialization.
-- Cold requests read the complete log; the service has no item-count or aggregate-byte cap. `maxNoteBytes` bounds only each note.
-- The Host contract records no authenticated actor or audit identity and therefore assumes a trusted caller boundary.
-- The Web controls appear in the chat view only. The trajectory and waterfall views render no feedback entry even though their assistant nodes carry the same `messageId`.
-- The Web controller does not consume feedback log events, so a second tab's rating becomes visible on reconnect or on the next conflict reply rather than immediately.
-- The dialog does not pre-check `maxNoteBytes`; an oversized description for a message fails on submit with `note-too-large` rather than while typing. A Session remark has no size bound, as the `/feedback` command never had one.
-- `sessionFeedback.record` serves live Sessions only and answers `session-not-found` otherwise; the dialog reports that failure when its Session retires while it is open.
+- 操作キューはプロセスローカルである。コールドライターの排除は選択された永続化プロバイダーに依存する。
+- 削除は現在のアイテムを削除するのであり、追記専用ログの以前のノートテキストや、既に配信されたサフィックスを削除するのではない。
+- ライブデタッチ後、永続化カタログがヘッダーをマテリアライズする前の狭い間隔でのリクエストは `session-not-found` を受け取ることがある。呼び出し元はリタイアのマテリアライズ後に再試行する。
+- コールドリクエストは完全なログを読む。サービスにはアイテム数や集約バイトの上限はない。`maxNoteBytes` は各ノートのみを制限する。
+- Host 契約は認証済みアクターや監査 ID を記録しないため、信頼された呼び出し元境界を前提とする。
+- Web コントロールはチャットビューにのみ表示される。trajectory ビューと waterfall ビューは、その assistant ノードが同じ `messageId` を運んでいても、フィードバックエントリーを描画しない。
+- Web コントローラーはフィードバックログイベントを消費しないため、2 つ目のタブの評価は即座ではなく、再接続時または次の競合応答時に可視になる。
+- ダイアログは `maxNoteBytes` を事前チェックしない。メッセージに対するサイズ超過の説明は、入力中ではなく送信時に `note-too-large` で失敗する。セッションレベル備考にはサイズ上限がなく、`/feedback` コマンドにもかつてなかった。
+- `sessionFeedback.record` はライブセッションのみを対象とし、それ以外には `session-not-found` を返す。ダイアログは、開いている間にセッションがリタイアするとその失敗を報告する。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

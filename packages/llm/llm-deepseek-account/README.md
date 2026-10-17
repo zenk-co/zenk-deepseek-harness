@@ -1,41 +1,41 @@
 ---
-description: "DeepSeek account authentication, model listing, and model gating."
+description: "DeepSeek アカウント認証、モデル一覧、モデルゲーティング。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-llm-deepseek-account
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Register authentication, the account model listing, and model gating for `deepseek-account`. This plugin shares the [Messages transport](../llm-deepseek/README.md) and owns credential resolution, the account catalog, and model admission.
+`deepseek-account` の認証、アカウントモデル一覧、モデルゲーティングを登録する。このプラグインは [Messages トランスポート](../llm-deepseek/README.md)を共有し、資格情報解決、アカウントカタログ、モデル受付を所有する。
 
-Authentication resolution returns `x-dsh-auth-token` and a failure callback capturing the same token. HTTP 401 classification and rejection stay in this provider; a rejected older request cannot clear a replacement login.
+認証解決は `x-dsh-auth-token` と、同じトークンをキャプチャする失敗コールバックを返す。HTTP 401 の分類と拒否はこのプロバイダーに留まる。拒否された古いリクエストが置き換えられたログインをクリアすることはできない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Only `deepseekAccount.resolveToken(url)` supplies the token; the account service validates the destination. Signed-out or ineligible requests fail with `ACCOUNT_SIGN_IN_REQUIRED` and discovery returns an empty catalog. The route never falls back to an API key. Other credential lookup errors propagate.
+トークンを供給するのは `deepseekAccount.resolveToken(url)` のみであり、アカウントサービスが宛先を検証する。サインアウト済みまたは不適格なリクエストは `ACCOUNT_SIGN_IN_REQUIRED` で失敗し、ディスカバリーは空のカタログを返す。このルートは API キーにフォールバックすることは決してない。他の資格情報検索エラーは伝播する。
 
-The route's catalog comes from the account's `GET /models` listing at the origin of the Messages `baseURL` (`https://api.deepseek.com/models` for the official endpoint); the listing endpoint is not configurable. Listing requests carry the account token in `x-dsh-auth-token` and the harness `User-Agent`, and reject redirects.
+ルートのカタログは、Messages の `baseURL` のオリジンでのアカウントの `GET /models` 一覧から来る（公式エンドポイントでは `https://api.deepseek.com/models`）。一覧エンドポイントは構成できない。一覧リクエストは `x-dsh-auth-token` にアカウントトークンを、harness の `User-Agent` を運び、リダイレクトを拒否する。
 
-The first access of a credential waits for the listing up to `modelsTimeoutMs`. Later accesses use the loaded listing and refresh it in the background once it is older than `modelsMaxAgeMs`. A failed or empty listing keeps the previous one; before any listing loads, the route serves the built-in catalog of the current version (`deepseek-flash` and `deepseek-v4-pro`). A listing HTTP 401 does not remove the stored login. Each loaded listing, the first failure of a failing streak with the catalog it falls back to, and each hidden listing entry are written to the console with the `[llm-deepseek-account]` tag; secrets are never logged. Each account token has its own listing, so the service can roll a model out to some accounts first.
+資格情報の最初のアクセスは最大 `modelsTimeoutMs` まで一覧を待つ。以降のアクセスはロード済みの一覧を使い、`modelsMaxAgeMs` より古くなるとバックグラウンドでリフレッシュする。失敗または空の一覧は前のものを保つ。どの一覧もロードされる前は、ルートは現在のバージョンの組み込みカタログ（`deepseek-flash` と `deepseek-v4-pro`）を提供する。一覧の HTTP 401 は保存されたログインを削除しない。ロードされた各一覧、失敗の連続の最初の失敗（フォールバック先のカタログ付き）、および各非表示の一覧エントリは、`[llm-deepseek-account]` タグ付きでコンソールに書き込まれる。シークレットがログに記録されることは決してない。各アカウントトークンは独自の一覧を持つため、サービスは一部のアカウントに先にモデルをロールアウトできる。
 
-A listed model is offered only when the current DeepSeek Harness version can serve it. A model that declares `client_requirements["deepseek-harness"].min_version` is offered when the current version is at least that version in semantic-version order, including prerelease tags such as `0.2.0-alpha.1` and `0.2.0-rc.1`. A prerelease orders below its release: `min_version: 0.2.1` refuses `0.2.1-alpha.2`, so a listing that admits prereleases declares the earliest one it admits, such as `0.2.1-alpha.0`. A model without that declaration is offered only when the built-in catalog knows its id; other listed models stay hidden. A request for a listed model the current version cannot serve fails before network I/O with `CLIENT_UPGRADE_REQUIRED`, which names the required and current versions, or with `MODEL_UNSUPPORTED`. Model ids the listing does not name pass through unchanged.
+一覧されたモデルは、現在の DeepSeek Harness バージョンがそれを提供できる場合にのみ提示される。`client_requirements["deepseek-harness"].min_version` を宣言するモデルは、現在のバージョンがセマンティックバージョン順でそのバージョン以上（`0.2.0-alpha.1` や `0.2.0-rc.1` のようなプレリリースタグを含む）である場合に提示される。プレリリースはそのリリースより下位に並ぶ: `min_version: 0.2.1` は `0.2.1-alpha.2` を拒否するため、プレリリースを受け入れる一覧は、受け入れる中で最も早いもの（例: `0.2.1-alpha.0`）を宣言する。その宣言のないモデルは、組み込みカタログがその id を知っている場合にのみ提示される。他の一覧されたモデルは非表示のままである。現在のバージョンが提供できない一覧モデルのリクエストは、ネットワーク I/O の前に `CLIENT_UPGRADE_REQUIRED`（必要なバージョンと現在のバージョンを名指しする）または `MODEL_UNSUPPORTED` で失敗する。一覧が名指ししないモデル id はそのまま通過する。
 
-Offered models take the listing's name, `context_window`, input modalities, and Messages system prompt mode over the bundled entry for the same id, which keeps its tool-update mode, image budgets, and description. `max_output_tokens` bounds the request default: a request that names no cap sends the smaller of `maxTokens` and that capability. The listing's effort levels are not read; every model offers `off`, `low`, `high`, and `max`.
+提示されるモデルは、同じ id のバンドルエントリの代わりに、一覧の名前、`context_window`、入力モダリティ、Messages システムプロンプトモードを取る。バンドルエントリはそのツール更新モード、画像予算、説明を保つ。`max_output_tokens` はリクエストのデフォルトを制限する: 上限を名指ししないリクエストは `maxTokens` とそのケイパビリティの小さい方を送る。一覧のエフォートレベルは読まれない。すべてのモデルは `off`、`low`、`high`、`max` を提供する。
 
-`modelOverrides` adjusts single models without replacing the catalog. Keys are model ids; values take the fields of a [Messages `models` entry](../llm-deepseek/README.md#minimal-configuration), and unset fields inherit. Overrides apply over the listing and the bundled catalog; they cannot add models or make a refused model available. Listed capabilities do not bound an override: an override `maxTokens` above the listed `max_output_tokens` is sent as written, and the service rejects requests beyond its limits. An override that names a model neither the listing nor the built-in catalog describes, or that the listed model rejects, becomes the provider diagnostic on the Models page, which has no editor for this route. An override for a refused model that the built-in catalog does not describe is checked only once the current version can serve that model. The route has no `models` field; a configuration that still sets it fails at load and names `modelOverrides`. Edit `$DSH_HOME/profiles/<profile>/cordis.patch.yml`; the next request uses the change.
+`modelOverrides` はカタログを置き換えずに単一モデルを調整する。キーはモデル id で、値は [Messages `models` エントリ](../llm-deepseek/README.md#minimal-configuration)のフィールドを取り、未設定のフィールドは継承する。オーバーライドは一覧とバンドルカタログの上に適用される。モデルを追加したり、拒否されたモデルを利用可能にしたりはできない。一覧のケイパビリティはオーバーライドを制限しない: 一覧の `max_output_tokens` を超えるオーバーライド `maxTokens` は書かれたまま送信され、サービスはその制限を超えるリクエストを拒否する。一覧も組み込みカタログも記述しないモデルを名指しするオーバーライド、または一覧されたモデルが拒否するオーバーライドは、Models ページのプロバイダー診断になる。このルートにはそのエディターがない。組み込みカタログが記述しない拒否されたモデルのオーバーライドは、現在のバージョンがそのモデルを提供できる場合にのみチェックされる。このルートには `models` フィールドがない。それをまだ設定している構成はロード時に失敗し、`modelOverrides` を名指しする。`$DSH_HOME/profiles/<profile>/cordis.patch.yml` を編集する。次のリクエストがその変更を使う。
 
 ```yaml
 - id: llm-deepseek-account
@@ -48,57 +48,57 @@ Offered models take the listing's name, `context_window`, input modalities, and 
         maxTokens: 131072
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `modelsTimeoutMs` | `5,000` | Deadline of one listing request and of a first-access wait |
-| `modelsMaxAgeMs` | `600,000` | Listing age after which the next access refreshes it; a failed load retries after the same age |
-| `modelOverrides` | `{}` | Field overrides by model id |
+| `modelsTimeoutMs` | `5,000` | 1 つの一覧リクエストと最初のアクセス待ちのデッドライン |
+| `modelsMaxAgeMs` | `600,000` | この経過後に次のアクセスが一覧をリフレッシュする経過時間。失敗したロードは同じ経過時間後に再試行する |
+| `modelOverrides` | `{}` | モデル id ごとのフィールドオーバーライド |
 
-An account request HTTP 401 maps to `ACCOUNT_TOKEN_INVALID` independently of the response body. The account service removes the credential only if it still matches the request token. HTTP 403 and other failures do not clear the login. The account module owns task cancellation after sign-out; this plugin does not inspect Agents.
+アカウントリクエストの HTTP 401 は、レスポンスボディとは独立に `ACCOUNT_TOKEN_INVALID` にマップされる。アカウントサービスは、資格情報がまだリクエストトークンと一致する場合にのみそれを削除する。HTTP 403 およびその他の失敗はログインをクリアしない。サインアウト後のタスクキャンセルはアカウントモジュールが所有する。このプラグインはエージェントを検査しない。
 
-The settings namespace is the Cordis entry id, or the plugin name without an entry. Product profiles retain the official entry id `llm-deepseek` and use `llm-deepseek-account` for the account route.
+設定名前空間は Cordis エントリ id、またはエントリのないプラグイン名である。製品プロファイルは公式エントリ id `llm-deepseek` を保持し、アカウントルートには `llm-deepseek-account` を使う。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-Registrations and listeners dispose with the plugin, and disposal aborts an in-flight listing request. Shared Host wiring supplies attachments, request extensions, anonymous identity, and atomic retry-policy updates; this plugin registers only its own route and uses the transport's `connect` and `admit` hooks for the catalog and the gate. The listing cache lives in memory and is keyed by endpoint and a SHA-256 of the token.
+登録とリスナーはプラグインとともに破棄され、破棄は進行中の一覧リクエストをアボートする。共有 Host 配線が添付、リクエスト拡張、匿名 ID、およびアトミックなリトライポリシー更新を供給する。このプラグインは自身のルートのみを登録し、カタログとゲートにはトランスポートの `connect` と `admit` フックを使う。一覧キャッシュはメモリ内にあり、エンドポイントとトークンの SHA-256 でキー付けされる。
 
-A failed request the shared transport classifies as `QUOTA` is rewritten to `ACCOUNT_QUOTA` before it leaves this provider, covering an HTTP 402 response and an in-band SSE error alike. The shared transport and the `deepseek-official` route keep `QUOTA`, so the account route's top-up action never appears for an API-key or third-party failure.
+共有トランスポートが `QUOTA` と分類する失敗したリクエストは、このプロバイダーを離れる前に `ACCOUNT_QUOTA` に書き換えられる。HTTP 402 レスポンスと帯域内 SSE エラーの両方をカバーする。共有トランスポートと `deepseek-official` ルートは `QUOTA` を保つため、アカウントルートのトップアップアクションが API キーやサードパーティの失敗に対して現れることは決してない。
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-[LLM streaming](../../../docs/subsystems/llm-streaming.md) · [Messages](../llm-deepseek/README.md) · [Account catalog decision](../../../.agents/notes/implemented/architecture/2026-09-24-deepseek-account-remote-model-catalog.md)
+[LLM ストリーミング](../../../docs/subsystems/llm-streaming.md) · [Messages](../llm-deepseek/README.md) · [アカウントカタログの決定](../../../.agents/notes/implemented/architecture/2026-09-24-deepseek-account-remote-model-catalog.md)
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Authenticated model requests
+### 認証済みモデルリクエスト
 
-#### What the model sees
+#### モデルが見るもの
 
-Requests on `deepseek-account` add no model-visible text from this plugin; the shared Messages transport serializes requests.
+`deepseek-account` のリクエストはこのプラグインからモデル可視のテキストを追加しない。共有 Messages トランスポートがリクエストをシリアライズする。
 
-#### Token effect
+#### トークンへの影響
 
-Authentication and the listing add no input tokens. The resolved catalog sets each model's context window and default output cap, which each request's logged context and header record.
+認証と一覧は入力トークンを追加しない。解決されたカタログは各モデルのコンテキストウィンドウとデフォルト出力上限を設定し、各リクエストの記録済みコンテキストとヘッダーがそれを記録する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Credentials and catalog availability do not enter model input; the protocol transport owns request-prefix serialization. A catalog change to a model's system prompt mode changes how later system prompt updates are serialized.
+資格情報とカタログの可用性はモデル入力に入らない。プロトコルトランスポートがリクエストプレフィックスのシリアライズを所有する。モデルのシステムプロンプトモードへのカタログ変更は、以降のシステムプロンプト更新がどうシリアライズされるかを変える。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- The listing cache lives in memory; a start without network serves bundled capabilities until a listing loads.
-- A listing change during a running process reaches the Web model picker at its next catalog refresh; the plugin does not announce it.
-- The gate runs in this client; a modified client can still request any id unless the service rejects it.
-- The listing's effort levels are ignored.
-- When the current version can serve no listed model, the account offers no models, and model selectors show their generic empty state rather than an upgrade prompt.
-- An override can set but not remove `systemPromptUpdate` and `toolUpdate` declarations.
+- 一覧キャッシュはメモリ内にある。ネットワークなしの起動は、一覧がロードされるまでバンドルされたケイパビリティを提供する。
+- 実行中のプロセス中の一覧変更は、次のカタログリフレッシュで Web モデルピッカーに届く。プラグインはそれを告知しない。
+- ゲートはこのクライアントで実行される。改変されたクライアントは、サービスが拒否しない限り任意の id を要求できる。
+- 一覧のエフォートレベルは無視される。
+- 現在のバージョンが一覧されたどのモデルも提供できない場合、アカウントはモデルを提供せず、モデルセレクターはアップグレードプロンプトではなく汎用の空状態を表示する。
+- オーバーライドは `systemPromptUpdate` と `toolUpdate` の宣言を設定できるが、削除はできない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
-Registration and authentication tests also cover the Loader composition in the shared transport package.
+登録と認証のテストは、共有トランスポートパッケージの Loader 構成もカバーする。

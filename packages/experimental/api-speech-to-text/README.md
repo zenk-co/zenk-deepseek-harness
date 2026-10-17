@@ -5,76 +5,76 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-api-speech-to-text
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `speech` Remote connects browser recordings to `ctx.speechToText`. It exposes provider discovery and one complete-recording transcription call.
+`speech` Remote はブラウザー録音を `ctx.speechToText` につなぐ。プロバイダー検出と、完全な録音 1 件の文字起こし呼び出しを公開する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Compose with the speech Service Definition and Typert. `maxAudioBytes` and `maxDurationSeconds` limit accepted recordings. The browser UI mounts this package’s generated `/remote` contribution when enabled.
+音声 Service Definition と Typert と共に構成する。`maxAudioBytes` と `maxDurationSeconds` が受け付ける録音を制限する。有効時、ブラウザー UI はこのパッケージの生成 `/remote` 提供物をマウントする。
 
-`prepare(providerId, { downloadSource })` forwards one advertised source to the provider; omission keeps its configured policy. The catalog carries `downloadSources` for the picker. The provider rejects unavailable choices and changes to an active task’s source.
+`prepare(providerId, { downloadSource })` は告知済みソース 1 件をプロバイダーに転送する。省略時は設定済みポリシーを保持する。カタログはピッカー用に `downloadSources` を運ぶ。プロバイダーは利用不可の選択と、アクティブタスクのソースへの変更を拒否する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Maintainer details — click to expand</summary>
+<summary>メンテナー向け詳細 — クリックで展開</summary>
 
-`catalog()` exposes provider identities, the default selection and recording limits. `transcribe()` validates canonical base64 and 16 kHz mono PCM16 WAV before resolving the selected provider. The existing gateway owns authentication and cancellation transport. Audio is transient, never a Session event or attachment; only the user’s later ordinary submission records recognized text.
+`catalog()` はプロバイダー ID、デフォルト選択、録音上限を公開する。`transcribe()` は選択されたプロバイダーを解決する前に正規 base64 と 16 kHz モノラル PCM16 WAV を検証する。既存ゲートウェイが認証と取り消しトランスポートを所有する。音声は一時的であり、セッションイベントにも添付にもならない。認識テキストを記録するのはユーザーの後の通常送信のみである。
 
-`follow()` streams complete catalogs, including preparation states and current preferences. `prepare()` starts or joins a Host task; `cancelPreparation()` explicitly cancels it. `configure()` persists the supplied preference fields. A disconnected observer does not cancel preparation.
+`follow()` は準備状態と現在の設定を含む完全なカタログをストリームする。`prepare()` は Host タスクを開始または参加する。`cancelPreparation()` はそれを明示的に取り消す。`configure()` は提供された設定フィールドを永続化する。切断された観測者は準備を取り消さない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-[Voice input subsystem](../../../docs/subsystems/voice-input.md)
+[音声入力サブシステム](../../../docs/subsystems/voice-input.md)
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as recordings and preparation remain outside model requests; ordinary user submission owns any later text.
+なし。録音と準備はモデルリクエストの外に留まり、後の通常ユーザー送信がテキストを所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct effect; ordinary submission owns the message content.
+直接の影響はない。通常の送信がメッセージ内容を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- No file upload, persistent transcript history or streaming protocol is exposed. Base64 adds transport overhead; recordings remain bounded by the advertised limits.
+- ファイルアップロード、永続トランスクリプト履歴、ストリーミングプロトコルは公開されない。Base64 は転送オーバーヘッドを追加し、録音は告知上限に縛られる。
 
 -----
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Maintainer details — click to expand</summary>
+<summary>メンテナー向け詳細 — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

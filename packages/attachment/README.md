@@ -1,51 +1,51 @@
 ---
-description: "Package map for the durable image attachment capability family: what you can do with image attachments, and where your images are stored."
+description: "耐久イメージ添付ケイパビリティ群のパッケージマップ: イメージ添付でできることと、イメージの保存場所。"
 kind: "package-group"
 ---
 
-# attachment/ — durable attachment capability family
+# attachment/ — 耐久添付ケイパビリティ群
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `attachment/` group provides durable image attachments: attach images to prompts and commands, and the harness saves them on your machine, shows them again in conversation history, and sends them to the model in later turns. The shipped `dsh` composition enables this with no setup. The capability and its storage are split across two packages, described below. Stored images survive restarts and are never deleted automatically, and only raster image formats are supported.
+`attachment/` グループは耐久イメージ添付を提供する。プロンプトやコマンドにイメージを添付すると、ハーネスはそれらをマシンに保存し、会話履歴に再び表示し、後のターンでモデルに送信する。出荷 `dsh` 構成は設定なしでこれを有効化する。ケイパビリティとそのストレージは下記の 2 パッケージに分かれる。保存済みイメージは再起動を超えて残り、自動削除されることはなく、ラスターイメージフォーマットのみ対応する。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-These two packages provide durable image attachments; each README describes what you can do with its part.
+この 2 パッケージが耐久イメージ添付を提供する。各 README がその担当でできることを説明する。
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`attachment/`](attachment/README.md) | Image attachments for prompts and commands that persist and come back in history | `ctx.attachments` |
-| [`attachment-local/`](attachment-local/README.md) | Stores your attached images on this machine below `DSH_HOME` | registers on `ctx.attachments` |
+| [`attachment/`](attachment/README.md) | 永続化して履歴に戻ってくるプロンプト・コマンド向けのイメージ添付 | `ctx.attachments` |
+| [`attachment-local/`](attachment-local/README.md) | 添付イメージを `DSH_HOME` 配下のこのマシンに保存する | `ctx.attachments` に登録 |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Start with the subsystem reference for the service contract, then the capability-seam table and the configuration surface of the local backend.
+サービス契約はサブシステム参照から始め、次にケイパビリティシーム表とローカルバックエンドの設定面を読むこと。
 
-- [Attachment subsystem reference](../../docs/subsystems/attachment.md) — service contract, payload types, and the `ctx.attachments` Cordis surface.
-- [Capability seams](../../docs/capability-seams.md) — the Service Definition / Service Provider / Consumer split this family follows.
-- [Generated configuration catalog](../../docs/config-catalog.md#deepseek-aidsh-attachment-local) — every accepted field of the local backend.
+- [添付サブシステム参照](../../docs/subsystems/attachment.md) — サービス契約、ペイロード型、`ctx.attachments` Cordis 面。
+- [ケイパビリティシーム](../../docs/capability-seams.md) — この群が従う Service Definition / Service Provider / Consumer 分割。
+- [生成設定カタログ](../../docs/config-catalog.md#deepseek-aidsh-attachment-local) — ローカルバックエンドの受け付け可能な全フィールド。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

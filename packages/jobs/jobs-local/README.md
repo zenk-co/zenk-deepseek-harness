@@ -1,156 +1,156 @@
 ---
-description: "The process-local background-job registry for users and maintainers composing, sizing, or debugging in-process jobs: per-owner admission, lifecycle, and teardown."
+description: "プロセスローカルのバックグラウンドジョブレジストリ。インプロセスのジョブを構成、サイジング、デバッグするユーザーとメンテナー向け: オーナーごとの受け入れ、ライフサイクル、ティアダウン。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-jobs-local
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-jobs-local` runs background jobs inside the harness process while the agent continues. The owning agent can read, wait on, list, and cancel its jobs; mounting `dsh-tool-jobs` also delivers completion notices in-session. Configurable concurrency and output-retention limits bound resource use. Producers can supply output for periodic reading or append it directly; users can observe retained output without consuming the agent's unread output. Jobs end when their owner or the harness shuts down.
+`dsh-jobs-local` は、エージェントが作業を続ける間、harness プロセス内でバックグラウンドジョブを実行する。所有エージェントは自分のジョブを読む、待つ、一覧する、キャンセルできる。`dsh-tool-jobs` をマウントすると、完了通知もセッション内で配信される。設定可能な並行数と出力保持の上限がリソース使用を制限する。プロデューサーは定期的な読み取り用に出力を供給することも、直接追記することもでき、ユーザーはエージェントの未読出力を消費せずに保持された出力を観察できる。ジョブはオーナーまたは harness がシャットダウンすると終了する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Load this plugin when a composition needs in-process background jobs: long-running tools register their work, and the owning agent reads, waits on, lists, and cancels it without blocking its own turn. It implements the [`dsh-jobs`](../jobs/README.md) contract; the model-facing `job_output`, `job_list`, and `job_kill` tools come from [`dsh-tool-jobs`](../tool-jobs/README.md).
+構成にインプロセスのバックグラウンドジョブが必要なときにこのプラグインをロードする。長時間実行のツールが作業を登録し、所有エージェントは自分のターンをブロックせずに、それを読む、待つ、一覧する、キャンセルできる。これは [`dsh-jobs`](../jobs/README.md) コントラクトを実装する。モデル向けの `job_output`、`job_list`、`job_kill` ツールは [`dsh-tool-jobs`](../tool-jobs/README.md) から提供される。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it when jobs should live in the harness process and die with it. Avoid it when work must survive a restart or span processes: records are in-memory, so a durable or cross-process backend must implement the same contract differently.
+ジョブを harness プロセス内で生存させ、プロセスとともに消えるべき場合にこれを選ぶ。作業が再起動をまたいで生き残る必要がある場合やプロセスをまたぐ場合は避ける。レコードはインメモリなので、durable またはクロスプロセスのバックエンドは同じコントラクトを別の方法で実装する必要がある。
 
-### Minimal configuration
+### 最小構成
 
-Loading the plugin registers `ctx.jobs`; every field is optional.
+プラグインをロードすると `ctx.jobs` が登録される。すべてのフィールドは省略可能である。
 
 ```yaml
 - name: '@deepseek-ai/dsh-jobs-local'
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `maxConcurrentJobsPerOwner` | `10` | Maximum `running` plus `stopping` jobs per exact owner, or in the shared unowned bucket |
-| `retainBytes` | `262144` | Live ring retention per job, in UTF-8 bytes |
-| `settledRetainBytes` | `16384` | Ring retention kept after a job settles, in UTF-8 bytes; bytes the model has not read stay until its first terminal read |
-| `pumpPollMs` | `150` | Poll interval for a job's pull sources, in milliseconds |
+| `maxConcurrentJobsPerOwner` | `10` | 正確なオーナーごと、または共有の非所有バケット内の `running` と `stopping` ジョブの最大数 |
+| `retainBytes` | `262144` | ジョブごとのライブリング保持量（UTF-8 バイト） |
+| `settledRetainBytes` | `16384` | ジョブの確定後に保持されるリング保持量（UTF-8 バイト）。モデルが読んでいないバイトは最初の終端読み取りまで残る |
+| `pumpPollMs` | `150` | ジョブのプルソースのポーリング間隔（ミリ秒） |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-jobs-local) is the exhaustive source for the accepted fields.
+生成された [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-jobs-local) が、受け入れられるフィールドの網羅的なソースである。
 
-### What each owner gets
+### 各オーナーが得るもの
 
-The limit counts the exact owner's `running` and `stopping` records; all unowned jobs share one separate service-level bucket. Terminal history does not occupy capacity, and only a producer's `done` settlement releases a stopping job's place. At capacity, `start()` fails before the producer runs, with an error that names the limit and tells the agent to kill an unneeded job, wait for it to finish, and retry — the registry neither queues nor preempts.
+制限は正確なオーナーの `running` および `stopping` レコードを数える。すべての非所有ジョブは 1 つの別個のサービスレベルのバケットを共有する。終端履歴は容量を占有せず、プロデューサーの `done` 確定だけが stopping ジョブの枠を解放する。容量に達すると、`start()` はプロデューサーの実行前に失敗し、そのエラーは制限を名指しして、不要なジョブを kill し、終了を待って再試行するようエージェントに伝える。レジストリはキューイングもプリエンプトもしない。
 
-### Lifecycle
+### ライフサイクル
 
-Jobs belong to their owner and backend, not to the producer tool, so producer or controller reloads do not stop them. When an agent that owns jobs is disposed, its jobs are cancelled, their producers awaited, and their snapshots removed; service disposal does the same for every remaining job. A cancellation that throws during teardown force-fails the record and warns that the work may be orphaned, so teardown never deadlocks.
+ジョブはプロデューサーツールではなく、そのオーナーとバックエンドに属する。したがってプロデューサーやコントローラーのリロードでは停止しない。ジョブを所有するエージェントが破棄されると、そのジョブはキャンセルされ、プロデューサーが待機され、スナップショットが削除される。サービスの破棄は残りのすべてのジョブに対して同じことを行う。ティアダウン中にスローするキャンセルはレコードを強制失敗させ、作業が孤立する可能性があると警告するので、ティアダウンがデッドロックすることはない。
 
-### Session timing records
+### セッションタイミング記録
 
-Owned jobs record registration and settlement in their original Session, independently of model output collection. SDK consumers receive the same events through `session.event`; the [jobs reference](../../../docs/subsystems/jobs.md#session-lifecycle-records) defines identities, timestamps, and producer settlement reports. Events already persisted remain available after process exit; live jobs and output rings are not resumed.
+所有ジョブは、モデル出力の収集とは独立に、登録と確定を元の Session に記録する。SDK コンシューマーは `session.event` を通じて同じイベントを受け取る。[jobs リファレンス](../../../docs/subsystems/jobs.md#session-lifecycle-records) がアイデンティティ、タイムスタンプ、プロデューサー確定レポートを定義する。すでに永続化されたイベントはプロセス終了後も利用できる。ライブジョブと出力リングは再開されない。
 
-Lifecycle facts are appended synchronously at the registration or settlement commit, before live hub subscribers and completion waiters react. Append failures warn without abandoning execution or blocking cleanup; consumers must retain incomplete histories as incomplete.
+ライフサイクルの事実は、登録または確定のコミット時に、ライブ hub サブスクライバーと完了ウェイターが反応する前に同期的に追記される。追記の失敗は、実行を放棄したりクリーンアップをブロックしたりせずに警告する。コンシューマーは不完全な履歴を不完全なものとして保持しなければならない。
 
-### What can go wrong
+### 何が問題になりうるか
 
-Starting work fails without a controller that serves the owner — loading `dsh-tool-jobs` attaches one, and `start()` otherwise refuses with a message naming it. A producer cancel that returns without settling `done` stays indistinguishable from a slow stop and can stall teardown while holding one capacity slot. Live registry records disappear when the harness process exits; persisted lifecycle events remain.
+オーナーに奉仕するコントローラーがないと作業の開始は失敗する。`dsh-tool-jobs` をロードするとコントローラーが取り付けられ、そうでなければ `start()` はそれを名指しするメッセージで拒否する。`done` を確定せずに戻るプロデューサーキャンセルは、遅い停止と区別できず、容量スロットを 1 つ保持したままティアダウンを停滞させうる。ライブレジストリのレコードは harness プロセスの終了時に消える。永続化されたライフサイクルイベントは残る。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-This section explains the design decisions behind the registry and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節ではレジストリ背後の設計判断とそれを実現するコードを説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱っている。
 
-### Design philosophy
+### 設計哲学
 
-- **In-memory records, fresh projections.** `LocalJobRegistry` keeps one `TrackedJob` per job — lifecycle state, the output ring, and the model cursor — and projects a new read-only view or chunk copy per call; callers never receive live state.
-- **Retention is bounded per ring.** Appends past the live cap drop the oldest retained chunks (a single oversized chunk keeps its UTF-8-safe tail); a reader below the retained window gets a lossy read, never an error. Settlement trims to the settled cap but never below the bytes the model cursor has not consumed, so a job that finishes before its first `job_output` hands over everything the live cap retained; that terminal read then trims to the settled cap.
-- **Owner-relative layers, one process-wide registry.** Controllers and `{ owners: 'scope' }` subscriptions are filed into the scope that registered them (`ScopedLayers`), and reads union the global layer with the owner's scope chain — so one preset's job controls never hold `start()` open for an agent whose own composition loads none, and a scoped settlement reaches only the listeners its owner's composition registered.
-- **Preflight before start.** `start()` checks controller service, spec validity, live ownership, and capacity before invoking the producer, so a rejection leaves no job id or execution resource; registration commits without a later failable step.
-- **First-wins settlement, event last.** The earliest terminal outcome records once, waits for the pump's final drain, trims the ring, releases waiters, and then delivers one `settled` event with per-listener containment, followed by the ring's final `output` signal.
-- **Teardown never deadlocks.** A throwing cancel force-fails the record and reports a possible orphan instead of stalling disposal.
+- **インメモリレコード、新鮮なプロジェクション。** `LocalJobRegistry` はジョブごとに 1 つの `TrackedJob` — ライフサイクル状態、出力リング、モデルカーソル — を保持し、呼び出しごとに新しい読み取り専用ビューまたはチャンクコピーを射影する。呼び出し元がライブ状態を受け取ることはない。
+- **保持はリングごとに有界。** ライブ上限を超える追記は最古の保持チャンクを落とす（単一の巨大チャンクは UTF-8 安全な末尾を保つ）。保持ウィンドウより下を読むリーダーは喪失のある読み取りを受け取るが、エラーにはならない。確定は確定上限までトリムするが、モデルカーソルが消費していないバイトを下回ることはない。したがって最初の `job_output` より前に終了したジョブは、ライブ上限が保持したすべてを引き渡し、その終端読み取りの後に確定上限までトリムされる。
+- **オーナー相対のレイヤー、プロセス全体で 1 つのレジストリ。** コントローラーと `{ owners: 'scope' }` サブスクリプションは、それらを登録したスコープにファイルされる（`ScopedLayers`）。読み取りはグローバルレイヤーとオーナーのスコープチェーンを union する。したがってあるプリセットのジョブコントローラーが、自分の構成で何もロードしないエージェントのために `start()` を開いたままにすることはなく、スコープ付き確定はオーナーの構成が登録したリスナーにのみ届く。
+- **開始前のプリフライト。** `start()` はプロデューサーを呼び出す前に、コントローラーサービス、spec の妥当性、ライブ所有権、容量をチェックする。したがって拒否はジョブ id も実行リソースも残さず、登録は後続の失敗しうるステップなしにコミットする。
+- **先勝ちの確定、イベントは最後。** 最初の終端結果が 1 度だけ記録され、ポンプの最終ドレインを待ち、リングをトリムし、ウェイターを解放し、それからリスナーごとの封じ込め付きで 1 つの `settled` イベントを配信し、続いてリングの最終 `output` シグナルを送る。
+- **ティアダウンは決してデッドロックしない。** スローするキャンセルはレコードを強制失敗させ、破棄を停滞させる代わりに孤立の可能性を報告する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, `LocalJobRegistry`, admission, lifecycle, teardown |
-| [`src/events.ts`](src/events.ts) | Scope-layered event routing: `{ owner }`, `{ owners: 'all' }`, and `{ owners: 'scope' }` subscriptions |
-| [`src/ring.ts`](src/ring.ts) | The bounded per-job output ring: append, retention trim, offset reads |
-| [`src/pump.ts`](src/pump.ts) | The registry-owned pull pump: one timer per job, final drain before settlement |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: `Config` スキーマ、`LocalJobRegistry`、受け入れ、ライフサイクル、ティアダウン |
+| [`src/events.ts`](src/events.ts) | スコープ階層化イベントルーティング: `{ owner }`、`{ owners: 'all' }`、`{ owners: 'scope' }` サブスクリプション |
+| [`src/ring.ts`](src/ring.ts) | 有界のジョブごと出力リング: 追記、保持トリム、オフセット読み取り |
+| [`src/pump.ts`](src/pump.ts) | レジストリ所有のプルポンプ: ジョブごとに 1 つのタイマー、確定前の最終ドレイン |
 
-### Scope layers
+### スコープレイヤー
 
-`attachController` and `{ owners: 'scope' }` subscriptions register into the calling context's scope layer; `{ owner }` and `{ owners: 'all' }` subscriptions are unscoped. The controller question (`servesOwner`) and scoped delivery walk the same chain: global layer first, then each scoped layer along the owner's chain. Registrations are anonymous tokens so duplicate labels stay independently disposable.
+`attachController` と `{ owners: 'scope' }` サブスクリプションは、呼び出し元コンテキストのスコープレイヤーに登録される。`{ owner }` と `{ owners: 'all' }` サブスクリプションはスコープなしである。コントローラーの問い（`servesOwner`）とスコープ付き配信は同じチェーンを辿る。最初にグローバルレイヤー、次にオーナーのチェーンに沿った各スコープレイヤーである。登録は匿名トークンなので、重複するラベルも独立に破棄できる。
 
-### Admission and settlement
+### 受け入れと確定
 
-`activeJobCount` counts authoritative records per exact owner or in the shared unowned bucket. `settle` records the terminal outcome once (merging a recorded kill reason into a `killed` detail), clears the progress line, trims the ring to the settled cap (keeping every byte the model cursor has not consumed), resolves every waiter, then emits `settled` with its cause and the ring's final `output` signal. The cause is `kill` after `JobRegistry.kill`, `teardown` after an owner or service cancel, and `producer` otherwise; `dsh-tool-jobs` uses it to skip notices nobody can read.
+`activeJobCount` は正確なオーナーごと、または共有の非所有バケット内の権威あるレコードを数える。`settle` は終端結果を 1 度だけ記録し（記録された kill 理由を `killed` 詳細にマージする）、進行行を消去し、リングを確定上限までトリムし（モデルカーソルが消費していないすべてのバイトを保つ）、すべてのウェイターを解決し、それから原因付きの `settled` とリングの最終 `output` シグナルを発行する。原因は、`JobRegistry.kill` の後は `kill`、オーナーまたはサービスのキャンセルの後は `teardown`、それ以外は `producer` である。`dsh-tool-jobs` はこれを使って、誰も読めない通知をスキップする。
 
-### Teardown
+### ティアダウン
 
-Owner disposal (`disposeOwned`) cancels the owner's jobs, awaits their settlement, removes their records, and announces each removal — the one visible-set change no per-job record carries. Service disposal (`disposeAll`) cancels all live jobs, awaits settlement, removes every record (announcing each removal, so a subscriber mounted outside the service drops its rows), then detaches the cross-fiber owner-cleanup effects.
+オーナー破棄（`disposeOwned`）はオーナーのジョブをキャンセルし、その確定を待ち、レコードを削除し、各削除を告知する — これはジョブごとのレコードが運ばない唯一の可視セット変化である。サービス破棄（`disposeAll`）はすべてのライブジョブをキャンセルし、確定を待ち、すべてのレコードを削除し（各削除を告知するので、サービス外でマウントされたサブスクライバーは行を落とす）、それからクロスファイバーのオーナー清掃エフェクトを切り離す。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the registry contract to the model-facing controls and the design records.
+パッケージレベルのコントラクトでは足りないときにこれらのページを読む。レジストリコントラクトから、モデル向けの制御と設計記録へ進む。
 
-- [Background task runtime subsystem](../../../docs/subsystems/jobs.md) — the job types, projection fields, and `ctx.jobs` Cordis surface.
-- [jobs group map](../README.md) — the sibling group page and its package table.
-- [Registry contract](../jobs/README.md) — the abstract `ctx.jobs` service this package implements.
-- [Model-facing job controls](../tool-jobs/README.md) — the `job_output`, `job_list`, and `job_kill` tools and completion notices.
-- [Generic long-running tool runtime reference](../jobs/README.md) — the design behind the background-job runtime.
-- [Job lifecycle recording decision](../../../.agents/notes/implemented/bug-fix/2026-09-30-job-session-lifecycle.md) — durable timing, execution identity, and recording-failure behavior.
-- [job-registry seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-job-registry-seam.md) — the owner-fenced registry contract and its rationale.
+- [バックグラウンドタスクランタイムサブシステム](../../../docs/subsystems/jobs.md) — ジョブ型、プロジェクションフィールド、`ctx.jobs` の Cordis サーフェス。
+- [jobs グループマップ](../README.md) — 兄弟グループページとそのパッケージ表。
+- [レジストリコントラクト](../jobs/README.md) — このパッケージが実装する抽象 `ctx.jobs` サービス。
+- [モデル向けのジョブ制御](../tool-jobs/README.md) — `job_output`、`job_list`、`job_kill` ツールと完了通知。
+- [汎用長時間実行ツールランタイムリファレンス](../jobs/README.md) — バックグラウンドジョブランタイム背後の設計。
+- [ジョブライフサイクル記録の決定](../../../.agents/notes/implemented/bug-fix/2026-09-30-job-session-lifecycle.md) — durable なタイミング、実行アイデンティティ、記録失敗時の動作。
+- [job-registry seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-job-registry-seam.md) — オーナーで囲まれたレジストリコントラクトとその根拠。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through producer plugins and `dsh-tool-jobs`, to which the registry backend delegates all model rendering.
+間接的に、プロデューサープラグインと `dsh-tool-jobs` を通じて。レジストリバックエンドはすべてのモデルレンダリングをこれらに委譲する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumers own any request-prefix changes.
+直接の無効化はない。名前を挙げられたコンシューマーがリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the registry is a poor fit. They are current package constraints, not a task backlog.
+これらの制限は、レジストリが適さない状況を定義する。現在のパッケージ制約であり、タスクバックログではない。
 
-- **Jobs are process-local** — live execution and output rings die with the harness process; durable or cross-restart execution needs a separate backend implementing the seam.
-- **Final settlement persistence is not guaranteed during teardown** — normal one-shot completion, signal shutdown, or hard exit can stop Session routing or close its writer before the final `job/settled` reaches storage. Consumers must retain the interval as incomplete when settlement is absent; cross-fiber shutdown ordering is outside this journal's contract.
-- **A silently ineffective cancel can stall teardown and hold capacity** — if `cancel` returns without settling `done`, the registry cannot distinguish it from a slow stop; the job keeps one bucket slot for the rest of the service lifetime, and only an explicit throw can be force-failed safely.
+- **ジョブはプロセスローカル** — ライブ実行と出力リングは harness プロセスとともに消える。durable または再起動をまたぐ実行には、このシームを実装する別個のバックエンドが必要である。
+- **ティアダウン中の最終確定の永続化は保証されない** — 通常のワンショット完了、シグナルシャットダウン、またはハード終了は、最終の `job/settled` がストレージに到達する前に Session ルーティングを止めるか、そのライターを閉じることがある。確定がない場合、コンシューマーはその区間を不完全なものとして保持しなければならない。クロスファイバーのシャットダウン順序はこのジャーナルのコントラクトの外にある。
+- **黙って効かないキャンセルはティアダウンを停滞させ、容量を保持しうる** — `cancel` が `done` を確定せずに戻ると、レジストリはそれを遅い停止と区別できない。ジョブはサービスの残りの寿命の間バケットスロットを 1 つ保持し、明示的なスローだけが安全に強制失敗できる。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

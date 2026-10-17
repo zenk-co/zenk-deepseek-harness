@@ -1,10 +1,10 @@
-# Tool authoring reference
+# ツール作成リファレンス
 
-English | [中文](adding-a-tool.zh.md)
+日本語 | [English](adding-a-tool.en.md) | [中文](adding-a-tool.zh.md)
 
-Reference for the contracts a model-facing tool must satisfy. For an ordered first tool, follow [Build a tool](../user/develop/basic/tool.md). `packages/shell/tool-bash` is the production-grade three-package example.
+モデルに公開されるツールが満たさなければならない契約のリファレンス。順序立てて最初のツールを作る場合は、[ツールを作る](../user/develop/basic/tool.md)に従う。`packages/shell/tool-bash` が本番品質の 3 パッケージ構成の例である。
 
-## The minimal shape
+## 最小構成
 
 ```ts
 import { readFile } from 'node:fs/promises'
@@ -35,67 +35,67 @@ export function apply(ctx: Context) {
 }
 ```
 
-Registration is effect-based: disposing the plugin fiber unregisters the tool. Schemas flow into the system-prompt assembly automatically.
+登録は effect ベースである: プラグインファイバーを破棄すると、ツールが登録解除される。スキーマはシステムプロンプトの組み立てに自動的に流れ込む。
 
-## Rules of the execute() contract
+## execute() 契約のルール
 
-- **Args are validated for you.** `defineTool` validates model-generated `arguments` against the unified `ParameterSchemaSpec` before `execute` runs (types, required keys, literal constraints, exact-one unions, and nested values), so inside `execute` the args match `InferArgs`. Explicit object nodes declare `additionalProperties: true | false`; the implicit parameter root stays open. You still hand-check constraints the DSL does not express, such as non-empty strings, positive numbers, or cross-field rules. Raw JSON-Schema tools registered directly own their input validation.
-- **Registration borrows your readonly definition.** A typed same-process contribution is not a serialization boundary; do not mutate its schema or replace callbacks after registration. `schemas()` materializes only the explicit model-facing projection. To hot-swap a tool, dispose its owning effect and register the replacement; mutable state inside the callback's closure remains ordinary plugin state.
-- **Execution identity is protected.** The registry materializes `arguments` as detached lossless JSON in one recursive pass, freezes that value before policy starts, and assigns an opaque `exec.token`; `callId`, `name`, `arguments`, `agent`, `token`, the required caller-owned `signal`, and an optional enclosing-transport `parent` token stay immutable through dispatch. `parent` is identity-only and exposes no live outer execution. Treat `args` as readonly input. Only an around-dispatch wrapper receives a mutable view, and it may replace and restore the required `exec.signal` to impose a deadline but cannot remove it.
-- **Declare and return one canonical JSON value.** `output.schema` uses `ValueSchemaSpec` and may have an object, array, scalar, or null root. `execute` returns only the inferred value; the registry snapshots it as lossless JSON, validates it, freezes it, and passes it to `output.render(args, value)`. Do not return content blocks from the body or make callers parse prose for ids and fields.
-- **Throwing or returning an invalid value means `isError`.** The registry catches throws and contains schema, renderer, metadata-projector, and lossless-JSON failures before observers run. Throw for infrastructure failures. Represent a successful domain outcome in the canonical value even when its Native renderer explains a non-ideal state, such as a non-zero process exit.
-- **Honor `exec.signal`.** Cancel in-flight work when it fires.
-- **Project durable card data with `presentationMeta` (optional).** `output.presentationMeta(args, value)` derives replayable JSON from the same canonical value. The core persists it on `tool/result` and hands it to `presentResult`, so a card that needs result-time facts—such as `write`/`edit` applied hunks—survives replay without persisting the canonical value. The projector is skipped for nested Code dispatches because they have no cards.
-- **Use `exec.agent` for async notifications.** `agent.inject({ content, source: { kind: 'my-plugin' } })` appends durable context the NEXT model request sees — it is not a wake-up (an idle agent stays idle). Declare that `kind` through [`MessageSourceMap`](../subsystems/llm-streaming.md#content-blocks-and-messages) in your plugin: session format V4 rejects the retired `{ kind: 'plugin', plugin: '<name>' }` wrapper at message admission. Guard against disposed agents (try/catch).
+- **引数は検証済みである。** `defineTool` は `execute` が走る前に、モデルが生成した `arguments` を統合された `ParameterSchemaSpec` に対して検証する (型、必須キー、リテラル制約、exact-one ユニオン、ネストされた値)。そのため `execute` の内部では、引数は `InferArgs` に一致する。明示的なオブジェクトノードは `additionalProperties: true | false` を宣言し、暗黙のパラメータールートはオープンのままである。DSL が表現しない制約 — 例: 空でない文字列、正の数値、フィールド横断ルール — は依然として自分で検査する。直接登録される生の JSON-Schema ツールは、入力検証を自ら負う。
+- **登録は読み取り専用の定義を借用する。** 型付けされた同一プロセス内のコントリビューションはシリアライゼーション境界ではない。登録後にそのスキーマを変更したりコールバックを差し替えたりしてはならない。`schemas()` は明示的なモデル向けプロジェクションのみを実体化する。ツールをホットスワップするには、それを所有する effect を破棄して代替を登録する。コールバックのクロージャー内の可変状態は、通常のプラグイン状態のままである。
+- **実行アイデンティティは保護される。** レジストリは `arguments` を 1 回の再帰パスで切り離されたロスレス JSON として実体化し、ポリシー開始前にその値をフリーズし、不透明な `exec.token` を割り当てる。`callId`、`name`、`arguments`、`agent`、`token`、必須の呼び出し元所有の `signal`、および任意の外側トランスポート用 `parent` トークンは、ディスパッチを通じて不変のままである。`parent` はアイデンティティ専用であり、生きた外側の実行を公開しない。`args` は読み取り専用入力として扱う。可変ビューを受け取るのはディスパッチを包むラッパーのみであり、ラッパーは期限を課すために必須の `exec.signal` を置き換えて復元できるが、削除はできない。
+- **正規の JSON 値を 1 つ宣言して返す。** `output.schema` は `ValueSchemaSpec` を使い、ルートはオブジェクト、配列、スカラー、または null でありうる。`execute` は推論された値のみを返す。レジストリはそれをロスレス JSON としてスナップショットし、検証し、フリーズし、`output.render(args, value)` に渡す。body からコンテンツブロックを返したり、呼び出し元に id やフィールドのために散文を解析させたりしてはならない。
+- **throw または無効な値の返却は `isError` を意味する。** レジストリは throw を捕捉し、オブザーバーが走る前にスキーマ、レンダラー、メタデータプロジェクター、ロスレス JSON の失敗を封じ込める。インフラストラクチャーの失敗には throw する。成功したドメイン上の結果は、そのネイティブレンダラーが理想的でない状態 (例: 非ゼロのプロセス終了) を説明する場合でも、正規の値で表現する。
+- **`exec.signal` を尊重する。** 発火したら進行中の作業をキャンセルする。
+- **`presentationMeta` で永続的なカードデータを射影する (任意)。** `output.presentationMeta(args, value)` は同じ正規の値からリプレイ可能な JSON を導出する。コアはそれを `tool/result` に永続化し `presentResult` に渡すため、結果時点のファクト (例: `write`/`edit` の適用済みハンク) を必要とするカードは、正規の値を永続化せずにリプレイを生き延びる。プロジェクターは、カードを持たないネストされた Code ディスパッチではスキップされる。
+- **非同期通知には `exec.agent` を使う。** `agent.inject({ content, source: { kind: 'my-plugin' } })` は、次のモデルリクエストが見る永続コンテキストを追記する — これは起こしではない (アイドルのエージェントはアイドルのままである)。その `kind` はプラグイン内で [`MessageSourceMap`](../subsystems/llm-streaming.md#content-blocks-and-messages) を通じて宣言する: セッションフォーマット V4 は、メッセージ受け入れ時に廃止された `{ kind: 'plugin', plugin: '<name>' }` ラッパーを拒否する。破棄されたエージェントに対しては防護する (try/catch)。
 
-## Long-running work
+## 長時間実行される作業
 
-Gate `run_in_background` with producer config, then register through `ctx.jobs.start({ kind, label, owner: exec.agent, run })`. The registry rejects a pre-aborted invocation before the producer body; the runtime validates ownership and task-controller availability before `run()` starts work, then supplies the id, session fence, generic control tools, notices, and owner cleanup. A successful background branch returns a typed canonical handle such as `{ kind: 'background', jobId }`; its Native renderer may keep human prose such as `started background job bash-1`, but PTC mode must never parse that prose to recover the id.
+`run_in_background` はプロデューサー設定でゲートし、`ctx.jobs.start({ kind, label, owner: exec.agent, run })` で登録する。レジストリはプロデューサー body の前に事前 abort された呼び出しを拒否する。ランタイムは `run()` が作業を開始する前に所有権とタスクコントローラーの可用性を検証し、その後 id、セッションフェンス、汎用制御ツール、通知、オーナーのクリーンアップを供給する。成功したバックグラウンド分岐は `{ kind: 'background', jobId }` のような型付きの正規ハンドルを返す。そのネイティブレンダラーは `started background job bash-1` のような人間向け散文を保持してよいが、PTC モードは id を回収するためにその散文を決して解析してはならない。
 
-The spec supplies synchronous `cancel`, a non-rejecting `done` that settles after resource cleanup, and either pull `output` sources the registry pumps into the job's output ring or pushes through the `JobHandle` its starter receives; `dsh-tool-jobs` renders the model's consuming read from that ring. A pre-aborted call is a failure because no task exists whose id could satisfy the successful output schema. Once `ctx.jobs.start()` publishes the id, use a task-owned cancellation signal rather than `exec.signal`: later outer-call cancellation stops waiting for the call but does not kill published work; `job_kill`, owner disposal, and service teardown own that lifetime. Foreground work remains coupled to `exec.signal`. See the [background job runtime reference](../../packages/jobs/jobs/README.md) and `dsh-tool-bash` for a stream producer.
+spec は同期 `cancel`、リソースのクリーンアップ後に決着する reject しない `done`、および、レジストリがジョブの出力リングへ汲み出す pull 型 `output` ソースか、starter が受け取る `JobHandle` を通じた push のいずれかを供給する。`dsh-tool-jobs` はそのリングからモデルの消費用読み取りをレンダリングする。事前 abort された呼び出しは失敗である。成功時の出力スキーマを満たす id を持つタスクが存在しないためである。`ctx.jobs.start()` が id を公開した後は、`exec.signal` ではなくタスク所有のキャンセルシグナルを使う: 後からの外側呼び出しのキャンセルは、呼び出しの待機を止めるが、公開された作業は殺さない。`job_kill`、オーナーの破棄、サービスのティアダウンがそのライフタイムを所有する。フォアグラウンドの作業は `exec.signal` に結合されたままである。ストリームプロデューサーについては[バックグラウンドジョブランタイムリファレンス](../../packages/jobs/jobs/README.md)と `dsh-tool-bash` を参照。
 
-## Execution policy and observation
+## 実行ポリシーと観測
 
-Prefer not to build deployment policy into the tool. Use `tools/pre-execute` for extensible allow/deny/ask policy (the [permission-gate example](extension-cookbook.md#a-hook-plugin-permission-gate-example)), `ctx.tools.guard()` for a final monotonic deny that later listeners cannot undo, `tools/execute` to wrap dispatch with a deadline, retry, or metrics collection, `tools/post-execute` to replace presentation content or the returned value, block the result, or attach model-facing context, and `tools/result` to observe the immutable normalized outcome. A content replacement leaves programmatic access to `value` intact; confidentiality policy blocks or replaces the value. A sandboxing implementation can also run inside the tool's executor implementation; the [`dsh-tools` README](../../packages/core/tools/README.md#extension-points) defines each extension point's inputs, order, return values, and failure behavior.
+デプロイポリシーをツールに組み込まないことを優先する。拡張可能な allow/deny/ask ポリシーには `tools/pre-execute` ([permission-gate の例](extension-cookbook.md#a-hook-plugin-permission-gate-example))、後続のリスナーが取り消せない最終的な単調 deny には `ctx.tools.guard()`、期限、リトライ、メトリクス収集でディスパッチを包むには `tools/execute`、プレゼンテーションコンテンツや返却値の置き換え、結果のブロック、モデル向けコンテキストの添付には `tools/post-execute`、不変の正規化された結果の観測には `tools/result` を使う。コンテンツの置き換えは `value` へのプログラム的アクセスを無傷で残す。機密ポリシーは値をブロックまたは置き換える。サンドボックス実装はツールのエグゼキューター実装内で走ることもできる。[`dsh-tools` README](../../packages/core/tools/README.md#extension-points)が各拡張ポイントの入力、順序、返却値、失敗時の振る舞いを定義する。
 
-## PTC mode reaches your tool for free
+## PTC モードは追加作業なしでツールに到達する
 
-In [PTC mode](../../packages/core/tools/README.md), every visible registered tool is available as `await tools.<name>(args)` without extra integration. The generated `ToolArgsMap` and `ToolOutputMap` derive exact argument and canonical-return types from the same schemas, and calls re-enter the normal execution pipeline. A successful call resolves to the final canonical JSON value after policy, not to rendered Native content. A failed call rejects with the real `ToolCallError`; programs can inspect only its `name`, `toolName`, and human-readable `message`, not internal error codes or a failure union.
+[PTC モード](../../packages/core/tools/README.md)では、可視の登録済みツールすべてが、追加の統合なしに `await tools.<name>(args)` として利用できる。生成される `ToolArgsMap` と `ToolOutputMap` は、同じスキーマから正確な引数型と正規返却型を導出し、呼び出しは通常の実行パイプラインに再突入する。成功した呼び出しは、レンダリングされたネイティブコンテンツではなく、ポリシー後の最終的な正規 JSON 値に解決する。失敗した呼び出しは本物の `ToolCallError` で reject する。プログラムが検査できるのはその `name`、`toolName`、人間可読の `message` のみであり、内部エラーコードや失敗ユニオンは検査できない。
 
-Design `output.schema` as a useful programmatic API: return handles and fields directly, allow scalar/array/null roots when they are the honest value, and keep human explanation in `output.render`. Intermediate values are execution-local, are not persisted or prompt-truncated, and have no byte cap, so the producer's truthful acquisition bounds and process memory still matter. Only the outer `run_code` logs/result cross the configurable output cap and model-facing spill pipeline.
+`output.schema` は有用なプログラム的 API として設計する: ハンドルとフィールドを直接返し、正直な値である場合はスカラー/配列/null ルートを許し、人間向けの説明は `output.render` に置く。中間値は実行列ローカルであり、永続化もプロンプト切り詰めもされず、バイト上限もないため、プロデューサーの正直な取得境界とプロセスメモリは依然として重要である。設定可能な出力上限とモデル向け spill パイプラインを越えるのは、外側の `run_code` のログ/結果のみである。
 
-## How your tool renders in a UI
+## ツールが UI でどのようにレンダリングされるか
 
-Your tool's `output.render` returns model-facing content; its **UI card** is a separate concern declared through pure presentation projections and optional `presentCall` / `presentResult` methods. Design these alongside the canonical value. A tool with no UI presentation falls back to a generic card (title = tool name, raw args as input).
+ツールの `output.render` はモデル向けコンテンツを返す。その **UI カード**は別個の関心事であり、純粋なプレゼンテーションプロジェクションと任意の `presentCall` / `presentResult` メソッドで宣言する。これらは正規の値と並行して設計する。UI プレゼンテーションを持たないツールは、汎用カード (タイトル = ツール名、入力 = 生の引数) にフォールバックする。
 
-Both methods return a **`card`-tagged render intent** — pick the card kind that matches what your tool does:
+どちらのメソッドも **`card` タグ付きレンダーインテント**を返す — ツールの動作に合うカード種別を選ぶ:
 
-- `presentCall(args)` → a `ToolCallView` (the PENDING card):
-  - `{ card: 'generic', title, kind?, rawInput?, content?, locations? }` — the default. Set `kind` for an icon (`read`/`search`/…); set `locations: [{ path, line? }]` for any file your tool touches so a capable editor follows along / jumps to it.
-  - `{ card: 'terminal', title, description?, cwd? }` — your call IS a shell command. `title` is the command, `description` renders above the terminal card. (tool-bash.)
-  - `{ card: 'diff', title, diffs, locations? }` — your call creates or modifies a file. `diffs: [{ path, oldText, newText }]` (`oldText: null` for a new file) renders as an inline diff card. (tool-fs `write`/`edit`.)
-- `presentResult(args, { content, isError, meta? })` returns the completed card:
-  - `generic` supplies an optional title and content.
-  - `terminal` supplies raw output and optional exit metadata; each UI renders its capable or fallback view.
-  - `diff` supplies applied hunks, often derived by `output.presentationMeta` and carried in persisted `result.meta` so replay reproduces them. Mutation tools keep a diff result because the completed view replaces the pending card.
-  - `read` supplies a completed file window reconstructed from persisted `result.meta`: the file `path`, a 1-based `offset`, the returned `lines` (each keeping its file line number), `totalLines`, and an optional `lang` highlight hint; a UI without the `read` capability falls back to the raw result content. There is no `read` call view — a read call's pending state stays a generic card, since content exists only after `execute`. (tool-fs `read`.)
-  - `search` supplies a discovery result reconstructed from persisted `result.meta`: grouped-by-file matches (`shape: 'matches'`, grep) or a flat path list (`shape: 'paths'`, glob), plus `truncated`/`total` so a UI never presents a capped result as complete. The view carries no result text (a UI without a search card falls back to the raw result content), and there is no `search` call view — a discovery call's pending state stays a generic card, since matches exist only after `execute`. (tool-fs-search `grep`/`glob`.)
-  - `web` supplies a completed web retrieval, discriminated by `kind: 'search' | 'fetch'` (the structured search sources or the fetch summary), derived from `result.meta`; it carries no body copy, so a UI without the `web` capability falls back to the raw result content. (tool-web `web_search`/`web_fetch`.)
+- `presentCall(args)` → `ToolCallView` (PENDING カード):
+  - `{ card: 'generic', title, kind?, rawInput?, content?, locations? }` — デフォルト。アイコンのために `kind` を設定し (`read`/`search`/…)、ツールが触れるすべてのファイルについて `locations: [{ path, line? }]` を設定すると、対応するエディターが追従/ジャンプできる。
+  - `{ card: 'terminal', title, description?, cwd? }` — この呼び出し自体がシェルコマンドである。`title` がコマンドで、`description` はターミナルカードの上に描画される。(tool-bash.)
+  - `{ card: 'diff', title, diffs, locations? }` — この呼び出しはファイルを作成または変更する。`diffs: [{ path, oldText, newText }]` (新規ファイルは `oldText: null`) がインライン diff カードとして描画される。(tool-fs `write`/`edit`.)
+- `presentResult(args, { content, isError, meta? })` は完了したカードを返す:
+  - `generic` は任意のタイトルとコンテンツを供給する。
+  - `terminal` は生の出力と任意の終了メタデータを供給する。各 UI は対応ビューまたはフォールバックビューを描画する。
+  - `diff` は適用済みハンクを供給する。多くは `output.presentationMeta` によって導出され、永続化された `result.meta` に載り、リプレイがそれらを再現する。ミューテーションツールは diff 結果を保持する。完了ビューが PENDING カードを置き換えるためである。
+  - `read` は永続化された `result.meta` から再構築される完了済みのファイルウィンドウを供給する: ファイル `path`、1 始まりの `offset`、返却された `lines` (各要素はファイルの行番号を保持)、`totalLines`、任意の `lang` ハイライトヒント。`read` ケイパビリティを持たない UI は生の結果コンテンツにフォールバックする。`read` 呼び出しビューは存在しない — read 呼び出しの PENDING 状態は汎用カードのままである。コンテンツは `execute` の後にのみ存在するためである。(tool-fs `read`.)
+  - `search` は永続化された `result.meta` から再構築されるディスカバリー結果を供給する: ファイルごとにグループ化されたマッチ (`shape: 'matches'`、grep) またはフラットなパス一覧 (`shape: 'paths'`、glob)、加えて `truncated`/`total` があり、UI が上限付きの結果を完全なものとして提示することはない。ビューは結果テキストを持たず (search カードを持たない UI は生の結果コンテンツにフォールバックする)、`search` 呼び出しビューも存在しない — ディスカバリー呼び出しの PENDING 状態は汎用カードのままである。マッチは `execute` の後にのみ存在するためである。(tool-fs-search `grep`/`glob`.)
+  - `web` は完了した Web リトリーバルを供給する。`kind: 'search' | 'fetch'` で判別され (構造化された検索ソースまたはフェッチサマリー)、`result.meta` から導出される。body コピーを持たないため、`web` ケイパビリティを持たない UI は生の結果コンテンツにフォールバックする。(tool-web `web_search`/`web_fetch`.)
 
-Hard rules (they bite if broken):
+厳格なルール (破ると噛みつかれる):
 
-- **Purity.** These run on live streaming AND on session-log REPLAY, so they must be pure functions of `args` (+ the result) — NO I/O, NO reading session state, NO clock/random. A diff is derived from the args (`write` uses `oldText: null` because a call-time presenter has no prior file content); the UI adapter, not the tool, supplies session context. If you find yourself wanting the file's old content or the working directory inside `presentCall`, stop — that belongs in durable result metadata or the adapter, not the presenter.
-- **UI-only formatting stays out of the model result.** A fenced ` ```console ` block, a diff, a relativized path—none of these belongs in the canonical value or Native content merely to serve a UI. `output.render` owns model-facing prose; `presentationMeta` plus the card presenters own replayable UI state. A `terminal` result view carries raw output and the adapter adds any fallback framing.
-- **`defineTool` soft-validates the display path.** Malformed or older logged arguments make the wrapper return `undefined` (a generic fallback) rather than throw — display must never crash a replay.
+- **純粋性。** これらはライブストリーミング時とセッションログのリプレイ時の両方で走るため、`args` (と結果) の純粋関数でなければならない — I/O なし、セッション状態の読み取りなし、クロック/乱数なし。diff は引数から導出される (`write` が `oldText: null` を使うのは、呼び出し時点のプレゼンターが事前のファイルコンテンツを持たないためである)。セッションコンテキストを供給するのはツールではなく UI アダプターである。`presentCall` の中でファイルの旧コンテンツや作業ディレクトリが欲しくなったら、手を止める — それはプレゼンターではなく、永続的な結果メタデータまたはアダプターに属する。
+- **UI 専用の整形はモデル結果に入れない。** フェンス付き ` ```console ` ブロック、diff、相対化されたパス — これらは UI に供するためだけに正規の値やネイティブコンテンツに属するものではない。`output.render` がモデル向けの散文を所有し、`presentationMeta` とカードプレゼンターがリプレイ可能な UI 状態を所有する。`terminal` 結果ビューは生の出力を運び、アダプターがフォールバックの枠付けを加える。
+- **`defineTool` は表示パスをソフト検証する。** 不正な形式または古いログ済み引数に対して、ラッパーは throw ではなく `undefined` (汎用フォールバック) を返す — 表示がリプレイをクラッシュさせては決してならない。
 
-The neutral vocabulary lives in `dsh-tools`; tools never import a UI or transport type. Consumers of this API map each `card` into their own view. The design and the why are in [the render-intent-union Agent Note](../../.agents/notes/implemented/architecture/2026-07-02-tool-render-intent-union.md); `dsh-tool-fs` (generic/diff) and `dsh-tool-bash` (terminal) are the reference implementations.
+ニュートラルな語彙は `dsh-tools` にある。ツールが UI やトランスポートの型を import することはない。この API のコンシューマーは各 `card` を自身のビューにマップする。設計とその理由は [render-intent-union の Agent Note](../../.agents/notes/implemented/architecture/2026-07-02-tool-render-intent-union.md) にある。`dsh-tool-fs` (generic/diff) と `dsh-tool-bash` (terminal) がリファレンス実装である。
 
-## Web Client presentation
+## Web クライアントのプレゼンテーション
 
-The built-in Web Client does not consume `presentCall` or `presentResult`. Session `page` and `follow` transport raw `tool/call` and `tool/result` events, including persisted `result.meta`. A Client plugin registers its wire tool name in the `tool.call.toolview` keyed slot and derives component props from the `ToolCallBlock` arguments, content, error, metadata, existing PTC dispatch `parentCallId`, and Session path facts. It validates these wire values locally and returns the generic row for malformed or unsupported input.
+組み込みの Web クライアントは `presentCall` や `presentResult` を消費しない。Session の `page` と `follow` が生の `tool/call` と `tool/result` イベント (永続化された `result.meta` を含む) を転送する。クライアントプラグインは、`tool.call.toolview` キー付きスロットにワイヤーツール名を登録し、`ToolCallBlock` の引数、コンテンツ、エラー、メタデータ、既存の PTC ディスパッチ `parentCallId`、Session パスファクトからコンポーネント props を導出する。ワイヤー値はローカルで検証し、不正な形式またはサポートされない入力には汎用行を返す。
 
-Use `output.presentationMeta(args, value)` when an existing Web card needs bounded structured result facts that model-facing content cannot preserve losslessly. Do not store React props or a selected card in metadata, import a Host tool implementation into a browser bundle, or create another Client presenter registry. Defining Host presentation methods alone does not add a specialized Web card. The [Client-derived presentation Agent Note](../../.agents/notes/implemented/architecture/2026-08-23-client-derived-tool-presentation.md) defines ownership, fallback, and equivalence requirements.
+既存の Web カードが、モデル向けコンテンツではロスレスに保持できない、上限付きの構造化された結果ファクトを必要とする場合は `output.presentationMeta(args, value)` を使う。メタデータに React props や選択されたカードを保存したり、Host ツール実装をブラウザーバンドルに import したり、別のクライアントプレゼンター レジストリを作成したりしない。Host プレゼンテーションメソッドを定義するだけでは、特化された Web カードは追加されない。[クライアント導出プレゼンテーションの Agent Note](../../.agents/notes/implemented/architecture/2026-08-23-client-derived-tool-presentation.md) が所有権、フォールバック、等価性の要件を定義する。
 
-## Verification
+## 検証
 
-Follow the [repository testing policy](../testing.md) and the owning package's test documentation. A shipped model- or UI-visible change requires the assembled coverage specified there.
+[リポジトリのテストポリシー](../testing.md)と所有パッケージのテストドキュメントに従う。出荷されるモデル可視または UI 可視の変更には、そこで指定される組み立て済みカバレッジが必要である。

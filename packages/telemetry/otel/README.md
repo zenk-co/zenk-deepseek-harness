@@ -1,72 +1,72 @@
 ---
-description: "Create independent OTLP reporting channels through the shared Cordis OTel service."
+description: "共有 Cordis OTel サービスを通じて独立した OTLP 報告チャネルを作成する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-otel
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Mount one `otel` service to create ordinary-event and Session-log reporting channels. Each channel has its own exporter, resource, instrumentation scope, and queue. Mounting alone creates no transport or identity and sends nothing. Business consumers own authorization, redaction, field selection, and their channel's disposal.
+1 つの `otel` サービスをマウントして通常イベントとセッションログの報告チャネルを作成する。各チャネルは独自のエクスポーター、リソース、計装スコープ、キューを持つ。マウントだけでは転送も identity も作らず、何も送信しない。認可、編集、フィールド選択、チャネルの破棄は業務コンシューマーが所有する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The base bundle mounts `@deepseek-ai/dsh-otel`. Independent compositions must mount it before consumers that inject `otel`. Call `ctx.otel.createEventReporter(options)` for ordinary analytics or `ctx.otel.createSessionLogReporter(options)` for complete Session events. Options explicitly supply endpoint, scope, resource attributes, queue settings, and a diagnostic callback; the service has no deployment defaults or automatic collection policy of its own.
+基本バンドルは `@deepseek-ai/dsh-otel` をマウントする。独立した構成は `otel` を注入するコンシューマーの前にそれをマウントしなければならない。通常分析には `ctx.otel.createEventReporter(options)` を呼び、完全なセッションイベントには `ctx.otel.createSessionLogReporter(options)` を呼ぶ。オプションはエンドポイント、スコープ、リソース属性、キュー設定、診断コールバックを明示的に供給する。サービス自体にデプロイ既定値や自動収集ポリシーはない。
 
-The returned channel belongs to the consumer. Ordinary-event `shutdown(signal)` cancels requests and retry waits when the supplied signal aborts, and resolves after transport cleanup. Register shutdown with the consumer's Cordis fiber and bound the complete drain with its configured deadline. Injection makes service replacement unload dependent consumers. Do not retain a channel after its consumer unloads. The product and Session adapters implement this ownership for UI and feedback callers.
+返されるチャネルはコンシューマーに属する。通常イベントの `shutdown(signal)` は供給シグナル中止時に要求と再試行待機を取り消し、転送片付け後に解決する。コンシューマーの Cordis ファイバーにシャットダウンを登録し、完全排出を設定済み期限で区切る。注入によりサービス置換は依存コンシューマーをアンロードする。コンシューマーのアンロード後にチャネルを保持しないこと。製品とセッションのアダプターは UI とフィードバック呼び出し元のためにこの所有を実装する。
 
-Ordinary channels use SDK count-based batching. Session channels preserve one complete event per record with `eventName: "session-log"`, `sessionId`, and a JSON string `content`, and enforce at most 4,000,000 uncompressed request bytes. Their byte limits, single-record rejection, serial transport settlement, and shutdown behavior are specified by the [Session adapter](../../session/session-telemetry-otel/README.md). A Session channel never shares a request or queue with ordinary events.
+通常チャネルは SDK の件数基準バッチ処理を使う。セッションチャネルは `eventName: "session-log"`、`sessionId`、JSON 文字列 `content` 付きでレコードごとに完全なイベント 1 つを保ち、非圧縮要求バイト最大 4,000,000 を強制する。そのバイト上限、単一レコード拒否、直列転送決着、シャットダウン動作は[セッションアダプター](../../session/session-telemetry-otel/README.md)で規定される。セッションチャネルは通常イベントと要求もキューも共有しない。
 
-Headers are explicit. The service does not add a channel header or inherit ambient authorization headers or TLS identity. Agent factories configure their returned agents, including keepAlive. Ordinary-event channels destroy their agent on shutdown; factories must provide a dedicated agent for each channel. Scope names and versions are supplied by each consumer, so transport sharing does not change event attribution.
+ヘッダーは明示的である。サービスはチャネルヘッダーを追加せず、周囲の認可ヘッダーや TLS identity を継承しない。エージェントファクトリーは keepAlive を含め返されるエージェントを設定する。通常イベントチャネルはシャットダウン時にエージェントを破棄する。ファクトリーはチャネルごとに専用エージェントを提供しなければならない。スコープ名とバージョンは各コンシューマーが供給するため、転送共有はイベント帰属を変えない。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-`src/index.ts` registers the service; `event-log.ts` owns ordinary SDK batching; `session-log.ts` owns byte/count scheduling; `transport.ts` supplies the Session SDK JSON HTTP delegate and owns the shared exporter metrics recorder, which receives no meter provider and records nothing; `event-transport.ts` uses Got for cancellable ordinary-event HTTP requests and retry waits with SDK serialization and export accounting. No global OTel provider is installed; the accepted exporter options exclude the upstream `selfObsMeterProvider`, and the Session processor accepts only the batching fields it implements, so exporter and Session-processor self-observability metrics stay unrecorded. The Session processor measures each record once, groups conservative sizes, and waits for the SDK concurrency queue to clear after every callback before sending another request.
+`src/index.ts` はサービスを登録する。`event-log.ts` は通常 SDK バッチ処理を所有する。`session-log.ts` はバイト・件数スケジューリングを所有する。`transport.ts` はセッション SDK JSON HTTP 委譲を提供し、共有エクスポーターメトリクス記録器を所有する。これはメータープロバイダーを受け取らず何も記録しない。`event-transport.ts` は取り消し可能な通常イベント HTTP 要求と再試行待機に Got を使い、SDK 直列化とエクスポート集計を伴う。全体 OTel プロバイダーはインストールされない。受け入れ済みエクスポーターオプションは上流 `selfObsMeterProvider` を除外し、セッションプロセッサーは実装するバッチ処理フィールドのみを受け付けるため、エクスポーターとセッションプロセッサーの自己観測メトリクスは記録されないままである。セッションプロセッサーは各レコードを 1 回測定し、保守的な寸法でまとめ、別の要求を送る前に毎回コールバック後に SDK 並行キューが空くを待つ。
 
-OpenTelemetry SDK dependencies use exact versions from one coordinated release across this service and its two adapters.
+OpenTelemetry SDK 依存は、このサービスと 2 つのアダプターにわたる 1 つの調整リリースからの厳密バージョンを使う。
 
-Composition tests exercise independent channels and service removal; adapter tests cover dependent-fiber cleanup and feedback authorization.
+構成テストは独立チャネルとサービス除去を検証する。アダプターテストは依存ファイバー片付けとフィードバック認可をカバーする。
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [OTel subsystem](../../../docs/subsystems/otel.md) — service ownership and API.
-- [Product adapter](../../host/product-telemetry-otel/README.md) — explicit analytics policy and configuration.
-- [Session adapter](../../session/session-telemetry-otel/README.md) — feedback authorization and configured upload limits.
+- [OTel サブシステム](../../../docs/subsystems/otel.md) — サービス所有と API。
+- [製品アダプター](../../host/product-telemetry-otel/README.md) — 明示的な分析ポリシーと設定。
+- [セッションアダプター](../../session/session-telemetry-otel/README.md) — フィードバック認可と設定済みアップロード上限。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the service delivers caller-selected records without changing model context.
+なし。このサービスは呼び出し元選択のレコードを配送するだけであり、モデルコンテキストを変えない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; reporting does not change model requests.
+なし。報告はモデル要求を変えない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-Channels provide best-effort, memory-only delivery with the following limits.
+チャネルは以下の制限でベストエフォートのメモリーのみ配送を提供する。
 
-- The caller owns consent, redaction, resource identity, renderer-to-host RPC, and the outer shutdown deadline.
-- Queue overflow, oversized Session events, transport failure, and process exit can lose records. There is no durable outbox or warehouse acknowledgement.
-- Ordinary-event channels batch by count; their consumers must select event and batch sizes suitable for the collector.
+- 呼び出し元は同意、編集、リソース identity、レンダラー・ホスト間 RPC、外側シャットダウン期限を所有する。
+- キューあふれ、過大セッションイベント、転送失敗、プロセス終了はレコードを失い得る。永続的な outbox やウェアハウス承認はない。
+- 通常イベントチャネルは件数でバッチ処理する。そのコンシューマーは収集器に適したイベントとバッチ寸法を選ばなければならない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
-None.
+なし。

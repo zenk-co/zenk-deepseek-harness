@@ -1,51 +1,51 @@
 ---
-description: "The subprocess group map: the shared child-process service and its local host provider, for users and maintainers navigating the group."
+description: "サブプロセスグループマップ: 共有子プロセスサービスとそのローカルホストプロバイダー。グループ内を移動するユーザーとメンテナー向け。"
 kind: "package-group"
 ---
 
-# subprocess/ — subprocess capability family
+# subprocess/ — サブプロセスケイパビリティファミリー
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Every child process and terminal session the harness runs — bash commands, language servers, persistent shells, and out-of-process subagent backends — is started, observed, and terminated through one shared service (`ctx.subprocess`), with a local provider running them on the host machine. It is not a standalone product feature: the consuming capability seams decide what each process means, and command semantics, deadlines, and model-facing presentation stay with them. The group provides executable lookup, bounded output capture with spill recovery, provider-managed process ranges with disclosed weaker fallbacks, and a scrubbed starting environment for every child.
+ハーネスが実行するすべての子プロセスとターミナルセッション（bash コマンド、言語サーバー、永続シェル、プロセス外サブエージェントバックエンド）は、1つの共有サービス（`ctx.subprocess`）経由で開始・観測・終了され、ローカルプロバイダーがホストマシン上でそれらを実行する。これは独立した製品機能ではない。消費側ケイパビリティシームが各プロセスの意味を決定し、コマンドセマンティクス、期限、モデル向け提示は消費側に属する。このグループは実行ファイル lookup、有界出力キャプチャ（spill 回復付き）、プロバイダー管理のプロセス範囲（開示済みの弱いフォールバック付き）、すべての子プロセス向けにスクラブ済み開始環境を提供する。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`subprocess`](subprocess/README.md) | Defines the child-process service: executable lookup, managed process spawns, and real terminal sessions | `ctx.subprocess` |
-| [`subprocess-local`](subprocess-local/README.md) | Runs host processes and terminals with native managed ranges where supported and explicit weaker fallbacks elsewhere | registers on `ctx.subprocess` |
-| [`win32-process`](win32-process/README.md) | Owns shared Win32 bindings for sandbox and ordinary process creation, stdio, Job assignment, polling, waits, and handle cleanup | library — no ctx key |
+| [`subprocess`](subprocess/README.md) | 子プロセスサービスを定義する: 実行ファイル lookup、管理されたプロセス起動、実際のターミナルセッション | `ctx.subprocess` |
+| [`subprocess-local`](subprocess-local/README.md) | サポート対象ではネイティブ管理範囲付きで、対象外では明示的に弱いフォールバックでホストプロセスとターミナルを実行する | `ctx.subprocess` に登録する |
+| [`win32-process`](win32-process/README.md) | サンドボックスと通常のプロセス作成、stdio、Job 割り当て、ポーリング、待機、ハンドルクリーンアップのための共有 Win32 バインディングを所有する | ライブラリー — ctx キーなし |
 
-The service keeps process lifetime across consumer reloads; consumers own what a process means (a bash command, a language server) and every default that shapes one.
+このサービスは消費者リロードをまたいでプロセス寿命を保持する。プロセスが何を意味するか（bash コマンド、言語サーバー）と、それを形作るすべての既定値は消費者が所有する。
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Subprocess subsystem](../../docs/subsystems/subprocess.md) — spawn specs, output readers, outcomes, and the managed `DSH_*` environment.
-- [Subprocess seam Agent Note](../../.agents/notes/archived/architecture/2026-07-26-subprocess-seam.md) — why the process half of the bash executors became its own seam.
+- [Subprocess サブシステム](../../docs/subsystems/subprocess.md) — 起動仕様、出力リーダー、結果、管理済み `DSH_*` 環境。
+- [Subprocess シーム Agent Note](../../.agents/notes/archived/architecture/2026-07-26-subprocess-seam.md) — bash 実行器のプロセス側半分が独自シームになった理由。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

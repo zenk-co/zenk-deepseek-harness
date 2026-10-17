@@ -1,47 +1,47 @@
 ---
-description: "Retrospective Session persistence types and adjacent-release changes for dsh-v0.1.3-alpha.1."
+description: "dsh-v0.1.3-alpha.1 向け遡及 Session 永続型と隣接リリース変更。"
 kind: persistence-release
 ---
 
-# Persistence release: dsh-v0.1.3-alpha.1
+# 永続リリース: dsh-v0.1.3-alpha.1
 
-English | [中文](dsh-v0.1.3-alpha.1.zh.md)
+日本語 | [English](dsh-v0.1.3-alpha.1.en.md) | [中文](dsh-v0.1.3-alpha.1.zh.md)
 
-## Summary
+## 概要
 
-The writer format advances from 0 to 2 across these tags: the JSONL header replaces seedLength with required isSeeded, and session/end-seed gains optional inherited. assistant/chunk is removed, assistant/attempt is added, and assistant/message gains a required stream array. Team event payload versions advance from 1 to 2, alongside changes to shared content types and optional capturedFormatVersion/sessionFormatVersion metadata.
+書き手形式はこれらタグ横断で 0 から 2 に進む。JSONL ヘッダーは seedLength を必須 isSeeded に置換し、session/end-seed は任意 inherited を得る。assistant/chunk は除去され、assistant/attempt は追加され、assistant/message は必須 stream 配列を得る。Team イベントペイロード版は 1 から 2 に進み、共有内容型と任意 capturedFormatVersion/sessionFormatVersion メタデータの変更を伴う。
 
-## Table of Contents
+## 目次
 
-- [Release evidence](#evidence)
-- [Declaration](#declaration)
-- [Structural changes](#changes)
-- [Verification](#verification)
+- [リリース証拠](#evidence)
+- [宣言](#declaration)
+- [構造変更](#changes)
+- [検証](#verification)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="evidence"></a>
-## Release evidence
+## リリース証拠
 
-This approximate backfill supports reading and format validation; it is not a contemporaneous compatibility acknowledgement. See the [archive reference](README.md) for extraction and coverage limits.
+この概算 backfill は読み取りと形式検証を支援する。同時代の互換性承認ではない。抽出と範囲制限は[アーカイブリファレンス](README.md)を見る。
 
-| Item | Recorded value |
+| 項目 | 記録値 |
 |---|---|
-| Source tag | `dsh-v0.1.3-alpha.1` |
-| Source date | 2026-09-04T09:16:23.000Z |
-| Release record | Release object present. |
-| Previous release | [dsh-v0.1.2-rc.1](dsh-v0.1.2-rc.1.md) |
-| Session writer version | 2 |
-| Reconstructed inventory | <!-- persistence-release-inventory:start -->54 roots / 425 types<!-- persistence-release-inventory:end --> |
-| This snapshot | [dsh-v0.1.3-alpha.1.schema.json](dsh-v0.1.3-alpha.1.schema.json) |
+| ソースタグ | `dsh-v0.1.3-alpha.1` |
+| ソース日時 | 2026-09-04T09:16:23.000Z |
+| リリース記録 | Release オブジェクトあり。 |
+| 前リリース | [dsh-v0.1.2-rc.1](dsh-v0.1.2-rc.1.md) |
+| セッション書き手版 | 2 |
+| 再構成目録 | <!-- persistence-release-inventory:start -->54 roots / 425 types<!-- persistence-release-inventory:end --> |
+| このスナップショット | [dsh-v0.1.3-alpha.1.schema.json](dsh-v0.1.3-alpha.1.schema.json) |
 
-Source evidence for the writer version constant at this tag:
+このタグでの書き手版定数のソース証拠:
 
 - `packages/core/session/src/types.ts`: `export const SESSION_FORMAT_VERSION = 2`
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-release
 schemaVersion: 1
@@ -103,13 +103,13 @@ changes:
 ```
 
 <a id="changes"></a>
-## Structural changes
+## 構造変更
 
 <!-- persistence-release-changes:start -->
 
-Detected 17 changed roots and 25 structural differences. The review requirement below is calculated using current rules for comparison only; it does not assert historical compliance, migration correctness, or runtime compatibility.
+17 変更ルートと 25 構造差分を検出。下のレビュー要件は現行規則で比較用に算出したものであり、歴史的準拠・移行正しさ・ランタイム互換性を主張しない。
 
-| Path | Change | Review requirement |
+| パス | 変更 | レビュー要件 |
 |---|---|---|
 | `JsonlHeaderLine.seedLength` | `property-removed` | `review-required` |
 | `JsonlHeaderLine.isSeeded` | `required-property-added` | `review-required` |
@@ -140,9 +140,9 @@ Detected 17 changed roots and 25 structural differences. The review requirement 
 <!-- persistence-release-changes:end -->
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Extraction passed canonical-graph, root-digest, and reachable-type-digest validation, permitting the original optional `surfaceOp` only for historical surface events. The in-tree check reconstructs each tag from its predecessor and verifies before/after values, snapshot coverage, and bilingual machine declarations.
+抽出は正準グラフ・ルートダイジェスト・到達型ダイジェスト検証を通過し、元の任意 `surfaceOp` は歴史表面イベントにのみ許される。ツリー内検査は各タグを前任から再構成し、前後値・スナップショット範囲・バイリンガル機械宣言を検証する。
 
 ```sh
 pnpm run verify-persistence-releases
@@ -151,4 +151,4 @@ pnpm run verify-persistence-releases
 <a id="dev-note"></a>
 ## Dev Note
 
-None.
+なし。

@@ -1,108 +1,108 @@
 ---
-description: "Standalone SDK profile with a persistent shell, image reading, automatic context compaction, and a Session working-directory tool for a minimal cross-platform coding agent without the shared base bundle."
+description: "永続シェル・画像読み取り・自動文脈圧縮・セッション作業ディレクトリツールを備えたスタンドアロン SDK プロファイル。共有基盤バンドルなしの最小クロス平台コーディングエージェント用。"
 kind: "package-bundle"
 ---
 
 # `@deepseek-ai/dsh-sdk-minimal`
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh --profile sdk-minimal` when an SDK client needs a small, explicit coding-agent runtime. By default, the profile advertises a platform-selected persistent shell, `read_image`, and `working_directory`, persists sessions as uncompressed JSONL, and selects the model from the SDK initialization request. It supplies a complete Cordis tree and excludes `dsh-base`, Web, settings, managed credentials, telemetry, text file tools, workspace instructions, skills, jobs, and subagents. Its danger-full-access policy lets the shell modify any path available to the process, so use it only with an isolated workspace.
+SDK クライアントが小さく明示的なコーディングエージェントランタイムを必要とする場合に `dsh --profile sdk-minimal` を使う。既定では、平台選択の永続シェル、`read_image`、`working_directory` を広告し、セッションを非圧縮 JSONL で永続化し、SDK 初期化要求からモデルを選ぶ。完全な Cordis ツリーを提供し、`dsh-base`、Web、設定、管理資格情報、テレメトリー、テキストファイルツール、ワークスペース指示、スキル、ジョブ、サブエージェントを除外する。その danger 全 access ポリシーはプロセスが利用できる任意パスをシェルが変更できるようにするため、分離ワークスペースでのみ使う。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Launch the profile directly or select it from the Python SDK. Supply an explicit `DSH_HOME`, use a disposable workspace, and provide the model credential through `DEEPSEEK_API_KEY`.
+プロファイルを直接起動するか Python SDK から選ぶ。明示 `DSH_HOME` を提供し、使い捨てワークスペースを使い、`DEEPSEEK_API_KEY` 経由でモデル資格情報を提供する。
 
 ```sh
 export DSH_HOME=/absolute/path/to/example-dsh-home
 dsh --profile sdk-minimal
 ```
 
-`DSH_CONTEXT_WINDOW` sets the fallback capacity for a model absent from the adapter's advisory catalog. `DSH_SYSTEM_PROMPT` replaces the default persona. The SDK initialization request is the sole model selection and overrides environment defaults.
+`DSH_CONTEXT_WINDOW` は適合器の助言カタログにないモデルの代替容量を設定する。`DSH_SYSTEM_PROMPT` は既定 persona を置換する。SDK 初期化要求が唯一のモデル選択であり、環境既定を上書きする。
 
-Use `dsh plugin --profile sdk-minimal` to manage persistent external dependencies. Profile, home, and ordered `--patch` files can replace rows or insert bundles above the complete default tree. The shipped template applies patches only at startup.
+永続的な外部依存の管理には `dsh plugin --profile sdk-minimal` を使う。プロファイル・ホーム・順序付き `--patch` ファイルは行を置換したり完全既定ツリーの上にバンドルを挿入したりできる。出荷テンプレートは起動時にのみパッチを適用する。
 
-The profile mounts exactly one persistent shell stack: Bash on Linux and macOS, or PowerShell on Windows. Both stacks use a 300-second timeout and one owner-scoped terminal; the other platform's rows remain disabled.
+このプロファイルはちょうど 1 件の永続シェル stack をマウントする。Linux と macOS では Bash、Windows では PowerShell である。両 stack は 300 秒 timeout と所有者スコープのターミナル 1 件を使い、他平台の行は無効のままである。
 
-Like every shipped profile, it mounts [MCP resources](../../mcp/mcp-resources/README.md) once. Configure only [MCP client entries](../../mcp/mcp-client/README.md) to add servers. Clients mounted by another provider also count as configured. With no server configured in the caller's scope, MCP contributes no prompt text or tools and the default remains the shell, `read_image`, and `working_directory` tools.
+すべての出荷プロファイルと同様に [MCP リソース](../../mcp/mcp-resources/README.md) を 1 回マウントする。サーバー追加には [MCP クライアントエントリ](../../mcp/mcp-client/README.md) のみを設定する。他プロバイダーがマウントしたクライアントも設定済みとして数える。呼び出し側スコープにサーバー設定がない場合、MCP はプロンプト文やツールを提供せず、既定はシェル、`read_image`、`working_directory` ツールのままである。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The bundle's single insert is the complete application tree: SDK stdio startup and JSON-RPC serving, one environment-configured DeepSeek adapter, the explicit agent core, conditional MCP resource tools, local filesystem, image attachments, automatic context compaction, and subprocess services, Session working-directory state and its tool, a platform-selected persistent shell PTY, and uncompressed JSONL persistence under `$DSH_HOME/sessions`. It does not inherit another bundle, so every extra row is an explicit profile change.
+バンドルの単一挿入は完全なアプリケーションツリーである。SDK stdio 起動と JSON-RPC 提供、環境設定済み DeepSeek 適合器 1 件、明示エージェント中核、条件付き MCP リソースツール、ローカルファイルシステム、画像添付、自動文脈圧縮、サブプロセスサービス、セッション作業ディレクトリ状態とそのツール、平台選択の永続シェル PTY、`$DSH_HOME/sessions` 配下の非圧縮 JSONL 永続化である。他バンドルを継承しないため、追加の行はすべて明示プロファイル変更である。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`cordis.patch.yml`](cordis.patch.yml) | Complete standalone profile tree and its environment-backed defaults |
-| [`src/index.ts`](src/index.ts) | Bundle package entry |
-| [`tests/sdk-minimal.spec.ts`](tests/sdk-minimal.spec.ts) | Exact composition, profile-name, and platform-selection checks |
+| [`cordis.patch.yml`](cordis.patch.yml) | 完全なスタンドアロンプロファイルツリーとその環境基盤既定値 |
+| [`src/index.ts`](src/index.ts) | バンドルパッケージ入口 |
+| [`tests/sdk-minimal.spec.ts`](tests/sdk-minimal.spec.ts) | 厳密な構成・プロファイル名・平台選択の検査 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Python SDK example](../../../python/sdk/examples/README.md) — launches this profile from Python against an explicit Harness home.
-- [SDK application bundle](../sdk-app/README.md) — the JSON-RPC application layer reused by full and minimal SDK profiles.
-- [Base bundle](../base/README.md) — the full product foundation that this profile deliberately omits.
+- [Python SDK 例](../../../python/sdk/examples/README.md) — 明示ハーネスホームに対して Python からこのプロファイルを起動する。
+- [SDK アプリケーションバンドル](../sdk-app/README.md) — 完全版と最小版の SDK プロファイルが再利用する JSON-RPC アプリケーション層。
+- [基盤バンドル](../base/README.md) — このプロファイルが意図的に省く完全な製品基盤。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Minimal coding-agent composition
+### 最小コーディングエージェント構成
 
-#### What the model sees
+#### モデルが見るもの
 
-The system prompt is `DSH_SYSTEM_PROMPT` or `You are a helpful software engineer assistant.`. With no MCP server configured, the advertised tools are `read_image`, `working_directory`, and owner-scoped persistent `bash` on Linux/macOS or `pwsh` on Windows. Required user context supplies the current directory. Optional runtime context, text file tools, workspace instructions, skills, jobs controls, and Harness identity are absent.
+システムプロンプトは `DSH_SYSTEM_PROMPT` または `You are a helpful software engineer assistant.` である。MCP サーバー設定がない場合、広告ツールは `read_image`、`working_directory`、Linux/macOS の所有者スコープ永続 `bash` または Windows の `pwsh` である。必須ユーザー文脈は現行ディレクトリを提供する。任意実行時文脈、テキストファイルツール、ワークスペース指示、スキル、ジョブ制御、ハーネス同一性はない。
 
-#### Token effect
+#### トークン効果
 
-By default, one stable persona, three tool schemas, and user context for the initial directory and subsequent changes. Configured MCP servers add their tools, shared resource tools, and available server instructions. Images consume model input tokens. When images exceed the route budget, [image offload](../../compaction/compaction-image-offload/README.md) permanently replaces older image occurrences with attachment/path placeholders and retries the request or compaction summary. Automatic compaction sends an additional summarization request when context pressure reaches the configured threshold and replaces older model-visible history with its summary; the durable JSONL log retains those events.
+既定では安定 persona 1 件、ツールスキーマ 3 件、初期ディレクトリと以降変更のユーザー文脈である。設定済み MCP サーバーはそのツール、共有リソースツール、利用可能サーバー指示を追加する。画像はモデル入力トークンを消費する。画像が経路予算を超える場合、[画像 offload](../../compaction/compaction-image-offload/README.md) は古い画像出現を添付/パスプレースホルダーに恒久的に置換し、要求または圧縮要約を再試行する。自動圧縮は文脈圧力が設定しきい値に達すると追加の要約要求を送り、古いモデル可視履歴をその要約に置換する。耐久性のある JSONL ログはそれらのイベントを保持する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Stable for a fixed persona, platform, provider, model, and bundle patch stack. Compaction replaces part of the request history and can reduce cache reuse. Image offload also ends cache reuse at the first changed image. Profile changes take effect on the next process.
+固定 persona・平台・プロバイダー・モデル・バンドルパッチ stack に対して安定である。圧縮は要求履歴の一部を置換し、キャッシュ再利用を減らし得る。画像 offload も最初の変更画像でキャッシュ再利用を終える。プロファイル変更は次プロセスに反映される。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **The composition intentionally omits shared product services** — select `dsh --profile sdk` when settings, managed credentials, policy presets, telemetry, Web tools, or the full default tool roster are required.
-- **Image reading requires an image-capable model** — select a route whose adapter declares image input; text-only routes return a tool error. Images are stored under `$DSH_HOME/attachments/v1`.
-- **Compaction is automatic** — configure [compaction-basic](../../compaction/compaction-basic/README.md) through profile patches. SDK prompt text does not execute `/compact` or other slash commands.
-- **User patches can expand the tree and corrupt stdout** — profile customization is trusted application composition; a plugin that writes ordinary text to stdout can break JSON-RPC framing.
+- **構成は共有製品サービスを意図的に省く** — 設定、管理資格情報、ポリシー preset、テレメトリー、Web ツール、完全な既定ツール名簿が必要な場合は `dsh --profile sdk` を選ぶ。
+- **画像読み取りには画像対応モデルが必要** — 画像入力を宣言する適合器の経路を選ぶ。テキスト専用経路はツール誤差を返す。画像は `$DSH_HOME/attachments/v1` 配下に保存される。
+- **圧縮は自動である** — プロファイルパッチ経由で [compaction-basic](../../compaction/compaction-basic/README.md) を設定する。SDK プロンプト文は `/compact` や他のスラッシュコマンドを実行しない。
+- **ユーザーパッチはツリーを拡大し stdout を壊し得る** — プロファイルカスタマイズは信頼済みアプリケーション構成であり、通常文を stdout に書くプラグインは JSON-RPC framing を壊し得る。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

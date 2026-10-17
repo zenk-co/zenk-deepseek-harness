@@ -1,33 +1,33 @@
 ---
-description: "Atomic file replacement and cross-process writer locking for packages that must never leave partial, symlink-hijacked, or wider-permission content on disk."
+description: "部分的な内容、シンボリックリンクに乗っ取られた内容、またはより広い権限の内容をディスクに残してはならないパッケージ向けの、アトミックなファイル置換とプロセス間ライターロック。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-atomic-write
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-atomic-write` to replace a file without exposing partial content or following a symlinked temporary path. Its writer lock serializes read-modify-write cycles across processes so concurrent writers cannot overwrite one another with stale state. Each replacement uses caller-selected permission bits on a fresh inode, which safely narrows an existing file's permissions. This zero-dependency library accepts strings and binary byte arrays; it does not provide a `cordis.yml` plugin or crash durability because it does not call `fsync`.
+`dsh-atomic-write` は、部分的な内容を露出したり、シンボリックリンクされた一時パスを追跡したりせずにファイルを置換するために使用する。そのライターロックはプロセス間で read-modify-write サイクルを直列化するため、並行するライターが古い状態で互いを上書きすることはできない。各置換は新しい inode 上で呼び出し元が選択した権限ビットを使用し、既存ファイルの権限を安全に狭められる。このゼロ依存ライブラリは文字列とバイナリバイト配列を受け付ける。`fsync` を呼び出さないため、`cordis.yml` プラグインやクラッシュ耐久性は提供しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Use `writeFileAtomic` when a file-backed store must replace complete text or binary content without ever exposing a partial, symlink-hijacked, or wider-permission state, and `withFileLock` when several processes read-modify-write the same file. The smallest path is one call with the final content and the replacement's permission bits.
+ファイルベースのストアが、部分的な状態、シンボリックリンクに乗っ取られた状態、またはより広い権限の状態を決して露出せずに完全なテキストまたはバイナリコンテンツを置換しなければならない場合は `writeFileAtomic` を、複数のプロセスが同じファイルを read-modify-write する場合は `withFileLock` を使用する。最小の経路は、最終コンテンツと置換の権限ビットを伴う 1 回の呼び出しである。
 
-### Writing a file atomically
+### ファイルをアトミックに書き込む
 
 ```ts
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
@@ -36,11 +36,11 @@ declare const text: string
 await writeFileAtomic('/home/u/.dsh/cordis.patch.yml', text, { mode: 0o600 })
 ```
 
-Parent directories are created as needed, and readers observe either the old or the new complete content. On Windows, transient replacement interference reported as `EACCES`, `EBUSY`, or `EPERM` is retried for a bounded interval; any remaining failure removes the temporary file and leaves the target untouched.
+親ディレクトリは必要に応じて作成され、リーダーは古い完全なコンテンツか新しい完全なコンテンツのどちらかを観察する。Windows では、`EACCES`、`EBUSY`、または `EPERM` として報告される一時的な置換干渉が有限の間隔で再試行される。それでも失敗が残る場合は一時ファイルが削除され、ターゲットはそのまま残る。
 
-### Coordinating writers
+### ライターの調整
 
-For a read-render-commit cycle that a bare atomic commit cannot make safe on its own, hold the writer lock around the operation:
+素のアトミックコミットだけでは安全にできない read-render-commit サイクルでは、操作の周囲でライターロックを保持する:
 
 ```text
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
@@ -54,84 +54,84 @@ await withFileLock('/home/u/.dsh/cordis.patch.yml', async () => {
 })
 ```
 
-Only writers contend — readers never take the lock — and a contender backs off exponentially and fails with a timed-out error rather than blocking forever. How long a contender waits is stated per call through `waitMs`: the default is sized for file work alone, so a holder whose cycle includes a network round trip — a credential mutation that refreshes an expired token — states a longer one, because leaving the default would fail every other writer of that file for the duration. The retry cadence stays fixed. A contender removes an existing lock only when the lock names a process that no longer exists; file age alone never removes a lock.
+競合するのはライターのみであり(リーダーはロックを取得することは決してない)、競合者は指数的にバックオフし、永遠にブロックするのではなくタイムアウトエラーで失敗する。競合者がどれだけ待つかは `waitMs` を通じて呼び出しごとに指定する。デフォルトはファイル作業のみに合わせたサイズであるため、サイクルにネットワークラウンドトリップを含む保持者(期限切れトークンを更新する資格情報の変更など)はより長い値を指定する。デフォルトのままにすると、その間そのファイルの他のすべてのライターが失敗するためである。再試行の間隔は固定のままである。競合者が既存のロックを削除するのは、ロックがもはや存在しないプロセスを名指す場合のみである。ファイルの古さだけでロックが削除されることは決してない。
 
-### Failures to plan for
+### 想定すべき失敗
 
-Windows retries one `EPERM` when the lock cannot be observed, because its holder can release between exclusive creation and the existence check. A repeated unconfirmed `EPERM` is rethrown without running the operation.
+Windows では、ロックを観察できない場合に `EPERM` を 1 回再試行する。保持者が排他的作成と存在確認の間に解放する可能性があるためである。確認できない `EPERM` が繰り返される場合は、操作を実行せずに再スローされる。
 
-The lock's parent directory must already exist, so `withFileLock` rejects an invalid parent hierarchy before running the operation. A process that exits while holding the lock leaves the lock sibling behind, and the next writer takes it over. A lock whose record is empty or incomplete, or names a PID that a live process reused, is not taken over; later writers time out, and an operator removes it only after verifying that no writer still owns it. An optional `signal` cancels acquisition and contention waits; the operation owns cancellation after it starts.
+ロックの親ディレクトリはあらかじめ存在しなければならないため、`withFileLock` は操作を実行する前に無効な親階層を拒否する。ロックを保持したまま終了するプロセスはロックの兄弟ファイルを残し、次のライターがそれを引き継ぐ。レコードが空または不完全なロック、または生きたプロセスが再利用した PID を名指すロックは引き継がれない。後続のライターはタイムアウトし、オペレーターはまだ所有しているライターがいないことを確認した後にのみそれを削除する。オプションの `signal` は取得と競合の待機をキャンセルする。操作が開始された後のキャンセルは操作が所有する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The package is built on one separation: the atomic commit owns the swap, and the writer lock owns cross-process ordering.
+このパッケージは 1 つの分離の上に構築されている: アトミックコミットがスワップを所有し、ライターロックがプロセス間の順序付けを所有する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `writeFileAtomic` and `withFileLock`, the package's whole surface |
+| [`src/index.ts`](src/index.ts) | `writeFileAtomic` と `withFileLock`、パッケージのサーフェス全体 |
 
-### Write path
+### 書き込み経路
 
-`writeFileAtomic` writes a random-suffix sibling opened with exclusive create (`wx`), then renames it over the target. The exclusive open refuses to follow a symlink planted at a guessable temp path; the same-directory sibling keeps the rename on one filesystem; and the rename replaces a symlinked target itself instead of writing through to its referent. A Windows retry keeps the same complete sibling and uses bounded exponential backoff, so temporary use of the target by software outside the cooperative writer lock cannot turn a safe replacement into an immediate failure; the archived [retry decision record](../../../.agents/notes/archived/bug-fix/2026-08-29-windows-atomic-replace-retry.md) documents the original rationale and rejected alternatives.
+`writeFileAtomic` は、排他的作成(`wx`)で開いたランダムサフィックスの兄弟ファイルに書き込み、それをターゲットの上にリネームする。排他的オープンは、推測可能な一時パスに仕掛けられたシンボリックリンクを追跡することを拒否する。同じディレクトリの兄弟ファイルはリネームを 1 つのファイルシステム上に保つ。リネームは、シンボリックリンクされたターゲットをその参照先へ書き抜けるのではなく、それ自体を置換する。Windows の再試行は同じ完全な兄弟ファイルを保ち、有限の指数バックオフを使用するため、協調ライターロック外のソフトウェアによるターゲットの一時的な使用が、安全な置換を即時の失敗に変えることはない。アーカイブされた[再試行の決定記録](../../../.agents/notes/archived/bug-fix/2026-08-29-windows-atomic-replace-retry.md)が元の根拠と却下された代替案を記録している。
 
-`withFileLock` creates a `<filename>.lock` sibling with `wx`. `EEXIST` identifies contention directly; `EPERM` does so only when a fresh `lstat` confirms the lock path exists, covering Windows exclusive-create behavior without hiding an unrelated permission failure. The lock records its creator's PID as `<pid>\n` and is removed by the holder in a `finally`. A contender that reads a record whose PID a signal probe reports as absent (`ESRCH`) creates a `<filename>.lock.takeover-<record hash>` claim with `wx`, re-reads the lock and probes its PID again, removes it only if it still holds the same record and that PID is still absent, removes the claim, and retries at once. A holder that exists under another user (`EPERM`) and a record naming the contender's own process are waited for. Contenders that read the same record contend for one claim, and the second probe rejects a holder that reused the exited PID, so a takeover never removes a lock that another contender acquired after the exited holder's. Takeover proves only that the recorded process exited; an operation that starts other writers leaves its successor a way to find them, as the [Plugin Manager](../../boot/plugin-manager/README.md) does for its pnpm runs. Contention backs off exponentially and fails when the per-call `waitMs` deadline (default two seconds) passes; the [historical takeover decision record](../../../.agents/notes/archived/bug-fix/2026-09-24-exited-holder-lock-takeover.md) records the rationale.
+`withFileLock` は `wx` で `<filename>.lock` の兄弟ファイルを作成する。`EEXIST` は競合を直接識別し、`EPERM` は新しい `lstat` がロックパスの存在を確認した場合にのみ競合を識別する。これにより、無関係な権限エラーを隠すことなく Windows の排他的作成の挙動をカバーする。ロックは作成者の PID を `<pid>\n` として記録し、保持者が `finally` で削除する。シグナルプローブが不在(`ESRCH`)と報告する PID のレコードを読んだ競合者は、`wx` で `<filename>.lock.takeover-<record hash>` のクレームを作成し、ロックを再読み取りして PID を再度プローブし、まだ同じレコードを保持していてその PID が依然として不在の場合にのみ削除し、クレームを削除して即座に再試行する。別のユーザーの下に存在する保持者(`EPERM`)と、競合者自身のプロセスを名指すレコードは待機の対象である。同じレコードを読んだ競合者は 1 つのクレームを争い、2 回目のプローブが終了した PID を再利用した保持者を拒否するため、引き継ぎが、終了した保持者の後に別の競合者が取得したロックを削除することは決してない。引き継ぎは、記録されたプロセスが終了したことのみを証明する。他のライターを起動する操作は、後継者がそれらを見つける方法を残す。たとえば [Plugin Manager](../../boot/plugin-manager/README.md) は自身の pnpm 実行についてそうしている。競合は指数的にバックオフし、呼び出しごとの `waitMs` 期限(デフォルト 2 秒)を過ぎると失敗する。[historical takeover decision record](../../../.agents/notes/archived/bug-fix/2026-09-24-exited-holder-lock-takeover.md) が根拠を記録している。
 
-### Why the swap stays safe
+### スワップが安全であり続ける理由
 
-- **Fresh inode, caller-stated mode** — the temp carries `mode` through the rename, so narrowing a wider-permission file has no chmod race. `mode` is required so the permission decision stays visible at every call site.
-- **Readers never contend** — the rename commit is atomic, so a reader needs no lock.
-- **A contender deletes only an exited holder's lock** — age cannot distinguish a crashed owner from a paused live writer, but a missing process can.
+- **新しい inode、呼び出し元が指定する mode** — 一時ファイルはリネームを通じて `mode` を運ぶため、より広い権限のファイルを狭める際に chmod レースはない。`mode` は、権限の決定がすべての呼び出し箇所で可視であるように必須である。
+- **リーダーは競合しない** — リネームコミットはアトミックであるため、リーダーはロックを必要としない。
+- **競合者が削除するのは終了した保持者のロックのみ** — 古さではクラッシュした所有者と一時停止した生きたライターを区別できないが、不在のプロセスならできる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when you need the consuming stores or the family this primitive belongs to.
+このプリミティブを消費するストアや、それが属するファミリーが必要な場合にこれらのページを読む。
 
-- [Profile configuration editor](../../boot/config-editor/README.md) — the profile patch every edit replaces through this package.
-- [Credentials store](../../credentials/credentials-local/README.md) — the credentials file this package locks and replaces.
-- [util group map](../README.md) — the zero-dependency utility family this package belongs to.
+- [プロファイル設定エディター](../../boot/config-editor/README.md) — すべての編集がこのパッケージを通じて置換するプロファイルパッチ。
+- [資格情報ストア](../../credentials/credentials-local/README.md) — このパッケージがロックして置換する資格情報ファイル。
+- [util グループマップ](../README.md) — このパッケージが属するゼロ依存ユーティリティファミリー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this is a pure filesystem write primitive that registers nothing model-facing.
+なし。これはモデルに面するものを何も登録しない純粋なファイルシステム書き込みプリミティブである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Nothing here enters a request prefix, so provider cache reuse is unaffected.
+ここにあるものはリクエストプレフィックスに入らないため、プロバイダーキャッシュの再利用は影響を受けない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the package is not the right tool. They are current package constraints, not a task backlog.
+これらの制限は、このパッケージが適切なツールでない状況を定義する。現在のパッケージの制約であり、タスクのバックログではない。
 
-- **Atomic, not durable** — no `fsync` of the file or its directory, so after a crash the rename may be observed unwound. The file-backed stores here re-read and republish on boot, keeping durability the caller's policy.
-- **Callers supply complete content** — strings and `Uint8Array` (including `Buffer`) are accepted; streaming writes are unsupported.
-- **Some orphaned locks require operator recovery** — a lock whose record is empty or incomplete, or names a PID a live process reused, stays in place; later writers time out without deleting it. A contender that ends between creating a claim and removing the lock leaves both `<filename>.lock` and `<filename>.lock.takeover-<record hash>`, and the operator removes both.
-- **One host and one PID namespace** — the probe runs on the contender's host. Writers on several hosts sharing a network filesystem, or containers sharing a volume, can see a live holder as exited, take over its lock, and write at the same time as it.
+- **アトミックだが耐久性はない** — ファイルやそのディレクトリの `fsync` は行われないため、クラッシュ後にリネームが巻き戻って観察される可能性がある。ここでファイルベースのストアは起動時に再読み取りして再公開し、耐久性を呼び出し元のポリシーのままにする。
+- **呼び出し元が完全なコンテンツを提供する** — 文字列と `Uint8Array`(`Buffer` を含む)が受け付けられ、ストリーミング書き込みはサポートされない。
+- **一部の孤立したロックはオペレーターの回復を必要とする** — レコードが空または不完全なロック、または生きたプロセスが再利用した PID を名指すロックはその場に残る。後続のライターはそれを削除せずにタイムアウトする。クレームの作成とロックの削除の間に終了した競合者は、`<filename>.lock` と `<filename>.lock.takeover-<record hash>` の両方を残し、オペレーターは両方を削除する。
+- **1 つのホストと 1 つの PID 名前空間** — プローブは競合者のホストで実行される。ネットワークファイルシステムを共有する複数のホスト、またはボリュームを共有するコンテナ上のライターは、生きた保持者を終了済みと見なし、そのロックを引き継ぎ、それと同時に書き込む可能性がある。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-A durability-replacement that `fsync`s the file and parent directory and preserves owner-only permissions on Windows remains open (tracked as `settings-atomic-durability` in source).
+ファイルと親ディレクトリを `fsync` し、Windows で所有者限定の権限を保持する耐久性の置き換えは未解決のままである(ソース内で `settings-atomic-durability` として追跡されている)。
 
 </details>

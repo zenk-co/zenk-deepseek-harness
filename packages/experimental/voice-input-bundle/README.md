@@ -5,73 +5,73 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-voice-input-bundle
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This optional bundle composes a speech Service Definition, local SenseVoice provider, authenticated Remote and browser microphone control. Shipped profiles leave it disabled.
+音声 Service Definition、ローカル SenseVoice プロバイダー、認証済み Remote、ブラウザーマイク制御を組み合わせた任意バンドル。出荷プロファイルでは無効のままである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Open Plugins in the Web sidebar and enable Voice Input, marked by a blue waveform icon. If models need preparation, a dialog offers Go to setup or Later; Go to setup opens the bundle details. Complete caches need no setup prompt. In the details, choose Download and prepare; the collapsed current-step summary expands to the complete step list. Downloads report actual bytes; verification and loading show elapsed time. Once ready, click the microphone between the model selector and Send, then Stop to insert a transcript. Bundle details store the recognizer and language through the Settings service. Disabling the bundle cancels active work; cached assets remain on disk.
+Web サイドバーの Plugins を開き、青い波形アイコンの Voice Input を有効にする。モデルに準備が必要な場合、Go to setup または Later を選ぶダイアログが表示される。Go to setup はバンドル詳細を開く。キャッシュが完全な場合はセットアップ確認は不要である。詳細画面で Download and prepare を選択する。折りたたまれた現在のステップ概要を展開すると完全なステップリストが表示される。ダウンロードは実際のバイト数を報告し、検証と読み込みは経過時間を表示する。準備ができたら、モデルセレクターと Send の間のマイクをクリックし、Stop でトランスクリプトを挿入する。バンドル詳細は Settings サービスを通じて認識器と言語を保存する。バンドルを無効にすると実行中の作業は取り消される。キャッシュ済みアセットはディスクに残る。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Maintainer details — click to expand</summary>
+<summary>メンテナー向け詳細 — クリックで展開</summary>
 
-The static `cordis.patch.yml` adds the four voice rows, selects `sensevoice-local` as the default recognizer and supplies the provider cache directory with `dshHomePath`. Optional-bundle installation makes the package available to management without selecting it in default profiles. The browser contribution owns its generated Remote mount; stable API Remotes do not import experimental code.
+静的な `cordis.patch.yml` が 4 つの音声行を追加し、デフォルト認識器として `sensevoice-local` を選択し、`dshHomePath` でプロバイダーキャッシュディレクトリを提供する。任意バンドルのインストールにより、デフォルトプロファイルで選択されなくてもパッケージが管理対象として利用可能になる。ブラウザー提供物は生成された Remote マウントを所有し、安定 API の Remote は実験的コードをインポートしない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-[Voice input subsystem](../../../docs/subsystems/voice-input.md)
+[音声入力サブシステム](../../../docs/subsystems/voice-input.md)
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as recordings and preparation remain outside model requests; ordinary user submission owns any later text.
+なし。録音と準備はモデルリクエストの外に留まり、後の通常ユーザー送信がテキストを所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct effect; ordinary submission owns the message content.
+直接の影響はない。通常の送信がメッセージ内容を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- The initial bundle supplies one local recognizer. Additional providers register with the same service under distinct ids; cloud recognition requires an explicit new provider and credential configuration. The bundle does not add a model tool or change the agent loop.
-- Installing dsh also installs `sherpa-onnx-node` and its platform-specific native runtime, including ONNX Runtime, even when this bundle is disabled. Runtime installation adds disk and download costs separate from the models downloaded by Download and prepare; the native package size varies by platform and version.
+- 初期バンドルは 1 つのローカル認識器のみを提供する。追加のプロバイダーは同じサービスに異なる id で登録する。クラウド認識には明示的な新規プロバイダーとクレデンシャル設定が必要である。バンドルはモデルツール追加もエージェントループ変更も行わない。
+- dsh のインストールにより、バンドルが無効でも `sherpa-onnx-node` とそのプラットフォーム固有ネイティブランタイム（ONNX Runtime を含む）がインストールされる。ランタイムのインストールは Download and prepare でダウンロードされるモデルとは別にディスクとダウンロードのコストを追加する。ネイティブパッケージのサイズはプラットフォームとバージョンによって異なる。
 
 -----
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Maintainer details — click to expand</summary>
+<summary>メンテナー向け詳細 — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

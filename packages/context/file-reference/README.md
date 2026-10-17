@@ -5,55 +5,55 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-file-reference
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Host-backed user interfaces use `dsh-file-reference` to offer `@file` completion: a UI asks for path candidates for the addressed agent, the model types `@path` or `@"path with spaces"`, and picking a candidate inserts the matching mention as ordinary prompt text. The seam itself owns no filesystem access — a concrete provider such as `@deepseek-ai/dsh-file-reference-local` supplies candidates, ranking, caching, and invalidation. Selecting a candidate never reads or attaches file contents; the model must call a filesystem tool to inspect a file. Session Controller exposes the same discovery to browser consumers through the `fileReferences/list` Remote.
+ホスト支援ユーザーインターフェースは `@file` 補完のために `dsh-file-reference` を使います。UI は対象エージェント向けパス候補を問い合わせ、モデルは `@path` または `@"path with spaces"` と入力し、候補選択は対応メンションを通常プロンプトテキストとして挿入します。シーム自体はファイルシステムアクセスを持ちません。`@deepseek-ai/dsh-file-reference-local` のような具象プロバイダーが候補、ランキング、キャッシュ、無効化を提供します。候補選択はファイル内容を読まず添付もしません。ファイルを調べるにはモデルがファイルシステムツールを呼ばなければなりません。Session Controller は同じ検出をブラウザーコンシューマーに `fileReferences/list` Remote 経由で公開します。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-Choose this package when a host-backed UI (web or terminal) should offer `@file` completion, and pair it with a provider whose namespace matches the agent's effective `read` tool. Mounting the seam without a provider gives the UI an empty completion surface.
+ホスト支援 UI (Web またはターミナル) に `@file` 補完を持たせる場合にこのパッケージを選び、エージェントの有効 `read` ツールに名前空間が合うプロバイダーと組み合わせます。プロバイダーなしにシームをマウントすると UI の補完面は空になります。
 
-### Mention grammar
+### メンション文法
 
-An `@path` token at the start of input or after whitespace triggers completion; an `@` inside another token, such as an email address, does not. `@"path with spaces"` opens a quoted mention, and a directory candidate keeps that quote open after its trailing slash so completion can descend another level. Completed directory chips close the quote after the trailing slash. Relative mentions resolve from the workspace root; absolute mentions retain the host path. The formatter rejects paths with control characters or embedded quotes that the grammar cannot represent safely.
+入力先頭または空白後の `@path` トークンが補完を起動します。メールアドレスのような別トークン内の `@` は起動しません。`@"path with spaces"` は引用メンションを開き、ディレクトリー候補は末尾スラッシュ後に引用を開いたままにするため、補完はもう 1 階層降りられます。完了済みディレクトリーチップは末尾スラッシュ後に引用を閉じます。相対メンションはワークスペースルートから解決します。絶対メンションはホストパスを保持します。フォーマッターは文法で安全に表せない制御文字や埋込引用を含むパスを拒否します。
 
-### Getting candidates
+### 候補の取得
 
-`ctx.fileReferences.list(agent, query, signal)` returns path-only file and directory candidates for one agent's working directory, deterministically ranked by the provider. Directory mentions render with a trailing `/` so completion can descend another level. Browser consumers call the Session Controller adapter as `ctx.remote.fileReferences.list`; the trailing signal cancels a slow autocomplete.
+`ctx.fileReferences.list(agent, query, signal)` は 1 エージェントの作業ディレクトリー向けパス限定のファイルおよびディレクトリー候補を返し、プロバイダーが決定論的にランク付けします。ディレクトリーメンションは末尾 `/` 付きで描画されるため、補完はもう 1 階層降りられます。ブラウザーコンシューマーは Session Controller アダプターを `ctx.remote.fileReferences.list` として呼びます。末尾シグナルは遅い自動補完をキャンセルします。
 
-### Pairing with a provider
+### プロバイダーとの組合せ
 
-For a local filesystem, mount `@deepseek-ai/dsh-file-reference-local`; other namespaces (remote or virtual filesystems) need a provider whose discovery matches the effective tool. When the addressed agent can call `read`, a provider may install the stable `FILE_REFERENCE_PROMPT` guidance that tells the model to read a referenced file before claiming to have inspected it.
+ローカルファイルシステムには `@deepseek-ai/dsh-file-reference-local` をマウントします。他名前空間 (リモートまたは仮想ファイルシステム) には検出が有効ツールに合うプロバイダーが必要です。対象エージェントが `read` を呼べる場合、プロバイダーは参照ファイルを検査済みと主張する前に読むようモデルに伝える安定 `FILE_REFERENCE_PROMPT` ガイダンスを導入できます。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-This section explains the design of the seam; the observable behavior is covered in [Use this package](#use-this-package).
+この節ではシームの設計を説明します。観測可能な動作は [Use this package](#use-this-package) で扱っています。
 
-### Design concept
+### 設計概念
 
-The package separates an abstract discovery service from a shared, browser-safe mention grammar, with providers owning namespace access, ranking, caching, and invalidation. The service remains wire-neutral; `dsh-api-session-controller` owns the `fileReferences/list` Remote adapter and delegates to the active provider after resolving its Agent.
+パッケージは抽象検出サービスを共有のブラウザー安全メンション文法から分離し、プロバイダーが名前空間アクセス、ランキング、キャッシュ、無効化を所有します。サービスはワイヤー中立のままです。`dsh-api-session-controller` は `fileReferences/list` Remote アダプターを所有し、エージェント解決後に有効プロバイダーに委譲します。
 
-### Source map
+### ソースマップ
 
 | File | Role |
 |---|---|
@@ -61,9 +61,9 @@ The package separates an abstract discovery service from a shared, browser-safe 
 | [`src/grammar.ts`](src/grammar.ts) | `activeAtToken` recognition and `formatFileMention` rendering |
 | [`src/types.ts`](src/types.ts) | `FileReferenceCandidate` path-only result type |
 
-### Main flow
+### 主フロー
 
-The UI recognizes an active `@` token through `activeAtToken`, calls `list` with the query text, and renders the ranked candidates. On selection, `formatFileMention` emits the matching prompt spelling (`@path`, `@"path with spaces"`, or an open `@"dir/` for a quoted directory). No file content is read at any point; providers may additionally install the stable `FILE_REFERENCE_PROMPT` section when the addressed agent has a `read` tool.
+UI は `activeAtToken` 経由で有効 `@` トークンを認識し、照会テキストで `list` を呼び、ランク付き候補を描画します。選択時、`formatFileMention` は対応プロンプト綴り (`@path`、`@"path with spaces"`、引用ディレクトリー向け開いた `@"dir/` ) を送出します。いかなる時点もファイル内容は読みません。プロバイダーは対象エージェントが `read` ツールを持つ場合、安定 `FILE_REFERENCE_PROMPT` 節を追加導入できます。
 
 </details>
 
@@ -72,36 +72,36 @@ The UI recognizes an active `@` token through `activeAtToken`, calls `list` with
 <a id="further-exploration"></a>
 ## Further Exploration
 
-Read these pages when the package-level contract is not enough. They move from the shipped provider to the shared reference surface and the tools the candidates point at.
+パッケージレベルの契約では足りない場合にこれらのページを読みます。出荷プロバイダーから共有参照面、そして候補が指すツールへ進みます。
 
-- [Local file-reference provider](../file-reference-local/README.md) — the shipped local-workspace implementation of this seam.
-- [Session-reference subsystem](../../../docs/subsystems/session-reference.md) — the shared file-reference and session-reference contracts behind host UIs.
-- [Context group map](../README.md) — sibling request-context packages.
-- [Filesystem tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-fs) — the `read` tool that referenced paths are meant for.
+- [Local file-reference provider](../file-reference-local/README.md) — このシームの出荷ローカルワークスペース実装。
+- [Session-reference subsystem](../../../docs/subsystems/session-reference.md) — ホスト UI 背後の共有 file-reference および session-reference 契約。
+- [Context group map](../README.md) — 兄弟要求コンテキストパッケージ。
+- [Filesystem tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-fs) — 参照パスが対象とする `read` ツール。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the composed provider, which owns the file-reference guidance that this package's discovery seam and grammar delegate to it.
+間接的に、構成済みプロバイダー経由です。このパッケージの検出シームと文法が委譲する file-reference ガイダンスをプロバイダーが所有します。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-The interface and grammar add no request tokens; a provider-owned prompt section determines whether the reusable prefix changes.
+インターフェースと文法は要求トークンを加えません。プロバイダー所有プロンプト節が再利用可能プレフィックスが変わるかを決定します。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the seam is a poor fit. They are current package constraints.
+これらの制限は、シームが不向きになる条件を定めます。これらは現行パッケージの制約です。
 
-- **Path candidates are advisory** — the seam does not prove that a later model-facing filesystem tool can access the same namespace; deployments must align the provider with the effective `read` implementation.
-- **No file-content reference object** — selected files remain ordinary prompt text and require an explicit model tool call before their contents become model-visible.
+- **Path candidates are advisory** — シームは以降のモデル向けファイルシステムツールが同じ名前空間にアクセスできることを証明しません。配置はプロバイダーを有効 `read` 実装に合わせなければなりません。
+- **No file-content reference object** — 選択ファイルは通常プロンプトテキストのまま残り、その内容がモデル可視になる前に明示モデルツール呼び出しが必要です。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

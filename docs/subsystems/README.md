@@ -1,76 +1,76 @@
-# Subsystems
+# サブシステム
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-One page per subsystem of the DeepSeek Harness: what it is, the data structures it moves, and — where a `ctx` service or event scope backs it — a generated **Cordis API** section carrying its service and event reference. The folder complements [architecture.md](../architecture.md), which describes *behavior* across subsystems (the service map, the session/turn/step lifecycle, the event taxonomy); each page here is the reference for one subsystem's vocabulary and wiring.
+DeepSeek Harness のサブシステムごとに 1 ページ: それが何か、動かすデータ構造、そして — `ctx` サービスまたはイベントスコープがそれを支える場合 — そのサービスとイベントリファレンスを運ぶ生成された **Cordis API** セクション。このフォルダは [architecture.md](../architecture.md) を補完する。同ファイルはサブシステム横断の*動作*（サービスマップ、session/turn/step ライフサイクル、イベント分類）を記述する。ここにある各ページは 1 つのサブシステムの語彙と結線のリファレンスである。
 
-| Page | Owns |
+| ページ | 所有 |
 |---|---|
-| [boot.md](boot.md) | Current-profile plugin management and launcher reload coordination |
-| [core.md](core.md) | how `packages/core` controls the agent loop: the package-by-package loop description, agent creation and ownership (`AgentHandle`), the `Agent` handle's delivery/cancellation/interception contracts, and the repo-wide type patterns (`…Map → derived-union`, branded ids) |
-| [llm-streaming.md](llm-streaming.md) | the `packages/llm` conversation types — `Message`/`ContentBlock`, the assembled model request, the `StreamChunk` wire protocol and adapter contract, `BlockAssembler`, and the `LlmAdapter` provider contract |
-| [token-meter.md](token-meter.md) | immutable scalar and positional replay measurements with consumed-log revisions |
-| [scope.md](scope.md) | scoped registration identity, dispatch carriers, and the owned `Scope` context |
-| [typert.md](typert.md) | Remote invocation descriptors, lookup/Context declarations, Typert registries, and the Host Gateway/Client API boundaries |
-| [goal.md](goal.md) | persisted goal identity, lifecycle snapshots, activation, change records, and round attribution |
-| [schedule.md](schedule.md) | Host-owned reminder records, durable transitions, active and ended views, and ordinary-conversation delivery |
-| [todo.md](todo.md) | the todo package's whole-list item type, durable event ownership, and projection |
-| [deliverables.md](deliverables.md) | what a turn hands to the user: `PresentedFile` deliveries from `present` and the Host-served `WorkspaceChangesSummary` of changed files from git snapshots |
-| [commands.md](commands.md) | the human-command registry service: definitions, adapter discovery, direct invocation, results, and parsing views |
-| [session.md](session.md) | the full `SessionEventMap` variant catalog, `TurnEndReason`, `deriveMessages()`, execution enclosure, and standalone events |
-| [working-directory.md](working-directory.md) | Session execution directories, durable changes, recovery, and user context |
-| [worktrees.md](worktrees.md) | Experimental Git branch and checkout creation under existing permissions |
-| [persistence.md](persistence.md) | the durability seam: `SessionPersistence`, the JSONL provider, `session/flush`, crash recovery, `SessionHeader` |
-| [settings.md](settings.md) | the user-settings seam: `SettingsNamespace` registration, layered resolution (defaults → composition `base` → user document), owner scopes, hot commits |
-| [credentials.md](credentials.md) | the credential seam: `CredentialRef` references (never values) in configuration, per-operation resolution, UI-safe `CredentialInfo`, provider source layers |
-| [session-query.md](session-query.md) | logical records, bounded exact-event reads, relationship traces, semantic filters/documents, and full-text result pages |
-| [feedback.md](feedback.md) | lifecycle-bound per-message feedback records, optimistic versions, sidecar persistence, and the Host Remote contract |
-| [session-title.md](session-title.md) | durable title snapshots, cited source-message seqs, and the asynchronous provider contract |
-| [session-reference.md](session-reference.md) | structured cross-session references: `SessionReferenceInput`/`Candidate`, prepared message contexts, the stable error taxonomy |
-| [system-prompt.md](system-prompt.md) | per-assembly context, tool-provider results, prompt sections, and cooperative assembly |
-| [tools.md](tools.md) | `ToolDefinition` full fields, the schema DSL, `ToolExecution`/`ToolResult`, tool-presentation UI types, and the guarded execution pipeline |
-| [mcp.md](mcp.md) | external MCP connections, scoped tools and resources, server instructions, protocol results, and configuration ownership |
-| [user-questions.md](user-questions.md) | the UI-backed human question/answer seam: `AskUserQuestionRequest`, answer/options vocabulary, provider API, error taxonomy |
-| [approval.md](approval.md) | the one-shot user-approval seam: `ApprovalRequest`, `ApprovalOutcome`, per-session policy, audit events, and answerer contracts |
-| [office-to-pdf.md](office-to-pdf.md) | authorized Office-to-PDF conversion, native/WASM engines, and bounded shared reuse |
-| [attachment.md](attachment.md) | durable image identity and metadata, validation inputs, verified reads, and the `AttachmentStore` seam |
-| [shell.md](shell.md) | the shell executor seam: `ShellExecRequest`/`Spec`, `ShellRunResult`, background `ShellProcess` handles |
-| [subprocess.md](subprocess.md) | the subprocess seam: fully-explicit `SubprocessSpawnSpec`, offset-based output readers, unclassified `SubprocessOutcome`, and the managed `DSH_*` environment vocabulary |
-| [ssh.md](ssh.md) | the POSIX SSH connection and remote filesystem, subprocess and sandbox providers |
-| [terminal.md](terminal.md) | persistent terminal ids, backend/session contracts, send readiness, bounded reads, and owner-visible snapshots |
-| [sandbox.md](sandbox.md) | per-session policy resolution and the process-confinement seam: file-effect modes, execution/provider policies, `ConfinedArgv`, enforcement and fail-closed errors |
-| [ptc-runtime.md](ptc-runtime.md) | the PTC execution seam: `PtcRunRequest`/`Result`, binding namespaces, captured logs, the `PtcRunFailure` taxonomy |
-| [computer-use.md](computer-use.md) | exclusive named computer-use provider registration and Cua Driver integration choices |
-| [browser-use.md](browser-use.md) | exclusive named browser-use registration, provider choices, and per-Session browser ownership |
-| [extensions.md](extensions.md) | versioned dynamic Cordis Plugins and Packages, Host/Client activation, approval, runtime inspection, and lifecycle teardown |
-| [filesystem.md](filesystem.md) | the filesystem seam: `FsTarget`, read/write/edit outcomes, observed-file state, `FsErrorCode` |
-| [lsp.md](lsp.md) | the LSP navigation seam: `LspQueryRequest`/`Result`, `LspProvider`/`Service`, four operations, `LspError` |
-| [skills.md](skills.md) | the skill service: discovery priority, `SkillSummary`/`SkillDefinition`, session-prefix catalog, model-facing `skill` loading |
-| [compaction.md](compaction.md) | the compaction seam: the `compaction/*` session events, `CompactionResult`, the `CompactionEngine` interface |
-| [subagent.md](subagent.md) | the subagent seam: the named-provider registry, `SubagentStartRequest`/`Result`/`Run`, the start-time-vs-runtime capability split |
-| [voice-input.md](voice-input.md) | experimental named recognizers, transient audio and revision-guarded draft insertion |
-| [translation.md](translation.md) | experimental anonymous text translation and explicit provider requests |
-| [agent-team.md](agent-team.md) | Agent Teams: implicit Lead identity, named continuable teammates, direct peer inbox delivery, and shared task DAG |
-| [claude-code-mods.md](claude-code-mods.md) | Claude Code mods through the experimental bridge: every event, `$` member, chain rule, drawing feature, and example mod that differs from Claude Code |
-| [web.md](web.md) | the web access seam: `WebSearchRequest`/`Result`, `WebFetchRequest`/`Result`, `WebFetchBody`, provider availability, `WebError` |
-| [spill.md](spill.md) | the spill storage seam: `SaveTextSpill`, `SpillOwner`/`SpillSource`, `SpillRef`, the branded `SpillLocator` |
-| [workflow.md](workflow.md) | the workflow seam: `WorkflowStartRequest`, `WorkflowMeta`, `WorkflowRun`/`Result`, the `workflow/*` event payloads, `WorkflowError` fatality |
-| [jobs.md](jobs.md) | the background-job runtime: branded `JobId`s, the producer contract, consumer views, and `ctx.jobs` service behavior |
-| [permission-presets.md](permission-presets.md) | the permission-preset layer: `PresetSpec`/`PresetOption`, the derived `custom` state, the log-only `permission/preset` event |
-| [plan.md](plan.md) | plan mode: the log-only `plan/mode` state, pending-selection flush, `PlanModeConfig`, the `exit_plan_mode` review arc |
-| [web-server.md](web-server.md) | the HTTP carrier: `WebRouteKind`/`WebRoute`, match order, the claimable fallback seat, index taps |
-| [webhook.md](webhook.md) | authenticated provider deliveries, arbitrary programmatic rules, and fire-and-forget Workspace Session creation |
-| [storage.md](storage.md) | the storage subsystem: the backend contract (`StorageBackend`), `StorageForms`, `DomainSpec`/`Domain`, `domain/changed` |
-| [workspace.md](workspace.md) | the workspace registry: `Workspace`/`WorkspaceId`, registration and resolution, the session `cwd` relationship |
-| [web-client.md](web-client.md) | the browser architecture: boot, Remote communication, paired Client models, UI adapters, Conversation assembly, Slots, and reconnect semantics |
-| [client-modules.md](client-modules.md) | the web plugin table: `dsh.client` declarations, `WebBootGraph` wire composition, the bundle route and index tap |
-| [slots.md](slots.md) | typed Web UI composition: declaration ownership, cardinality and scope, framework and feature injection, props derivation, and the shipped hierarchy |
-| [client-resources.md](client-resources.md) | the client resource model: `dsh-resource://<type>/…` addresses, protocol providers and `ResourceProtocolMap`, the `useResource` global hook and its states, pins and release |
-| [sidebar-right.md](sidebar-right.md) | the right Sidebar: resource and navigation addresses, tab-type registration and routing, the `ctx.sidebarRight` navigation service, the pane-tab slots and owner props, the resource model, and the Workspace Files service |
-| [conversation.md](conversation.md) | target-neutral Session-event assembly: Context identity, Location data, replay paths, view builders, and target-owned render nodes |
-| [session-projection.md](session-projection.md) | the projection seam: `SessionProjectionMap`, the pure `ProjectionDefinition` unit, `ProjectionSnapshot`'s consistent cut, the change feed |
-| [session-telemetry.md](session-telemetry.md) | the outbound session-reporting capability seam: `SessionTelemetryRecord`/`SessionTelemetrySeverity`, the `SessionTelemetrySink` contract, and the `session-telemetry/record` redact waterfall |
-| [otel.md](otel.md) | Shared ordinary-event and Session-log OTLP channels |
-| [product-telemetry.md](product-telemetry.md) | Explicit product analytics submission and OTLP/HTTP transport |
+| [boot.md](boot.md) | 現在のプロファイルのプラグイン管理とランチャーリロード調整 |
+| [core.md](core.md) | `packages/core` がエージェントループをいかに制御するか: パッケージごとのループ記述、エージェントの作成と所有権（`AgentHandle`）、`Agent` ハンドルの配達/キャンセル/インターセプトの契約、リポジトリ全体の型パターン（`…Map → derived-union`、ブランド付き id） |
+| [llm-streaming.md](llm-streaming.md) | `packages/llm` の会話型 — `Message`/`ContentBlock`、組み立てられたモデルリクエスト、`StreamChunk` ワイヤープロトコルとアダプター契約、`BlockAssembler`、`LlmAdapter` プロバイダー契約 |
+| [token-meter.md](token-meter.md) | 消費ログのリビジョン付きの不変なスカラーおよび位置指定リプレイ計測 |
+| [scope.md](scope.md) | スコープ付き登録アイデンティティ、ディスパッチキャリア、所有された `Scope` コンテキスト |
+| [typert.md](typert.md) | リモート呼び出し記述子、ルックアップ/Context 宣言、Typert レジストリ、Host Gateway/Client API 境界 |
+| [goal.md](goal.md) | 永続化されたゴールアイデンティティ、ライフサイクルスナップショット、アクティベーション、変更レコード、ラウンド帰属 |
+| [schedule.md](schedule.md) | Host 所有のリマインダーレコード、durable な遷移、アクティブと終了のビュー、通常会話への配達 |
+| [todo.md](todo.md) | todo パッケージのリスト全体の項目型、durable なイベント所有権、プロジェクション |
+| [deliverables.md](deliverables.md) | ターンがユーザーに手渡すもの: `present` からの `PresentedFile` 配達と、git スナップショットからの変更ファイルの Host 提供 `WorkspaceChangesSummary` |
+| [commands.md](commands.md) | 人間コマンドレジストリサービス: 定義、アダプター探索、直接呼び出し、結果、解析ビュー |
+| [session.md](session.md) | 完全な `SessionEventMap` バリアントカタログ、`TurnEndReason`、`deriveMessages()`、実行エンクロージャ、スタンドアロンイベント |
+| [working-directory.md](working-directory.md) | セッション実行ディレクトリ、durable な変更、復旧、ユーザーコンテキスト |
+| [worktrees.md](worktrees.md) | 既存の権限の下での実験的な Git ブランチとチェックアウトの作成 |
+| [persistence.md](persistence.md) | durability シーム: `SessionPersistence`、JSONL プロバイダー、`session/flush`、クラッシュ復旧、`SessionHeader` |
+| [settings.md](settings.md) | ユーザー設定シーム: `SettingsNamespace` 登録、階層解決（既定 → 構成 `base` → ユーザードキュメント）、オーナースコープ、ホットコミット |
+| [credentials.md](credentials.md) | 資格情報シーム: 設定内の `CredentialRef` 参照（値ではない）、操作ごとの解決、UI 安全な `CredentialInfo`、プロバイダーソースレイヤー |
+| [session-query.md](session-query.md) | 論理レコード、境界付きの正確なイベント読み取り、関係トレース、意味論フィルター/ドキュメント、全文結果ページ |
+| [feedback.md](feedback.md) | ライフサイクルに束縛されたメッセージごとのフィードバックレコード、楽観的バージョン、サイドカー永続化、Host Remote 契約 |
+| [session-title.md](session-title.md) | durable なタイトルスナップショット、引用されたソースメッセージ seq、非同期プロバイダー契約 |
+| [session-reference.md](session-reference.md) | 構造化されたセッション横断参照: `SessionReferenceInput`/`Candidate`、準備されたメッセージコンテキスト、安定したエラー分類 |
+| [system-prompt.md](system-prompt.md) | アセンブリごとのコンテキスト、ツールプロバイダー結果、プロンプトセクション、協調的アセンブリ |
+| [tools.md](tools.md) | `ToolDefinition` の全フィールド、スキーマ DSL、`ToolExecution`/`ToolResult`、ツール提示 UI 型、ガード付き実行パイプライン |
+| [mcp.md](mcp.md) | 外部 MCP 接続、スコープ付きツールとリソース、サーバー指示、プロトコル結果、設定所有権 |
+| [user-questions.md](user-questions.md) | UI に支えられた人間の質問/回答シーム: `AskUserQuestionRequest`、回答/オプション語彙、プロバイダー API、エラー分類 |
+| [approval.md](approval.md) | ワンショットのユーザー承認シーム: `ApprovalRequest`、`ApprovalOutcome`、セッションごとのポリシー、監査イベント、回答者契約 |
+| [office-to-pdf.md](office-to-pdf.md) | 認可された Office→PDF 変換、ネイティブ/WASM エンジン、境界付きの共有再利用 |
+| [attachment.md](attachment.md) | durable な画像アイデンティティとメタデータ、検証入力、検証済み読み取り、`AttachmentStore` シーム |
+| [shell.md](shell.md) | シェル実行者シーム: `ShellExecRequest`/`Spec`、`ShellRunResult`、バックグラウンド `ShellProcess` ハンドル |
+| [subprocess.md](subprocess.md) | サブプロセスシーム: 完全に明示的な `SubprocessSpawnSpec`、オフセットベースの出力リーダー、未分類の `SubprocessOutcome`、管理された `DSH_*` 環境語彙 |
+| [ssh.md](ssh.md) | POSIX SSH 接続とリモートファイルシステム、サブプロセスとサンドボックスプロバイダー |
+| [terminal.md](terminal.md) | 永続ターミナル id、バックエンド/セッション契約、送信準備、境界付き読み取り、オーナー可視スナップショット |
+| [sandbox.md](sandbox.md) | セッションごとのポリシー解決とプロセス閉じ込めシーム: ファイル効果モード、実行/プロバイダーポリシー、`ConfinedArgv`、強制とフェイルクローズドエラー |
+| [ptc-runtime.md](ptc-runtime.md) | PTC 実行シーム: `PtcRunRequest`/`Result`、バインディング名前空間、キャプチャされたログ、`PtcRunFailure` 分類 |
+| [computer-use.md](computer-use.md) | 排他的な名前付き computer-use プロバイダー登録と Cua Driver 統合の選択 |
+| [browser-use.md](browser-use.md) | 排他的な名前付き browser-use 登録、プロバイダー選択、セッションごとのブラウザ所有権 |
+| [extensions.md](extensions.md) | バージョン付き動的 Cordis Plugin と Package、Host/Client アクティベーション、承認、ランタイム検査、ライフサイクルティアダウン |
+| [filesystem.md](filesystem.md) | ファイルシステムシーム: `FsTarget`、読み取り/書き込み/編集の結果、観察されたファイル状態、`FsErrorCode` |
+| [lsp.md](lsp.md) | LSP ナビゲーションシーム: `LspQueryRequest`/`Result`、`LspProvider`/`Service`、4 つの操作、`LspError` |
+| [skills.md](skills.md) | スキルサービス: 探索優先順位、`SkillSummary`/`SkillDefinition`、セッションプレフィックスカタログ、モデル向け `skill` ローディング |
+| [compaction.md](compaction.md) | compaction シーム: `compaction/*` セッションイベント、`CompactionResult`、`CompactionEngine` インターフェース |
+| [subagent.md](subagent.md) | subagent シーム: 名前付きプロバイダーレジストリ、`SubagentStartRequest`/`Result`/`Run`、開始時対実行時のケイパビリティ分割 |
+| [voice-input.md](voice-input.md) | 実験的な名前付き認識器、一時オーディオ、リビジョンガード付きドラフト挿入 |
+| [translation.md](translation.md) | 実験的な匿名テキスト翻訳と明示的なプロバイダーリクエスト |
+| [agent-team.md](agent-team.md) | Agent Teams: 暗黙の Lead アイデンティティ、名前付きで継続可能なチームメイト、peer 受信箱への直接配達、共有タスク DAG |
+| [claude-code-mods.md](claude-code-mods.md) | 実験的ブリッジ経由の Claude Code mod: Claude Code と異なるすべてのイベント、`$` メンバー、チェーンルール、描画機能、例 mod |
+| [web.md](web.md) | web アクセスシーム: `WebSearchRequest`/`Result`、`WebFetchRequest`/`Result`、`WebFetchBody`、プロバイダー可用性、`WebError` |
+| [spill.md](spill.md) | スピルストレージシーム: `SaveTextSpill`、`SpillOwner`/`SpillSource`、`SpillRef`、ブランド付き `SpillLocator` |
+| [workflow.md](workflow.md) | ワークフローシーム: `WorkflowStartRequest`、`WorkflowMeta`、`WorkflowRun`/`Result`、`workflow/*` イベントペイロード、`WorkflowError` の致命性 |
+| [jobs.md](jobs.md) | バックグラウンドジョブランタイム: ブランド付き `JobId`、プロデューサー契約、消費者ビュー、`ctx.jobs` サービス動作 |
+| [permission-presets.md](permission-presets.md) | 権限プリセットレイヤー: `PresetSpec`/`PresetOption`、派生 `custom` 状態、ログのみの `permission/preset` イベント |
+| [plan.md](plan.md) | plan モード: ログのみの `plan/mode` 状態、保留中選択のフラッシュ、`PlanModeConfig`、`exit_plan_mode` レビューアーク |
+| [web-server.md](web-server.md) | HTTP キャリア: `WebRouteKind`/`WebRoute`、マッチ順序、クレーム可能なフォールバック席、インデックスタップ |
+| [webhook.md](webhook.md) | 認証済みプロバイダー配達、任意のプログラム的ルール、ファイアアンドフォーゲットの Workspace セッション作成 |
+| [storage.md](storage.md) | ストレージサブシステム: バックエンド契約（`StorageBackend`）、`StorageForms`、`DomainSpec`/`Domain`、`domain/changed` |
+| [workspace.md](workspace.md) | ワークスペースレジストリ: `Workspace`/`WorkspaceId`、登録と解決、セッション `cwd` の関係 |
+| [web-client.md](web-client.md) | ブラウザーアーキテクチャ: ブート、Remote 通信、ペアになった Client モデル、UI アダプター、Conversation アセンブリ、Slot、再接続セマンティクス |
+| [client-modules.md](client-modules.md) | web プラグインテーブル: `dsh.client` 宣言、`WebBootGraph` ワイヤー合成、バンドルルートとインデックスタップ |
+| [slots.md](slots.md) | 型付き Web UI 合成: 宣言所有権、濃度とスコープ、フレームワークとフィーチャーの注入、props 導出、出荷済み階層 |
+| [client-resources.md](client-resources.md) | クライアントリソースモデル: `dsh-resource://<type>/…` アドレス、プロトコルプロバイダーと `ResourceProtocolMap`、`useResource` グローバルフックとその状態、ピンと解放 |
+| [sidebar-right.md](sidebar-right.md) | 右サイドバー: リソースとナビゲーションのアドレス、タブ型の登録とルーティング、`ctx.sidebarRight` ナビゲーションサービス、ペインタブスロットとオーナー props、リソースモデル、Workspace Files サービス |
+| [conversation.md](conversation.md) | ターゲット中立の Session イベントアセンブリ: Context アイデンティティ、Location データ、リプレイパス、ビュービルダー、ターゲット所有のレンダーノード |
+| [session-projection.md](session-projection.md) | プロジェクションシーム: `SessionProjectionMap`、純粋な `ProjectionDefinition` ユニット、`ProjectionSnapshot` の一貫したカット、変更フィード |
+| [session-telemetry.md](session-telemetry.md) | 外向きセッションレポートケイパビリティシーム: `SessionTelemetryRecord`/`SessionTelemetrySeverity`、`SessionTelemetrySink` 契約、`session-telemetry/record` の redact ウォーターフォール |
+| [otel.md](otel.md) | 共有の通常イベントと Session ログの OTLP チャネル |
+| [product-telemetry.md](product-telemetry.md) | 明示的な製品分析送信と OTLP/HTTP トランスポート |
 
-> Type declarations and their JSDoc on these pages are source-equivalent and drift-checked by `pnpm run verify-type-equiv` (see [development.md](../development.md#documenting-types-verbatim-ts-type-equiv)). Ordinary blocks preserve complete declarations; `public-api` blocks preserve body-stripped public class declarations. Cordis services and events use each page's generated **Cordis API** section.
+> これらのページの型宣言とその JSDoc はソースと等価であり、`pnpm run verify-type-equiv` によってドリフトチェックされる（[development.md](../development.md#documenting-types-verbatim-ts-type-equiv) を参照）。通常のブロックは完全な宣言を保持し、`public-api` ブロックは本体を削った公開クラス宣言を保持する。Cordis サービスとイベントは各ページの生成された **Cordis API** セクションを使う。

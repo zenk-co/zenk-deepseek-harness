@@ -1,12 +1,12 @@
-# 3. Services
+# 3. サービス
 
-English | [中文](03-services.zh.md)
+日本語 | [English](03-services.en.md) | [中文](03-services.zh.md)
 
-A **service** is a named capability one plugin provides and other plugins consume through `ctx`. In the harness, `ctx.tools`, `ctx.llm`, and `ctx.agents` are services. A consumer names the capability, such as `'tools'`, rather than importing its provider, so configuration can select a provider without changing the consumer.
+**サービス**は 1 プラグインが提供し、他プラグインが `ctx` 越しに消費する名前付きケイパビリティである。ハーネスでは `ctx.tools`・`ctx.llm`・`ctx.agents` がサービスである。利用者はプロバイダーをインポートせず、`'tools'` のようなケイパビリティを指名するため、設定は利用者を変えずにプロバイダーを選べる。
 
-## Provide a service
+## サービスを提供する
 
-Create `greeter.ts` in `tmp/cordis-tutorial`:
+`tmp/cordis-tutorial` に `greeter.ts` を作る:
 
 ```ts
 import { Service, type Context } from '@deepseek-ai/cordis'
@@ -34,16 +34,16 @@ export function apply(ctx: Context) {
 }
 ```
 
-Two pieces work together:
+2 断片が協働する:
 
-- **Runtime**: `super(ctx, 'greeter')` registers the instance under the name `greeter`. From then on, any plugin can reach it as `ctx.greeter`. The registration is an effect — unloading the provider removes the service.
-- **Compile time**: the `declare module '@deepseek-ai/cordis'` block is TypeScript declaration merging. It adds `greeter` to the `Context` interface so `ctx.greeter` typechecks everywhere. It generates no code; without it the service still works at runtime, but consumers lose type safety.
+- **実行時**: `super(ctx, 'greeter')` は `greeter` 名でインスタンスを登録する。以降どのプラグインも `ctx.greeter` としてそれに届く。登録はエフェクトであり、プロバイダーのアンロードでサービスは消える。
+- **コンパイル時**: `declare module '@deepseek-ai/cordis'` 塊は TypeScript 宣言統合である。`Context` インターフェースに `greeter` を加え、どこでも `ctx.greeter` が型検査を通るようにする。コードを生成せず、これがなくてもサービスは実行時に動作するが、利用者は型安全を失う。
 
-A `Service` subclass is itself a plugin (the class form from chapter 1), so `ctx.plugin(GreeterService)` mounts it like any other.
+`Service` サブクラスはそれ自体がプラグインであり（第 1 章のクラス形態）、`ctx.plugin(GreeterService)` は他のものと同様にそれをマウントする。
 
-## Consume a service with `inject`
+## `inject` でサービスを消費する
 
-Create `consumer.ts`:
+`consumer.ts` を作る:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -56,9 +56,9 @@ export function apply(ctx: Context) {
 }
 ```
 
-`inject` lists the services this plugin requires. Cordis holds the plugin in PENDING until every listed service exists, so inside `apply`, `ctx.greeter` is guaranteed ready. Load order in `cordis.yml` does not matter — dependencies, not file order, decide when plugins start.
+`inject` はこのプラグインが必要とするサービスを列挙する。Cordis は列挙サービスがすべて存在するまでプラグインを PENDING に保つため、`apply` 内では `ctx.greeter` の準備が保証される。`cordis.yml` 内の読み込み順は関係ない。ファイル順ではなく依存関係がプラグイン開始時期を決める。
 
-Compose and run:
+組み立てと実行:
 
 ```yaml
 - name: './greeter.ts'
@@ -69,17 +69,17 @@ Compose and run:
 Hello, world!
 ```
 
-Swap the two lines in `cordis.yml` and rerun: same output. Try removing `./greeter.ts` entirely: the consumer stays PENDING and prints nothing — no crash, no partial run. A PENDING fiber does not keep Node's event loop alive either, so a composition with nothing else running exits 0 silently. [Chapter 6](06-composition-and-hmr.md) shows how to diagnose that state.
+`cordis.yml` 内の 2 行を入れ替えて再実行する。同じ出力である。`./greeter.ts` を丸ごと除いてみる。利用者は PENDING のまま何も出力しない。衝突も部分実行もない。PENDING ファイバーは Node イベントループも生かさないため、他に動作するものがないコンポジションは黙って 0 終了する。その状態の診断は[第 6 章](06-composition-and-hmr.md)に示す。
 
-## Dependencies are tracked after load
+## 依存関係は読み込み後も追跡される
 
-`inject` is not a one-shot boot check. If a required service disappears while the app runs — its provider was unloaded or hot-replaced — every dependent plugin is unloaded too, and loads again when the service returns. Combined with effects ([chapter 2](02-lifecycle-and-effects.md)), this prevents a running consumer from retaining a reference to an unavailable service: its own registrations are unwound when the dependency disappears.
+`inject` は一度きりの起動検査ではない。実行中に必須サービスが消えると（プロバイダーがアンロードまたはホット置換されると）、依存するすべてのプラグインもアンロードされ、サービスが戻ると再読み込みされる。エフェクト（[第 2 章](02-lifecycle-and-effects.md)）と組み合わせることで、実行中の利用者が利用不能サービスへの参照を保持し続けるのを防ぐ。自身の登録は依存消失時に巻き戻される。
 
-This is also why service replacement works in config: unload the `dsh-bash-local` entry, mount a different `shell` provider, and every plugin injecting `'shell'` cleanly restarts against the new implementation.
+だから設定でのサービス置換も動作する。`dsh-bash-local` エントリーをアンロードし、別の `shell` プロバイダーをマウントすると、`'shell'` を注入するすべてのプラグインは新実装に対してきれいに再起動する。
 
-## Optional dependencies
+## 任意依存関係
 
-`inject` is for hard requirements. For a capability the plugin can live without, skip `inject` and probe at the use site:
+`inject` は強い要件向けである。なくても生きられるケイパビリティには `inject` を跳ばし、利用箇所で探る:
 
 ```ts ignore-check
 export function apply(ctx: Context) {
@@ -89,10 +89,10 @@ export function apply(ctx: Context) {
 }
 ```
 
-## Naming
+## 名前付け
 
-Service names live in one flat namespace per application. Prefix or namespace your own services distinctively (the harness claims plain names like `tools` and `llm`); the generated `cordis-surface` regions on the [subsystem pages](../subsystems/core.md) list every name the harness registers.
+サービス名はアプリケーションごとに 1 つの平坦な名前空間に生きる。自身のサービスには目立つ接頭辞や名前空間を付けよ（ハーネスは `tools` や `llm` のような素名を主張する）。ハーネスが登録するすべての名前は[サブシステムページ](../subsystems/core.md)上の生成 `cordis-surface` 領域に一覧がある。
 
-Next: [Events](04-events.md) — communication without a shared service.
+次: [イベント](04-events.md) — 共有サービスなしの通信。
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)

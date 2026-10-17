@@ -1,137 +1,137 @@
 ---
-description: "The runtime Typert registry: stores generated package reflection, lazy Zod schema factories, and Remote invocation descriptors, and resolves them for consumers."
+description: "ランタイム Typert レジストリ: 生成されたパッケージリフレクション、遅延 Zod スキーマファクトリー、Remote 呼び出しディスクリプターを保存し、コンシューマー向けにそれらを解決する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-typert-registry
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-typert-registry` makes generated Typert artifacts queryable at runtime: each package's reflection, lazy Zod schema factories, and Remote invocation descriptors live under stable keys. A schema is materialized and cached when a consumer first requests it. Registrations are atomic and fiber-scoped: a contribution lands whole or not at all and is withdrawn automatically when the registering component unloads. The same service hosts the lookup and scoped-Context provider registries that Remote calls resolve through. It performs no TypeScript analysis and generates no schemas; the generator and the loader handle those.
+`dsh-typert-registry` は、生成された Typert アーティファクトを実行時にクエリ可能にする。各パッケージのリフレクション、遅延 Zod スキーマファクトリー、Remote 呼び出しディスクリプターは安定したキーの下に置かれる。スキーマは、コンシューマーが最初に要求したときに実体化されてキャッシュされる。登録はアトミックでファイバースコープである。コントリビューションは丸ごと着地するか全く着地せず、登録したコンポーネントのアンロード時に自動的に撤回される。同じサービスが、Remote 呼び出しの解決に使うルックアップレジストリとスコープ付き Context プロバイダーレジストリをホストする。TypeScript 解析は行わず、スキーマも生成しない。それらはジェネレーターとローダーが担う。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Mount the registry in any Host or Client composition that stores or consumes generated Typert artifacts; it provides `ctx.typert`. There is no configuration. Node resolves `/client` to the standalone ESM `lib/client.node.js` bundle for programmatic Cordis composition; browsers use the `lib/client.browser.js` loader factory through the logical `/plugins/.../client.js` URL. Both bundles use the same registry implementation, separate from the Host package root.
+生成された Typert アーティファクトを保存または消費する任意の Host または Client コンポジションにレジストリをマウントする。`ctx.typert` を提供する。設定はない。Node はプログラムによる Cordis コンポジションのために `/client` をスタンドアロン ESM の `lib/client.node.js` バンドルに解決し、ブラウザは論理 URL `/plugins/.../client.js` を通じて `lib/client.browser.js` ローダーファクトリーを使用する。両方のバンドルは同じレジストリ実装を使用し、Host パッケージルートとは分離されている。
 
-### Minimal setup
+### 最小セットアップ
 
-Load the registry plugin; the Client face is installed the same way by the Client runtime's own metadata, and both faces run the same implementation:
+レジストリプラグインをロードする。Client フェイスも Client ランタイム自身のメタデータによって同じ方法でインストールされ、両方のフェイスが同じ実装を実行する:
 
 ```yaml
 - name: '@deepseek-ai/dsh-typert-registry'
 ```
 
-### Querying schemas and reflection
+### スキーマとリフレクションのクエリ
 
-Consumers read schemas with `get(key)`, `resolve(key)`, or `list(filter?)` and package reflection with `getPackage(name, face?)` or `listPackages(filter?)`. The first schema read materializes one process-realm instance; later reads reuse it. `resolve()` distinguishes a malformed key, an absent package, and a registered package that contributes no schema under that name, each with its own error. `toJSONSchema(key)` projects the materialized Zod schema to JSON Schema without caching the projection.
+コンシューマーはスキーマを `get(key)`、`resolve(key)`、または `list(filter?)` で、パッケージリフレクションを `getPackage(name, face?)` または `listPackages(filter?)` で読む。最初のスキーマ読み取りがプロセスレルムごとに 1 つのインスタンスを実体化し、以降の読み取りはそれを再利用する。`resolve()` は、不正な形式のキー、存在しないパッケージ、その名前でスキーマを提供しない登録済みパッケージを区別し、それぞれ独自のエラーを持つ。`toJSONSchema(key)` は実体化された Zod スキーマを JSON Schema に投影し、投影はキャッシュしない。
 
-Invocation information is available through existing `ctx.typert.local.get/list` and `ctx.typert.remotes.get/list` queries. They return the registered descriptor objects, including generated direct methods with `input(options?)`, `result`, and `invoke`; there is no separate metadata store or RPC API. Consumers select `method.input({ strict: true })` for matching strict parsing and JSON Schema without changing registration or Host dispatch. Use `isTypertRemoteMethod(descriptor)` from `@deepseek-ai/dsh-typert-protocol/remote-info` to narrow the base descriptor. This guard exposes inputs as `object` and outputs as `unknown`, not endpoint-dependent generics. The [ordinary generated `TYPERT_REMOTE.methods` index](<../generator/README.md#ordinary-remote-metadata>) supplies precise per-method static types and aliases those same descriptors within its artifact instance.
+呼び出し情報は既存の `ctx.typert.local.get/list` および `ctx.typert.remotes.get/list` クエリを通じて利用できる。それらは登録されたディスクリプターオブジェクトを返す。`input(options?)`、`result`、`invoke` を持つ生成済みの直接メソッドを含む。別個のメタデータストアや RPC API は存在しない。コンシューマーは登録や Host ディスパッチを変更せずに、一致する strict パースと JSON Schema のために `method.input({ strict: true })` を選択する。ベースディスクリプターを絞り込むには `@deepseek-ai/dsh-typert-protocol/remote-info` の `isTypertRemoteMethod(descriptor)` を使用する。このガードは入力を `object` として、出力を `unknown` として公開し、エンドポイント依存のジェネリクスではない。[通常の生成された `TYPERT_REMOTE.methods` インデックス](<../generator/README.md#ordinary-remote-metadata>)は、メソッドごとの正確な静的型を提供し、そのアーティファクトインスタンス内でそれらの同じディスクリプターをエイリアスする。
 
-### Registering a contribution
+### コントリビューションの登録
 
-Generated artifacts register through the [loader](../loader/README.md) in Loader compositions; any other owner calls `ctx.typert.register(contribution)` directly and receives the exact disposer that withdraws it. Duplicate package-face identities, schema keys, invocation ids, or endpoints reject the whole batch before anything is committed.
+生成されたアーティファクトは、Loader コンポジションでは[ローダー](../loader/README.md)を通じて登録する。その他のオーナーは `ctx.typert.register(contribution)` を直接呼び出し、それを撤回する正確なディスポーザーを受け取る。パッケージフェイス ID、スキーマキー、呼び出し ID、エンドポイントの重複は、何かがコミットされる前にバッチ全体を拒否する。
 
-Harness offline integrations register an ordinary `TYPERT_REMOTE` contribution with `ctx.typert.remotes.register(contribution)` in their profile Context. `$mount(contribution)` already performs that registration, so registering and mounting the same contribution in the same registry duplicates it and fails. Keep offline metadata ownership separate from the live connection-and-mount Context. Independent offline consumers may instead read `TYPERT_REMOTE.methods` without any Registry. Registry state belongs to its Context and process, is not shared across processes, and neither registration nor querying opens a connection.
+Harness のオフライン統合は、プロファイル Context 内で `ctx.typert.remotes.register(contribution)` により通常の `TYPERT_REMOTE` コントリビューションを登録する。`$mount(contribution)` がすでにその登録を行うため、同じレジストリで同じコントリビューションを登録してマウントすると重複となり失敗する。オフラインメタデータの所有権は、ライブの接続とマウントの Context から分離しておく。独立したオフラインコンシューマーは、代わりに Registry なしで `TYPERT_REMOTE.methods` を読んでもよい。レジストリの状態はその Context とプロセスに属し、プロセス間で共有されず、登録もクエリも接続を開かない。
 
-### Lookup and Context providers
+### ルックアップと Context プロバイダー
 
-Remote calls resolve Host objects and scoped Contexts through `ctx.typert.lookups` and `ctx.typert.contexts`. `registerHost()` installs the Host wire declaration and its wire-to-Context resolver, while `configureHost()` replaces only that resolver. `registerClient()` installs the bidirectional Client adapter for the same merge-declared kind. Host-to-Client event sources carry their domain identity explicitly instead of projecting it back from a Context.
+Remote 呼び出しは `ctx.typert.lookups` と `ctx.typert.contexts` を通じて Host オブジェクトとスコープ付き Context を解決する。`registerHost()` は Host ワイヤ宣言とそのワイヤから Context へのリゾルバーをインストールし、`configureHost()` はそのリゾルバーのみを置き換える。`registerClient()` は同じマージ宣言された種別の双方向 Client アダプターをインストールする。Host から Client へのイベントソースは、Context からそれを投影し戻すのではなく、自身のドメイン ID を明示的に運ぶ。
 
-`ctx.typert.resources` holds the default wire field of each resource kind declared in `TypertResourceMap`. The domain that owns a kind registers it with `register(kind, { field })` as a Cordis effect of the calling fiber; a second registration of one kind throws, and so does `global`, the built-in identity-less resource kind. `get(kind)` reads one declaration, and `entries()` lists every registered `{ kind, field }` in registration order. A lookup provider and a Host Context adapter may name the resource kind of their wire identity through `resource`, and a configured resolver keeps it. The Gateway reads all three when it resolves the resources of a non-owner call.
+`ctx.typert.resources` は `TypertResourceMap` で宣言された各リソース種別のデフォルトワイヤフィールドを保持する。ある種別を所有するドメインは、呼び出し元ファイバーの Cordis effect として `register(kind, { field })` でそれを登録する。1 つの種別の 2 回目の登録はスローし、組み込みの ID を持たないリソース種別である `global` も同様である。`get(kind)` は 1 つの宣言を読み取り、`entries()` は登録されたすべての `{ kind, field }` を登録順に一覧する。ルックアッププロバイダーと Host Context アダプターは `resource` を通じて自身のワイヤ ID のリソース種別を指定でき、設定されたリゾルバーはそれを保持する。Gateway は非オーナー呼び出しのリソースを解決するときに 3 つすべてを読む。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains how the registry stores and owns contributions; the consumer API is covered in [Use this package](#use-this-package).
+このセクションでは、レジストリがコントリビューションをどのように保存し所有するかを説明する。コンシューマー API は[このパッケージの使い方](#use-this-package)で扱う。
 
-### Design concept
+### 設計の考え方
 
-The registry is built on one principle: a contribution is one atomic, fiber-owned commit. `register()` validates the package-face identity, schemas, and invocation descriptors first, then commits everything under a single Cordis effect whose disposer withdraws exactly that contribution. Duplicate identities fail at the owning operation boundary before any state changes.
+レジストリは 1 つの原則の上に構築されている。コントリビューションは 1 つのアトミックでファイバー所有のコミットである。`register()` は最初にパッケージフェイス ID、スキーマ、呼び出しディスクリプターを検証し、次にすべてを単一の Cordis effect の下でコミットする。そのディスポーザーはまさにそのコントリビューションを撤回する。重複する ID は、状態が変わる前に所有操作の境界で失敗する。
 
-### Sub-registries
+### サブレジストリ
 
-- `ctx.typert.local` — current-environment invocation definitions, including `hasSeen()` history for source-mode fallback.
-- `ctx.typert.remotes` — consumer-selected contributions mounted in the calling fiber.
-- `ctx.typert.lookups` — lookup providers plus composition-owned resolver overrides per key.
-- `ctx.typert.contexts` — Host Context providers and Client Context binders per scoped key.
-- `ctx.typert.resources` — the default wire field per resource kind.
+- `ctx.typert.local` — 現在の環境の呼び出し定義。ソースモードフォールバック用の `hasSeen()` 履歴を含む。
+- `ctx.typert.remotes` — 呼び出し元ファイバーにマウントされた、コンシューマーが選択したコントリビューション。
+- `ctx.typert.lookups` — ルックアッププロバイダーと、キーごとにコンポジションが所有するリゾルバーオーバーライド。
+- `ctx.typert.contexts` — スコープ付きキーごとの Host Context プロバイダーと Client Context バインダー。
+- `ctx.typert.resources` — リソース種別ごとのデフォルトワイヤフィールド。
 
-Each sub-registry publishes `TypertRegistryChange` events to subscribed listeners; a throwing listener is logged and does not stop later listeners.
+各サブレジストリは `TypertRegistryChange` イベントを購読リスナーに発行する。スローするリスナーはログに記録され、後続のリスナーを止めない。
 
-### Identity and validation
+### アイデンティティと検証
 
-Keys are stable: `<package>#<face>` for reflection, `<package>#<name>` for schemas, and `<namespace>/<method>` for endpoints. Validation rejects names containing `#`, wire names outside the RPC segment grammar, duplicate keys, and lookup definitions whose wire declaration changes during the registry lifetime; schema entries and strict codecs must carry a factory.
+キーは安定している。リフレクションは `<package>#<face>`、スキーマは `<package>#<name>`、エンドポイントは `<namespace>/<method>` である。検証は、`#` を含む名前、RPC セグメント文法に合わないワイヤ名、重複キー、レジストリのライフタイム中にワイヤ宣言が変わるルックアップ定義を拒否する。スキーマエントリと strict コーデックはファクトリーを運ばなければならない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/service.ts`](src/service.ts) | `TypertRegistry` service, stores, validation, effect wiring |
-| [`src/types.ts`](src/types.ts) | Contribution, record, and filter types |
-| [`src/client/index.ts`](src/client/index.ts) | Client face installing the same registry |
+| [`src/service.ts`](src/service.ts) | `TypertRegistry` サービス、ストア、検証、effect の配線 |
+| [`src/types.ts`](src/types.ts) | コントリビューション、レコード、フィルターの型 |
+| [`src/client/index.ts`](src/client/index.ts) | 同じレジストリをインストールする Client フェイス |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough; they move from the registry to what feeds it and what consumes it.
+パッケージレベルのコントラクトでは足りない場合にこれらのページを読む。レジストリから、それを供給するものとそれを消費するものへと進む。
 
-- [Typert loader](../loader/README.md) — automatic registration of generated host artifacts.
-- [Typert generator](../generator/README.md) — what produces the contributions the registry stores.
-- [Typert protocol](../protocol/README.md) — the descriptors, codecs, and provider contracts the registry serves.
-- [Typert subsystem reference](../../../docs/subsystems/typert.md) — the literal `ctx.typert` contract.
-- [API Gateway reference](../../../docs/api-gateway.md) — the main consumer of invocation descriptors and providers.
+- [Typert ローダー](../loader/README.md) — 生成された host アーティファクトの自動登録。
+- [Typert ジェネレーター](../generator/README.md) — レジストリが保存するコントリビューションを生成するもの。
+- [Typert プロトコル](../protocol/README.md) — レジストリが提供するディスクリプター、コーデック、プロバイダーコントラクト。
+- [Typert サブシステムリファレンス](../../../docs/subsystems/typert.md) — 文字どおりの `ctx.typert` コントラクト。
+- [API Gateway リファレンス](../../../docs/api-gateway.md) — 呼び出しディスクリプターとプロバイダーの主要なコンシューマー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this runtime type registry's consumers (cordis_inspect, wire faces, gates) own any model-visible projection of registry contents.
+なし。このランタイム型レジストリのコンシューマー(cordis_inspect、ワイヤフェイス、ゲート)が、レジストリ内容のモデル可視の投影を所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct effect; a consumer that places reflection or schemas in a request owns the resulting prefix change.
+直接の影響はない。リフレクションやスキーマをリクエストに置くコンシューマーが、結果として生じるプレフィックス変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the registry stores and rejects; they are current package constraints, not a task backlog.
+これらの制限は、レジストリが何を保存し何を拒否するかを定義する。現在のパッケージの制約であり、タスクのバックログではない。
 
-- **No graph merging** — the registry stores generated reflection per face but does not merge host and client graphs or resolve TypeScript references; those are analyzer and emitter concerns.
-- **Schema keys omit the face** — host and client run in separate contexts, so registering same-named schemas from both faces into one context is rejected as a duplicate.
-- **JSON Schema projection is uncached** — `toJSONSchema()` returns a fresh document per call; consumers that project repeatedly own caching.
+- **グラフのマージなし** — レジストリはフェイスごとに生成されたリフレクションを保存するが、host と client のグラフをマージしたり、TypeScript 参照を解決したりしない。それらはアナライザーとエミッターの関心事である。
+- **スキーマキーはフェイスを含まない** — host と client は別々のコンテキストで実行されるため、両方のフェイスから同じ名前のスキーマを 1 つのコンテキストに登録すると重複として拒否される。
+- **JSON Schema の投影はキャッシュされない** — `toJSONSchema()` は呼び出しごとに新しいドキュメントを返す。繰り返し投影するコンシューマーがキャッシュを所有する。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

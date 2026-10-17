@@ -1,39 +1,39 @@
 ---
-description: "Automation-only ACP (Agent Client Protocol) server for programmatic clients and maintainers driving DeepSeek Harness agents over JSON-RPC stdio."
+description: "プログラム的なクライアントおよびメンテナーが JSON-RPC stdio 経由で DeepSeek Harness エージェントを駆動するための、自動化専用の ACP (Agent Client Protocol) サーバー。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-acp
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-acp` lets trusted programs automate persistent DeepSeek Harness agents through the standard [ACP](https://agentclientprotocol.com): create or resume sessions, select a model and reasoning effort, attach MCP servers, submit or cancel work, receive semantic updates, and close sessions independently. Choose it for out-of-process subagents, test runners, and scripted controllers; it intentionally omits DSH-specific presentation data and interactive UI features. Persistence supports listing, resuming, and closing sessions across process restarts, but deletion, forks, transcript replay, and additional directories are unsupported. Run `pnpm dsh --profile acp` to start the server; use `dsh-subagent-acp` as the repository client.
+`dsh-acp` は、信頼されたプログラムが標準の [ACP](https://agentclientprotocol.com) を通じて永続的な DeepSeek Harness エージェントを自動化できるようにする。セッションの作成や再開、モデルと推論エフォートの選択、MCP サーバーの接続、作業の送信やキャンセル、セマンティック更新の受信、セッションの独立したクローズが可能である。プロセス外サブエージェント、テストランナー、スクリプト化されたコントローラーにはこれを選ぶ。DSH 固有のプレゼンテーションデータとインタラクティブ UI 機能は意図的に省略されている。永続化はプロセス再起動をまたぐセッションの一覧表示、再開、クローズをサポートするが、削除、フォーク、トランスクリプトのリプレイ、追加ディレクトリはサポートされない。サーバーを起動するには `pnpm dsh --profile acp` を実行し、リポジトリ側のクライアントとして `dsh-subagent-acp` を使用する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use this package when a script, test runner, or another harness needs to run agent work end to end through a standard automation protocol. The common path is: start the server, create or resume a session, optionally mount MCP servers and select model options, send a prompt, consume semantic updates, and close the session.
+スクリプト、テストランナー、または別のハーネスが、標準の自動化プロトコルを通じてエージェント作業をエンドツーエンドで実行する必要がある場合にこのパッケージを使用する。一般的な流れは、サーバーを起動し、セッションを作成または再開し、任意で MCP サーバーをマウントしてモデルオプションを選択し、プロンプトを送信し、セマンティック更新を消費し、セッションをクローズする、というものである。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it when automation should own the interaction: an out-of-process subagent, test runner, or scripted controller that manages persistent sessions, tools, model selection, and permissions. Avoid it when a human needs DSH-specific presentation cards, plans, titles, todos, terminal views, or elicitation; this server intentionally exposes only the standard ACP v1 surface.
+自動化が対話を所有すべき場合 — 永続セッション、ツール、モデル選択、権限を管理するプロセス外サブエージェント、テストランナー、スクリプト化されたコントローラー — に選ぶ。人間が DSH 固有のプレゼンテーションカード、プラン、タイトル、Todo、ターミナルビュー、引き出し (elicitation) を必要とする場合は避ける。このサーバーは標準の ACP v1 サーフェスのみを意図的に公開する。
 
-### Minimal configuration
+### 最小構成
 
-Every session the server creates uses the provider and model configured here. Both fields are optional so another agent or request listener can supply them; the runnable demo composition sets both. Stdout carries only protocol traffic, so keep logging off it.
+サーバーが作成するすべてのセッションは、ここで構成されたプロバイダーとモデルを使用する。両フィールドとも任意であり、別のエージェントやリクエストリスナーが指定することもできる。実行可能なデモ構成では両方を設定する。stdout はプロトコルトラフィックのみを運ぶので、ログをそこに出さないようにする。
 
 ```yaml
 - name: '@deepseek-ai/dsh-acp'
@@ -42,144 +42,144 @@ Every session the server creates uses the provider and model configured here. Bo
     model: deepseek-v4-pro
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `provider` | — | Provider route for every session's agent |
-| `model` | — | Model for every session's agent |
-| `sessionListPageSize` | `100` | Maximum summaries returned in one `session/list` page |
+| `provider` | — | すべてのセッションのエージェントに使用するプロバイダールート |
+| `model` | — | すべてのセッションのエージェントに使用するモデル |
+| `sessionListPageSize` | `100` | 1 つの `session/list` ページで返されるサマリーの最大数 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-acp) is the exhaustive source for every accepted field and its JSDoc.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-acp)は、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### Start a server
+### サーバーを起動する
 
-`pnpm dsh --profile acp` starts the shipped stdio server. The `acp` profile mounts session persistence, so clients can list, resume, and close persistent sessions. [`@deepseek-ai/dsh-subagent-acp`](../../subagent/subagent-acp/README.md) starts the same profile for out-of-process delegation.
+`pnpm dsh --profile acp` は同梱の stdio サーバーを起動する。`acp` プロファイルはセッション永続化をマウントするので、クライアントは永続セッションを一覧表示、再開、クローズできる。[`@deepseek-ai/dsh-subagent-acp`](../../subagent/subagent-acp/README.md) はプロセス外委任用に同じプロファイルを起動する。
 
 <a id="protocol-contract"></a><a id="standard-acp-v1-surface"></a>
-### Protocol contract
+### プロトコル契約
 
-One connection can run several sessions at once, each independent. The calls a client makes:
+1 つの接続で複数のセッションを同時に、それぞれ独立に実行できる。クライアントが行う呼び出し:
 
-| Call | What you get |
+| 呼び出し | 得られるもの |
 |---|---|
-| `initialize` | Stable ACP v1 plus `session/list`, `session/resume`, `session/close`, and Streamable HTTP MCP support; image prompts only when the durable attachment store and configured exact route support them. |
-| `authenticate` | Immediate success; the server requires no authentication. |
-| `session/new` | A fresh persistent agent whose absolute workspace and stdio or HTTP MCP servers are validated before publication, plus its complete configuration-option state. |
-| `session/list` | Deterministic newest-first pages of persisted, resumable root sessions; an optional absolute `cwd` filter uses physical-directory identity where possible. |
-| `session/resume` | A persisted inactive session whose canonical workspace is verified before composition; its log is restored without replaying old updates. |
-| `session/close` | Quiescent cancellation, update draining, descendant disposal, persistence flush, and disposal of only the addressed Agent scope. |
-| `session/set_config_option` | A serialized update to the advertised `model` or `reasoning_effort`, returning the complete resulting state. |
-| `session/prompt` | Ordered text, resource links, and supported images, one prompt at a time per session; settlement follows root and descendant completion plus ordered update delivery. |
-| `session/cancel` / `$/cancel_request` | The prompt-owned cancellation path; without an ACP prompt in flight it cancels autonomous work, while unknown session ids are no-ops. |
-| `session/update` | Committed assistant messages and thoughts, generic tool lifecycle, configuration changes, and context usage, serialized per session. |
-| `session/request_permission` | A permission prompt with one-shot allow/reject choices; your client can answer automatically. |
+| `initialize` | 安定した ACP v1 に加えて `session/list`、`session/resume`、`session/close`、Streamable HTTP MCP サポート。画像プロンプトは永続アタッチメントストアと構成された正確なルートが対応する場合のみ。 |
+| `authenticate` | 即時の成功。サーバーは認証を必要としない。 |
+| `session/new` | 公開前に絶対ワークスペースと stdio または HTTP MCP サーバーが検証される新しい永続エージェント、およびその完全な設定オプション状態。 |
+| `session/list` | 永続化された再開可能なルートセッションの、決定論的な新しい順のページ。任意の絶対 `cwd` フィルターは可能な限り物理ディレクトリ同一性を使用する。 |
+| `session/resume` | 構成前に正規ワークスペースが検証される、永続化された非アクティブセッション。そのログは古い更新をリプレイせずに復元される。 |
+| `session/close` | 静穏なキャンセル、更新の排出、子孫のディスポーズ、永続化のフラッシュ、および対象の Agent スコープのみのディスポーズ。 |
+| `session/set_config_option` | アドバタイズされた `model` または `reasoning_effort` への直列化された更新。結果の完全な状態を返す。 |
+| `session/prompt` | 順序付けられたテキスト、リソースリンク、サポートされる画像。セッションごとに 1 プロンプトずつ。確定はルートと子孫の完了および順序付けられた更新の配信に従う。 |
+| `session/cancel` / `$/cancel_request` | プロンプトが所有するキャンセル経路。ACP プロンプトが進行中でない場合は自律的な作業をキャンセルし、未知のセッション ID は no-op である。 |
+| `session/update` | コミットされたアシスタントメッセージと思考、一般的なツールライフサイクル、設定変更、コンテキスト使用量。セッションごとに直列化される。 |
+| `session/request_permission` | ワンショットの許可/拒否の選択肢を伴う権限プロンプト。クライアントは自動的に回答できる。 |
 
-A prompt remains in flight while managed descendants run, while their results trigger later root turns, and while committed output drains. Root work accepted during that output drain joins the same activity interval before completion. Its completion includes the latest root stop reason and any assistant output delivery failure; only the original prompt turn pins the model selection captured at admission. Cancellation stops the root activity present at that call and waits for that activity and its queued output. Later child messages may start autonomous work and do not delay the cancelled response; the session remains available for later prompts. Idle descendants with parked inbox messages remain resident but do not delay prompt completion. Closing the session also drains its descendants.
+プロンプトは、管理された子孫が実行されている間、その結果が後続のルートターンをトリガーする間、コミットされた出力が排出されている間は進行中のままである。その出力排出中に受け入れられたルート作業は、完了前に同じアクティビティ間隔に加わる。その完了には最新のルート停止理由と、アシスタント出力の配信失敗があればそれが含まれる。モデル選択を固定するのは元のプロンプトターンのみで、アドミッション時にキャプチャされた選択が使われる。キャンセルはその呼び出し時に存在したルートアクティビティを停止し、そのアクティビティとキューに入った出力を待つ。後続の子メッセージは自律的な作業を開始することがあり、キャンセルされた応答を遅延させない。セッションは後のプロンプトのために利用可能なままである。受信箱にメッセージが滞留しているアイドル状態の子孫は常駐したままであるが、プロンプト完了を遅延させない。セッションをクローズするとその子孫も排出される。
 
-A failure to append `turn/start` or `turn/end` rejects the prompt even when a preceding turn completed.
+`turn/start` または `turn/end` の追記に失敗すると、先行するターンが完了していてもプロンプトは拒否される。
 
-Session configuration offers opaque provider/model choices from the live LLM service catalog and a `reasoning_effort` selector when the exact model declares one. A prompt snapshots that selection before asynchronous image admission and pins it across every model step in that turn; a concurrent option change applies to the next turn. ACP clients are trusted controllers: stdio MCP entries authorize their absolute commands and environment, HTTP entries authorize their absolute HTTP(S) URLs and headers, and any initial connection or discovery failure rolls back the unpublished Agent. Unsupported surfaces are omitted or rejected: `session/load`, deletion, fork, additional directories, SSE or ACP-transport MCP, modes, commands, plans, terminals, client filesystem operations, and elicitation.
+セッション設定は、ライブ LLM サービスカタログからの不透明なプロバイダー/モデルの選択肢と、その正確なモデルが宣言する場合の `reasoning_effort` セレクターを提供する。プロンプトは非同期の画像アドミッションの前にその選択をスナップショットし、そのターンのすべてのモデルステップにわたって固定する。同時に行われたオプション変更は次のターンに適用される。ACP クライアントは信頼されたコントローラーである: stdio MCP エントリーはその絶対コマンドと環境を認可し、HTTP エントリーはその絶対 HTTP(S) URL とヘッダーを認可し、初期接続または検出の失敗は未公開の Agent をロールバックする。サポートされないサーフェスは省略または拒否される: `session/load`、削除、フォーク、追加ディレクトリ、SSE または ACP トランスポートの MCP、モード、コマンド、プラン、ターミナル、クライアントのファイルシステム操作、および引き出し。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the server realizes the behavior above and points at the code that implements it; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、サーバーが上記の挙動をどのように実現しているかを説明し、それを実装するコードを示す。観察可能な挙動は[このパッケージを使う](#use-this-package)で完全に説明されている。
 
-### Design philosophy
+### 設計哲学
 
-The server is an automation transport with an intentionally standard public protocol. Three commitments shape it:
+このサーバーは、意図的に標準的な公開プロトコルを持つ自動化トランスポートである。3 つのコミットメントがそれを形作る:
 
-- **Standard semantic updates only.** The wire carries committed messages and thoughts, generic tool lifecycle, configuration, and context usage; raw provider deltas, retry attempts, DSH presentation data, and unsupported content stay off the wire.
-- **Truthful capability and configuration state.** `initialize` advertises only mounted support, topology changes publish complete configuration options, and a prompt pins the exact route it admitted.
-- **Quiescence before settlement.** Prompt and close operations settle only after their owned admission, Agent activity, ordered updates, descendants, persistence, and disposal have reached the required terminal state.
+- **標準のセマンティック更新のみ。** ワイヤはコミットされたメッセージと思考、一般的なツールライフサイクル、設定、コンテキスト使用量を運ぶ。生のプロバイダーデルタ、リトライ試行、DSH プレゼンテーションデータ、サポートされないコンテンツはワイヤに載らない。
+- **真実のケイパビリティと設定状態。** `initialize` はマウントされたサポートのみをアドバタイズし、トポロジー変更は完全な設定オプションを公開し、プロンプトはそれが受け入れた正確なルートを固定する。
+- **確定の前に静止。** プロンプトとクローズの操作は、所有するアドミッション、Agent アクティビティ、順序付けられた更新、子孫、永続化、ディスポーズが必要な終端状態に達した後にのみ確定する。
 
-The decision history lives in the [ACP as an automation-only protocol note](../../../.agents/notes/implemented/simplification/2026-07-23-acp-automation-only-protocol.md) and the [multi-session note](../../../.agents/notes/archived/feature/2026-06-14-acp-multi-session.md).
+決定の履歴は [ACP as an automation-only protocol note](../../../.agents/notes/implemented/simplification/2026-07-23-acp-automation-only-protocol.md) と [multi-session note](../../../.agents/notes/archived/feature/2026-06-14-acp-multi-session.md) にある。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, `AgentSideConnection` wiring, per-session records, admission and settlement, teardown |
-| [`src/content.ts`](src/content.ts) | Wire-content admission and projection: image validation, route recheck, prompt reconstruction, assistant block conversion |
-| [`src/codec.ts`](src/codec.ts) | Pure turn-ending to ACP `stopReason` mapping |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `Config` スキーマ、`AgentSideConnection` の配線、セッションごとのレコード、アドミッションと確定、ティアダウン |
+| [`src/content.ts`](src/content.ts) | ワイヤコンテンツのアドミッションと投影: 画像検証、ルート再チェック、プロンプト再構成、アシスタントブロック変換 |
+| [`src/codec.ts`](src/codec.ts) | 純粋なターン終了から ACP `stopReason` へのマッピング |
 
-### Admission and prompt settlement
+### アドミッションとプロンプトの確定
 
-Each session permits one in-flight prompt. Admission validates the whole prompt batch, snapshots the selected route, rechecks the exact Agent identity and image capability, persists image attachments, and only then queues the user message — a cancellation that wins admission never enqueues a late turn. Once queued, the session module associates the snapshot with the inbox message until claim and pins the same provider, model, and reasoning effort across prompt variables and every model step in that turn. Per-session update delivery is serialized; committed images are re-read and integrity-verified, so a missing or corrupt image fails the correlated prompt instead of emitting a placeholder. Settlement precedence is explicit cancellation, committed-output failure, interval-wide Agent failure, then the correlated turn ending.
+各セッションは進行中のプロンプトを 1 つだけ許可する。アドミッションはプロンプトバッチ全体を検証し、選択されたルートをスナップショットし、正確な Agent 同一性と画像ケイパビリティを再チェックし、画像アタッチメントを永続化し、その後にのみユーザーメッセージをキューに入れる — アドミッションに勝ったキャンセルが遅延ターンをキューに入れることはない。キューに入ると、セッションモジュールはクレームまでスナップショットをインボックスメッセージに関連付け、プロンプト変数とそのターンのすべてのモデルステップにわたって同じプロバイダー、モデル、推論エフォートを固定する。セッションごとの更新配信は直列化される。コミットされた画像は再読み取りされ整合性が検証されるので、欠落または破損した画像はプレースホルダーを出力するのではなく、対応するプロンプトを失敗させる。確定の優先順位は、明示的なキャンセル、コミット済み出力の失敗、間隔全体の Agent 失敗、次に対応するターン終了である。
 
-### Teardown and connection ownership
+### ティアダウンと接続の所有権
 
-Each session module owns its Agent handle, MCP mounts, future and turn-pinned model selections, prompt slot, update chain, and memoized close operation. Explicit close, client disconnect, and Cordis disposal use the same quiescent teardown: stop new work, cancel prompt admission and Agent activity, drain committed updates, dispose continuable descendants child-first, flush persistence, and release the owned Agent scope. A session close leaves persisted state available for list and resume, and other sessions or frontends sharing the Context remain untouched.
+各セッションモジュールは自身の Agent ハンドル、MCP マウント、将来とターン固定のモデル選択、プロンプトスロット、更新チェーン、メモ化されたクローズ操作を所有する。明示的なクローズ、クライアント切断、Cordis ディスポーズは同じ静穏なティアダウンを使用する: 新しい作業を停止し、プロンプトのアドミッションと Agent アクティビティをキャンセルし、コミットされた更新を排出し、継続可能な子孫を子優先でディスポーズし、永続化をフラッシュし、所有する Agent スコープを解放する。セッションのクローズは、一覧表示と再開のために永続化状態を利用可能なまま残し、Context を共有する他のセッションやフロントエンドは影響を受けない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the matching client to the design records behind the automation contract.
+パッケージレベルの契約では足りないときにこれらのページを読む。対応するクライアントから、自動化契約の背後にある設計記録へと進む。
 
-- [dsh-subagent-acp](../../subagent/subagent-acp/README.md) — the out-of-process ACP client that spawns and drives this server.
-- [ACP as an automation-only protocol](../../../.agents/notes/implemented/simplification/2026-07-23-acp-automation-only-protocol.md) — the design record for the automation contract and its wire boundaries.
-- [Multiplex concurrent ACP sessions over one connection](../../../.agents/notes/archived/feature/2026-06-14-acp-multi-session.md) — per-session isolation, ownership, and teardown decisions.
-- [Extension cookbook](../../../docs/cookbook/extension-cookbook.md) — this package as the automation-only worked example for extension authors.
+- [dsh-subagent-acp](../../subagent/subagent-acp/README.md) — このサーバーを起動して駆動するプロセス外 ACP クライアント。
+- [ACP as an automation-only protocol](../../../.agents/notes/implemented/simplification/2026-07-23-acp-automation-only-protocol.md) — 自動化契約とそのワイヤ境界の設計記録。
+- [Multiplex concurrent ACP sessions over one connection](../../../.agents/notes/archived/feature/2026-06-14-acp-multi-session.md) — セッションごとの分離、所有権、ティアダウンの決定。
+- [Extension cookbook](../../../docs/cookbook/extension-cookbook.md) — 拡張作者向けの、自動化専用の実例としてのこのパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Prompt content
+### プロンプト内容
 
-#### What the model sees
+#### モデルが見るもの
 
-`session/prompt` preserves text and image order in one user message: adjacent text concatenates, and a resource link appears as a bracketed `[resource_link name=… uri=…]` reference the model may open with its own tools. Inline image base64 is discarded after batch admission, so the durable message contains only verified attachment references. Protocol metadata, client capabilities, permission choices, and session ids never enter the model request.
+`session/prompt` は 1 つのユーザーメッセージ内でテキストと画像の順序を保持する: 隣接するテキストは連結され、リソースリンクはモデルが自身のツールで開くことができる角括弧付きの `[resource_link name=… uri=…]` 参照として現れる。インライン画像の base64 はバッチアドミッション後に破棄されるので、永続メッセージには検証済みのアタッチメント参照のみが含まれる。プロトコルメタデータ、クライアントケイパビリティ、権限の選択、セッション ID がモデルリクエストに入ることはない。
 
-#### Token effect
+#### トークンへの影響
 
-Prompt content, tool calls/results, and durable image references remain in that session until compaction. Concurrent sessions retain independent contexts.
+プロンプト内容、ツール呼び出し/結果、永続画像参照は、コンパクションまでそのセッションに残る。同時セッションは独立したコンテキストを保持する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only while the selected route and assembled prefix stay unchanged. A model change starts the next ACP turn on the new route.
+選択されたルートと組み立てられたプレフィックスが変わらない限り追記のみ。モデル変更は次の ACP ターンを新しいルートで開始する。
 
-### Permission decisions
+### 権限の決定
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing directly. The owning tool records its allowed, rejected, cancelled, or unavailable outcome through the normal tool-result path.
+直接には何も。所有ツールは、許可、拒否、キャンセル、利用不可の結果を通常のツール結果経路で記録する。
 
-#### Token effect
+#### トークンへの影響
 
-Only the owning tool result contributes tokens.
+所有ツールの結果のみがトークンに寄与する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only through the owning tool result.
+所有ツールの結果を通じて追記のみ。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this package is a poor fit or needs special operational care. They are current package constraints, not a protocol comparison or a task backlog.
+これらの制限は、このパッケージが不適切な選択となる、または特別な運用上の注意を要する条件を定義する。これらは現在のパッケージ制約であり、プロトコル比較やタスクのバックログではない。
 
-- **One primary workspace** — additional directories remain unsupported.
-- **Raster prompt images only** — PNG, JPEG, WebP, and GIF require a durable attachment store and an exact image-capable route.
-- **MCP tools only** — MCP resources and prompts have no DSH consumer.
-- **No transcript replay or interactive extensions** — session deletion, fork, `session/load`, modes, commands, plans, terminals, client filesystem operations, and elicitation remain outside this automation surface.
+- **プライマリワークスペースは 1 つ** — 追加ディレクトリは引き続きサポートされない。
+- **ラスター画像プロンプトのみ** — PNG、JPEG、WebP、GIF には永続アタッチメントストアと正確な画像対応ルートが必要である。
+- **MCP ツールのみ** — MCP リソースとプロンプトには DSH のコンシューマーが存在しない。
+- **トランスクリプトのリプレイやインタラクティブ拡張なし** — セッション削除、フォーク、`session/load`、モード、コマンド、プラン、ターミナル、クライアントのファイルシステム操作、引き出しは、この自動化サーフェスの対象外のままである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

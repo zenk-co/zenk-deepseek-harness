@@ -1,8 +1,8 @@
-# Extensions
+# 拡張
 
-English | [中文](extensions.zh.md)
+日本語 | [English](extensions.en.md) | [中文](extensions.zh.md)
 
-The extensions subsystem lets an agent define versioned Cordis packages, run their host and browser halves, and query approved runtime metadata before writing code. Package lifecycle and sandbox behavior belong to the [`packages/extensions`](../../packages/extensions/README.md) package group.
+拡張サブシステムは、エージェントがバージョン付き Cordis パッケージを定義し、その Host 側とブラウザ側のハーフを実行し、コードを書く前に承認済みのランタイムメタデータを照会することを可能にする。パッケージのライフサイクルとサンドボックス挙動は [`packages/extensions`](../../packages/extensions/README.md) パッケージグループに属する。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -10,13 +10,13 @@ The extensions subsystem lets an agent define versioned Cordis packages, run the
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxcordisinspect--cordisinspectregistryservice"></a>
 
 ### `ctx.cordisInspect` — `CordisInspectRegistryService`
 
-Registry and cross-page router behind the two model-facing inspect tools.
+2 つのモデルに面する inspect ツールの背後にあるレジストリとクロスページルーター。
 
 ```ts cordis-catalog
 /**
@@ -69,7 +69,7 @@ Source: [`packages/extensions/cordis-host-runner/src/inspect-registry.ts`](../..
 
 ### `ctx.dynamicCordisRunner` — `DynamicCordisRunnerService`
 
-Dynamic Plugin registry and Host-half lifecycle.
+動的 Plugin レジストリと Host 側ライフサイクル。
 
 ```ts cordis-catalog
 /**
@@ -262,7 +262,7 @@ Source: [`packages/extensions/cordis-host-runner/src/index.ts`](../../packages/e
 
 ### `ctx.inspector` — `InspectorService`
 
-Shared Host/Client service façade over the realm's source publisher.
+レルムのソースパブリッシャーを包む、Host/Client 共有のサービスファサード。
 
 ```ts cordis-catalog
 /**
@@ -278,13 +278,13 @@ Source: [`packages/experimental/inspector/src/index.ts`](../../packages/experime
 
 <a id="cordis-events"></a>
 
-### `cordis/*` events
+### `cordis/*` イベント
 
 <a id="cordisdynamic-package--emit"></a>
 
 #### `cordis/dynamic-package` — emit
 
-One exact Plugin/Package activation is now live in the Host.
+1 つの正確な Plugin/Package アクティベーションが Host でライブになった。
 
 ```ts cordis-catalog
 /**
@@ -301,7 +301,7 @@ Source: [`packages/extensions/cordis-host-runner/src/types.ts`](../../packages/e
 
 #### `cordis/dynamic-retract` — emit
 
-One exact activation was withdrawn.
+1 つの正確なアクティベーションが取り消された。
 
 ```ts cordis-catalog
 /**
@@ -318,7 +318,7 @@ Source: [`packages/extensions/cordis-host-runner/src/types.ts`](../../packages/e
 
 #### `cordis/inspect-query` — emit
 
-Request a live read-only query from the Client inspect registry.
+Client inspect レジストリへのライブの読み取り専用クエリを要求する。
 
 ```ts cordis-catalog
 /**
@@ -335,7 +335,7 @@ Source: [`packages/extensions/cordis-host-runner/src/types.ts`](../../packages/e
 
 #### `cordis/inspect-query-resolved` — emit
 
-Notify every Client that an inspect query has settled or been cancelled.
+inspect クエリが解決またはキャンセルされたことをすべての Client に通知する。
 
 ```ts cordis-catalog
 /**
@@ -352,7 +352,7 @@ Source: [`packages/extensions/cordis-host-runner/src/types.ts`](../../packages/e
 
 #### `cordis/request-run` — emit
 
-A Client-bearing activation needs a browser page, and may require a user decision.
+Client を含むアクティベーションはブラウザページを必要とし、ユーザーの決定を要することがある。
 
 ```ts cordis-catalog
 /**
@@ -369,7 +369,7 @@ Source: [`packages/extensions/cordis-host-runner/src/types.ts`](../../packages/e
 
 #### `cordis/request-run-resolved` — emit
 
-A pending Client activation request left the answerable state.
+保留中の Client アクティベーションリクエストが応答可能状態を離れた。
 
 ```ts cordis-catalog
 /**

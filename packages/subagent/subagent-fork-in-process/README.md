@@ -1,43 +1,43 @@
 ---
-description: "In-process fork subagent backend for users and maintainers choosing, configuring, or debugging children seeded with the parent's completed turns."
+description: "親の完了済みターンでシードされた子を選択・設定・デバッグするユーザーおよびメンテナ向けの、インプロセス fork サブエージェントバックエンド。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-subagent-fork-in-process
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-subagent-fork-in-process` is an in-process subagent backend that seeds each child with the parent's completed conversation turns: the child sees every finished turn and none of the in-flight one, so follow-up work builds on the conversation without duplicating it. A delegation tool reaches it under the `fork` provider name, and its behavior matches the spawn backend except for the session seed. Choose it when a subtask continues this conversation; choose spawn when the child must stand alone. The seed is a one-time snapshot taken at fork time: later parent turns never reach the child.
+`dsh-subagent-fork-in-process` は、各子エージェントを親の完了済み会話ターンでシードするインプロセスのサブエージェントバックエンドである。子は完了済みのターンをすべて見て、進行中のターンはまったく見ないため、後続作業は会話を複製せずにその上に積み上がる。委任ツールは `fork` プロバイダー名でこれに到達し、その動作はセッションシードを除いて spawn バックエンドと一致する。サブタスクがこの会話を継続する場合はこれを選び、子が単独で成立する必要がある場合は spawn を選ぶ。シードは fork 時に取得される一度限りのスナップショットであり、その後の親のターンが子に届くことはない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Mount this backend when delegated work must build on the parent's conversation. The common path mirrors spawn: load the subagent service and this backend, then point a delegation tool such as `dsh-tool-subagent` at the `fork` provider.
+委任された作業が親の会話の上に積み上がる必要がある場合に、このバックエンドをマウントする。一般的な手順は spawn と同じである。サブエージェントサービスとこのバックエンドをロードし、`dsh-tool-subagent` のような委任ツールを `fork` プロバイダーに向ける。
 
-### When to choose it
+### いつ選ぶか
 
-Choose fork when the child needs the conversation's completed turns — a follow-up analysis, a review, a continuation. Choose spawn when the child should start clean, or an out-of-process backend when the child must not share this process. The seed carries conversation history only: the child still gets a fresh tool scope and none of the parent's authority.
+子が会話の完了済みターンを必要とする場合 — フォローアップ分析、レビュー、継続 — は fork を選ぶ。子がクリーンに開始すべき場合は spawn を、子がこのプロセスを共有してはならない場合はアウトオブプロセスのバックエンドを選ぶ。シードが運ぶのは会話履歴のみである。子は依然として新しいツールスコープを得て、親の権限は一切引き継がない。
 
-### Seed boundary
+### シードの境界
 
-The seed ends at the parent's last completed turn. A parent's current tool-calling turn is still open when a subagent starts, so that in-flight turn is never included; before the first completed turn the seed is empty and the child behaves like a fresh spawn.
+シードは親の最後の完了済みターンで終わる。サブエージェントの開始時、親の現在のツール呼び出しターンはまだ開いているため、その進行中のターンは決して含まれない。最初の完了済みターンより前はシードは空であり、子は新規 spawn と同様に振る舞う。
 
-### Minimal configuration
+### 最小構成
 
-Load the subagent service and this backend, then configure a delegation tool. This composition exposes a `subagent` tool backed by fork:
+サブエージェントサービスとこのバックエンドをロードし、委任ツールを設定する。この構成は fork に支えられた `subagent` ツールを公開する:
 
 ```yaml
 - name: '@deepseek-ai/dsh-subagent'
@@ -47,109 +47,109 @@ Load the subagent service and this backend, then configure a delegation tool. Th
     provider: fork
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `providerName` | `fork` | Provider name registered on `ctx.subagents` |
+| `providerName` | `fork` | `ctx.subagents` に登録されるプロバイダー名 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-fork-in-process) is the exhaustive source for every accepted field and its JSDoc.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-subagent-fork-in-process)が、受け入れられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### What a fork delegation does
+### fork 委任が行うこと
 
-One tool call creates a background child and returns its session id immediately. The child works in its own session; the parent receives its final answer in a completion notice. The child can also send messages through `send_message`. A rejected start leaves no published child. Programmatic callers such as workflows can await the activation result directly.
+1 回のツール呼び出しがバックグラウンドの子を作成し、そのセッション id を直ちに返す。子は自身のセッションで作業し、親は完了通知で最終回答を受け取る。子は `send_message` でメッセージを送ることもできる。拒否された開始は公開された子を残さない。ワークフローのようなプログラムによる呼び出し元は、アクティベーション結果を直接待つことができる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the backend and where the behavior in [Use this package](#use-this-package) comes from.
+このセクションでは、バックエンドの背後にある設計上の決定と、[このパッケージの使い方](#use-this-package)の動作がどこから来るのかを説明する。
 
-### Design concept
+### 設計構想
 
-This backend supplies the balanced completed-turn prefix of the parent log as the child session seed. The subagent service records the inherited range so results contain only the child’s own output.
+このバックエンドは、親ログのバランスの取れた完了済みターン接頭辞を子セッションのシードとして提供する。サブエージェントサービスは継承された範囲を記録するため、結果には子自身の出力のみが含まれる。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Provider registration: prefix computation, `Config` schema, capability declaration |
+| [`src/index.ts`](src/index.ts) | プロバイダー登録: 接頭辞の計算、`Config` スキーマ、ケイパビリティ宣言 |
 
-### Run flow
+### 実行フロー
 
-`prepareContinuable()` captures the parent’s completed-turn prefix once at creation. `startActivation()` creates the child with that seed, and the subagent service composes the inherited preset and optional structured output. The provider advertises agent options, output, and depth capabilities; independent preset selection is unsupported.
+`prepareContinuable()` は作成時に親の完了済みターン接頭辞を一度だけ捕捉する。`startActivation()` はそのシードで子を作成し、サブエージェントサービスが継承されたプリセットとオプションの構造化出力を構成する。プロバイダーはエージェントオプション、出力、深さのケイパビリティを広告する。独立したプリセット選択はサポートされない。
 
-### Lifecycle binding
+### ライフサイクルバインディング
 
-The delegation tool creates a background activation and returns a stable child session id. Parent and child share the same messaging tool definitions and ordering; the parent id and return guidance follow inherited history in the initial task. Workflows await results with caller delivery and send no completion notice to the parent.
+委任ツールはバックグラウンドアクティベーションを作成し、安定した子セッション id を返す。親と子は同じメッセージングツール定義と順序を共有する。親 id と返却ガイダンスは初期タスク内で継承された履歴に続く。ワークフローは呼び出し元配送で結果を待ち、親に完了通知を送らない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough; they move from the shared subagent model to the sibling backends and the design evidence for preserving the inherited request prefix.
+パッケージレベルの契約では足りない場合にこれらのページを読むとよい。共有されたサブエージェントモデルから、兄弟バックエンド、そして継承されたリクエスト接頭辞を保持する設計の根拠へと進む。
 
-- [Subagent subsystem](../../../docs/subsystems/subagent.md) — start requests, results, provider contract, and in-process depth and seed.
-- [dsh-subagent-spawn-in-process](../subagent-spawn-in-process/README.md) — the fresh-child sibling backend.
-- [dsh-tool-subagent](../tool-subagent/README.md) — the model-facing delegation tool that reaches this provider.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-fork-in-process) — every accepted config field and its source declaration.
-- [Forked children preserve the parent request prefix](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md) — why continuable fork preserves the inherited request prefix.
+- [Subagent サブシステム](../../../docs/subsystems/subagent.md) — 開始リクエスト、結果、プロバイダー契約、インプロセスの深さとシード。
+- [dsh-subagent-spawn-in-process](../subagent-spawn-in-process/README.md) — 新規子の兄弟バックエンド。
+- [dsh-tool-subagent](../tool-subagent/README.md) — このプロバイダーに到達する、モデルに面した委任ツール。
+- [生成される設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-subagent-fork-in-process) — 受け入れられるすべての設定フィールドとそのソース宣言。
+- [fork された子は親のリクエスト接頭辞を保持する](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md) — continuable fork が継承されたリクエスト接頭辞を保持する理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Child-agent history and envelope
+### 子エージェントの履歴とエンベロープ
 
-#### What the model sees
+#### モデルが見るもの
 
-The child receives the parent's balanced completed-turn prefix, then the new task content verbatim. It joins the parent's preset revision, which supplies persona and tools. Parent agent-local restrictions are not copied. An optional structured-output request adds a child-only tool; the parent's current in-flight turn is excluded.
+子は親のバランスの取れた完了済みターン接頭辞を受け取り、その後に新しいタスク内容をそのまま受け取る。子は人物像とツールを提供する親のプリセットリビジョンに参加する。親のエージェントローカルな制限はコピーされない。オプションの構造化出力リクエストは子専用のツールを追加する。親の現在進行中のターンは除外される。
 
-#### Token effect
+#### トークンへの影響
 
-Forking duplicates retained completed history into the child's request, which then accumulates its own tokens independently. A first-turn fork has no inherited history.
+フォークは保持された完了済み履歴を子のリクエストに複製し、その後子は独立して自身のトークンを蓄積する。初回ターンでの fork には継承履歴がない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The child may reuse the inherited byte-identical prefix under the same provider and model. Structured output, generated-SDK, route changes, or historical descriptor overrides on cold resume can invalidate reuse before inherited history; later child history is append-only. Continuable messaging adds no child-only system-prompt section or tool schema; the parent id and return guidance follow inherited history in the initial user task ([cache-preserving fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md)).
+子は同じプロバイダーとモデルの下で、継承されたバイト単位で同一の接頭辞を再利用できる場合がある。構造化出力、生成 SDK、ルート変更、またはコールド再開時の履歴ディスクリプター上書きは、継承履歴より前の再利用を無効化しうる。以降の子の履歴は追記のみである。continuable メッセージングは子専用のシステムプロンプトセクションやツールスキーマを追加しない。親 id と返却ガイダンスは初期ユーザータスク内で継承履歴に続く([キャッシュを保持する fork の Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md))。
 
-### Parent tool result, indirectly
+### 親のツール結果、間接的に
 
-#### What the model sees
+#### モデルが見るもの
 
-Through `dsh-tool-subagent`, the parent first receives the child session id, then a completion notice with its final answer. Child-authored messages arrive through `send_message`; the inherited prefix and internal work remain in the child session.
+`dsh-tool-subagent` を通じて、親はまず子セッション id を受け取り、その後最終回答を含む完了通知を受け取る。子が書いたメッセージは `send_message` を通じて届く。継承された接頭辞と内部の作業は子セッション内に留まる。
 
-#### Token effect
+#### トークンへの影響
 
-Parent input grows by one data-dependent final result retained until compaction.
+親の入力は、コンパクションまで保持されるデータ依存の最終結果 1 件分増加する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ。新たに可視になる内容は再利用可能なリクエスト接頭辞の後に続き、既存の KV キャッシュエントリを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the backend is the wrong choice; they are current package constraints.
+これらの制限は、このバックエンドが誤った選択となる場合を定義する。これらは現在のパッケージ制約である。
 
-- **The seed is a one-time snapshot** — the child sees the parent's completed turns as of the fork and nothing the parent logs afterwards; there is no live context sharing.
-- **Prefix reuse depends on matching request inputs** — parent and child messaging definitions match byte for byte; structured output, generated-SDK, route changes, or restored historical overrides can still break equality. Rationale: the [cache-preserving fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md).
-- **Shipped fork tools do not expose child LLM route selection** — they inherit the parent's provider and model so the copied history remains eligible for KV Cache reuse. Route selection stays disabled until a change can preserve reuse or expose a bounded recomputation cost.
+- **シードは一度限りのスナップショット** — 子は fork 時点の親の完了済みターンを見て、親がその後ログに記録したものは見ない。ライブのコンテキスト共有は存在しない。
+- **接頭辞の再利用はリクエスト入力の一致に依存する** — 親と子のメッセージング定義はバイト単位で一致する。構造化出力、生成 SDK、ルート変更、または復元された履歴上書きは、依然として等価性を壊しうる。根拠: [キャッシュを保持する fork の Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md)。
+- **出荷済み fork ツールは子の LLM ルート選択を公開しない** — コピーされた履歴が KV キャッシュ再利用の対象であり続けるよう、親のプロバイダーとモデルを継承する。ルート選択は、再利用を保持できる、または上限付きの再計算コストを公開できる変更まで無効のままである。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

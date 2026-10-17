@@ -1,63 +1,63 @@
-# Session format version and release status
+# セッション形式バージョンとリリース状態
 
-English | [中文](session-format-status.zh.md)
+日本語 | [English](session-format-status.en.md) | [中文](session-format-status.zh.md)
 
-## Summary
+## 概要
 
-Use this reference to distinguish the checkout writer, the accepted compatibility baseline, and the latest published Session format. The code constant owns the writer; the finalization and release records below separately identify accepted history and publication evidence. Other documentation links here instead of restating those values.
+このリファレンスを使い、チェックアウト writer、受け入れ済み互換性 baseline、最新の公開セッション形式を区別する。コード定数が writer を所有し、以下の確定記録とリリース記録が受け入れ済み履歴と公開証跡を別々に特定する。他の文書はそれらの値を再掲せずここへリンクする。
 
-## Table of Contents
+## 目次
 
-- [Sources of truth](#sources-of-truth)
-- [Finalization record](#finalization-record)
-- [Release record](#release-record)
-- [Updating the record](#updating-the-record)
-- [Dev Note](#dev-note)
+- [真実の情報源](#sources-of-truth)
+- [確定記録](#finalization-record)
+- [リリース記録](#release-record)
+- [記録の更新](#updating-the-record)
+- [開発者ノート](#dev-note)
 
 <a id="sources-of-truth"></a>
-## Sources of truth
+## 真実の情報源
 
-- **Checkout writer:** `SESSION_FORMAT_VERSION` in [core Session types](../packages/core/session/src/types.ts) is the only hand-maintained current-writer number in code. The [catalog generator](../scripts/gen-session-format-catalog.ts) derives codec ordering and checks that adjacent migrations reach it. A package version, codec export name, fixture filename, or projection-cache version is not the writer authority.
-- **Latest released format:** `latestReleasedVersion` in the following record identifies the published Session format. `evidenceTag` names a published product release whose tagged writer has that value; it need not be the first release carrying the format. The bilingual copy is checked against the same record, not maintained as a separate decision.
-- **Release status:** compare the writer constant with the verified release record. Equality means the writer format has shipped. A greater writer version is not yet recorded as published; its finalization record independently identifies the accepted compatibility baseline. When comparing an older checkout against a newer branch’s verified record, a lower writer version identifies an older writer format; the local consistency gate rejects that ordering within one checkout. No separate released boolean is maintained. Before declaring a greater version unreleased, verify that no published release has advanced the record.
+- **チェックアウト writer:** [core セッション型](../packages/core/session/src/types.ts)内の `SESSION_FORMAT_VERSION` は、コード内で手保守される唯一の現行 writer 番号である。[カタログ生成器](../scripts/gen-session-format-catalog.ts)はコーデック順序を導出し、隣接マイグレーションがそこに到達することを検査する。パッケージバージョン、コーデックエクスポート名、フィクスチャファイル名、射影キャッシュバージョンは writer の権威ではない。
+- **最新のリリース済み形式:** 以下の記録内の `latestReleasedVersion` は公開セッション形式を特定する。`evidenceTag` はその値を持つタグ付き writer の公開製品リリースを指名する。その形式を運ぶ最初のリリースである必要はない。バイリンガル対訳は同じ記録に対して検査され、別の決定として保守されない。
+- **リリース状態:** writer 定数を検証済みリリース記録と比較する。等しさは writer 形式が出荷済みであることを意味する。より大きな writer バージョンはまだ公開として記録されていない。その確定記録は受け入れ済み互換性 baseline を独立に特定する。古いチェックアウトを新しいブランチの検証済み記録と比較する場合、より低い writer バージョンは古い writer 形式を特定する。ローカル整合性ゲートは 1 つのチェックアウト内でのその順序を拒否する。別のリリース済み真偽値は保守されない。より大きなバージョンを未リリースと宣言する前に、公開リリースが記録を進めていないことを検証する。
 
-An alpha, beta, or release-candidate product publication establishes released Session-format obligations. GitHub’s prerelease flag does not make persisted user data disposable. A missing release record is not evidence of non-publication. The [versioning and authority decision](../.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.md) owns compatibility decisions; [released-format migration](../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md) owns immutable generations and adjacent conversion.
+alpha、beta、リリース候補の製品公開は、リリース済みセッション形式義務を確立する。GitHub の prerelease フラグで永続化ユーザーデータを使い捨てにできない。欠落したリリース記録は非公開の証拠ではない。[バージョン付与と権威の決定](../.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.md)は互換性決定を所有し、[リリース済み形式マイグレーション](../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md)は不変世代と隣接変換を所有する。
 
-The [format references](persistence-changes/historical-formats/README.md) document every integer from zero through the checkout writer, with historical schemas and the existing current catalog.
+[形式リファレンス](persistence-changes/historical-formats/README.md)はゼロからチェックアウト writer までのすべての整数を、歴史的スキーマと既存の現行カタログと共に文書化する。
 
 <a id="finalization-record"></a>
-## Finalization record
+## 確定記録
 
 ```yaml session-format-finalization
 latestFinalizedVersion: 4
 ```
 
-V4 has an accepted compatibility baseline in the [checkpoint](persistence-changes/finalized/v4.json). Schema changes may remain V4 when the [reader-compatibility rules](persistence-changes/README.md#compatibility-rules) are satisfied and the required review is recorded. A version-bump decision requires a higher writer version and its own header transition; it cannot reuse the accepted 3→4 transition. Accepted machine records and after schemas remain immutable.
+V4 は[チェックポイント](persistence-changes/finalized/v4.json)に受け入れ済み互換性 baseline を持つ。[リーダー互換性規則](persistence-changes/README.md#compatibility-rules)が満たされ、必要なレビューが記録された場合、スキーマ変更は V4 のまま残り得る。バージョン上げ決定にはより高い writer バージョンと独自のヘッダー遷移が必要であり、受け入れ済み 3→4 遷移を再利用できない。受け入れ済み機械記録と after スキーマは不変のままである。
 
-Finalization does not freeze every future V4 addition and does not assert publication. The release record below retains the independently verified published version. Ordinary comments, aliases, source locations, and implementation fixes preserving the accepted meaning do not change this baseline.
+確定は将来のすべての V4 追加を凍結せず、公開を主張しない。以下のリリース記録は独立に検証された公開バージョンを保持する。受け入れ済み意味を保つ通常のコメント、別名、ソース位置、実装修正はこの baseline を変えない。
 
-The [final V3 vocabulary](cookbook/adding-a-session-format-version.md#final-v3-vocabulary) remains historical and independent of current V4 additions.
+[最終 V3 語彙](cookbook/adding-a-session-format-version.md#final-v3-vocabulary)は歴史的なままであり、現在の V4 追加から独立している。
 
 <a id="release-record"></a>
-## Release record
+## リリース記録
 
 ```yaml session-format-release
 latestReleasedVersion: 4
 evidenceTag: dsh-v0.2.0-rc.2
 ```
 
-Evidence: published product tag `dsh-v0.2.0-rc.2`; tagged writer: `packages/core/session/src/types.ts`.
+証跡: 公開製品タグ `dsh-v0.2.0-rc.2`。タグ付き writer: `packages/core/session/src/types.ts`。
 
 <a id="updating-the-record"></a>
-## Updating the record
+## 記録の更新
 
-When a Session format bump is implemented, update the code constant and adjacent catalog together; do not advance this release record before publication. When a product release first publishes a higher Session format, confirm publication and its tagged writer, then advance this record and the evidence tag and tagged writer path in the same bilingual update. Later product releases carrying the same format do not require changing the record. Never lower it on the development trunk.
+セッション形式上げを実装する場合はコード定数と隣接カタログを一緒に更新する。公開前にこのリリース記録を進めない。製品リリースがより高いセッション形式を初めて公開する場合は公開とそのタグ付き writer を確認し、次にこの記録と証跡タグおよびタグ付き writer パスを同じバイリンガル更新で進める。同じ形式を運ぶ後の製品リリースでは記録の変更は不要である。開発トランク上でこれを下げることは決してない。
 
-The [documentation-standard test](../scripts/doc-standard.spec.ts) checks record structure, bilingual equality, evidence-tag and writer-path consistency, and that the documented release does not exceed the checkout writer. This keyless check does not query GitHub or prove that the record is up to date; publication verification remains part of the release update.
+[文書標準テスト](../scripts/doc-standard.spec.ts)は記録構造、バイリンガル等価性、証跡タグと writer パス整合性、および文書化リリースがチェックアウト writer を超えないことを検査する。このキーレス検査は GitHub に問い合わせず、記録が最新であることも証明しない。公開検証はリリース更新の一部であり続ける。
 
-Use “current format” and “next adjacent version” for general behavior. Keep explicit numbers for fixed migration inputs and outputs, wire schemas, historical evidence, and tests of those particular versions. The [format-version cookbook](cookbook/adding-a-session-format-version.md) uses N for the latest finalized or released format and N+1 for its successor.
+一般的な動作には「現在の形式」と「次の隣接バージョン」を使う。固定マイグレーション入出力、wire スキーマ、歴史的証跡、それら特定バージョンのテストには明示的な番号を保持する。[形式バージョンクックブック](cookbook/adding-a-session-format-version.md)は最新の確定またはリリース済み形式に N を、その後継に N+1 を使う。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
-None.
+なし。

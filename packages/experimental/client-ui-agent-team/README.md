@@ -1,102 +1,102 @@
 ---
-description: "Use and debug the experimental Web Agent Teams roster, shared task board, and teammate navigation panel."
+description: "実験的 Web エージェントチーム名簿・共有タスクボード・チームメイト移動パネルの使用とデバッグ。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-experimental-client-ui-agent-team
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package adds an Agent Teams action to the Web conversation header, where a user can inspect the current roster, inspect the shared task board, and navigate into a teammate's conversation. It reads the Lead Session's `agentTeam` projection from the shared Session store, where Host projection frames keep it current without a refresh control, and keeps ordinary child-history navigation on the stable addressed-subagent path. Choose it through the published experimental Agent Teams bundle. The browser projection does not extend the stable API Proxy, store Team state, or register model-facing input.
+このパッケージは Web 会話ヘッダーにエージェントチーム操作を追加し、ユーザーが現在の名簿の確認、共有タスクボードの確認、チームメイト会話への移動を行える。共有 Session ストアからリードセッションの `agentTeam` プロジェクションを読み、ホストのプロジェクションフレームが更新制御なしで最新に保ち、通常の子履歴移動は安定したアドレス指定サブエージェントパスに保つ。公開済み実験エージェントチームバンドル経由で選ぶ。ブラウザープロジェクションは安定 API プロキシを拡張せず、チーム状態を保存せず、モデル向け入力を登録しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Enable this package through [`@deepseek-ai/dsh-experimental-agent-team-profile`](../agent-team-profile/README.md), which supplies the Team service, tools, and Web UI together. The Web Client loader mounts the `/client` export; the root Host export is inert, and the package has no user configuration fields.
+[`@deepseek-ai/dsh-experimental-agent-team-profile`](../agent-team-profile/README.md) 経由でこのパッケージを有効化する。同バンドルはチームサービス・ツール・Web UI を一体で提供する。Web クライアントローダーは `/client` エクスポートをマウントし、ルートのホストエクスポートは不活性であり、ユーザー設定フィールドはない。
 
-### Inspect and navigate the roster
+### 名簿の確認と移動
 
-The panel shows the Lead Session's roster and task board from the shared Session store. Task and roster updates appear while the panel stays open. Opening the panel performs no projection requests. The panel shows a loading notice while the conversation or Session list is loading, and an unavailable notice when no Team value is present afterward.
+パネルは共有 Session ストアからリードセッションの名簿とタスクボードを表示する。パネルを開いたままタスクと名簿の更新が現れる。パネルを開いてもプロジェクション要求は行わない。会話またはセッション一覧の読み込み中は読み込み中通知を表示し、その後にチーム値がなければ利用不可通知を表示する。
 
-Roster rows show durable names and phases. Provisioning and running members use the shared ongoing loader, inactive members use a person icon, and failed members use error. Live Session status supplies running activity; the shared `modelSelection` projection supplies a model when available. The current conversation carries a Current chat tag and cannot be selected. Selecting the Lead from a teammate conversation opens the Lead Session directly. Selecting an active teammate opens its ordinary continuable child address. The Host validates the parent, child, and mode when history opens; later human prompts use the same addressed-subagent conversation.
+名簿行は耐久性のある名前と段階を表示する。プロビジョニング中と実行中のメンバーは共有の進行中ローダーを使い、非活性メンバーは人物アイコンを使い、失敗メンバーはエラーを使う。ライブセッション状態が実行中活動を提供し、共有 `modelSelection` プロジェクションが利用可能な場合にモデルを提供する。現在の会話は Current chat タグを持ち、選択できない。チームメイト会話からリードを選ぶとリードセッションを直接開く。活性チームメイトを選ぶと通常の継続可能子アドレスを開く。ホストは履歴オープン時に親・子・モードを検証し、以降の人間プロンプトは同じアドレス指定サブエージェント会話を使う。
 
-### Inspect the task board
+### タスクボードの確認
 
-Ready pending tasks use idle, blocked pending tasks use warning, in-progress tasks use ongoing, and completed tasks use done.
+準備完了の保留タスクは idle、ブロック中の保留タスクは warning、進行中タスクは ongoing、完了タスクは done を使う。
 
-The read-only task board shows task identity, owner, blockers, readiness, advisory write scopes, and overlap warnings. Descriptions longer than two lines have an expand toggle. Section headings show member and task counts; an empty board shows a short description, and a lone member with no tasks uses a single-column panel. Team agents create and update tasks through their tools; the panel provides no task mutation controls. When the projection reports a rejected persisted Team record, the panel shows that failure above the last valid roster and tasks.
+読み取り専用タスクボードはタスク同一性・所有者・ブロッカー・準備状態・助言的書き込みスコープ・重複警告を表示する。2 行を超える説明には展開トグルがある。節見出しはメンバー数とタスク数を表示し、空ボードは短い説明を表示し、タスクなしの単独メンバーは単列パネルを使う。チームエージェントはツール経由でタスクを作成・更新し、パネルはタスク変更制御を提供しない。プロジェクションが拒否された永続化チームレコードを報告すると、パネルは最終有効名簿とタスクの上にその失敗を表示する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The Client export registers its locale dictionaries and one conversation-header slot through Cordis effects; it mounts no Remote namespace. Disposing the plugin fiber removes both registrations.
+クライアントエクスポートはロケール辞書と会話ヘッダースロット 1 件を Cordis エフェクト経由で登録する。リモート名前空間はマウントしない。プラグインファイバーの破棄は両登録を除去する。
 
-The panel renders outside the conversation container and stays within the viewport. Member cards use the shared elevation stroke for their outlines in resting, selected, and hover states. Hovering the trigger opens the panel after 150ms; leaving both trigger and panel closes it after a 120ms grace period. Clicking the trigger pins the panel and moves focus into it. Outside clicks and Escape dismiss the panel; Escape returns focus to the trigger only when focus was inside the panel. In a narrow header, the trigger becomes an icon and opens only on click. The component derives every row from the `useSessions`, `useSessionStatus`, and `useSession` seats: the Lead identity comes from the current Session's subagent address, the Team view from `projectionsBySession[lead].values.agentTeam`, member activity from Session status with the list summary as fallback, and the model from `projectionsBySession[member].values.modelSelection.next`. Each roster row selects its own running state. The only injected callback opens a roster Session using the current and target Session ids. Switching conversations closes the panel and clears a navigation failure.
+パネルは会話コンテナの外に描画され、ビューポート内に収まる。メンバーカードは静止・選択・ホバー状態の輪郭に共有 elevation ストロークを使う。トリガーのホバーは 150ms 後にパネルを開き、トリガーとパネルの両方から離れると 120ms 猶予後に閉じる。トリガーのクリックはパネルを固定し、フォーカスを中に移す。外側クリックと Escape はパネルを閉じる。フォーカスがパネル内にあった場合のみ Escape はフォーカスをトリガーに戻す。狭いヘッダーではトリガーがアイコンになり、クリックでのみ開く。コンポーネントはすべての行を `useSessions`、`useSessionStatus`、`useSession` シートから導出する。リード同一性は現行セッションのサブエージェントアドレスから、チームビューは `projectionsBySession[lead].values.agentTeam` から、メンバー活動は一覧要約フォールバック付きセッション状態から、モデルは `projectionsBySession[member].values.modelSelection.next` から得る。各名簿行は独自の実行状態を選ぶ。注入コールバックは現行と対象のセッション id を使って名簿セッションを開くだけである。会話切替はパネルを閉じて移動失敗を消去する。
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/client/mount.ts`](src/client/mount.ts) | Locale, navigation, and slot registrations |
-| [`src/client/TeamAction.tsx`](src/client/TeamAction.tsx) | Projection-derived roster and task board with panel interaction state |
-| [`src/client/locales.ts`](src/client/locales.ts) | English and Chinese panel copy |
-| [`src/index.ts`](src/index.ts) | Inert Host entry |
+| [`src/client/mount.ts`](src/client/mount.ts) | ロケール・移動・スロット登録 |
+| [`src/client/TeamAction.tsx`](src/client/TeamAction.tsx) | プロジェクション由来の名簿とタスクボードおよびパネル対話状態 |
+| [`src/client/locales.ts`](src/client/locales.ts) | 英語と中国語のパネル文言 |
+| [`src/index.ts`](src/index.ts) | 不活性ホスト入口 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Agent Teams bundle](../agent-team-profile/README.md) — the published opt-in bundle that mounts this Client plugin.
-- [Agent Teams service](../agent-team/README.md) — authoritative roster, task, and projection behavior.
-- [Conversation UI](../../client/ui-conversation/README.md) — the stable header slot and addressed-subagent navigation surface.
-- [Experimental packages](../README.md) — incubation status and publication policy.
+- [エージェントチームバンドル](../agent-team-profile/README.md) — このクライアントプラグインをマウントする公開オプトインバンドル。
+- [エージェントチームサービス](../agent-team/README.md) — 権威ある名簿・タスク・プロジェクション動作。
+- [会話 UI](../../client/ui-conversation/README.md) — 安定ヘッダースロットとアドレス指定サブエージェント移動面。
+- [実験パッケージ](../README.md) — インキュベーション状態と公開ポリシー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this browser projection registers no model-facing input.
+なし。このブラウザープロジェクションはモデル向け入力を登録しないためである。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-No direct effect; the Team tools and ordinary conversation submission own any later model-visible use.
+直接効果なし。チームツールと通常会話送信が以降のモデル可視利用を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **No mailbox timeline** — the projection view carries roster and tasks only; peer messages are not shown.
-- **Late plugin activation** — after enabling Agent Teams in an already-open conversation, reload the page to receive its Team projection.
-- **Model availability** — a model appears only when the shared store has a durable selection or request for that member. Missing cold-cache values stay absent until normal Session loading or a live update supplies them.
-- **Ordinary child continuation** — a human message sent after navigation uses the stable addressed-subagent prompt path, not the Team peer mailbox.
-- **No lifecycle or workspace controls** — the panel cannot spawn, rename, delete, or interrupt teammates, and write scopes remain advisory metadata.
+- **メールボックスタイムラインなし** — プロジェクションビューは名簿とタスクのみを運び、ピアメッセージは表示しない。
+- **遅いプラグイン有効化** — 既に開いた会話でエージェントチームを有効化した後はチームプロジェクションを受け取るためにページを再読み込みする。
+- **モデル可用性** — モデルは共有ストアにそのメンバーの耐久性のある選択または要求がある場合にのみ現れる。コールドキャッシュ欠落値は通常セッション読み込みやライブ更新が提供するまで不在のままである。
+- **通常の子継続** — 移動後に送った人間メッセージはチームピアメールボックスではなく安定アドレス指定サブエージェントプロンプトパスを使う。
+- **ライフサイクルやワークスペース制御なし** — パネルはチームメイトの生成・改名・削除・中断ができず、書き込みスコープは助言メタデータのままである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

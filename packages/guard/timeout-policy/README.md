@@ -1,134 +1,134 @@
 ---
-description: "Cooperative time limit for cancellation-aware tool calls, mapping a settled timeout to a clear model error for users and maintainers choosing or debugging the plugin."
+description: "キャンセル対応のツール呼び出しに対する協調的制限時間。確定したタイムアウトを明確なモデルエラーに対応付ける。このプラグインを選択またはデバッグするユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-call-timeout-policy
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to give tool calls their configured cooperative time limits and return a clear timeout error to the model after cancellation settles. Calls that finish in time are unchanged. A tool that ignores or slowly handles cancellation can keep the caller waiting because the package cannot hard-stop downstream work. Each tool supplies its own limit; the package has no configuration and is enabled in the `dsh` base bundle.
+このパッケージは、ツール呼び出しに設定された協調的制限時間を与え、キャンセルが確定した後に明確なタイムアウトエラーをモデルへ返す。時間内に完了した呼び出しは変更されない。キャンセルを無視する、または遅く処理するツールは呼び出し元を待たせ続ける可能性がある。このパッケージは下流の作業を強制停止できないためである。各ツールが独自の制限を提供し、このパッケージに設定はなく、`dsh` ベースバンドルで有効になっている。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The common path is one line: add the plugin to the composition — the `dsh` base bundle already has it. Tools that have a limit configured are protected automatically; every other tool is untouched.
+一般的な使い方は 1 行である: プラグインを構成に追加する — `dsh` ベースバンドルにはすでに含まれている。制限が設定されたツールは自動的に保護され、その他のツールには何も起きない。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it when the model calls tools that can take a long time, those tools honor `exec.signal`, and you want a predictable timed-out answer after cancellation settles. Avoid it when a tool must be hard-stopped at its limit — the plugin can only ask a tool to stop, so a tool that ignores cancellation keeps running and keeps the caller waiting — and when you want one default limit for every tool, because each tool's limit comes from that tool's own configuration.
+モデルが長時間かかりうるツールを呼び、それらのツールが `exec.signal` に従い、キャンセルが確定した後に予測可能なタイムアウト応答を望む場合に選ぶ。ツールを制限時間で強制停止しなければならない場合は避ける — プラグインはツールに停止を依頼することしかできず、キャンセルを無視するツールは動作を続けて呼び出し元を待たせ続ける — また、すべてのツールに単一のデフォルト制限を望む場合も避ける。各ツールの制限はそのツール自身の設定から来るためである。
 
-### Setting it up
+### セットアップ
 
-Mount the plugin with no configuration:
+設定なしでプラグインをマウントする:
 
 ```yaml
 - name: '@deepseek-ai/dsh-tool-call-timeout-policy'
 ```
 
-The limit is set where the tool is configured. For example, `dsh-tool-web`'s `fetchTimeoutMs`/`searchTimeoutMs` settings (default 30,000 ms) put the limit on `web_fetch` and `web_search`. Tools without a limit — the shipped `bash`, `read`, `write`, and `edit` — are never cut off. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-web) lists the tool settings that produce limits.
+制限はツールが設定される場所で設定される。たとえば `dsh-tool-web` の `fetchTimeoutMs`/`searchTimeoutMs` 設定（デフォルト 30,000 ms）は `web_fetch` と `web_search` に制限を課す。制限のないツール — 出荷済みの `bash`、`read`、`write`、`edit` — は決して切断されない。生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-web)に、制限を生み出すツール設定が一覧されている。
 
-### What you get
+### 得られるもの
 
-When the deadline fires, the plugin aborts the derived `exec.signal`. After downstream code honors cancellation and `next()` settles, the model receives `Error: tool call timed out after <ms>ms` as an error result, so it can decide to retry, adjust, or give up. A tool that ignores or slowly handles the signal keeps the caller waiting and produces no timeout result until it settles; calls that finish in time are unchanged.
+デッドラインが発火すると、プラグインは派生した `exec.signal` をアボートする。下流のコードがキャンセルに従い `next()` が確定した後、モデルは `Error: tool call timed out after <ms>ms` をエラー結果として受け取り、再試行、調整、または断念を判断できる。シグナルを無視する、または遅く処理するツールは呼び出し元を待たせ続け、確定するまでタイムアウト結果を生成しない。時間内に完了した呼び出しは変更されない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the plugin arms a deadline around each dispatch and maps it to the `TOOL_TIMEOUT` result, and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、プラグインが各ディスパッチの周囲にデッドラインを設定し、それを `TOOL_TIMEOUT` 結果にマッピングする方法を説明し、それを実現するコードを指し示す。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計思想
 
-The wrapper is built on four commitments:
+このラッパーは 4 つの約束の上に築かれている:
 
-- **Enforcement home, not a library.** `dsh-timeout` owns timing and classification (`deadline`, `timeoutOf`); this plugin owns the per-call wiring over `tools/execute`; each capability owns termination. The split is recorded in the [timeout-deadline-library Agent Note](../../../.agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.md).
-- **The tool declares its own budget.** `timeoutMs` lives on the tool's `ToolDefinition`, read from the registry (`ctx.tools.get(exec.name, exec.agent)?.timeoutMs`), so a mistyped tool name is impossible and undeclared tools delegate untouched.
-- **Scoped classification.** `TOOL_TIMEOUT` serves as both the internal `deadline` classification code and the structured error `code`; scoping `timeoutOf` to it keeps a nested outer deadline (another wrapper's timer that fired first) from being misread as this plugin's timeout — it reads as an ordinary upstream cancel.
-- **Signal swap, then restore.** Cordis `next()` ignores passed arguments, so the wrapper mutates the shared `exec` in place: it swaps the derived deadline signal onto `exec` for dispatch and restores the caller's signal in a `finally`, so `tools/post-execute` listeners never see this plugin's possibly-aborted signal.
+- **執行の本拠地であり、ライブラリではない。** `dsh-timeout` がタイミングと分類（`deadline`、`timeoutOf`）を所有し、このプラグインが `tools/execute` 上の呼び出しごとの配線を所有し、各ケイパビリティが終了処理を所有する。この分割は [timeout-deadline-library Agent Note](../../../.agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.md) に記録されている。
+- **ツールが自身の予算を宣言する。** `timeoutMs` はツールの `ToolDefinition` 上にあり、レジストリから読まれる（`ctx.tools.get(exec.name, exec.agent)?.timeoutMs`）。そのためツール名の打ち間違いは起こりえず、宣言のないツールはそのまま委譲される。
+- **スコープ付きの分類。** `TOOL_TIMEOUT` は内部の `deadline` 分類コードと構造化エラーの `code` の両方を兼ねる。`timeoutOf` をそれにスコープすることで、ネストした外側のデッドライン（先に発火した別のラッパーのタイマー）がこのプラグインのタイムアウトと誤読されない — それは通常の上流キャンセルとして読まれる。
+- **シグナルの差し替えと復元。** Cordis の `next()` は渡された引数を無視するため、ラッパーは共有 `exec` をその場で変更する: ディスパッチ用に派生デッドラインシグナルを `exec` に差し替え、`finally` で呼び出し元のシグナルを復元する。これにより `tools/post-execute` リスナーはこのプラグインのアボートされた可能性のあるシグナルを見ることがない。
 
-### How a deadline is armed and mapped
+### デッドラインの設定とマッピングの方法
 
-One `tools/execute` listener reads the dispatched tool's declared limit from the registry (`ctx.tools.get(exec.name, exec.agent)?.timeoutMs`); a tool without a limit delegates untouched. For a limited tool, `deadline(exec.signal, timeoutMs, TOOL_TIMEOUT)` builds a fused signal that the wrapper swaps onto `exec` for dispatch and restores in a `finally`, so `tools/post-execute` listeners never see the derived signal. When the wrapper's own timer fired — `timeoutOf(d.signal, 'TOOL_TIMEOUT')` scoped by the code, so a nested outer deadline reads as an ordinary upstream cancel — the dispatched result, already normalized into an error result by dispatch, is replaced with the structured result: `isError: true`, content `Error: tool call timed out after <ms>ms`, and error info `{ name: 'ToolTimeoutError', code: 'TOOL_TIMEOUT' }`.
+1 つの `tools/execute` リスナーが、ディスパッチされたツールの宣言済み制限をレジストリから読む（`ctx.tools.get(exec.name, exec.agent)?.timeoutMs`）。制限のないツールはそのまま委譲される。制限のあるツールでは、`deadline(exec.signal, timeoutMs, TOOL_TIMEOUT)` が融合シグナルを構築し、ラッパーがディスパッチ用に `exec` へ差し替え、`finally` で復元するため、`tools/post-execute` リスナーは派生シグナルを見ることがない。ラッパー自身のタイマーが発火した場合 — `timeoutOf(d.signal, 'TOOL_TIMEOUT')` をコードでスコープするため、ネストした外側のデッドラインは通常の上流キャンセルとして読まれる — ディスパッチによってすでにエラー結果に正規化されたディスパッチ結果が、構造化結果で置き換えられる: `isError: true`、内容 `Error: tool call timed out after <ms>ms`、エラー情報 `{ name: 'ToolTimeoutError', code: 'TOOL_TIMEOUT' }`。
 
-### Composing with other wrappers
+### 他のラッパーとの構成
 
-Multiple `tools/execute` listeners compose by Cordis registration order, which chooses the semantics: the timeout registered outer covers a whole retry operation, the timeout registered inner covers each attempt.
+複数の `tools/execute` リスナーは Cordis の登録順で構成され、それがセマンティクスを決める: 外側に登録されたタイムアウトはリトライ操作全体をカバーし、内側に登録されたタイムアウトは各試行をカバーする。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `TOOL_TIMEOUT`, `name`/`inject`/`apply`, the `tools/execute` wrapper |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: `TOOL_TIMEOUT`、`name`/`inject`/`apply`、`tools/execute` ラッパー |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the package-level contract is not enough. They move from the tool-call pipeline to the timeout-library split, the enforced limits, and the guard group map.
+パッケージレベルの契約では足りないときにこれらのページを読む。ツール呼び出しパイプラインから、タイムアウトライブラリの分割、執行される制限、および guard グループのマップへと進む。
 
-- [Tools subsystem reference](../../../docs/subsystems/tools.md) — the `tools/execute` waterfall and decision shapes this wrapper hooks.
-- [Timeout deadline library Agent Note](../../../.agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.md) — the timing/termination split and why the deadline only notifies.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-web) — `dsh-tool-web`'s `fetchTimeoutMs`/`searchTimeoutMs` budgets the policy enforces.
-- [guard group map](../README.md) — the sibling guard packages and the loop-hygiene family.
+- [Tools サブシステムリファレンス](../../../docs/subsystems/tools.md) — このラッパーがフックする `tools/execute` ウォーターフォールと決定の形。
+- [Timeout deadline library Agent Note](../../../.agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.md) — タイミング/終了の分割と、デッドラインが通知のみを行う理由。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-web) — このポリシーが執行する `dsh-tool-web` の `fetchTimeoutMs`/`searchTimeoutMs` 予算。
+- [guard グループのマップ](../README.md) — 兄弟 guard パッケージとループ健全性ファミリー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Conditional tool result
+### 条件付きツール結果
 
-#### What the model sees
+#### モデルが見るもの
 
-This plugin adds no prompt or schema. If a declared deadline wins and downstream cancellation settles, it replaces the provider's outcome with `Error: tool call timed out after <ms>ms` plus the structured `TOOL_TIMEOUT` error; otherwise the original result passes through unchanged. A downstream call that never settles cannot produce a timeout result.
+このプラグインはプロンプトやスキーマを追加しない。宣言されたデッドラインが勝ち、下流のキャンセルが確定した場合、プロバイダーの結果を `Error: tool call timed out after <ms>ms` と構造化 `TOOL_TIMEOUT` エラーで置き換える。それ以外の場合、元の結果はそのまま通過する。確定しない下流呼び出しはタイムアウト結果を生成できない。
 
-#### Token effect
+#### トークンへの影響
 
-Zero tokens on non-timeout calls. A timeout adds one small retained error result and can prevent a larger late provider result from entering context.
+タイムアウト以外の呼び出しではゼロトークン。タイムアウトは小さな保持済みエラー結果を 1 つ追加し、遅れて届くより大きなプロバイダー結果がコンテキストに入るのを防げる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
+追記のみ。新たに可視になる内容は再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリを無効にしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the policy is a poor fit. They are current package constraints, not a task backlog.
+これらの制限は、このポリシーが不向きな場合を定義する。これらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **Cooperative, never a hard kill** — the deadline only notifies via `exec.signal`; a tool that ignores the signal does not stop on timeout, the wrapper remains inside `await next()`, and the model receives no timeout result until downstream settles.
-- **No blanket budget** — only tools that declare `timeoutMs` on their `ToolDefinition` get a deadline; undeclared tools (the shipped `bash`, `read`, `write`, and `edit` declare none) have no registry-wide default.
+- **協調的であり、強制終了はしない** — デッドラインは `exec.signal` を介して通知するのみである。シグナルを無視するツールはタイムアウトで停止せず、ラッパーは `await next()` の内側に留まり、下流が確定するまでモデルはタイムアウト結果を受け取らない。
+- **包括的な予算はない** — `ToolDefinition` で `timeoutMs` を宣言したツールだけがデッドラインを得る。宣言のないツール（出荷済みの `bash`、`read`、`write`、`edit` は宣言していない）にはレジストリ全体のデフォルトはない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発メモはメンテナー向けの作業コンテキストである: 未解決の疑問と未決定の方向性。明示的に非権威である — 出荷済みの動作、制限、認められた根拠は、上記のセクション、パッケージコード、およびリンクされた Agent Note にある。
 
-The `src/index.ts` FIXME asks to settle a `@deepseek-ai/dsh-timeout-guard` rename; the [naming ledger](../../../.agents/notes/archived/architecture/2026-08-11-repository-naming-contract-and-rename-ledger.md) already records `@deepseek-ai/dsh-tool-call-timeout-policy` as the decided name, so the FIXME is stale pending a code cleanup.
+`src/index.ts` の FIXME は `@deepseek-ai/dsh-timeout-guard` への改名を決着させることを求めているが、[naming ledger](../../../.agents/notes/archived/architecture/2026-08-11-repository-naming-contract-and-rename-ledger.md)はすでに `@deepseek-ai/dsh-tool-call-timeout-policy` を決定済みの名前として記録しているため、この FIXME はコード整理待ちの古いものである。
 
 </details>

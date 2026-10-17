@@ -1,20 +1,20 @@
 # API Gateway
 
-English | [中文](api-gateway.zh.md)
+日本語 | [English](api-gateway.en.md) | [中文](api-gateway.zh.md)
 
-This is the current-state reference for the Typert API Gateway. It describes how business services declare unary and stream Remote methods, how the build generates Host and Client contracts, and how calls reuse the Connection RPC and `/api` route. Session events, incremental data, and other streaming protocols are outside this document's scope; they may use the same Connection but do not use Remote method descriptors.
+これは Typert API Gateway の現在の状態のリファレンスである。ビジネスサービスが単項およびストリームの Remote メソッドをどう宣言し、ビルドが Host と Client の契約をどう生成し、呼び出しが Connection RPC と `/api` ルートをどう再利用するかを説明する。Session イベント、増分データ、その他のストリーミングプロトコルはこのドキュメントの範囲外である。それらは同じ Connection を使ってよいが、Remote メソッド記述子は使わない。
 
-## Programming model
+## プログラミングモデル
 
-Business services use `@Remote` or `@RemoteScope` to select the methods exposed to the Client. Unmarked methods do not enter the generated Client types or runtime contributions and cannot be called through `ctx.remote`.
+ビジネスサービスは `@Remote` または `@RemoteScope` を使って、Client に公開するメソッドを選ぶ。マークされていないメソッドは生成される Client 型やランタイムコントリビューションに入らず、`ctx.remote` から呼べない。
 
-`@Remote` denotes calling a Cordis service registered on the root Host Context. Complex Host objects cannot cross the wire directly; the business package must declare their association with a wire identity through `TypertLookupMap` and register a default resolution provider with `ctx.typert.lookups` at runtime. For example, an `Agent` parameter named `agent` in the Host signature produces an `agentId` wire field, and the Gateway resolves that id to a Host object before invoking the business method. Host composition can use `ctx.typert.lookups.configure()` to override the resolution policy for a lookup key without changing the parameter name, wire field, or canonical type symbol owned by the business package.
+`@Remote` は、ルート Host Context に登録された Cordis サービスへの呼び出しを表す。複雑な Host オブジェクトは wire を直接越えられない。ビジネスパッケージは `TypertLookupMap` を通じてそれらの wire 同一性との関連を宣言し、実行時に `ctx.typert.lookups` で既定の解決プロバイダーを登録しなければならない。例えば、Host シグネチャで `agent` という名前の `Agent` パラメーターは `agentId` wire フィールドを生成し、Gateway はビジネスメソッドを呼び出す前にその id を Host オブジェクトへ解決する。Host コンポジションは `ctx.typert.lookups.configure()` を使って、ビジネスパッケージが所有するパラメーター名、wire フィールド、正規型シンボルを変えることなく、ルックアップキーの解決ポリシーを上書きできる。
 
-`@RemoteScope(key)` first resolves an identity to a scoped Context through `ctx.typert.contexts`, then obtains the service from that Context and invokes the method. It applies when the method itself depends on scoped composition and does not need to receive objects such as `Agent` explicitly.
+`@RemoteScope(key)` はまず `ctx.typert.contexts` を通じて同一性をスコープ付き Context に解決し、次にその Context からサービスを取得してメソッドを呼び出す。これは、メソッド自体がスコープ付きコンポジションに依存し、`Agent` のようなオブジェクトを明示的に受け取る必要がない場合に適用される。
 
-`@Remote` accepts an export name or `{ name?, mode?, resources? }`, and `@RemoteScope(key, option?)` accepts an export name, as in `@RemoteScope('agent', 'current')` below, or `{ name?, resources? }` as its second argument. `resources` holds per-kind readers that return the identities of the resources one call touches for access control; each reader receives the method's wire arguments as its own parameters, with types inferred from the decorated method. Most methods declare no readers, because the Gateway also reads identities from lookup parameters and scoped Contexts that declare a `resource`, and from the default fields in `typert.resources`; the [Typert subsystem](subsystems/typert.md) owns that order.
+`@Remote` はエクスポート名または `{ name?, mode?, resources? }` を受け取り、`@RemoteScope(key, option?)` はエクスポート名 — 下記の `@RemoteScope('agent', 'current')` のように — または `{ name?, resources? }` を第 2 引数として受け取る。`resources` は、アクセス制御のために 1 回の呼び出しが触れるリソースの同一性を返す、kind ごとのリーダーを保持する。各リーダーは、デコレートされたメソッドから推論された型を持つ、そのメソッドの wire 引数を自身のパラメーターとして受け取る。ほとんどのメソッドはリーダーを宣言しない。Gateway は `resource` を宣言するルックアップパラメーターとスコープ付き Context、および `typert.resources` の既定フィールドからも同一性を読むからである。その順序は [Typert サブシステム](subsystems/typert.md)が所有する。
 
-Services normally extend `TypertRemoteService` so the constructor explicitly binds the Cordis service key and default Remote namespace. A service that already has another base class can instead declare `readonly typertRemote = bindTypertRemote(this, serviceKey)`; both forms leave an inspectable public binding and do not depend on the compiler injecting a symbol into the constructor.
+サービスは通常 `TypertRemoteService` を継承し、コンストラクターが Cordis サービスキーと既定の Remote 名前空間を明示的にバインドする。すでに別の基底クラスを持つサービスは、代わりに `readonly typertRemote = bindTypertRemote(this, serviceKey)` を宣言できる。どちらの形式も検査可能な公開バインディングを残し、コンパイラーがシンボルをコンストラクターに注入することに依存しない。
 
 ```ts
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -55,11 +55,11 @@ export class GoalService extends TypertRemoteService {
 }
 ```
 
-Remote methods may return a value synchronously or return a Promise. For cooperative cancellation, the final parameter in the Host signature must be `signal: AbortSignal` using the global type; it is recorded in the descriptor instead of entering `args`, while the generated Client method accepts an optional final `AbortSignal`.
+Remote メソッドは値を同期的に返すか、Promise を返してよい。協調的キャンセルのためには、Host シグネチャの最後のパラメーターがグローバル型を使う `signal: AbortSignal` でなければならない。これは `args` に入らずに記述子に記録され、生成される Client メソッドはオプションの最後の `AbortSignal` を受け入れる。
 
-`@Remote({ mode: 'stream' })` marks a method that returns `Iterable`, `AsyncIterable`, or `RemoteStream<Out, In>`: the Gateway delivers each yielded item, a value the Host method produced, over its multiplexed `/api/remote.mux` WebSocket or an in-process carrier, and the generated Client method returns a `RemoteStreamHandle<Out, In>` that iterates the items and exposes `send`, `end`, and `dispose` for the Client-to-Host uplink of the same logical stream. The second type argument of `RemoteStream<Out, In>` declares the uplink item type; the Gateway validates each item the Client sends, because it arrives from the browser, with the generated `In` codec before the Host method reads it through `this.ctx.invocation.uplink<In>()`. The uplink enters neither `args` nor the parameter list; the [Gateway README](../packages/api/gateway/README.md) owns the frame, half-close, cancellation, and inbox-bound contracts.
+`@Remote({ mode: 'stream' })` は、`Iterable`、`AsyncIterable`、または `RemoteStream<Out, In>` を返すメソッドをマークする: Gateway は yield された各項目 — Host メソッドが生成した値 — を、多重化された `/api/remote.mux` WebSocket またはインプロセスキャリアを通じて配信し、生成される Client メソッドは項目を反復し、同じ論理ストリームの Client から Host へのアップリンク用の `send`、`end`、`dispose` を公開する `RemoteStreamHandle<Out, In>` を返す。`RemoteStream<Out, In>` の第 2 型引数はアップリンク項目型を宣言する。Client が送る各項目はブラウザーから届くため、Host メソッドが `this.ctx.invocation.uplink<In>()` を通じて読む前に、Gateway が生成された `In` コーデックで検証する。アップリンクは `args` にもパラメーターリストにも入らない。フレーム、ハーフクローズ、キャンセル、inbox バウンドの契約は [Gateway README](../packages/api/gateway/README.md)が所有する。
 
-The Client uses concrete functions on ordinary objects, not a JavaScript Proxy. Direct and scoped calls appear under `ctx.remote.<namespace>` and `agentCtx.remote.<namespace>`. Each namespace is a traced Cordis child Service registered as `remote.<namespace>`; the Client assembly mounts contributions through `ctx.remote.$mount()`, and the namespace unloads after its last method is withdrawn. Dependency declarations belong to the actual caller: only a business package that reads `ctx.remote.<namespace>` or `agentCtx.remote.<namespace>` declares both `remote` and `remote.<namespace>` in its own `inject`; assemblies that only mount contributions and higher-level runtimes that do not call that namespace do not declare the namespace dependency on the business package's behalf. When an `@Remote` method has exactly one lookup parameter and a same-named `TypertContextMap` uses the same wire identity, the generated scoped signature omits that identity parameter. `@RemoteScope` generates only the scoped invocation interface.
+Client は JavaScript Proxy ではなく、通常のオブジェクトの具象関数を使う。直接呼び出しとスコープ付き呼び出しは `ctx.remote.<namespace>` と `agentCtx.remote.<namespace>` の下に現れる。各名前空間は `remote.<namespace>` として登録されるトレースされた Cordis 子サービスである。Client アセンブリは `ctx.remote.$mount()` を通じてコントリビューションをマウントし、名前空間は最後のメソッドが撤回された後にアンロードされる。依存関係の宣言は実際の呼び出し元に属する: `ctx.remote.<namespace>` または `agentCtx.remote.<namespace>` を読むビジネスパッケージだけが、自身の `inject` に `remote` と `remote.<namespace>` の両方を宣言する。コントリビューションをマウントするだけのアセンブリや、その名前空間を呼ばない上位のランタイムは、ビジネスパッケージに代わって名前空間依存を宣言しない。`@Remote` メソッドがちょうど 1 つのルックアップパラメーターを持ち、同名の `TypertContextMap` が同じ wire 同一性を使う場合、生成されるスコープ付きシグネチャはその同一性パラメーターを省略する。`@RemoteScope` はスコープ付き呼び出しインターフェースのみを生成する。
 
 ```ts ignore-check
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -77,96 +77,96 @@ await ctx.remote.goals.create(agentId, { objective: 'ship it' })
 await agentCtx.remote.goals.create({ objective: 'ship it' })
 ```
 
-Client applications assemble only `@deepseek-ai/dsh-api-remotes`. That package imports the `/remote` subpaths of selected business packages as runtime values, mounts their contributions through `ctx.remote.$mount()`, and re-exports the declaration merges from the same files. Adding a Host Remote package is an explicit choice by the Client composition owner; business components do not need to load the Typert Gateway or the business package's Remote JS separately.
+Client アプリケーションは `@deepseek-ai/dsh-api-remotes` のみをアセンブルする。このパッケージは選択されたビジネスパッケージの `/remote` サブパスをランタイム値としてインポートし、`ctx.remote.$mount()` を通じてそれらのコントリビューションをマウントし、同じファイルの宣言マージを再エクスポートする。Host Remote パッケージの追加は Client コンポジションのオーナーによる明示的な選択である。ビジネスコンポーネントは Typert Gateway やビジネスパッケージの Remote JS を個別にロードする必要はない。
 
-The `api-remotes` assembly and the `ctx.remote` contract are React-independent; the Host methods visible to any Client assembly are limited to the Remote methods selected at generation time.
+`api-remotes` アセンブリと `ctx.remote` 契約は React 非依存である。任意の Client アセンブリに見える Host メソッドは、生成時に選択された Remote メソッドに限られる。
 
-## Component responsibilities
+## コンポーネントの責務
 
-| Location | Package or entry | Responsibility |
+| 場所 | パッケージまたはエントリー | 責務 |
 |---|---|---|
-| Shared | `@deepseek-ai/dsh-typert-protocol` | Declares decorators, Gateway bindings, merge-extensible protocol maps, invocation descriptors, and provider types; starts no TypeScript analysis and registers no Cordis services |
-| Build | `@deepseek-ai/dsh-typert-generator` | Strictly analyzes Remote signatures, the type graph, lookups, Contexts, and source locations from the Host `ts.Program`, then generates Host and Host-for-Client artifacts |
-| Host | `@deepseek-ai/dsh-typert-registry` and Loader | Places generated Host descriptors, schemas, and business-package registrations in `ctx.typert`, and holds lookup and Context providers |
-| Host | `@deepseek-ai/dsh-api-session-controller` | Owns the application Agent/Session identity policy and configures the corresponding Typert lookups |
-| Host | `@deepseek-ai/dsh-api-gateway` | Provides `ctx.typertGateway`, claims Remote endpoints, validates request values, resolves objects or Contexts, and invokes live Cordis services |
-| Host | `@deepseek-ai/dsh-api-remote-access` | Decides which Remote methods a non-owner Peer may call through business-registered role-based policies, filters list results, and streams each Peer's access snapshot; the Gateway requires it |
-| Client | `@deepseek-ai/dsh-api-gateway/client` | Provides `ctx.remote` and `remote.<namespace>` child Services, mounts generated descriptors as concrete methods, and initiates and cancels calls through the Connection |
-| Client | `@deepseek-ai/dsh-api-remotes/client` | Explicitly selects and mounts the `/remote` contributions allowed by the application and brings the corresponding declaration merges into business code |
-| Both | `@deepseek-ai/dsh-client-connection` | Provides the RPC carrier, request correlation, trust boundary, cancellation, response envelope, and the `/api` HTTP bridge |
+| 共有 | `@deepseek-ai/dsh-typert-protocol` | デコレーター、Gateway バインディング、merge 拡張可能なプロトコルマップ、呼び出し記述子、プロバイダー型を宣言する。TypeScript 解析を開始せず、Cordis サービスも登録しない |
+| ビルド | `@deepseek-ai/dsh-typert-generator` | Host `ts.Program` から Remote シグネチャ、型グラフ、ルックアップ、Context、ソース位置を厳密に解析し、Host アーティファクトと Host-for-Client アーティファクトを生成する |
+| ホスト | `@deepseek-ai/dsh-typert-registry` と Loader | 生成された Host 記述子、スキーマ、ビジネスパッケージ登録を `ctx.typert` に配置し、ルックアッププロバイダーと Context プロバイダーを保持する |
+| ホスト | `@deepseek-ai/dsh-api-session-controller` | アプリケーションの Agent/Session 同一性ポリシーを所有し、対応する Typert ルックアップを構成する |
+| ホスト | `@deepseek-ai/dsh-api-gateway` | `ctx.typertGateway` を提供し、Remote エンドポイントをクレームし、リクエスト値を検証し、オブジェクトまたは Context を解決し、ライブ Cordis サービスを呼び出す |
+| ホスト | `@deepseek-ai/dsh-api-remote-access` | 非 owner の Peer が呼べる Remote メソッドを、ビジネスが登録したロールベースポリシーを通じて決定し、リスト結果をフィルターし、各 Peer のアクセススナップショットをストリームする。Gateway はこれを必須とする |
+| クライアント | `@deepseek-ai/dsh-api-gateway/client` | `ctx.remote` と `remote.<namespace>` 子サービスを提供し、生成された記述子を具象メソッドとしてマウントし、Connection を通じて呼び出しを開始・キャンセルする |
+| クライアント | `@deepseek-ai/dsh-api-remotes/client` | アプリケーションが許可する `/remote` コントリビューションを明示的に選択してマウントし、対応する宣言マージをビジネスコードへもたらす |
+| 両方 | `@deepseek-ai/dsh-client-connection` | RPC キャリア、リクエスト相関、信頼境界、キャンセル、レスポンスエンベロープ、および `/api` HTTP ブリッジを提供する |
 
-The API Gateway package owns the Host dispatcher and Client Remote endpoint as peer entries, but the two builds never enter the same `ts.Program`. The Host entry does not import the Client Cordis `Context` merge, and the Client entry does not import the Host Gateway service.
+API Gateway パッケージは、Host ディスパッチャーと Client Remote エンドポイントをピアエントリーとして所有するが、2 つのビルドが同じ `ts.Program` に入ることは決してない。Host エントリーは Client の Cordis `Context` マージをインポートせず、Client エントリーは Host Gateway サービスをインポートしない。
 
-## Strict generation pipeline
+## 厳密な生成パイプライン
 
-The root build compiles and bundles the Host face, then the Client face, then builds the Web shell ([step order](development.md#typescript-project-layout)). The Host phase first compiles the Host package references, then runs `tsdown --env.DSH_BUILD_FACE host`; the normal Host Project Reference graph compiles the Typert generator, which runs during this tsdown pass with the Host aggregate as its only `ts.Program` seed. The Client phase then compiles the Client package references and runs `tsdown --env.DSH_BUILD_FACE client`, consuming the newly generated Remote Client declarations and runtime contributions without starting Typert again.
+ルートビルドは Host フェイスをコンパイルしてバンドルし、次に Client フェイス、次に Web シェルをビルドする ([ステップ順序](development.md#typescript-project-layout))。Host フェーズはまず Host パッケージ参照をコンパイルし、次に `tsdown --env.DSH_BUILD_FACE host` を実行する。通常の Host Project Reference グラフが Typert generator をコンパイルし、これはこの tsdown パス中に、Host 集約を唯一の `ts.Program` シードとして実行される。Client フェーズは次に Client パッケージ参照をコンパイルし、`tsdown --env.DSH_BUILD_FACE client` を実行して、新しく生成された Remote Client 宣言とランタイムコントリビューションを、Typert を再び起動することなく消費する。
 
-Both tsdown passes match `vendor/*`, `packages/*/*`, and `apps/cli`, the Host pass also `apps/desktop-host` ([build order](development.md#typescript-project-layout)), and both bundle only JavaScript emitted to `lib/types` by the corresponding tsc phase. The root config does not scan Client artifacts, classify package names, or pass a maintained filter to tsdown; package-local configs return entries for the current phase based on `DSH_BUILD_FACE`. An ordinary Client plugin produces both its Node loader entry and browser bundle during the Client phase.
+両方の tsdown パスは `vendor/*`、`packages/*/*`、`apps/cli` に一致し、Host パスはさらに `apps/desktop-host` にも一致し ([ビルド順序](development.md#typescript-project-layout))、どちらも対応する tsc フェーズが `lib/types` に出力した JavaScript のみをバンドルする。ルート設定は Client アーティファクトをスキャンせず、パッケージ名を分類せず、維持されたフィルターを tsdown に渡さない。パッケージローカルの設定は `DSH_BUILD_FACE` に基づいて現在のフェーズのエントリーを返す。通常の Client プラグインは Client フェーズ中に Node ローダーエントリーとブラウザーバンドルの両方を生成する。
 
-`api/remotes`, `api/gateway`, `api/session-controller`, and `api/workspace-controller` (plus `client/connection`) split TypeScript faces. `api/remotes`' Client project depends on `/remote` declarations generated for business packages during Host tsdown; root aggregates and direct consumers must reference each split package's `tsconfig.host.json` or `tsconfig.client.json` respectively. `api-remotes`' `clientBundle(..., { hostPhase: true })` produces its Host entry during Host tsdown and leaves only the browser entry for Client tsdown. The Agent/Session lookup policy lives in `@deepseek-ai/dsh-api-session-controller`, not in `api-remotes`.
+`api/remotes`、`api/gateway`、`api/session-controller`、`api/workspace-controller` (および `client/connection`) は TypeScript フェイスを分割する。`api/remotes` の Client プロジェクトは、Host tsdown 中にビジネスパッケージ向けに生成された `/remote` 宣言に依存する。ルートの集約と直接のコンシューマーは、それぞれ分割パッケージの `tsconfig.host.json` または `tsconfig.client.json` を参照しなければならない。`api-remotes` の `clientBundle(..., { hostPhase: true })` は Host tsdown 中に Host エントリーを生成し、Client tsdown にはブラウザーエントリーだけを残す。Agent/Session ルックアップポリシーは `api-remotes` ではなく `@deepseek-ai/dsh-api-session-controller` に住む。
 
-Each contributing business package writes generated files to its own `lib/` directory, not to its source directory:
+コントリビューションする各ビジネスパッケージは、生成ファイルをソースディレクトリではなく自身の `lib/` ディレクトリに書き込む:
 
-| File | Consumer | Contents |
+| ファイル | コンシューマー | 内容 |
 |---|---|---|
-| `typert.host.js` | Host Loader | Runtime reflection for the Host face, strict invocation descriptors, and schema registration values |
-| `typert.host.d.ts` | Host type system | Generated declarations for the Host face |
-| `typert.remote-client.js` | `api-remotes` | A mountable `TypertRemoteContribution` containing strict descriptors and runtime codecs |
-| `typert.remote-client.d.ts` | Client type system | Declaration merges for `TypertRemoteNamespaceMap` and `TypertRemoteScopeMap`, plus Client-safe type references |
-| `typert.remote-client.d.ts.map` | Editor | Maps generated method properties back to Remote method declarations in the Host package |
+| `typert.host.js` | Host Loader | Host フェイスのランタイムリフレクション、厳密な呼び出し記述子、スキーマ登録値 |
+| `typert.host.d.ts` | Host 型システム | Host フェイスの生成宣言 |
+| `typert.remote-client.js` | `api-remotes` | 厳密な記述子とランタイムコーデックを含む、マウント可能な `TypertRemoteContribution` |
+| `typert.remote-client.d.ts` | Client 型システム | `TypertRemoteNamespaceMap` と `TypertRemoteScopeMap` の宣言マージ、および Client セーフな型参照 |
+| `typert.remote-client.d.ts.map` | エディター | 生成されたメソッドプロパティを Host パッケージ内の Remote メソッド宣言へマップし直す |
 
-Business packages expose the Host Loader entry through `./typert` and the Host-for-Client entry through `./remote`. The generator also validates these package exports and published-file lists; it generates artifacts only for explicit contribution packages that provide the corresponding entry.
+ビジネスパッケージは Host Loader エントリーを `./typert` を通じて、Host-for-Client エントリーを `./remote` を通じて公開する。generator はこれらのパッケージエクスポートと公開ファイルリストも検証する。対応するエントリーを提供する明示的なコントリビューションパッケージに対してのみアーティファクトを生成する。
 
-Parameter names in Remote Client declarations come from wire fields, while parameter and return types reference Client-safe types exported by the original business package. The declaration map resolves the generated property behind `ctx.remote.goals.create` back to the Host source method marked with `@Remote`, so editors that support declaration maps can navigate from a Client call to the real implementation instead of stopping at the generated `.d.ts`.
+Remote Client 宣言のパラメーター名は wire フィールドから来るが、パラメーター型と戻り値型は元のビジネスパッケージがエクスポートする Client セーフな型を参照する。宣言マップは `ctx.remote.goals.create` の背後の生成プロパティを、`@Remote` でマークされた Host ソースメソッドへ解決し直すので、宣言マップをサポートするエディターは、生成された `.d.ts` で止まらずに Client の呼び出しから実装へナビゲートできる。
 
-Strict analysis requires a Remote to be a public, non-static instance method with a concrete implementation. The method cannot be generic; parameters must be required, named simple identifiers and cannot use destructuring, default values, rest parameters, or optional parameters. Typert generates strict schemas for ordinary JSON-representable types; complex objects such as workspace classes must have a unique `TypertLookupMap` declaration. Lookup and Context packages are responsible for both static declaration merges and runtime provider registration; if either side is missing, the build fails or the first call that needs the provider fails.
+厳密な解析では、Remote は具象実装を持つ公開の非 static インスタンスメソッドでなければならない。メソッドはジェネリックにできず、パラメーターは必須の、名前付き単純識別子でなければならず、分割代入、デフォルト値、残余パラメーター、オプションパラメーターは使えない。Typert は通常の JSON 表現可能な型に対して厳密なスキーマを生成する。workspace クラスのような複雑なオブジェクトは一意な `TypertLookupMap` 宣言を持たなければならない。ルックアップパッケージと Context パッケージは、静的宣言マージとランタイムプロバイダー登録の両方に責任を持つ。どちらかが欠けている場合、ビルドが失敗するか、そのプロバイダーを必要とする最初の呼び出しが失敗する。
 
-## Runtime invocation
+## ランタイム呼び出し
 
-Remote calls use the Connection's `/api` route. The Client Remote calls `connection.rpc.call('/api', '<namespace>/<method>', { args }, signal)`; the HTTP carrier maps this to `POST /api/<namespace>/<method>`, with a payload containing only a named `args` object.
+Remote 呼び出しは Connection の `/api` ルートを使う。Client Remote は `connection.rpc.call('/api', '<namespace>/<method>', { args }, signal)` を呼び、HTTP キャリアはこれを `POST /api/<namespace>/<method>` にマップする。ペイロードには名前付き `args` オブジェクトだけが入る。
 
-The Connection performs the unified trust check for `/api` before the HTTP bridge, then dispatches inside the shared FetchHandler. The Typert Gateway claims only two-segment endpoints that have a strict descriptor or active SRC marker; it projects binary Remote fields into JSON-compatible metadata and result-relative byte attachments, which Connection frames as multipart responses. Feature-owned exact Fetch routes handle responses outside the RPC envelope, and other requests return 404. Connection owns transport, RPC ids, response envelopes, and request cancellation, while Gateway owns the Remote data protocol and business dispatch. Replacing the Connection carrier does not require changes to Remote descriptors or the Client programming interface.
+Connection は HTTP ブリッジの前に `/api` の統合信頼チェックを実行し、共有 FetchHandler の内側でディスパッチする。Typert Gateway は、厳密な記述子またはアクティブな SRC マーカーを持つ 2 セグメントのエンドポイントのみをクレームする。バイナリ Remote フィールドを JSON 互換メタデータと結果相対のバイト添付へ射影し、Connection がそれらをマルチパートレスポンスとしてフレーム化する。フィーチャー所有の正確な Fetch ルートは RPC エンベロープの外のレスポンスを扱い、その他のリクエストは 404 を返す。トランスポート、RPC id、レスポンスエンベロープ、リクエストキャンセルは Connection が所有し、Remote データプロトコルとビジネスディスパッチは Gateway が所有する。Connection キャリアの置き換えは、Remote 記述子や Client プログラミングインターフェースの変更を必要としない。
 
-For every call, the Gateway resolves the descriptor and live service from the current registries instead of caching business objects. Every call names the Peer it speaks for, and a disposed Peer is refused with `gateway/peer-disposed`. The Gateway requires the fields in `args` to match the descriptor exactly; for a call whose Peer principal is not the owner it then resolves the resources the call touches and asks `ctx.remoteAccess.decide()`, so a refused call resolves no lookup and activates no Agent. It validates wire values with codecs, resolves objects or receivers through registered lookup or Context providers, and invokes the service method targeted by the binding. The Client Gateway validates decoded binary results with the generated result codec; ordinary JSON results retain their existing handling. A missing provider, unknown identity, binding mismatch, missing or extra argument, schema failure, or missing method fails before entering or after leaving business code.
+Gateway はすべての呼び出しで、ビジネスオブジェクトをキャッシュせずに、現在のレジストリから記述子とライブサービスを解決する。すべての呼び出しはそれが代弁する Peer を名指し、破棄済みの Peer は `gateway/peer-disposed` で拒否される。Gateway は `args` のフィールドが記述子に正確に一致することを要求する。Peer のプリンシパルが owner でない呼び出しでは、その後に呼び出しが触れるリソースを解決して `ctx.remoteAccess.decide()` に問い合わせるので、拒否された呼び出しはルックアップを解決せず、Agent もアクティベートしない。wire 値をコーデックで検証し、登録されたルックアップまたは Context プロバイダーを通じてオブジェクトまたはレシーバーを解決し、バインディングが指すサービスメソッドを呼び出す。Client Gateway はデコードされたバイナリ結果を生成された結果コーデックで検証する。通常の JSON 結果は既存の扱いを保つ。プロバイダーの欠落、未知の同一性、バインディングの不一致、引数の欠落または過剰、スキーマ失敗、メソッドの欠落は、ビジネスコードに入る前または出た後に失敗する。
 
-The lookup provider's `register()` supplies both the stable declaration and the default resolver; `configure()` supplies a resolver owned by Host composition that may execute asynchronously and is scoped to an effect lifetime. Configuration may precede provider mounting; without a provider, invocation still fails with `gateway/lookup-unavailable`, and unloading the configuration restores the provider's default policy. The Session Controller owns the standard resolver semantics for `agent` and `session`: it reuses a live Agent, automatically resumes ordinary cold sessions, deduplicates concurrent resumes, and rejects identities owned by subagent routing; the `session` lookup returns that Agent's Session. A resume failure and an ownership fence raise a `RemoteError` carrying their own code, `session/not-found` or `session/agent-busy`, which the Gateway encodes onto the wire unchanged; only an unclassified throw folds into `gateway/internal`.
+ルックアッププロバイダーの `register()` は安定した宣言と既定のリゾルバーの両方を提供し、`configure()` は Host コンポジションが所有する、非同期に実行されてよくエフェクトライフタイムにスコープされるリゾルバーを提供する。設定はプロバイダーのマウントより先行してよい。プロバイダーがない場合でも呼び出しは `gateway/lookup-unavailable` で失敗し、設定をアンロードするとプロバイダーの既定ポリシーが復元される。Session コントローラーは `agent` と `session` の標準リゾルバーセマンティクスを所有する: ライブの Agent を再利用し、通常のコールドセッションを自動的に再開し、同時再開を重複排除し、サブエージェントルーティングが所有する同一性を拒否する。`session` ルックアップはその Agent の Session を返す。再開失敗と所有権フェンスは、自身のコード `session/not-found` または `session/agent-busy` を持つ `RemoteError` を投げ、Gateway はそれをそのまま wire にエンコードする。分類されない throw だけが `gateway/internal` に畳まれる。
 
-Unloading a Client contribution removes its descriptors and concrete methods together, aborts its in-flight calls, and makes stale method handles retained by external code reject further calls. A strict endpoint withdrawn on the Host also does not degrade to SRC inference, preventing a hot unload from silently weakening validation.
+Client コントリビューションのアンロードは、その記述子と具象メソッドをまとめて除去し、進行中の呼び出しを abort し、外部コードが保持する古いメソッドハンドルの以降の呼び出しを reject させる。Host で撤回された厳密なエンドポイントも SRC 推論に縮退しないので、ホットアンロードが黙って検証を弱めるのを防ぐ。
 
-## SRC development fallback
+## SRC 開発フォールバック
 
-When the Host starts from source through `node --import tsx/esm`, it does not execute the Typert compiler plugin. Standard decorator initializers still record the method name and invocation mode in a versioned descriptor on the Service prototype, while `TypertRemoteService` or `bindTypertRemote()` supplies the explicit service binding; the Gateway can therefore construct a weaker temporary descriptor without starting a `ts.Program`. The descriptor's stable string property name lets `remoteMethods()` read markers written by another installed copy of the protocol package.
+Host が `node --import tsx/esm` を通じてソースから起動する場合、Typert コンパイラープラグインは実行されない。標準のデコレーター初期化子は引き続き、Service プロトタイプ上のバージョン付き記述子にメソッド名と呼び出しモードを記録し、`TypertRemoteService` または `bindTypertRemote()` が明示的なサービスバインディングを提供する。したがって Gateway は `ts.Program` を起動せずに、より弱い一時記述子を構築できる。記述子の安定した文字列プロパティ名により、`remoteMethods()` は、別にインストールされたプロトコルパッケージのコピーが書いたマーカーを読める。
 
-The SRC fallback parses simple parameter names from the live function. When a parameter name matches the `parameter` of a registered lookup, such as `agent` or `session`, it uses the lookup's `agentId` or `sessionId` wire field and resolves the object on the Host; other parameters are checked only for cycle-free, JSON-safe data with no special prototype. `@RemoteScope` directly uses the wire field of a registered Host Context provider. SRC does not read TypeScript types, generate Zod schemas, infer optional parameters, or support destructuring, default values, rest parameters, or duplicate parameter names.
+SRC フォールバックはライブ関数から単純なパラメーター名をパースする。パラメーター名が登録済みルックアップの `parameter` (`agent` や `session` など) に一致する場合、そのルックアップの `agentId` または `sessionId` wire フィールドを使い、Host でそのオブジェクトを解決する。その他のパラメーターは、特殊なプロトタイプを持たない、循環のない JSON 安全なデータであることだけをチェックされる。`@RemoteScope` は登録済み Host Context プロバイダーの wire フィールドを直接使う。SRC は TypeScript 型を読まず、Zod スキーマを生成せず、オプションパラメーターを推論せず、分割代入、デフォルト値、残余パラメーター、重複パラメーター名もサポートしない。
 
-SRC solves only dispatch for a Host process running from source. The Client does not discover decorators from the running Host, and the Client Remote refuses to mount SRC descriptors that lack strict codecs; its types, codecs, and Remote registration values always come from the most recently generated `lib/typert.remote-client.*` artifacts.
+SRC が解決するのは、ソースから実行される Host プロセスのディスパッチだけである。Client は実行中の Host からデコレーターを発見せず、Client Remote は厳密なコーデックを持たない SRC 記述子のマウントを拒否する。その型、コーデック、Remote 登録値は常に、最も新しく生成された `lib/typert.remote-client.*` アーティファクトから来る。
 
-## Development mode
+## 開発モード
 
-Web development runs one command, which builds current Host, Client, and Web artifacts, starts the source Host, and keeps Client bundles rebuilt:
+Web 開発は 1 つのコマンドで実行され、現在の Host、Client、Web アーティファクトをビルドし、ソース Host を起動し、Client バンドルの再ビルドを続ける:
 
 ```sh
 pnpm run dev:web
 ```
 
-`dsh` starts the Host source through tsx, so the Host can use the SRC fallback; the `dev:web` watchers rebuild the client-face type emit, Client plugin and library bundles, and the Web shell on source edits. They do not analyze Host decorators or generate Remote Client DTS; only the complete build that `dev:web` runs first (or `pnpm run build`) does.
+`dsh` は tsx を通じて Host ソースを起動するので、Host は SRC フォールバックを使える。`dev:web` のウォッチャーは、client フェイスの型出力、Client プラグインとライブラリのバンドル、Web シェルをソース編集時に再ビルドする。それらは Host デコレーターを解析せず、Remote Client DTS も生成しない。`dev:web` が最初に実行する完全ビルド (または `pnpm run build`) だけがそれを行う。
 
-Changing only a Remote method's implementation body without changing its contract does not require regenerating the Typert files. After adding or removing a decorator or changing an export name, namespace, parameter, return value, lookup, Context, or cancellation signature, rerun the ordered lib build so the Host generates the strict contract before the Client compiles and bundles the new contribution:
+Remote メソッドの契約を変えずに実装本体だけを変更する場合、Typert ファイルの再生成は不要である。デコレーターの追加・削除や、エクスポート名、名前空間、パラメーター、戻り値、ルックアップ、Context、キャンセルシグネチャの変更の後は、Client が新しいコントリビューションをコンパイルしてバンドルする前に Host が厳密な契約を生成するよう、順序付けられた lib ビルドを再実行する:
 
 ```sh
 pnpm run build:lib
 ```
 
-The running Client watcher consumes these generated files when it rebundles. If `pnpm run build:lib:host` has already refreshed the Host contract, `pnpm run build:lib:client` can complete the Client side; a clean worktree cannot skip the Host phase. Recompiling only the frontend source cannot infer new types from Host decorators. `pnpm run typecheck` generates the Host contract with the bundle-free Typert pass before Client tsc, and the CI build lanes and release builds generate it in the Host bundle phase before Client tsc.
+実行中の Client ウォッチャーは、再バンドル時にこれらの生成ファイルを消費する。`pnpm run build:lib:host` がすでに Host 契約を更新している場合、`pnpm run build:lib:client` が Client 側を完了できる。クリーンなワークツリーは Host フェーズをスキップできない。フロントエンドソースだけの再コンパイルは Host デコレーターから新しい型を推論できない。`pnpm run typecheck` は Client tsc の前にバンドルなしの Typert パスで Host 契約を生成し、CI ビルドレーンとリリースビルドは Client tsc の前に Host バンドルフェーズでそれを生成する。
 
-## Boundaries
+## 境界
 
-Remote handles unary method calls with one request and one result, and stream methods whose items flow Host → Client while the Client's items reach the running Host method through `this.ctx.invocation.uplink()`. Session event streams, pagination, incremental reduce, projection, and entity substreams still require a separate data protocol and registration model; even when they reuse the Connection, they must not masquerade as Remote methods or enter invocation descriptors.
+Remote が扱うのは、1 リクエストと 1 結果で完結する単項メソッド呼び出しと、項目が Host → Client へ流れ、Client の項目が `this.ctx.invocation.uplink()` を通じて実行中の Host メソッドへ届くストリームメソッドである。Session イベントストリーム、ページネーション、増分 reduce、プロジェクション、エンティティサブストリームには、依然として別のデータプロトコルと登録モデルが必要である。Connection を再利用する場合でも、Remote メソッドを装ったり、呼び出し記述子に入ったりしてはならない。
 
-The API layers are organized as `remotes → gateway → connection → webserver`. The BFF and Typert RPC layers live under `packages/api`; Connection and WebServer live at `packages/client/connection` and `packages/host/webserver`. Unary results containing `Uint8Array`, including nested fields and array entries, use [binary Remote transfer](../.agents/notes/implemented/architecture/2026-09-17-workspace-file-binary-transfer.md). A feature that needs a response outside the RPC envelope registers an exact Connection Fetch route.
+API レイヤーは `remotes → gateway → connection → webserver` として構成される。BFF と Typert RPC レイヤーは `packages/api` の下に住み、Connection と WebServer は `packages/client/connection` と `packages/host/webserver` に住む。ネストされたフィールドや配列エントリーを含む `Uint8Array` を含む単項結果は[バイナリ Remote 転送](../.agents/notes/implemented/architecture/2026-09-17-workspace-file-binary-transfer.md)を使う。RPC エンベロープの外のレスポンスを必要とするフィーチャーは、正確な Connection Fetch ルートを登録する。
 
-Lookup policy is configured per key, so all `agent` or `session` parameters share the cold-resume behavior. Accepting live objects only would require an explicit per-parameter or per-endpoint policy, which does not exist; the business method must not guess whether the object came from restoration.
+ルックアップポリシーはキーごとに構成されるので、すべての `agent` または `session` パラメーターがコールドレジューム動作を共有する。ライブオブジェクトのみを受け入れるには、存在しないパラメーターごとまたはエンドポイントごとの明示的ポリシーが必要になる。ビジネスメソッドは、オブジェクトが復元由来かどうかを推測してはならない。
 
-### Business ownership
+### ビジネス所有権
 
-`packages/api` owns transport, call shape, and session lifecycle; a business rule belongs to an independent business package and reaches this layer through a registration surface or projected data. The requirements a change here must satisfy — the four `@Remote` disciplines, the additive-names rule, and the boundary this layer keeps — are owned by [Remote and API rules](defensive-patterns/remote-and-api.md), which is where a review checks them.
+`packages/api` はトランスポート、呼び出し形式、Session ライフサイクルを所有する。ビジネスルールは独立したビジネスパッケージに属し、登録サーフェスまたは射影されたデータを通じてこのレイヤーに届く。ここの変更が満たすべき要件 — 4 つの `@Remote` 規律、名前の加算性ルール、このレイヤーが守る境界 — は [Remote と API のルール](defensive-patterns/remote-and-api.md)が所有し、レビューはそこで確認する。

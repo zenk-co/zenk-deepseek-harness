@@ -5,47 +5,47 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-experimental-speech-to-text-sensevoice
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This provider recognizes speech with SenseVoiceSmall ONNX and Silero VAD on the Host CPU. The platform-specific sherpa-onnx Node package includes ONNX Runtime; users need no Python, compiler or model conversion. Activation checks cached resources without loading models or downloading assets.
+このプロバイダーはホスト CPU 上で SenseVoiceSmall ONNX と Silero VAD により音声認識します。プラットフォーム固有 sherpa-onnx Node パッケージは ONNX Runtime を含みます。ユーザーは Python、コンパイラー、モデル変換を必要としません。有効化はモデル読込やアセット取得なしにキャッシュ済みリソースを確認します。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-The [bundle](../voice-input-bundle/README.md) supplies an absolute `dataRoot` under the DSH home. Preparation downloads revision-pinned model files, verifies their sizes and SHA-256 hashes, then loads them. `precision` defaults to `int8`; `fp32` selects the larger reference weights. `modelDirectory` supplies an existing absolute directory containing the selected ONNX file and `tokens.txt`; `vadModelPath` selects an existing Silero ONNX file. Verified completed files remain reusable after cancellation or failure.
+[バンドル](../voice-input-bundle/README.md)は DSH ホーム配下の絶対 `dataRoot` を提供します。準備はリビジョンピン留めモデルファイルをダウンロードし、サイズと SHA-256 ハッシュを検証してから読込みます。`precision` は既定 `int8` です。`fp32` は大型リファレンス重みを選択します。`modelDirectory` は選択 ONNX ファイルと `tokens.txt` を含む既存絶対ディレクトリーを提供します。`vadModelPath` は既存 Silero ONNX ファイルを選択します。検証済み完了ファイルはキャンセルや失敗後も再利用可能です。
 
-Before each missing asset is downloaded, the Host compares the Hugging Face-compatible `modelOrigins`, which default to `https://huggingface.co` and [HF-Mirror](https://hf-mirror.com). Concurrent HEAD requests follow the pinned file path and redirects through the Host's fetch proxy; the first 2xx response is tried first. `modelProbeTimeoutMs` defaults to 3000 ms; when every probe fails, downloads use the configured order. Network, HTTP, certificate and integrity failures try the remaining sources; cancellation, storage failures and unclassified failures stop preparation. Pinned revisions, sizes and SHA-256 hashes apply to every source. Response latency does not measure download throughput; the preparation deadline still bounds the complete download.
+不足アセットの各ダウンロード前に、ホストは Hugging Face 互換 `modelOrigins` を比較します。既定は `https://huggingface.co` と [HF-Mirror](https://hf-mirror.com) です。同時 HEAD 要求はピン留めファイルパスとリダイレクトをホスト fetch プロキシー経由でたどります。最初の 2xx 応答が先に試されます。`modelProbeTimeoutMs` は既定 3000 ms です。すべてのプローブ失敗時は設定順でダウンロードします。ネットワーク、HTTP、証明書、完全性失敗は残りソースを試します。キャンセル、保存失敗、未分類失敗は準備を停止します。ピン留めリビジョン、サイズ、SHA-256 ハッシュはすべてのソースに適用されます。応答遅延はダウンロードスループットを測定しません。準備期限は完全ダウンロード全体をなお制限します。
 
-An explicit `modelOrigin` uses only that origin, without probing or public fallback. A single-entry `modelOrigins` also skips probing. Verified caches and explicit offline paths require no source requests. The voice UI offers the advertised sources before preparation or retry. A manual choice overrides selection for that task only, uses one source without fallback, and cannot replace an active task’s source. The Host rejects choices outside its configured origins; fully offline deployments advertise no download sources.
+明示 `modelOrigin` はプローブや公開フォールバックなしにそのオリジンのみ使います。単一エントリー `modelOrigins` もプローブを省略します。検証済みキャッシュと明示オフラインパスはソース要求不要です。音声 UI は準備や再試行前に宣伝ソースを提供します。手動選択はそのタスクのみ選択を上書きし、フォールバックなしに 1 ソースを使い、有効タスクのソースを置換できません。ホストは設定オリジン外の選択を拒否します。完全オフライン配置はダウンロードソースを宣伝しません。
 
-Download failures identify the asset and source origin, with a classified cause and HTTP status or diagnostic code when available. The public state omits URL credentials, query strings and raw cause messages. Retry reuses verified files; partial downloads restart.
+ダウンロード失敗はアセットとソースオリジンを識別し、利用可能な場合は分類済み原因と HTTP 状態または診断コードを付けます。公開状態は URL 認証情報、クエリー文字列、生原因メッセージを省きます。再試行は検証済みファイルを再利用します。部分ダウンロードは再開します。
 
-Every activation checks the selected model, tokens and VAD on disk. Complete verified caches restore readiness immediately after inspection; the first recording wakes the worker. Missing files or mismatched managed checksums require explicit preparation, while unreadable paths report an error. Explicit deployment paths are checked for accessibility; their contents remain the deployer's responsibility. Disabling the plugin or restarting the Host does not require downloading intact caches again.
+すべての有効化は選択モデル、トークン、VAD をディスク上で確認します。完全検証済みキャッシュは検査直後に準備完了を復元します。最初の録音がワーカーを起動します。不足ファイルや管理チェックサム不一致は明示準備を要求し、読取不可パスはエラーを報告します。明示配置パスは到達可能性を確認します。その内容は配置者の責任のままです。プラグイン無効化やホスト再起動は無事なキャッシュの再取得を要求しません。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Maintainer details — click to expand</summary>
 
-One managed Node subprocess serializes inference. Recordings submitted during wake-up join the bounded queue. At execution, the worker requires ready or standby resources. Transcription never starts preparation downloads. `threads`, `segmentSeconds`, `vadThreshold`, `minSpeechSeconds`, `minSilenceSeconds` and `vadOnsetPaddingSeconds` tune CPU inference and segmentation, the last restoring the onset a cold detector reports late; `maxPending` bounds accepted work. Preparation and inference have separate deadlines. Invalid language or WAV input is rejected before native inference and retains the loaded worker; inference failures, malformed responses and transport failures reclaim it. Cancellation terminates an active worker and joins its process range; cancelled queued recordings never run. `idleTimeoutMs` releases the worker after inactivity, with zero retaining it until disposal. Models remain cached. Authenticated loopback requests keep audio in memory. Electron workers run in Node mode and copy VAD buffers to satisfy the V8 memory cage.
+1 つの管理 Node サブプロセスが推論を直列化します。起動中の提出録音は有界キューに参加します。実行時、ワーカーは ready または standby リソースを要求します。文字起こしは準備ダウンロードを開始しません。`threads`、`segmentSeconds`、`vadThreshold`、`minSpeechSeconds`、`minSilenceSeconds`、`vadOnsetPaddingSeconds` は CPU 推論と分割を調整し、最後はコールド検出器が遅れて報告する開始を復元します。`maxPending` は受付処理を制限します。準備と推論は別期限です。無効言語や WAV 入力はネイティブ推論前に拒否され、読込済みワーカーを保持します。推論失敗、不正応答、転送失敗はワーカーを回収します。キャンセルは有効ワーカーを終了し、そのプロセス範囲を結合します。キャンセル済みキュー録音は実行されません。`idleTimeoutMs` は無活動後にワーカーを解放し、ゼロは破棄まで保持します。モデルはキャッシュ残留します。認証済みループバック要求は音声をメモリー内に保ちます。Electron ワーカーは Node モードで実行し、V8 メモリーケージを満たすため VAD バッファーをコピーします。
 
-The Host owns preparation across page and Session changes: check resources, download recognition weights and tokens, download VAD, verify files, and load the worker. Explicit model paths omit their download steps. Downloads report bytes; other steps report elapsed time. An idle worker retains prepared paths and needs only model loading on wake-up. Cancellation after a preparation result is published waits for cleanup without replacing that result.
+ホストはページやセッションまたぎに準備を所有します。リソース確認、認識重みとトークンの取得、VAD 取得、ファイル検証、ワーカー読込です。明示モデルパスは対応ダウンロード手順を省きます。ダウンロードはバイトを報告し、他手順は経過時間を報告します。待機ワーカーは準備済みパスを保持し、起動時はモデル読込のみ必要です。準備結果公開後のキャンセルは、その結果を置換せずクリーンアップを待ちます。
 
 </details>
 
@@ -59,24 +59,24 @@ The Host owns preparation across page and Session changes: check resources, down
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
 None, as recordings and preparation remain outside model requests; ordinary user submission owns any later text.
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-No direct effect; ordinary submission owns the message content.
+直接効果なし。通常提出がメッセージ内容を所有します。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- CPU only. Native packages target macOS arm64/x64, Linux glibc arm64/x64 and Windows x64; Windows ARM64 and Linux musl are not verified deployment targets. INT8 weights occupy about 239 MB, FP32 about 938 MB, plus the runtime and VAD. Model memory exceeds file size and grows with recording length; installation hints are estimates. Language hints are auto, Chinese, English, Cantonese, Japanese and Korean. Disabling the plugin retains model caches. Packaged Desktop releases still require platform signing and microphone-permission acceptance; Linux Desktop distribution is outside this provider.
+- CPU のみです。ネイティブパッケージ対象は macOS arm64/x64、Linux glibc arm64/x64、Windows x64 です。Windows ARM64 と Linux musl は検証済み配置対象ではありません。INT8 重みは約 239 MB、FP32 は約 938 MBにランタイムと VAD を加えます。モデルメモリーはファイルサイズを超え、録音長と共に増加します。インストール目安は見積りです。言語ヒントは auto、中国語、英語、広東語、日本語、韓国語です。プラグイン無効化はモデルキャッシュを保持します。パッケージ済み Desktop リリースはなおプラットフォーム署名とマイク権限承諾を要求します。Linux Desktop 配布はこのプロバイダー外です。
 
 -----
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Maintainer details — click to expand</summary>

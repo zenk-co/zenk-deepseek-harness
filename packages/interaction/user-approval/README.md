@@ -1,39 +1,39 @@
 ---
-description: "Channel-neutral one-shot approval seam for users and maintainers composing answerers, setting policy, or debugging fail-closed permission decisions."
+description: "回答者をコンポーズし、ポリシーを設定し、フェイルクローズの権限決定をデバッグするユーザーとメンテナー向けの、チャンネル中立なワンショット承認シーム。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-user-approval
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to require a one-shot decision before a sensitive tool action proceeds. The `ask` policy sends each request to the deployment's human or machine answerers; `never` rejects it without prompting. Missing or failed answerers return `unavailable`, so the action fails closed, and an approval applies only to that request. Every request and outcome is recorded in the requesting session's audit log. The model sees the resulting tool outcome and current policy, but not the human permission UI or audit events.
+このパッケージは、敏感なツール操作が進む前にワンショットの決定を要求するために使います。`ask` ポリシーは各リクエストをデプロイメントの人間またはマシンの回答者へ送り、`never` はプロンプトなしで拒否します。回答者が欠落しているか失敗すると `unavailable` を返すため、操作はフェイルクローズし、承認はそのリクエストだけに適用されます。すべてのリクエストと結果は、要求元セッションの監査ログに記録されます。モデルは結果のツール結果と現在のポリシーを見ますが、人間の権限 UI や監査イベントは見ません。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と保留作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Compose this service when sensitive tool actions should pause for a human or machine decision instead of running unconditionally. The tools pipeline and the sandboxed bash tool route their `ask` decisions through this seam and fail closed when it is absent, so interactive deployments mount it with at least one answerer.
+敏感なツール操作が無条件に実行されるのではなく、人間またはマシンの決定のために停止すべき場合に、このサービスをコンポーズします。ツールパイプラインとサンドボックス化された bash ツールは `ask` の決定をこのシーム経由でルーティングし、それが存在しない場合はフェイルクローズするため、対話的なデプロイメントは少なくとも 1 つの回答者と共にこれをマウントします。
 
-### Composing answerers
+### 回答者のコンポーズ
 
-Answerers are `approval/request` waterfall listeners: return an outcome to answer for an owned agent, or call `next()` to delegate. Agent-scoped listeners receive only that agent's requests, and a deployment composes one terminal answerer — sibling listener order is not a policy-priority mechanism. Without a terminal answerer, requests resolve `unavailable` and fail closed; the service itself never prompts a human.
+回答者は `approval/request` のウォーターフォールリスナーです: 所有するエージェントに代わって結果を返すか、`next()` を呼び出して委譲します。エージェントスコープのリスナーはそのエージェントのリクエストだけを受け取り、デプロイメントは 1 つの終端回答者をコンポーズします — 兄弟リスナーの順序はポリシー優先度のメカニズムではありません。終端回答者がなければ、リクエストは `unavailable` に解決してフェイルクローズします。サービス自体が人間にプロンプトすることは決してありません。
 
-### Setting the policy
+### ポリシーの設定
 
-The effective policy is the one set for the session, falling back to the configured default. `ask` (the default) delegates to the composed answerers; `never` rejects every request deterministically before interactive dispatch — the strict headless stance for CI and unattended runs.
+有効なポリシーはセッションに設定されたもので、なければ設定されたデフォルトにフォールバックします。`ask` (デフォルト) はコンポーズされた回答者へ委譲します。`never` は対話的ディスパッチの前にすべてのリクエストを決定論的に拒否します — CI と無人実行のための厳格なヘッドレス姿勢です。
 
 ```yaml
 - name: '@deepseek-ai/dsh-user-approval'
@@ -41,126 +41,126 @@ The effective policy is the one set for the session, falling back to the configu
     policy: ask
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `policy` | `ask` | Default for sessions without an `approval/policy` override |
+| `policy` | `ask` | `approval/policy` オーバーライドを持たないセッションのデフォルト |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-user-approval) is the exhaustive source for every accepted field and its JSDoc. `setPolicy(agent, policy)` switches a live agent and queues a "changed by the user" message for its next model step; `setApprovalPolicy(session, policy)` is the direct durable write path used by session initialization.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-user-approval)が、受理されるすべてのフィールドとその JSDoc の網羅的な情報源です。`setPolicy(agent, policy)` はライブエージェントを切り替え、その次のモデルステップに「changed by the user」メッセージをキューイングします。`setApprovalPolicy(session, policy)` はセッション初期化が使う直接の永続書き込みパスです。
 
-### Requesting a decision
+### 決定を要求する
 
-`request(req)` names the agent, tool, optional call id and reason, and an abort signal. Optional `displayReason` supplies localized presentation text without changing the logged reason. It requires an open turn: an idle or between-turn caller throws before auditing anything. Aborting withdraws the question — the request settles `cancelled` and a late answer is discarded. A failure that prevents either audit append from committing rejects instead of returning an unlogged decision.
+`request(req)` はエージェント、ツール、任意の呼び出し ID と理由、および中断シグナルを名指します。任意の `displayReason` は、ログされる理由を変えずにローカライズされた表示テキストを提供します。開いているターンが必要です: アイドル中またはターン間の呼び出し元は、何かを監査する前に例外を投げます。中断は質問を取り下げます — リクエストは `cancelled` に解決し、遅れて届いた回答は破棄されます。どちらかの監査追記のコミットを妨げる失敗は、ログに残らない決定を返すのではなく拒否します。
 
-### What the model and user see
+### モデルとユーザーが見るもの
 
-The model sees only the asking consumer's eventual tool outcome — allowed, rejected, cancelled, or unavailable — plus the current policy in the runtime-context snapshot; the audit events and the human permission UI are not model context. A `never` switch is announced to the model by a sourced user message, and both policies contribute their complete current meaning to the snapshot.
+モデルは、要求元コンシューマーの最終的なツール結果 — allowed、rejected、cancelled、unavailable — と、ランタイムコンテキストスナップショット内の現在のポリシーのみを見ます。監査イベントと人間の権限 UI はモデルコンテキストではありません。`never` への切り替えは、出所付きのユーザーメッセージでモデルに通知され、両方のポリシーがその完全な現在の意味をスナップショットに寄与します。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The observable behavior is covered in [Use this package](#use-this-package); this section explains dispatch, policy enforcement, and the audit path.
+観察可能な動作は[このパッケージを使う](#use-this-package)で扱います。このセクションではディスパッチ、ポリシーの適用、監査パスを説明します。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `ApprovalService`: request dispatch, policy fold and write path, runtime-context contribution |
-| [`src/types.ts`](src/types.ts) | `ApprovalRequestId` brand and outcome types |
+| [`src/index.ts`](src/index.ts) | `ApprovalService`: リクエストディスパッチ、ポリシーフォールドと書き込みパス、ランタイムコンテキストへの寄与 |
+| [`src/types.ts`](src/types.ts) | `ApprovalRequestId` ブランドと結果の型 |
 
-### Dispatch
+### ディスパッチ
 
-`decide()` races the answerer waterfall against the request signal and contains every answerer failure: a throwing listener fails the question closed to `unavailable`, and a rogue non-vocabulary return is normalized to `unavailable`. The `never` policy is enforced inside the service before waterfall dispatch, so a listener registered later with `prepend` cannot bypass the deterministic rejection. The request must be turn-enclosed because the turn is the durable log's commit/replay boundary — a bare event between turns is indistinguishable from a crash tail.
+`decide()` は回答者ウォーターフォールとリクエストシグナルを競わせ、すべての回答者の失敗を封じ込めます: 例外を投げるリスナーは質問を `unavailable` へのフェイルクローズとし、語彙外の不正な戻り値は `unavailable` に正規化されます。`never` ポリシーはウォーターフォールディスパッチの前にサービス内部で適用されるため、後から `prepend` で登録されたリスナーが決定論的な拒否を迂回することはできません。リクエストはターンに囲まれている必要があります。ターンが永続ログのコミット/リプレイ境界だからです — ターン間の裸のイベントはクラッシュテールと区別が付きません。
 
-### Policy and the runtime-context snapshot
+### ポリシーとランタイムコンテキストスナップショット
 
-The system-prompt contribution `approval:policy` states the complete current meaning of the effective policy — `ask` with its fail-closed consequence, or `never` with its non-escalation consequence — after retained history, so switching policy appends a new full snapshot instead of rewriting the stable request header. `setPolicy()` also injects a sourced user message announcing the change for the next step.
+システムプロンプトへの寄与 `approval:policy` は、有効なポリシーの完全な現在の意味 — フェイルクローズの帰結を伴う `ask`、または非エスカレーションの帰結を伴う `never` — を保持された履歴の後に述べます。そのためポリシーを切り替えると、安定したリクエストヘッダーを書き換えるのではなく、新しい完全なスナップショットが追記されます。`setPolicy()` はさらに、次のステップに向けて変更を告知する出所付きユーザーメッセージを注入します。
 
-### Audit
+### 監査
 
-`request()` appends `approval/asked` with the request identity and tool, then `approval/decided` with the closed outcome; the exact appended fields live in [`src/index.ts`](src/index.ts). Both are log-only.
+`request()` はリクエストのアイデンティティとツールと共に `approval/asked` を追記し、次にクローズされた結果と共に `approval/decided` を追記します。正確に追記されるフィールドは [`src/index.ts`](src/index.ts) にあります。どちらもログ専用です。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the approval vocabulary to the consumers and the design rationale.
+パッケージレベルの契約では足りないときに、これらのページを読んでください。承認の語彙からコンシューマーと設計根拠へと進みます。
 
-- [Approval subsystem reference](../../../docs/subsystems/approval.md) — the shared request/outcome vocabulary and the `ctx.approval` Cordis surface.
-- [Approval seam Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-approval-seam.md) — design rationale for the seam.
-- [Sandbox reference](../../shell/tool-bash/README.md) — how the sandboxed bash tool consumes approvals for escalated retries.
-- [Interaction group map](../README.md) — adjacent permission preset and question packages.
+- [承認サブシステムリファレンス](../../../docs/subsystems/approval.md) — 共有のリクエスト/結果語彙と `ctx.approval` Cordis サーフェス。
+- [承認シームの Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-approval-seam.md) — シームの設計根拠。
+- [サンドボックスリファレンス](../../shell/tool-bash/README.md) — サンドボックス化された bash ツールがエスカレーション付きリトライのために承認をどう消費するか。
+- [interaction グループマップ](../README.md) — 隣接する permission preset と質問パッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Current approval policy context
+### 現在の承認ポリシーコンテキスト
 
-#### What the model sees
+#### モデルが見るもの
 
-The first request and each effective policy change append a full runtime-context snapshot after retained history. Under `ask`, the approval contribution states that configured answerers may be consulted and absence fails closed. Under `never`, it states the deterministic rejection and non-escalation consequence. Unchanged requests retain the earlier snapshot without adding another message.
+最初のリクエストと各実効ポリシーの変更が、保持された履歴の後に完全なランタイムコンテキストスナップショットを追記します。`ask` の下では、承認の寄与は設定された回答者に照会され得ることと、回答者の不在はフェイルクローズすることを述べます。`never` の下では、決定論的な拒否と非エスカレーションの帰結を述べます。変更のないリクエストは、別のメッセージを追加せずに以前のスナップショットを保ちます。
 
-##### Ask-policy contribution
+##### ask ポリシーの寄与
 
 ```markdown
 Approval policy: ask. Operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.
 ```
 
-##### Never-policy contribution
+##### never ポリシーの寄与
 
 ```markdown
 Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).
 ```
 
-#### Token effect
+#### トークン効果
 
-One concise context message on the first request and on an effective change; unchanged requests add no duplicate policy tokens.
+最初のリクエストと実効的な変更のときに、1 つの簡潔なコンテキストメッセージ。変更のないリクエストは重複したポリシートークンを追加しません。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Append-only after retained history. An `ask`/`never` switch preserves the stable system and conversation prefix instead of rewriting the first wire message.
+保持された履歴の後に追記専用。`ask`/`never` の切り替えは、最初のワイヤメッセージを書き換えるのではなく、安定したシステムと会話のプレフィックスを保ちます。
 
-### Tool outcome
+### ツール結果
 
-#### What the model sees
+#### モデルが見るもの
 
-`approval/asked` and `approval/decided` are log-only. The model sees only the asking consumer's eventual allowed, rejected, cancelled, or unavailable tool outcome; the human permission UI is not context.
+`approval/asked` と `approval/decided` はログ専用です。モデルは要求元コンシューマーの最終的な allowed、rejected、cancelled、unavailable のツール結果のみを見ます。人間の権限 UI はコンテキストではありません。
 
-#### Token effect
+#### トークン効果
 
-Zero duplicate audit tokens. A rejection may replace a normal tool result with a small retained error, while an allowance leaves the consumer's ordinary result.
+重複した監査トークンはゼロ。拒否は通常のツール結果を小さな保持されたエラーに置き換えることがあり、許可はコンシューマーの通常の結果をそのまま残します。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記専用。新たに見えるコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリを無効化しません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と保留作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the seam is a poor fit or needs special composition care. They are current package constraints, not a general permission comparison.
+これらの制限は、シームが不向きな場合、または特別なコンポジション上の注意が必要な場合を定義します。これらは現在のパッケージ制約であり、一般的な権限の比較ではありません。
 
-- **Requests are valid only inside an open turn** — an idle or between-turn caller throws before auditing; a durable out-of-turn approval workflow is deferred.
-- **Only one-shot grants exist** — the outcome vocabulary has `allowed-once` but no `allow-always`, remembered rule, revocation, or grant store; session policy is only `ask` / `never`.
-- **The request carries no tool arguments** — an answerer sees the tool name, reason, and optional call id; the ACP machine channel requires a call id and delegates requests without one.
-- **No built-in answerer** — headless or incompletely composed deployments resolve `unavailable` and fail closed; the service itself never prompts a human.
+- **リクエストは開いているターンの中でのみ有効** — アイドル中またはターン間の呼び出し元は監査の前に例外を投げます。永続的なターン外承認ワークフローは保留されています。
+- **存在するのはワンショットの許可のみ** — 結果語彙には `allowed-once` はありますが、`allow-always`、記憶されるルール、取り消し、グラントストアはありません。セッションポリシーは `ask` / `never` だけです。
+- **リクエストはツール引数を運ばない** — 回答者はツール名、理由、任意の呼び出し ID を見ます。ACP マシンチャンネルは呼び出し ID を必要とし、それのないリクエストを委譲します。
+- **組み込みの回答者なし** — ヘッドレスまたは不完全にコンポーズされたデプロイメントは `unavailable` に解決してフェイルクローズします。サービス自体が人間にプロンプトすることは決してありません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

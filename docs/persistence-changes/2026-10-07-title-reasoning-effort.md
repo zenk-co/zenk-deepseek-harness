@@ -1,25 +1,25 @@
 ---
-description: "Records a persistence type transition and its compatibility acknowledgement."
+description: "永続化型の移行とその互換性の承認を記録する。"
 kind: persistence-change
 ---
 
 # 2026-10-07-title-reasoning-effort
 
-English | [中文](2026-10-07-title-reasoning-effort.zh.md)
+日本語 | [English](2026-10-07-title-reasoning-effort.en.md) | [中文](2026-10-07-title-reasoning-effort.zh.md)
 
-## Summary
+## 概要
 
-Records the concrete reasoning effort selected for auxiliary session-title requests.
+補助セッションタイトルリクエストに対して選択された具体的なリーズニングエフォートを記録する。
 
-## Table of Contents
+## 目次
 
-- [Declaration](#declaration)
-- [Compatibility](#compatibility)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [宣言](#declaration)
+- [互換性](#compatibility)
+- [検証](#verification)
+- [開発者ノート](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -33,16 +33,16 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-The new reasoningEffort field is optional. Existing V4 records remain valid and retain their original absence of a recorded effort. Prepared title requests write the resolved effort when the route exposes selectable reasoning; no Session format bump is required.
+新しい reasoningEffort フィールドは任意である。既存の V4 レコードは引き続き有効で、記録されたエフォートが元々存在しないまま保たれる。準備済みタイトルリクエストは、ルートが選択可能なリーズニングを公開する場合に解決済みエフォートを書き込む。Session 形式のバンプは不要である。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Focused LLM, adapter, title-provider, and replay tests passed: 50 files and 1960 tests. The session-title-after-turn SDK snapshot passed with a recorded low effort selected from a route whose default is high.
+LLM、adapter、title-provider、replay の focused テストが合格した: 50 ファイル、1960 テスト。session-title-after-turn SDK スナップショットは、デフォルトが high のルートから選択された記録済み low エフォートで合格した。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 None.

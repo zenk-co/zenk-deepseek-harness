@@ -5,28 +5,28 @@ kind: "package-library"
 
 # dsh-util-time
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Zero-dependency zone vocabulary for the wire boundaries that accept a caller's time zone. `canonicalClientTimeZone` admits `UTC` or an IANA `Area/Location` name and answers the platform-canonical spelling of it, so an alias never reaches a durable record: a zone identity is stored on messages and re-derived later by another process, where an alias would not compare equal. The library validates and canonicalizes only — it formats no time and owns no failure vocabulary, because each boundary throws its own domain code.
+呼び出し元報告のタイムゾーンをワイヤ境界で受け付けるメンテナー用の、依存ゼロのゾーン語彙。`canonicalClientTimeZone` は `UTC` または IANA `Area/Location` 名を受け付け、そのプラットフォーム正規綴りを回答するため、別名が durable 記録に到達しない。ゾーン ID はメッセージに格納され、後に別プロセスが再導出する。別名では等価比較できないためである。このライブラリは検証と正規化のみ行う。時刻整形を行わず、失敗語彙も所有しない。各境界が独自のドメインコードを投げるためである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
+- [このパッケージを使う](#use-this-package)
 - [API](#api)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-It is a **library, not a service or plugin**: no `ctx`, registers nothing, holds no state.
+これは**サービスやプラグインではなくライブラリ**である。`ctx` なし、何も登録せず、状態を持たない。
 
-Call it at the boundary that receives the zone, before the value reaches anything durable. An unusable name answers `undefined`, and the caller raises its own refusal — `session/invalid-time-zone` for the Session prompt, `subagent/invalid-time-zone` for a subagent continuation.
+ゾーンを受け取る境界で、値が durable なものに到達する前に呼び出す。使用できない名前には `undefined` を回答し、呼び出し元が独自の拒否を上げる。セッションプロンプト用は `session/invalid-time-zone`、サブエージェント継続用は `subagent/invalid-time-zone` である。
 
 -----
 
@@ -37,32 +37,32 @@ Call it at the boundary that receives the zone, before the value reaches anythin
 import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
 ```
 
-| Export | Role |
+| エクスポート | 役割 |
 |---|---|
-| `canonicalClientTimeZone(value)` | Canonical `UTC` or IANA `Area/Location` name for an accepted zone, `undefined` for a blank, padded, abbreviated, single-segment, or platform-unsupported one. |
+| `canonicalClientTimeZone(value)` | 受け付けたゾーン用の正規 `UTC` または IANA `Area/Location` 名。空白、パディング、略称、単一セグメント、プラットフォーム未対応のものには `undefined`。 |
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the consumer that records a canonical zone on a durable message, from which `dsh-time-context` renders the turn's model-visible zone instruction and timestamp.
+durable メッセージに正規ゾーンを記録する利用者を通じて間接的に関与する。そこから `dsh-time-context` がターンのモデル可視ゾーン指示とタイムスタンプを描画する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None of its own. The consumer that injects a zone-derived line into a request owns that request's cache behavior.
+独自のものはない。ゾーン由来の行をリクエストに注入する利用者が、そのリクエストのキャッシュ動作を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Alias resolution follows the runtime's ICU data** — which name an alias group canonicalizes to is the platform's answer, so two processes on different Node builds can disagree about it.
-- **Validation only** — no formatting, offset arithmetic, DST reasoning, or instant conversion; consumers needing those use `Intl` directly.
+- **別名解決はランタイムの ICU データに従う** — 別名グループがどの名前に正規化されるかはプラットフォームの回答であるため、異なる Node ビルド上の 2 プロセスが一致しないことがある。
+- **検証のみ** — 整形、オフセット演算、DST 推論、瞬時変換は行わない。それらが必要な利用者は `Intl` を直接使用する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

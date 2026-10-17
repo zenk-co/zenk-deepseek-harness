@@ -1,157 +1,157 @@
 ---
-description: "Run Python model code in fresh CPython processes under the shared filesystem sandbox, with configured resource budgets and async host bindings."
+description: "共有ファイルシステムサンドボックスの下で、設定されたリソースバジェットと非同期ホストバインディングを伴い、モデル生成の Python コードを新しい CPython プロセスで実行する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-experimental-ptc-runtime-python
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Run model-generated Python in a fresh CPython 3.10+ process on macOS or Linux under the same file policy as TypeScript PTC. Programs can use top-level `await` and `return`, call configured bindings, and write normal stdout/stderr. Direct file operations follow the selected sandbox policy; resource budgets and process-group teardown bound execution. No state persists across runs, and no shipped profile enables this experimental runtime.
+モデルが生成した Python を、TypeScript PTC と同じファイルポリシーの下、macOS または Linux 上の新しい CPython 3.10+ プロセスで実行する。プログラムはトップレベルの `await` と `return` を使い、設定されたバインディングを呼び出し、通常の stdout/stderr に書き込める。直接のファイル操作は選択されたサンドボックスポリシーに従い、リソースバジェットとプロセスグループのティアダウンが実行を制限する。実行をまたいで状態は永続化されず、この実験的ランタイムを有効化する出荷済みプロファイルはない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Choose this published experimental package only in an explicit composition. Register `PythonPtcRuntime` beside `dsh-tools`; `run(resolve(request))` executes each program in a fresh CPython 3.10+ subprocess, resolving with `result.value` on success and `result.error` on failure (the orthogonal `PtcRunFailure.kind` taxonomy classifies parse failures, thrown exceptions, invalid completions, output overflows, budget expiry, aborts, unavailable confinement, and substrate death). It rejects only for caller misuse, such as malformed bindings, unresolved execution options, or a call after disposal. Configuration is rejected at load: a non-Unix platform; an explicit `pythonBin` that is not an executable regular file or a bare name that does not resolve on `PATH`; a non-CPython, pre-3.10, or probe-failing interpreter; a non-positive or non-integer budget; a `maxLogBytes` below the truncation-marker floor (64); a timer value `setTimeout` would clamp; a budget larger than the effective fd-3 frame cap (lowered when the host heap cannot safely parse a near-cap frame); or an `addressSpaceMb`/output-budget pair whose worst-case peak would breach `RLIMIT_AS`.
+この公開された実験的パッケージは、明示的なコンポジションでのみ選ぶ。`PythonPtcRuntime` を `dsh-tools` の隣に登録する。`run(resolve(request))` は各プログラムを新しい CPython 3.10+ サブプロセスで実行し、成功時は `result.value` で、失敗時は `result.error` で解決する (直交する `PtcRunFailure.kind` 分類が、パース失敗、throw された例外、無効な完了、出力オーバーフロー、バジェット期限切れ、アボート、確立できない封じ込め、基盤の死を分類する)。拒否するのは呼び出し元の誤用のみであり、例えば不正なバインディング、解決できない実行オプション、破棄後の呼び出しである。設定はロード時に拒否される: 非 Unix プラットフォーム; 実行可能な通常ファイルでない明示的 `pythonBin` または `PATH` 上で解決できない裸の名前; 非 CPython・3.10 未満・プローブに失敗するインタープリター; 非正または非整数のバジェット; 切詰めマーカーの下限 (64) 未満の `maxLogBytes`; `setTimeout` がクランプするタイマー値; 有効な fd-3 フレーム上限より大きいバジェット (ホストヒープが上限近くのフレームを安全にパースできない場合は引き下げられる); または最悪ケースのピークが `RLIMIT_AS` を破る `addressSpaceMb`/出力バジェットの組。
 
-The composition must supply `sandbox` and `sandboxPolicy` for this local execution host. `resolve(request)` accepts an explicit `sandboxPolicy` or resolves the shared deployment policy, and defaults `cwd` to that policy's workspace root. PTC mode supplies the calling Session's policy and directory. The configured `maxWallMs` remains the execution deadline; explicit `timeoutMs` overrides are unsupported.
+コンポジションはこのローカル実行ホストのために `sandbox` と `sandboxPolicy` を供給しなければならない。`resolve(request)` は明示的な `sandboxPolicy` を受け入れるか、共有のデプロイメントポリシーを解決し、`cwd` をそのポリシーのワークスペースルートにデフォルト設定する。PTC モードは呼び出し元セッションのポリシーとディレクトリを供給する。設定された `maxWallMs` が実行期限のままであり、明示的な `timeoutMs` オーバーライドはサポートされない。
 
-`read-only` and `workspace-write` execute through the configured sandbox provider; `danger-full-access` explicitly bypasses confinement. `result.sandbox` reports the mode, observed denial, and the backend's full or partial enforcement separately from the program outcome. The [sandbox service](../../sandbox/sandbox/README.md) defines the file restrictions and backend limits; these modes do not restrict network access or arbitrary file reads.
+`read-only` と `workspace-write` は設定されたサンドボックスプロバイダーを通じて実行され、`danger-full-access` は明示的に封じ込めを迂回する。`result.sandbox` はモード、観測された拒否、バックエンドの完全または部分的な施行を、プログラムの結果とは別に報告する。[サンドボックスサービス](../../sandbox/sandbox/README.md)がファイル制限とバックエンドの制限を定義する。これらのモードはネットワークアクセスや任意のファイル読み取りを制限しない。
 
-The runtime advertises file confinement so `run_code` exposes `sandbox_permissions` and `justification`. Approval widens access for that complete program once; nested tools retain their own policies and approvals. Programs are never replayed automatically after a denial. See [PTC mode](../../core/tools/README.md#ptc-mode) for the consumer's escalation instructions.
+ランタイムはファイル封じ込めを広告するので、`run_code` が `sandbox_permissions` と `justification` を公開する。承認はそのプログラム全体に対して一度だけアクセスを広げる。ネストされたツールは自身のポリシーと承認を保持する。拒否の後にプログラムが自動でリプレイされることはない。コンシューマーのエスカレーション手順については [PTC モード](../../core/tools/README.md#ptc-mode)を参照。
 
-The runtime supplies these execution instructions:
+ランタイムは次の実行指示を供給する:
 
 ```text
 The program is the body of an async Python function. Top-level await and return are supported. Emit output with print(...) or return a lossless JSON value. Only printed values and the returned value become program output. Each call runs in a fresh Python process; variables and imported modules do not persist across calls. Relative paths use the supplied working directory; only TMPDIR is set in the environment. Direct filesystem access follows this execution's sandbox policy.
 ```
 
-### What you get
+### 得られるもの
 
-The package's default export is the `PythonPtcRuntime` plugin. Its public surface also re-exports the host-side protocol vocabulary: `validateChildFrame` (rebuilds every inbound frame), the lossless-JSON codec and meters (`encodeJsonPlain`, `checkDoneValue`, `hasUnsafeIntegerToken`, `hasNonLosslessNumber`), `logTruncationMarker` (the shared truncation-marker text), plus `resolvePythonBin` (interpreter lookup against the current `PATH`), `readProcessStart` (process-start statistics for tests), `detachResidual` (a test seam for the settled run's resource cleanup), and `hostFrameParseCeiling` (the heap-derived frame parse cap a given heap limit admits). Every cap is a validated `Config` field with a default: `cpuSeconds` (60), `maxWallMs` (600000), `addressSpaceMb` (512, not applied on Darwin), `maxLogBytes` (65536), `maxValueBytes` (32768), `graceMs` (3000), and `pythonBin` (`python3`, resolved, executable-checked, version-probed under a five-second force-kill deadline, and frozen at load). Each child receives only `TMPDIR`; ambient credentials, `PATH`, `HOME`, and other host state stay unavailable.
+このパッケージのデフォルトエクスポートは `PythonPtcRuntime` プラグインである。その公開サーフェスはホスト側のプロトコル語彙も再エクスポートする: `validateChildFrame` (すべての受信フレームを再構築する)、ロスレス JSON コーデックとメーター (`encodeJsonPlain`、`checkDoneValue`、`hasUnsafeIntegerToken`、`hasNonLosslessNumber`)、`logTruncationMarker` (共有の切詰めマーカーテキスト)、さらに `resolvePythonBin` (現在の `PATH` に対するインタープリター検索)、`readProcessStart` (テスト用のプロセス開始統計)、`detachResidual` (決着した実行のリソースクリーンアップ用のテストシーム)、`hostFrameParseCeiling` (与えられたヒープ上限が許容する、ヒープ由来のフレームパース上限)。すべての上限はデフォルトを持つ検証済み `Config` フィールドである: `cpuSeconds` (60)、`maxWallMs` (600000)、`addressSpaceMb` (512、Darwin では適用されない)、`maxLogBytes` (65536)、`maxValueBytes` (32768)、`graceMs` (3000)、`pythonBin` (`python3`、解決・実行可能性チェック・5 秒の強制終了期限付きバージョンプローブの上で、ロード時に凍結される)。各子プロセスが受け取るのは `TMPDIR` のみである。環境の資格情報、`PATH`、`HOME`、その他のホスト状態は利用できないままである。
 
-### The wire
+### wire
 
-Frames travel on the child's fd 3 as JSON-lines — one object per line — so stdout/stderr stay clear for the program's own output. Child → host: `boot-ack`, `call`, `log`, `done`. Host → child: `boot` (first frame, carrying every cap and the namespace declarations), `run` (after `boot-ack`, carrying only the program body), and one `reply` per `call`. A forged frame can carry both `value` and `error` on `done`, so a consumer must check `error` first and ignore `value` when it is set. A `log` frame's `open` flag marks an unterminated line committed by an explicit flush: the host appends the next log frame to the same entry, so `print('a', end='', flush=True); print('b')` reads back as one `'ab'` entry rather than a fake newline (the split-billing arithmetic lives in the fd-3 protocol Agent Note's wire-contract section). The one exception to merging is truncation: when a later over-budget frame trips the ledger, the already-billed prefix is committed as its own entry and the truncation marker follows it (the marker stays last, with no re-charge).
+フレームは子プロセスの fd 3 を JSON-lines — 1 行に 1 オブジェクト — として流れるので、stdout/stderr はプログラム自身の出力のために空いたままになる。子 → ホスト: `boot-ack`、`call`、`log`、`done`。ホスト → 子: `boot` (最初のフレームで、すべての上限と名前空間宣言を運ぶ)、`run` (`boot-ack` の後で、プログラム本体のみを運ぶ)、`call` ごとに 1 つの `reply`。偽造されたフレームは `done` に `value` と `error` の両方を載せられるため、コンシューマーはまず `error` をチェックし、設定されている場合は `value` を無視しなければならない。`log` フレームの `open` フラグは、明示的なフラッシュによってコミットされた未終端の行をマークする。ホストは次のログフレームを同じエントリーに追加するので、`print('a', end='', flush=True); print('b')` は偽の改行ではなく 1 つの `'ab'` エントリーとして読み戻される (分割課金の算術は fd-3 プロトコルの Agent Note の wire 契約節にある)。マージの唯一の例外は切詰めである。後のバジェット超過フレームが台帳をトリップさせると、既に課金されたプレフィックスが自身のエントリーとしてコミットされ、その後に切詰めマーカーが続く (マーカーは最後のままで、再課金はない)。
 
-### What can go wrong
+### 起こりうる問題
 
-Required confinement that cannot be established returns `sandbox-unavailable`; the runtime never retries unconfined. An operation denied by a working sandbox remains a program failure with `sandbox.denied` set when its diagnostic matches the selected backend. A caught denial need not appear in this diagnostic flag.
+確立できない必須の封じ込めは `sandbox-unavailable` を返す。ランタイムは封じ込めなしで再試行することは決してない。動作中のサンドボックスによって拒否された操作は、その診断が選択されたバックエンドと一致する場合、`sandbox.denied` が設定されたプログラム失敗のままである。捕捉された拒否は、この診断フラグに現れる必要はない。
 
-Host-side validation drops junk without throwing, so a malformed or forged frame never crashes the host process: `validateChildFrame` returns `undefined` for anything that does not rebuild cleanly, a non-number call id can never be echoed into a reply, and forged extra fields never ride along. A completion value that is not lossless JSON, or that exceeds the configured byte budget, is rejected explicitly (`non-lossless` / `over-budget`) rather than silently rounded or truncated. An fd-3 frame whose raw length exceeds the effective frame parse cap (64 MiB, or lower when the host's configured heap cannot safely parse a near-cap frame — see `hostFrameParseCeiling`) settles the run as a `worker-exit` (the receive path caps raw frames before `toString`/`JSON.parse` so a compact wide frame cannot decode to far more host memory than its wire bytes admitted).
+ホスト側の検証は throw せずにジャンクを捨てるので、不正または偽造されたフレームがホストプロセスをクラッシュさせることは決してない。`validateChildFrame` はきれいに再構築できないものに対して `undefined` を返し、数値でない呼び出し id が reply にエコーされることは決してなく、偽造された余分なフィールドが同伴することも決してない。ロスレス JSON でない完了値、または設定されたバイトバジェットを超える完了値は、黙って丸めたり切り詰めたりするのではなく、明示的に拒否される (`non-lossless` / `over-budget`)。生の長さが有効なフレームパース上限 (64 MiB。ホストの設定ヒープが上限近くのフレームを安全にパースできない場合はそれより低い — `hostFrameParseCeiling` を参照) を超える fd-3 フレームは、実行を `worker-exit` として決着させる (受信経路は `toString`/`JSON.parse` の前に生フレームを上限で切り詰めるので、コンパクトな広いフレームが、その wire バイト数が許容したよりはるかに多いホストメモリにデコードされることはない)。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design behind the backend; observable behavior is fully covered in [Use this package](#use-this-package).
+この節はバックエンド背後の設計を説明する。観測可能な振る舞いは[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design concept
+### 設計概念
 
-One direction of trust: the host treats every inbound frame as hostile (model code can forge anything on fd 3) and REBUILDS it field by field before reading; the Python side trusts host replies. The bootstrap (`py/bootstrap.py`) runs the program as the body of an async function, so top-level `await` and `return` work; binding calls travel over fd 3 as JSON-lines and replies are paced across the pump so a flood of large replies cannot pin the host's fd-3 write buffer.
+信頼は一方向である。ホストはすべての受信フレームを敵対的とみなし (モデルコードは fd 3 で何でも偽造できる)、読む前にフィールドごとに再構築する。Python 側はホストの reply を信頼する。ブートストラップ (`py/bootstrap.py`) はプログラムを async 関数の本体として実行するので、トップレベルの `await` と `return` が機能する。バインディング呼び出しは JSON-lines として fd 3 を流れ、reply はポンプ全体でペース配分されるので、大量の大きな reply がホストの fd-3 書き込みバッファーを塞ぐことはない。
 
-The shipped bootstrap and protocol sources reach the interpreter as UTF-8 JSON on trusted binary stdin, independently of sandbox temporary-directory mounts and locale text encoding. Model programs and binding traffic use fd 3. The host resolves the sandbox runner before spawning with only `TMPDIR` in the child environment. The wall deadline includes sandbox setup. The configured interpreter's load-time version probe runs outside confinement and executes no model code.
+出荷されるブートストラップとプロトコルのソースは、信頼されたバイナリ stdin 上の UTF-8 JSON としてインタープリターに届き、サンドボックスの一時ディレクトリマウントやロケールのテキストエンコーディングから独立している。モデルプログラムとバインディングトラフィックは fd 3 を使う。ホストはスポーン前にサンドボックスランナーを解決し、子の環境には `TMPDIR` のみを入れる。ウォール期限にはサンドボックスのセットアップが含まれる。設定されたインタープリターのロード時バージョンプローブは封じ込めの外で実行され、モデルコードを実行しない。
 
-### Wire contract
+### wire 契約
 
-The frames are `boot` / `run` (host → child) and `boot-ack` / `call` / `log` / `done` plus one `reply` per call (child → host). The `log` frame's `truncated` flag marks the frame that IS the child ledger's truncation marker, so the host stops capturing at the same point the child did instead of inferring it from its own budget. The `log` frame's `open` flag marks an unterminated line committed by an explicit flush: the host merges the next log frame into the same entry, so `print('a', end='', flush=True); print('b')` reads back as one `'ab'` entry rather than a fake newline (the split-billing arithmetic lives in the fd-3 protocol Agent Note's wire-contract section). The one exception to merging is truncation: the already-billed prefix is committed as its own entry and the truncation marker follows it (marker last, no re-charge). `done.error.kind` is one of `exception`, `invalid-output`, `output-limit`, or `timeout` from the CPU check after model code returns; wall deadlines, aborts, and substrate death are observed host-side.
+フレームは `boot` / `run` (ホスト → 子) と `boot-ack` / `call` / `log` / `done` に加えて呼び出しごとに 1 つの `reply` (子 → ホスト) である。`log` フレームの `truncated` フラグは、子の台帳の切詰めマーカーそのものであるフレームをマークするので、ホストは自身のバジェットから推測するのではなく、子と同じ時点でキャプチャを停止する。`log` フレームの `open` フラグは、明示的なフラッシュによってコミットされた未終端の行をマークする。ホストは次のログフレームを同じエントリーにマージするので、`print('a', end='', flush=True); print('b')` は偽の改行ではなく 1 つの `'ab'` エントリーとして読み戻される (分割課金の算術は fd-3 プロトコルの Agent Note の wire 契約節にある)。マージの唯一の例外は切詰めである。既に課金されたプレフィックスが自身のエントリーとしてコミットされ、その後に切詰めマーカーが続く (マーカーは最後、再課金なし)。`done.error.kind` は、モデルコードが戻った後の CPU チェックによる `exception`、`invalid-output`、`output-limit`、`timeout` のいずれかである。ウォール期限、アボート、基盤の死はホスト側で観測される。
 
-### Lossless JSON crossing
+### ロスレス JSON の横断
 
-Completion values and binding arguments cross as exact JSON: values serialize without recursion, so a deep payload below the byte budget survives instead of dying on `JSON.stringify`'s stack limit, and integral doubles beyond the safe range cross as exact digits rather than silently rounded tokens; the meters in `src/protocol.ts` enforce byte budgets and number losslessness before anything else reads the payload.
+完了値とバインディング引数は正確な JSON として横断する。値は再帰なしでシリアライズされるので、バイトバジェット未満の深いペイロードは `JSON.stringify` のスタック制限で死ぬことなく生き残り、安全範囲を超える整数値の double は黙って丸められたトークンではなく正確な桁として横断する。`src/protocol.ts` のメーターが、他の何かがペイロードを読む前にバイトバジェットと数値のロスレス性を強制する。
 
-### Mirror alignment
+### ミラー整合
 
-`tests/protocol-mirror.e2e.ts` spawns a real `python3` and asserts, against `src/protocol.ts`, both `PROTOCOL_FD` / the truncation-marker text and each `TypedDict`'s required/optional wire field set in `py/protocol.py`, so a renamed or dropped field — or one side making a field optional the other requires — fails the test. Field *types* are not compared across the language boundary; that residue stays with review plus the backend's real-subprocess suite (`tests/runtime.spec.ts`).
+`tests/protocol-mirror.e2e.ts` は実際の `python3` をスポーンし、`src/protocol.ts` に対して `PROTOCOL_FD` / 切詰めマーカーテキストの両方と、`py/protocol.py` の各 `TypedDict` の必須/オプションの wire フィールド集合をアサートするので、名前変更やフィールド欠落 — または一方が他方の必須フィールドをオプションにする — はテストを失敗させる。フィールド*型*は言語境界を跨いで比較されない。その残余はレビューとバックエンドの実サブプロセススイート (`tests/runtime.spec.ts`) に委ねられる。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `PythonPtcRuntime` — spawn, frame pump, budgets, containment, teardown; re-exports the protocol vocabulary |
-| [`src/protocol.ts`](src/protocol.ts) | Host side: frame codec, hostile-frame validators, lossless-JSON meters, shared marker text |
-| [`py/bootstrap.py`](py/bootstrap.py) | Child side: fd-3 channel, program execution, binding dispatch, ledger and settlement |
-| [`py/protocol.py`](py/protocol.py) | Python side: `PROTOCOL_FD`, `TypedDict` frame mirrors, `log_truncation_marker` |
-| [`tests/runtime.spec.ts`](tests/runtime.spec.ts) | Real-subprocess suite: budgets, containment, hostile frames, name rebinding |
-| [`tests/protocol-mirror.e2e.ts`](tests/protocol-mirror.e2e.ts) | Cross-language mirror test against a real `python3` |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `PythonPtcRuntime` — スポーン、フレームポンプ、バジェット、封じ込め、ティアダウン。プロトコル語彙を再エクスポートする |
+| [`src/protocol.ts`](src/protocol.ts) | ホスト側: フレームコーデック、敵対的フレームの検証器、ロスレス JSON メーター、共有マーカーテキスト |
+| [`py/bootstrap.py`](py/bootstrap.py) | 子側: fd-3 チャネル、プログラム実行、バインディングディスパッチ、台帳と決着 |
+| [`py/protocol.py`](py/protocol.py) | Python 側: `PROTOCOL_FD`、`TypedDict` フレームミラー、`log_truncation_marker` |
+| [`tests/runtime.spec.ts`](tests/runtime.spec.ts) | 実サブプロセススイート: バジェット、封じ込め、敵対的フレーム、名前の再バインド |
+| [`tests/protocol-mirror.e2e.ts`](tests/protocol-mirror.e2e.ts) | 実際の `python3` に対する言語を跨ぐミラーテスト |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these when the runtime contract is not enough. They move from the seam definition to the design record and the companion backend.
+ランタイム契約では足りないときにこれらを読む。シーム定義から設計記録とコンパニオンバックエンドへ進む。
 
-- [PTC runtime seam](../../ptc-runtime/ptc-runtime/README.md) — the abstract contract this backend implements.
-- [fd-3 protocol Agent Note](../../../.agents/notes/implemented/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.md) — design rationale and wire contract.
-- [Settlement-fixes Agent Note](../../../.agents/notes/archived/bug-fix/2026-07-31-code-runtime-python-settlement-fixes.md) — settlement, metering, and containment fixes and their regression cases.
-- [Node process backend](../../ptc-runtime/ptc-runtime-node/README.md) — the released TypeScript sibling.
-- [PTC runtime subsystem reference](../../../docs/subsystems/ptc-runtime.md) — request/result vocabulary, bindings, and failure taxonomy.
+- [PTC ランタイムシーム](../../ptc-runtime/ptc-runtime/README.md) — このバックエンドが実装する抽象契約。
+- [fd-3 プロトコル Agent Note](../../../.agents/notes/implemented/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.md) — 設計根拠と wire 契約。
+- [決着修正 Agent Note](../../../.agents/notes/archived/bug-fix/2026-07-31-code-runtime-python-settlement-fixes.md) — 決着、計量、封じ込めの修正とその回帰ケース。
+- [Node プロセスバックエンド](../../ptc-runtime/ptc-runtime-node/README.md) — リリース済みの TypeScript 兄弟。
+- [PTC ランタイムサブシステムリファレンス](../../../docs/subsystems/ptc-runtime.md) — リクエスト/結果の語彙、バインディング、失敗分類。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through PTC mode in `dsh-tools` when explicitly composed: the consumer appends this provider's async-function, output and fresh-process instructions to `run_code` and renders its completion value or failure as the tool result.
+間接的に、明示的にコンポーズされた場合の `dsh-tools` の PTC モードを通じて: コンシューマーはこのプロバイダーの async 関数・出力・新規プロセスの指示を `run_code` に追加し、その完了値または失敗をツール結果として描画する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+直接の無効化なし。名前を挙げたコンシューマーがリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the package does and does not cover; they are current package constraints, not a task backlog.
+これらの制限は、このパッケージがカバーするものとしないものを定義する。それらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **The cross-language guard covers the executed surfaces and the frame field shapes, not the field types** — the mirror e2e compares required/optional field sets, not that `cpuSeconds` is an `int` on both sides; a type-level drift is caught by review plus the backend's real-subprocess suite.
-- **A descendant that escapes the child's process group with `setsid()` is not reaped by the group teardown** — `kill(-pid)` cannot reach it; the run still settles on the value the done frame decided, and the close-deadline backstop forces settlement if the orphan holds the pipes open, but the orphan itself outlives the fiber until it exits on its own.
-- **A `log` frame that arrives after settlement is dropped** — once the run has settled, host-side capture is closed; a late fd-3 `log` frame (from a thread that outlived the done frame) is discarded rather than appended to `logs`.
-- **A binding REPLY value has no seam-level byte or depth cap** — `maxValueBytes` meters only the done frame's completion value; a wide binding reply is rebuilt host-side (`snapshotJsonValue` traversal) and encoded whole, bounded on both sides only by process memory (like a binding argument, which has no child-side budget either).
-- **No shipped profile mounts this provider** — the keyless `ptc-python-turn` snapshot replaces the headless PTC runtime through the real Loader; released profiles use the sandboxed Node process backend.
-- **Workflow execution requires Node** — compositions using this Python provider disable `workflow-ptc`, `tool-workflow`, and `tool-ralph`; the workflow provider rejects an incompatible runtime when loaded.
-- **Cross-channel log interleaving is backend-dependent** — Python stdout, stderr, and fd-3 log frames travel independently; each channel preserves its own order, while their total order in `result.logs` may differ.
-- **CPython 3.10 or newer is required** — the configured executable is resolved and version-probed at load; unsupported interpreters fail before `ctx.ptcRuntime` is registered.
-- **Execution is local and Unix-only** — the interpreter, working directory, and sandbox runner must belong to the host running this plugin. The provider uses POSIX resource limits and process-group signals; it does not support Windows or remote execution providers.
-- **Sandbox enforcement inherits backend limits** — a successful program can report partial enforcement, and file confinement does not establish multi-tenant isolation or complete descendant cleanup.
-- **Diagnostic prefixes omit the package's experimental qualifier** — the marker `[dsh-ptc-runtime-python] log capture truncated at <N> bytes` identifies this provider independently of its npm package name. The protocol mirror verifies identical marker bytes in TypeScript and Python.
-- **`run()` is one-shot** — `logs` become available only after `PtcRunResult` resolves; there is no streaming-log or progress interface for output produced by a running program.
-- **No state persists across runs** — every request executes in a fresh subprocess; a persistent REPL-style kernel stays deferred until a backend brings its own logging scheme.
-- **An fd-3 frame whose raw length exceeds the effective frame parse cap settles the run as a worker-exit** — the cap is 64 MiB, or lower when the host's configured heap cannot safely parse a near-cap frame (`hostFrameParseCeiling`); `maxLogBytes`/`maxValueBytes` are load-bounded to the same cap so an honest child's frames always fit; a model-constructed binding ARGUMENT above the cap (a value with no seam-level budget) trips it too — an accepted residual of the OOM guard.
-- **A child that stops reading its replies settles the run as a worker-exit once the reply backlog passes 1024 frames** — the host writes replies one at a time, waiting for `drain` when the pipe is full; a child that keeps sending calls without consuming replies would otherwise grow the retained backlog (and the binding results it pins) until the wall clock, so the backlog cap fails the run early. Binding results carry no seam-level byte cap, so this is a count bound, not a byte bound.
-- **A child that floods calls against a binding that never settles settles the run as a worker-exit once 1024 calls are in flight** — binding calls are counted before dispatch and released when the async body settles, so a binding whose promise never resolves would otherwise accumulate one async closure per call frame until the wall clock. Like the reply backlog, this is a count bound, not a byte bound.
-- **A combined log-and-value peak is not modelled by the load gate** — a model daemon thread that keeps writing while the completion value is metered and framed can add the two peaks in a way no gate admits or rejects; the run dies as `worker-exit`, containment holds, and only the failure classification is degraded.
-- **CPU signal classification depends on the launcher** — the soft limit retains default `SIGXCPU` termination, including during native calls. A launcher such as bwrap can convert that signal into an ambiguous exit code, reported as `worker-exit`; a directly observed `SIGXCPU` is `timeout`. Only the CPU check after model code returns attempts a `timeout` frame before termination, and a busy or backpressured control channel can prevent that report. Kernel limits and the wall deadline remain in force.
-- **A 1-second dual-limit `ulimit -t 1` CPU overrun is reported as `worker-exit`, not a timeout** — when the host starts under a hard CPU limit equal to the soft and that limit is 1, `_clamped` cannot lower the soft, so the kernel SIGKILLs the busy loop and SIGXCPU is never delivered; containment holds, only the classification is degraded.
-- **No byte cap on intermediate binding values** — the implementation remains bounded by the lossless-JSON serialization cost and process memory, and a provider or executor may apply its own fetch cap.
+- **言語を跨ぐガードが対象とするのは実行サーフェスとフレームフィールドの形であり、フィールド型ではない** — ミラー e2e は必須/オプションのフィールド集合を比較するのであり、`cpuSeconds` が両側で `int` であることは比較しない。型レベルのドリフトはレビューとバックエンドの実サブプロセススイートが捕捉する。
+- **`setsid()` で子のプロセスグループを脱出した子孫は、グループティアダウンに回収されない** — `kill(-pid)` はそれに届かない。実行は done フレームが決めた値で依然として決着し、孤児がパイプを開いたままにする場合はクローズ期限のバックストップが決着を強制するが、孤児自体は自身で終了するまでファイバーより長く生き残る。
+- **決着後に到着した `log` フレームは破棄される** — 実行が決着すると、ホスト側のキャプチャは閉じられる。遅れて届いた fd-3 の `log` フレーム (done フレームより長く生きたスレッドから) は、`logs` に追記されずに破棄される。
+- **バインディングの REPLY 値にはシームレベルのバイト上限も深さ上限もない** — `maxValueBytes` が計量するのは done フレームの完了値のみである。広いバインディング reply はホスト側で再構築され (`snapshotJsonValue` 走査)、全体としてエンコードされ、両側ともプロセスメモリによってのみ制限される (子側のバジェットも持たないバインディング引数と同様)。
+- **このプロバイダーをマウントする出荷済みプロファイルはない** — キー不要の `ptc-python-turn` スナップショットが、実際の Loader を通じてヘッドレス PTC ランタイムを差し替える。リリース済みプロファイルはサンドボックス化された Node プロセスバックエンドを使う。
+- **ワークフロー実行には Node が必要である** — この Python プロバイダーを使うコンポジションは `workflow-ptc`、`tool-workflow`、`tool-ralph` を無効化する。ワークフロープロバイダーは、ロード時に非互換のランタイムを拒否する。
+- **チャネル間のログインターリーブはバックエンド依存である** — Python の stdout、stderr、fd-3 ログフレームは独立して流れる。各チャネルは自身の順序を保つが、`result.logs` での全順序は異なることがある。
+- **CPython 3.10 以降が必要である** — 設定された実行ファイルはロード時に解決されバージョンプローブされる。サポートされないインタープリターは `ctx.ptcRuntime` が登録される前に失敗する。
+- **実行はローカルかつ Unix 専用である** — インタープリター、作業ディレクトリ、サンドボックスランナーは、このプラグインを実行するホストに属していなければならない。プロバイダーは POSIX のリソース制限とプロセスグループシグナルを使う。Windows やリモート実行プロバイダーはサポートしない。
+- **サンドボックスの施行はバックエンドの制限を継承する** — 成功したプログラムが部分的な施行を報告することがあり、ファイル封じ込めはマルチテナント分離や完全な子孫クリーンアップを確立しない。
+- **診断プレフィックスはパッケージの実験的修飾子を省略する** — マーカー `[dsh-ptc-runtime-python] log capture truncated at <N> bytes` は、npm パッケージ名とは独立にこのプロバイダーを識別する。プロトコルミラーが TypeScript と Python で同一のマーカーバイトを検証する。
+- **`run()` はワンショットである** — `logs` は `PtcRunResult` が解決した後にのみ利用可能になる。実行中のプログラムが生成する出力のためのストリーミングログや進捗インターフェースはない。
+- **実行をまたいで状態は永続化されない** — すべてのリクエストは新しいサブプロセスで実行される。永続的な REPL スタイルのカーネルは、バックエンドが独自のログ方式を持ち込むまで先送りされる。
+- **生の長さが有効なフレームパース上限を超える fd-3 フレームは、実行を worker-exit として決着させる** — 上限は 64 MiB、またはホストの設定ヒープが上限近くのフレームを安全にパースできない場合はそれより低い (`hostFrameParseCeiling`)。`maxLogBytes`/`maxValueBytes` は同じ上限にロード時に制限されるので、正直な子のフレームは常に収まる。上限を超えるモデル構築のバインディング ARGUMENT (シームレベルのバジェットを持たない値) も同様にトリップさせる — OOM ガードの受け入れられた残余である。
+- **reply の読み取りをやめた子は、reply バックログが 1024 フレームを超えると実行を worker-exit として決着させる** — ホストは reply を 1 つずつ書き、パイプが満杯のときは `drain` を待つ。reply を消費せずに call を送り続ける子は、さもなければ保持されたバックログ (およびそれがピン留めするバインディング結果) をウォールクロックまで増やし続けるので、バックログ上限が実行を早期に失敗させる。バインディング結果はシームレベルのバイト上限を持たないため、これはカウントの上限でありバイトの上限ではない。
+- **決して決着しないバインディングに対して call を氾濫させる子は、1024 の呼び出しが飛行中になると実行を worker-exit として決着させる** — バインディング呼び出しはディスパッチ前にカウントされ、async 本体が決着したときに解放される。プロミスが決して解決しないバインディングは、さもなければ call フレームごとに 1 つの async クロージャをウォールクロックまで蓄積する。reply バックログと同様、これはカウントの上限でありバイトの上限ではない。
+- **ログと値の合算ピークはロードゲートでモデル化されない** — 完了値が計量されフレーミングされている間に書き込み続けるモデルのデーモンスレッドは、どのゲートも許容も拒否もできない形で 2 つのピークを合算しうる。実行は `worker-exit` として死に、封じ込めは保たれ、劣化するのは失敗の分類のみである。
+- **CPU シグナルの分類はランチャーに依存する** — ソフトリミットはネイティブ呼び出し中を含め、デフォルトの `SIGXCPU` 終了を保つ。bwrap などのランチャーはそのシグナルを曖昧な終了コードに変換し、`worker-exit` として報告されることがある。直接観測された `SIGXCPU` は `timeout` である。モデルコードが戻った後の CPU チェックだけが、終了の前に `timeout` フレームを試み、ビジーまたはバックプレッシャーのかかった制御チャネルはその報告を妨げうる。カーネル制限とウォール期限は有効なままである。
+- **1 秒の二重制限 `ulimit -t 1` による CPU オーバーランは、timeout ではなく `worker-exit` として報告される** — ホストがソフトと等しいハード CPU 制限の下で起動し、その制限が 1 の場合、`_clamped` はソフトを下げられないので、カーネルがビジーループを SIGKILL し、SIGXCPU は決して配信されない。封じ込めは保たれ、劣化するのは分類のみである。
+- **中間バインディング値にバイト上限はない** — 実装はロスレス JSON のシリアライズコストとプロセスメモリによって制限されたままであり、プロバイダーやエグゼキューターが独自のフェッチ上限を適用することがある。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

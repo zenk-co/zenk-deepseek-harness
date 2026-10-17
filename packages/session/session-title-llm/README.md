@@ -1,130 +1,130 @@
 ---
-description: "Shared model-execution policy for session-title providers: route, bounds, cancellation, request logging, and stream assembly."
+description: "セッションタイトルプロバイダー向け共有モデル実行ポリシー。ルート、境界、キャンセル、リクエスト記録、ストリーム組み立て。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-session-title-llm
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-session-title-llm` executes one prepared auxiliary title request under consistent execution controls. Each provider supplies its own system instruction, user input, source-message attribution, reasoning selection, and output interpretation. This package resolves the route, caps the input, output, and end-to-end duration, keeps caller cancellation effective throughout streaming, records the exact model-visible request, and assembles the stream. Invalid or late operational results reject before a title can be replaced.
+`dsh-session-title-llm` は、準備済み補助タイトルリクエスト 1 件を一貫した実行制御の下で実行する。各プロバイダーは独自のシステム指示、ユーザー入力、ソースメッセージ帰属、リーズニング選択、出力解釈を提供する。このパッケージはルートを解決し、入力・出力・端到端時間を上限付けし、ストリーミング全体で呼び出し元キャンセルを有効に保ち、モデルに正確に見えたリクエストを記録し、ストリームを組み立てる。無効または遅延した運用結果は、タイトル置換前に拒否される。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-As a deployment, configure this policy through the [first-prompt](../session-title-first-prompt-llm/README.md) or [all-prompts](../../experimental/session-title-all-prompts-llm/README.md) provider plugin. As a provider author, build your own prepared input and execute it through the shared function.
+デプロイとしては、[first-prompt](../session-title-first-prompt-llm/README.md) または [all-prompts](../../experimental/session-title-all-prompts-llm/README.md) プロバイダープラグインを通じてこのポリシーを設定する。プロバイダー作者としては、独自の準備済み入力を構築し、共有関数経由で実行する。
 
-### Executing a provider request
+### プロバイダーリクエストの実行
 
-A provider plugin registers directly on `ctx.sessionTitle` and, inside its `generate(request)`, passes `{ system, input, messageSeqs, selectReasoningEffort }` to `executeSessionTitleLlm`. The provider owns the system instruction, input framing, its reasoning selection, and output interpretation; the function owns route preparation, bounds, cancellation, request logging, and stream assembly. A second registration on the service throws.
+プロバイダープラグインは `ctx.sessionTitle` に直接登録し、`generate(request)` 内で `{ system, input, messageSeqs, selectReasoningEffort }` を `executeSessionTitleLlm` に渡す。プロバイダーはシステム指示、入力成形、リーズニング選択、出力解釈を所有し、関数はルート準備、境界、キャンセル、リクエスト記録、ストリーム組み立てを所有する。サービスへの 2 件目の登録は投げる。
 
-Every request carries `currentTitle`, the latest accepted title snapshot the service captured for the call, including an accepted fallback. A provider decides whether to use it: the all-prompts provider anchors only a provider-sourced title, including one inherited from a different provider, and treats fallback, user, and absent titles as initial generation. The first-prompt provider ignores `currentTitle`.
+各リクエストは `currentTitle` を運ぶ。これはサービスが呼び出し向けに捕捉した最新の受理済みタイトルスナップショットであり、受理済みフォールバックを含む。使うかはプロバイダーが決める。all-prompts プロバイダーは、異なるプロバイダーから継承したものを含むプロバイダー由来タイトルにのみ固定し、フォールバック・ユーザー・不在タイトルは初期生成として扱う。first-prompt プロバイダーは `currentTitle` を無視する。
 
-### Route and failure contract
+### ルートと失敗契約
 
-`provider` and `model` overrides are optional but must be supplied together as non-empty strings. Without that pair, the function uses the exact provider/model route captured from the current session's logged `request/header`, so an explicit refresh before any route exists needs overrides. It measures the final prepared user input against `maxInputBytes` before logging or dispatch instead of truncating it, and rechecks timeout and caller cancellation while consuming the stream and after it completes, so a late successful result cannot be accepted even if an interceptor or adapter ignores abort. It records the exact request in `session/title-llm-request` and returns the assembled content blocks plus the terminal finish and the used model identity. Operational errors, aborts, and unsupported finish reasons reject; `stop`, `tool-calls`, and `max-tokens` return to the provider for its own acceptance decision. The title request uses `maxOutputTokens` independently of the conversation's cap. Its route must have a registered adapter so preparation can resolve the request before it is recorded.
+`provider` と `model` の上書きは任意だが、非空文字列のペアでまとめて指定しなければならない。そのペアなしでは、関数は現在のセッションの記録済み `request/header` から捕捉した正確なプロバイダー/モデルルートを使うため、ルート存在前の明示リフレッシュには上書きが必要である。最終準備済みユーザー入力を `maxInputBytes` に対して、記録やディスパッチの前に計測し、切り詰めはしない。ストリーム消費中と完了後にタイムアウトと呼び出し元キャンセルを再確認するため、インターセプターやアダプターが abort を無視しても遅延成功結果は受理されえない。正確なリクエストを `session/title-llm-request` に記録し、組み立て済み内容ブロックに終端 finish と使用モデル識別子を添えて返す。運用エラー、abort、未対応 finish 理由は拒否する。`stop`、`tool-calls`、`max-tokens` はプロバイダーに返され、独自の受理判断に委ねられる。タイトルリクエストは会話の上限とは独立に `maxOutputTokens` を使う。そのルートは、記録前にリクエストを解決できるよう登録済みアダプターを持たなければならない。
 
-### Configuration
+### 構成
 
 <a id="configuration"></a>
 
-Every execution field is required except the paired route override; there are no library defaults. Each provider adds its own title-length target settings, which that provider's README documents.
+ペアのルート上書きを除き、すべての実行フィールドが必須である。ライブラリ既定値はない。各プロバイダーは独自のタイトル長目標設定を追加し、それは各プロバイダーの README が文書化する。
 
-| Key | Default | Meaning |
+| キー | 既定値 | 意味 |
 |---|---|---|
-| `maxInputBytes` | required | UTF-8 byte ceiling for the prepared user input |
-| `maxOutputTokens` | required | Title output-token cap, independent of conversation requests |
-| `timeoutMs` | required | End-to-end deadline within the runtime timer limit |
-| `provider`, `model` | optional | Explicit route; both or neither |
+| `maxInputBytes` | 必須 | 準備済みユーザー入力の UTF-8 バイト上限 |
+| `maxOutputTokens` | 必須 | タイトル出力トークン上限。会話リクエストとは独立 |
+| `timeoutMs` | 必須 | ランタイムタイマー上限内の端到端デッドライン |
+| `provider`、`model` | 任意 | 明示ルート。両方またはどちらもなし |
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the generation path; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは生成パスを説明する。観測可能な動作はすべて[このパッケージの使い方](#use-this-package)で扱っている。
 
-### Design concept
+### 設計構想
 
-One small shared execution policy so operational behavior cannot drift: execution-control validation, route resolution, budget enforcement, cancellation, request logging, and stream assembly live here. Prompt wording, title-length targets, reasoning selection, and output interpretation stay with each provider.
+運用動作が漂流しないよう、小さな共有実行ポリシー 1 つにまとめる。実行制御検証、ルート解決、予算強制、キャンセル、リクエスト記録、ストリーム組み立てはここに置く。プロンプト文面、タイトル長目標、リーズニング選択、出力解釈は各プロバイダーに残す。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Config schema and validation, route resolution, request bounds, dispatch, logging, and stream assembly |
+| [`src/index.ts`](src/index.ts) | 設定スキーマと検証、ルート解決、リクエスト境界、ディスパッチ、記録、ストリーム組み立て |
 
-### Request flow
+### リクエストフロー
 
-The caller builds the prepared input and frames it; the function checks the complete input against `maxInputBytes`. The provider's reasoning selector chooses at most one effort during `ctx.llm.prepareCall()`. The function records the exact input, output cap, and resolved effort in `session/title-llm-request`, then dispatches through the same captured adapter generation under the shared deadline. `purpose: 'session-title'` supplies attribution only. The request has no agent-loop identity and does not enter conversation history. Generation failures preserve the request record.
+呼び出し元が準備済み入力を構築して成形し、関数は完成入力全体を `maxInputBytes` と照合する。プロバイダーのリーズニングセレクターは `ctx.llm.prepareCall()` 中に高々 1 つの effort を選ぶ。関数は正確な入力、出力上限、解決済み effort を `session/title-llm-request` に記録し、共有デッドラインの下で同じ捕捉アダプター生成経由でディスパッチする。`purpose: 'session-title'` は帰属のみを提供する。このリクエストはエージェントループ識別子を持たず、会話履歴に入らない。生成失敗はリクエスト記録を保持する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the generation policy is not enough. They move from the service it plugs into to the provider plugins that consume it.
+生成ポリシーでは足りない場合にこれらのページを読むとよい。接続するサービスから、それを消費するプロバイダープラグインへと進む。
 
-- [Session title service](../session-title/README.md) — the title service, fallback behavior, and provider registration contract.
-- [Session title subsystem](../../../docs/subsystems/session-title.md) — durable title state and the auxiliary request record.
-- [First-message title provider](../session-title-first-prompt-llm/README.md) — titles from the first eligible human message.
-- [All-messages title provider](../../experimental/session-title-all-prompts-llm/README.md) — titles from every eligible human message.
-- [Session package map](../README.md) — adjacent persistence, projection, title, and telemetry packages.
+- [Session title サービス](../session-title/README.md) — タイトルサービス、フォールバック動作、プロバイダー登録契約。
+- [Session title サブシステム](../../../docs/subsystems/session-title.md) — 耐久タイトル状態と補助リクエスト記録。
+- [First-message タイトルプロバイダー](../session-title-first-prompt-llm/README.md) — 最初の適格ヒューマンメッセージからのタイトル。
+- [All-messages タイトルプロバイダー](../../experimental/session-title-all-prompts-llm/README.md) — すべての適格ヒューマンメッセージからのタイトル。
+- [Session パッケージマップ](../README.md) — 隣接する永続化、投影、タイトル、テレメトリーパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Auxiliary title request
+### 補助タイトルリクエスト
 
-#### What the model sees
+#### モデルが見るもの
 
-The title model receives the provider-owned system instruction and one user message containing the provider-owned input. The executor records and dispatches those exact values without reconstruction; the framing and the output instruction belong to each provider, which the [first-prompt](../session-title-first-prompt-llm/README.md) and [all-prompts](../../experimental/session-title-all-prompts-llm/README.md) READMEs document.
+タイトルモデルは、プロバイダー由来のシステム指示と、プロバイダー由来入力を含む 1 件のユーザーメッセージを受け取る。実行器はそれら正確な値を再構成せず記録・ディスパッチする。成形と出力指示は各プロバイダーに属し、[first-prompt](../session-title-first-prompt-llm/README.md) と [all-prompts](../../experimental/session-title-all-prompts-llm/README.md) README が文書化する。
 
-#### Token effect
+#### トークンへの影響
 
-The auxiliary request consumes tokens according to the provider-prepared input size and `maxOutputTokens`. It is separate from the main agent request and does not add title text or framing to agent history. The executor applies the provider's selected reasoning effort, or the route's normal default when the selector returns `undefined`; a model that still reasons spends part of `maxOutputTokens` on it. The main conversation retains its configured thinking mode.
+補助リクエストは、プロバイダー準備済み入力サイズと `maxOutputTokens` に応じてトークンを消費する。主エージェントリクエストとは別であり、エージェント履歴にタイトル文や成形を追加しない。実行器はプロバイダーが選んだリーズニング effort を適用し、セレクターが `undefined` を返す場合はルートの通常既定を適用する。なおリーズニングするモデルは `maxOutputTokens` の一部をそれに使う。主会話は設定された思考モードを保持する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No main-request invalidation. Auxiliary cache reuse is provider-specific: this executor dispatches the provider's exact system prompt and input, so reuse depends on how each provider frames successive revisions.
+主リクエストの無効化なし。補助キャッシュ再利用はプロバイダー固有である。この実行器はプロバイダーの正確なシステムプロンプトと入力をディスパッチするため、再利用は各プロバイダーが連続改訂をどう成形するかに依存する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the accepted generation shapes. They are current package constraints.
+これらの制限は受け入れられる生成形状を定義する。これらは現在のパッケージ制約である。
 
-- **Provider-interpreted output** — the executor returns assembled content blocks and the terminal finish and does not accept or reject them; each shipped provider's README owns its acceptance policy.
-- **Whole-input byte ceiling** — it rejects prepared input over `maxInputBytes` rather than truncating it.
-- **Reasoning is provider-selected** — the executor applies the effort the provider returns and never chooses one; when the selector returns `undefined`, the route's normal default applies.
+- **プロバイダー解釈出力** — 実行器は組み立て済み内容ブロックと終端 finish を返し、受理も拒否もしない。各出荷プロバイダーの README が受理ポリシーを所有する。
+- **全入力バイト上限** — 準備済み入力が `maxInputBytes` を超えると切り詰めず拒否する。
+- **リーズニングはプロバイダー選択** — 実行器はプロバイダーが返した effort を適用し、自ら選ぶことはない。セレクターが `undefined` を返す場合はルートの通常既定が適用される。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

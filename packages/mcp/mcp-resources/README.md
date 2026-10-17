@@ -1,134 +1,131 @@
 ---
-description: "Discover and read MCP resources on demand with shared tools, explicit server selection, and agent-scoped access."
+description: "共有ツール、明示的サーバー選択、エージェントスコープのアクセスにより MCP リソースをオンデマンドで検出・読み取りする。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-mcp-resources
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-mcp-resources` lets the model discover and read documents from configured MCP servers. Shipped profiles make its three shared tools available automatically when a server is configured in the caller's scope. Each tool requires an explicit server name and reads content only when called. Resource text enters conversation history; binary payloads remain available to programmatic callers and appear as descriptions to the model.
+`dsh-mcp-resources` を使うと、モデルは構成済み MCP サーバーから文書を検出・読み取りできる。呼び出し元スコープにサーバーが構成されている場合、出荷済みプロファイルは 3 つの共有ツールを自動的に利用可能にする。各ツールは明示的サーバー名を要求し、呼び出されたときにのみ内容を読む。リソーステキストは会話履歴に入り、バイナリペイロードはプログラム呼び出し元が利用可能なままで、モデルには説明として現れる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Shipped profiles already mount this package once. Configure only the [MCP client](../mcp-client/README.md) entries for the servers you need.
+出荷済みプロファイルは既にこのパッケージを 1 回マウントしている。必要なサーバー向けに [MCP クライアント](../mcp-client/README.md)エントリだけを構成すること。
 
-### Server configuration
+### サーバー構成
 
-Use the [client configuration](../mcp-client/README.md#use-this-package) to add a server in the intended scope. This package has no configuration fields.
+意図したスコープにサーバーを追加するには[クライアント構成](../mcp-client/README.md#use-this-package)を使う。このパッケージに構成フィールドはない。
+構成済み MCP サーバーを持たない呼び出し元には、ネイティブ・PTC いずれのモードでも MCP プロンプトテキストやリソースツールは現れない。構成済みサーバーは 3 つの共有リソースツールを有効化する。別のプロバイダーがそのクライアントをマウントしている場合や、サーバーにツールや指示がない場合も含む。クライアントエントリが有効な間、接続失敗は共有ツールを除去しない。リソース呼び出しは接続エラーを報告する。
 
-A caller with no configured MCP server sees no MCP prompt text or resource tools in native or PTC mode. A configured server enables the three shared resource tools, including when another provider mounts its client or the server has no tools or instructions. Connection failures do not remove the shared tools while the client entry remains active; resource calls report the connection error.
+### 検出と読み取り
 
-### Discover and read
-
-When system-prompt assembly is mounted, the prompt lists server names visible to the calling agent. Call `list_mcp_resources` or `list_mcp_resource_templates` with one of those names as `server`. Without a cursor, the MCP SDK collects the server’s pages. An explicit `cursor` requests that page; pass a returned `nextCursor` unchanged. Read a listed URI or an expanded template with `read_mcp_resource`, using the same `server` name and an explicit `uri`.
-
-Every operation resolves the server in the calling agent's scope. A missing server argument or unavailable server fails before dispatch. The connection owner handles request cancellation, timeouts, and recovery; a failed request remains a failed tool call.
+システムプロンプト組立がマウントされている場合、プロンプトは呼び出しエージェントから可視のサーバー名を列挙する。`server` としてそれらの名前の 1 つを付けて `list_mcp_resources` または `list_mcp_resource_templates` を呼ぶ。カーソルなしでは MCP SDK がサーバーのページを収集する。明示的 `cursor` はそのページを要求し、返された `nextCursor` をそのまま渡す。一覧された URI や展開済みテンプレートは、同じ `server` 名と明示的 `uri` を付けて `read_mcp_resource` で読む。
+すべての操作は呼び出しエージェントのスコープでサーバーを解決する。サーバー引数の欠如や利用不可サーバーはディスパッチ前に失敗する。接続所有者がリクエストキャンセル、タイムアウト、回復を扱い、失敗したリクエストは失敗したツール呼び出しのままである。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The [base](../../bundle/base/README.md) and standalone [sdk-minimal](../../bundle/sdk-minimal/README.md) bundles each own this row:
+[base](../../bundle/base/README.md)とスタンドアロン [sdk-minimal](../../bundle/sdk-minimal/README.md) バンドルがそれぞれこの行を所有する。
 
 ```yaml
 - id: mcp-resources
   name: '@deepseek-ai/dsh-mcp-resources'
 ```
 
-The first provider in a scope registers its shared tools; removing the last removes those local registrations, while inherited providers and tools remain visible. The resource service owns the shared tool effects independently of the first provider's plugin, so unloading that provider cannot remove tools needed by another server. Provider selection and the server-name prompt use the same scoped registry. Each call resolves its server before dispatch.
+スコープ内最初のプロバイダーが共有ツールを登録し、最後のものを除去するとそれらのローカル登録は除去されるが、継承プロバイダーとツールは可視のままである。リソースサービスは最初のプロバイダーのプラグインから独立に共有ツールエフェクトを所有するため、そのプロバイダーのアンロードが別のサーバーに必要なツールを除去することはない。プロバイダー選択とサーバー名プロンプトは同じスコープ付きレジストリを使う。各呼び出しはディスパッチ前に自身のサーバーを解決する。
+正規結果はプログラム呼び出し元向けに完全な JSON を保持する。純粋テキストレンダラーはサーバー帰属を加え、文字列値 `blob` フィールドを base64 長の説明に置換する。URI、MIME 型、テキストフィールドは描画済み JSON に残る。記録済み結果はツールパイプラインが所有する。サーバー指示は MCP クライアントとその記録済みシステムプロンプト節に属する。
 
-Canonical results retain the complete JSON for programmatic callers. The pure text renderer adds server attribution and replaces string-valued `blob` fields with a description of their base64 length; URI, MIME type, and text fields remain in the rendered JSON. The tool pipeline owns recorded results. Server instructions belong to the MCP client and its logged system-prompt section.
-
-| Source | Responsibility |
+| ソース | 責務 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Scoped provider selection and server-name prompt context |
-| [`src/tools.ts`](src/tools.ts) | Shared resource operations and argument schemas |
-| [`src/render.ts`](src/render.ts) | Attributed text projection without inline binary payloads |
+| [`src/index.ts`](src/index.ts) | スコープ付きプロバイダー選択とサーバー名プロンプトコンテキスト |
+| [`src/tools.ts`](src/tools.ts) | 共有リソース操作と引数スキーマ |
+| [`src/render.ts`](src/render.ts) | インラインバイナリペイロードなしの帰属付きテキスト射影 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover server configuration, execution, and the decisions behind resource access.
+これらのページはサーバー構成、実行、リソースアクセスの背後にある決定を扱う。
 
-- [MCP client](../mcp-client/README.md) — server transports, instructions, and connection lifecycle.
-- [Tools subsystem](../../../docs/subsystems/tools.md) — canonical values and model-visible results.
-- [Resource visibility reference](README.md) — shared profile mounting and visibility from configured servers.
-- [Resources and instructions reference](README.md) — scope, on-demand access, and excluded mechanisms.
+- [MCP クライアント](../mcp-client/README.md) — サーバートランスポート、指示、接続ライフサイクル。
+- [ツールサブシステム](../../../docs/subsystems/tools.md) — 正規値とモデル可視結果。
+- [リソース可視性リファレンス](README.md) — 共有プロファイルマウントと構成済みサーバーからの可視性。
+- [リソースと指示リファレンス](README.md) — スコープ、オンデマンドアクセス、除外機構。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Shared resource tools
+### 共有リソースツール
 
-#### What the model sees
+#### モデルが見るもの
 
-The [generated tool schemas](../../../docs/tool-catalog.md#deepseek-aidsh-mcp-resources) define three tools shared by all caller-visible configured servers. With none, native schemas, PTC declarations and bindings, and the server-name prompt are absent. Connecting, disconnecting, or retrying an active client leaves these shared tool definitions unchanged. When system-prompt assembly is mounted and providers are visible, the `MCP resource servers` section says `Use list_mcp_resources, list_mcp_resource_templates, or read_mcp_resource with one of these names as the server argument: <JSON array>.` The names come from the same scoped registry, including servers with neither tools nor instructions. An empty registry contributes no section.
+[生成ツールスキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-mcp-resources)はすべての呼び出し元可視構成済みサーバーが共有する 3 ツールを定義する。サーバーがなければネイティブスキーマ、PTC 宣言・結合、サーバー名プロンプトは存在しない。有効なクライアントの接続・切断・再試行はこれらの共有ツール定義を変えない。システムプロンプト組立がマウントされプロバイダーが可視の場合、`MCP resource servers` 節は `Use list_mcp_resources, list_mcp_resource_templates, or read_mcp_resource with one of these names as the server argument: <JSON array>.` と述べる。名前はツールも指示も持たないサーバーを含め同じスコープ付きレジストリから得られる。空レジストリは何も寄与しない。
 
-#### Token effect
+#### トークンへの影響
 
-With no caller-visible configured servers, this package adds no tool or prompt tokens. Otherwise, three shared definitions contribute a fixed schema cost and the server-name section adds a sorted JSON list of visible names. Resource listings and documents add content only when an operation returns them.
+呼び出し元可視構成済みサーバーがなければ、このパッケージはツール・プロンプトトークンを追加しない。それ以外の場合、3 つの共有定義が固定スキーマコストを寄与し、サーバー名節が可視名のソート済み JSON 一覧を追加する。リソース一覧と文書は操作が返したときにのみ内容を追加する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Adding the first caller-visible server or removing the last changes the next tool schema or PTC declaration prefix. Changes to visible names update the server-name section; replacing a provider under the same name leaves that text unchanged. Connection failures alone do not change the shared definitions or names.
+最初の呼び出し元可視サーバー追加や最後のものの除去は、次のツールスキーマや PTC 宣言プレフィックスを変える。可視名の変更はサーバー名節を更新し、同じ名前下でのプロバイダー置換はそのテキストを変えない。接続失敗だけでは共有定義や名前は変わらない。
 
-### Resource results
+### リソース結果
 
-#### What the model sees
+#### モデルが見るもの
 
-A successful result starts with `MCP server: <server>`, followed by a newline and the returned JSON. Each string-valued `blob` becomes `[binary resource: <length> base64 characters; available to programmatic callers]`. Server-provided text, metadata, and continuation cursors remain visible.
+成功結果は `MCP server: <server>` で始まり、改行と返された JSON が続く。各文字列値 `blob` は `[binary resource: <length> base64 characters; available to programmatic callers]` になる。サーバー提供テキスト、メタデータ、継続カーソルは可視のままである。
 
-#### Token effect
+#### トークンへの影響
 
-Rendered results add text to tool history. Binary descriptions replace the payload's base64 token cost; this package imposes no separate text-size limit.
+描画済み結果はツール履歴にテキストを追加する。バイナリ説明はペイロード base64 のトークンコストを置換し、このパッケージは別個のテキストサイズ制限を課さない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Each result appends to history without rewriting earlier results. Later reads can return changed server content and append a different result; the package does not refresh previously recorded content.
+各結果は以前の結果を書き換えず履歴に追記される。後の読み取りは変わったサーバー内容を返して異なる結果を追記しうる。このパッケージは以前記録された内容を更新しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-Resource access is explicit and on demand.
+リソースアクセスは明示的かつオンデマンドである。
 
-- A configured server without the MCP `resources` capability still appears in the server-name prompt and keeps shared resource tools available. The SDK returns empty resource and template lists; unsupported reads fail.
-- `tools.restrict()` checks names supplied by global or ancestor scopes when the filter is registered. Naming a resource tool absent from those scopes fails as an unknown tool. Resource tools registered in the caller's own scope are outside allow/deny masks.
-- Resource subscriptions and update notifications are unsupported; call the list or read tools again to obtain current content.
-- Binary resources are not projected as native images or audio. Programmatic callers retain their canonical base64 values.
-- The caller must supply a server name. The shared tools do not aggregate different servers; pagination follows the MCP SDK.
+- MCP `resources` ケイパビリティを持たない構成済みサーバーもサーバー名プロンプトに現れ、共有リソースツールを利用可能に保つ。SDK は空のリソース・テンプレート一覧を返し、未対応読み取りは失敗する。
+- `tools.restrict()` はフィルター登録時にグローバルまたは祖先スコープが供給した名前を検査する。それらのスコープにないリソースツールを名指しすると未知ツールとして失敗する。呼び出し元自身スコープに登録されたリソースツールは allow/deny マスク外である。
+- リソース購読と更新通知は未対応であり、最新内容を得るには一覧または読み取りツールを再び呼ぶ。
+- バイナリリソースはネイティブ画像や音声として射影されない。プログラム呼び出し元は正規 base64 値を保持する。
+- 呼び出し元はサーバー名を供給しなければならない。共有ツールは異なるサーバーを集約せず、ページングは MCP SDK に従う。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

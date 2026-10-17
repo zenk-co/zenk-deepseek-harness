@@ -1,54 +1,54 @@
 ---
-description: "App-owned command lines for dsh app bins: your app parses its own flags, --help, and exit behavior from the launcher's remaining arguments."
+description: "dsh アプリ bin のアプリ所有コマンドライン: アプリはランチャーの残りの引数から自身のフラグ、--help、終了動作を解析する。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-cmdline
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-cmdline` lets an app parse its own flags, `--help`, and errors from the arguments left unchanged after launcher flags. Parsed values can override configuration defaults without rewriting configuration. The app can also request process exit through the launcher's shutdown path. Use this package for app bins with their own command-line interface. It adds no prompt, schema, or model-visible content.
+`dsh-cmdline` は、ランチャーフラグの後に変更されずに残された引数から、アプリが自身のフラグ、`--help`、エラーを解析できるようにする。解析された値は、設定を書き換えずに設定デフォルトを上書きできる。アプリはランチャーのシャットダウンパスを通じてプロセス終了を要求することもできる。独自のコマンドラインインターフェースを持つアプリ bin にこのパッケージを使う。プロンプト、スキーマ、またはモデル可視のコンテンツは追加しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Your app reads the invocation's inner arguments at startup, and any number of its plugins can use them. The common path: a startup plugin reads the arguments, parses them, and publishes the parsed values; other rows configure themselves from those values.
+アプリは起動時に呼び出しの内側の引数を読み、任意の数のプラグインがそれを使える。一般的なパス: 起動プラグインが引数を読み、解析し、解析された値を公開する。他の行はその値から自身を構成する。
 
-### The launcher values
+### ランチャーの値
 
-The launcher makes three things available to your app:
+ランチャーはアプリに 3 つを利用可能にする:
 
-- `ctx.cmdlineArgs` — the inner arguments of your invocation. Reading them returns an immutable snapshot and never consumes or changes them: `dsh --profile tui --resume abc` gives your app `['--resume', 'abc']`.
-- `ctx.appExit` — a way to ask the process to exit once the tree has shut down, wired to the launcher's shutdown controller.
-- `ctx.appReady` — the successful-startup signal, committed only after the Loader tree and launcher-owned setup succeed.
+- `ctx.cmdlineArgs` — 呼び出しの内側の引数。読み取りは不変スナップショットを返し、それらを消費または変更することは決してない: `dsh --profile tui --resume abc` はアプリに `['--resume', 'abc']` を与える。
+- `ctx.appExit` — ツリーがシャットダウンした後にプロセスへ終了を要求する方法。ランチャーのシャットダウンコントローラーに配線されている。
+- `ctx.appReady` — 起動成功のシグナル。Loader ツリーとランチャー所有のセットアップが成功した後にのみコミットされる。
 
-An app launched with no arguments sees an empty list — that is the honest answer, not a missing value.
+引数なしで起動されたアプリには空のリストが見える — それが正直な答えであり、値の欠落ではない。
 
-`exitOnStdinEnd(ctx, label)` binds a successfully started stdio application's EOF to `ctx.appExit(0)`. It never reads or resumes stdin, so a protocol transport receives bytes buffered before it mounts; startup rejection wins over a racing EOF, and the owning fiber removes both pending listeners.
+`exitOnStdinEnd(ctx, label)` は、正常に起動した stdio アプリケーションの EOF を `ctx.appExit(0)` に束縛する。stdin を読んだり再開したりすることは決してないため、プロトコルトランスポートはマウント前にバッファリングされたバイトを受け取る。起動拒否は競合する EOF に優先し、所有ファイバーが両方の保留リスナーを削除する。
 
-### Parsing your flags
+### フラグの解析
 
-You bring your own commander program: declare your flags and your actions, and the package runs it against the inner arguments. Your action is the only place validation happens, and it publishes whatever your rows need. The plugin's Loader row carries no special marker:
+独自の commander プログラムを持ち込む: フラグとアクションを宣言すると、パッケージがそれを内側の引数に対して実行する。検証が行われるのはアクションだけであり、行が必要とするものを何でも公開する。プラグインの Loader 行には特別なマーカーはない:
 
 ```yaml
 - id: web-startup
   name: '@deepseek-ai/dsh-web-app/startup'
 ```
 
-Rows configured from the parsed values inject the published service and read it directly in their config:
+解析された値から構成される行は、公開されたサービスを注入し、その設定で直接読む:
 
 ```yaml
 - id: webserver
@@ -59,90 +59,90 @@ Rows configured from the parsed values inject the published service and read it 
     port: !!js ctx.webStartup.port ?? 3080
 ```
 
-The outcomes: `dsh --profile web --port 8080` starts the server on port 8080 even when the config says 3080, because the flag wins. `--help` prints your app's help and exits 0 without starting anything; a rejected value (for example a non-numeric port) prints your error and exits nonzero, and no row that depends on the parsed values ever starts.
+結果: `dsh --profile web --port 8080` は、設定が 3080 と言っていてもポート 8080 でサーバーを起動する。フラグが勝つためである。`--help` はアプリのヘルプを表示し、何も起動せずに終了コード 0 で終了する。拒否された値（たとえば非数値のポート）はエラーを表示して非ゼロで終了し、解析された値に依存する行は決して起動しない。
 
-### How flags beat config values
+### フラグが設定値に勝つ方法
 
-The value written beside a `!!js` expression is the fallback: the flag wins when present, the written value is used otherwise. Resolution happens once at startup, after your parser ran, so a flag is never silently reset by a later config reload.
+`!!js` 式の隣に書かれた値はフォールバックである: フラグがあればフラグが勝ち、そうでなければ書かれた値が使われる。解決は起動時に 1 回、パーサーの実行後に行われるため、フラグが後の設定リロードで暗黙にリセットされることはない。
 
-### Reading the same arguments from several plugins
+### 複数のプラグインから同じ引数を読む
 
-Any number of plugins can read the same arguments — reading never consumes them — and each can parse what it needs and publish its own values. The launcher does not decide who owns the command line: an app with no reader ignores its arguments.
+任意の数のプラグインが同じ引数を読め、読み取りがそれらを消費することは決してなく、それぞれが必要なものを解析して自身の値を公開できる。ランチャーはコマンドラインの所有者を決めない: リーダーのないアプリは引数を無視する。
 
-Apps built outside this repository behave the same way: their `--help` prints and exits instead of crashing, even though they carry their own commander copy.
+このリポジトリの外でビルドされたアプリも同じように動作する: 独自の commander コピーを持っていても、`--help` はクラッシュせずに表示して終了する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the outcomes above are realized and points at the code that realizes them; everything here is developer-facing and not needed to use the package.
+このセクションでは上記の結果がどのように実現されるかを説明し、それを実現するコードを指し示す。ここにあるものはすべて開発者向けで、パッケージを使うのに必要ではない。
 
-### Design notes
+### 設計ノート
 
-- **Launcher facts, not config.** `cmdlineArgs` and `appExit` are provided on the host context before the tree mounts; they are not Loader rows, so no composition owns or overrides them.
-- **Positional split.** The launcher recognizes no app row: the first token after its own flags starts the app's arguments, so the app owns its flag family, its `--help` text, and its parse errors.
-- **Structural error detection.** `isCommanderError` reads commander's error code prefix instead of using `instanceof`, because an out-of-tree plugin brings its own commander copy whose `CommanderError` identity differs; `configureExitAndOutput` walks every subcommand because commander copies exit and output settings only at registration.
-- **Injectable output streams.** `internals` holds the output streams so tests can capture commander's text without touching the process.
+- **ランチャーの事実であり、設定ではない。** `cmdlineArgs` と `appExit` はツリーがマウントされる前にホストコンテキスト上で提供される。それらは Loader 行ではないため、どの構成もそれらを所有または上書きしない。
+- **位置による分割。** ランチャーはアプリ行を認識しない: 自身のフラグの後の最初のトークンがアプリの引数を開始するため、アプリが自身のフラグファミリー、`--help` テキスト、解析エラーを所有する。
+- **構造的なエラー検出。** `isCommanderError` は `instanceof` を使う代わりに commander のエラーコードプレフィックスを読む。ツリー外のプラグインは、`CommanderError` の同一性が異なる独自の commander コピーを持ち込むためである。`configureExitAndOutput` はすべてのサブコマンドを走査する。commander は終了と出力の設定を登録時にのみコピーするためである。
+- **注入可能な出力ストリーム。** `internals` が出力ストリームを保持するため、テストはプロセスに触れずに commander のテキストをキャプチャできる。
 
-### Parsing contract
+### 解析契約
 
-The parse path is one small family with two owners: `provideCmdline` freezes the host arguments and provides `cmdlineArgs` and `appExit` before any tree entry mounts, and `parseCmdline` runs your commander program against the immutable arguments, routing every command's help, version, and error output through the launcher. A rejected value, `--help`, or `--version` prints commander's text and requests `ctx.appExit` without publishing anything, so dependent rows never activate; Loader defers each row's `!!js` interpolation until its declared injections are active. Per-export contracts live in the code, not this README — see [`src/index.ts`](src/index.ts).
+解析パスは 2 つのオーナーを持つ小さなファミリーである: `provideCmdline` はツリーエントリがマウントされる前にホスト引数を凍結し、`cmdlineArgs` と `appExit` を提供し、`parseCmdline` は不変の引数に対して commander プログラムを実行し、すべてのコマンドのヘルプ、バージョン、エラー出力をランチャーを通じてルーティングする。拒否された値、`--help`、または `--version` は commander のテキストを表示し、何も公開せずに `ctx.appExit` を要求するため、依存する行は決してアクティブにならない。Loader は各行の `!!js` 補間を、宣言された注入がアクティブになるまで遅延させる。エクスポートごとの契約はこの README ではなくコードにある — [`src/index.ts`](src/index.ts) を参照。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `CmdlineArgs`/`AppExit` types, `provideCmdline`, `parseCmdline`, commander exit/output routing |
+| [`src/index.ts`](src/index.ts) | `CmdlineArgs`/`AppExit` 型、`provideCmdline`、`parseCmdline`、commander の終了/出力ルーティング |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the package-level contract is not enough. They move from the handoff mechanism to the apps that consume it.
+パッケージレベルの契約では足りないときにこれらのページを読む。受け渡しメカニズムから、それを消費するアプリへと進む。
 
-- [dsh-app-boot](../app-boot/README.md) — the boot sequence that provides these launcher values.
-- [dsh-web-app bundle](../../bundle/web-app/README.md) — an app that owns the Web flag family through this package.
-- [dsh-headless bundle](../../bundle/headless/README.md) — the one-shot runner that reads its task from the command line.
+- [dsh-app-boot](../app-boot/README.md) — これらのランチャー値を提供するブートシーケンス。
+- [dsh-web-app バンドル](../../bundle/web-app/README.md) — このパッケージを通じて Web フラグファミリーを所有するアプリ。
+- [dsh-headless バンドル](../../bundle/headless/README.md) — コマンドラインからタスクを読むワンショットランナー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package resolves the process command line before any session exists; configured rows own every model-visible consequence.
+なし。このパッケージはセッションが存在する前にプロセスのコマンドラインを解決し、構成された行がすべてのモデル可視の結果を所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てたり送信したりしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits describe where app-owned command lines are a poor fit or need special care. They are current package constraints, not a task backlog.
+これらの制限は、アプリ所有のコマンドラインが不向きな場合や特別な注意が必要な場合を説明する。これらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **Launcher flags must precede app arguments** — the split is positional: the first token the launcher does not recognize starts the inner arguments, so `--patch` placed after an app flag belongs to the app. The launcher's parser consumes one `--`, so an app argument that must survive as a literal `--` needs `-- --`.
-- **An app-owned service has no statically declared provider** — consumer rows name it through ordinary injection; a bundle that omits its provider fails at settlement with pending entries naming the service rather than at load.
-- **A user patch that replaces a row's whole `config` drops its expressions** — a flag beats the value written beside it, not a literal a user wrote in place of the expression; keeping the expression is what keeps the flag winning.
+- **ランチャーフラグはアプリ引数の前に置かなければならない** — 分割は位置による: ランチャーが認識しない最初のトークンが内側の引数を開始するため、アプリフラグの後に置かれた `--patch` はアプリに属する。ランチャーのパーサーは 1 つの `--` を消費するため、そのままリテラル `--` として残らなければならないアプリ引数には `-- --` が必要である。
+- **アプリ所有のサービスには静的に宣言されたプロバイダーがない** — コンシューマー行は通常の注入を通じてそれを名指しする。プロバイダーを省略したバンドルは、ロード時ではなく、サービスを名指しする pending エントリとともに確定時に失敗する。
+- **行の `config` 全体を置き換えるユーザーパッチはその式を落とす** — フラグが勝つのは式の隣に書かれた値に対してであり、式の代わりにユーザーが書いたリテラルに対してではない。式を保つことがフラグの勝利を保つ。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発メモはメンテナー向けの作業コンテキストである: 未解決の設計上の疑問と未決定の方向性。明示的に非権威である — 出荷済みの動作、制限、認められた根拠は、上記のセクション、パッケージコード、およびリンクされた Agent Note にある。
 
-#### Open: parser surface
+#### 未解決: パーサーの面
 
-`parseCmdline` is a commander adapter, not a command-line framework: help, version, and error output follow commander's formatting, and the exit/output routing assumes commander's control-flow model. A different parser would need its own routing and error handling; nothing in the `cmdlineArgs` service contract depends on commander.
+`parseCmdline` は commander アダプターであり、コマンドラインフレームワークではない: ヘルプ、バージョン、エラー出力は commander のフォーマットに従い、終了/出力ルーティングは commander の制御フローモデルを前提とする。別のパーサーには独自のルーティングとエラーハンドリングが必要になる。`cmdlineArgs` サービス契約のどこも commander に依存していない。
 
 </details>

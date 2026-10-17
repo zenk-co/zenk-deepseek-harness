@@ -1,41 +1,41 @@
 ---
-description: "The shipped shell backend for persistent terminal sessions: interactive bash or pwsh under the shared sandbox policy, with readiness detection and bounded line-oriented output."
+description: "永続ターミナルセッション用の出荷済みシェルバックエンド: 共有サンドボックスポリシーの下のインタラクティブ bash または pwsh。準備完了の検出と有界の行指向出力を備える。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-terminal-bash
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-terminal-bash` starts a persistent interactive shell under the deployment's sandbox policy: the session stays alive across tool calls, readiness for input is detected, and bounded line-oriented output is retained for reads. It provides the `shell` backend type and supports bash on POSIX and pwsh on Windows through a `shellDialect` setting. The same backend composes with local or remote execution worlds through the mounted subprocess provider. Full-screen terminal applications are outside its line-oriented contract.
+`dsh-terminal-bash` はデプロイのサンドボックスポリシーの下で永続的なインタラクティブシェルを起動する。セッションはツール呼び出しをまたいで生き続け、入力への準備完了が検出され、有界の行指向出力が読み取り用に保持される。`shell` バックエンドタイプを提供し、`shellDialect` 設定を通じて POSIX では bash を、Windows では pwsh をサポートする。同じバックエンドが、マウントされた subprocess プロバイダーを通じてローカルまたはリモートの実行ワールドと組み合わせられる。全画面ターミナルアプリケーションは行指向の契約の外にある。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-A terminal without an explicit initial directory starts in the owner's current Session directory. Its sandbox permission root remains governed by Session policy.
+初期ディレクトリを明示しないターミナルは、所有者の現在の Session ディレクトリで開始する。そのサンドボックス権限ルートは引き続き Session ポリシーが統治する。
 
-Mount this backend when a composition needs persistent shell sessions — state such as cwd, exported variables, functions, or running interactive children must survive across tool calls. It is the default `shell` type: a composition that mounts `@deepseek-ai/dsh-terminal` without it has no sessions to open.
+cwd、エクスポートされた変数、関数、実行中のインタラクティブな子プロセスといった状態がツール呼び出しをまたいで生き残る必要があるコンポジションに、このバックエンドをマウントする。これは既定の `shell` タイプである。`@deepseek-ai/dsh-terminal` をこれなしでマウントしたコンポジションには開けるセッションがない。
 
-### When to choose it
+### いつ選ぶか
 
-Choose this backend when work needs an interactive shell or REPL whose state persists: stepping a debugger, exploring in a Python or Node REPL, or returning to a shell after interrupting a foreground command. Choose the one-shot bash tool for bounded commands that should start and end in one call. The bash dialect targets POSIX; the pwsh dialect targets Windows hosts where `dsh-pwsh-local` can resolve a pwsh executable.
+状態が持続するインタラクティブシェルや REPL を必要とする作業——デバッガーのステップ実行、Python や Node の REPL での探索、フォアグラウンドコマンドを中断した後にシェルへ戻ること——にこのバックエンドを選ぶ。1 回の呼び出しで開始と終了を完結すべき有界のコマンドにはワンショットの bash ツールを選ぶ。bash 方言は POSIX を、pwsh 方言は `dsh-pwsh-local` が pwsh 実行ファイルを解決できる Windows ホストを対象とする。
 
-### Composition
+### コンポジション
 
-Mount the terminal service, a subprocess provider, the sandbox and policy services, this backend, and a tool package:
+terminal サービス、subprocess プロバイダー、sandbox と policy のサービス、このバックエンド、およびツールパッケージをマウントする:
 
 ```yaml
 - name: '@deepseek-ai/dsh-terminal'
@@ -46,138 +46,137 @@ Mount the terminal service, a subprocess provider, the sandbox and policy servic
 - name: '@deepseek-ai/dsh-tool-terminal'
 ```
 
-`danger-full-access` starts the shell directly. Confined modes require a same-world `ctx.sandbox` provider: without one, the spawn fails before the shell starts. Confinement preparation receives the opening signal; cancellation prevents terminal allocation even if the provider returns later.
+`danger-full-access` はシェルを直接起動する。隔離モードには同じ実行ワールドの `ctx.sandbox` プロバイダーが必要である。これがない場合、シェルが起動する前に spawn が失敗する。隔離の準備は開始シグナルを受け取る。キャンセルは、プロバイダーが後で応答する場合でもターミナルの割り当てを阻止する。
 
-### Configuration
+### 構成
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `backendType` | `shell` | Backend type registered on `ctx.terminals` |
-| `shellDialect` | `bash` | Interactive shell stack: `bash` or `pwsh` |
-| `shellPath` / `shellArgs` | per dialect | Shell executable and arguments; empty selects the dialect defaults |
-| `maxReadBytes` | `262144` | Maximum UTF-8 bytes returned by one read or settled send |
-| `timeoutMs` | `30000` | Absolute bound on one send wait |
-| `disposeGraceMs` | `3000` | Grace before teardown escalates to `SIGKILL` |
+| `backendType` | `shell` | `ctx.terminals` に登録されるバックエンドタイプ |
+| `shellDialect` | `bash` | インタラクティブシェルのスタック: `bash` または `pwsh` |
+| `shellPath` / `shellArgs` | 方言ごと | シェル実行ファイルと引数。空の場合は方言の既定値が選択される |
+| `maxReadBytes` | `262144` | 1 回の読み取りまたは確定した送信が返す UTF-8 バイトの最大値 |
+| `timeoutMs` | `30000` | 1 回の送信待機に対する絶対的な上限 |
+| `disposeGraceMs` | `3000` | テアダウンが `SIGKILL` にエスカレートするまでの猶予 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-terminal-bash) is the exhaustive source for every field, including the readiness timings (`pollIntervalMs`, `exactProbeAfterMs`, `idleSilenceMs`, `handoffGraceMs`, `promptTailGraceMs`), terminal size (`rows`, `cols`), and scrollback bounds (`scrollbackLines`, `scrollbackMaxBytes`).
+生成される[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-terminal-bash)が、準備完了のタイミング（`pollIntervalMs`、`exactProbeAfterMs`、`idleSilenceMs`、`handoffGraceMs`、`promptTailGraceMs`）、ターミナルサイズ（`rows`、`cols`）、スクロールバックの境界（`scrollbackLines`、`scrollbackMaxBytes`）を含むすべてのフィールドの網羅的な情報源である。
 
-### Shell dialects and readiness
+### シェル方言と準備完了
 
-Both dialects expose the same readiness contract, so consumers are dialect-agnostic. A send settles when the shell is ready again: after the controlled prompt is verified, after the foreground process group provably waits on stdin (Linux), after output silence (`inferred_idle`), or at the absolute `timeoutMs`. A prompt marker whose printable tail has not arrived yet holds the send on the exact path for `promptTailGraceMs` beyond `idleSilenceMs + handoffGraceMs`, because the marker and its tail are written by the same prompt render. An `inferred_idle` or `timeout` result does not prove the foreground command exited.
+両方の方言は同じ準備完了の契約を公開するため、コンシューマーは方言に依存しない。送信はシェルが再び準備完了になった時点で決着する。制御されたプロンプトが検証された後、フォアグラウンドプロセスグループが stdin で待機していることが証明可能な場合（Linux）、出力の沈黙の後（`inferred_idle`）、または絶対的な `timeoutMs` である。印刷可能な末尾がまだ到着していないプロンプトマーカーは、`idleSilenceMs + handoffGraceMs` を超えて `promptTailGraceMs` の間、送信を正確なパスに留める。マーカーとその末尾は同じプロンプトレンダーによって書き込まれるためである。`inferred_idle` または `timeout` の結果は、フォアグラウンドコマンドが終了したことを証明しない。
 
-### Sandboxing and safe operation
+### サンドボックスと安全な運用
 
-The shell runs under the effective sandbox boundary for its whole life. Changing the effective sandbox mode is rejected while the owner still has open sessions or a spawn in progress — wait for creation to settle and close the sessions first, so a terminal opened with wider access cannot survive a downgrade. The backend supplies only terminal-specific environment overrides; the subprocess provider applies its shared credential scrub.
+シェルはその生涯を通じて有効なサンドボックス境界の下で実行される。所有者がまだ開いているセッションまたは進行中の spawn を持っている間は、有効なサンドボックスモードの変更が拒否される。作成の決着を待ち、先にセッションを閉じること。これにより、より広いアクセスで開かれたターミナルがダウングレードを生き残ることはできない。バックエンドが供給するのはターミナル固有の環境オーバーライドのみで、subprocess プロバイダーがその共有の資格情報スクラブを適用する。
 
-### Observable outcomes and failures
+### 観測可能な結果と失敗
 
-An open returns the session id and a bounded startup message. Sends settle with one of the four wait reasons and a session status; `session_exit` means the top-level shell exited. Setup failures reject the open: a missing sandbox provider in a confined mode, a shell that exits during startup, a shell that fails to reach readiness before the startup timeout, or caller cancellation. Cleanup failures reject the close instead of claiming success.
+オープンはセッション id と有界の起動メッセージを返す。送信は 4 つの待機理由のいずれかとセッションステータスで決着し、`session_exit` はトップレベルのシェルが終了したことを意味する。セットアップの失敗はオープンを拒否する。隔離モードでサンドボックスプロバイダーが欠けている場合、起動中にシェルが終了した場合、起動タイムアウトの前にシェルが準備完了に到達できない場合、または呼び出し元のキャンセルである。クリーンアップの失敗は、成功を主張する代わりにクローズを拒否する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design behind the backend and points at the code that realizes it; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションはバックエンドの背後の設計を説明し、それを実現するコードを指し示す。観測可能な挙動は[このパッケージを使う](#use-this-package)でカバーされている。
 
-### Design concept
+### 設計概念
 
-One backend serves both dialects: bash and pwsh share the same session machinery — sanitizer, bounded buffers, readiness polling, cancellation, and teardown — and differ only in argv, environment, and prompt installation. Bash receives a private marker through `PS1` plus `PROMPT_COMMAND`. Pwsh writes a prompt function, pins UTF-8 console encoding, and publishes startup only after the backend reports `stdin_read`; echoed setup text cannot publish the shell. A zero-scrollback `@xterm/headless` instance consumes raw PTY data and returns terminal-protocol replies through the same handle, while the line sanitizer remains the only output projection.
+1 つのバックエンドが両方の方言にサービスする。bash と pwsh は同じセッション機構——サニタイザー、有界バッファ、準備完了ポーリング、キャンセル、テアダウン——を共有し、argv、環境、プロンプトのインストールだけが異なる。bash は `PS1` と `PROMPT_COMMAND` を通じて私有のマーカーを受け取る。Pwsh はプロンプト関数を書き、UTF-8 コンソールエンコーディングを固定し、バックエンドが `stdin_read` を報告した後にのみ起動を公開する。エコーされたセットアップテキストがシェルを公開することはできない。スクロールバックなしの `@xterm/headless` インスタンスが生の PTY データを消費し、同じハンドルを通じてターミナルプロトコルの応答を返す一方、行サニタイザーは唯一の出力投影のままである。
 
-Scrollback and unread send output retain independently owned strings with incremental byte and newline counts, so sanitized slices cannot retain discarded control sequences. Appending and evicting text takes amortized time proportional to incoming text; reads assemble the retained chunks. Retention preserves code-point boundaries and counts the empty line after a trailing newline. The [historical retention decision](../../../.agents/notes/archived/bug-fix/2026-09-11-incremental-terminal-retention.md) records the complexity and measurement rationale.
+スクロールバックと未読の送信出力は、増分的なバイト数と改行数を持つ独立所有の文字列を保持するため、サニタイズされたスライスが破棄された制御シーケンスを保持することはできない。テキストの追加と追い出しは入ってくるテキストに比例する償却時間で行われ、読み取りは保持されたチャンクを組み立てる。保持はコードポイント境界を保ち、末尾の改行の後の空行も数える。[歴史的な保持の決定](../../../.agents/notes/archived/bug-fix/2026-09-11-incremental-terminal-retention.md)が複雑性と計測の根拠を記録している。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Backend registration, sandbox-mode fence, argv and environment assembly, startup sequence |
-| [`src/config.ts`](src/config.ts) | Dialect resolution, defaults, and validation of every timing field |
-| [`src/session.ts`](src/session.ts) | `LocalPtySession`: send lifecycle, readiness polling, scrollback, signals, close |
-| [`src/sanitize.ts`](src/sanitize.ts) | Streaming control-sequence sanitizer and line normalization |
+| [`src/index.ts`](src/index.ts) | バックエンド登録、サンドボックスモードのフェンス、argv と環境の組み立て、起動シーケンス |
+| [`src/config.ts`](src/config.ts) | 方言の解決、既定値、すべてのタイミングフィールドの検証 |
+| [`src/session.ts`](src/session.ts) | `LocalPtySession`: 送信ライフサイクル、準備完了ポーリング、スクロールバック、シグナル、クローズ |
+| [`src/sanitize.ts`](src/sanitize.ts) | ストリーミング制御シーケンスのサニタイザーと行の正規化 |
 
-### Readiness model
+### 準備完了モデル
 
-Three bounded tiers settle a send: exact stdin-wait evidence from the subprocess provider (Linux only), the verified private prompt marker with an exact printable tail, and output silence (`inferred_idle`); an absolute timeout always bounds the wait. Pwsh startup uses one deadline across its complete setup loop, so an `inferred_idle` follow-up does not restart the bound. Evidence collected before the provider write is discarded at the write boundary, a stdin wait that predates the write is not post-write readiness, and unknown foreground state is never a positive exact-idle signal.
+3 つの有界の段階が送信を決着させる。subprocess プロバイダーからの正確な stdin 待機の証拠（Linux のみ）、検証済みの私有プロンプトマーカーと正確な印刷可能末尾、および出力の沈黙（`inferred_idle`）である。絶対タイムアウトが常に待機を制限する。Pwsh の起動はその完全なセットアップループにわたって 1 つの期限を使うため、`inferred_idle` のフォローアップが制限を再起動することはない。プロバイダーへの書き込み前に収集された証拠は書き込み境界で破棄され、書き込みより前の stdin 待機は書き込み後の準備完了ではなく、未知のフォアグラウンド状態がポジティブな exact-idle シグナルになることは決してない。
 
-### Send cancellation and teardown
+### 送信のキャンセルとテアダウン
 
-Cancellation marks queued input as canceled, then signals the current foreground process group with a real `SIGINT` after any in-flight provider write settles; it never emulates interruption by writing `\x03`. Closing stops readiness polling, terminates the provider-owned process tree, awaits quiescence, and settles the active send as `session_exit`.
+キャンセルはキュー済み入力をキャンセル済みとしてマークし、進行中のプロバイダー書き込みが決着した後に、現在のフォアグラウンドプロセスグループに本物の `SIGINT` を送る。`\x03` を書き込んで割り込みをエミュレートすることは決してない。クローズは準備完了ポーリングを停止し、プロバイダーが所有するプロセスツリーを終了させ、静止を待ち、アクティブな送信を `session_exit` として決着させる。
 
-### Sandbox-mode fence
+### サンドボックスモードのフェンス
 
-A write that would change the effective sandbox mode is rejected before the `sandbox/mode` event commits while that owner has an open session or a spawn in progress. The fence is attached to the exact owner and outlives a provider reload that retains existing sessions.
+有効なサンドボックスモードを変える書き込みは、その所有者が開いているセッションまたは進行中の spawn を持つ間、`sandbox/mode` イベントがコミットする前に拒否される。フェンスは正確な所有者に取り付けられ、既存のセッションを保持するプロバイダーのリロードよりも長生きする。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared terminal model to the service, the tools, and the execution-world substrate.
+パッケージレベルの契約で足りない場合はこれらのページを読む。共有ターミナルモデルからサービス、ツール、実行ワールドの基盤へと進む。
 
-- [Terminal subsystem reference](../../../docs/subsystems/terminal.md) — the service contract this backend implements and the generated `ctx.terminals` surface.
-- [terminal service](../terminal/README.md) — backend registration, owner fencing, and cleanup semantics.
-- [tool-terminal tools](../../experimental/tool-terminal/README.md) — the model-facing tools that operate sessions.
-- [Subprocess seam](../../../docs/subsystems/subprocess.md) — the terminal primitive that owns PTY allocation and process-tree cleanup.
-- [Persistent PTY Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — the capability design and deferred boundaries.
-- [Persistent pwsh Agent Note](../../../.agents/notes/archived/architecture/2026-08-11-pwsh-persistent-pty.md) — the Windows substrate and the pwsh dialect.
+- [Terminal サブシステムリファレンス](../../../docs/subsystems/terminal.md) — このバックエンドが実装するサービス契約と生成された `ctx.terminals` サーフェス。
+- [terminal サービス](../terminal/README.md) — バックエンド登録、所有者のフェンシング、クリーンアップの意味論。
+- [tool-terminal ツール](../../experimental/tool-terminal/README.md) — セッションを操作するモデル向けツール。
+- [Subprocess seam](../../../docs/subsystems/subprocess.md) — PTY の割り当てとプロセスツリーのクリーンアップを所有するターミナルプリミティブ。
+- [永続 PTY の Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — ケイパビリティの設計と先送りされた境界。
+- [永続 pwsh の Agent Note](../../../.agents/notes/archived/architecture/2026-08-11-pwsh-persistent-pty.md) — Windows の基盤と pwsh 方言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Indirect consumer
+### 間接的なコンシューマー
 
-#### What the model sees
+#### モデルが見るもの
 
-This package registers no prompt or tool. Through `@deepseek-ai/dsh-tool-terminal` or another PTY consumer, the model may receive bounded startup output, send deltas, scrollback pages, readiness reasons, and cleanup errors.
+本パッケージはプロンプトもツールも登録しない。`@deepseek-ai/dsh-tool-terminal` または別の PTY コンシューマーを通じて、モデルは有界の起動出力、送信デルタ、スクロールバックのページ、準備完了の理由、クリーンアップのエラーを受け取ることがある。
 
-#### Token effect
+#### トークンへの影響
 
-Retained PTY scrollback is not placed in model history until a consumer returns bounded output.
+保持された PTY スクロールバックは、コンシューマーが有界の出力を返すまでモデル履歴に置かれない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; consumer results remain append-only.
+直接の無効化はない。コンシューマーの結果は追記専用のままである。
 
-### Sandbox policy context
+### サンドボックスポリシーのコンテキスト
 
-#### What the model sees
+#### モデルが見るもの
 
-While this backend is composed, the `sandbox-policy` owner contributes the capability-neutral `sandbox:policy` runtime-context clause to prompts.
+このバックエンドがコンポーズされている間、`sandbox-policy` の所有者はケイパビリティ中立の `sandbox:policy` ランタイムコンテキスト句をプロンプトに寄与する。
 
-#### Token effect
+#### トークンへの影響
 
-The policy clause is present on requests while the backend is mounted.
+バックエンドがマウントされている間、ポリシーの句がリクエストに存在する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-A standing-policy change appends a superseding runtime-context snapshot after retained history.
+定常ポリシーの変更は、保持された履歴の後にそれを置き換えるランタイムコンテキストスナップショットを追記する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
+これらの制限は、このバックエンドが不向きになる、または特別な運用上の注意を要する状況を定義する。一般的なシェルの比較やタスクバックログではなく、現在のパッケージの制約である。
 
-These limits define where the backend is a poor fit or needs special operational care. They are current package constraints, not a general shell comparison or a task backlog.
-
-- **Line-oriented output only** — a headless xterm maintains control-sequence state only for terminal-protocol replies. Returned output remains normalized to lines, and full-screen alternate-buffer interaction is unsupported.
-- **Readiness is heuristic without an exact tier** — exact stdin-wait detection depends on the mounted subprocess provider; providers that cannot prove it (macOS, Windows) settle on prompt-marker and silence/timeout readiness.
-- **pwsh bootstrap in a constrained sandbox** — the prompt function and UTF-8 pin write through `[Console]::`, which the Windows ACL sandbox's read-only mode may deny. When that prevents marker readiness, startup rejects at `timeoutMs` instead of publishing an incomplete shell.
-- **Cleanup guarantees belong to the provider** — process-tree teardown is the `SubprocessTerminalHandle` contract, not this backend's.
-- **Sessions do not survive process exit** — a harness restart destroys every session.
+- **行指向の出力のみ** — ヘッドレスの xterm はターミナルプロトコルの応答のためにのみ制御シーケンス状態を維持する。返される出力は行に正規化されたままで、全画面の代替バッファ操作はサポートされない。
+- **正確な段階のない場合の準備完了はヒューリスティック** — 正確な stdin 待機の検出はマウントされた subprocess プロバイダーに依存する。それを証明できないプロバイダー（macOS、Windows）はプロンプトマーカーと沈黙/タイムアウトの準備完了で決着する。
+- **制約されたサンドボックスでの pwsh のブートストラップ** — プロンプト関数と UTF-8 の固定は `[Console]::` を通じて書き込み、Windows の ACL サンドボックスの読み取り専用モードがそれを拒否することがある。それがマーカーの準備完了を妨げる場合、起動は不完全なシェルを公開する代わりに `timeoutMs` で拒否される。
+- **クリーンアップの保証はプロバイダーに属する** — プロセスツリーのテアダウンはこのバックエンドの契約ではなく `SubprocessTerminalHandle` の契約である。
+- **セッションはプロセスの終了を生き残らない** — harness の再起動はすべてのセッションを破壊する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,35 +1,35 @@
 ---
-description: "The stdio language-server provider for ctx.lsp: configured server commands, extension mappings, and bounded transient-open queries, for users and maintainers composing local code navigation."
+description: "ctx.lsp の stdio 言語サーバープロバイダー: 設定されたサーバーコマンド、拡張子マッピング、および上限付きの transient-open クエリ。ローカルコードナビゲーションをコンポーズするユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-lsp-stdio
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-lsp-stdio` to give agents definitions, references, implementations, and hover from explicitly configured local language servers. It maps file extensions to language identifiers, starts one server per workspace on demand, and reads each queried file afresh without retaining document state between queries. Language-server processes and source reads share the mounted filesystem and subprocess environment. The package does not install servers or provide a sandbox: deployments supply commands, mappings, and any required confinement. Queries are serialized per server and workspace, while different workspaces can run in parallel.
+`dsh-lsp-stdio` は、明示的に設定されたローカル言語サーバーから、エージェントに定義、参照、実装、および hover を提供するために使う。ファイル拡張子を言語識別子にマップし、要求に応じてワークスペースごとに 1 つのサーバーを起動し、クエリ間でドキュメント状態を保持せずに、クエリされた各ファイルを新たに読む。言語サーバープロセスとソース読み取りは、マウントされたファイルシステムと subprocess 環境を共有する。このパッケージはサーバーをインストールせず、サンドボックスも提供しない: デプロイメントがコマンド、マッピング、および必要な封じ込めを供給する。クエリはサーバーとワークスペースごとに直列化され、異なるワークスペースは並行して実行できる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [本パッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 本パッケージを使う
 
-Mount this provider when a deployment has local language servers — for example `typescript-language-server` — and wants the harness to navigate code through them. It needs filesystem and subprocess providers for the same execution world, plus the `dsh-lsp` seam and, for model access, `dsh-tool-lsp`.
+デプロイメントがローカル言語サーバー — たとえば `typescript-language-server` — を持ち、Harness にそれらを通じてコードをナビゲートさせたい場合にこのプロバイダーをマウントする。同じ実行ワールドのファイルシステムと subprocess プロバイダー、`dsh-lsp` シーム、およびモデルアクセスのために `dsh-tool-lsp` を必要とする。
 
-### Minimal configuration
+### 最小構成
 
-The `servers` record maps each stable provider id to one server command. The provider resolves every executable at load after credential scrubbing, so a bad entry prevents every provider from registering; processes launch lazily on the first matching query.
+`servers` レコードは各安定したプロバイダー id を 1 つのサーバーコマンドにマップする。プロバイダーはクレデンシャル洗浄後にロード時にすべての実行ファイルを解決するため、不正なエントリーはすべてのプロバイダーの登録を妨げる; プロセスは最初の一致するクエリで遅延起動する。
 
 ```yaml
 - name: '@deepseek-ai/dsh-fs-local'
@@ -46,114 +46,114 @@ The `servers` record maps each stable provider id to one server command. The pro
 - name: '@deepseek-ai/dsh-tool-lsp'
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `command` | required | Executable to spawn — absolute, or resolved on the child PATH at load; launched without a shell |
-| `extensionToLanguage` | required | Lowercase leading-dot extension → LSP language id (e.g. `{ '.ts': 'typescript' }`) |
-| `args` | `[]` | Arguments passed to the executable |
-| `env` | `{}` | Extra env merged over the credential-scrubbed ambient env; variables matching `KEY`/`PASSWORD`/`SECRET`/`TOKEN` and all `DSH_*` names are not forwarded |
-| `initializationOptions` | `null` | Static `initialize` options forwarded to the server |
-| `configuration` | `null` | Static answer to every `workspace/configuration` item |
-| `maxMessageBytes` | `16000000` | Largest single framed message accepted from the server |
-| `maxStderrBytes` | `1000000` | Largest stderr tail retained for diagnostics |
-| `maxDocumentBytes` | `4000000` | Largest source file this host opens |
-| `shutdownTimeoutMs` | `5000` | Graceful `shutdown`/`exit` budget before escalation |
-| `killGraceMs` | `2000` | Request-cancel and SIGTERM→SIGKILL escalation grace |
+| `command` | 必須 | spawn される実行ファイル — 絶対パス、またはロード時に子の PATH で解決; シェルなしで起動される |
+| `extensionToLanguage` | 必須 | 小文字の先頭ドット拡張子 → LSP language id (例: `{ '.ts': 'typescript' }`) |
+| `args` | `[]` | 実行ファイルに渡される引数 |
+| `env` | `{}` | クレデンシャル洗浄済みのアンビエント環境の上にマージされる追加 env; `KEY`/`PASSWORD`/`SECRET`/`TOKEN` に一致する変数とすべての `DSH_*` 名は転送されない |
+| `initializationOptions` | `null` | サーバーへ転送される静的な `initialize` オプション |
+| `configuration` | `null` | すべての `workspace/configuration` 項目への静的な答え |
+| `maxMessageBytes` | `16000000` | サーバーから受け入れる最大の単一フレーミングメッセージ |
+| `maxStderrBytes` | `1000000` | 診断のために保持される最大 stderr テール |
+| `maxDocumentBytes` | `4000000` | このホストが開く最大ソースファイル |
+| `shutdownTimeoutMs` | `5000` | エスカレーション前の優雅な `shutdown`/`exit` 予算 |
+| `killGraceMs` | `2000` | リクエストキャンセルと SIGTERM→SIGKILL エスカレーションの猶予 |
 
-`servers` must contain at least one entry with non-empty ids; timer budgets must be positive integers within Node's timer range, and byte caps must be positive. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-lsp-stdio) is the exhaustive source for every accepted field.
+`servers` は空でない id を持つ少なくとも 1 つのエントリーを含まなければならない; タイマー予算は Node のタイマー範囲内の正の整数でなければならず、バイト上限は正でなければならない。生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-lsp-stdio)が、受け入れられるすべてのフィールドの網羅的な情報源である。
 
-### What a query does
+### クエリが行うこと
 
-On the first query for a workspace, the provider launches one server process for that workspace and keeps it pooled. Each query reads the current source through `ctx.fs`, opens it in the server (`textDocument/didOpen`), runs the requested operation, and closes it — so the server always sees current text and no document state persists between calls. Queries to one server and workspace run one at a time; different workspaces run in parallel. If the pooled process fails before or during a read-only query, the provider retries that query once on a fresh process.
+ワークスペースへの最初のクエリで、プロバイダーはそのワークスペースのためにサーバープロセスを 1 つ起動し、プールしたままにする。各クエリは `ctx.fs` を通じて現在のソースを読み、サーバー内でそれを開き (`textDocument/didOpen`)、要求された操作を実行し、閉じる — したがってサーバーは常に現在のテキストを見て、呼び出し間でドキュメント状態は持続しない。1 つのサーバーとワークスペースへのクエリは一度に 1 つずつ実行される; 異なるワークスペースは並行して実行される。プールされたプロセスが読み取り専用クエリの前または途中で失敗した場合、プロバイダーはそのクエリを新しいプロセスで 1 回再試行する。
 
-### Observable success and failures
+### 観察可能な成功と失敗
 
-A successful navigation returns normalized locations, and hover returns normalized text or a no-hover notice; empty results are successful no-result responses. The query fails when the server does not support the operation or the transient open/close synchronization (`LSP_UNSUPPORTED_OPERATION`), when the source is missing, non-regular, non-UTF-8, oversized, or outside the canonical workspace (rejected before the server starts), or when the server returns a malformed payload (`LSP_MALFORMED_RESPONSE`). A hard-killed harness leaves servers running until they exit on their own — graceful shutdown happens only through service disposal.
+成功したナビゲーションは正規化された位置を返し、hover は正規化されたテキストまたは hover なしの通知を返す; 空の結果は成功した無結果レスポンスである。クエリは、サーバーが操作または transient な open/close 同期をサポートしない場合 (`LSP_UNSUPPORTED_OPERATION`)、ソースが欠落、非通常ファイル、非 UTF-8、サイズ超過、または正規のワークスペース外である場合 (サーバー起動前に拒否される)、またはサーバーが不正なペイロードを返す場合 (`LSP_MALFORMED_RESPONSE`) に失敗する。ハード kill された Harness はサーバーを自力で終了するまで実行したまま残す — 優雅なシャットダウンはサービスの破棄を通じてのみ起こる。
 
-### Security boundary
+### セキュリティ境界
 
-This provider trusts its configured server and adds no sandbox confinement; the server receives the filesystem and process authority of the mounted execution world. It rejects query sources that are missing, non-regular, non-UTF-8, oversized, or canonically outside the workspace before server startup. Result locations may point outside the workspace, but an external path can never become a query source. Mount filesystem and subprocess providers for the same execution world — a split-world composition is invalid.
+このプロバイダーは設定されたサーバーを信頼し、サンドボックスの封じ込めを追加しない; サーバーはマウントされた実行ワールドのファイルシステムとプロセス権限を受け取る。サーバー起動前に、欠落、非通常ファイル、非 UTF-8、サイズ超過、または正規にワークスペース外であるクエリソースを拒否する。結果の位置はワークスペース外を指してよいが、外部パスがクエリソースになることは決してできない。同じ実行ワールドのファイルシステムと subprocess プロバイダーをマウントする — ワールドが分かれたコンポジションは無効である。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the provider and where the code realizes them; observable behavior is covered in [Use this package](#use-this-package).
+このセクションは、プロバイダーの背後にある設計上の決定と、コードがそれらをどこで実現するかを説明する; 観察可能な挙動は[本パッケージを使う](#use-this-package)で扱う。
 
-### Design philosophy
+### 設計哲学
 
-- **Generic host, not a catalog.** Deployments configure commands and mappings explicitly; presets belong in `cordis.yml` overlays, not in this package.
-- **Compatibility-first transient open.** Every query runs `didOpen` (version 1, full text) → request → `didClose`, so the server always sees current bytes and the first version needs no `didChange`, content cache, or document LRU.
-- **Read before spawn.** The source is resolved, contained, and byte-bounded inside the workspace queue before any process is created, so a queued query sees current bytes when its turn starts and an invalid source cannot leave an idle process pooled.
-- **One pooled process per canonical workspace.** Instances are single-flighted per `(server id, canonical workspace target)`; a transport failure retries the read-only query once on a fresh process after awaiting disposal.
-- **Per-workspace serialization.** One abortable queue per workspace serializes source-read/open/query/close lifecycles; distinct workspaces run in parallel, and a cancellation that fails to stop a server terminates only that instance.
-- **Bounded teardown.** Graceful `shutdown`/`exit` escalates through the subprocess provider's managed-range termination procedure; quiescence is confirmed by awaiting that whole range, not by the termination request's outcome.
-- **Execution-world pairing.** Servers launch through `ctx.subprocess` with `processId: null` (another machine or PID namespace must not monitor the harness), sources read through `ctx.fs`, and no `fs/observed` event is emitted — only the LSP result is model-visible.
+- **カタログではなく汎用ホスト。** デプロイメントはコマンドとマッピングを明示的に設定する; プリセットは `cordis.yml` オーバーレイに属し、このパッケージには属さない。
+- **互換性優先の transient open。** すべてのクエリは `didOpen` (バージョン 1、完全なテキスト) → リクエスト → `didClose` を実行するため、サーバーは常に現在のバイトを見て、最初のバージョンに `didChange`、コンテンツキャッシュ、ドキュメント LRU は不要である。
+- **spawn 前の読み取り。** ソースはプロセスが作られる前にワークスペースキュー内で解決、封じ込め、バイト上限が適用されるため、キュー済みのクエリは順番が来たときに現在のバイトを見て、無効なソースがアイドルプロセスをプールに残すことはできない。
+- **正規のワークスペースごとに 1 つのプールされたプロセス。** インスタンスは `(サーバー id, 正規のワークスペース対象)` ごとに single-flight される; トランスポート失敗は破棄を待った後、読み取り専用クエリを新しいプロセスで 1 回再試行する。
+- **ワークスペースごとの直列化。** ワークスペースごとに 1 つの abort 可能なキューがソース読み取り/open/クエリ/close のライフサイクルを直列化する; 異なるワークスペースは並行して実行され、サーバーを停止できなかったキャンセルはそのインスタンスだけを終了させる。
+- **上限付きのティアダウン。** 優雅な `shutdown`/`exit` は subprocess プロバイダーの管理レンジ終了手順を通じてエスカレートする; 静止は終了リクエストの結果ではなく、そのレンジ全体を待つことによって確認される。
+- **実行ワールドのペアリング。** サーバーは `processId: null` で `ctx.subprocess` を通じて起動され (別マシンまたは PID 名前空間が Harness を監視してはならない)、ソースは `ctx.fs` を通じて読まれ、`fs/observed` イベントは emit されない — モデル可視なのは LSP 結果だけである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config schema, executable resolution, provider registration, process pooling |
-| [`src/host.ts`](src/host.ts) | Workspace canonicalization and bounded source reads through `ctx.fs` |
-| [`src/instance.ts`](src/instance.ts) | One server process: initialize handshake, serialized transient-open queries, bounded teardown |
-| [`src/connection.ts`](src/connection.ts) | JSON-RPC endpoint: id correlation, outbound requests, inbound server requests, stderr cap |
-| [`src/framing.ts`](src/framing.ts) | `Content-Length` framing and a bounded decoder |
-| [`src/protocol.ts`](src/protocol.ts) | Wire-type subset: capabilities, locations, hover, text-document synchronization |
-| [`src/translate.ts`](src/translate.ts) | Capability checks, UTF-16 negotiation, `Location`/`LocationLink`/hover normalization |
-| [`src/abort.ts`](src/abort.ts) | Cancellation helpers fusing caller and disposal signals |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: 設定スキーマ、実行ファイル解決、プロバイダー登録、プロセスプーリング |
+| [`src/host.ts`](src/host.ts) | ワークスペースの正規化と `ctx.fs` を通じた上限付きソース読み取り |
+| [`src/instance.ts`](src/instance.ts) | 1 つのサーバープロセス: initialize ハンドシェイク、直列化された transient-open クエリ、上限付きティアダウン |
+| [`src/connection.ts`](src/connection.ts) | JSON-RPC エンドポイント: id 相関、アウトバウンドリクエスト、インバウンドサーバーリクエスト、stderr 上限 |
+| [`src/framing.ts`](src/framing.ts) | `Content-Length` フレーミングと上限付きデコーダー |
+| [`src/protocol.ts`](src/protocol.ts) | wire 型のサブセット: ケイパビリティ、位置、hover、テキストドキュメント同期 |
+| [`src/translate.ts`](src/translate.ts) | ケイパビリティチェック、UTF-16 ネゴシエーション、`Location`/`LocationLink`/hover の正規化 |
+| [`src/abort.ts`](src/abort.ts) | 呼び出し元と破棄のシグナルを融合するキャンセルヘルパー |
 
-### Protocol behavior
+### プロトコルの挙動
 
-Initialization advertises UTF-16 positions, workspace folders and configuration, markdown/plaintext hover, and link support for definition and implementation, with no dynamic registration; the server's returned capabilities are authoritative. An omitted server `positionEncoding` defaults to `utf-16`; any other value fails the query. The client answers `workspace/configuration` from static config, accepts lifecycle bookkeeping requests, and rejects `workspace/applyEdit` — it never applies edits or runs commands. Navigation maps `Location` directly and `LocationLink` from `targetUri` plus `targetSelectionRange`; hover normalization accepts `MarkupContent` and `MarkedString` shapes, preserves string values, renders language-tagged values as fenced code, and joins arrays with one blank line. Missing results, malformed ranges or positions, and malformed hover encodings fail as structured `LSP_MALFORMED_RESPONSE` errors.
+初期化は UTF-16 位置、ワークスペースフォルダーと設定、markdown/プレーンテキストの hover、および definition と implementation の link サポートを広告し、動的登録は行わない; サーバーが返すケイパビリティが権威である。省略されたサーバーの `positionEncoding` は `utf-16` にデフォルトし、その他の値はクエリを失敗させる。クライアントは静的設定から `workspace/configuration` に答え、ライフサイクルのブックキーピングリクエストを受け入れ、`workspace/applyEdit` を拒否する — 編集を適用したりコマンドを実行したりすることは決してない。ナビゲーションは `Location` を直接マップし、`LocationLink` を `targetUri` と `targetSelectionRange` からマップする; hover の正規化は `MarkupContent` と `MarkedString` の形を受け入れ、文字列値を保ち、言語タグ付きの値をフェンス付きコードとしてレンダリングし、配列を 1 つの空行で結合する。欠落した結果、不正な範囲や位置、および不正な hover エンコーディングは、構造化された `LSP_MALFORMED_RESPONSE` エラーとして失敗する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared navigation model to the seam and the tool.
+パッケージレベルの契約では不十分なときにこれらのページを読む。共有のナビゲーションモデルからシームとツールへ進む。
 
-- [LSP navigation subsystem](../../../docs/subsystems/lsp.md) — operations, coordinates, requests and results, and `LspError` codes.
-- [dsh-lsp](../lsp/README.md) — the seam this provider registers against.
-- [dsh-tool-lsp](../tool-lsp/README.md) — the model-facing tool over the seam.
-- [lsp group map](../README.md) — the three-package family and its related documentation.
+- [LSP ナビゲーションサブシステム](../../../docs/subsystems/lsp.md) — 操作、座標、リクエストと結果、および `LspError` コード。
+- [dsh-lsp](../lsp/README.md) — このプロバイダーが登録する対象のシーム。
+- [dsh-tool-lsp](../tool-lsp/README.md) — シーム上のモデル向けツール。
+- [lsp グループマップ](../README.md) — 3 パッケージのファミリーとその関連ドキュメント。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-tool-lsp`, which surfaces this provider's normalized results while this host contributes no prompt or schema itself.
+間接的に、`dsh-tool-lsp` を通じて。それはこのプロバイダーの正規化された結果を表面化し、このホスト自体はプロンプトやスキーマを何も寄与しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; `dsh-tool-lsp` owns request-prefix changes.
+直接の無効化はなし; `dsh-tool-lsp` がリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the provider is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+これらの制限は、このプロバイダーが適さない場合や特別な運用上の注意が必要な場合を定義する。それらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **No confinement policy** — this package trusts the configured server and does not sandbox its process; a restricted deployment must supply appropriate process and filesystem providers or a same-world sandbox wrapper.
-- **Transient-open compatibility floor** — servers whose synchronization omits open/close (or advertises `None`) are unsupported even if closed-document queries would work; the pinned TypeScript e2e establishes one compatibility floor, not a cross-language claim.
-- **Per-server and per-workspace serialization latency** — parallel agents sharing one server and workspace queue behind one process; long-lived workspace processes consume memory until disposal.
-- **A hard-killed harness orphans language servers** — `initialize.processId: null` removes server-side client-PID monitoring, so servers are cleaned only by graceful service disposal; a SIGKILL'd harness leaves them running until they exit on their own.
+- **封じ込めポリシーなし** — このパッケージは設定されたサーバーを信頼し、そのプロセスをサンドボックス化しない; 制限されたデプロイメントは適切なプロセスとファイルシステムのプロバイダー、または同一ワールドのサンドボックスラッパーを供給しなければならない。
+- **transient-open 互換性の下限** — 同期が open/close を省略する (または `None` を広告する) サーバーは、クローズドドキュメントのクエリが機能するとしてもサポートされない; 固定された TypeScript e2e は 1 つの互換性の下限を確立するものであり、言語横断的な主張ではない。
+- **サーバーごと・ワークスペースごとの直列化レイテンシ** — 1 つのサーバーとワークスペースを共有する並行エージェントは 1 つのプロセスの後ろにキューされる; 長命のワークスペースプロセスは破棄までメモリを消費する。
+- **ハード kill された Harness は言語サーバーを孤立させる** — `initialize.processId: null` はサーバー側のクライアント PID 監視を除去するため、サーバーは優雅なサービス破棄によってのみクリーンアップされる; SIGKILL された Harness はそれらを自力で終了するまで実行したまま残す。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

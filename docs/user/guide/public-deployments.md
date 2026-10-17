@@ -1,37 +1,37 @@
-# Publish the Web UI behind a reverse proxy
+# Web UI をリバースプロキシの背後で公開する
 
-English | [中文](public-deployments.zh.md)
+日本語 | [English](public-deployments.en.md) | [中文](public-deployments.zh.md)
 
-`dsh --profile web` serves the GUI on a loopback port, so a browser on another machine cannot reach it, and the process knows nothing about the address you do use. A reverse proxy in front of it owns that external leg — the public host name, TLS, and the path prefix it strips before forwarding to the listener — and `--public-url` tells DSH which address browsers use:
+`dsh --profile web` は GUI をループバックポートで提供するため、別マシンのブラウザーからは届かず、プロセスは実際に使うアドレスを知らない。前段のリバースプロキシが外部側（公開ホスト名・TLS・転送前に剥がすパス接頭辞）を所有し、`--public-url` がブラウザーの使うアドレスを DSH に伝える:
 
 ```sh
 dsh --profile web --public-url https://app.example/ui/ --trusted-host app.example
 ```
 
-## What `--public-url` advertises
+## `--public-url` が広告するもの
 
-`--public-url` accepts an `http://` or `https://` root with an optional mount prefix and normalizes it to end in `/`. It supplies the printed and opened startup URL, `DSH_WEB_URL`, and the Web GUI URL in the agent's runtime context. The webserver keeps serving origin-root routes and never learns the mount. The `publicUrl` config field publishes the same advertisement.
+`--public-url` はマウント接頭辞付き任意の `http://` または `https://` ルートを受け付け、末尾 `/` に正規化する。起動時に出力・開く URL、`DSH_WEB_URL`、エージェント実行コンテキスト内の Web GUI URL を供給する。Web サーバーはオリジンルートの経路提供を続け、マウントを知らない。`publicUrl` 設定フィールドは同じ広告を公開する。
 
-## What the proxy must do
+## プロキシがしなければならないこと
 
-- **Preserve the browser-facing `Host`.** The fence compares the received `Host` against the accepted authorities, so the proxy forwards it unchanged instead of rewriting it to the listener's address.
-- **Strip the mount prefix.** The listener answers origin-root routes, so a request for `/ui/api/...` must arrive as `/api/...`.
-- **Forward upgrades.** Every request and WebSocket upgrade the page opens must reach the listener with its `Upgrade` and `Connection` headers intact; TLS terminates on the proxy's external leg when it serves HTTPS.
-- **Rewrite cookie scope.** A backend serving plain HTTP issues host-only `Path=/` cookies without `Secure`; the proxy then rewrites `Path` to the mount (`/ui/`) and adds `Secure` on its HTTPS leg. A backend listener serving its own TLS already marks the cookie `Secure`, so the proxy only rewrites `Path`.
-- **Redirect the bare mount.** `/ui/` is the only entry: it alone exchanges the launch token for the session cookie, and it or `/ui/index.html` serves the document to a browser that already holds that cookie, because the served document resolves URLs against its own directory. A request to `/ui` must arrive as `/ui/`, and the stripped backend cannot reconstruct that external path.
+- **ブラウザー向き `Host` を保持する。**フェンスは受け取った `Host` を受理可能な機関と照合するため、プロキシはそれをリスナー宛に書き換えず、そのまま転送する。
+- **マウント接頭辞を剥がす。**リスナーはオリジンルートの経路に答えるため、`/ui/api/...` への要求は `/api/...` として届かなければならない。
+- **アップグレードを転送する。**ページが開くすべての要求と WebSocket アップグレードは `Upgrade`・`Connection` ヘッダーを保ったままリスナーに届かなければならない。HTTPS を提供する場合、TLS はプロキシの外部側で終端する。
+- **Cookie スコープを書き換える。**素の HTTP で提供するバックエンドはホスト限定 `Path=/` Cookie を `Secure` なしで発行するため、プロキシは `Path` をマウント（`/ui/`）に書き換え、HTTPS 側で `Secure` を付ける。自身の TLS で提供するバックエンドリスナーは既に Cookie に `Secure` を付けるため、プロキシは `Path` のみ書き換える。
+- **素のマウントへリダイレクトする。**`/ui/` が唯一の入口である。起動トークンをセッション Cookie と交換するのはそこだけであり、既にその Cookie を持つブラウザーにはそこまたは `/ui/index.html` が文書を提供する。提供文書は自身のディレクトリ基準で URL を解決するためである。`/ui` への要求は `/ui/` として届かなければならず、剥がし済みのバックエンドはその外部パスを再構成できない。
 
-## Trust the authority browsers use
+## ブラウザーが使う機関を信頼する
 
-The fence accepts loopback, the listener's own bind address, and every authority `--trusted-host` names. A browser that reaches the deployment under any other authority gets 403 for every API call, however correct the proxy is, so name the browser-visible authority with `--trusted-host`; advertising it with `--public-url` is display only and does not admit it. An entry without a port matches any port, which suits a tunnel that binds a different one each time. The fence only admits the request; the launch token in the printed URL and the signed session cookie authenticate it. TLS, wherever it terminates, changes none of this: the certificate identifies the server to the browser, not the browser to the server.
+フェンスはループバック・リスナー自身のバインドアドレス・`--trusted-host` が指名するすべての機関を受け付ける。それ以外の機関でデプロイに届くブラウザーは、プロキシが正しくてもすべての API 呼び出しで 403 になるため、ブラウザー可視の機関を `--trusted-host` で指名すること。`--public-url` での広告は表示用であり、受理にはならない。ポートなしのエントリーは任意ポートに一致し、毎回異なるポートに束縛するトンネルに適する。フェンスは要求を受理するだけであり、認証するのは出力 URL 内の起動トークンと署名付きセッション Cookie である。TLS はどこで終端してもこれを変えない。証明書はサーバーをブラウザーに対して識別するものであり、ブラウザーをサーバーに対して識別するものではない。
 
-Neither the advertised URL nor the fence protects the listening port itself, so restrict the port to the trusted proxy or network.
+広告 URL もフェンスも待受ポート自体を守らないため、ポートは信頼するプロキシまたはネットワークに制限すること。
 
-## Secure the external leg
+## 外部側を守る
 
-Terminate TLS at the proxy, on the listener itself, or on both; `--public-url` remains an advertisement. An `http://` browser-facing root exposes the launch token in plaintext. An `https://` proxy root protects the browser-to-proxy leg; encryption between proxy and listener depends on the listener's TLS configuration.
+TLS はプロキシ上、リスナー自体、または両方で終端する。`--public-url` は広告のままである。ブラウザー向きルートが `http://` の場合、起動トークンは平文で露出する。`https://` プロキシルートはブラウザー・プロキシ間を守り、プロキシ・リスナー間の暗号化はリスナーの TLS 設定に依存する。
 
-To terminate on the listener, pass `--tls-cert` and `--tls-key`, each a path resolved against the process working directory: the certificate file holds the full chain and the key file an unencrypted PEM private key. DSH never obtains, renews, or watches certificates, and the carrier reads the files once, so replace them and reload the listener or restart the process to change them; startup fails on a missing or invalid pair and never falls back to HTTP. The browser applies its own trust store and name checks, so the certificate must cover the hostname or IP you open. The default port stays 3080. Native TLS needs no proxy, but proxy deployments and `--public-url` remain supported independently. A TLS listener marks session cookies `Secure`; keep the public browser-facing leg HTTPS so browsers can return those cookies.
+リスナーで終端するには `--tls-cert` と `--tls-key` を渡し、それぞれプロセス作業ディレクトリ基準のパスとする。証明書ファイルは完全なチェーンを持ち、鍵ファイルは暗号化されていない PEM 秘密鍵である。DSH は証明書の取得・更新・監視を一切行わず、キャリアはファイルを一度だけ読むため、変更には置換後のリスナー再読み込みまたはプロセス再起動が必要である。起動はペアの欠落・不正で失敗し、HTTP へのフォールバックは決してない。ブラウザーは独自の信頼ストアと名前検査を適用するため、証明書は開くホスト名または IP をカバーしなければならない。既定ポートは 3080 のままである。ネイティブ TLS にプロキシは不要だが、プロキシデプロイと `--public-url` は独立に支援され続ける。TLS リスナーはセッション Cookie に `Secure` を付けるため、ブラウザー向きの公開側は HTTPS を保ち、ブラウザーがその Cookie を返せるようにすること。
 
-The printed URL carries a process credential, so share it only with intended users.
+出力 URL はプロセス資格情報を運ぶため、意図した利用者とのみ共有すること。
 
-The [Web app reference](../../../packages/bundle/web-app/README.md#public-deployments) documents the `--public-url`, `--trusted-host`, and `--tls-cert`/`--tls-key` command-line options. In the Web profile, `publicUrl` configures the `web-runtime` row, `trustedHosts` configures the [Connection row](../../../packages/client/connection/README.md), and `tls` configures the [webserver row](../../../docs/subsystems/web-server.md#config).
+[Web アプリリファレンス](../../../packages/bundle/web-app/README.md#public-deployments)は `--public-url`・`--trusted-host`・`--tls-cert`/`--tls-key` コマンドラインオプションを文書化している。Web プロファイルでは、`publicUrl` が `web-runtime` 行を設定し、`trustedHosts` が [Connection 行](../../../packages/client/connection/README.md)を設定し、`tls` が [Web サーバー行](../../../docs/subsystems/web-server.md#config)を設定する。

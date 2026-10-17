@@ -1,41 +1,41 @@
 ---
-description: "Prebuilt system primitives for Linux confinement and POSIX Session write locks."
+description: "Linux 閉じ込めと POSIX セッション書き込みロック向けのビルド済みシステムプリミティブ。"
 kind: "package-library"
 ---
 # @deepseek-ai/node-addon-system
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use the Linux `landlock-run` executable to confine subprocesses, or the `./flock` entry to acquire a POSIX write lock. Platform packages contain the precompiled binaries; consumer installation never builds native code. Landlock policy and Session lifecycle remain with callers.
+Linux では `landlock-run` 実行ファイルでサブプロセスを閉じ込め、`./flock` エントリーで POSIX 書き込みロックを取得する。プラットフォームパッケージはビルド済みバイナリーを含み、消費者のインストール時にネイティブコードをビルドしない。Landlock ポリシーとセッションライフサイクルは呼び出し側が所有する。
 
-## Table of Contents
+## 目次
 
-- [Use](#use)
-- [Support](#support)
-- [Development](#development)
+- [使い方](#use)
+- [サポート](#support)
+- [開発](#development)
 
-## Use
+## 使い方
 
-`@deepseek-ai/node-addon-system/landlock-run` exports `launcherPath`, `probe`, and `grantArgs` for Landlock. Its executable name, flags, and failure semantics are defined by the [CLI contract](docs/cli-contract.md).
+`@deepseek-ai/node-addon-system/landlock-run` は Landlock 向けに `launcherPath`、`probe`、`grantArgs` をエクスポートする。その実行ファイル名、フラグ、失敗セマンティクスは [CLI 契約](docs/cli-contract.md) で定義される。
 
-The [flock behavior contract](docs/flock-contract.md) maps descriptor, process, and advisory-lock semantics to independent native tests.
+[flock 動作契約](docs/flock-contract.md) は記述子、プロセス、勧告ロックのセマンティクスを独立したネイティブテストに対応付ける。
 
-`@deepseek-ai/node-addon-system/flock` exports `tryLockExclusive(fd): Promise<void>`. Keep the descriptor open until completion. Acquisition uses nonblocking exclusive flock; contention rejects with `EAGAIN` or `EWOULDBLOCK`, and closing the final descriptor for the open file description releases the lock. See the [entry README](packages/entry/README.md).
+`@deepseek-ai/node-addon-system/flock` は `tryLockExclusive(fd): Promise<void>` をエクスポートする。完了まで記述子を開いたままにすること。取得はノンブロッキング排他 flock を使い、競合時は `EAGAIN` または `EWOULDBLOCK` で拒否され、開いているファイル記述に対する最後の記述子を閉じるとロックが解放される。[エントリー README](packages/entry/README.md) を参照すること。
 
-Importing either entry does not load an addon. A missing Landlock executable probes unusable; a missing flock binding rejects acquisition. Neither path compiles or silently grants unsupported behavior.
+どちらのエントリーのインポートもアドオンを読み込まない。Landlock 実行ファイルが欠けているとプローブは使用不可となり、flock バインディングが欠けていると取得は拒否される。どちらのパスも自動コンパイルやサポート外動作の暗黙の許可を行わない。
 
-## Support
+## サポート
 
-Linux x64/arm64 packages contain the static Landlock executable and separate glibc/musl `system.node` files. macOS x64/arm64 packages contain `system.node` only. Landlock additionally needs an enforcing Linux kernel; Windows uses the Harness's existing locking implementation. The [support matrix](docs/support-matrix.md) names builders and verification owners.
+Linux x64/arm64 パッケージは静的な Landlock 実行ファイルと glibc/musl 用の個別 `system.node` ファイルを含む。macOS x64/arm64 パッケージは `system.node` のみを含む。Landlock には加えて強制モードの Linux カーネルが必要であり、Windows は Harness の既存ロック実装を使う。[サポートマトリクス](docs/support-matrix.md) がビルダーと検証所有者を命名する。
 
-## Development
+## 開発
 
-From this directory, `pnpm build:ts` builds the entry, `pnpm build:native` builds the host's declared native payload, and `pnpm build:test-oracle` builds an independent flock syscall fixture. Then `pnpm test` exercises entry, lock, packaging, and available kernel behavior. Linux requires musl-gcc for a complete build; macOS uses cc. The root `pnpm run build:native-system` builds only the current host addon for source tests.
+このディレクトリーから `pnpm build:ts` でエントリーをビルドし、`pnpm build:native` でホストの宣言済みネイティブペイロードをビルドし、`pnpm build:test-oracle` で独立した flock システムコールフィクスチャをビルドする。その後 `pnpm test` でエントリー、ロック、パッケージング、利用可能なカーネル動作をテストする。Linux の完全ビルドには musl-gcc が必要であり、macOS は cc を使う。ルートの `pnpm run build:native-system` はソーステスト用に現在のホストアドオンのみをビルドする。
 
-The [architecture](docs/architecture.md), [packaging](docs/packaging.md), and [release procedure](docs/release.md) own implementation and publication details.
+[アーキテクチャ](docs/architecture.md)、[パッケージング](docs/packaging.md)、[リリース手順](docs/release.md) が実装と公開の詳細を所有する。
 
-### Dev Note
+### 開発ノート
 
-None.
+なし。

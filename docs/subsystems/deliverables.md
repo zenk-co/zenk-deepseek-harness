@@ -1,12 +1,12 @@
-# Deliverables
+# デリバラブル
 
-English | [中文](deliverables.zh.md)
+日本語 | [English](deliverables.en.md) | [中文](deliverables.zh.md)
 
-What a turn hands to the user, owned by the [deliverables package group](../../packages/deliverables/README.md): the files the model declared through the `present` tool, recorded in a log-only Session event, and the files the turn changed, summarized from git working-tree snapshots taken at turn start and turn end plus whole-file captures around each file-tool edit for the paths git does not cover, announced by a log-only event and served by a Host service while the Session lives together with each listed file's turn-start and turn-end comparison. Only clients read them; the Web [deliverables plugin](../../packages/client/ui-deliverables/README.md) renders both at the end of the turn. Tool behavior, snapshot mechanics, and configuration are on the package READMEs for [`tool-present`](../../packages/deliverables/tool-present/README.md) and [`workspace-changes`](../../packages/deliverables/workspace-changes/README.md).
+ターンがユーザーに手渡すもの。所有するのは [deliverables パッケージグループ](../../packages/deliverables/README.md)です: モデルが `present` ツールを通じて宣言したファイル (ログ専用のセッションイベントに記録されます) と、ターンが変更したファイル (ターン開始時とターン終了時に取得した git ワーキングツリースナップショット、および git がカバーしないパス向けの各ファイルツール編集の前後でのファイル全体キャプチャから要約されます)。後者はログ専用イベントでアナウンスされ、セッションが存続する間は Host サービスが提供し、各一覧ファイルのターン開始時とターン終了時の比較を伴います。これを読むのはクライアントのみで、Web の [deliverables プラグイン](../../packages/client/ui-deliverables/README.md)がターン終了時に両方をレンダリングします。ツールの動作、スナップショットの仕組み、設定は [`tool-present`](../../packages/deliverables/tool-present/README.md) と [`workspace-changes`](../../packages/deliverables/workspace-changes/README.md) のパッケージ README にあります。
 
-Sources: [`packages/deliverables/tool-present/src/types.ts`](../../packages/deliverables/tool-present/src/types.ts), [`packages/deliverables/workspace-changes/src/types.ts`](../../packages/deliverables/workspace-changes/src/types.ts)
+ソース: [`packages/deliverables/tool-present/src/types.ts`](../../packages/deliverables/tool-present/src/types.ts), [`packages/deliverables/workspace-changes/src/types.ts`](../../packages/deliverables/workspace-changes/src/types.ts)
 
-## `PresentedFile` — one declared delivery
+## `PresentedFile` — 宣言された 1 件の配信
 
 ```ts type-equiv
 /** A declared filesystem file whose current contents remain at its source path. */
@@ -18,7 +18,7 @@ interface PresentedFile {
 }
 ```
 
-## `WorkspaceChangedFile` — one changed file
+## `WorkspaceChangedFile` — 変更された 1 ファイル
 
 ```ts type-equiv
 /** One file changed during a turn, with line counts from git or from the whole-file captures around its file-tool edits. */
@@ -42,7 +42,7 @@ interface WorkspaceChangedFile {
 }
 ```
 
-## `WorkspaceChangesSummary` — one turn's change summary
+## `WorkspaceChangesSummary` — 1 ターンの変更サマリー
 
 ```ts type-equiv
 /** Files changed during one top-level turn, kept on the Host until its Session is disposed. */
@@ -64,7 +64,7 @@ interface WorkspaceChangesSummary {
 }
 ```
 
-## `WorkspaceDiffHunk` — one unified-diff hunk
+## `WorkspaceDiffHunk` — 1 つの unified diff ハンク
 
 ```ts type-equiv
 /** One unified-diff hunk with three context lines; every line keeps its `+`, `-`, or space prefix. */
@@ -82,7 +82,7 @@ interface WorkspaceDiffHunk {
 }
 ```
 
-## `WorkspaceFileDiff` — one file's comparison
+## `WorkspaceFileDiff` — 1 ファイルの比較
 
 ```ts type-equiv
 /** The comparison of one listed file's turn-start and turn-end contents, computed when asked for. */
@@ -108,7 +108,7 @@ type WorkspaceFileDiff =
   | { kind: 'oversized'; path: string; display: string }
 ```
 
-## `WorkspaceChanges` — the Host service serving summaries and comparisons
+## `WorkspaceChanges` — サマリーと比較を提供する Host サービス
 
 ```ts type-equiv
 /** Serves the summaries and file comparisons the recorder keeps for live Sessions. */
@@ -133,9 +133,9 @@ interface WorkspaceChanges {
 }
 ```
 
-## Durable events and the served summary
+## 永続イベントと提供されるサマリー
 
-`tool-present` declaration-merges `deliverables/presented: { turn; callId; files: PresentedFile[] }` into `SessionEventMap`, appended once per successful final `present` result. `workspace-changes` merges `workspace/changes: { turn }`, appended when a top-level turn stops; the summary that event announced is not in the log but is returned by `workspaceChanges.summary(sessionId, seq)` for the event's sequence until the Session is disposed, so a conversation reopened after a Host restart has no changed-files card for its earlier turns. `workspaceChanges.diff(sessionId, seq, index, signal)` compares one listed file on the same terms. A later event for the same turn replaces the earlier one, so a client keeps only the latest. The generated [persistence catalog](../persistence-catalog.md#deliverablespresented--log-only) records both declaration sites. Neither event reaches the model.
+`tool-present` は `deliverables/presented: { turn; callId; files: PresentedFile[] }` を `SessionEventMap` に宣言マージし、成功した最終 `present` 結果ごとに 1 回追記します。`workspace-changes` は `workspace/changes: { turn }` をマージし、トップレベルターンが停止したときに追記します。そのイベントがアナウンスしたサマリーはログにはありませんが、セッションが破棄されるまで、そのイベントの seq に対して `workspaceChanges.summary(sessionId, seq)` が返します。そのため、Host 再起動後に再開された会話には、以前のターンの変更ファイルカードがありません。`workspaceChanges.diff(sessionId, seq, index, signal)` は同じ条件で 1 つの一覧ファイルを比較します。同じターンの後続イベントは以前のものを置き換えるため、クライアントは最新のみを保持します。生成された[永続カタログ](../persistence-catalog.md#deliverablespresented--log-only)が両方の宣言サイトを記録します。どちらのイベントもモデルには届きません。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -143,13 +143,13 @@ interface WorkspaceChanges {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成 (doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。再生成は `pnpm run gen-cordis-catalog`) — 各言語側で異なるのはロケール固有の対訳ドキュメントパスだけです。署名ブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保ちます。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にあります。
 
 <a id="ctxworkspacechanges--workspacechanges"></a>
 
 ### `ctx.workspaceChanges` — `WorkspaceChanges`
 
-Serves the summaries and file comparisons the recorder keeps for live Sessions.
+レコーダーがライブセッションのために保持するサマリーとファイル比較を提供します。
 
 ```ts cordis-catalog
 /**
@@ -172,7 +172,7 @@ summary(sessionId: SessionId, seq: number): WorkspaceChangesSummary | undefined
 diff(sessionId: SessionId, seq: number, index: number, signal: AbortSignal): Promise<WorkspaceFileDiff | undefined>
 ```
 
-Types: [SessionId](core.md)
+型: [SessionId](core.md)
 
-Source: [`packages/deliverables/workspace-changes/src/types.ts`](../../packages/deliverables/workspace-changes/src/types.ts)
+ソース: [`packages/deliverables/workspace-changes/src/types.ts`](../../packages/deliverables/workspace-changes/src/types.ts)
 <!-- END GENERATED cordis-surface -->

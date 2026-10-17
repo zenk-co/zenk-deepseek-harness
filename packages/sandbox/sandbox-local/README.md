@@ -1,149 +1,149 @@
 ---
-description: "Local per-platform sandbox backends for users and maintainers choosing, configuring, or debugging process confinement on Linux, macOS, or Windows."
+description: "Linux、macOS、Windows でのプロセス隔離を選択・設定・デバッグするユーザーとメンテナー向けの、プラットフォームごとのローカルサンドボックスバックエンド。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-sandbox-local
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-sandbox-local` confines commands and their descendants on Linux, macOS, and Windows while sharing the host kernel and filesystem. It chooses a supported platform runner automatically and fails with `SANDBOX_UNAVAILABLE` when none is usable, so commands never silently run without confinement. Each execution reports `full` or `partial` enforcement plus denial and runner-failure signatures, allowing callers to distinguish an unavailable or broken sandbox from a policy denial. Choose it for host-local bash or pwsh execution; use a container or remote executor when the process needs an isolated environment.
+`dsh-sandbox-local` は、ホストのカーネルとファイルシステムを共有しつつ、Linux、macOS、Windows でコマンドとその子孫を隔離する。サポートされているプラットフォームランナーを自動で選択し、使用可能なものがない場合は `SANDBOX_UNAVAILABLE` で失敗するため、コマンドが隔離なしで黙って実行されることは決してない。各実行は `full` または `partial` の強制と、拒否およびランナー失敗のシグネチャを報告し、呼び出し元が利用不可または壊れたサンドボックスをポリシー拒否と区別できるようにする。ホストローカルの bash または pwsh 実行にはこれを選び、プロセスが隔離された環境を必要とする場合はコンテナまたはリモートエグゼキューターを使う。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this provider behind `ctx.sandbox` and a confined executor, and every command the executor spawns runs confined under the policy you resolve. The shipped [base bundle](../../bundle/base/cordis.patch.yml) owns the default policy and executor wiring.
+このプロバイダーを `ctx.sandbox` と隔離されたエグゼキューターの背後にマウントすると、エグゼキューターが起動するすべてのコマンドが、あなたが解決したポリシーの下で隔離された状態で実行される。出荷される[ベースバンドル](../../bundle/base/cordis.patch.yml)がデフォルトポリシーとエグゼキューターの配線を所有する。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it when commands must run confined on the host: it is the default backend for Linux, macOS, and Windows compositions that mount `ctx.sandbox`. Choose a different mechanism when the process must run in an isolated environment — a container or remote executor replaces whole capabilities, and this provider shares the host kernel and filesystem.
+コマンドがホスト上で隔離されて実行されなければならない場合に選ぶ。これは `ctx.sandbox` をマウントする Linux、macOS、Windows のコンポジションのデフォルトバックエンドである。プロセスが隔離された環境で実行されなければならない場合は別の機構を選ぶ — コンテナまたはリモートエグゼキューターはケイパビリティ全体を置き換え、このプロバイダーはホストのカーネルとファイルシステムを共有する。
 
-### Minimal configuration
+### 最小構成
 
-Load the sandbox service and mount the provider; the defaults below are the selection policy.
+サンドボックスサービスをロードし、プロバイダーをマウントする。以下のデフォルトが選択ポリシーである。
 
 ```yaml
 - id: sandbox
   name: '@deepseek-ai/dsh-sandbox-local'
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `runnerCommand` | `[]` | Custom runner argv; bwrap-compatible profile arguments are appended, full enforcement is asserted, and built-in selection and probes are skipped |
-| `runnerFailureSignatures` | `[]` | Case-insensitive stderr substrings identifying the custom runner's own failure dialect; required with `runnerCommand` |
-| `probeTimeoutMs` | `5,000` | Timeout for each functional probe of a competing runner candidate |
+| `runnerCommand` | `[]` | カスタムランナーの argv。bwrap 互換のプロファイル引数が付加され、完全な強制が表明され、組み込みの選択とプローブはスキップされる |
+| `runnerFailureSignatures` | `[]` | カスタムランナー自身の失敗方言を識別する、大文字小文字を区別しない stderr の部分文字列。`runnerCommand` とともに必須 |
+| `probeTimeoutMs` | `5,000` | 競合するランナー候補の各機能プローブのタイムアウト |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-sandbox-local) is the exhaustive source for every accepted field and its JSDoc.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-sandbox-local)が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### Confined execution and enforcement
+### 隔離された実行と強制
 
-With the provider mounted, a command runs under the mode you resolve per call. Enforcement is a reported fact, not a promise: `full` means the backend governs every promised file effect, while `partial` means it governs only a subset — the Windows ACL rung (hard-link, unconfined-read, and AppContainer-ACL boundaries) and older Landlock ABIs are the current partial cases, so a consumer that requires an absolute boundary can reject or surface them. Denied file effects surface through the backend's denial dialect, and a runner that fails before executing the command reports a structured runner-failure signature.
+プロバイダーがマウントされていると、コマンドは呼び出しごとに解決したモードの下で実行される。強制は約束ではなく報告されるファクトである: `full` はバックエンドが約束されたすべてのファイル効果を統治することを意味し、`partial` はその一部のみを統治することを意味する — Windows の ACL rung（ハードリンク、非隔離読み取り、AppContainer ACL の境界）と古い Landlock ABI が現在の partial ケースであり、絶対的な境界を必要とするコンシューマーはそれらを拒否または表面化できる。拒否されたファイル効果はバックエンドの拒否方言を通じて表面化し、コマンドを実行する前に失敗するランナーは構造化されたランナー失敗シグネチャを報告する。
 
-### Failures and recovery
+### 失敗と回復
 
-An unsupported platform or an unusable runner fails closed: `confine()` rejects with `SANDBOX_UNAVAILABLE` and names the runner options for the platform, and the consumer surfaces that error rather than running the command unconfined. A runner that starts but refuses its profile is identified by its fatal stderr signature and exit code, so a broken sandbox is not mistaken for a denied command. The `runnerCommand` override is an operator assertion: it skips functional probes and assumes the configured runner implements the bwrap-compatible profile honestly.
+サポートされていないプラットフォームまたは使用不能なランナーはフェイルクローズドする: `confine()` は `SANDBOX_UNAVAILABLE` で拒否し、そのプラットフォームのランナーオプションを名指し、コンシューマーはコマンドを隔離なしで実行するのではなくそのエラーを表面化する。起動したがプロファイルを拒否するランナーは、その致命的な stderr シグネチャと終了コードによって識別されるため、壊れたサンドボックスが拒否されたコマンドと誤認されることはない。`runnerCommand` の上書きは操作者の表明である: 機能プローブをスキップし、設定されたランナーが bwrap 互換プロファイルを誠実に実装していると仮定する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains runner selection, the per-platform profiles, and the failure dialects; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではランナーの選択、プラットフォームごとのプロファイル、失敗方言を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Runner selection
+### ランナー選択
 
-Selection is by platform first, probes second: each platform has a runner chain (`linux`: `bwrap` then Landlock; `darwin`: Seatbelt; `win32`: the ACL restricted-token runner). A sole candidate is selected without a probe; competing candidates are functionally probed once in chain order, and the first usable verdict is cached for the provider's lifetime. A platform with no chain, or a chain where every probe fails, is unavailable and fails closed at `confine()`.
+選択はまずプラットフォームによって、次にプローブによって行われる: 各プラットフォームにはランナーチェーンがある（`linux`: `bwrap` の次に Landlock、`darwin`: Seatbelt、`win32`: ACL 制限トークンランナー）。唯一の候補はプローブなしで選択される。競合する候補はチェーン順に一度だけ機能プローブされ、最初の使用可能な判定がプロバイダーの生存期間にわたってキャッシュされる。チェーンのないプラットフォーム、またはすべてのプローブが失敗するチェーンは利用不可であり、`confine()` でフェイルクローズドする。
 
-### Platform profiles
+### プラットフォームプロファイル
 
-The bwrap profile combines a read-only host root, a fresh `/dev`, and `/proc` from a private PID namespace — commands manage their descendants but cannot see host processes, so procfs magic links cannot bypass the mounts; `workspace-write` adds an ephemeral `/tmp` and a writable workspace bind. The [historical private-PID note](../../../.agents/notes/archived/bug-fix/2026-08-06-bwrap-private-pid-namespace.md) records the boundary.
+bwrap プロファイルは読み取り専用のホストルート、新しい `/dev`、およびプライベート PID 名前空間からの `/proc` を組み合わせる — コマンドは自身の子孫を管理できるがホストのプロセスを見ることはできず、procfs のマジックリンクがマウントを迂回することはできない。`workspace-write` は一時的な `/tmp` と書き込み可能なワークスペースバインドを追加する。[歴史的なプライベート PID のノート](../../../.agents/notes/archived/bug-fix/2026-08-06-bwrap-private-pid-namespace.md)がその境界を記録している。
 
-The `@deepseek-ai/node-addon-system/landlock-run` API supplies the platform launcher, functional probe, and grant vocabulary; this provider maps mode to grants only, keeping path resolution and probe parsing with the versioned binary.
+`@deepseek-ai/node-addon-system/landlock-run` API がプラットフォームランチャー、機能プローブ、グラント語彙を提供する。このプロバイダーはモードをグラントへマッピングするだけであり、パス解決とプローブ解析はバージョン付きバイナリに残す。
 
-The Seatbelt profile is allow-default with `(deny file-write*)` plus write allow-lists derived from the shared `writableRoots` helper, so exactly the mode's promised file effects are governed; every root is canonicalized because Seatbelt matches resolved paths (`/tmp` IS `/private/tmp`).
+Seatbelt プロファイルは allow-default と `(deny file-write*)` に加え、共有 `writableRoots` ヘルパーから導出された書き込み許可リストを備えるため、モードが約束するファイル効果がちょうど統治される。すべてのルートは正規化される。Seatbelt は解決済みのパスに一致するからである（`/tmp` は `/private/tmp` である）。
 
-The Windows rung keeps one deterministic write SID and standing ACE per workspace, while every live session/workspace pair gets a random private temp directory with a distinct SID and revocable ACE — sessions sharing a workspace share its intended write authority without inheriting one another's temp authority. A fresh provider always chooses a new temp path and SID, so crash residue cannot block or authorize a resumed session. The rung reports `partial` enforcement because NTFS hard links alias one file object across paths, reads stay unconfined, and a tree another AppContainer tool has ACL'd with a package SID is unreadable to the Low-integrity child.
+Windows rung はワークスペースごとに 1 つの決定論的な書き込み SID と常設 ACE を保つ一方、ライブの各セッション/ワークスペースペアは固有の SID と取り消し可能な ACE を持つランダムなプライベート一時ディレクトリを取得する — ワークスペースを共有するセッションは、互いの一時権限を継承することなく、その意図された書き込み権限を共有する。新しいプロバイダーは常に新しい一時パスと SID を選ぶため、クラッシュの残骸が再開されたセッションをブロックしたり認可したりすることはできない。この rung は `partial` 強制を報告する。NTFS のハードリンクが 1 つのファイルオブジェクトを複数のパスに別名付けし、読み取りは隔離されないままであり、別の AppContainer ツールがパッケージ SID で ACL を付けたツリーは Low 整合性の子から読み取り不能だからである。
 
-With the built-in Windows runner and a skill registry, this provider registers the [ACL diagnosis skill](../sandbox-windows-acl/README.md#failures-and-recovery). An operator-supplied `runnerCommand` does not register it; provider disposal removes the skill and its extracted resources.
+組み込みの Windows ランナーとスキルレジストリがある場合、このプロバイダーは [ACL 診断スキル](../sandbox-windows-acl/README.md#failures-and-recovery)を登録する。操作者が提供した `runnerCommand` はそれを登録しない。プロバイダーの破棄はスキルとその抽出済みリソースを削除する。
 
-When the built ACL runner is absent, source launch pins the `tsx/esm/api` loader and TypeScript path mapping to this installation. The command's working directory and ambient `TSX_TSCONFIG_PATH` cannot select the runner's source dependencies.
+組み込みの ACL ランナーが存在しない場合、ソース起動は `tsx/esm/api` ローダーと TypeScript のパスマッピングをこのインストールに固定する。コマンドの作業ディレクトリと環境の `TSX_TSCONFIG_PATH` はランナーのソース依存関係を選択できない。
 
-### Denial and runner-failure dialects
+### 拒否とランナー失敗の方言
 
-Each runner's kernel speaks its own denial dialect, carried on every wrap as `denialSignatures`, and `runnerFailureRules` give each runner's fatal signature, so consumers classify a runner refusal before checking denial signatures. The exact strings and exit codes live in [`src/index.ts`](src/index.ts).
+各ランナーのカーネルは自身の拒否方言を話し、すべてのラップに `denialSignatures` として運ばれる。`runnerFailureRules` は各ランナーの致命的シグネチャを与えるため、コンシューマーは拒否シグネチャを確認する前にランナーの拒否を分類する。正確な文字列と終了コードは [`src/index.ts`](src/index.ts) にある。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: runner chain selection, functional probes, per-call wrap, ACL grant lifecycle |
-| [`src/profiles.ts`](src/profiles.ts) | Per-platform profile builders: bwrap mounts, Landlock grants, Seatbelt SBPL |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: ランナーチェーンの選択、機能プローブ、呼び出しごとのラップ、ACL グラントのライフサイクル |
+| [`src/profiles.ts`](src/profiles.ts) | プラットフォームごとのプロファイルビルダー: bwrap マウント、Landlock グラント、Seatbelt SBPL |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Start with the subsystem reference for the shared vocabulary, then the seam contract, the consumers, and the win32 rung.
+共有語彙のサブシステムリファレンスから始め、次にシーム契約、コンシューマー、win32 rung へ進む。
 
-- [Process sandbox subsystem](../../../docs/subsystems/sandbox.md) — modes, per-call policy, and classification dialects.
-- [Sandbox seam package](../sandbox/README.md) — the service contract this provider implements.
-- [Bash sandbox executor](../../shell/bash-sandbox/README.md) — the confined bash consumer.
-- [Windows ACL restricted-token rung](../sandbox-windows-acl/README.md) — the win32 backend this provider mounts.
-- [The historical subprocess sandbox decision](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) — capability boundary and runner selection semantics.
+- [プロセスサンドボックスサブシステム](../../../docs/subsystems/sandbox.md) — モード、呼び出しごとのポリシー、分類方言。
+- [サンドボックスシームパッケージ](../sandbox/README.md) — このプロバイダーが実装するサービス契約。
+- [Bash サンドボックスエグゼキューター](../../shell/bash-sandbox/README.md) — 隔離された bash のコンシューマー。
+- [Windows ACL 制限トークン rung](../sandbox-windows-acl/README.md) — このプロバイダーがマウントする win32 バックエンド。
+- [歴史的なサブプロセスサンドボックスの決定](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) — ケイパビリティ境界とランナー選択のセマンティクス。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.md) and [`dsh-tool-bash`](../../shell/tool-bash/README.md), which render this provider's enforcement and denial facts, while the [`dsh-sandbox`](../sandbox/README.md) seam owns the `SANDBOX_UNAVAILABLE` text and this provider owns runner selection, and profiles stay outside context.
+間接的に、[`dsh-bash-sandbox`](../../shell/bash-sandbox/README.md) と [`dsh-tool-bash`](../../shell/tool-bash/README.md) を通じて。これらがこのプロバイダーの強制と拒否のファクトをレンダリングする。[`dsh-sandbox`](../sandbox/README.md) シームが `SANDBOX_UNAVAILABLE` のテキストを所有し、このプロバイダーがランナー選択を所有し、プロファイルはコンテキストの外にとどまる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumers own any request-prefix changes.
+直接の無効化はない。名前指しされたコンシューマーがリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the provider is a poor fit or needs special operational care. They are current package constraints, not a general platform comparison or a task backlog.
+これらの制限は、プロバイダーが不適切な選択となる、または特別な運用上の注意を要する状況を定義する。これらは現在のパッケージ制約であり、一般的なプラットフォーム比較やタスクバックログではない。
 
-- **Windows ACL enforcement is partial** — NTFS hard links alias one file object across workspace and external paths, reads stay unconfined, and a tree another AppContainer tool has ACL'd with a package SID is unreadable to the Low-integrity child. The provider reports `enforcement: 'partial'` rather than overstating that boundary as full.
-- **Landlock may be partial** — older supported kernel ABIs confine only the access classes they expose, reported as `enforcement: 'partial'` rather than overstated as full.
-- **Seatbelt depends on deprecated `sandbox-exec`** — macOS still ships it, but this provider cannot replace or probe that private policy engine if Apple removes it.
-- **Runner selection is cached for the provider lifetime** — installing, removing, or repairing a runner requires reloading the plugin before selection changes.
-- **`runnerCommand` is an operator assertion** — a configured custom runner skips functional probes and is assumed to implement the bwrap-compatible profile honestly; if it is itself a Bash script, its interpreter startup runs before that script applies confinement.
+- **Windows ACL の強制は partial である** — NTFS のハードリンクが 1 つのファイルオブジェクトをワークスペースと外部パスに別名付けし、読み取りは隔離されないままであり、別の AppContainer ツールがパッケージ SID で ACL を付けたツリーは Low 整合性の子から読み取り不能である。プロバイダーはその境界を full と誇張するのではなく `enforcement: 'partial'` を報告する。
+- **Landlock は partial になりうる** — サポートされる古いカーネル ABI は、公開するアクセスクラスのみを隔離し、full と誇張するのではなく `enforcement: 'partial'` として報告される。
+- **Seatbelt は非推奨の `sandbox-exec` に依存する** — macOS は依然としてそれを出荷しているが、Apple が削除した場合、このプロバイダーはそのプライベートなポリシーエンジンを置き換えたりプローブしたりできない。
+- **ランナー選択はプロバイダーの生存期間キャッシュされる** — ランナーのインストール、削除、修復には、選択が変わる前にプラグインのリロードが必要である。
+- **`runnerCommand` は操作者の表明である** — 設定されたカスタムランナーは機能プローブをスキップし、bwrap 互換プロファイルを誠実に実装していると仮定される。それ自体が Bash スクリプトである場合、そのインタープリターの起動はそのスクリプトが隔離を適用する前に実行される。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: undecided directions and open questions. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発者ノートはメンテナー向けの作業コンテキストである: 未決定の方向性と未解決の疑問。これは明示的に非権威である — 出荷される動作、制限、受け入れられた根拠は上記のセクション、パッケージコード、リンクされた Agent Notes にある。
 
-#### Future: environment-coherent groups
+#### 将来: 環境整合的なグループ
 
-An environment-coherent capability group example, such as bash plus fs against one container, remains undecided.
+1 つのコンテナに対する bash と fs のような、環境整合的なケイパビリティグループの例は未決定のままである。
 
 </details>

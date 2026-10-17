@@ -1,12 +1,12 @@
-# Workspaces
+# ワークスペース
 
-English | [中文](workspace.zh.md)
+日本語 | [English](workspace.en.md) | [中文](workspace.zh.md)
 
-A workspace is the persistent record of a directory the user works in: a stable id over a canonical path, a display title, and the ordered account of sessions that belong to it. The subsystem is one package ([dsh-workspace](../../packages/workspace/workspace), `ctx.workspaceRegistry`) — an optional host-side capability, not part of the agent-loop spine, and invisible to models (no tools, no prompt text, no session events). It stores its records through the [storage domain form](storage.md) and validates session membership against [`SessionHeader.cwd`](persistence.md#sessionheader--metadata-beside-the-log), so `storageDomain` and `sessionPersistence` are mandatory startup dependencies: an unavailable persistence peer leaves the plugin pending rather than being mistaken for an empty history. Design record: [domain KV storage Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md); bootstrap and GUI ordering: [Workspace UI product-flow Agent Note](../../.agents/notes/archived/feature/2026-07-25-workspace-ui-product-flow.md).
+ワークスペースはユーザーが作業するディレクトリの永続レコードである: 正規パス上の安定した id、表示タイトル、およびそれに属するセッションの順序付き台帳。サブシステムは 1 つのパッケージ ([dsh-workspace](../../packages/workspace/workspace)、`ctx.workspaceRegistry`) である — オプションのホスト側ケイパビリティであり、エージェントループの背骨の一部ではなく、モデルからは不可視である (ツールなし、プロンプトテキストなし、セッションイベントなし)。レコードは [storage ドメイン形式](storage.md)を通じて保存し、セッションメンバーシップを [`SessionHeader.cwd`](persistence.md#sessionheader--metadata-beside-the-log)に対して検証するため、`storageDomain` と `sessionPersistence` は必須の起動依存である: 永続化ピアが利用不可の場合は空の履歴と誤認されるのではなくプラグインがペンディングのまま残る。設計記録: [domain KV storage Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md); ブートストラップと GUI 順序: [Workspace UI product-flow Agent Note](../../.agents/notes/archived/feature/2026-07-25-workspace-ui-product-flow.md)。
 
 Source: [`packages/workspace/workspace/src/types.ts`](../../packages/workspace/workspace/src/types.ts)
 
-## Identity
+## アイデンティティ
 
 ```ts type-equiv
 /**
@@ -16,11 +16,11 @@ Source: [`packages/workspace/workspace/src/types.ts`](../../packages/workspace/w
 type WorkspaceId = Branded<'WorkspaceId'>
 ```
 
-`WorkspaceId` is a [branded id](core.md#branded-ids). Path identity is separate: `realpathNormalize` (`fs.realpath`; trailing slashes, `..`, and symlinks resolved) is the one uniqueness canon — workspace paths are stored canonicalized, uniqueness is string equality of canonical paths (a symlink to an owned directory collides), and attach-time session cwd checks go through the same canon.
+`WorkspaceId` は [branded id](core.md#branded-ids)である。パスアイデンティティは別である: `realpathNormalize` (`fs.realpath`; 末尾スラッシュ、`..`、シンボリックリンクを解決) が唯一の一意性正規形である — ワークスペースパスは正規化して保存され、一意性は正規パスの文字列等価であり (所有済みディレクトリへのシンボリックリンクは衝突する)、アタッチ時のセッション cwd チェックも同じ正規形を通る。
 
-## The workspace entity
+## ワークスペースエンティティ
 
-Consumers see only the `Workspace` interface; the implementation stays package-private.
+コンシューマーが見るのは `Workspace` インターフェースのみであり、実装はパッケージプライベートのままである。
 
 ```ts type-equiv
 /**
@@ -117,25 +117,25 @@ interface Workspace {
 }
 ```
 
-Ownership truth is the record's ordered `sessionIds`, never derived from session cwd. Membership validates the recorded header cwd against the workspace path; an existing candidate remains owned when its fully qualified cwd fails resolution or directory stat with `ENOENT`. This preserves missing-directory and dangling-symlink accounts without admitting new sessions. Failed writes reject (`insertSessionBefore` account errors as `WorkspaceMoveInvalidError`, storage failures as plain errors); every accepted mutation stamps `updatedAt` and durably prunes candidates that no longer pass the membership check.
+所有の真実はレコードの順序付き `sessionIds` であり、セッション cwd から導出されることはない。メンバーシップは記録済みヘッダー cwd をワークスペースパスに対して検証する; 既存候補は、その完全修飾 cwd の解決またはディレクトリ stat が `ENOENT` で失敗した場合も所有されたまま残る。これにより、新規セッションを受け入れずに、欠落ディレクトリや宙ぶらりんシンボリックリンクの台帳を保持する。失敗した書き込みはリジェクトする (`insertSessionBefore` の台帳エラーは `WorkspaceMoveInvalidError`、ストレージ失敗はプレーンエラー); 受け入れられたすべてのミューテーションは `updatedAt` を刻印し、メンバーシップチェックを通らなくなった候補を耐久的にプルーニングする。
 
-## The registry: `ctx.workspaceRegistry`
+## レジストリ: `ctx.workspaceRegistry`
 
-`WorkspaceRegistry` ([signatures](#ctxworkspaceregistry--workspaceregistry)) owns registration and resolution. `create(path, title?)` requires a fully qualified path, canonicalizes it, rejects a nonexistent path (the original `ENOENT`) or a non-directory, returns the existing entity unchanged when the canonical path is already owned, and otherwise creates a record with `title ?? defaultWorkspaceTitle(path)` prepended to the durable registry order (different canonical paths may share a display title, and a path with no final segment uses its root spelling). `get(id)` and the ordered `list()` are synchronous cache reads; `resolveByPath(path)` applies the same fully qualified realpath canon without creating. `delete(id)` removes only the registration, order entry, and session account — the directory, user files, live sessions, and persisted logs are never touched, so those sessions become Ungrouped ([reference](../../packages/workspace/workspace/README.md)); unknown ids return `false`. Create and delete persist a pending-mutation marker before their two writes (record + order) can diverge; startup resolves exactly the marked mutation — by deleting the marked table row, which completes an interrupted delete and rolls back an interrupted create (the registration is re-creatable, so rollback is the safe direction) — and an unmarked order/table mismatch fails loud as corruption.
+`WorkspaceRegistry` ([シグネチャー](#ctxworkspaceregistry--workspaceregistry)) は登録と解決を所有する。`create(path, title?)` は完全修飾パスを要求し、それを正規化し、存在しないパス (元の `ENOENT`) または非ディレクトリをリジェクトし、正規パスが既に所有されている場合は既存エンティティを無変更で返し、そうでなければ `title ?? defaultWorkspaceTitle(path)` のレコードを耐久レジストリ順序の先頭に追加して作成する (異なる正規パスが表示タイトルを共有してよく、最終セグメントを持たないパスはルート綴りを使う)。`get(id)` と順序付き `list()` は同期的キャッシュ読み取りであり、`resolveByPath(path)` は作成せずに同じ完全修飾 realpath 正規形を適用する。`delete(id)` は登録、順序エントリ、セッション台帳のみを削除する — ディレクトリ、ユーザーファイル、ライブセッション、永続ログには決して触れないため、それらのセッションは Ungrouped になる ([リファレンス](../../packages/workspace/workspace/README.md)); 未知 id は `false` を返す。作成と削除は 2 つの書き込み (レコード + 順序) が乖離する前にペンディングミューテーションマーカーを永続化する; 起動時はマークされたミューテーションだけを解決する — マークされたテーブル行を削除することにより、中断した削除を完了し、中断した作成をロールバックする (登録は再作成可能なためロールバックが安全な方向である) — そしてマークのない順序/テーブル不一致は破損として loud に失敗する。
 
-Sessions get their cwd at create time from whoever creates them, not from this registry — the API gateway resolves a new session's cwd from the chosen workspace's `path` (falling back to an explicit or default cwd), creates the session so the cwd lands in its immutable [`SessionHeader`](persistence.md#sessionheader--metadata-beside-the-log), then calls `attachSession`, which re-validates that stored header cwd against the workspace path. On the first successful start, the registry bootstraps history from persisted headers alone (`id`, `cwd`, `createdAt` — never event bodies), grouping sessions with a valid canonical cwd into per-directory workspaces, newest first; the initialized marker is written last so an interrupted bootstrap resumes safely. The bootstrap is one-time: cwd-less legacy sessions stay Ungrouped, and sessions created afterwards join a workspace only through `attachSession`.
+セッションは作成時に作成者から cwd を受け取り、このレジストリからではない — API ゲートウェイは選択されたワークスペースの `path` から新規セッションの cwd を解決し (明示またはデフォルト cwd にフォールバック)、セッションを作成して cwd が不変の [`SessionHeader`](persistence.md#sessionheader--metadata-beside-the-log)に収まるようにし、次に `attachSession` を呼んで保存済みヘッダー cwd をワークスペースパスに対して再検証する。最初の成功起動時に、レジストリは永続ヘッダーのみ (`id`、`cwd`、`createdAt` — イベント本体は決して使わない) から履歴をブートストラップし、有効な正規 cwd を持つセッションをディレクトリごとのワークスペースに新しい順にグループ化する; 初期化済みマーカーは最後に書き込むため、中断したブートストラップは安全に再開する。ブートストラップは一度きりである: cwd のないレガシーセッションは Ungrouped のまま残り、後に作成されるセッションは `attachSession` 経由でのみワークスペースに参加する。
 
-## Default Workspace initialization
+## デフォルトワークスペースの初期化
 
-The controller's `initializeDefault` takes no request: it owns the fixed `default-workspace` directory name, resolves the Documents location, and asks the registry to initialize once. The registry accepts a directory resolver, derives the initial title from the requested directory's final segment rather than the canonical one, and commits the registration with its durable identity. No language reaches the Host — browser consumers label a Workspace still carrying that automatic title through the controller's `workspaceDisplayTitle`, so only the on-screen name follows the reader's language. [First-use behavior and configuration](../../packages/api/workspace-controller/README.md#first-use-workspace) describe reuse and failure handling.
+コントローラーの `initializeDefault` はリクエストを取らない: 固定の `default-workspace` ディレクトリ名を所有し、Documents の場所を解決し、レジストリに一度だけ初期化を求める。レジストリはディレクトリリゾルバーを受け入れ、初期タイトルを正規の方ではなく要求ディレクトリの最終セグメントから導出し、その耐久アイデンティティで登録をコミットする。言語は Host に届かない — ブラウザーコンシューマーは、その自動タイトルをまだ運ぶ Workspace にコントローラーの `workspaceDisplayTitle` を通じてラベル付けするため、画面上の名前だけが読者の言語に従う。[初回使用の動作と構成](../../packages/api/workspace-controller/README.md#first-use-workspace)は再利用と失敗処理を記述する。
 
-## Session pinning
+## セッションピン留め
 
-The controller's [transport types](../../packages/api/workspace-controller/src/types.ts) define `WorkspacePinSessionRequest` and `WorkspaceUnpinSessionRequest`, each carrying one `sessionId`. Both operations return `WorkspacePinValue`: the complete `pinnedSessionIds` array of Session ids, most recently pinned first. Pinning requires a known, unarchived Session; unpinning an id that is not pinned succeeds without changing the set. Archiving removes the Session's pin in the same durable write, and unarchiving does not restore it.
+コントローラーの[トランスポート型](../../packages/api/workspace-controller/src/types.ts)は `WorkspacePinSessionRequest` と `WorkspaceUnpinSessionRequest` を定義し、それぞれ 1 つの `sessionId` を運ぶ。どちらの操作も `WorkspacePinValue` を返す: セッション id の完全な `pinnedSessionIds` 配列であり、最近ピン留めしたものが先頭である。ピン留めには既知の非アーカイブセッションが必要であり、ピン留めされていない id のピン外しは集合を変更せずに成功する。アーカイブは同じ耐久書き込みでセッションのピンを除去し、アーカイブ解除はそれを復元しない。
 
-## Archive admission
+## アーカイブ受け入れ
 
-Archiving is a registry-global durable set, and the registry refuses to hide running work behind it. The rule is a capability seam over two Host events the package declares and dispatches ([events](#workspace-events)): `workspace/session-activity` (waterfall) asks the composed providers what still runs for a Session, and `workspace/session-stop` (parallel) asks them to stop it. Each provider registers on the root like any listener, so the package knows no agent, job, or schedule vocabulary; the families are keys of a merge-extensible map.
+アーカイブはレジストリグローバルな耐久集合であり、レジストリは実行中作業をその背後に隠すことを拒否する。この規則は、パッケージが宣言し送出する 2 つの Host イベント上のケイパビリティシームである ([イベント](#workspace-events)): `workspace/session-activity` (waterfall) は構成済みプロバイダーにセッションでまだ実行中のものを問い合わせ、`workspace/session-stop` (parallel) はそれらに停止を求める。各プロバイダーは他のリスナーと同様にルートに登録するため、パッケージはエージェント、ジョブ、スケジュールの語彙を知らない; ファミリーはマージ拡張可能マップのキーである。
 
 ```ts type-equiv
 /**
@@ -150,7 +150,7 @@ Archiving is a registry-global durable set, and the registry refuses to hide run
 interface SessionActivityKindMap {}
 ```
 
-`SessionActivityKind` is `keyof SessionActivityKindMap`, so a program that compiled no provider sees no key at all. The shipped keys live in client-importable type modules: `turn` in the Agent registry's `types.ts`, `job` in the job registry seam's `view.ts`, `subagent` in the Subagent runtime's `control-types.ts`, `schedule` in the Schedule plugin's `types.ts`; a consumer that renders the families imports those modules for its cases and keeps a generic line for any other key. A provider answers the waterfall by prepending its `SessionActivity` entries to the result of `next()`; the registry's innermost callback returns an empty list, so a composition without providers archives freely.
+`SessionActivityKind` は `keyof SessionActivityKindMap` であるため、プロバイダーをコンパイルしなかったプログラムにはキーがまったく見えない。出荷キーはクライアントがインポート可能な型モジュールに存在する: Agent レジストリの `types.ts` の `turn`、ジョブレジストリシームの `view.ts` の `job`、サブエージェントランタイムの `control-types.ts` の `subagent`、Schedule プラグインの `types.ts` の `schedule`; ファミリーを描画するコンシューマーはそのケース用にそれらのモジュールをインポートし、他のキーには汎用行を残す。プロバイダーは `next()` の結果に自身の `SessionActivity` エントリを先頭追加して waterfall に答える; レジストリの最内コールバックは空リストを返すため、プロバイダーのない構成は自由にアーカイブする。
 
 ```ts type-equiv
 /**
@@ -164,11 +164,11 @@ interface SessionActivity {
 }
 ```
 
-`SessionActivityItem` carries the family-specific `id` (a session, job, or schedule id) and an optional display `label`. `archiveSession(sessionId)` asks the waterfall once, after the existence check, and rejects a non-empty answer with `WorkspaceActiveSessionError` (`sessionId`, `activity`) without writing; the controller maps it to the `workspace/session-active` error, whose details carry the same two fields. `archiveSession(sessionId, { stopActivity: true })` — the `ArchiveSessionOptions` field the transport request exposes as `stopActivity` — skips the check, writes the archive, then dispatches `workspace/session-stop`; a rejecting provider is logged and the archive stays, and the stopped work is never awaited to settlement. An already archived id neither asks nor stops. The shipped providers, what they stop, and the `agent/pre-step` gate that keeps an archived Session from running a model step are documented with the [registry package](../../packages/workspace/workspace/README.md#api-behavior); the decision record is the [archive-stops-running-work Agent Note](../../.agents/notes/implemented/feature/2026-09-21-archive-stops-running-session-work.md).
+`SessionActivityItem` はファミリー固有の `id` (セッション、ジョブ、またはスケジュール id) と省略可能な表示 `label` を運ぶ。`archiveSession(sessionId)` は存在チェックの後に waterfall を一度問い合わせ、非空の回答を `WorkspaceActiveSessionError` (`sessionId`、`activity`) で書き込まずにリジェクトする; コントローラーはそれを `workspace/session-active` エラーにマップし、その詳細は同じ 2 フィールドを運ぶ。`archiveSession(sessionId, { stopActivity: true })` — トランスポートリクエストが `stopActivity` として公開する `ArchiveSessionOptions` フィールド — はチェックをスキップし、アーカイブを書き込んでから `workspace/session-stop` を送出する; リジェクトするプロバイダーはログに記録され、アーカイブは残り、停止した作業が落ち着くのを待つことはない。既にアーカイブされた id は問い合わせも停止もしない。出荷プロバイダー、それらが停止するもの、アーカイブ済みセッションがモデルステップを実行しないようにする `agent/pre-step` ゲートは[レジストリパッケージ](../../packages/workspace/workspace/README.md#api-behavior)で文書化されている; 決定記録は [archive-stops-running-work Agent Note](../../.agents/notes/implemented/feature/2026-09-21-archive-stops-running-session-work.md)である。
 
-## Consumers
+## コンシューマー
 
-[`dsh-workspace-controller`](../../packages/api/workspace-controller) serves workspace CRUD to GUI clients over `ctx.workspaceRegistry`, and [`dsh-session-controller`](../../packages/api/session-controller) performs the create-session-then-attach flow above. [dsh-agent-instructions](../../packages/context/agent-instructions) is **not** a consumer despite the name: it discovers AGENTS.md-style instruction files under an agent's own cwd and never touches `ctx.workspaceRegistry` — the shared word refers to the user's working directory, not to this registry's entities.
+[`dsh-workspace-controller`](../../packages/api/workspace-controller) は `ctx.workspaceRegistry` 経由で GUI クライアントにワークスペース CRUD を提供し、[`dsh-session-controller`](../../packages/api/session-controller) は上記の create-session-then-attach フローを実行する。[dsh-agent-instructions](../../packages/context/agent-instructions) は名前にもかかわらずコンシューマー**ではない**: エージェント自身の cwd 配下の AGENTS.md 形式の指示ファイルを検出し、`ctx.workspaceRegistry` には決して触れない — 共有される語はユーザーの作業ディレクトリを指し、このレジストリのエンティティではない。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -176,13 +176,13 @@ interface SessionActivity {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxdirectorypicker--directorypicker-abstract-seam"></a>
 
-### `ctx.directoryPicker` — `DirectoryPicker` (abstract seam)
+### `ctx.directoryPicker` — `DirectoryPicker` (abstract シーム)
 
-Abstract directory-picking service. Subclass, implement `capability()`, and load the subclass as a plugin — it registers as `ctx.directoryPicker` (one implementation per context; loading a second throws, cordis' standard duplicate-service behavior). The capability object must be stable for the service lifetime: consumers may capture it across calls.
+抽象ディレクトリ選択サービス。サブクラス化し、`capability()` を実装し、そのサブクラスをプラグインとしてロードする — それは `ctx.directoryPicker` として登録される (コンテキストごとに 1 実装; 2 つ目のロードは throw し、cordis 標準の重複サービス動作である)。ケイパビリティオブジェクトはサービス存続期間中安定でなければならない: コンシューマーは呼び出しをまたいでそれをキャプチャしてよい。
 
 ```ts cordis-catalog
 /**
@@ -198,7 +198,7 @@ Source: [`packages/host/directory-picker/src/index.ts`](../../packages/host/dire
 
 ### `ctx.directoryPickerController` — `DirectoryPickerController`
 
-Host service backing the generated `ctx.remote.directoryPicker` namespace. The seam it exports is abstract and therefore never a Loader entry of its own, so this controller carries the wire verbs: one composed backend serves either the native chooser or the browse primitives, and a verb the composition cannot serve is refused rather than approximated.
+生成された `ctx.remote.directoryPicker` 名前空間を支える Host サービス。それがエクスポートするシームは abstract であるため、それ自体の Loader エントリには決してならず、このコントローラーがワイヤーバーブを運ぶ: 1 つの合成バックエンドがネイティブチューザーまたはブラウズプリミティブのいずれかを提供し、合成が提供できないバーブは近似ではなく拒否される。
 
 ```ts cordis-catalog
 /**
@@ -232,7 +232,7 @@ Source: [`packages/api/workspace-controller/src/directory-picker.ts`](../../pack
 
 ### `ctx.terminalController` — `TerminalController`
 
-Typed Remote control of transient Session-owned terminal processes.
+一時的セッション所有ターミナルプロセスの型付き Remote 制御。
 
 ```ts cordis-catalog
 /**
@@ -310,7 +310,7 @@ Source: [`packages/api/terminal-controller/src/index.ts`](../../packages/api/ter
 
 ### `ctx.workspaceController` — `WorkspaceController`
 
-Host service backing the generated `ctx.remote.workspace` namespace.
+生成された `ctx.remote.workspace` 名前空間を支える Host サービス。
 
 ```ts cordis-catalog
 /**
@@ -406,7 +406,7 @@ Source: [`packages/api/workspace-controller/src/index.ts`](../../packages/api/wo
 
 ### `ctx.workspaceFiles` — `WorkspaceFiles`
 
-Host Remote file reads and workspace directory observations over the composed filesystem.
+合成ファイルシステム上の Host Remote ファイル読み取りとワークスペースディレクトリ観測。
 
 ```ts cordis-catalog
 /**
@@ -465,7 +465,7 @@ Source: [`packages/api/workspace-files/src/index.ts`](../../packages/api/workspa
 
 ### `ctx.workspaceRegistry` — `WorkspaceRegistry`
 
-Durable workspace registry. Startup waits for `sessionPersistence`, builds one canonical-cwd header index, and completes the one-time history bootstrap before the service becomes active. The persistence dependency is mandatory so an unavailable peer can never be mistaken for an empty history and commit the initialized marker.
+耐久ワークスペースレジストリ。起動時は `sessionPersistence` を待ち、正規 cwd ヘッダーインデックスを 1 つ構築し、サービスがアクティブになる前に一度きりの履歴ブートストラップを完了する。永続化依存は必須であり、利用不可ピアが空の履歴と誤認されて初期化済みマーカーをコミットすることは決してない。
 
 ```ts cordis-catalog
 /**
@@ -595,13 +595,13 @@ Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/w
 
 <a id="workspace-events"></a>
 
-### `workspace/*` events
+### `workspace/*` イベント
 
 <a id="workspacesession-activity--waterfall"></a>
 
 #### `workspace/session-activity` — waterfall
 
-Ask the composed providers what still runs for a session before it is archived. A listener prepends its own SessionActivity entries to the result of `next()`; the registry's innermost callback returns an empty list, so a composition without providers archives freely. Any non-empty result refuses the archive without a write.
+アーカイブ前にセッションでまだ実行中のものを構成済みプロバイダーに問い合わせる。リスナーは `next()` の結果に自身の SessionActivity エントリを先頭追加する; レジストリの最内コールバックは空リストを返すため、プロバイダーのない構成は自由にアーカイブする。非空の結果は書き込まずにアーカイブを拒否する。
 
 ```ts cordis-catalog
 /**
@@ -623,7 +623,7 @@ Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/w
 
 #### `workspace/session-stop` — parallel
 
-Stop a session's running work because the caller archived it with `stopActivity`; the archive set is durable when this dispatches. Each provider stops its own families — cancelling a turn, its subagent descendants, owned jobs, or active schedules — through the same cancel paths the user's own stop actions use, so the session log ends every open turn regularly and a later unarchive can continue the conversation. Listeners issue their stop requests without waiting for running work to settle; a listener may await its own durability barrier. A rejection is logged by the registry and does not undo the archive.
+呼び出し元が `stopActivity` 付きでアーカイブしたためセッションの実行中作業を停止する; 送出時点でアーカイブ集合は耐久である。各プロバイダーは自身のファミリー — ターン、そのサブエージェント子孫、所有ジョブ、またはアクティブスケジュール — を、ユーザー自身の停止操作と同じキャンセル経路で停止するため、セッションログは開いたターンをすべて正規に終了し、後のアーカイブ解除で会話を継続できる。リスナーは実行中作業の落ち着きを待たずに停止要求を発行する; リスナーは自身の耐久バリアを待ってもよい。リジェクトはレジストリがログに記録し、アーカイブを取り消さない。
 
 ```ts cordis-catalog
 /**

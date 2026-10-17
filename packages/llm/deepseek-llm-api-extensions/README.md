@@ -5,55 +5,55 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-deepseek-llm-api-extensions
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Provider-specific registry for additive top-level fields on official DeepSeek LLM API requests. `DeepSeekLlmApiExtensionRegistry` registers `ctx.deepseekLlmApiExtensions`; contributor plugins claim one declaration-merged field, and `dsh-llm-deepseek` prepares the current contributions after serializing its base request. Use it when a plugin must add a validated provider-specific field without changing the base adapter.
+公式 DeepSeek LLM API リクエストに対する、加算的なトップレベルフィールド用のプロバイダー固有レジストリー。`DeepSeekLlmApiExtensionRegistry` は `ctx.deepseekLlmApiExtensions` を登録する。提供側プラグインは宣言マージされたフィールドを 1 つずつ確保し、`dsh-llm-deepseek` はベースリクエストの直列化後に現在の提供物を準備する。ベースアダプターを変更せずに検証済みプロバイダー固有フィールドを追加しなければならない場合に使用する。
 
-## Table of Contents
+## 目次
 
-- [Service](#service)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [サービス](#service)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="service"></a>
-## Service
+## サービス
 
-- `register(field, provider)` reserves one field for the calling fiber. Duplicate or malformed names fail synchronously; disposing the registration releases it for a later provider.
-- `prepare(request)` snapshots the registered providers, prepares them concurrently, clones and freezes returned JSON values, and returns `{ fields, accept }`. A provider whose preparation throws is omitted while the other fields are returned, and only its first failure is logged; request cancellation rejects and stops awaiting providers even when one ignores its signal.
-- `accept()` runs every captured post-2xx callback once. Concurrent calls join the same settlement, every callback settles before failures are reported, and several failures become one `AggregateError`.
+- `register(field, provider)` は呼び出しファイバー用に 1 つのフィールドを予約する。重複または不正な名前は同期的に失敗する。登録の破棄により後のプロバイダー用に解放される。
+- `prepare(request)` は登録済みプロバイダーのスナップショットを取得し、並行に準備し、返された JSON 値を複製して凍結し、`{ fields, accept }` を返す。準備で例外を投げたプロバイダーは除外され、他のフィールドは返される。その最初の失敗のみがログに記録される。リクエストの取り消しは拒否され、一方がシグナルを無視してもプロバイダーの待機を停止する。
+- `accept()` は取り込んだすべての 2xx 後コールバックを 1 回ずつ実行する。並行呼び出しは同じ確定に参加し、失敗を報告する前にすべてのコールバックが確定し、複数の失敗は 1 つの `AggregateError` になる。
 
-Each provider sees the exact serialized Messages body, the request `AbortSignal`, plus optional `sessionId` and auxiliary-call `purpose`. It must stop its own work promptly after cancellation and returns `undefined` when its field does not apply to that request. A prepared operation retains the providers it captured even if HMR removes their registrations before HTTP acceptance.
+各プロバイダーは、正確に直列化された Messages ボディ、リクエスト `AbortSignal`、任意の `sessionId` と補助呼び出し用 `purpose` を受け取る。取り消し後は速やかに自身の作業を停止しなければならず、そのリクエストにフィールドが適用されない場合は `undefined` を返す。準備済み操作は、HTTP 受理前に HMR が登録を除去しても取り込んだプロバイダーを保持する。
 
-The registry owns addition and lifecycle, not field semantics. `@deepseek-ai/dsh-session-log-deepseek` owns `dsh_session_log`; `@deepseek-ai/dsh-plugin-package-inventory-deepseek` owns `dsh_plugin_packages`. The provider-neutral LLM seam and `llm-pi-ai` do not consume this registry.
+レジストリーは追加とライフサイクルを所有し、フィールドの意味は所有しない。`dsh_session_log` は `@deepseek-ai/dsh-session-log-deepseek` が、`dsh_plugin_packages` は `@deepseek-ai/dsh-plugin-package-inventory-deepseek` が所有する。プロバイダー中立の LLM シームと `llm-pi-ai` はこのレジストリーを使用しない。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `@deepseek-ai/dsh-llm-deepseek`, which sends registered fields outside the model's `messages`, system prompt, and tool schemas.
+`@deepseek-ai/dsh-llm-deepseek` を通じて間接的に関与する。登録済みフィールドはモデルの `messages`、システムプロンプト、ツールスキーマの外側で送信される。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; registry fields are model-hidden provider metadata and do not alter the serialized model-input prefix.
+なし。レジストリーフィールドはモデルから隠されたプロバイダーメタデータであり、直列化されたモデル入力プレフィックスを変更しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Official DeepSeek requests only** — the registry intentionally has no provider-neutral routing or pi-ai adapter integration.
-- **No field ordering contract** — JSON object member order follows registration preparation but receivers address fields by name.
+- **公式 DeepSeek リクエストのみ** — このレジストリーには意図的にプロバイダー中立のルーティングや pi-ai アダプター統合がない。
+- **フィールド順序の契約なし** — JSON オブジェクトメンバーの順序は登録準備に従うが、受信者はフィールドを名前で参照する。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,54 +1,54 @@
 ---
-description: "Complete V3-to-V4 Session conversion and native admission: tool-role results, producer sources, parent catalogs, reference remapping, and refusal."
+description: "完全な V3-to-V4 セッション変換とネイティブアドミッション: ツールロール結果、プロデューサーソース、親カタログ、参照再マッピング、および拒否。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-session-format-v3-to-v4
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Restore supported released V3 Sessions as V4 without rewriting their stored generation. This page specifies the edge's transformations, preservation, prerequisites, and refusal, then separates native V4 admission. The conversion lifts tool results, renames message sources, closes evidenced interrupted turns, and appends missing parent catalog facts. Persistence owns file reads and successor publication; this library owns conversion and target rules.
+サポート対象のリリース済み V3 セッションを、保存済みジェネレーションを書き換えずに V4 として復元する。このページは、このエッジの変換、保持、前提条件、および拒否を規定し、ネイティブ V4 アドミッションとは分けて説明する。変換ではツール結果を持ち上げ、メッセージソースを改名し、証拠のある中断ターンを閉じ、不足している親カタログファクトを追加する。ファイル読み取りと後継の公開は永続化が所有し、このライブラリは変換とターゲット規則を所有する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [V3-to-V4 specification](#v3-to-v4-specification)
-  - [Header and physical framing](#header-and-framing)
-  - [Tool-result representation](#tool-results)
-  - [Extension data](#extension-data)
-  - [Message-source conversion](#message-sources)
-  - [Parent catalog prerequisites](#parent-catalog)
-  - [Sequence references and inheritance](#sequence-references)
-  - [Delivery generations](#delivery-guards)
-  - [Source audit and refusal](#source-audit)
-- [Native V4 admission](#native-v4-admission)
-  - [Header, messages, and surface metadata](#native-fields)
-  - [Lifecycle and reference relationships](#native-relationships)
-  - [Developer changes and deferred schemas](#developer-changes)
-  - [Fork-generated results](#fork-results)
-  - [Validation entry points and recovery](#native-recovery)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [V3-to-V4 仕様](#v3-to-v4-specification)
+  - [ヘッダーと物理フレーミング](#header-and-framing)
+  - [ツール結果の表現](#tool-results)
+  - [拡張データ](#extension-data)
+  - [メッセージソース変換](#message-sources)
+  - [親カタログの前提条件](#parent-catalog)
+  - [シーケンス参照と継承](#sequence-references)
+  - [デリバリージェネレーション](#delivery-guards)
+  - [ソース監査と拒否](#source-audit)
+- [ネイティブ V4 アドミッション](#native-v4-admission)
+  - [ヘッダー、メッセージ、サーフェスメタデータ](#native-fields)
+  - [ライフサイクルと参照関係](#native-relationships)
+  - [開発者変更と延期スキーマ](#developer-changes)
+  - [フォーク生成結果](#fork-results)
+  - [検証エントリーポイントと回復](#native-recovery)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しの作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use the [catalog](../session-format-catalog/README.md) for complete restoration. Direct imports serve catalog assembly and tests; this library has no Cordis mount configuration. Its [public exports](src/index.ts) provide the adjacent migration, the released V3 source codec, the V4 codec, and target validators. The source codec remains owned by [V2-to-V3](../session-format-v2-to-v3/README.md).
+完全な復元には[カタログ](../session-format-catalog/README.md)を使うこと。直接インポートはカタログ組み立てとテスト用であり、このライブラリには Cordis マウント設定はない。その[公開エクスポート](src/index.ts)は隣接マイグレーション、リリース済み V3 ソースコーデック、V4 コーデック、およびターゲットバリデーターを提供する。ソースコーデックは引き続き [V2-to-V3](../session-format-v2-to-v3/README.md) が所有する。
 
-Header-only migration validates and advances metadata without reading the body or collecting children:
+ヘッダーのみのマイグレーションは、ボディの読み取りや子の収集なしにメタデータを検証して進める:
 
 ```text
 const targetHeader = sessionFormatV3ToV4.migrateHeader(sourceHeader)
 ```
 
-Historical body restoration requires explicit child evidence. `sessionFormatV3ToV4.createStage()` refuses without that binding; an empty array explicitly declares no children. Persistence must collect the complete available direct-child set, while isolated transcript replay can supply its deliberately empty set. Keep the evidence unchanged for the catalog's lifetime.
+履歴ボディの復元には明示的な子エビデンスが必要である。`sessionFormatV3ToV4.createStage()` はその束縛なしでは拒否する。空配列は子が存在しないことの明示的な宣言である。永続化は利用可能な直接の子の完全な集合を収集しなければならず、分離されたトランスクリプト再生では意図的に空の集合を与えてよい。エビデンスはカタログの存続期間中変更せずに保持すること。
 
 ```text
 const catalog = createSessionFormatCatalogWithChildren(childFacts)
@@ -59,292 +59,292 @@ for (const row of physicalRows) restore.decodeRow(row)
 const artifact = restore.finish()
 ```
 
-Every restore creates independent Stage state. Compact runs expand as iterables without an intermediate event array. Partial emissions do not establish success: a later row or `finish()` can refuse the artifact. The [format protocol](../session-format/README.md) owns scheduling and error handling; [JSONL persistence](../session-persistence-jsonl/README.md) owns source reads, preparation, and verified exclusive successor publication.
+各復元は独立した Stage 状態を作成する。コンパクトランは中間のイベント配列なしにイテラブルとして展開される。部分的な排出は成功を確定しない。後の行や `finish()` がアーティファクトを拒否しうる。[フォーマットプロトコル](../session-format/README.md)はスケジューリングとエラー処理を所有し、[JSONL 永続化](../session-persistence-jsonl/README.md)はソース読み取り、準備、および検証済み排他的後継公開を所有する。
 
 -----
 
 <a id="v3-to-v4-specification"></a>
-## V3-to-V4 specification
+## V3-to-V4 仕様
 
-This edge changes only the named representations below, closes evidenced interrupted turns, and appends available missing catalog facts. It namespaces unknown ignorable event types and retains each admitted source event's time, message identities, and all fields outside those conversions and the coordinate remapping below. It creates no system prompt, developer event, tool execution, or replacement message. Earlier V0–V2 inputs first pass through their existing edges to V3; those edges retain their own transformations and refusal policies.
+このエッジは、以下で名指しされた表現のみを変更し、証拠のある中断ターンを閉じ、利用可能な不足カタログファクトを追加する。未知の無視可能なイベント型には名前空間を付け、受け入れた各ソースイベントの時刻、メッセージ同一性、およびそれらの変換と以下の座標再マッピングの対象外のすべてのフィールドを保持する。システムプロンプト、開発者イベント、ツール実行、置換メッセージは作成しない。それ以前の V0–V2 入力は、まず既存のエッジを通って V3 になる。それらのエッジはそれぞれの変換と拒否方針を保持する。
 
 <a id="header-and-framing"></a>
-### Header and physical framing
+### ヘッダーと物理フレーミング
 
-| Input | V4 result | Preservation or refusal |
+| 入力 | V4 結果 | 保持または拒否 |
 |---|---|---|
-| Logical V3 header | `version: 3` becomes `4` | Released V3 header validation runs first; all other logical header fields remain unchanged. |
-| V3 physical rows | Released V3 source codec decodes events and compact runs | Source framing and source-event range decoding remain owned by the preceding package. |
-| V4 physical rows | `releasedV4SessionFormatCodec` reuses released V2 framing with native V4 admission | No V4 event is projected into a V3 semantic validator. Encoding and decoding do not run this incoming migration. |
+| 論理 V3 ヘッダー | `version: 3` が `4` になる | リリース済み V3 ヘッダー検証が先に実行される。その他の論理ヘッダーフィールドはすべて変更されない。 |
+| V3 物理行 | リリース済み V3 ソースコーデックがイベントとコンパクトランをデコードする | ソースフレーミングとソースイベント範囲デコードは引き続き前段のパッケージが所有する。 |
+| V4 物理行 | `releasedV4SessionFormatCodec` はネイティブ V4 アドミッションを伴うリリース済み V2 フレーミングを再利用する | V4 イベントが V3 セマンティックバリデーターに投影されることはない。エンコードとデコードではこの入力側マイグレーションは実行されない。 |
 
-No preset id, PTC dispatch event tag, file attachment, or physical filename is renamed by this edge. Content extensions in embedded streams follow the rules below; stream order and indices remain unchanged.
+このエッジはプリセット id、PTC ディスパッチイベントタグ、ファイル添付、物理ファイル名のいずれも改名しない。埋め込みストリーム内のコンテンツ拡張は以下の規則に従う。ストリームの順序とインデックスは変更されない。
 
 <a id="tool-results"></a>
-### Tool-result representation
+### ツール結果の表現
 
-[liftToolResult](src/tool-role.ts) converts the message of a `tool/result` event whose source representation has role `user`. It requires a nonempty message id, source `{ kind: 'tool', callId }` with a nonempty call id, and exactly one `tool-result` block naming the same call. The block's content must be an array; an optional `isError` must be boolean.
+[liftToolResult](src/tool-role.ts) は、ソース表現のロールが `user` である `tool/result` イベントのメッセージを変換する。空でないメッセージ id、空でない呼び出し id を持つソース `{ kind: 'tool', callId }`、および同じ呼び出しを指名するちょうど 1 つの `tool-result` ブロックを要求する。ブロックのコンテンツは配列でなければならず、任意の `isError` は真偽値でなければならない。
 
-| V3 field | V4 field or treatment |
+| V3 フィールド | V4 フィールドまたは扱い |
 |---|---|
 | `data.message.role: 'user'` | `role: 'tool'` |
-| `data.message.content[0].toolCallId` | `data.message.toolCallId`, equal to the retained `source.callId` |
-| `data.message.content[0].content` | Direct `data.message.content`, including empty content |
-| `data.message.content[0].isError` | Optional `data.message.isError` |
-| Wrapper `type: 'tool-result'` | Removed with the wrapper |
-| Message `id`, `source`, event fields | Retained; no message or call id is minted |
+| `data.message.content[0].toolCallId` | `data.message.toolCallId`、保持された `source.callId` と等しい |
+| `data.message.content[0].content` | 直接の `data.message.content`、空のコンテンツを含む |
+| `data.message.content[0].isError` | 任意の `data.message.isError` |
+| ラッパー `type: 'tool-result'` | ラッパーとともに除去される |
+| メッセージ `id`、`source`、イベントフィールド | 保持される。メッセージ id も呼び出し id も新規発行されない |
 
-The wrapper alone supplies the interpreted call id, content, and optional error flag. Other wrapper fields become `plugin:result:<original-field>`; outer message fields other than `id`, `role`, `source`, and `content` become `plugin:message:<original-field>`. Complete original names remain in the suffix, including existing prefixes. Distinct owners and colliding names retain separate values; own `__proto__` and `constructor` data stays intact. No metadata container or new content type is added.
+解釈された呼び出し id、コンテンツ、および任意のエラーフラグを提供するのはラッパーのみである。その他のラッパーフィールドは `plugin:result:<original-field>` になる。`id`、`role`、`source`、`content` 以外の外側のメッセージフィールドは `plugin:message:<original-field>` になる。完全な元の名前がサフィックスに残り、既存のプレフィックスも含む。異なる所有者や衝突する名前は別々の値を保持し、自身の `__proto__` および `constructor` データはそのまま残る。メタデータコンテナーや新しいコンテンツ型は追加されない。
 
-A malformed canonical wrapper raises a format error. Nested results are unsupported by this converter and refuse without publishing a successor. The transformation does not repair contradictory `data.error`; native target validation requires it to accompany the wrapper's `isError: true`. Converter support may expand later while preserving the established native V4 representation.
+不正な形式の正規ラッパーはフォーマットエラーを送出する。入れ子の結果はこのコンバーターではサポートされず、後継を公開せずに拒否する。この変換は矛盾する `data.error` を修復しない。ネイティブターゲット検証では、それがラッパーの `isError: true` に付随することを要求する。確立されたネイティブ V4 表現を保ちながら、コンバーターのサポートは将来拡大しうる。
 
 <a id="extension-data"></a>
-### Extension data
+### 拡張データ
 
-Unknown V3 content tags become `plugin:<original-type>`; all other fields remain unchanged and opaque. Stream starts use the same tag in `blockType`; every other field retains its original key and value. An existing prefix on a content tag is prefixed again, keeping distinct old names distinct. Arguments, replay state, and plugin content fields are not traversed. These names do not load or execute plugins.
+未知の V3 コンテンツタグは `plugin:<original-type>` になる。その他のすべてのフィールドは変更されず不透明なままである。ストリーム開始は `blockType` に同じタグを使用し、それ以外のすべてのフィールドは元のキーと値を保持する。コンテンツタグ上の既存プレフィックスにはさらにプレフィックスが付加され、異なる旧名は異なるまま保たれる。引数、再生状態、およびプラグインコンテンツフィールドは走査されない。これらの名前はプラグインを読み込みも実行もしない。
 
-Request-tool definitions retain their own field names and values, including ordinary extension metadata. A definition with its own top-level `deferLoading` field refuses V3 migration: the field is defined only in V4, so this edge assigns it no historical meaning. Nested parameter data is unchanged. Native V4 admission of `deferLoading: true` is unchanged.
+リクエストツール定義は、通常の拡張メタデータを含め、自身のフィールド名と値を保持する。トップレベルに `deferLoading` フィールドを持つ定義は V3 マイグレーションを拒否する。このフィールドは V4 でのみ定義されており、このエッジはそれに歴史的な意味を与えないからである。入れ子のパラメーターデータは変更されない。`deferLoading: true` のネイティブ V4 アドミッションは変更されない。
 
 <a id="message-sources"></a>
-### Message-source conversion
+### メッセージソース変換
 
-The [message walker](src/sources.ts) visits only these payload positions. It converts legacy plugin wrappers and retains direct source kinds.
+[メッセージウォーカー](src/sources.ts)はこれらのペイロード位置のみを訪問する。レガシープラグインラッパーを変換し、直接ソース種別を保持する。
 
-| Owning event | Message position |
+| 所有イベント | メッセージ位置 |
 |---|---|
 | `user/message` | `data` |
-| `system/message`, `assistant/message`, `tool/result` | `data.message` |
-| `agent/inbox/spliced` | Each `data.inserted[]` member |
-| `session/title-llm-request` | Each `data.messages[]` member |
-| `developer/message` | Native walker only; an unknown ignorable V3 event is namespaced and its payload is not visited |
+| `system/message`、`assistant/message`、`tool/result` | `data.message` |
+| `agent/inbox/spliced` | 各 `data.inserted[]` メンバー |
+| `session/title-llm-request` | 各 `data.messages[]` メンバー |
+| `developer/message` | ネイティブウォーカーのみ。未知の無視可能な V3 イベントは名前空間が付けられ、そのペイロードは訪問されない |
 
-A plugin source requires a string `plugin`, including the empty string. Conversion removes that property, replaces `kind`, and preserves every other own JSON property. Direct source kinds must be nonempty strings. Conversion does not infer missing metadata from message text, tool arguments, configuration, or current files.
+プラグインソースは、空文字列を含め、文字列の `plugin` を要求する。変換ではそのプロパティを除去し、`kind` を置換し、その他のすべての own JSON プロパティを保持する。直接ソース種別は空でない文字列でなければならない。変換は、メッセージテキスト、ツール引数、設定、または現行ファイルから不足メタデータを推測しない。
 
-| Exact V3 `plugin` | V4 `kind` |
+| 完全一致 V3 `plugin` | V4 `kind` |
 |---|---|
 | `compact` | `compact-checkpoint` |
-| `tools-code-mode`, `tools-ptc` | `ptc-mode` |
+| `tools-code-mode`、`tools-ptc` | `ptc-mode` |
 | `dsh-compaction-basic` | `compact-basic` |
-| `@deepseek-ai/dsh-system-prompt`, on a system-role message | `system-prompt` |
-| `@deepseek-ai/dsh-system-prompt`, on another role | `runtime-context` |
-| Same-name first-party producers listed below | The exact plugin string |
-| Any other plugin name | `plugin:` followed by the complete original name |
+| `@deepseek-ai/dsh-system-prompt`、システムロールメッセージ上 | `system-prompt` |
+| `@deepseek-ai/dsh-system-prompt`、他のロール上 | `runtime-context` |
+| 以下に列挙する同名ファーストパーティープロデューサー | 正確なプラグイン文字列 |
+| その他の任意のプラグイン名 | 完全な元の名前に `plugin:` を付けたもの |
 
-The same-name producers are `agent-instructions`, `session-reference`, `team-message`, `goal`, `skill-invocation`, `skill-catalog`, `coordinator`, `subagent-report`, `subagent-settled`, `webhook`, `agent-message`, `model-selection`, `plan-mode`, `time-context`, `tmux-context`, `user-approval`, `repeat-tool-reminder`, `tool-cordis`, `cordis-host-runner`, `tool-goal`, `tool-jobs`, `hooks-codex`, `hooks-claude-code`, `schedule`, and `dsh-session-title-llm`.
+同名プロデューサーは `agent-instructions`、`session-reference`、`team-message`、`goal`、`skill-invocation`、`skill-catalog`、`coordinator`、`subagent-report`、`subagent-settled`、`webhook`、`agent-message`、`model-selection`、`plan-mode`、`time-context`、`tmux-context`、`user-approval`、`repeat-tool-reminder`、`tool-cordis`、`cordis-host-runner`、`tool-goal`、`tool-jobs`、`hooks-codex`、`hooks-claude-code`、`schedule`、および `dsh-session-title-llm` である。
 
-The complete plugin string is retained after `plugin:`: a plugin named `acme` becomes `plugin:acme`. Direct sources, including unknown and already-prefixed kinds, keep their original kind and every own JSON field.
+完全なプラグイン文字列は `plugin:` の後に保持される。`acme` というプラグインは `plugin:acme` になる。未知の種別や既にプレフィックス付きの種別を含む直接ソースは、元の種別とすべての own JSON フィールドを保持する。
 
-There is no recursive source search. Captured request text, assistant replay state and streams, tool arguments/content metadata, Team payloads, and arbitrary nested objects remain unchanged unless another explicitly named rule applies.
+再帰的なソース探索はない。キャプチャーされたリクエストテキスト、アシスタント再生状態とストリーム、ツール引数/コンテンツメタデータ、Team ペイロード、および任意の入れ子オブジェクトは、他の明示的に名指しされた規則が適用されない限り変更されない。
 
 <a id="parent-catalog"></a>
-### Parent catalog prerequisites
+### 親カタログの前提条件
 
-`historicalChildCatalogSource()` collects a direct subagent child's id and creation time, the number of its own `subagent/descriptor` events after its inherited cut, and the first descriptor payload. The child must have `origin: 'subagent'` and a direct parent. Supplemental facts require `childId`, a nonnegative safe-integer `childCreatedAt` and `descriptorCount`, and a `descriptor` property; absent descriptors are represented by null. An optional `sourcePath` is retained for diagnostics.
+`historicalChildCatalogSource()` は、直接のサブエージェント子の id と作成時刻、その継承カット以降の自身の `subagent/descriptor` イベント数、および最初の記述子ペイロードを収集する。子は `origin: 'subagent'` と直接の親を持たなければならない。補足ファクトは `childId`、非負安全整数の `childCreatedAt` と `descriptorCount`、および `descriptor` プロパティを要求する。存在しない記述子は null で表される。任意の `sourcePath` は診断用に保持される。
 
-| Available evidence | Migration decision |
+| 利用可能なエビデンス | マイグレーション決定 |
 |---|---|
-| One descriptor with version 1 | Require string provider and label; derive `mode: 'continuable'`. |
-| One descriptor with version 2 or 3 | Require string provider; use its mode and optional label under catalog rules. |
-| Zero descriptors, or an unsupported descriptor version | Retain an existing parent entry; otherwise append unknown-mode membership. |
-| More than one own descriptor | Retain an existing parent entry without mode/label comparison; otherwise append unknown-mode membership. |
-| Existing own parent entry | Retain it and its extensions; require matching child creation time and mode/label from exactly one supported own descriptor, when available. |
-| Missing own parent entry with complete supported evidence | Append a version-0 catalog fact with child id, creation time, mode, and optional label. |
-| Missing own parent entry without complete evidence | Append a version-1 `subagent/catalog` with header identity and unknown mode, without inventing a label. |
+| バージョン 1 の記述子 1 件 | 文字列のプロバイダーとラベルを要求する。`mode: 'continuable'` を導出する。 |
+| バージョン 2 または 3 の記述子 1 件 | 文字列のプロバイダーを要求する。カタログ規則の下でそのモードと任意のラベルを使用する。 |
+| 記述子ゼロ件、またはサポート外の記述子バージョン | 既存の親エントリーを保持する。なければ unknown モードのメンバーシップを追加する。 |
+| 自身の記述子が複数件 | モード/ラベル比較なしに既存の親エントリーを保持する。なければ unknown モードのメンバーシップを追加する。 |
+| 既存の自身の親エントリー | それとその拡張を保持する。利用可能な場合、ちょうど 1 件のサポート対象の自身の記述子からの子作成時刻とモード/ラベルの一致を要求する。 |
+| 完全なサポート対象エビデンスを伴う自身の親エントリーの欠落 | 子 id、作成時刻、モード、および任意のラベルを持つバージョン 0 カタログファクトを追加する。 |
+| 完全なエビデンスを伴わない自身の親エントリーの欠落 | ヘッダー同一性と unknown モードを持つバージョン 1 `subagent/catalog` を追加する。ラベルを捏造しない。 |
 
-Catalog versions 0 and 1 require string `childId`, nonnegative safe-integer `childCreatedAt`, mode `continuable` or `one-shot` (version 1 additionally accepts `unknown`), and a string label for continuable mode; a present label in any mode must also be a string. Version 2 accepts only `external` mode with an optional string label. Duplicate own child ids are refused. Existing entries without a corresponding retained child remain in the parent. Descriptor collection does not restore a child's old continuation composition or recover deleted children from tool arguments. Unknown-mode entries retain header identity without asserting a supported child descriptor.
+カタログバージョン 0 と 1 は、文字列の `childId`、非負安全整数の `childCreatedAt`、モード `continuable` または `one-shot` (バージョン 1 は追加で `unknown` を受け入れる)、および continuable モード用の文字列ラベルを要求する。いずれのモードでも存在するラベルは文字列でなければならない。バージョン 2 は任意の文字列ラベルを伴う `external` モードのみを受け入れる。重複する自身の子 id は拒否される。対応する保持された子を持たない既存エントリーは親に残る。記述子収集は、子の古い継続構成を復元せず、ツール引数から削除済み子を回復しない。unknown モードのエントリーは、サポート対象の子記述子を主張せずにヘッダー同一性を保持する。
 
-The stage considers parent catalog records only after the final inherited cut. Every inherited marker discards earlier catalog candidates without interpreting their payloads. Missing entries append after all source events, sorted by creation time then child id, with dense new sequences. Their time is the final source event's time, or header creation time for an empty log. They neither enter the model surface nor change the inherited count.
+ステージは最終継承カットより後の親カタログレコードのみを考慮する。各継承マーカーは、それ以前のカタログ候補をペイロード解釈なしに破棄する。欠落エントリーはすべてのソースイベントの後に追加され、作成時刻、次に子 id の順にソートされ、密な新しいシーケンスを持つ。その時刻は最終ソースイベントの時刻であり、空ログではヘッダー作成時刻である。これらはモデルサーフェスに入らず、継承カウントも変更しない。
 
-Storage supplies recognizable direct-child evidence and rechecks membership and physical revisions during preparation, memo reuse, and publication. The JSONL provider isolates unreadable child headers, child decoding failures, and invalid descriptor fields while retaining other catalog entries; it does not migrate child catalogs during parent preparation. The converter still rejects conflicting supplied facts and changed parent history. [JSONL persistence](../session-persistence-jsonl/README.md) owns warnings, source checks, and child-local failure handling. Current V4 reads never invoke this converter and validate native catalog fields, uniqueness, and delivery ownership directly.
+ストレージは認識可能な直接の子エビデンスを提供し、準備、メモ再利用、および公開の間にメンバーシップと物理リビジョンを再検査する。JSONL プロバイダーは、他のカタログエントリーを保持しながら、読み取り不能な子ヘッダー、子デコード失敗、および無効な記述子フィールドを分離する。親準備中に子カタログを移行しない。コンバーターはそれでも矛盾する提供ファクトや変更された親履歴を拒否する。[JSONL 永続化](../session-persistence-jsonl/README.md)は警告、ソース検査、および子ローカル失敗処理を所有する。現行 V4 読み取りはこのコンバーターを呼び出さず、ネイティブカタログフィールド、一意性、およびデリバリー所有を直接検証する。
 
 <a id="sequence-references"></a>
-### Sequence references and inheritance
+### シーケンス参照と継承
 
-An open turn with no open step can be closed when the next numbered `turn/start` immediately follows a nonempty `agent/inbox/spliced` for `next-turn`. The stage inserts `turn/end` with reason `interrupted` immediately before that start, using its timestamp. Open tails remain open. Other turn-order violations, unresolved tools, and active compactions still fail target validation. Native V4 never applies this repair.
+`next-turn` 用の空でない `agent/inbox/spliced` の直後に番号付き `turn/start` が続く場合、開いたステップを持たない開いたターンを閉じることができる。ステージはその開始の直前に理由 `interrupted` の `turn/end` を、そのタイムスタンプを用いて挿入する。開いた末尾は開いたまま残る。その他のターン順序違反、未解決ツール、および動作中のコンパクションは依然としてターゲット検証に失敗する。ネイティブ V4 はこの修復を適用しない。
 
-Insertion renumbers subsequent envelopes densely and remaps audited same-artifact references: `sourceEventSeqs`, replacement `startSeq/endSeq`, command completion `sourceEventSeq`, title `messageSeqs`, compaction `shadowedRange` and `shadowedSeqs`, and image-offload target `seq`. Captured Session references, generation-qualified delivery coordinates, turn/step numbers, stream and image indexes, ids, and arbitrary JSON retain their values. Unknown ignorable events retain opaque payload and surface metadata; only their envelope sequence is renumbered. Without insertion, source event coordinates remain unchanged; appended catalog records only extend the suffix.
+挿入は後続エンベロープを密に採番し直し、監査対象の同一アーティファクト参照を再マッピングする。すなわち `sourceEventSeqs`、置換の `startSeq/endSeq`、コマンド完了の `sourceEventSeq`、タイトルの `messageSeqs`、コンパクションの `shadowedRange` と `shadowedSeqs`、および画像オフロード対象 `seq` である。キャプチャーされたセッション参照、ジェネレーション修飾デリバリー座標、ターン/ステップ番号、ストリームおよび画像インデックス、id、および任意 JSON は値を保持する。未知の無視可能なイベントは不透明なペイロードとサーフェスメタデータを保持し、エンベロープシーケンスのみが採番し直される。挿入がなければソースイベント座標は変更されず、追加カタログレコードはサフィックスを延長するのみである。
 
-For a seeded Session, the last `session/end-seed` carrying `inherited: true` identifies the inherited event count, excluding that marker. The target count includes inserted events before that marker. A supplied source cut must agree with the original V3-stage marker position, including when preceding V0–V2 migrations already remapped it; a missing tagged marker, an inherited marker in an unseeded Session, or a cut outside the events is refused. Unseeded stages expose zero before EOF; seeded stages leave the count unknown until `finish()`. Untagged markers do not define fork inheritance.
+シード済みセッションでは、`inherited: true` を持つ最後の `session/end-seed` が継承イベント数を識別し、そのマーカー自体は除外される。ターゲットカウントはそのマーカーより前の挿入イベントを含む。提供されたソースカットは、先行 V0–V2 マイグレーションが既に再マッピング済みの場合を含め、元の V3 ステージのマーカー位置と一致しなければならない。タグ付きマーカーの欠落、非シードセッション内の継承マーカー、またはイベント範囲外のカットは拒否される。非シードステージは EOF 前にゼロを公開し、シード済みステージは `finish()` までカウントを不明のままにする。タグなしマーカーはフォーク継承を定義しない。
 
 <a id="delivery-guards"></a>
-### Delivery generations
+### デリバリージェネレーション
 
-| Delivery record | Admission and preservation |
+| デリバリーレコード | アドミッションと保持 |
 |---|---|
-| Any interpreted `session-log-deepseek/delivery-accepted` | Generation must be a nonnegative safe integer; omission identifies V0. |
-| V3 source marker claiming generation 4 | Refuse: advancing the header must not activate a target-generation watermark. |
-| V3 source marker for generation 3 | Require a nonempty Session id and nonnegative safe-integer `throughSeq` before the marker; a foreign id is allowed only before the inherited cut with `parentSession`. |
-| Other source generations, including values above 4 | Retain their event type and payload coordinates unchanged; they remain inactive in V4. |
-| Native V4 marker for generation 4 | Apply the same earlier-coordinate and Session-ownership checks using V4 as current. |
-| Native V4 historical marker, including generation 3 | Retain recorded coordinates and identity; it is not a V4 acceptance watermark. |
+| 解釈された任意の `session-log-deepseek/delivery-accepted` | ジェネレーションは非負安全整数でなければならない。省略は V0 を識別する。 |
+| ジェネレーション 4 を主張する V3 ソースマーカー | 拒否。ヘッダーを進めてもターゲットジェネレーションのウォーターマークを有効化してはならない。 |
+| ジェネレーション 3 の V3 ソースマーカー | マーカー以前の空でないセッション id と非負安全整数 `throughSeq` を要求する。外部 id は `parentSession` を伴い継承カットより前でのみ許される。 |
+| 4 を超える値を含むその他のソースジェネレーション | イベント型とペイロード座標を変更せずに保持する。V4 では非活性のままである。 |
+| ジェネレーション 4 のネイティブ V4 マーカー | V4 を現行として同じ前期座標およびセッション所有チェックを適用する。 |
+| ジェネレーション 3 を含むネイティブ V4 履歴マーカー | 記録された座標と同一性を保持する。これは V4 受理ウォーターマークではない。 |
 
-No delivery payload or event type is rewritten. Higher-version migrations own any future activation checks; this edge checks only promotion to V4. The marker’s envelope sequence follows insertion remapping; source-generation ownership is checked against the original V3 sequence and inherited cut.
+デリバリーペイロードもイベント型も書き換えられない。上位バージョンマイグレーションは将来の有効化検査を所有し、このエッジは V4 への昇格のみを検査する。マーカーのエンベロープシーケンスは挿入再マッピングに従い、ソースジェネレーション所有は元の V3 シーケンスと継承カットに対して検査される。
 
 <a id="source-audit"></a>
-### Source audit and refusal
+### ソース監査と拒否
 
-V3 physical decoding and header validation run before the stage. The stage checks dense sequences, source cuts, canonical tool-result wrappers, named plugin sources, delivery ownership, and supplied catalog evidence as specified above. It does not run the complete released V3 semantic restorer or copy the V2→V3 event/content allowlist. Complete restoration additionally applies the V4 target rules below; physical parsing, stage conversion, and target restoration are distinct checks.
+V3 物理デコードとヘッダー検証はステージより前に実行される。ステージは上記の規定どおり密シーケンス、ソースカット、正規ツール結果ラッパー、名指しプラグインソース、デリバリー所有、および提供カタログエビデンスを検査する。リリース済み V3 セマンティック復元全体は実行せず、V2→V3 イベント/コンテンツ許可リストも複写しない。完全な復元は追加で以下の V4 ターゲット規則を適用する。物理解析、ステージ変換、およびターゲット復元は別個の検査である。
 
-Only the enumerated messages and fields are converted. Unrelated events and arbitrary JSON do not acquire new meanings from matching strings or numbers. The fixed `RELEASED_V3_EVENT_TYPES` set separates source events from extensions independently of the current writer. The stage rejects unknown required V3 event types before interpreting their payloads or consulting the V4 vocabulary, including names that V4 recognizes. Unknown ignorable names become `plugin:<original-name>` with their payload unchanged. No generic source-schema validation or recursive numeric-field inference is implied.
+変換されるのは列挙されたメッセージとフィールドのみである。無関係なイベントや任意 JSON は、一致する文字列や数値から新しい意味を取得しない。固定の `RELEASED_V3_EVENT_TYPES` 集合は、現行ライターとは独立にソースイベントと拡張を分離する。ステージは、V4 が認識する名前を含め、ペイロード解釈や V4 語彙照会の前に未知の必須 V3 イベント型を拒否する。未知の無視可能な名前はペイロード変更なしに `plugin:<original-name>` になる。汎用ソーススキーマ検証や再帰的数値フィールド推測は含意されない。
 
-Only the canonical V3 `tool/result` wrapper has a preserving conversion. A retired `tool-result` block in another interpreted position is refused by target admission rather than retained as an invalid V4 block. Native V4 applies the same tag refusal before recoverable suffix suppression. The check covers only these positions:
+保持的変換を持つのは正規 V3 `tool/result` ラッパーのみである。他の解釈位置にある退役 `tool-result` ブロックは、無効な V4 ブロックとして保持されるのではなくターゲットアドミッションで拒否される。ネイティブ V4 は回復可能サフィックス抑制の前に同じタグ拒否を適用する。この検査は以下の位置のみを対象とする:
 
-| Owner | Content inspected for the retired tag |
+| 所有者 | 退役タグの検査対象コンテンツ |
 |---|---|
 | `user/message` | `data.content[]` |
-| `system/message`, `developer/message`, `assistant/message`, `tool/result` | `data.message.content[]`; the canonical source tool/result wrapper is lifted before target checking |
-| `agent/inbox/spliced`, `session/title-llm-request` | `data.inserted[].content[]` and `data.messages[].content[]`, respectively |
+| `system/message`、`developer/message`、`assistant/message`、`tool/result` | `data.message.content[]`。正規ソース tool/result ラッパーはターゲット検査の前に持ち上げられる |
+| `agent/inbox/spliced`、`session/title-llm-request` | それぞれ `data.inserted[].content[]` および `data.messages[].content[]` |
 | `team/message/queued` | `data.message.content[]` |
-| `compaction/summary`, `tool/ptc-dispatch` | `data.summary[]`, optional `data.rawOutput[]`, and `data.content[]`, respectively |
-| Embedded assistant streams | `assistant/message.data.stream[]` and `assistant/attempt.data.stream[]` entries with `type: 'chunk'`: `chunk.block.type` for `block-end`, and `chunk.blockType` for `block-start` |
+| `compaction/summary`、`tool/ptc-dispatch` | それぞれ `data.summary[]`、任意の `data.rawOutput[]`、および `data.content[]` |
+| 埋め込みアシスタントストリーム | `type: 'chunk'` を持つ `assistant/message.data.stream[]` および `assistant/attempt.data.stream[]` エントリー。`block-end` には `chunk.block.type`、`block-start` には `chunk.blockType` |
 
-The [retired-syntax check](src/retired-syntax.ts) examines direct block tags, not arbitrary descendants. Tool arguments, replay state, JSON-schema parameters, nested metadata, and unknown ignorable event payloads remain opaque. An unknown ignorable developer payload is deferred until reader vocabulary recognizes it; the writer validates known developer records even when marked ignorable.
+[退役構文検査](src/retired-syntax.ts)は任意の子孫ではなく直接ブロックタグを調べる。ツール引数、再生状態、JSON スキーマパラメーター、入れ子メタデータ、および未知の無視可能なイベントペイロードは不透明なままである。未知の無視可能な開発者ペイロードは、リーダー語彙がそのイベント型を認識するまで延期される。ライターは無視可能とマークされていても既知の開発者レコードを検証する。
 
-A direct stage can raise `SessionFormatError` for malformed data or `SessionFormatUnsupportedMigrationError` when a preserving conversion is unavailable. The catalog wraps stage failures as unsupported migration; transformed-target failures receive that classification as well. Strict current validation reports its target failure directly. Physical corruption follows the chosen decoder recovery policy. No prefix is a completed restore, and a refusal does not authorize source mutation, a partial successor, or generation fallback.
+直接ステージは、不正データに対して `SessionFormatError` を送出し、保持的変換が利用不可の場合に `SessionFormatUnsupportedMigrationError` を送出しうる。カタログはステージ失敗をサポート外マイグレーションとしてラップし、変換済みターゲット失敗も同じ分類を受ける。厳格な現行検証はターゲット失敗を直接報告する。物理破損は選択されたデコーダー回復方針に従う。プレフィックスは完成した復元ではなく、拒否はソース変更、部分後継、またはジェネレーションフォールバックを許可しない。
 
 -----
 
 <a id="native-v4-admission"></a>
-## Native V4 admission
+## ネイティブ V4 アドミッション
 
-An input already marked V4 never runs V3→V4. Native validation preserves recorded events and returns the same artifact; it does not synthesize catalog entries, fork results, developer changes, or repaired source fields. The following catalog describes the current accepted V4 rules, separately from historical transformations.
+既に V4 とマークされた入力は V3→V4 を実行しない。ネイティブ検証は記録イベントを保持して同じアーティファクトを返し、カタログエントリー、フォーク結果、開発者変更、または修復ソースフィールドを合成しない。以下のカタログは、歴史的変換とは別に、現行で受け入れられる V4 規則を記述する。
 
 <a id="native-fields"></a>
-### Header, messages, and surface metadata
+### ヘッダー、メッセージ、サーフェスメタデータ
 
-| Data | Native rule |
+| データ | ネイティブ規則 |
 |---|---|
-| Logical header | Exact required fields `version`, `id`, `createdAt`, `isSeeded`, `delegationDepth`; optional `cwd`, `parentSession`, `origin`, `agentPreset`; no other keys. Version is 4, id is a string, creation time/depth are nonnegative safe integers, seeded is boolean, cwd is absolute when present, optional ids are strings, and origin is `subagent` when present. |
-| Event envelope | Required `type`, `seq`, `time`, and JSON `data`; only optional `surfaceOp`, `sourceEventSeqs`, and `ignorable` are admitted. Sequences are dense nonnegative safe integers, time is a safe integer, and a present `ignorable` is exactly true. |
-| Surface messages | System, user, developer, assistant, and tool/result require placement and identified messages with their matching role. Installed Session validation owns ordinary message envelopes and role-specific source acceptance. |
-| Replacements and references | Endpoints select an inclusive current-surface span in surface order; references name earlier events and cover removed nodes. The protected first system head can be replaced only by one system message covering exactly that head. |
-| Request header | Reject retired `header.system`, even empty, and malformed header/data records; installed Session checks current config, reason, adapter-default markers, and omission of empty `tools` / `adapterDefaults`. |
-| Tool result | Require role `tool`, nonempty message/call ids, matching `source.kind: 'tool'` and `source.callId`, direct array content, no retired result wrapper, and boolean `isError` when present. `data.error` requires `isError: true`. |
-| System message | Require positive turn/step, nonempty id, role `system`, array content, and system-prompt source. Known text/reasoning, tool-call, and image fields are checked; retired tool-result wrappers are refused. Additional JSON metadata and merge-extensible block kinds are not globally stripped. |
-| Producer attribution | Interpreted message slots require an object source with a nonempty, non-`plugin` kind. Unknown attribution and own JSON metadata survive; this does not grant a producer runtime authority. |
+| 論理ヘッダー | 必須フィールドは `version`、`id`、`createdAt`、`isSeeded`、`delegationDepth` のみ。任意で `cwd`、`parentSession`、`origin`、`agentPreset`。他のキーは不可。バージョンは 4、id は文字列、作成時刻/深さは非負安全整数、シード済みは真偽値、存在する場合 cwd は絶対パス、任意 id は文字列、存在する場合 origin は `subagent`。 |
+| イベントエンベロープ | 必須 `type`、`seq`、`time`、および JSON `data`。任意の `surfaceOp`、`sourceEventSeqs`、`ignorable` のみが許される。シーケンスは密な非負安全整数、時刻は安全整数、存在する `ignorable` は正確に true。 |
+| サーフェスメッセージ | システム、ユーザー、開発者、アシスタント、および tool/result は、配置と、一致するロールを持つ識別済みメッセージを要求する。通常のメッセージエンベロープとロール別ソース受理は、インストール済みセッション検証が所有する。 |
+| 置換と参照 | エンドポイントはサーフェス順で包括的な現行サーフェススパンを選択する。参照は前期イベントを指名し、除去ノードをカバーする。保護された先頭システムヘッドは、そのヘッドのみを正確にカバーする 1 つのシステムメッセージでのみ置換できる。 |
+| リクエストヘッダー | 退役 `header.system` を拒否する。空でも同様である。不正なヘッダー/データレコードも拒否する。インストール済みセッションは現行設定、理由、アダプターデフォルトマーク、および空 `tools` / `adapterDefaults` の省略を検査する。 |
+| ツール結果 | ロール `tool`、空でないメッセージ/呼び出し id、一致する `source.kind: 'tool'` と `source.callId`、直接配列コンテンツ、退役結果ラッパーなし、および存在する場合真偽値 `isError` を要求する。`data.error` は `isError: true` を要求する。 |
+| システムメッセージ | 正のターン/ステップ、空でない id、ロール `system`、配列コンテンツ、およびシステムプロンプトソースを要求する。既知テキスト/リーズニング、ツール呼び出し、および画像フィールドが検査される。退役ツール結果ラッパーは拒否される。追加 JSON メタデータやマージ拡張可能なブロック種別はグローバルに除去されない。 |
+| プロデューサー帰属 | 解釈メッセージスロットは、空でなく `plugin` でない種別を持つオブジェクトソースを要求する。未知の帰属と own JSON メタデータは存続する。これはプロデューサー実行権限を与えない。 |
 
-All five surface event types require `surfaceOp`. A present `sourceEventSeqs` must be a nonempty array of unique earlier nonnegative safe-integer sequences; `assistant/message` must omit it. Because a replacement must cite all removed nodes, an assistant event cannot itself replace a surface span. Known log-only events carry neither field. A replacement object has exactly `op: 'replace'`, `startSeq`, and `endSeq`; old endpoint names, mixed spellings, and extra keys are refused.
+5 種のサーフェスイベント型はすべて `surfaceOp` を要求する。存在する `sourceEventSeqs` は、重複のない前期非負安全整数シーケンスの空でない配列でなければならない。`assistant/message` はそれを省略しなければならない。置換は除去ノード全体を引用しなければならないため、アシスタントイベント自体はサーフェススパンを置換できない。既知のログ専用イベントはどちらのフィールドも持たない。置換オブジェクトは正確に `op: 'replace'`、`startSeq`、`endSeq` を持つ。旧エンドポイント名、混在綴り、余分なキーは拒否される。
 
-Request-header config requires nonempty provider/model strings; a present reasoning effort is a nonempty string. `reason` is `initial`, `resume`, `change`, or `series`, and a present `startsSeries` is true. Adapter-default markers use only `reasoningEffort` and `maxTokens`, each set to true with its corresponding config value present. These checks do not execute arbitrary tool JSON schemas.
+リクエストヘッダー設定は空でないプロバイダー/モデル文字列を要求する。存在するリーズニングエフォートは空でない文字列である。`reason` は `initial`、`resume`、`change`、または `series` であり、存在する `startsSeries` は true である。アダプターデフォルトマークは `reasoningEffort` と `maxTokens` のみを使用し、各々は対応する設定値の存在を伴い true に設定される。これらの検査は任意のツール JSON スキーマを実行しない。
 
-System image admission requires a nonempty attachment id, one of PNG/JPEG/WebP/GIF MIME types, nonnegative bytes, positive width/height, optional string name, and positive original dimensions when present. Native storage admission is distinct from whether a particular model provider can represent that content.
+システム画像アドミッションは、空でない添付 id、PNG/JPEG/WebP/GIF MIME 型のいずれか、非負バイト数、正の幅/高さ、任意の文字列名、および存在する場合正の元寸法を要求する。ネイティブストレージアドミッションは、特定モデルプロバイダーがそのコンテンツを表現できるかとは別個である。
 
-Current common admission does not validate each user/tool/developer content block against the complete generated schema. It checks message identity, role, source, and an array container; version-specific validators add only the checks listed here. Unknown block kinds and uninspected fields can therefore survive storage admission and still be refused by a provider.
+現行共通アドミッションは、各ユーザー/ツール/開発者コンテンツブロックを完全な生成スキーマに対して検証しない。メッセージ同一性、ロール、ソース、および配列コンテナーを検査し、バージョン別バリデーターはここに列挙された検査のみを追加する。未知ブロック種別や未検査フィールドはストレージアドミッションを通過し、プロバイダーに拒否されうる。
 
 <a id="native-relationships"></a>
-### Lifecycle and reference relationships
+### ライフサイクルと参照関係
 
-| Owner | Required relationship |
+| 所有者 | 必須関係 |
 |---|---|
-| `turn/start`, `turn/end`, `step/start`, `step/end` | Ordered turn/step numbers, matching open owners, no overlapping turn/step, and no unresolved advertised or started tool call at a closing boundary. Unfinished tails remain open. |
-| `assistant/message`, `tool/call`, appended `tool/result` | Match an open step; advertised call ids are unique, starts retain name/arguments, and results settle one advertised call. A result before its start requires the exact admitted `TOOL_NOT_STARTED` repair. Tool-result surface replacements require an open turn instead of replaying the original call lifecycle. |
-| `system/message`, `developer/message`, `assistant/attempt` | Match an open turn and step. Request headers and contexts require an open turn. |
-| `tool/ptc-dispatch-start`, `tool/ptc-dispatch` | Require an open turn, unique sub-call start and settlement, stable root/parent/name/arguments, and a nested parent belonging to the same root. |
-| `llm/retry`, `llm/retry-started` | Match the current request provider and turn/step, sequential attempts per policy chain, stable retry identity, and one start matching a prior scheduled attempt. |
-| `session/title`, `session/title-llm-request` | Cite distinct earlier human `user/message` events. User-assigned titles have no citations; other titles have citations. An LLM title request has nonempty citations and one user-role text message sourced from `dsh-session-title-llm`. |
-| `command/run`, `command/done` | Run ids are unique; completion has a prior run. A present completion `sourceEventSeq` names an earlier non-command event and accompanies success. |
-| `compaction/start`, `compaction/summary`, `compaction/end` | Match compaction id, source command, and the active turn context. Summary spans name exact current-surface nodes and exclude the protected head; successful completion has one summary. Inherited unfinished compactions expire at the end-seed marker. |
-| `compaction/prune` | Its span names exact current-surface nodes and excludes the protected head; it does not require a compaction transaction or its owner fields. |
-| Compact checkpoint replacement | Its `compact-checkpoint` source identifies the active compaction. |
-| Native `subagent/catalog` | Validates own version-0/version-1/version-2 payloads after the inherited cut. Each child id must be unique. Native reads neither collect child logs nor compare their physical facts; inherited entries do not establish own membership. |
-| Inherited cut and delivery | Apply the marker, coordinate, and generation-ownership rules stated above. |
+| `turn/start`、`turn/end`、`step/start`、`step/end` | 順序立ったターン/ステップ番号、一致する開所有者、ターン/ステップの重なりなし、および終了境界で未解決の広告済みまたは開始済みツール呼び出しなし。未完末尾は開いたまま残る。 |
+| `assistant/message`、`tool/call`、追加 `tool/result` | 開ステップに一致する。広告呼び出し id は一意、開始は名前/引数を保持し、結果は 1 件の広告呼び出しを確定する。その開始より前の結果は正確に受理された `TOOL_NOT_STARTED` 修復を要求する。ツール結果サーフェス置換は、元の呼び出しライフサイクルを再生する代わりに開ターンを要求する。 |
+| `system/message`、`developer/message`、`assistant/attempt` | 開ターンとステップに一致する。リクエストヘッダーとコンテキストは開ターンを要求する。 |
+| `tool/ptc-dispatch-start`、`tool/ptc-dispatch` | 開ターンを要求し、サブ呼び出し開始と確定の一意性、ルート/親/名前/引数の安定性、および同じルートに属する入れ子親を要求する。 |
+| `llm/retry`、`llm/retry-started` | 現行リクエストプロバイダーとターン/ステップに一致し、方針チェーンごとに逐次試行、安定した再試行同一性、および事前予定試行に一致する 1 件の開始を要求する。 |
+| `session/title`、`session/title-llm-request` | 相異なる前期人間 `user/message` イベントを引用する。ユーザー割当タイトルは引用なし。その他のタイトルは引用あり。LLM タイトルリクエストは空でない引用と、`dsh-session-title-llm` 由来のユーザーロールテキストメッセージ 1 件を持つ。 |
+| `command/run`、`command/done` | 実行 id は一意。完了は事前実行を持つ。存在する完了 `sourceEventSeq` は前期非コマンドイベントを指名し、成功に付随する。 |
+| `compaction/start`、`compaction/summary`、`compaction/end` | コンパクション id、ソースコマンド、および動作中ターン文脈に一致する。要約スパンは正確な現行サーフェスノードを指名し、保護ヘッドを除外する。成功完了は要約 1 件を持つ。継承された未完コンパクションは end-seed マーカーで失効する。 |
+| `compaction/prune` | そのスパンは正確な現行サーフェスノードを指名し、保護ヘッドを除外する。コンパクショントランザクションやその所有フィールドを要求しない。 |
+| コンパクトチェックポイント置換 | その `compact-checkpoint` ソースは動作中コンパクションを識別する。 |
+| ネイティブ `subagent/catalog` | 継承カット後の own バージョン 0/バージョン 1/バージョン 2 ペイロードを検証する。各子 id は一意でなければならない。ネイティブ読み取りは子ログ収集も物理ファクト比較も行わず、継承エントリーは own メンバーシップを確立しない。 |
+| 継承カットとデリバリー | 上記のマーカー、座標、およびジェネレーション所有規則を適用する。 |
 
-These checks are generation-owned in [relationships.ts](src/relationships.ts). Full common message/envelope acceptance and plugin-owned message projections additionally use the installed Session; the exported V4 restorer alone is not a replacement for complete catalog restoration.
+これらの検査は [relationships.ts](src/relationships.ts) によるジェネレーション所有である。完全な共通メッセージ/エンベロープ受理とプラグイン所有メッセージプロジェクションは追加でインストール済みセッションを使用する。エクスポートされた V4 復元器のみでは完全なカタログ復元の代替にならない。
 
 <a id="developer-changes"></a>
-### Developer changes and deferred schemas
+### 開発者変更と延期スキーマ
 
-The edge does not create developer history. Native `developer/message` requires positive turn/step coordinates, role `developer`, a nonempty message id, array content, and producer-owned source metadata. Each `tool-addition` or `tool-removal` block requires a nonempty `toolName`. Additions reject any own inline `tool` field, including values that would otherwise be optional JSON metadata.
+エッジは開発者履歴を作成しない。ネイティブ `developer/message` は正のターン/ステップ座標、ロール `developer`、空でないメッセージ id、配列コンテンツ、およびプロデューサー所有ソースメタデータを要求する。各 `tool-addition` または `tool-removal` ブロックは空でない `toolName` を要求する。追加は own インライン `tool` フィールドを拒否し、任意 JSON メタデータになりうる値も含む。
 
-An event containing additions must have `headerSeq`; it selects an earlier known `request/header` for all additions in that event. Each name must match exactly one definition there with string `description` and object `parameters`. Missing, forward, wrong-type, unknown, ambiguous, and incomplete bindings are refused. Events without additions must omit `headerSeq`; `sourceEventSeqs` remains independent derivation/replacement metadata. Replacement, fork, restart, and compaction retain the recorded binding rather than consulting the current registry or latest header.
+追加を含むイベントは `headerSeq` を持たなければならない。これはそのイベント内の全追加に対して前期の既知 `request/header` を 1 件選択する。各名前は、文字列 `description` とオブジェクト `parameters` を持つ定義にそのヘッダー内で正確に 1 件一致しなければならない。欠落、前方、型誤り、未知、曖昧、および不完全な束縛は拒否される。追加なしのイベントは `headerSeq` を省略しなければならない。`sourceEventSeqs` は独立した導出/置換メタデータのままである。置換、フォーク、再開、およびコンパクションは、現行レジストリや最新ヘッダーを参照せず、記録束縛を保持する。
 
-Tool-change blocks in ordinary messages, inbox/title input, compaction summary/raw output, or embedded assistant block-start/block-end records are refused. A present `request/header.header.tools[].deferLoading` must be exactly true; it is independent of whether any developer addition exists. Empty developer nodes retain surface positions, produce no model message, and cannot replace the protected system head. Unknown ignorable developer payloads are deferred until the reader knows that event type.
+通常メッセージ、inbox/タイトル入力、コンパクション要約/生出力、または埋め込みアシスタント block-start/block-end レコード内のツール変更ブロックは拒否される。存在する `request/header.header.tools[].deferLoading` は正確に true でなければならない。これは開発者追加の有無とは独立である。空の開発者ノードはサーフェス位置を保持し、モデルメッセージを生成せず、保護システムヘッドを置換できない。未知の無視可能な開発者ペイロードは、リーダーがそのイベント型を知るまで延期される。
 
-Native format support validates and preserves developer history. The [LLM runtime](../../llm/llm/README.md) projects tool updates for each route and omits developer messages on unsupported routes; Chat and Trajectory render tool-change notices. These consumers use the accepted representation without adding a new format.
+ネイティブフォーマットサポートは開発者履歴を検証して保持する。[LLM ランタイム](../../llm/llm/README.md)は各ルート向けにツール更新を投影し、未対応ルートでは開発者メッセージを省略する。Chat と Trajectory はツール変更通知を描画する。これらのコンシューマーは新しいフォーマットを追加せずに受理表現を使用する。
 
 <a id="fork-results"></a>
-### Fork-generated results
+### フォーク生成結果
 
-Fork seed construction belongs to core Session, not this migration. Native V4 admits its synthetic `TOOL_NOT_STARTED` error results with ids `forked-tool-result-<callId>-<seq>`, role `tool`, matching source/call ids, `isError: true`, `ToolNotStartedError`, and one text block. Append results carry their own sequence and no source references; later replacements retain an earlier suffix and cite exactly that original result. The branch-specific text is retained, not normalized to crash-recovery wording.
+フォークシード構築はコアセッションに属し、このマイグレーションには属さない。ネイティブ V4 は、id `forked-tool-result-<callId>-<seq>`、ロール `tool`、一致するソース/呼び出し id、`isError: true`、`ToolNotStartedError`、および 1 件のテキストブロックを持つ合成 `TOOL_NOT_STARTED` エラー結果を受理する。追加結果は自身のシーケンスを持ち、ソース参照を持たない。後の置換は前期サフィックスを保持し、正確にその元結果を引用する。分岐固有テキストは保持され、クラッシュ回復文言に正規化されない。
 
-Started fork calls use `TOOL_OUTCOME_UNKNOWN` error results and retain their recorded start references. They follow ordinary started-call validation; the special not-started identity rules above do not apply to them. Fork construction closes its open tail with `turn/end.reason.kind: 'forked'` and leaves completed earlier steps and turns unchanged.
+開始済みフォーク呼び出しは `TOOL_OUTCOME_UNKNOWN` エラー結果を使用し、記録された開始参照を保持する。通常の開始済み呼び出し検証に従い、上記の特殊な未開始同一性規則は適用されない。フォーク構築は開末尾を `turn/end.reason.kind: 'forked'` で閉じ、完了済みの前期ステップとターンは変更しない。
 
-The ordinary interrupted not-started repair retains its canonical historical integer suffix and exact crash-recovery text. Both forms must settle an advertised call under the lifecycle rules. The stage preserves existing fork/call/message ids; it does not infer ancestry from their string prefixes or execute a tool.
+通常の中断未開始修復は、正規の歴史的整数サフィックスと正確なクラッシュ回復テキストを保持する。両形式ともライフサイクル規則の下で広告呼び出しを確定しなければならない。ステージは既存フォーク/呼び出し/メッセージ id を保持し、文字列プレフィックスから祖先を推測せず、ツールを実行しない。
 
 <a id="native-recovery"></a>
-### Validation entry points and recovery
+### 検証エントリーポイントと回復
 
-| Entry point | Checks and limits |
+| エントリーポイント | 検査と制限 |
 |---|---|
-| V4 codec decode | Released physical framing plus V4 row admission. Required predecessor PTC tags, retired system headers, and owned malformed native fields are refused before recoverable suffix suppression. |
-| V4 codec encode | The same native row checks; ignorable developer payloads are still validated by the writer. |
-| Native catalog, `validation: 'transformed'` | Codec checks only; skips artifact restoration because no migration ran. This is not full native validation. |
-| Historical catalog, `validation: 'transformed'` | Conversion followed by generation-owned V4 restoration; skips installed common Session validation. |
-| Catalog, `validation: 'current'` | Generation-owned V4 checks plus installed current Session header, envelope, message, surface, and projection validation. Use strict recovery for fixtures and publication verification. |
-| Native JSONL scanner | Supplies installed vocabulary to row admission before recovery and applies mandatory V4 relationships before exposing the accepted prefix. |
+| V4 コーデックデコード | リリース済み物理フレーミングに V4 行アドミッションを加えたもの。必須前任 PTC タグ、退役システムヘッダー、および所有側の不正ネイティブフィールドは、回復可能サフィックス抑制の前に拒否される。 |
+| V4 コーデックエンコード | 同じネイティブ行検査。無視可能な開発者ペイロードもライターが検証する。 |
+| ネイティブカタログ、`validation: 'transformed'` | コーデック検査のみ。マイグレーションが実行されていないためアーティファクト復元をスキップする。これは完全なネイティブ検証ではない。 |
+| 履歴カタログ、`validation: 'transformed'` | 変換に続くジェネレーション所有 V4 復元。インストール済み共通セッション検証をスキップする。 |
+| カタログ、`validation: 'current'` | ジェネレーション所有 V4 検査に加え、インストール済み現行セッションヘッダー、エンベロープ、メッセージ、サーフェス、およびプロジェクション検証。フィクスチャと公開検証には厳格回復を使うこと。 |
+| ネイティブ JSONL スキャナー | 回復前に行アドミッションへインストール済み語彙を提供し、受理済みプレフィックス公開前に必須 V4 関係を適用する。 |
 
-Unknown required events are refused by vocabulary-aware restoration. Unknown ignorable payloads remain uninterpreted; required `tool/code-dispatch-start` / `tool/code-dispatch` are refused as retired syntax, while ignorable predecessors stay opaque. The physical decoder defers ignorable developer payloads when vocabulary is absent; a native reader that knows developer events must validate them before accepting a recoverable suffix. Only accepted inherited markers establish the cut.
+未知の必須イベントは語彙認識復元で拒否される。未知の無視可能なペイロードは未解釈のままである。必須 `tool/code-dispatch-start` / `tool/code-dispatch` は退役構文として拒否され、無視可能な前任は不透明なまま残る。物理デコーダーは語彙不在時に無視可能な開発者ペイロードを延期し、開発者イベントを知るネイティブリーダーは回復可能サフィックス受理前にそれらを検証しなければならない。受理された継承マーカーのみがカットを確立する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The migration declaration creates independent streaming stages. Compact runs expand as iterables without an intermediate event array. The V3-to-V4 stage rewrites historical message sources, lifts historical tool-result wrappers, and inserts evidenced interrupted turn endings while emitting V4 events. It retains one source-to-target sequence entry per source event for local reference remapping. The V4 codec uses the released V2 codec only for physical header and source-range framing, and validates native tool-role rows directly; it does not invoke the released V3 validator or source-conversion views. JSONL scanners call `assertV4RowAdmission` before suppressing recoverable rows and the shared mandatory relationship validator before returning the completed logical prefix.
+マイグレーション宣言は独立したストリーミングステージを作成する。コンパクトランは中間のイベント配列なしにイテラブルとして展開される。V3-to-V4 ステージは歴史的メッセージソースを書き換え、歴史的ツール結果ラッパーを持ち上げ、証拠のある中断ターン終了を挿入しながら V4 イベントを排出する。ローカル参照再マッピング用にソースイベントごとに 1 件のソース対ターゲットシーケンスエントリーを保持する。V4 コーデックは物理ヘッダーとソース範囲フレーミングにのみリリース済み V2 コーデックを使用し、ネイティブツールロール行を直接検証する。リリース済み V3 バリデーターやソース変換ビューは呼び出さない。JSONL スキャナーは、回復可能行の抑制前に `assertV4RowAdmission` を呼び出し、完成論理プレフィックス返却前に共有必須関係バリデーターを呼び出す。
 
-The target restorer validates native fields and mandatory cross-event relationships, then returns the original artifact. Unknown ignorable events remain opaque, and unfinished inherited compactions expire at the end-seed marker.
+ターゲット復元器はネイティブフィールドと必須クロスイベント関係を検証し、元の アーティファクトを返す。未知の無視可能なイベントは不透明なまま残り、未完の継承コンパクションは end-seed マーカーで失効する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Format version and release status](../../../docs/session-format-status.md) — checkout writer and published format authority.
-- [Adding a Session format version](../../../docs/cookbook/adding-a-session-format-version.md) — adjacent-edge integration and validation.
-- [JSONL persistence](../session-persistence-jsonl/README.md) — immutable generation selection and publication.
+- [フォーマットバージョンとリリース状態](../../../docs/session-format-status.md) — チェックアウトライターと公開フォーマット権威。
+- [セッションフォーマットバージョンの追加](../../../docs/cookbook/adding-a-session-format-version.md) — 隣接エッジ統合と検証。
+- [JSONL 永続化](../session-persistence-jsonl/README.md) — 不変ジェネレーション選択と公開。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Historical restoration
+### 歴史的復元
 
-#### What the model sees
+#### モデルが見るもの
 
-Historical requests retain their recorded messages and model configuration. The [migration stage](src/migration.ts) represents `tool/result` payloads as tool-role messages without adding model-visible content; catalog records do not enter model messages directly, though later subagent listing can discover the historical children.
+歴史的リクエストは記録メッセージとモデル構成を保持する。[マイグレーションステージ](src/migration.ts)は `tool/result` ペイロードをモデル可視コンテンツ追加なしにツールロールメッセージとして表現する。カタログレコードはモデルメッセージに直接入らないが、後のサブエージェント一覧で歴史的子を発見できる。
 
-#### Token effect
+#### トークン効果
 
-The conversion changes no request text or token-bearing data.
+変換はリクエストテキストやトークン保持データを変更しない。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-The edge preserves the recorded request prefix. Provider cache availability and eviction remain outside this library.
+エッジは記録リクエストプレフィックスを保持する。プロバイダーキャッシュ可用性と追い出しはこのライブラリの対象外である。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しの作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Historical converter coverage** — Unsupported source forms may fail without publishing a successor or changing the source. First-party recordings do not enumerate third-party extensions. Later converter fixes may add support after V4 publication if their V4 output remains compatible. Interpreting extra stream-start fields and preparing future delivery generations require a concrete format change.
-- **Accepted V4 transition** — the [checkpoint](../../../docs/session-format-status.md#finalization-record) protects the accepted history. Backward-compatible additions can remain V4 through new acknowledgements; breaking changes require a successor. Already-written V4 files do not rerun this incoming edge, and historical inputs remain intact.
-- **V5 prerequisite readers** — V4 child evidence currently goes through the installed catalog. A future writer must bind fixed-generation V4 prerequisite reading before changing that catalog. The exported V4 restorer supplies generation-owned checks; full common message admission additionally uses installed Session validation.
-- **Nested historical tool results** — migration currently refuses results containing another tool-result wrapper. The original generation remains intact and no V4 successor is published. A later converter may support evidenced source cases without changing the established V4 format; the [migration cookbook](../../../docs/cookbook/adding-a-session-format-version.md#stages-and-validation) defines that distinction.
-- **Historical extension consumers** — prefixed message and result fields preserve JSON data without activating core fields. A consumer must explicitly understand those fields before interpreting them.
-- **Retained child logs required** — a parent alone cannot recover unrecorded child ids, creation times, or descriptors. Deleted children cannot be reconstructed from tool arguments; existing parent catalog records remain.
-- **Unknown historical modes** — without exactly one supported own descriptor, a missing parent entry records unknown mode. Current reads do not rewrite that entry; opening the child resolves available descriptor information or reports its own error.
-- **Storage scope** — facts cover recognizable children within the same persistence root. Cross-root import and corrupt-log repair are outside this migration.
+- **歴史的コンバーター範囲** — サポート外ソース形式は後継公開やソース変更なしに失敗しうる。ファーストパーティー記録はサードパーティー拡張を列挙しない。後のコンバーター修正は、V4 出力が互換性を保つ場合に V4 公開後サポートを追加しうる。追加ストリーム開始フィールドの解釈や将来デリバリージェネレーションの準備には具体的なフォーマット変更が必要である。
+- **受理済み V4 遷移** — [チェックポイント](../../../docs/session-format-status.md#finalization-record)は受理履歴を保護する。後方互換追加は新しい承認を経て V4 のまま残りうる。破壊的変更は後継を要求する。書き込み済み V4 ファイルはこの入力エッジを再実行せず、歴史的入力はそのまま残る。
+- **V5 前提リーダー** — V4 子エビデンスは現在インストール済みカタログを経由する。将来ライターはそのカタログ変更前に固定ジェネレーション V4 前提読み取りを束縛しなければならない。エクスポートされた V4 復元器はジェネレーション所有検査を提供し、完全な共通メッセージ受理は追加でインストール済みセッション検証を使用する。
+- **入れ子の歴史的ツール結果** — マイグレーションは現在、別のツール結果ラッパーを含む結果を拒否する。元のジェネレーションはそのまま残り、V4 後継は公開されない。後のコンバーターは、確立された V4 フォーマット変更なしに証拠のあるソース事例をサポートしうる。[マイグレーションクックブック](../../../docs/cookbook/adding-a-session-format-version.md#stages-and-validation)はその区別を定義する。
+- **歴史的拡張コンシューマー** — プレフィックス付きメッセージおよび結果フィールドは、コアフィールドを有効化せずに JSON データを保持する。コンシューマーはそれらのフィールド解釈前に明示的に理解しなければならない。
+- **保持子ログが必須** — 親のみでは未記録の子 id、作成時刻、または記述子を回復できない。削除済み子はツール引数から再構築できない。既存の親カタログレコードは残る。
+- **未知の歴史的モード** — ちょうど 1 件のサポート対象の自身の記述子がなければ、欠落親エントリーは unknown モードを記録する。現行読み取りはそのエントリーを書き換えない。子を開くことで利用可能な記述子情報が解決されるか、その子自身のエラーが報告される。
+- **ストレージ範囲** — ファクトは同一永続化ルート内の認識可能な子を対象とする。クロスルート取り込みや破損ログ修復はこのマイグレーションの対象外である。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>保守者向け作業文脈 — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

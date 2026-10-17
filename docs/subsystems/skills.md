@@ -1,20 +1,20 @@
 # Skills
 
-English | [中文](skills.zh.md)
+日本語 | [English](skills.en.md) | [中文](skills.zh.md)
 
-The [skill capability family](../../packages/skill) includes the Service Definition ([dsh-skill](../../packages/skill/skill), `ctx.skills`), the local Service Provider ([dsh-skill-filesystem](../../packages/skill/skill-filesystem)), optional packaged providers ([dsh-skill-badge](../../packages/experimental/skill-badge), [dsh-skill-office](../../packages/skill/skill-office), and the Windows ACL diagnosis provider in [dsh-sandbox-windows-acl](../../packages/sandbox/sandbox-windows-acl)), and the Consumer ([dsh-tool-skill](../../packages/skill/tool-skill)). The registry merges provider catalogs across its host and per-scope layers; providers contribute local or packaged skills; the Consumer owns the initial and replacement catalogs plus the model-facing `skill` tool. Skills are optional instructions, not session events, so their vocabulary lives here rather than in [core.md](core.md).
+[skill ケイパビリティファミリー](../../packages/skill)には、Service Definition ([dsh-skill](../../packages/skill/skill)、`ctx.skills`)、ローカル Service Provider ([dsh-skill-filesystem](../../packages/skill/skill-filesystem))、省略可能な同梱プロバイダー ([dsh-skill-badge](../../packages/experimental/skill-badge)、[dsh-skill-office](../../packages/skill/skill-office)、および [dsh-sandbox-windows-acl](../../packages/sandbox/sandbox-windows-acl) 内の Windows ACL 診断プロバイダー)、そして Consumer ([dsh-tool-skill](../../packages/skill/tool-skill)) が含まれる。レジストリはホスト層とスコープごとの層にまたがってプロバイダーのカタログをマージし、プロバイダーはローカルまたは同梱のスキルを提供し、Consumer は初期カタログと置換カタログ、およびモデル向けの `skill` ツールを所有する。スキルはセッションイベントではなく省略可能な指示であるため、その語彙は [core.md](core.md) ではなくここに置かれる。
 
-Source: [`packages/skill/skill/src/index.ts`](../../packages/skill/skill/src/index.ts), [`packages/skill/skill-filesystem/src/index.ts`](../../packages/skill/skill-filesystem/src/index.ts), [`packages/experimental/skill-badge/src/index.ts`](../../packages/experimental/skill-badge/src/index.ts), [`packages/skill/skill-office/src/index.ts`](../../packages/skill/skill-office/src/index.ts), [`packages/sandbox/sandbox-windows-acl/src/acl-skill.ts`](../../packages/sandbox/sandbox-windows-acl/src/acl-skill.ts), and [`packages/skill/tool-skill/src/index.ts`](../../packages/skill/tool-skill/src/index.ts).
+ソース: [`packages/skill/skill/src/index.ts`](../../packages/skill/skill/src/index.ts)、[`packages/skill/skill-filesystem/src/index.ts`](../../packages/skill/skill-filesystem/src/index.ts)、[`packages/experimental/skill-badge/src/index.ts`](../../packages/experimental/skill-badge/src/index.ts)、[`packages/skill/skill-office/src/index.ts`](../../packages/skill/skill-office/src/index.ts)、[`packages/sandbox/sandbox-windows-acl/src/acl-skill.ts`](../../packages/sandbox/sandbox-windows-acl/src/acl-skill.ts)、[`packages/skill/tool-skill/src/index.ts`](../../packages/skill/tool-skill/src/index.ts)。
 
-## Provider registry
+## プロバイダーレジストリ
 
-`ctx.skills` combines local, embedded, remote, or other providers. Registration is synchronous; remote initialization and discovery belong in awaited `list()`. Provider objects, options, and candidates are borrowed readonly, while semantic fields are validated.
+`ctx.skills` はローカル、組み込み、リモート、その他のプロバイダーを統合する。登録は同期であり、リモートの初期化とディスカバリーは await される `list()` に属する。プロバイダーオブジェクト、オプション、候補は読み取り専用として借用され、意味論的フィールドは検証される。
 
-The registry is host+per-scope layered, the shape the [tools registry](tools.md) established over [dsh-scope](../../packages/core/scope): a registration files into the layer of its calling context's scope, so host rows and repository plugins land in the global layer while a plugin mounted by an agent preset's standing composition lands in that preset's layer, and provider names are unique per layer rather than process-wide. A read merges the global layer with the viewing scope's chain — the nearest layer's entry wins a duplicate skill name outright, and the rank order below decides duplicates only within one layer. Discovery caches are keyed by the resolved scope chain, so re-parenting a scope (a blank-session recompose) is visible to the next read without a registry mutation.
+レジストリはホスト + スコープごとの層構造であり、[tools レジストリ](tools.md)が [dsh-scope](../../packages/core/scope) の上で確立した形態である: 登録は呼び出し元コンテキストのスコープの層にファイルされ、ホスト行とリポジトリプラグインはグローバル層に、エージェント preset の常設コンポジションがマウントしたプラグインはその preset の層に着地し、プロバイダー名はプロセス全体ではなく層ごとに一意である。読み取りはグローバル層と閲覧スコープのチェーンをマージする — 最も近い層のエントリーが重複するスキル名を完全に制し、以下のランク順は 1 つの層内でだけ重複を裁決する。ディスカバリーキャッシュは解決されたスコープチェーンでキー付けされるため、スコープの親の付け替え (空セッションの再コンポーズ) はレジストリの変更なしに次の読み取りから見える。
 
-Within one layer, duplicate names resolve by rank, provider order, then local order; summaries sort by name. A rejected `list()` is logged and omitted from an incomplete observation, while an explicit incomplete observation contributes usable candidates without making the result cacheable; malformed candidates fail fast. Each provider factory receives a registration-scoped control whose `invalidate()` clears completed catalogs only while that exact registration remains active and whose signal aborts on failed registration or disposal. An in-flight discovery retries once when its provider generation changes; a second change returns the latest candidates incomplete and uncached. Provider and runtime mutations emit the unfiltered `skills/change` invalidation event; it carries no diff, so consumers refetch `snapshot()` with their own lookup options.
+1 つの層内では、重複名は rank、プロバイダー順、次にローカル順で解決され、サマリーは名前でソートされる。拒否された `list()` はログに記録され、不完全な観測からは省略される。一方、明示的な不完全観測は使用可能な候補を提供しつつ、結果をキャッシュ可能にはしない。不正な候補は即座に失敗する。各プロバイダーファクトリーは登録スコープのコントロールを受け取る。その `invalidate()` はその正確な登録がアクティブな間だけ完了済みカタログをクリアし、そのシグナルは登録失敗または破棄で abort する。進行中のディスカバリーは、プロバイダーの世代が変わると 1 回再試行する。2 回目の変化は最新の候補を不完全かつ非キャッシュとして返す。プロバイダーとランタイムの変更はフィルターなしの `skills/change` 無効化イベントを発行する。差分を運ばないため、コンシューマーは自身のルックアップオプションで `snapshot()` を再取得する。
 
-An array returned by `SkillProvider.list()` is complete-discovery shorthand. `SkillProviderObservation` lets a provider expose candidates that remain directly loadable while reporting that the observation is not authoritative.
+`SkillProvider.list()` が返す配列は完全ディスカバリーの省略記法である。`SkillProviderObservation` は、その観測が権威的でないことを報告しつつ、直接ロード可能なままの候補をプロバイダーが公開できるようにする。
 
 ```ts type-equiv
 /** Provider candidates plus whether the current discovery is authoritative. */
@@ -61,37 +61,37 @@ interface SkillProviderControl {
 }
 ```
 
-## Local discovery priority
+## ローカルディスカバリーの優先順位
 
-The shipped local provider scans roots in rank order:
+同梱のローカルプロバイダーはランク順にルートを走査する:
 
-| Rank | Source | Root |
+| Rank | ソース | ルート |
 |---|---|---|
 | 100 | `project-dsh` | `<projectRoot>/.dsh/skills` |
 | 200 | `project-agents` | `<projectRoot>/.agents/skills` |
 | 300 | `custom` | `Config.customSkillDirs` |
 | 400 | `user-dsh` | `<dshHome>/skills` |
 | 500 | `user-agents` | `<agentsHome>/skills` |
-| 600 | `bundled` | `Config.bundledSkillDir` when configured |
+| 600 | `bundled` | 設定されている場合は `Config.bundledSkillDir` |
 
-The project root is the nearest ancestor containing `.git`; without one, the current cwd is used. When `ctx.fs` is available, the git-root walk probes `.git` through the filesystem service so remote or sandboxed workspaces do not fall back to the host filesystem boundary. The user DSH root skips its `.system` child. The local provider does not synthesize built-in system skills; deployments supply packaged skills through configured bundled roots or dedicated providers.
+プロジェクトルートは `.git` を含む最も近い祖先であり、それがなければ現在の cwd が使われる。`ctx.fs` が利用可能な場合、git ルートの探索はファイルシステムサービスを通じて `.git` を調べるため、リモートまたはサンドボックス化されたワークスペースがホストのファイルシステム境界にフォールバックすることはない。ユーザー DSH ルートはその `.system` 子をスキップする。ローカルプロバイダーはビルトインのシステムスキルを合成しない。デプロイメントは設定された同梱ルートまたは専用プロバイダーを通じて同梱スキルを提供する。
 
-`dsh-skill-badge` registers one immutable `bundled` candidate at `BUNDLED_SKILL_RANK` and exposes its packaged asset directory through `resourceBase`. The shipped CLI declares the plugin disabled, so enabling its composition row is an explicit opt-in.
+`dsh-skill-badge` は `BUNDLED_SKILL_RANK` に 1 つの不変な `bundled` 候補を登録し、同梱アセットディレクトリを `resourceBase` を通じて公開する。出荷される CLI はこのプラグインを無効として宣言しているため、そのコンポジション行の有効化は明示的なオプトインである。
 
-Chokidar watches existing roots for direct bundle/flat-entry additions and removals plus direct skill-entry changes. A missing root is followed one absent path segment at a time from its nearest existing ancestor until Chokidar can attach. Resource files below a bundle are not catalog changes. Model-facing `write` and `edit` observations synchronously invalidate the provider when their target is catalog-relevant, while the host watcher covers IDE, Git, shell, and external-process mutations. Watcher failures make the current observation incomplete without hiding readable candidates from direct loads; project-scoped watchers use a configured bounded LRU.
+Chokidar は既存のルートを監視し、バンドル/フラットエントリーの直接の追加と削除、およびスキルエントリーの直接の変更を捉える。欠落したルートは、Chokidar がアタッチできるまで、最も近い既存の祖先から 1 つの欠落パスセグメントずつ辿られる。バンドルの下のリソースファイルはカタログ変更ではない。モデル向けの `write` と `edit` の観測は、そのターゲットがカタログに関係する場合にプロバイダーを同期的に無効化し、ホストのウォッチャーは IDE、Git、シェル、外部プロセスの変更をカバーする。ウォッチャーの失敗は、直接ロードに対して読み取り可能な候補を隠すことなく、現在の観測を不完全にする。プロジェクトスコープのウォッチャーは設定された上限付き LRU を使う。
 
-## Skill identity
+## スキルの同一性
 
-Skill names are kebab-case (`^[a-z0-9]+(?:-[a-z0-9]+)*$`). The local provider accepts directory bundles (`<name>/SKILL.md`) and flat Markdown files (`<name>.md`). Nested recursive `**/SKILL.md` discovery is not supported.
+スキル名はケバブケースである (`^[a-z0-9]+(?:-[a-z0-9]+)*$`)。ローカルプロバイダーはディレクトリバンドル (`<name>/SKILL.md`) とフラットな Markdown ファイル (`<name>.md`) を受け入れる。入れ子の再帰的な `**/SKILL.md` ディスカバリーはサポートされない。
 
 ```ts type-equiv
 /** Origin bucket for a skill contribution. The value is prompt-visible metadata, not precedence by itself. */
 type SkillSource = 'project-dsh' | 'project-agents' | 'runtime' | 'user-dsh' | 'user-agents' | 'custom' | 'bundled' | (string & {})
 ```
 
-## Summaries, candidates, and complete definitions
+## サマリー、候補、完全な定義
 
-`SkillSummary` is the registry's invocation-neutral summary shape. Consumers choose which entries and fields to render; the model session catalog uses only model-invocable `name` and `description`, never the body or absolute file path. `SkillInvocationPolicy` normalizes the two independent invocation controls into positive booleans, and every resolved summary, candidate, and definition carries it without turning arbitrary frontmatter into the domain model.
+`SkillSummary` はレジストリの呼び出し中立なサマリー形式である。どのエントリーとフィールドをレンダリングするかはコンシューマーが選ぶ。モデルセッションカタログはモデル呼び出し可能な `name` と `description` だけを使い、ボディや絶対ファイルパスは決して使わない。`SkillInvocationPolicy` は 2 つの独立した呼び出しコントロールを正のブール値に正規化し、解決されたすべてのサマリー、候補、定義がそれを運び、任意のフロントマターをドメインモデルに変えることはない。
 
 ```ts type-equiv
 /** Invocation controls shared by skill discovery consumers. */
@@ -125,9 +125,9 @@ interface SkillSummary {
 }
 ```
 
-`ctx.skills.list()` preserves all four policy combinations. `isModelInvocable(skill)` and `isUserInvocable(skill)` read the corresponding required field. A model-only skill sets `{ modelInvocable: true, userInvocable: false }`, a user-only skill sets `{ modelInvocable: false, userInvocable: true }`, and setting both fields to `false` keeps the skill available only through trusted `ctx.skills.get()` callers. The local provider reads the exact kebab-case frontmatter keys `disable-model-invocation` and `user-invocable`, defaults omitted fields to `true`, and projects every parsed skill into this normalized policy.
+`ctx.skills.list()` は 4 つのポリシー組み合わせすべてを保持する。`isModelInvocable(skill)` と `isUserInvocable(skill)` は対応する必須フィールドを読む。モデル専用スキルは `{ modelInvocable: true, userInvocable: false }` を設定し、ユーザー専用スキルは `{ modelInvocable: false, userInvocable: true }` を設定し、両方を `false` にするとスキルは信頼された `ctx.skills.get()` 呼び出し元だけが利用できるようになる。ローカルプロバイダーは正確なケバブケースのフロントマターキー `disable-model-invocation` と `user-invocable` を読み、省略されたフィールドは `true` にデフォルトし、解析されたすべてのスキルをこの正規化ポリシーに投影する。
 
-`SkillCatalogSnapshot` distinguishes authoritative absence from transient provider failure or a catalog that kept changing during discovery. `skills` contains the sorted invocation-neutral summaries collected in that observation; `complete` is true only when every registered provider completed without a concurrent catalog revision. Incomplete snapshots are not cached, allowing each consumer to retain its last-good filtered catalog and retry.
+`SkillCatalogSnapshot` は権威的な不在を、一時的なプロバイダー障害やディスカバリー中に変わり続けたカタログと区別する。`skills` にはその観測で収集されたソート済みの呼び出し中立サマリーが含まれ、`complete` は登録されたすべてのプロバイダーがカタログ改訂と同時に走ることなく完了した場合にのみ true になる。不完全なスナップショットはキャッシュされず、各コンシューマーは最後に良好だったフィルター済みカタログを保持して再試行できる。
 
 ```ts type-equiv
 /** One catalog observation plus whether discovery completed within a stable catalog revision. */
@@ -139,7 +139,7 @@ interface SkillCatalogSnapshot {
 }
 ```
 
-`SkillCandidate` is the provider-to-registry shape. `locator` is opaque provider state; the registry only stores it and gives it back to the winning provider's `get()`.
+`SkillCandidate` はプロバイダーからレジストリへの形式である。`locator` は不透明なプロバイダー状態であり、レジストリはそれを保存し、勝ったプロバイダーの `get()` に返すだけである。
 
 ```ts type-equiv
 /** Provider catalog entry used by the registry to merge and later load skills. */
@@ -153,7 +153,7 @@ interface SkillCandidate extends SkillSummary {
 }
 ```
 
-`SkillDefinition` is the complete parsed result returned by `ctx.skills.get()` and used by the `skill` tool. `resourceBase` tells the tool how to render relative-resource guidance for local, URL, or provider-managed skills.
+`SkillDefinition` は `ctx.skills.get()` が返し、`skill` ツールが使う、完全に解析された結果である。`resourceBase` は、ローカル、URL、またはプロバイダー管理のスキルに対する相対リソースガイダンスのレンダリング方法をツールに伝える。
 
 ```ts type-equiv
 /** Optional provider-specific base used by loaded skill bodies to resolve relative resources. */
@@ -173,7 +173,7 @@ interface SkillDefinition extends SkillSummary {
 }
 ```
 
-Runtime skill inputs may omit invocation controls and the provider label. The registry resolves both defaults once, then uses the same complete definition shape and first-wins collection order as providers. The returned disposer removes the contribution and invalidates discovery caches.
+ランタイムスキル入力は呼び出しコントロールとプロバイダーラベルを省略できる。レジストリは両方のデフォルトを 1 回解決し、その後、プロバイダーと同じ完全な定義形式と先勝ちの収集順を使う。返された disposer はコントリビューションを除去し、ディスカバリーキャッシュを無効化する。
 
 ```ts type-equiv
 /** Runtime skill contribution accepted by `ctx.skills.register()`. */
@@ -185,11 +185,11 @@ type SkillRegistration = Omit<SkillDefinition, 'invocation' | 'provider'> & {
 }
 ```
 
-## Lookup and configuration
+## ルックアップと設定
 
-Skill lookup is cwd-sensitive because providers may expose workspace-local skills, and its optional signal cancels provider work for the caller. Registry reads additionally take the viewing scope — consumers pass the calling agent, which is its own scope key — through `SkillViewOptions`; the registry consumes `scope` for layer selection, and providers read only their `SkillLookupOptions` contract from the same borrowed options object. Cancellation is checked before and after catalog selection, including cache hits, and races both discovery and full-definition loading. If no git root is found, the local provider treats the supplied cwd itself as the project root.
+スキルのルックアップは cwd に敏感である。プロバイダーがワークスペースローカルのスキルを公開することがあり、その省略可能なシグナルは呼び出し元のためにプロバイダーの作業をキャンセルするからである。レジストリの読み取りはさらに閲覧スコープを取る — コンシューマーは呼び出し元エージェント (それ自体がスコープキー) を渡す — `SkillViewOptions` を通じて。レジストリは層選択のために `scope` を消費し、プロバイダーは同じ借用オプションオブジェクトから自身の `SkillLookupOptions` 契約だけを読む。キャンセルはカタログ選択の前後にチェックされ (キャッシュヒットを含む)、ディスカバリーと完全定義のロードの両方と競合する。git ルートが見つからない場合、ローカルプロバイダーは供給された cwd 自体をプロジェクトルートとして扱う。
 
-Full definitions are not cached by the registry. Each `get()` calls the winning provider with the selected candidate, so the local provider rereads the current body. A definition whose name no longer matches that candidate is rejected and invalidates the exact provider for rediscovery.
+完全な定義はレジストリにキャッシュされない。各 `get()` は選択された候補とともに勝ったプロバイダーを呼ぶため、ローカルプロバイダーは現在のボディを読み直す。名前がその候補と一致しなくなった定義は拒否され、再ディスカバリーのために正確なプロバイダーを無効化する。
 
 ```ts type-equiv
 /** Caller context used for cwd-sensitive and abortable provider work. */
@@ -214,7 +214,7 @@ interface SkillViewOptions extends SkillLookupOptions {
 }
 ```
 
-The registry owns only its discovery-cache bound. The local provider owns filesystem roots (`dshHome`, `agentsHome`, `customSkillDirs`, and optional `bundledSkillDir`/`DSH_BUNDLED_SKILL_DIR`) plus watcher enablement, polling, stability, symlink, and project-capacity controls. The consumer owns its catalog description bound. Exact defaults and validation are in the generated [config catalog](../config-catalog.md).
+レジストリは自身のディスカバリーキャッシュ上限だけを所有する。ローカルプロバイダーはファイルシステムルート (`dshHome`、`agentsHome`、`customSkillDirs`、および省略可能な `bundledSkillDir`/`DSH_BUNDLED_SKILL_DIR`) と、ウォッチャーの有効化、ポーリング、安定性、シンボリックリンク、プロジェクト容量のコントロールを所有する。コンシューマーは自身のカタログ説明の上限を所有する。正確なデフォルトと検証は生成された[設定カタログ](../config-catalog.md)にある。
 
 ```ts type-equiv
 /** Skill registry configuration. */
@@ -224,17 +224,17 @@ interface Config {
 }
 ```
 
-## Session catalog and tool contract
+## セッションカタログとツール契約
 
-`dsh-tool-skill` injects the initial durable user-role `<system-reminder>` at the first `agent/pre-step` of a live session that observes a non-empty complete view. The catalog contains sorted skill `name` and normalized, XML-escaped `description` only; it omits bodies, paths, sources, providers, and routing hints. Discovery forwards the step's abort signal through `SkillLookupOptions`. `catalogDescriptionMaxLength` is the consumer config for the description bound, with default `500` and integer minimum `3`.
+`dsh-tool-skill` は、空でない完全なビューを観測するライブセッションの最初の `agent/pre-step` で、初期の永続的な user ロールの `<system-reminder>` を注入する。カタログにはソート済みのスキル `name` と正規化され XML エスケープされた `description` だけが含まれ、ボディ、パス、ソース、プロバイダー、ルーティングヒントは省略される。ディスカバリーはステップの abort シグナルを `SkillLookupOptions` を通じて転送する。`catalogDescriptionMaxLength` は説明の上限に関するコンシューマー設定で、デフォルトは `500`、整数の最小値は `3` である。
 
-Before each later model step, the consumer applies exact tool visibility and digests the exact rendered entries between the `<available_skills>` tags from a complete snapshot. It derives the comparison baseline from the same entries in the newest recognizable visible catalog message sourced by the plugin. A changed digest appends a durable full replacement through `agent.inject()`; deleting every skill appends an explicit empty replacement. Incomplete snapshots preserve the last-good model view. If compaction hides every historical catalog message, the next complete snapshot re-establishes the current catalog; an empty view with no prior catalog emits nothing. These catalog messages are session history, not World State.
+以降の各モデルステップの前に、コンシューマーは正確なツール可視性を適用し、完全なスナップショットから `<available_skills>` タグの間の正確なレンダリング済みエントリーをダイジェストする。比較ベースラインは、プラグインが発信元である最新の認識可能な可視カタログメッセージ内の同じエントリーから導出する。ダイジェストが変わると、`agent.inject()` を通じて永続的な完全置換を追加する。すべてのスキルを削除すると、明示的な空置換を追加する。不完全なスナップショットは最後に良好だったモデルビューを保つ。コンパクションが履歴のカタログメッセージをすべて隠した場合、次の完全なスナップショットが現在のカタログを再確立する。先行カタログのない空ビューは何も発行しない。これらのカタログメッセージはセッション履歴であり、World State ではない。
 
-The model-facing `skill({ name })` tool validates the kebab-case name, finds the summary in the invocation-neutral catalog, rejects it before loading unless `isModelInvocable` permits access, then rereads the complete definition for the calling agent cwd and rechecks the policy before returning content. It reports an unresolved skill as unknown or no longer available and returns a tool result containing `<skill_content name="...">`, `<skill_resources>`, and `<skill_instructions>`. `resourceBase` resolves explicitly referenced scripts, references, and assets only as needed; the loaded result does not enumerate a skill directory. Body-only edits therefore change later tool calls without producing catalog messages or rewriting earlier tool results.
+モデル向けの `skill({ name })` ツールはケバブケースの名前を検証し、呼び出し中立カタログでサマリーを見つけ、`isModelInvocable` がアクセスを許さない限りロード前に拒否し、その後、呼び出し元エージェントの cwd に対して完全な定義を読み直し、コンテンツを返す前にポリシーを再チェックする。解決できないスキルは不明またはもはや利用不可として報告し、`<skill_content name="...">`、`<skill_resources>`、`<skill_instructions>` を含むツール結果を返す。`resourceBase` は明示的に参照されたスクリプト、参照、アセットを必要な分だけ解決する。ロードされた結果がスキルディレクトリを列挙することはない。したがってボディのみの編集は、カタログメッセージを生成したり以前のツール結果を書き換えたりすることなく、以降のツール呼び出しを変える。
 
-## Browser Session catalog
+## ブラウザー Session カタログ
 
-`SkillListRequest` addresses one Session by `sessionId`; `SkillListValue` returns the user-invocable entries with name, description, optional usage guidance, and model-invocation availability. `SessionSkillCatalog` reads the Session cwd and recorded preset without activating an Agent. A live Agent may supply its scoped registry, while a cold Session uses the preset's standing scope.
+`SkillListRequest` は `sessionId` によって 1 つの Session を指定する。`SkillListValue` は、ユーザー呼び出し可能なエントリーを、名前、説明、省略可能な使用ガイダンス、モデル呼び出しの可用性とともに返す。`SessionSkillCatalog` は Agent をアクティブ化せずに Session の cwd と記録された preset を読む。ライブ Agent は自身のスコープ付きレジストリを供給でき、コールド Session は preset の常設スコープを使う。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

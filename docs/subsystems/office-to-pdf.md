@@ -1,45 +1,45 @@
-# Office to PDF
+# Office から PDF への変換
 
-English | [中文](office-to-pdf.zh.md)
+日本語 | [English](office-to-pdf.en.md) | [中文](office-to-pdf.zh.md)
 
-The [document package family](../../packages/document/README.md) converts Office files to PDFs on the Node Host. Consumers authorize source reads and own presentation; the shared provider owns conversion, bounded admission, and transient PDF reuse. This subsystem creates no model-facing tool or Session event.
+[document パッケージファミリー](../../packages/document/README.md)は Node ホスト上で Office ファイルを PDF に変換する。コンシューマーはソース読み取りを承認し、プレゼンテーションを所有する。共有プロバイダーは変換、制限付きアドミッション、一時的な PDF の再利用を所有する。このサブシステムはモデル向けツールもセッションイベントも作らない。
 
-## Ownership
+## 所有関係
 
-| Owner | Responsibility |
+| 所有者 | 責務 |
 |---|---|
-| [office-to-pdf](../../packages/document/office-to-pdf/README.md) | `ctx.officeToPdf`: shared LibreOffice conversion, bounded admission, and PDF caching |
-| [Web bundle](../../packages/bundle/web-app/README.md) | One configurable conversion provider shared by Host consumers |
-| [Office preview Client](../../packages/client/ui-sidebar-documentpreview/README.md#office-preview) | Office extension selection, PDF reuse, and missing-font notices |
+| [office-to-pdf](../../packages/document/office-to-pdf/README.md) | `ctx.officeToPdf`: 共有 LibreOffice 変換、制限付きアドミッション、PDF キャッシュ |
+| [Web バンドル](../../packages/bundle/web-app/README.md) | ホストのコンシューマーが共有する設定可能な変換プロバイダー 1 件 |
+| [Office プレビュークライアント](../../packages/client/ui-sidebar-documentpreview/README.md#office-preview) | Office 拡張子の選択、PDF の再利用、フォント不足の通知 |
 
-## Requests and results
+## リクエストと結果
 
-[`OfficeToPdfRequest`](../../packages/document/office-to-pdf/src/types.ts) contains an already-authorized source key/version, optional stat size, a deferred `read(signal, maxBytes)` callback, foreground/background priority, and a `OfficeExtension`: `doc`, `docx`, `xls`, `xlsx`, `ppt`, or `pptx`. `OfficeToPdf.convert(request, signal?)` returns one complete PDF result. Cancellation follows the caller and provider lifetimes; validation, output, and engine failures reject with a classified `OfficeToPdfError`.
+[`OfficeToPdfRequest`](../../packages/document/office-to-pdf/src/types.ts) は承認済みのソースキー/バージョン、任意の stat サイズ、遅延 `read(signal, maxBytes)` コールバック、フォアグラウンド/バックグラウンドの優先度、`OfficeExtension` (`doc`、`docx`、`xls`、`xlsx`、`ppt`、`pptx` のいずれか) を含む。`OfficeToPdf.convert(request, signal?)` は完成した PDF 結果 1 件を返す。キャンセルは呼び出し元とプロバイダーのライフタイムに従う。検証、出力、エンジンの失敗は分類済み `OfficeToPdfError` で拒否される。
 
-`OfficeToPdfPriority` is `foreground` for requested preview/QA and `background` for speculation. `OfficeSourceKey` brands the caller-owned authorized source locator. `OfficeToPdfGeneration` brands a provider lifetime, and `OfficeToPdfKey` brands its content identity; neither opaque value is parsed by consumers.
+`OfficeToPdfPriority` は、要求されたプレビュー/QA では `foreground`、推測実行では `background` である。`OfficeSourceKey` は呼び出し元が所有する承認済みソースロケーターにブランドを付ける。`OfficeToPdfGeneration` はプロバイダーのライフタイムにブランドを付け、`OfficeToPdfKey` はそのコンテンツアイデンティティにブランドを付ける。どちらの不透明な値もコンシューマーは解析しない。
 
-| Result field | Meaning |
+| 結果フィールド | 意味 |
 |---|---|
-| `pdf` | Caller-owned `Uint8Array` containing the complete PDF |
-| `missingFonts` | Requested document font families unavailable to this conversion |
-| `cacheKey` | Opaque converter generation plus extension/source-content identity |
-| `generation` | Provider lifetime; replacement invalidates cached PDF reuse |
+| `pdf` | 完成した PDF を含む呼び出し元所有の `Uint8Array` |
+| `missingFonts` | この変換で利用できなかった要求文書のフォントファミリー |
+| `cacheKey` | コンバーターの世代と拡張子/ソースコンテンツのアイデンティティからなる不透明な値 |
+| `generation` | プロバイダーのライフタイム。置き換えるとキャッシュ済み PDF の再利用が無効になる |
 
-The provider admits the deferred read before allocating source bytes, shares conversions by content identity, and removes its private scratch directory before returning. Returned PDF bytes remain valid after provider disposal. Source and PDF bytes do not enter Session storage. Consumers can use [Workspace Files](../../packages/api/workspace-files/README.md) for authorized bounded reads.
+プロバイダーはソースバイトを確保する前に遅延読み取りをアドミッションし、コンテンツアイデンティティごとに変換を共有し、戻る前にプライベートなスクラッチディレクトリを削除する。返された PDF バイトはプロバイダー破棄後も有効なままである。ソースバイトと PDF バイトはセッションストレージに入らない。コンシューマーは承認付き制限付き読み取りに [Workspace Files](../../packages/api/workspace-files/README.md) を使える。
 
-## Preview reads
+## プレビュー読み取り
 
-`RenderedDocumentBytes` carries workspace file metadata, native PDF `data`, `missingFonts`, and `generation`; the original source identity accompanies the converted PDF.
+`RenderedDocumentBytes` はワークスペースファイルのメタデータ、ネイティブ PDF の `data`、`missingFonts`、`generation` を運び、変換済み PDF に元のソースアイデンティティが付随する。
 
-The `officeToPdf.render` Remote method checks source authorization and versions through the Session's [Workspace Files](../../packages/api/workspace-files/README.md) service. After conversion admission, `fs.readBytes` supplies raw input within the reserved byte capacity; Office input limits govern this read. The binary Remote projects the PDF into a multipart attachment and restores an `ArrayBuffer`-backed `Uint8Array` on the Client. Source access failures pass through; size and engine failures expose a classified reason without diagnostics. Conversion does not activate an Agent or append events.
+`officeToPdf.render` リモートメソッドは、セッションの [Workspace Files](../../packages/api/workspace-files/README.md) サービスを通じてソースの承認とバージョンを確認する。変換アドミッションの後、`fs.readBytes` が予約済みバイト容量の範囲内で生入力を供給する。この読み取りには Office 入力上限が適用される。バイナリリモートは PDF をマルチパート添付に投影し、クライアント側で `ArrayBuffer` に裏打ちされた `Uint8Array` を復元する。ソースアクセスの失敗はそのまま通過する。サイズとエンジンの失敗は診断情報なしに分類済み理由を公開する。変換はエージェントを起動せず、イベントも追加しない。
 
-The `api/remotes` assembly mounts the conversion service's generated Remote descriptor. The shared Document Preview package registers Office formats with complete-byte loading and its existing PDF.js Worker. Each preview read rechecks renderer generation, source authorization, and version before sharing an in-flight conversion or cached PDF. Connection resets and plugin disposal cancel requests and clear cached bytes. Missing services show localized configuration guidance.
+`api/remotes` アセンブリは変換サービスの生成済みリモート記述子をマウントする。共有ドキュメントプレビューパッケージは Office 形式を完全バイト読み込みと既存の PDF.js Worker で登録する。各プレビュー読み取りは、進行中の変換またはキャッシュ済み PDF を共有する前にレンダラー世代、ソース承認、バージョンを再確認する。接続リセットとプラグイン破棄は要求をキャンセルし、キャッシュ済みバイトを消去する。サービスが欠落している場合はローカライズされた構成ガイダンスを表示する。
 
-## Engine selection and limits
+## エンジン選択と上限
 
-The external [`@deepseek-ai/libreoffice-kit`](https://github.com/deepseek-ai/dsh-libreoffice-kit) Node API selects its precompiled engines. The kit has an independent version and release workflow, defined by the [release ownership decision](../../.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.md). Application builds install the published npm packages. Application packaging requires the target’s declared native engine, or Node WASM when the kit declares no native engine for that target. The [platform engine reference](../../packages/document/office-to-pdf/README.md) defines installation and packaging. Invalid metadata, missing required assets, and conversion errors reject without switching engines. Conversion uses disk input and output paths on the Host, with no browser conversion engine or font RPC.
+外部 [`@deepseek-ai/libreoffice-kit`](https://github.com/deepseek-ai/dsh-libreoffice-kit) Node API は事前コンパイル済みエンジンを選択する。このキットは独立したバージョンとリリースワークフローを持ち、[リリース所有の決定](../../.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.md)で定められている。アプリケーションビルドは公開済み npm パッケージをインストールする。アプリケーションパッケージングには対象の宣言済みネイティブエンジンが必要であり、その対象にキットがネイティブエンジンを宣言していない場合は Node WASM を使う。[プラットフォームエンジンリファレンス](../../packages/document/office-to-pdf/README.md)はインストールとパッケージングを定める。無効なメタデータ、必須アセットの欠落、変換エラーはエンジンを切り替えずに拒否される。変換はホスト上のディスク入出力パスを使い、ブラウザー変換エンジンもフォント RPC もない。
 
-The [Host provider configuration](../../packages/document/office-to-pdf/README.md#use-this-package) owns concurrency, deadlines, input/output limits, archive limits, image resolution, and font access. Native/WASM implementation and asset distribution belong to the kit workspace. System LibreOffice discovery, runtime engine downloads, persistent PDF caching, and model-facing rendering are outside this provider.
+[ホストプロバイダー構成](../../packages/document/office-to-pdf/README.md#use-this-package)は並行性、期限、入出力上限、アーカイブ上限、画像解像度、フォントアクセスを所有する。ネイティブ/WASM 実装とアセット配布はキットワークスペースに属する。システム LibreOffice 探索、ランタイムエンジンダウンロード、永続 PDF キャッシュ、モデル向けレンダリングはこのプロバイダーの範囲外である。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -47,13 +47,13 @@ The [Host provider configuration](../../packages/document/office-to-pdf/README.m
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によりソースから生成 (doc-sync の `pnpm run verify-cordis-catalog` で鮮度を検証。`pnpm run gen-cordis-catalog` で再生成) — 言語面の差異はロケール固有の対訳文書パスのみである。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保つ。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxofficetopdf--officetopdf"></a>
 
 ### `ctx.officeToPdf` — `OfficeToPdf`
 
-A provider lifetime owns all converters, queued calls, and temporary files.
+プロバイダーライフタイムはすべてのコンバーター、キュー済み呼び出し、一時ファイルを所有する。
 
 ```ts cordis-catalog
 /**

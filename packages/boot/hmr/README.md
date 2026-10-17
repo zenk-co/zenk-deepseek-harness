@@ -1,30 +1,30 @@
 ---
-description: "Reload plugin code and profile configuration through one coordinated queue."
+description: "1 つの協調キューを通じてプラグインコードとプロファイル設定をリロードする。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-hmr
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Reload plugin source and configuration while an application is running. Module replacements, Include refreshes and profile configuration changes share one queue. Package installation runs outside that queue. Existing Cordis HMR configuration and events remain available under `ctx.hmr`.
+アプリケーションの実行中にプラグインソースと設定をリロードする。モジュールの置き換え、Include のリフレッシュ、プロファイル設定の変更は 1 つのキューを共有する。パッケージのインストールはそのキューの外で実行される。既存の Cordis HMR 設定とイベントは `ctx.hmr` の下で引き続き利用できる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The base bundle enables HMR with `root: []` when the launcher supplies `profileContext`; hosts without that profile context leave this entry disabled. Headless, SDK and ACP bundles disable that entry in YAML; a later profile patch can enable it. Disabling or omitting HMR applies changes on restart. To enable source-module watching, configure the `hmr` entry supplied by the base bundle in the profile patch before launching:
+ランチャーが `profileContext` を供給する場合、ベースバンドルは `root: []` で HMR を有効化する。そのプロファイルコンテキストを持たないホストはこのエントリーを無効のままにする。Headless、SDK、ACP バンドルは YAML でそのエントリーを無効化する。後のプロファイルパッチで有効化できる。HMR を無効化または省略すると、変更は再起動時に適用される。ソースモジュールの監視を有効化するには、起動前にプロファイルパッチでベースバンドルが供給する `hmr` エントリーを設定する:
 
 ```yaml
 - id: hmr
@@ -33,97 +33,97 @@ The base bundle enables HMR with `root: []` when the launcher supplies `profileC
     root: ["."]
 ```
 
-Existing configurations replace the module name `@deepseek-ai/cordis-plugin-hmr` with `@deepseek-ai/dsh-hmr`. The `hmr` service key, `baseDir`, `config`, `getLinked()`, `getOuterStack()`, `hmr/change` and `hmr/reload` remain available. The vendored package remains available; DSH profiles use this package.
+既存の設定はモジュール名 `@deepseek-ai/cordis-plugin-hmr` を `@deepseek-ai/dsh-hmr` に置き換える。`hmr` サービスキー、`baseDir`、`config`、`getLinked()`、`getOuterStack()`、`hmr/change`、`hmr/reload` は引き続き利用できる。ベンダー版パッケージも引き続き利用できる。DSH プロファイルはこのパッケージを使う。
 
-### Configuration
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `base` | Context base URL | Base directory for module watching. |
-| `root` | `["."]` | Module watch roots; `[]` retains only explicit configuration watches. |
-| `ignored` | `["**/node_modules", "**/.*", "cache", "data"]` | Excluded module paths. |
-| `debounce` | `100` | Milliseconds for combining module changes. |
+| `base` | Context のベース URL | モジュール監視のベースディレクトリ。 |
+| `root` | `["."]` | モジュール監視ルート。`[]` では明示的な設定監視のみを保持する。 |
+| `ignored` | `["**/node_modules", "**/.*", "cache", "data"]` | 除外するモジュールパス。 |
+| `debounce` | `100` | モジュール変更をまとめるためのミリ秒数。 |
 
-Chokidar options, including polling, retain their existing meaning. Exact configuration watches also observe additions, removals and initially missing parent directories. They default to `awaitWriteFinish: true`: edits wait for Chokidar's 2-second write-stability window, avoiding its lossy change-event throttle. Configure `awaitWriteFinish` to adjust that window; disabling it can miss rapid consecutive edits. Direct Plugin Manager operations apply without waiting for file events.
+polling を含む Chokidar オプションは既存の意味を保つ。正確な設定監視は、追加、削除、および初期状態で存在しない親ディレクトリも観察する。それらはデフォルトで `awaitWriteFinish: true` であり、編集は Chokidar の 2 秒の書き込み安定性ウィンドウを待つため、その損失のある変更イベントスロットリングを回避する。`awaitWriteFinish` を設定してそのウィンドウを調整する。無効化すると急速な連続編集を見逃すことがある。Plugin Manager の直接操作はファイルイベントを待たずに適用される。
 
-Profile recompositions run by HMR's profile watches and by Plugin Manager also replace plugins whose loaded files below the profile directory changed on disk. This covers installed packages below `node_modules` and the targets of linked packages. A package whose files changed in place, such as a linked package whose build output changed or a dependency another installation upgraded, therefore takes effect without a restart at the next such recomposition; source watching through `root` is not required. A replacement that fails to load stops the previous plugin and is reported as `failed` with its load error instead of as a restart, which would load the same files; every later recomposition imports it again, so it starts once its files or dependencies are corrected.
+HMR のプロファイル監視と Plugin Manager によって実行されるプロファイル再構成は、プロファイルディレクトリ配下のロード済みファイルがディスク上で変更されたプラグインも置き換える。これは `node_modules` 配下のインストール済みパッケージとリンクされたパッケージのターゲットをカバーする。したがって、その場でファイルが変更されたパッケージ — ビルド出力が変わったリンク済みパッケージや、別のインストールがアップグレードした依存関係など — は、次のそのような再構成のときに再起動なしで有効になる。`root` によるソース監視は必要ない。ロードに失敗した置き換えは前のプラグインを停止し、再起動としてではなく、ロードエラーを伴う `failed` として報告される (再起動なら同じファイルをロードしてしまう)。以後のすべての再構成はそれを再度インポートするので、ファイルまたは依存関係が修正されれば起動する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-`watchConfig()` registers an awaited configuration handler and watches only its target path and required parent directories; sibling files, including temporary writer locks, are excluded before native watcher creation. `runExclusive()` serializes configuration changes and Loader updates with automatic reloads and rejects nested transactions. Package installation and removal run outside this queue. HMR does not acquire the package writer lock; manifest notifications reload only when the ordered `dsh.profile.bundles` list changes. Profile and home patch changes also trigger recomposition. File events received during a configuration transaction are processed afterward. Include refreshes and profile reconciliation reach plugins through ordinary Loader entry updates; Loader commits volatile-only changes in place.
+`watchConfig()` は await される設定ハンドラーを登録し、そのターゲットパスと必要な親ディレクトリのみを監視する。兄弟ファイル (一時的なライターのロックを含む) はネイティブウォッチャーの作成前に除外される。`runExclusive()` は設定変更と Loader 更新を自動リロードと直列化し、ネストしたトランザクションを拒否する。パッケージのインストールと削除はこのキューの外で実行される。HMR はパッケージライターロックを取得しない。マニフェスト通知は、順序付き `dsh.profile.bundles` リストが変化したときにのみリロードする。プロファイルとホームのパッチ変更も再構成を引き起こす。設定トランザクション中に受信したファイルイベントは後で処理される。Include のリフレッシュとプロファイルの調整は通常の Loader エントリー更新を通じてプラグインに到達する。Loader は volatile のみの変更をその場でコミットする。
 
-App-boot owns profile parsing and patch precedence. HMR reads the launcher’s data-only `profileContext`, registers the profile manifest and both user patch watches during initialization, and waits for application readiness before processing changes. Its disposal closes the watchers and cancels reloads waiting for startup. Configuration watchers start outside the active transaction context so later notifications can enter the queue.
+App-boot がプロファイルのパースとパッチの優先順位を所有する。HMR はランチャーのデータ専用 `profileContext` を読み、初期化中にプロファイルマニフェストと両方のユーザーパッチ監視を登録し、変更を処理する前にアプリケーションの準備完了を待つ。その破棄はウォッチャーをクローズし、起動を待っているリロードをキャンセルする。設定ウォッチャーはアクティブなトランザクションコンテキストの外で開始するので、後の通知がキューに入れることができる。
 
-`reconcileProfile()` is shared by HMR’s profile watches and Plugin Manager; callers hold `runExclusive()`. Config Editor recomposes through app-boot without replacing modules. App-boot prepares and preflights the generation before caches or running entries change.
+`reconcileProfile()` は HMR のプロファイル監視と Plugin Manager が共有し、呼び出し元は `runExclusive()` を保持する。Config Editor はモジュールを置き換えずに app-boot を通じて再構成する。App-boot はキャッシュや実行中のエントリーが変化する前に世代を準備してプリフライトする。
 
-File comparison covers the profile directory and linked package targets, recorded when the application becomes ready. [ModuleFiles](src/module-files.ts) records inode, size and modification time; adding a hard link alone does not invalidate a module. Existing modules retain the identities read before replacement, preserving later writes. Newly loaded modules are recorded at settlement so a subsequent installation does not restart them merely because they are recent.
+ファイル比較はプロファイルディレクトリとリンク済みパッケージのターゲットを対象とし、アプリケーションが準備完了になったときに記録される。[ModuleFiles](src/module-files.ts) は inode、サイズ、変更時刻を記録する。ハードリンクを追加しただけではモジュールは無効化されない。既存のモジュールは置き換え前に読まれた同一性を保持し、後の書き込みを保護する。新しくロードされたモジュールは確定時に記録されるので、その後のインストールが「最近だから」という理由だけでそれらを再起動することはない。
 
-Replacement follows ES module links and every CommonJS parent’s `children`. A module's plugins are read from its ES module namespace and from the CommonJS exports Node already cached, without evaluating anything, so a CommonJS plugin registered outside a Loader entry keeps its cache. Host dependencies and plugins outside the traversable Loader tree stay pending. The remaining changed modules and their importers are evicted without a backup, and the Loader entries running affected plugins stop. HMR imports no replacement code itself: the Loader imports the current files when the generation starts an entry, so disabled, removed and incompatible rows never execute it, and dynamic `disabled` expressions and nested Includes are evaluated as at startup.
+置き換えは ES モジュールリンクとすべての CommonJS 親の `children` をたどる。モジュールのプラグインは、その ES モジュール名前空間と Node がすでにキャッシュした CommonJS エクスポートから、何も評価せずに読まれるので、Loader エントリーの外で登録された CommonJS プラグインはそのキャッシュを保つ。Host 依存関係とトラバース可能な Loader ツリーの外のプラグインは保留のままである。残りの変更されたモジュールとそのインポーターはバックアップなしでエビクトされ、影響を受けるプラグインを実行している Loader エントリーは停止する。HMR 自身は置き換えコードをインポートしない: 世代がエントリーを開始するときに Loader が現在のファイルをインポートするので、無効化、削除、非互換の行はそれを決して実行せず、動的な `disabled` 式とネストした Include は起動時と同様に評価される。
 
-Affected runtimes stop without making their entries disabled, and `reconcileProfile()` passes them to app-boot's single `recomposeProfile()` call, which starts them, including those below an unchanged Include and those outside the profile composition, without importing an entry twice. A failure before any stop leaves every plugin running; stopped plugins start again with the current resolution when no generation applied. After eviction, a replacement that fails to import or start is an activation failure and rejects the operation; its previous code no longer runs. Every recomposition imports entries whose import failed again, after expiring the package configuration below the profile roots and evicting modules whose links failed, so a corrected file or a dependency installed later takes effect without a restart. [ProfileReconciliation](../../../docs/subsystems/boot.md#profile-reconciliation) lists changes requiring a restart. A module first loaded during a recomposition whose file was written after the comparison stays stale, so a write during activation is loaded next time; comparison or cache-inspection failure requires a restart even when no changed URL is known. HMR’s watches log the result.
+影響を受けるランタイムは、そのエントリーを無効化することなく停止し、`reconcileProfile()` はそれらを app-boot の単一の `recomposeProfile()` 呼び出しに渡す。この呼び出しは、変更されていない Include の下のものやプロファイル構成の外のものも含めてそれらを開始し、エントリーを 2 度インポートしない。停止前の失敗はすべてのプラグインを実行したままにする。世代が適用されなかった場合、停止したプラグインは現在の解決で再び起動する。エビクション後、インポートまたは開始に失敗した置き換えはアクティベーション失敗であり、操作を拒否する。その以前のコードはもはや実行されない。すべての再構成は、プロファイルルート配下のパッケージ設定を期限切れにし、リンクが失敗したモジュールをエビクトした後、インポートに失敗したエントリーを再度インポートするので、修正されたファイルや後からインストールされた依存関係は再起動なしで有効になる。[ProfileReconciliation](../../../docs/subsystems/boot.md#profile-reconciliation) は再起動を必要とする変更を列挙する。比較の後にファイルが書き込まれた、再構成中に最初にロードされたモジュールは古いままなので、アクティベーション中の書き込みは次回ロードされる。比較またはキャッシュ検査の失敗は、変更された URL が知られていない場合でも再起動を必要とする。HMR の監視は結果をログに記録する。
 
-After each recomposition, HMR evicts the loaded modules below the directories of the mappings the recomposition dropped and expires their package configuration, so the packages a removed or deselected bundle depends on, including those it imports dynamically, are imported afresh when it returns. A bundle package is not a mapping: its own files are replaced when they changed on disk, and a bundle switched off while its files stay unchanged keeps its modules loaded. A publication the runtime resolution rejects, such as a retained profile mapping that moved to another directory, stops and starts again the rows the generation would drop and leaves the composition as it was; the result has `restartReason: 'package-moved'`.
+各再構成の後、HMR は再構成が落としたマッピングのディレクトリ配下のロード済みモジュールをエビクトし、そのパッケージ設定を期限切れにするので、削除または選択解除されたバンドルが依存するパッケージ — 動的にインポートするものも含む — は、それが戻ったときに新たにインポートされる。バンドルパッケージはマッピングではない: その自身のファイルはディスク上で変更されたときに置き換えられ、ファイルが変わらないままオフに切り替えられたバンドルはモジュールをロードしたまま保つ。ランタイム解決が拒否する公開 — たとえば別のディレクトリに移動した保持されたプロファイルマッピング — は、世代が落とすはずの行を停止して再起動し、構成をそのまま残す。結果は `restartReason: 'package-moved'` を持つ。
 
-A changed `package.json` outside `node_modules` expires that package's cached configuration. A configuration-only manifest triggers no module reload; a manifest imported as a JSON module retains dependency-driven reloads, and one in the host dependency graph retains host reloads. Dedicated configuration watches keep their existing ownership. A new package entry takes effect when its Loader entry restarts.
+`node_modules` の外の変更された `package.json` は、そのパッケージのキャッシュされた設定を期限切れにする。設定のみのマニフェストはモジュールのリロードを引き起こさない。JSON モジュールとしてインポートされたマニフェストは依存関係駆動のリロードを保ち、host 依存関係グラフ内のものは host のリロードを保つ。専用の設定監視は既存の所有権を保つ。新しいパッケージエントリーは、その Loader エントリーが再起動したときに有効になる。
 
-Loader entries retain their raw import results. HMR retains every distinct imported namespace for each entry name and configuration-tree base URL; an uninitialized entry does not overwrite another entry's namespace. HMR matches those objects to cached ModuleJob namespaces instead of resolving entry names again. Names without an imported namespace and `cordis:` builtins keep name-based resolution. Source reloads therefore use the loaded modules after `exports` or `main` changes.
+Loader エントリーは生のインポート結果を保持する。HMR はエントリー名と構成ツリーベース URL の組み合わせごとに、すべての異なるインポート済み名前空間を保持する。未初期化のエントリーが別のエントリーの名前空間を上書きすることはない。HMR はそれらのオブジェクトを、エントリー名を再解決するのではなく、キャッシュされた ModuleJob 名前空間と突き合わせる。インポート済み名前空間を持たない名前と `cordis:` ビルトインは名前ベースの解決を保つ。したがってソースのリロードは、`exports` や `main` の変更後にロード済みモジュールを使う。
 
-Entries sharing a runtime are replaced together, with each entry receiving the implementation for its own module. Duplicate entries for one module retain their separate plugin instances. On replacement failure, HMR removes partially activated replacements and restores the previous modules and plugin implementations. A successful reload updates every matching entry record, including disabled entries; a failed replacement leaves those records unchanged. Entries that have never loaded remain uninitialized.
+ランタイムを共有するエントリーは一緒に置き換えられ、各エントリーは自身のモジュールの実装を受け取る。1 つのモジュールに対する重複エントリーは、それぞれ別個のプラグインインスタンスを保つ。置き換えの失敗時、HMR は部分的にアクティブ化された置き換えを除去し、以前のモジュールとプラグイン実装を復元する。成功したリロードは無効化されたエントリーも含め、一致するすべてのエントリーレコードを更新する。失敗した置き換えはそれらのレコードを変更しない。一度もロードされていないエントリーは未初期化のままである。
 
-[package-manifest.ts](src/package-manifest.ts) owns the Node internal interfaces for package reads, scope, type, and nearest-manifest lookups. Each HMR instance owns its configuration cache and restores its installed hooks on disposal. Manifest invalidation clears the ESM `ResolveCache` and CommonJS `_pathCache`: neither records every consulted manifest, and entries may point outside their package directory. CommonJS loads resolve requests with Node's default resolver before entering the native loader, bypassing old request aliases while preserving evaluated modules. Synchronous resolve hooks receive the resulting filenames. Ordinary module replacement remains HMR's separate operation.
+[package-manifest.ts](src/package-manifest.ts) は、パッケージ読み取り、スコープ、型、および最近傍マニフェストのルックアップのための Node 内部インターフェースを所有する。各 HMR インスタンスは自身の設定キャッシュを所有し、破棄時にインストールしたフックを復元する。マニフェストの無効化は ESM の `ResolveCache` と CommonJS の `_pathCache` をクリアする。どちらも参照されたすべてのマニフェストを記録するわけではなく、エントリーはそのパッケージディレクトリの外を指すことがある。CommonJS のロードはネイティブローダーに入る前に Node のデフォルトリゾルバーでリクエストを解決し、古いリクエストエイリアスを迂回しつつ評価済みモジュールを保持する。同期解決フックは結果のファイル名を受け取る。通常のモジュール置き換えは HMR の別個の操作のままである。
 
-Watched module paths use Node ESM resolution's `realpathSync()` spelling, including Windows short directory names, so file events match the module cache.
+監視されるモジュールパスは、Windows の短いディレクトリ名も含め、Node ESM 解決の `realpathSync()` 表記を使うので、ファイルイベントがモジュールキャッシュと一致する。
 
-The module replacement implementation derives from `@cordisjs/plugin-hmr` 1.0.15, with Harness Node-loader and lazy-config changes. Its [MIT license](LICENSE) is retained.
+モジュール置き換えの実装は `@cordisjs/plugin-hmr` 1.0.15 に由来し、Harness の Node ローダーと遅延設定の変更を加えている。その [MIT ライセンス](LICENSE)は保持されている。
 
 </details>
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Reloaded plugins
+### リロードされたプラグイン
 
-#### What the model sees
+#### モデルが見るもの
 
-`ctx.hmr` adds no model-facing tools or messages. Loaded plugins determine subsequent tool and prompt contributions.
+`ctx.hmr` はモデルに公開されるツールやメッセージを追加しない。ロードされたプラグインが以後のツールとプロンプトの貢献を決定する。
 
-#### Token effect
+#### トークン効果
 
-No direct token contribution.
+直接のトークン寄与はない。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Reloading a contributing plugin can change later request prefixes; HMR does not rewrite conversation history.
+貢献しているプラグインのリロードは以後のリクエストプレフィックスを変えうる。HMR は会話履歴を書き換えない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Module replacement requires Node loader internals. Framework dependency changes call the host-provided `loader.exit()` hook; HMR itself does not restart the process.
-- A change confined to `package.json` is not detected. Watcher notifications for manifests below `node_modules` are still ignored. The browser Client module graph retains its separate browser-side loading mechanism.
-- Replacement follows static imports. A dynamic `import()` of a stale module evaluates the new file on its next call while its importer keeps running; existing Workers and the TSX loader thread keep their module caches.
-- Every symbolic link below the profile's `node_modules` widens the comparison scope. Linking a package that the process entry point, located through the real path of a bin link, imports statically, such as `dsh-app-boot`, Cordis or the Loader from a dsh checkout, brings host modules into scope; their changes stay pending, and Plugin Manager reports `restart-required` for later operations until the process restarts. Linked dsh packages that Loader entries import are replaced like other plugins.
-- The comparison records belong to one HMR instance. A recomposition that restarts the `hmr` entry itself records the current files again, so changes pending at that point are no longer reported or retried.
-- A replacement that fails to import or start stays inactive until its files or dependencies are corrected; the previous version is not restored.
-- Compatibility checks run only where DSH composes rows: startup, profile recomposition and preset mounting; the Loader checks nothing when it imports a module. A replaced profile row passes the recomposition's preflight, but a row outside the profile composition, such as a preset row or an entry added through `ctx.loader.create()`, restarts with replaced code without a check. Plugin Manager refuses incompatible versions, so this affects packages changed outside it, such as a manual `pnpm add` in the profile directory or a rebuilt `link:` package.
-- The [packed worker loader](../../experimental/webworker-runtime/src/module-system/module-loader.ts) exposes neither Node’s `loadCache` nor `require.cache`; configuration recomposition remains available, but code replacement requires a restart. Native Node retains these caches even with asynchronous module hooks. The [packed worker browser test](../../../apps/web/tests/preview-boot.e2e.ts) exercises this deployment.
-- A newly loaded file is first recorded after recomposition settles and counts as changed when its modification time follows the comparison. The comparison time is the modification time of a marker file HMR writes in the temporary directory, so on one machine both come from the clock local file writes are stamped with; an edit within the timestamp granularity of the profile's filesystem after the comparison counts as earlier and can be missed, and network filesystems stamp writes with the server's clock.
-- A file replaced by a hard link to an older store file keeps an older modification time; when its module was first loaded after the last recording, the change is not detected.
-- Profile recomposition caused by HMR's own watches does not run for dependency-only manifest changes, so an install performed outside Plugin Manager takes effect at the next recomposition or restart.
-- TSX loaders and ordinary application-created Workers are outside the supported package-cache refresh scope.
-- CommonJS requests must be resolvable by Node's default resolver. Synchronous hooks may postprocess the resulting filenames, as Desktop's Office resolver does; hooks requiring the original request name or introducing virtual requests are unsupported. Builtins retain Node's original loading behavior.
-- Future work: retain package invalidation across HMR disposal and replacement. Restoring the native readers can expose their older cached configuration again.
-- If a shared runtime's replacement modules have different plugin callbacks, an instance without a Loader entry cannot be assigned to one of them. HMR reports an ambiguity error and rolls back the reload.
-- `watchConfig()` resolves when Chokidar reports readiness. On darwin, libuv starts the FSEvents stream afterwards on its own thread, so a write that lands within milliseconds of registration is not reported until the next event in that directory; edits made after startup are unaffected.
+- モジュール置き換えには Node ローダー内部が必要である。フレームワーク依存関係の変更はホスト提供の `loader.exit()` フックを呼ぶ。HMR 自身はプロセスを再起動しない。
+- `package.json` だけに閉じた変更は検出されない。`node_modules` 配下のマニフェストに対するウォッチャー通知は依然として無視される。ブラウザー Client のモジュールグラフは、独自のブラウザー側ロード機構を保つ。
+- 置き換えは静的インポートをたどる。古いモジュールの動的 `import()` は、そのインポーターが実行を続けたまま、次の呼び出しで新しいファイルを評価する。既存の Worker と TSX ローダースレッドは各自のモジュールキャッシュを保つ。
+- プロファイルの `node_modules` 配下のすべてのシンボリックリンクは比較スコープを広げる。bin リンクの実パスを通じて特定されるプロセスエントリーポイントが静的にインポートするパッケージ — dsh チェックアウトの `dsh-app-boot`、Cordis、または Loader など — をリンクすると、host モジュールがスコープに入る。それらの変更は保留のままで、Plugin Manager はプロセスが再起動するまで以後の操作に対して `restart-required` を報告する。Loader エントリーがインポートするリンク済み dsh パッケージは、他のプラグインと同様に置き換えられる。
+- 比較レコードは 1 つの HMR インスタンスに属する。`hmr` エントリー自体を再起動する再構成は現在のファイルを再び記録するので、その時点で保留だった変更はもはや報告も再試行もされない。
+- インポートまたは開始に失敗した置き換えは、ファイルまたは依存関係が修正されるまで非アクティブのままである。以前のバージョンは復元されない。
+- 互換性チェックは DSH が行を構成する場所でのみ実行される: 起動、プロファイル再構成、プリセットのマウントである。Loader はモジュールをインポートするときに何もチェックしない。置き換えられたプロファイル行は再構成のプリフライトを通過するが、プロファイル構成の外の行 — プリセット行や `ctx.loader.create()` で追加されたエントリーなど — はチェックなしで置き換えられたコードで再起動する。Plugin Manager は非互換バージョンを拒否するので、これはその外部で変更されたパッケージ — プロファイルディレクトリでの手動 `pnpm add` や再ビルドされた `link:` パッケージなど — に影響する。
+- [packed worker loader](../../experimental/webworker-runtime/src/module-system/module-loader.ts) は Node の `loadCache` も `require.cache` も公開しない。設定の再構成は引き続き利用できるが、コードの置き換えには再起動が必要である。ネイティブ Node は非同期モジュールフックがあってもこれらのキャッシュを保持する。[packed worker ブラウザーテスト](../../../apps/web/tests/preview-boot.e2e.ts)がこのデプロイメントを演習する。
+- 新しくロードされたファイルは再構成が確定した後に初めて記録され、その変更時刻が比較時刻より後であれば変更として数えられる。比較時刻は HMR が一時ディレクトリに書き込むマーカーファイルの変更時刻であるため、1 つのマシン上ではどちらもローカルのファイル書き込みに刻まれるクロックに由来する。比較の後、プロファイルのファイルシステムのタイムスタンプ粒度内の編集は以前として数えられ、見逃されることがある。ネットワークファイルシステムはサーバーのクロックで書き込みに刻印する。
+- 古いストアファイルへのハードリンクで置き換えられたファイルは、より古い変更時刻を保つ。そのモジュールが最後の記録の後に最初にロードされた場合、変更は検出されない。
+- HMR 自身の監視によるプロファイル再構成は、依存関係のみのマニフェスト変更では実行されない。したがって Plugin Manager の外で行われたインストールは、次の再構成または再起動のときに有効になる。
+- TSX ローダーとアプリケーションが作成した通常の Worker は、サポートされるパッケージキャッシュ更新スコープの外にある。
+- CommonJS リクエストは Node のデフォルトリゾルバーで解決可能でなければならない。同期フックは、Desktop の Office リゾルバーがそうであるように、結果のファイル名を後処理してよい。元のリクエスト名を必要とするフックや仮想リクエストを導入するフックはサポートされない。ビルトインは Node 本来のロード動作を保つ。
+- 今後の作業: HMR の破棄と置き換えをまたいでパッケージの無効化を保持する。ネイティブリーダーを復元すると、その古いキャッシュ設定が再び露出しうる。
+- 共有ランタイムの置き換えモジュールが異なるプラグインコールバックを持つ場合、Loader エントリーのないインスタンスをそのいずれかに割り当てることはできない。HMR は曖昧性エラーを報告し、リロードをロールバックする。
+- `watchConfig()` は Chokidar が準備完了を報告したときに解決する。darwin では、libuv がその後独自のスレッドで FSEvents ストリームを開始するので、登録から数ミリ秒以内に着地した書き込みは、そのディレクトリの次のイベントまで報告されない。起動後に行われた編集は影響を受けない。
 
-### Dev Note
+### 開発メモ
 
 <a id="dev-note"></a>
 
-None.
+なし。

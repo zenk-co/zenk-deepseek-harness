@@ -1,35 +1,35 @@
 ---
-description: "Tool-result retention with a shared text/image token budget and readable recovery files."
+description: "共有テキスト/画像トークン予算と可読回復ファイルによるツール結果保持。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-spill-policy
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Keep oversized text and image results within a shared estimated token budget. The model receives ordered head/tail content and a path to the complete result. Images remain in attachment storage; the result file records their readable paths. Omitting `maxInlineTokens` disables retention, and recovery failures leave the original content visible.
+大きすぎるテキストと画像結果を共有推定トークン予算内に収める。モデルは順序付き head/tail 内容と完全結果へのパスを受け取る。画像は添付記憶域に残り、結果ファイルはその可読パスを記録する。`maxInlineTokens` 省略は保持を無効化し、回復失敗は元の内容を可視のままにする。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Mount the policy alongside a spill backend. Text and images share the configured budget after post-execute policy accepts the result.
+spill バックエンドに並べてポリシーをマウントする。実行後ポリシーが結果を受理した後、テキストと画像は設定予算を共有する。
 
-### Minimal configuration
+### 最小構成
 
-Load a spill backend and set `maxInlineTokens` in estimated tokens:
+spill バックエンドをロードし、推定トークンで `maxInlineTokens` を設定する:
 
 ```yaml
 - name: '@deepseek-ai/dsh-spill-local'
@@ -38,15 +38,15 @@ Load a spill backend and set `maxInlineTokens` in estimated tokens:
     maxInlineTokens: 12500
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `maxInlineTokens` | omitted | Estimated token cap for retained text, images, image descriptions, and notices; omission disables retention |
+| `maxInlineTokens` | 省略 | 保持テキスト・画像・画像説明・通知の推定トークン上限。省略は保持を無効化 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-spill-policy) is the exhaustive source for every accepted field. A negative or fractional cap fails plugin load rather than corrupting per-call behavior.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-spill-policy)が、受け入れられるすべてのフィールドの網羅的な情報源である。負や小数の上限は呼び出し単位動作を壊すのではなくプラグインロード時に失敗する。
 
-### What the model sees
+### モデルが見るもの
 
-Oversized results keep their original order. Each end receives half the budget remaining after omission notices; text may be split, while each image is retained or omitted whole. Images inside the omitted interval are omitted too. A successful replacement stays within the configured token estimate:
+大きすぎる結果は元の順序を保つ。各端は省略通知差し引き後の残り予算の半分ずつを受け、テキストは分割されうる一方、各画像は全体で保持か省略のいずれかである。省略区間内の画像も省略される。成功した置換は設定トークン推定内に収まる:
 
 ```text
 <retained head/tail preview>
@@ -54,113 +54,113 @@ Oversized results keep their original order. Each end receives half the budget r
 (Omitted N bytes. Full formatted result stored at: /…/session-…/…-web_fetch.txt. Use read with offset/limit, or grep this path to search within it.)
 ```
 
-The notice also reports omitted image counts. A notice-only result is allowed when no preview fits; if the notice itself exceeds the cap, the original content stays visible. The full result file keeps all accepted text and an attachment path at each image position, so the model can use `read` and then `read_image`. Attachment bytes are not copied into this file. Local attachment objects persist independently of spill cleanup.
+通知は省略画像数も報告する。プレビューが収まらない場合の通知のみ結果は許される。通知自体が上限を超える場合、元の内容が可視のまま残る。完全結果ファイルは受理済みテキストすべてと各画像位置の添付パスを保持するため、モデルは `read` の後に `read_image` を使える。添付バイトはこのファイルに複写されない。ローカル添付オブジェクトは spill クリーンアップとは独立に永続する。
 
-### Which results are affected
+### 影響を受ける結果
 
-The policy accepts text/image sequences. Results within budget, `read`, blocked decisions, value replacements, and other block types pass through. Text-only nested results are bounded only in their log copies. Provider or tool limits applied before this policy cannot be recovered here.
+ポリシーはテキスト/画像列を受け付ける。予算内の結果、`read`、ブロック決定、値置換、その他ブロック型は通過する。テキストのみ入れ子結果はそのログ複製でのみ上限付けされる。このポリシーより前のプロバイダーやツール制限はここで回復できない。
 
-### Best-effort failure behavior
+### 最善努力の失敗動作
 
-A missing owner or spill backend, failed storage, missing route image pricing, or unavailable execution-world image path logs a warning and keeps the original content. The policy never substitutes an unreadable path for an image.
+所有者や spill バックエンドの欠落、記憶域失敗、ルート画像価格欠落、実行ワールド画像パス不可は、警告を記録して元の内容を保持する。ポリシーは画像に読めないパスを代置することは決してない。
 
-### The durable log copy
+### 耐久ログ複製
 
-PTC programs receive complete canonical values. Image-bearing sub-results are bounded before forwarding to the model; when every image is omitted, the model still receives the retained text and recovery notice. The dispatch log uses the same retained content. Text-only sub-call logs, including `read`, are bounded asynchronously without delaying program values.
+PTC プログラムは完全正準値を受け取る。画像を含む副結果はモデル転送前に上限付けされ、すべての画像が省略されてもモデルは保持テキストと回復通知を受け取る。ディスパッチログは同じ保持内容を使う。`read` を含むテキストのみ副呼び出しログは、プログラム値を遅らせず非同期に上限付けされる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the policy; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではポリシーの背後にある設計上の決定を説明する。観測可能な動作はすべて[このパッケージの使い方](#use-this-package)で扱っている。
 
-### Design philosophy
+### 設計思想
 
-The pure retention function selects ordered content by cost; the plugin owns policy, recovery text, and storage calls. Text uses the existing token-meter estimate. Images use the active route's `imageRequestPricing`, including descriptor text. DeepSeek routes reuse the provider's image-dimension calculator. The budget is an estimate, not an exact tokenizer guarantee.
+純粋保持関数がコスト順に順序付き内容を選び、プラグインがポリシー・回復文・記憶域呼び出しを所有する。テキストは既存トークンメーター推定を使う。画像は記述文を含め有効ルートの `imageRequestPricing` を使う。DeepSeek ルートはプロバイダーの画像寸法計算器を再利用する。予算は推定であり、正確なトークナイザー保証ではない。
 
-### The two arms
+### 2 つの腕
 
-The prepended `tools/post-execute` listener delegates before bounding accepted content. `tools/ptc-dispatch-log` shares the same helper. MCP's `projectContent` installs real image blocks before these policies; later content replacement, value replacement, or blocking remains authoritative.
+前置 `tools/post-execute` リスナーは受理済み内容を上限付けする前に委譲する。`tools/ptc-dispatch-log` は同じヘルパーを共有する。MCP の `projectContent` はこれらポリシーより前に実画像ブロックを据える。後の内容置換・値置換・ブロックは引き続き権威である。
 
 <a id="shared-notice-ownership"></a>
-### Shared notice ownership
+### 共有通知所有権
 
-The browser-safe `./notice` entry owns `formatSpillNotice(omitted, ref, images)` and `hasSpillNotice(text)`. It recognizes both historical byte-only notices and notices with whole-image counts without changing recorded text.
+ブラウザー安全 `./notice` エントリーが `formatSpillNotice(omitted, ref, images)` と `hasSpillNotice(text)` を所有する。記録文を変えずに、履歴的バイトのみ通知と全体画像数付き通知の両方を認識する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` validation, the two waterfall listeners, the shared replacement helper |
-| [`src/notice.ts`](src/notice.ts) | Browser-safe notice formatting and recognition, published as `./notice` |
-| [`src/retention.ts`](src/retention.ts) | Pure ordered text/image head-tail retention |
+| [`src/index.ts`](src/index.ts) | プラグイン入口。`Config` 検証、2 つのウォーターフォールリスナー、共有置換ヘルパー |
+| [`src/notice.ts`](src/notice.ts) | ブラウザー安全な通知整形と認識。`./notice` として公開 |
+| [`src/retention.ts`](src/retention.ts) | 純粋順序付きテキスト/画像 head-tail 保持 |
 
-### Failure modes
+### 失敗モード
 
-Recovery or pricing failures preserve the input and log the reason. Negative, fractional, or unsafe-integer budgets fail at plugin load. Results containing unsupported block types remain unchanged.
+回復や価格の失敗は入力を保持して理由を記録する。負・小数・安全整数外の予算はプラグインロード時に失敗する。未対応ブロック型を含む結果は不変のままである。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough.
+パッケージレベルの契約では足りない場合にこれらのページを読むとよい。
 
-- [Spill storage service](../spill/README.md) — the `saveText` contract behind the policy's replacement.
-- [dsh-spill-local](../spill-local/README.md) — the local backend that stores the spilled text.
-- [Token meter](../../llm/token-meter/README.md) — shared text estimates and route image accounting.
-- [Tool output spill decision](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md) — the capability boundary and design rationale.
+- [Spill 記憶域サービス](../spill/README.md) — ポリシー置換の背後にある `saveText` 契約。
+- [dsh-spill-local](../spill-local/README.md) — spill テキストを格納するローカルバックエンド。
+- [Token meter](../../llm/token-meter/README.md) — 共有テキスト推定とルート画像計算。
+- [ツール出力 spill 決定](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md) — ケイパビリティ境界と設計根拠。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Oversized text and image results
+### 大きすぎるテキストと画像結果
 
-#### What the model sees
+#### モデルが見るもの
 
-The retained prefix and suffix keep image order, with `[...]` at the omitted interval. The final notice names omitted text bytes, optional whole-image counts, and the complete-result path. Reading that file reveals the omitted text and image addresses.
+保持接頭辞と接尾辞は画像順序を保ち、省略区間に `[...]` を置く。最終通知は省略テキストバイト、任意全体画像数、完全結果パスを名指しする。そのファイルを読むと省略テキストと画像アドレスが分かる。
 
-#### Token effect
+#### トークンへの影響
 
-A successful replacement fits `maxInlineTokens` under the shared text estimate and active route's image calculator, including notices and image descriptor text. Provider-reported usage remains authoritative.
+成功した置換は、通知と画像記述文を含め、共有テキスト推定と有効ルート画像計算器の下で `maxInlineTokens` に収まる。プロバイダー報告使用量が引き続き権威である。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ。新規可視内容は再利用可能なリクエスト接頭辞の後に続き、既存 KV キャッシュエントリを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the policy cannot help. They are current package constraints.
+これらの制限はポリシーが助けにならない場合を定義する。これらは現在のパッケージ制約である。
 
-- **Text recognition cannot authenticate output** — a tool can print the same notice text; `hasSpillNotice` identifies a text convention, not proof that the policy saved a result.
-- **Unavailable recovery or pricing** — images require a route calculator and execution-readable attachment paths; otherwise the original content stays visible. Unsupported blocks, blocked feedback, and `read` also pass through.
-- **A notice that cannot fit disables replacement for that call** — a tiny cap or long locator leaves the oversized original inline after the backend has already saved an unreferenced spill.
+- **テキスト認識は出力を認証できない** — ツールは同じ通知文を表示できる。`hasSpillNotice` はテキスト慣例を識別するものであり、ポリシーが結果を保存した証明ではない。
+- **回復や価格の不可** — 画像にはルート計算器と実行可読添付パスが必要であり、なければ元の内容が可視のまま残る。未対応ブロック、ブロックフィードバック、`read` も通過する。
+- **収まらない通知はその呼び出しの置換を無効化する** — 微小上限や長いロケーターでは、バックエンドが既に未参照 spill を保存した後、大きすぎる元がインラインに残る。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open directions. It is explicitly non-authoritative.
+この Dev Note はメンテナ向け作業コンテキストである。開かれた方向性であり、明示的に非権威である。
 
-#### Future: per-tool configuration
+#### 将来: ツール単位設定
 
-Per-tool opt-out or per-tool policy declarations remain deferred; the built-in `read` skip covers the known loop, and a second real tool need would justify configuration.
+ツール単位オプトアウトやツール単位ポリシー宣言は先送りのままである。組み込み `read` スキップが既知ループを扱い、2 件目の実ツール需要が設定を正当化する。
 
-#### Future: earlier spill
+#### 将来: より早い spill
 
-The policy only sees final accepted content. Earlier provider truncation and tool-owned output limits remain outside its scope.
+ポリシーは最終受理内容のみを見る。より早いプロバイダー切り詰めとツール所有出力制限は対象外のままである。
 
 </details>

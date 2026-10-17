@@ -1,37 +1,37 @@
 ---
-description: "The file-backed credentials provider for users and maintainers choosing, configuring, or debugging the local credential store and its environment layering."
+description: "ローカル資格情報ストアとその環境の階層化を選択・設定・デバッグするユーザーとメンテナー向けの、ファイルベースの資格情報プロバイダー。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-credentials-local
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-credentials-local` keeps API keys and other secrets in a private file under your harness home. You can save credentials through the configuration UI or edit the file directly; changes reload automatically and saved values survive restarts. Credential lookup follows a fixed precedence: the stored file wins, followed by the launch environment, the project's `.env`, and the harness-home `.env`; a newly saved value immediately overrides older environment values. Only your OS user can read the file, but agent tool processes run as that same user, so this store cannot isolate secrets from the agent.
+`dsh-credentials-local` は API キーなどのシークレットをハーネスホーム配下のプライベートファイルに保管する。資格情報は設定 UI を通じて保存することも、ファイルを直接編集することもできる。変更は自動的に再ロードされ、保存された値は再起動を生き延びる。資格情報のルックアップは固定の優先順位に従う: 保存ファイルが最優先で、続いて起動環境、プロジェクトの `.env`、ハーネスホームの `.env` である。新しく保存された値は古い環境の値を即座に上書きする。ファイルを読めるのは OS のユーザーだけだが、エージェントのツールプロセスは同じユーザーとして実行されるので、このストアはエージェントからシークレットを隔離できない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-This package gives a composition a local credential store: save API keys and other secrets once, and every request that names them uses them. The common path is explicit: load the store, save keys through the configuration UI or `ctx.credentials`, and let the product resolve them when needed.
+このパッケージは構成にローカル資格情報ストアを与える: API キーなどのシークレットを一度保存すれば、それらを名指すすべてのリクエストがそれらを使う。一般的な経路は明示的である: ストアをロードし、設定 UI または `ctx.credentials` を通じてキーを保存し、必要時にプロダクトがそれらを解決する。
 
-### When to use it
+### いつ使うか
 
-Use it as the default local store: the product's base composition loads it, and a key you save through a configuration UI takes effect immediately. Choose a different store when a deployment must keep provider keys away from its own agent — file permissions cannot do that, because the agent's tool processes run as your OS user (see "Who can read the file").
+デフォルトのローカルストアとして使う: プロダクトのベース構成がこれをロードし、設定 UI を通じて保存したキーは即座に有効になる。デプロイメントがプロバイダーキーを自身のエージェントから遠ざけなければならない場合は別のストアを選ぶ — ファイル権限ではそれができない。エージェントのツールプロセスは OS のユーザーとして実行されるからである (「ファイルを読めるのは誰か」を参照)。
 
-### Setting it up
+### セットアップ
 
 ```yaml
 - name: '@deepseek-ai/dsh-credentials-local'
@@ -39,18 +39,18 @@ Use it as the default local store: the product's base composition loads it, and 
     path: /absolute/path/to/.credentials.yaml
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `path` | `<harness home>/.credentials.yaml` | Where the credential file lives |
-| `dshHome` | `$DSH_HOME` or `~/.dsh` | Harness home used when `path` is omitted |
-| `watch` | `true` | Reload the file automatically when it changes on disk |
-| `debounceMs` | `100` | Wait this long after a change before reloading, in milliseconds |
+| `path` | `<harness home>/.credentials.yaml` | 資格情報ファイルの場所 |
+| `dshHome` | `$DSH_HOME` または `~/.dsh` | `path` が省略されたときに使うハーネスホーム |
+| `watch` | `true` | ディスク上で変更されたときにファイルを自動的に再ロードする |
+| `debounceMs` | `100` | 変更後にリロードするまで待つミリ秒数 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-credentials-local) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-credentials-local)が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### Storing and removing keys
+### キーの保存と削除
 
-Save a key with `set`, remove it with `unset`, and check whether a key is configured with `describe` — the same operations the credential API provides:
+キーは `set` で保存し、`unset` で削除し、`describe` で設定済みかどうかを確認する — 資格情報 API が提供するものと同じ操作である:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -64,24 +64,24 @@ await ctx.credentials.describe(ref)             // { configured, source?, writab
 await ctx.credentials.unset(ref)                // remove
 ```
 
-A key you save is usable by the next request that names it, and `describe` reports whether it is set, where it comes from, and whether you can write to it — never the value itself. Records persist in the same file, addressed by `<owner>/<id>` and managed with the seam's record operations (`readRecord`, `describeRecord`, `listRecords`, `modifyRecord`, `deleteRecord`).
+保存したキーは、それを名指す次のリクエストから使用できる。`describe` は設定されているか、どこから来るか、書き込み可能かを報告し、値自体は決して報告しない。レコードは同じファイルに永続化され、`<owner>/<id>` でアドレス指定され、シームのレコード操作 (`readRecord`、`describeRecord`、`listRecords`、`modifyRecord`、`deleteRecord`) で管理される。
 
-### Where keys come from
+### キーの由来
 
-Keys are resolved in one fixed order — the first place that has a value wins:
+キーは 1 つの固定の順序で解決される — 値を持つ最初の場所が勝つ:
 
-| Place | Writable? | Wins over |
+| 場所 | 書き込み可能? | これに勝つ |
 |---|---|---|
-| The stored file | yes (`set`/`unset`) | everything |
-| The environment you launched in (`DEEPSEEK_API_KEY=… dsh`) | not here | both `.env` files |
-| Your project's `.env` (`<invocation cwd>/.env`) | not here | your home `.env` |
-| Your home `.env` (`$DSH_HOME/.env`) | not here | nothing |
+| 保存ファイル | はい (`set`/`unset`) | すべて |
+| 起動した環境 (`DEEPSEEK_API_KEY=… dsh`) | ここでは不可 | 両方の `.env` ファイル |
+| プロジェクトの `.env` (`<invocation cwd>/.env`) | ここでは不可 | ホームの `.env` |
+| ホームの `.env` (`$DSH_HOME/.env`) | ここでは不可 | なし |
 
-The stored file wins because a credential explicitly saved through the product must take effect consistently for every provider ([decision](../../../.agents/notes/implemented/architecture/2026-10-09-stored-credential-precedence.md)). The launching environment — `DEEPSEEK_API_KEY=… dsh`, a CI secret, or a container `-e` — is the fallback when no stored value exists; a project `.env` then outranks the harness-home `.env`. A save always writes the winning layer, so `describe` reports `writable: true` for every reference, and its `source` names the place that currently supplies the value. The environment layer is the launcher's snapshot taken at launch ([environment snapshot](../../util/launch-environment/README.md)), so a variable exported after startup is not seen.
+保存ファイルが勝つのは、プロダクトを通じて明示的に保存された資格情報がすべてのプロバイダーに対して一貫して有効にならなければならないからである ([決定](../../../.agents/notes/implemented/architecture/2026-10-09-stored-credential-precedence.md))。起動環境 — `DEEPSEEK_API_KEY=… dsh`、CI シークレット、またはコンテナの `-e` — は、保存値が存在しない場合のフォールバックである。次にプロジェクトの `.env` がハーネスホームの `.env` より上位になる。保存は常に勝者の層に書き込むので、`describe` はすべての参照について `writable: true` を報告し、その `source` は現在値を供給している場所を名指す。環境の層は起動時に取られたランチャーのスナップショット ([環境スナップショット](../../util/launch-environment/README.md)) なので、起動後にエクスポートされた変数は見えない。
 
-### The credential file
+### 資格情報ファイル
 
-A versioned YAML document with one section per key space, and nothing else:
+キースペースごとに 1 つのセクションを持つバージョン付き YAML 文書であり、それ以外は何もない:
 
 ```yaml
 version: 1
@@ -106,108 +106,108 @@ records:
     kind: api-key               # neither: the owner confirmed the ambient credential chain
 ```
 
-You can edit the file directly — the store reloads it automatically and picks up the change, including a key or record you delete. `refs` holds key values by environment-variable name; `records` holds per-plugin credentials by `<owner>/<id>`, each tagged `api-key` or `grant`, whose grant payload the store keeps verbatim because only its owner can interpret it. Comments and the formatting of untouched entries survive product writes; a comment directly above an entry is that entry's note and is removed with it. An unknown top-level key, such as a token another tool wrote, is kept on disk and ignored with a warning at startup and on each reload that changes the file, because only `refs` and `records` entries resolve. Inside the document anything else is refused loudly rather than silently ignored: a non-mapping root, a key that is not addressable in its space, a wrong-typed or empty value, an unknown record tag or field, duplicate keys, and malformed YAML all fail at startup, and on a live reload the last good content keeps serving with a warning.
+ファイルは直接編集できる — ストアはそれを自動的に再ロードし、削除したキーやレコードも含めて変更を拾い上げる。`refs` は環境変数名によるキー値を保持し、`records` は `<owner>/<id>` によるプラグインごとの資格情報を保持し、それぞれ `api-key` または `grant` とタグ付けされる。grant ペイロードはそのオーナーのみが解釈できるため、ストアはそれを逐語的に保つ。コメントと変更されていないエントリーの書式はプロダクトの書き込みを生き延びる。あるエントリーの直前のコメントはそのエントリーのノートであり、それとともに除去される。他のツールが書いたトークンのような未知のトップレベルキーはディスク上に保持され、起動時およびファイルを変更する各リロード時に警告とともに無視される。解決されるのは `refs` と `records` のエントリーのみだからである。文書の内部では、それ以外のものは黙って無視されるのではなく大きな声で拒否される: 非マッピングのルート、その空間でアドレス指定できないキー、型が誤ったまたは空の値、未知のレコードタグまたはフィールド、重複キー、不正な YAML はすべて起動時に失敗し、ライブリロードでは最後の良好な内容が警告とともに提供され続ける。
 
-A key's value can be any text, multi-line values included — no quoting tricks needed. An empty value means "no key", which is why an empty string in the file is rejected: removing a key deletes it, it does not blank it. A `grant` payload must survive a JSON round trip, enforced on the way in and on the way out, so the store refuses a value it could not read back exactly as written. If the file on disk no longer parses, saving fails instead of overwriting content the product could not read.
+キーの値は任意のテキストであり、複数行の値も含む — 引用のトリックは不要である。空の値は「キーなし」を意味し、だからファイル内の空文字列は拒否される: キーの削除はそれを消すのであり、空にするのではない。`grant` ペイロードは JSON の往復を生き延びなければならず、入り口と出口の両方で強制されるので、ストアは書かれたとおりに正確に読み戻せない値を受け付けない。ディスク上のファイルがもはやパースできない場合、保存は失敗し、プロダクトが読めなかった内容を上書きしない。
 
-### Who can read the file
+### ファイルを読めるのは誰か
 
-Only your OS user can read the file: the product creates it with owner-only permissions, and on POSIX it refuses to load a file that any other user can read — the error tells you to run `chmod 600`. Windows has no mode to inspect, so the check is skipped there rather than faked. The agent is not another user: its tool processes run as you, so they can read the file like any other file you own. The product never hands the agent the file's path and never loads the file into the environment, so reaching a value takes a deliberate read of a path the agent was not given. That is discretion, not a boundary: a deployment that must keep provider keys away from its own agent cannot get there with file permissions.
+ファイルを読めるのは OS のユーザーだけである: プロダクトはオーナー専用の権限でそれを作成し、POSIX では他のユーザーが読めるファイルのロードを拒否する — エラーは `chmod 600` の実行を指示する。Windows には検査するモードがないので、そこでチェックは偽装されるのではなくスキップされる。エージェントは別のユーザーではない: そのツールプロセスはあなたとして実行されるので、あなたが所有する他のファイルと同様にファイルを読める。プロダクトはエージェントにファイルのパスを決して渡さず、ファイルを環境にロードすることも決してないので、値に到達するにはエージェントに与えられていないパスを意図的に読む必要がある。それは裁量であり、境界ではない: プロバイダーキーを自身のエージェントから遠ざけなければならないデプロイメントは、ファイル権限ではそれを達成できない。
 
-### What can go wrong
+### 失敗しうるもの
 
-- **A key the launching environment supplies is a fallback** — saving a value stores a higher-priority credential; removing it reveals the launch environment again. To make an exported key apply, delete its entry under `refs` in the file.
-- **An empty value cannot be saved** — storing an empty string is refused; remove the key instead.
-- **The store refuses to load a file it cannot trust** — a file any other user can read, malformed YAML, or an unreachable path fails at startup; on a live reload the last good content keeps serving with a warning.
-- **Changes made at the same time are both kept** — if you edit the file while the product writes, your change is folded in rather than overwritten.
+- **起動環境が供給するキーはフォールバックである** — 値を保存するとより優先度の高い資格情報が保存され、それを削除すると起動環境が再び現れる。エクスポートされたキーを有効にするには、ファイル内の `refs` の下のそのエントリーを削除する。
+- **空の値は保存できない** — 空文字列の保存は拒否される。代わりにキーを削除する。
+- **ストアは信頼できないファイルのロードを拒否する** — 他のユーザーが読めるファイル、不正な YAML、または到達不能なパスは起動時に失敗する。ライブリロードでは最後の良好な内容が警告とともに提供され続ける。
+- **同時に行われた変更は両方とも保持される** — プロダクトの書き込み中にファイルを編集した場合、あなたの変更は上書きされるのではなく折り込まれる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the provider and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではプロバイダーの背後にある設計判断を説明し、それを実現するコードを示す。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計方針
 
-- **One honest precedence.** The managed store wins for every provider; launch environment, project `.env`, and harness-home `.env` are deterministic fallbacks in that order.
-- **The document holds only credentials.** A foreign top-level key is tolerated but resolves nothing. A versioned document with `refs` and `records` sections rather than a dotenv file: a store the harness owns and never materializes into the environment cannot also serve as the user's environment layer, which would shadow non-secret entries behind its precedence.
-- **Writes patch, reloads replace.** Line edits preserve comments and untouched entries under the cross-process writer lock; reloads swap the parsed snapshot wholesale so a deleted entry never lingers in memory.
-- **Fail loud where trust is at stake.** Boot and reload reject a document that is unreadable, invalid, or readable beyond its owner; a live reload that fails keeps the last good snapshot and warns rather than taking the process down.
+- **1 つの正直な優先順位。** 管理ストアはすべてのプロバイダーに対して勝つ。起動環境、プロジェクト `.env`、ハーネスホーム `.env` はその順序の決定的なフォールバックである。
+- **文書は資格情報のみを保持する。** 外来のトップレベルキーは許容されるが何も解決しない。dotenv ファイルではなく `refs` と `records` セクションを持つバージョン付き文書である: ハーネスが所有し環境に決して実体化しないストアは、ユーザーの環境層も兼ねることができない。それはその優先順位の背後に非シークレットのエントリーを影で覆ってしまう。
+- **書き込みはパッチ、リロードは置き換え。** 行編集はプロセス間ライターのロックの下でコメントと変更されていないエントリーを保つ。リロードはパース済みスナップショットを丸ごと入れ替えるので、削除されたエントリーがメモリに残留することはない。
+- **信頼がかかるところでは大きな声で失敗する。** 起動とリロードは、読めない、無効な、またはオーナーを超えて読める文書を拒否する。失敗したライブリロードはプロセスを落とすのではなく、最後の良好なスナップショットを保って警告する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Provider: layer resolution, strict document parse, reference and record write paths under the writer lock, watcher lifecycle, permissions check |
+| [`src/index.ts`](src/index.ts) | プロバイダー: 層の解決、厳密な文書パース、ライターのロックの下での参照とレコードの書き込み経路、ウォッチャーライフサイクル、権限チェック |
 
-### Resolution and write paths
+### 解決と書き込みの経路
 
-`resolve` and `describe` read the parsed document snapshot, the inherited environment snapshot, and the `.env` fallbacks in precedence order. `set`/`unset` queue onto one exclusive operation chain: entry checks reject early (disposed or empty value), and the queue performs a read-modify-write under the writer lock before firing `credentials/reference-updated` exactly once.
+`resolve` と `describe` は、パース済みの文書スナップショット、継承された環境スナップショット、および `.env` フォールバックを優先順位の順で読む。`set`/`unset` は 1 つの排他的操作チェーンにキューイングする: エントリーチェックが早期に拒否し (破棄済みまたは空の値)、チェーンがライターのロックの下で読み取り-変更-書き込みを実行してから `credentials/reference-updated` をちょうど 1 回発火する。
 
-`modifyRecord` runs on the same chain and lock: it re-reads the document, passes the record as it stands to the mutation, admits the result — a non-empty API key, a grant payload that survives a JSON round trip — renders the record wholesale, and commits, firing `credentials/record-updated` once. A composition the product CLI did not boot has only the inherited environment as its layer.
+`modifyRecord` は同じチェーンとロックで実行される: 文書を再読み取りし、現状のままのレコードを変更関数に渡し、結果 — 非空の API キー、JSON の往復を生き延びる grant ペイロード — を受理し、レコードを丸ごとレンダリングし、コミットして `credentials/record-updated` を 1 回発火する。プロダクト CLI が起動しなかった構成は、継承された環境のみを層として持つ。
 
-### Reload lifecycle
+### リロードライフサイクル
 
-A watcher event or the ready-time reconciliation queues a refresh behind the same chain. `reconcileFromDisk` re-checks permissions, re-reads the text, replaces both snapshots wholesale when the text differs, and publishes one event per changed reference or record; content equal to the text cache — including the provider's own writes — is a no-op. Disposal sets the closed flag, stops accepting events, closes the watcher, and waits out queued operations so nothing publishes after teardown.
+ウォッチャーイベントまたは準備完了時の調整が、同じチェーンの後ろにリフレッシュをキューイングする。`reconcileFromDisk` は権限を再チェックし、テキストを再読み取りし、テキストが異なる場合に両方のスナップショットを丸ごと置き換え、変更された参照またはレコードごとに 1 つのイベントを発行する。テキストキャッシュと等しい内容 — プロバイダー自身の書き込みを含む — はノーオペレーションである。破棄はクローズドフラグを立て、イベントの受け入れを停止し、ウォッチャーをクローズし、キューに入った操作を待ち切るので、ティアダウン後に何も発行されない。
 
-### Document versioning
+### 文書のバージョニング
 
-The document carries `version: 1`, stamped on every write. A boot that recognizes the pre-release flat layout — a bare mapping of reference names with no `version` — upgrades the document in place under the writer lock, nesting the original lines under `refs:` so values, comments, and spellings survive byte for byte; any other unversioned shape is refused by name rather than read as an empty store. A live reload never migrates: a flat document restored mid-run keeps the last good snapshot until the next boot.
+文書は `version: 1` を運び、すべての書き込みに刻印される。リリース前のフラットレイアウト — `version` のない、参照名の裸のマッピング — を認識する起動は、ライターのロックの下で文書をその場でアップグレードし、元の行を `refs:` の下にネストして、値、コメント、綴りがバイト単位で生き延びるようにする。それ以外のバージョンなしの形は、空のストアとして読まれるのではなく名前で拒否される。ライブリロードは決してマイグレーションしない: 実行中に復元されたフラット文書は次の起動まで最後の良好なスナップショットを保つ。
 
-### Diagnostics never quote a value
+### 診断は値を決して引用しない
 
-The YAML parser's own message quotes the offending source line, which in this document is the secret itself. Every diagnostic therefore carries only the error code and position — a key name is safe to print, a value is not.
+YAML パーサー自身のメッセージは問題のあるソース行を引用し、この文書ではそれがシークレットそのものである。したがってすべての診断はエラーコードと位置のみを運ぶ — キー名は出力しても安全だが、値は安全ではない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the provider-level contract is not enough. They move from the seam contract to the environment snapshot, the atomic-write primitive, and the boot-time environment layers.
+プロバイダーレベルの契約では足りないときにこれらのページを読む。シーム契約から、環境スナップショット、原子的書き込みプリミティブ、起動時の環境層へ進む。
 
-- [Credential-reference seam](../credentials/README.md) — `resolve`, `describe`, `set`, `unset`, the record operations, and the seam's update events.
-- [Credentials subsystem reference](../../../docs/subsystems/credentials.md) — `CredentialRef`, per-operation resolution, UI-safe `CredentialInfo`, provider layers.
-- [Launch environment snapshot](../../util/launch-environment/README.md) — the frozen layer snapshot resolution reads instead of `process.env`.
-- [Atomic write](../../util/atomic-write/README.md) — the writer lock and atomic replacement every write uses.
-- [App boot and Harness-home layers](../../boot/app-boot/README.md) — how the product CLI loads `.env` into the snapshot and `process.env`.
+- [資格情報参照シーム](../credentials/README.md) — `resolve`、`describe`、`set`、`unset`、レコード操作、およびシームの更新イベント。
+- [資格情報サブシステムリファレンス](../../../docs/subsystems/credentials.md) — `CredentialRef`、操作ごとの解決、UI セーフな `CredentialInfo`、プロバイダー層。
+- [起動環境スナップショット](../../util/launch-environment/README.md) — 解決が `process.env` の代わりに読む凍結された層スナップショット。
+- [原子的書き込み](../../util/atomic-write/README.md) — すべての書き込みが使うライターのロックと原子的置き換え。
+- [App boot とハーネスホームの層](../../boot/app-boot/README.md) — プロダクト CLI が `.env` をスナップショットと `process.env` にロードする方法。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the consumers of `ctx.credentials`, which own any model-facing behavior a stored value enables.
+間接的に、`ctx.credentials` のコンシューマーを通じて。保存値が可能にするモデルに公開される動作はそれらが所有する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-No direct invalidation; stored values never enter a request prefix.
+直接の無効化はない。保存値はリクエストプレフィックスに決して入らない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the provider is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+これらの制限は、プロバイダーが不適切になる、または特別な運用上の注意を要する条件を定める。それらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Same-reference concurrent writes are last-write-wins** — the writer lock and the read-modify-write keep concurrent writers from dropping each other's entries, but two writers editing one reference still resolve to the later write; there is no revision check.
-- **A same-UID process can read the document** — the file-effect sandbox modes do not deny reads, and an OS-keychain provider is deferred.
-- **Environment changes are invisible** — the snapshot is frozen at launch, so a variable exported after startup reaches neither resolution nor `describe`; changing an environment-sourced credential takes a restart.
-- **Atomic, not crash-durable** — inherited from `dsh-atomic-write`; the store re-reads on boot.
+- **同一参照への並行書き込みは最後の書き込みが勝つ** — ライターのロックと読み取り-変更-書き込みは、並行ライターが互いのエントリーを落とすことを防ぐが、1 つの参照を編集する 2 人のライターは依然として後の書き込みに解決される。リビジョンチェックは存在しない。
+- **同じ UID のプロセスは文書を読める** — ファイルエフェクトのサンドボックスモードは読み取りを拒否せず、OS キーチェーンプロバイダーは先送りされている。
+- **環境の変更は不可視である** — スナップショットは起動時に凍結されるので、起動後にエクスポートされた変数は解決にも `describe` にも到達しない。環境由来の資格情報を変更するには再起動が必要である。
+- **原子的だがクラッシュ耐性はない** — `dsh-atomic-write` から継承する。ストアは起動時に再読み取りする。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
+この開発メモはメンテナー向けの作業コンテキストである: 未解決の疑問と未決定の方向性。これは明示的に非権威である — 出荷済みの動作と制限は上記のセクションとパッケージのコードにある。
 
-An OS-keychain provider — a store the model's processes cannot read — is the deferred answer to the same-UID limitation and belongs beside this provider as a sibling package. The seam shape also leaves room for helper-command- and KMS-backed providers; none is shipped.
+OS キーチェーンプロバイダー — モデルのプロセスが読めないストア — は、同一 UID の制限に対する先送りの答えであり、このプロバイダーの隣に兄弟パッケージとして属する。シームの形はヘルパーコマンドおよび KMS ベースのプロバイダーの余地も残しているが、いずれも出荷されていない。
 
 </details>

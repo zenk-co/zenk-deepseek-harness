@@ -1,35 +1,35 @@
 ---
-description: "Run TypeScript programs in fresh Node processes with the session filesystem sandbox, managed cleanup, and configurable execution and output limits."
+description: "セッションのファイルシステムサンドボックス、管理されたクリーンアップ、構成可能な実行・出力制限のもとで、新しい Node プロセスで TypeScript プログラムを実行する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-ptc-runtime-node
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Execute model-written TypeScript with host-provided async functions. The default `per-call` mode starts a fresh Node process under the same platform sandbox policy as Bash. Opt-in `persistent-in-memory` mode retains a confined REPL across calls for each Agent. Both return captured logs, an exact JSON value, or a structured failure. Direct Node APIs remain available within the selected restrictions. Elapsed deadlines, output bounds and a V8 heap limit constrain execution; cancellation and per-call completion terminate the managed process range. A requested restricted mode fails when its sandbox backend is unavailable.
+モデルが書いた TypeScript を、Host が提供する非同期関数とともに実行する。既定の `per-call` モードは Bash と同じプラットフォームサンドボックスポリシーの下で新しい Node プロセスを起動する。オプトインの `persistent-in-memory` モードは、Agent ごとに呼び出しをまたいで閉じ込められた REPL を保持する。どちらもキャプチャーされたログ、正確な JSON 値、または構造化された失敗を返す。直接の Node API は選択された制限内で利用可能なままである。経過デッドライン、出力境界、V8 ヒープ制限が実行を制約し、キャンセルと呼び出しごとの完了が管理対象プロセス範囲を終了させる。要求された制限モードは、そのサンドボックスバックエンドが利用できないときに失敗する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this provider in a composition that supplies `fs`, `subprocess`, `sandbox` and `sandboxPolicy`. PTC mode in `dsh-tools` supplies the calling Session's directory and standing policy; direct runtime consumers resolve those options before execution.
+このプロバイダーは、`fs`、`subprocess`、`sandbox`、`sandboxPolicy` を提供するコンポジションにマウントする。`dsh-tools` の PTC モードは呼び出し元セッションのディレクトリと常駐ポリシーを提供し、直接のランタイムコンシューマーは実行前にそれらのオプションを解決する。
 
-### Configuration
+### 構成
 
-Configure the provider row after its required services are available:
+必要なサービスが利用可能になった後にプロバイダー行を構成する:
 
 ```yaml
 - name: '@deepseek-ai/dsh-ptc-runtime-node'
@@ -44,30 +44,30 @@ Configure the provider row after its required services are available:
     graceMs: 3000
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定 | 意味 |
 |---|---|---|
-| `executionMode` | `per-call` | `per-call` starts fresh processes under file policy; `persistent-in-memory` retains a confined REPL per owner |
-| `timeoutMs` | `120,000` | Default elapsed execution deadline, including nested tool and approval waits |
-| `maxTimeoutMs` | `600,000` | Elapsed deadline ceiling applied by the resolver |
-| `maxOutputBytes` | `67,108,864` | Combined serialized logs and completion or diagnostic budget |
-| `maxOldGenerationSizeMb` | `512` | V8 old-generation heap limit in MiB |
-| `maxMessageBytes` | `134,217,728` | Limit for a control frame, outstanding argument bytes and queued control writes |
-| `maxPendingCalls` | `128` | Maximum simultaneous host binding calls |
-| `graceMs` | `3,000` | Managed termination and output-drain grace |
-| `launch` | Local carrier | Explicit `{ kind: "node-script", executable, bootstrapPath? }` or `{ kind: "embedded", executable }` in the subprocess world |
+| `executionMode` | `per-call` | `per-call` はファイルポリシーの下で新しいプロセスを起動する。`persistent-in-memory` はオーナーごとに閉じ込められた REPL を保持する |
+| `timeoutMs` | `120,000` | 既定の経過実行デッドライン。ネストしたツールと承認の待ち時間を含む |
+| `maxTimeoutMs` | `600,000` | リゾルバーが適用する経過デッドラインの上限 |
+| `maxOutputBytes` | `67,108,864` | シリアライズされたログと完了または診断の合算予算 |
+| `maxOldGenerationSizeMb` | `512` | MiB 単位の V8 old-generation ヒープ制限 |
+| `maxMessageBytes` | `134,217,728` | 制御フレーム、未処理の引数バイト、キューされた制御書き込みの制限 |
+| `maxPendingCalls` | `128` | 同時 host binding 呼び出しの最大数 |
+| `graceMs` | `3,000` | 管理された終了と出力ドレインの猶予 |
+| `launch` | ローカルキャリア | subprocess ワールドでの明示的な `{ kind: "node-script", executable, bootstrapPath? }` または `{ kind: "embedded", executable }` |
 
-The [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-ptc-runtime-node) defines accepted config fields. `resolve(request)` defaults cwd to the sandbox policy workspace root and supplies the numeric or null deadline choice and execution policy; `run(spec)` accepts those resolved inputs and does not fill missing values.
+[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-ptc-runtime-node)が受け付けられる構成フィールドを定義する。`resolve(request)` は cwd をサンドボックスポリシーのワークスペースルートに既定し、数値または null のデッドライン選択と実行ポリシーを提供する。`run(spec)` はそれらの解決済み入数を受け付け、欠けている値を埋めない。
 
-### Execution and results
+### 実行と結果
 
-In `per-call` mode, programs are async function bodies: top-level `await` and `return` work, and only erasable TypeScript is accepted. A successful call returns its lossless-JSON value as `result.value` and captured text as `result.logs`. `result.sandbox` reports the selected mode, observed denial and the backend's full or partial enforcement independently of the program outcome.
+`per-call` モードでは、プログラムは非同期関数の本体である: トップレベルの `await` と `return` が機能し、消去可能な TypeScript のみが受け付けられる。成功した呼び出しはロスレス JSON 値を `result.value` として、キャプチャーされたテキストを `result.logs` として返す。`result.sandbox` は選択されたモード、観測された拒否、バックエンドの完全または部分的な強制を、プログラムの結果とは独立に報告する。
 
-Direct filesystem, network and subprocess operations remain Node operations, subject to the selected OS sandbox. Nested host bindings cross the control channel; PTC tool calls retain the registry's visibility, ordering, logging and approval rules. Running a program does not change the Session's standing policy or automatically replay it after a denial.
+直接のファイルシステム、ネットワーク、subprocess 操作は Node 操作のままで、選択された OS サンドボックスの対象である。ネストした host binding は制御チャネルを越え、PTC ツール呼び出しはレジストリの可視性、順序、ロギング、承認ルールを保持する。プログラムの実行はセッションの常駐ポリシーを変更せず、拒否の後に自動的に再実行することもない。
 
 <a id="persistent-repl"></a>
-### In-memory mode
+### インメモリモード
 
-Set `executionMode: persistent-in-memory` on the existing `@deepseek-ai/dsh-ptc-runtime-node` plugin to retain state. Both modes require `fs`, `subprocess`, `sandbox` and `sandboxPolicy`; both apply the selected file sandbox policy. Enable it deliberately with a profile patch:
+既存の `@deepseek-ai/dsh-ptc-runtime-node` プラグインで状態を保持するには `executionMode: persistent-in-memory` を設定する。どちらのモードも `fs`、`subprocess`、`sandbox`、`sandboxPolicy` を必要とし、どちらも選択されたファイルサンドボックスポリシーを適用する。プロファイルパッチで意図的に有効化する:
 
 ```yaml
 - id: ptc-runtime
@@ -75,107 +75,107 @@ Set `executionMode: persistent-in-memory` on the existing `@deepseek-ai/dsh-ptc-
     executionMode: persistent-in-memory
 ```
 
-Save the patch and pass its path to `dsh headless --patch <path>` in a composition with PTC tool presentation. The default `per-call` mode retains no program memory between calls. Changing the configuration reloads the provider and releases its execution resources. Packaged single-executable hosts require a `node-script` launch with `launch.executable` pointing to Node and `launch.bootstrapPath` pointing to this package's built `persistent-process.js` for in-memory execution.
+パッチを保存し、PTC ツール提示を含むコンポジションでそのパスを `dsh headless --patch <path>` に渡す。既定の `per-call` モードは呼び出し間にプログラムメモリを保持しない。構成の変更はプロバイダーをリロードし、その実行リソースを解放する。パッケージ済みの単一実行ファイル Host では、インメモリ実行のために `launch.executable` が Node を指し、`launch.bootstrapPath` がこのパッケージのビルド済み `persistent-process.js` を指す `node-script` 起動が必要である。
 
-Each live Agent keeps its own process and top-level variables, functions, and imported modules across `run_code` calls and turns. Use `await import(...)`, `console.log(...)`, and a final JSON expression; top-level `return` is not supported. Assignments to undeclared names create retained globals under Node REPL’s non-strict evaluation. `_` and `_error` are ordinary retained globals, without interactive REPL result setters. Node REPL declaration rules apply, including errors on redeclaring existing `let`, `const`, or `class` names; assign to a mutable binding or choose a new name. A leading `{ ... }` is a statement block and can contain top-level await and temporary declarations; parenthesize an object expression to return it. Retained functions and saved tool methods call the current evaluation's bindings. All tool calls must be awaited; callbacks from a completed evaluation cannot invoke tools in a later evaluation.
+稼働中の各 Agent は、`run_code` 呼び出しとターンをまたいで独自のプロセスとトップレベル変数、関数、インポート済みモジュールを保持する。`await import(...)`、`console.log(...)`、最後の JSON 式を使うこと。トップレベルの `return` はサポートされない。宣言されていない名前への代入は、Node REPL の非 strict 評価のもとで保持グローバルを作成する。`_` と `_error` は通常の保持グローバルであり、対話型 REPL の結果セッターはない。Node REPL の宣言ルールが適用され、既存の `let`、`const`、`class` 名の再宣言はエラーになる。可変バインディングに代入するか、新しい名前を選ぶこと。先頭の `{ ... }` は文ブロックであり、トップレベル await と一時宣言を含められる。オブジェクト式を返すには括弧で囲む。保持された関数と保存されたツールメソッドは、現在の評価のバインディングを呼び出す。すべてのツール呼び出しは await しなければならない。完了した評価からのコールバックは、後の評価でツールを呼び出せない。
 
-Memory is best-effort and never saved to disk. Restart, Agent disposal, provider unload, cancellation, timeout, protocol failure, output overflow, or process exit clears it. Missing variables raise normal reference errors; reacquire handles and recreate declarations. Exceptions in the active evaluation settle once and preserve earlier mutations. Exceptions thrown by callbacks from a completed evaluation are not reported in a later result; await asynchronous work before completing an evaluation. The Session still records programs, tool dispatches and visible results; restoring a Session or forking an Agent starts with empty memory. Each evaluation resets the process working directory to its resolved cwd; program calls to `process.chdir()` do not persist across evaluations. Direct Node access follows the resolved file policy. A retained owner cannot change mode, workspace root or Session identity until its environment is released.
+メモリはベストエフォートであり、ディスクに保存されることは決してない。再起動、Agent の破棄、プロバイダーのアンロード、キャンセル、タイムアウト、プロトコル障害、出力オーバーフロー、プロセス終了がそれをクリアする。欠けている変数は通常の参照エラーを発生させる。ハンドルを再取得し、宣言を再作成すること。アクティブな評価の例外は一度だけ決着し、以前の変更を保つ。完了した評価からのコールバックが投げる例外は、後の結果で報告されない。評価を完了する前に非同期作業を await すること。セッションは依然としてプログラム、ツールディスパッチ、可視結果を記録する。セッションの復元や Agent のフォークは空のメモリから始まる。各評価はプロセスの作業ディレクトリを解決済みの cwd にリセットする。プログラムによる `process.chdir()` の呼び出しは評価をまたいで持続しない。直接の Node アクセスは解決済みのファイルポリシーに従う。保持されたオーナーは、その環境が解放されるまでモード、ワークスペースルート、セッションアイデンティティを変更できない。
 
-Service consumers pass an object as `stateOwner` to reuse its environment and await `release(owner)` when finished. Requests without an owner run in temporary processes. Permission setters record the new mode synchronously. The runtime immediately invalidates affected processes and begins cancellation when the Session mode changes, including idle environments. The next program waits for their cleanup before starting; cleanup failure blocks that program and remains retryable. Permission-setting success does not mean old processes have finished stopping. A one-time approved escalation uses a separate environment and awaits its cleanup before returning; it cannot read the standing environment's variables or retain new declarations. Concurrent runs for one owner reject until execution and required cleanup complete; distinct owners may run concurrently. An idle environment has no expiration timer and keeps its process until release or failure. Raw stdout/stderr have no evaluation identity: bytes received during an evaluation share its output budget, even when written by an earlier child process; idle stdout is discarded and idle stderr retains only the bounded diagnostic tail. Await child-process completion before ending an evaluation. Process-exit diagnostics include the exit code and retained stderr tail; idle failures are written to the host logger. If process observation fails during cleanup, releasing the owner retries termination; new runs remain blocked until cleanup succeeds. Pipes that fail to drain after confirmed process exit produce a diagnostic but do not prevent releasing the environment.
+サービスのコンシューマーは `stateOwner` としてオブジェクトを渡して環境を再利用し、終了時に `release(owner)` を await する。オーナーのないリクエストは一時プロセスで実行される。パーミッションセッターは新しいモードを同期的に記録する。ランタイムはセッションモードが変わると、アイドル環境も含め、影響を受けるプロセスを直ちに無効化し、キャンセルを開始する。次のプログラムはそれらのクリーンアップを待ってから開始し、クリーンアップの失敗はそのプログラムをブロックし、再試行可能なままとする。パーミッション設定の成功は、古いプロセスの停止が完了したことを意味しない。一度だけ承認されたエスカレーションは別個の環境を使い、戻る前にそのクリーンアップを await する。常駐環境の変数を読むことも、新しい宣言を保持することもできない。1 つのオーナーの同時実行は、実行と必要なクリーンアップが完了するまで拒否され、別個のオーナーは並行して実行できる。アイドル環境には有効期限タイマーがなく、解放または失敗までプロセスを保つ。生の stdout/stderr は評価アイデンティティを持たない: 評価中に受信したバイトは、より前の子プロセスが書いたものでもその評価の出力予算を共有する。アイドル時の stdout は破棄され、アイドル時の stderr は有界の診断テールのみを保持する。評価を終える前に子プロセスの完了を await すること。プロセス終了の診断には終了コードと保持された stderr テールが含まれ、アイドル時の失敗は Host ロガーに書き込まれる。クリーンアップ中にプロセスの観測が失敗した場合、オーナーの解放は終了を再試行し、クリーンアップが成功するまで新しい実行はブロックされたままになる。プロセス終了の確認後にドレインに失敗したパイプは診断を生成するが、環境の解放を妨げない。
 
-### Deadlines and cancellation
+### デッドラインとキャンセル
 
-For calls carrying a Session policy, a mode change cancels admission even while waiting for cleanup or process startup. Restoring the previous mode does not revive a canceled call.
+セッションポリシーを運ぶ呼び出しでは、クリーンアップやプロセス起動の待機中でもモード変更が受け入れをキャンセルする。以前のモードへの復元はキャンセルされた呼び出しを復活させない。
 
-The PTC consumer exposes per-call timeout and approved sandbox choices as described in [dsh-tools](../../core/tools/README.md#ptc-mode). The runtime's readonly `timeout` descriptor reports its effective default and maximum to that consumer. The provider owns execution syntax, output syntax and state-retention guidance in `executionInstructions`. The tool consumer appends those mode-specific rules to its model-visible schema without inferring persistence from `programFormat`.
+PTC コンシューマーは、[dsh-tools](../../core/tools/README.md#ptc-mode)で説明されている呼び出しごとのタイムアウトと承認済みサンドボックス選択を公開する。ランタイムの読み取り専用 `timeout` 記述子は、その実効的な既定と最大をそのコンシューマーに報告する。プロバイダーは `executionInstructions` で実行構文、出力構文、状態保持ガイダンスを所有する。ツールコンシューマーはそれらのモード固有ルールをモデル可視スキーマに追記し、`programFormat` から永続性を推測することはない。
 
-Omitting `timeoutMs` uses the configured elapsed default; numeric requests are validated and capped. Service callers can explicitly pass `timeoutMs: null` to omit the elapsed timer, as the workflow adapter does; `run_code` continues to accept only positive numeric overrides. An enabled deadline covers runtime setup and execution, including time awaiting nested tools or approval. It is not a CPU meter. Timeout or cancellation stops a synchronous loop through the host's managed process owner; successful per-call completion also cleans that managed range. The timer stops when an outcome is selected, before cleanup, so the returned call can take longer than its execution deadline while cleanup settles.
+`timeoutMs` を省略すると構成済みの経過既定を使い、数値リクエストは検証されて上限が適用される。サービスの呼び出し元は、workflow アダプターがそうするように、`timeoutMs: null` を明示的に渡して経過タイマーを省略できる。`run_code` は引き続き正の数値オーバーライドのみを受け付ける。有効なデッドラインはランタイムのセットアップと実行を覆い、ネストしたツールや承認の待ち時間も含む。CPU メーターではない。タイムアウトまたはキャンセルは Host の管理プロセスオーナーを通じて同期的なループを停止し、呼び出しごとの正常な完了もその管理範囲をクリーンアップする。タイマーは結果が選択されるとクリーンアップの前に停止するため、返された呼び出しはクリーンアップの決着中、実行デッドラインより長くかかることがある。
 
-### Failures
+### 失敗
 
-Program parse errors and thrown exceptions are `exception`; deadline expiry is `timeout`; cancellation is `abort`; malformed or excessive control traffic is `protocol`; unavailable confinement is `sandbox-unavailable`; early process exit or failed managed cleanup is `worker-exit`. The substrate-independent failure name remains `worker-exit` for process providers. Lossy completions are `invalid-output`, and an oversized outer result is `output-limit`, retaining the fitting log prefix. Invalid or unsupported options and calls after disposal reject as caller misuse.
+プログラムのパースエラーと投げられた例外は `exception`、デッドライン超過は `timeout`、キャンセルは `abort`、不正または過剰な制御トラフィックは `protocol`、利用できない閉じ込めは `sandbox-unavailable`、早期のプロセス終了または管理クリーンアップの失敗は `worker-exit` である。基盤に依存しない失敗名はプロセスプロバイダーでも `worker-exit` のままである。ロッシーな完了は `invalid-output`、サイズ超過の外側の結果は `output-limit` で、収まるログプレフィックスを保つ。無効または未サポートのオプションと、破棄後の呼び出しは呼び出し元の誤用として拒否される。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The host owns policy, deadlines, binding lookup and process cleanup. The child owns program evaluation and binding proxies; model-written code is an untrusted peer even when its messages use the expected control descriptor.
+Host がポリシー、デッドライン、バインディングルックアップ、プロセスのクリーンアップを所有する。子はプログラム評価とバインディングプロキシを所有し、モデルが書いたコードは、そのメッセージが期待された制御記述子を使っていても信頼できないピアである。
 
-### Launch and control
+### 起動と制御
 
-For per-call execution, the host strips erasable types, resolves the executable and bootstrap in the configured execution world, awaits argv confinement through `ctx.sandbox`, then spawns through `ctx.subprocess`. Cancellation is checked again after confinement, so a provider returning after cancellation cannot start the program. After adopting the inherited control channel, the child retains only executable-search, Windows system, and temporary paths in its OS environment and replaces the program-visible `process.env` with an empty dictionary. Windows ACL setup receives the parent's distinct `TEMP` and `TMP` values for shared grant locks, then replaces both with its private directory before starting the program. These native paths keep nested process creation and native temporary-file APIs functional. The host preserves `ELECTRON_RUN_AS_NODE` only for child startup so the Desktop executable runs the Node bootstrap; the bootstrap removes the selector before evaluating model code. The heap limit uses Node argv or a provider-created `NODE_OPTIONS` value for packaged executables; ambient loader and inspector flags are discarded.
+呼び出しごとの実行では、Host は消去可能な型を取り除き、構成された実行ワールドで実行ファイルとブートストラップを解決し、`ctx.sandbox` を通じた argv の閉じ込めを待ってから、`ctx.subprocess` を通じて spawn する。キャンセルは閉じ込めの後に再度確認されるため、キャンセル後に戻ったプロバイダーがプログラムを開始することはできない。継承された制御チャネルを採用した後、子は OS 環境に実行ファイル検索、Windows システム、一時パスのみを保持し、プログラム可視の `process.env` を空の辞書に置き換える。Windows ACL のセットアップは共有グラントロックのために親の別個の `TEMP` と `TMP` 値を受け取り、プログラム開始前に両方をそのプライベートディレクトリに置き換える。これらのネイティブパスはネストしたプロセス作成とネイティブ一時ファイル API を機能させ続ける。Host は子の起動のためだけに `ELECTRON_RUN_AS_NODE` を保つため、Desktop 実行ファイルが Node ブートストラップを実行する。ブートストラップはモデルコードを評価する前にそのセレクターを取り除く。ヒープ制限は Node argv またはパッケージ済み実行ファイル用のプロバイダー作成の `NODE_OPTIONS` 値を使う。環境の loader フラグと inspector フラグは破棄される。
 
-Length-framed JSON travels separately from stdout/stderr. The host bounds frames and queued writes, validates call identity and declared binding names before dispatch, and refuses invalid traffic. The child flushes its terminal frame and keeps the control channel open until the host closes it. After submitting that frame, it ignores later binding replies and sends no further program control messages. Output capture meters serialized logs plus the completion or diagnostic; fixed result-envelope fields and sandbox metadata are outside that ledger.
+長さフレームの JSON は stdout/stderr とは別に流れる。Host はフレームとキューされた書き込みを制限し、ディスパッチ前に呼び出しアイデンティティと宣言されたバインディング名を検証し、無効なトラフィックを拒否する。子は終端フレームをフラッシュし、Host が閉じるまで制御チャネルを開いたままにする。そのフレームを送信した後は、後のバインディング応答を無視し、それ以上のプログラム制御メッセージを送らない。出力キャプチャーはシリアライズされたログと完了または診断を計量し、固定の結果エンベロープフィールドとサンドボックスメタデータはその台帳の外にある。
 
-### Source and built bootstraps
+### ソースおよびビルド済みブートストラップ
 
-Source execution loads an erasable-only bootstrap closure without relying on sibling built exports. Built script execution uses `process.js` for per-call programs or `persistent-process.js` for retained REPL environments. Persistent mode requires a `node-script` launch. A remote script deployment supplies the matching `launch.bootstrapPath`. Embedded carriers launch their private worker through `launch.executable`. `resolveLaunch()` selects the local default during construction; an explicit remote invocation never depends on whether the client itself is packaged. A host path is never assumed to name the same remote file.
+ソース実行は、兄弟のビルド済みエクスポートに頼ることなく、消去可能専用のブートストラップクロージャーをロードする。ビルド済みスクリプトの実行は、呼び出しごとのプログラムには `process.js` を、保持 REPL 環境には `persistent-process.js` を使う。永続モードは `node-script` 起動を必要とする。リモートスクリプトのデプロイは一致する `launch.bootstrapPath` を供給する。埋め込みキャリアは `launch.executable` を通じてそのプライベート worker を起動する。`resolveLaunch()` は構築中にローカルの既定を選択し、明示的なリモート呼び出しはクライアント自身がパッケージ済みかどうかに依存しない。Host パスが同じリモートファイルを指すと仮定されることは決してない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Node provider: mode selection, per-call resolution, policy and managed execution |
-| [`src/config.ts`](src/config.ts) | Execution mode, validated limits and defaults |
-| [`src/persistent.ts`](src/persistent.ts) | In-memory process ownership, evaluation deadlines and cleanup |
-| [`src/persistent-process.ts`](src/persistent-process.ts) | Child REPL, retained declarations and current binding dispatch |
-| [`src/output-stream.ts`](src/output-stream.ts) | Bounded stream capture and process-output draining |
-| [`src/launch.ts`](src/launch.ts) | Executable/bootstrap arguments and execution-world asset mapping |
-| [`src/process.ts`](src/process.ts) | Child handshake, environment clearing and program lifecycle |
-| [`src/bootstrap.ts`](src/bootstrap.ts) | Program evaluation, binding proxies and output capture |
-| [`src/channel.ts`](src/channel.ts) | Framing, bounded writes and protocol failures |
-| [`src/output-ledger.ts`](src/output-ledger.ts) | Host accounting for the outer result |
+| [`src/index.ts`](src/index.ts) | Node プロバイダー: モード選択、呼び出しごとの解決、ポリシーと管理実行 |
+| [`src/config.ts`](src/config.ts) | 実行モード、検証済みの制限と既定 |
+| [`src/persistent.ts`](src/persistent.ts) | インメモリのプロセス所有権、評価デッドライン、クリーンアップ |
+| [`src/persistent-process.ts`](src/persistent-process.ts) | 子 REPL、保持された宣言、現在のバインディングのディスパッチ |
+| [`src/output-stream.ts`](src/output-stream.ts) | 有界のストリームキャプチャーとプロセス出力のドレイン |
+| [`src/launch.ts`](src/launch.ts) | 実行ファイル/ブートストラップ引数と実行ワールドのアセットマッピング |
+| [`src/process.ts`](src/process.ts) | 子のハンドシェイク、環境のクリア、プログラムのライフサイクル |
+| [`src/bootstrap.ts`](src/bootstrap.ts) | プログラム評価、バインディングプロキシ、出力キャプチャー |
+| [`src/channel.ts`](src/channel.ts) | フレーミング、有界の書き込み、プロトコル障害 |
+| [`src/output-ledger.ts`](src/output-ledger.ts) | 外側の結果に対する Host の計量 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read the service contract before using the provider directly; the decisions explain policy and consumer ownership.
+プロバイダーを直接使う前にサービス契約を読むこと。決定はポリシーとコンシューマーの所有権を説明する。
 
-- [PTC runtime service](../ptc-runtime/README.md) — requests, resolved specs and results.
-- [Sandboxed Node decision](../../../.agents/notes/implemented/architecture/2026-09-11-sandboxed-node-ptc-runtime.md) — security, lifecycle and timeout tradeoffs.
-- [PTC foundation](../../../.agents/notes/implemented/feature/2026-06-15-ptc.md) — registry presentation and nested tool dispatch.
-- [Subprocess provider](../../subprocess/subprocess-local/README.md) — managed process ranges and platform limitations.
+- [PTC ランタイムサービス](../ptc-runtime/README.md) — リクエスト、解決済み仕様、結果。
+- [サンドボックス化 Node の決定](../../../.agents/notes/implemented/architecture/2026-09-11-sandboxed-node-ptc-runtime.md) — セキュリティ、ライフサイクル、タイムアウトのトレードオフ。
+- [PTC 基盤](../../../.agents/notes/implemented/feature/2026-06-15-ptc.md) — レジストリの提示とネストしたツールディスパッチ。
+- [Subprocess プロバイダー](../../subprocess/subprocess-local/README.md) — 管理プロセス範囲とプラットフォームの制限。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through PTC mode in `dsh-tools` and `dsh-workflow-ptc`, which present program outcomes through their own tool results. Intermediate binding traffic stays outside model history; the outer result follows the ordinary tool spill policy.
+間接的。`dsh-tools` と `dsh-workflow-ptc` の PTC モードを通じてであり、これらはプログラムの結果を自身のツール結果として提示する。中間のバインディングトラフィックはモデル履歴の外にとどまり、外側の結果は通常のツールスピルポリシーに従う。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+直接の無効化はない。リクエストプレフィックスの変更は指名されたコンシューマーが所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits qualify the execution guarantees and retained output.
+これらの制限が実行保証と保持出力を限定する。
 
-- **Confinement inherits the selected backend's limits** — full and partial enforcement are reported separately; sandbox policy and managed-process containment are distinct guarantees.
-- **The heap cap is not a process-tree memory limit** — native allocations and descendant memory are outside the V8 old-generation bound. No process-tree CPU meter is supplied.
-- **Cleanup inherits subprocess observability** — escaped descendants on a fallback platform may remain outside the managed range; see the subprocess provider's stated limits.
-- **Default execution is one-shot** — retained state requires `executionMode: persistent-in-memory`; neither mode offers a yield/wait API.
-- **In-memory environments retain one process per live owner** — idle owners keep their process and heap until explicit release, owner disposal or failure. Fan-out can retain many processes; idle expiration remains deferred.
-- **Output caps reject rather than retain every byte** — spill can preserve only the bounded result delivered by this provider.
-- **Bindings are bounded at transport admission** — control limits do not bound the memory a host binding allocates while producing its result.
-- **The console shim has five methods** — `log`, `info`, `warn`, `error` and `debug`.
+- **閉じ込めは選択されたバックエンドの制限を継承する** — 完全な強制と部分的な強制は別々に報告される。サンドボックスポリシーと管理プロセスの封じ込めは別の保証である。
+- **ヒープ上限はプロセスツリーのメモリ制限ではない** — ネイティブアロケーションと子孫のメモリは V8 old-generation の境界の外にある。プロセスツリーの CPU メーターは提供されない。
+- **クリーンアップは subprocess の観測可能性を継承する** — フォールバックプラットフォームで逃げた子孫は管理範囲の外に残ることがある。subprocess プロバイダーが示す制限を参照。
+- **既定の実行はワンショット** — 状態の保持には `executionMode: persistent-in-memory` が必要で、どちらのモードも yield/wait API を提供しない。
+- **インメモリ環境は稼働中オーナーごとに 1 プロセスを保持する** — アイドルのオーナーは明示的な解放、オーナーの破棄、または失敗までプロセスとヒープを保つ。ファンアウトは多数のプロセスを保持しうる。アイドル期限は引き続き先送りである。
+- **出力上限は全バイトを保持するのではなく拒否する** — スピルが保全できるのは、このプロバイダーが届ける有界の結果のみである。
+- **バインディングはトランスポート受け入れ時に制限される** — 制御制限は、host binding が結果を生成する間に確保するメモリを制限しない。
+- **コンソール shim には 5 つのメソッドがある** — `log`、`info`、`warn`、`error`、`debug`。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-The [timeout discussion](../../../.agents/notes/implemented/architecture/2026-09-11-sandboxed-node-ptc-runtime.md#deferred-timeout-design) records open choices about yielding, total lifetime, approval wait accounting and process-tree CPU/RSS limits. Those choices do not alter numeric deadline defaults or the explicit no-deadline service option.
+[タイムアウトの議論](../../../.agents/notes/implemented/architecture/2026-09-11-sandboxed-node-ptc-runtime.md#deferred-timeout-design)は、yield、総寿命、承認待ちの計上、プロセスツリーの CPU/RSS 制限に関する未決の選択を記録している。これらの選択は数値デッドラインの既定や、明示的なデッドラインなしのサービスオプションを変えない。
 
 </details>

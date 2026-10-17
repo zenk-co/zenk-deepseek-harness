@@ -1,77 +1,77 @@
 # MCP
 
-English | [中文](mcp.zh.md)
+日本語 | [English](mcp.en.md) | [中文](mcp.zh.md)
 
-## Summary
+## 概要
 
-Model Context Protocol (MCP) connects the model to tools supplied by external servers. Each configured server contributes ordinary harness tools with cancellation, permission checks, recorded results, and supported image output. Shared tools discover and read resources when a server is configured in the caller's scope, while server instructions join the logged system prompt. The official SDK negotiates modern or supported legacy protocol revisions. This reference covers the MCP package group's responsibilities, scope, and composition choices; the [client README](../../packages/mcp/mcp-client/README.md) owns server configuration.
+Model Context Protocol (MCP) は、モデルを外部サーバーが提供するツールに接続する。設定された各サーバーは、キャンセル、権限チェック、記録された結果、対応する画像出力を備えた通常の harness ツールを提供する。共有ツールは、呼び出し元のスコープでサーバーが設定されている場合にリソースを検出して読み取り、サーバーの instructions はログに記録されるシステムプロンプトに加わる。公式 SDK は、モダンなプロトコルリビジョンおよびサポート対象のレガシーリビジョンをネゴシエートする。このリファレンスでは、MCP パッケージグループの責務、スコープ、構成の選択肢を扱う。サーバー設定は [client README](../../packages/mcp/mcp-client/README.md) が所有する。
 
-## Table of Contents
+## 目次
 
-- [Configuration](#configuration)
-- [Responsibilities and scope](#responsibilities-and-scope)
-- [Protocol and results](#protocol-and-results)
-- [Resources and instructions](#resources-and-instructions)
-- [Resource provider types](#resource-provider-types)
-- [Limits](#limits)
-- [Further reading](#further-reading)
+- [設定](#configuration)
+- [責務とスコープ](#responsibilities-and-scope)
+- [プロトコルと結果](#protocol-and-results)
+- [リソースと instructions](#resources-and-instructions)
+- [リソースプロバイダーの型](#resource-provider-types)
+- [制限](#limits)
+- [関連資料](#further-reading)
 
 -----
 
 <a id="configuration"></a>
-## Configuration
+## 設定
 
-MCP servers are opt-in. Configure one `@deepseek-ai/dsh-mcp-client` entry per server in the intended Cordis scope. Every shipped profile supplies the [tool registry](tools.md) and mounts the shared resource service once; users configure only client entries. Callers with no visible configured server receive no MCP prompt text or tools in native or PTC mode.
+MCP サーバーはオプトインである。サーバーごとに 1 つの `@deepseek-ai/dsh-mcp-client` エントリを、意図した Cordis スコープで設定する。出荷されるすべてのプロファイルは [tool registry](tools.md) を提供し、共有リソースサービスを一度マウントする。ユーザーが設定するのはクライアントエントリのみである。可視の設定済みサーバーを持たない呼び出し元は、native モードでも PTC モードでも MCP のプロンプトテキストやツールを受け取らない。
 
-| Choice | Configuration owner |
+| 選択肢 | 設定の所有者 |
 |---|---|
-| Server identity, local process or HTTP endpoint, credentials, and process environment | [Client configuration](../../packages/mcp/mcp-client/README.md#use-this-package) |
-| Tool and resource request timeout, startup failure policy, and reconnection | [Client configuration](../../packages/mcp/mcp-client/README.md#use-this-package) |
-| Resource discovery and reading | The [MCP resource service](../../packages/mcp/mcp-resources/README.md#use-this-package) is included in shipped profiles; it has no configuration fields |
-| Server instruction size limit | Client `maxInstructionBytes`; the composition supplies [system-prompt assembly](system-prompt.md) |
-| Permission decisions and supported image output | [Tool execution](tools.md) and [attachments](attachment.md) |
+| サーバー ID、ローカルプロセスまたは HTTP エンドポイント、資格情報、プロセス環境 | [クライアント設定](../../packages/mcp/mcp-client/README.md#use-this-package) |
+| ツールとリソースのリクエストタイムアウト、起動失敗ポリシー、再接続 | [クライアント設定](../../packages/mcp/mcp-client/README.md#use-this-package) |
+| リソースの検出と読み取り | [MCP resource service](../../packages/mcp/mcp-resources/README.md#use-this-package) が出荷プロファイルに含まれる。設定フィールドはない |
+| サーバー instructions のサイズ制限 | クライアントの `maxInstructionBytes`。[システムプロンプトの組み立て](system-prompt.md)は構成が提供する |
+| 権限の決定と対応する画像出力 | [ツール実行](tools.md)と[添付](attachment.md) |
 
-Protocol negotiation follows the SDK's supported revisions; there is no product setting that forces a protocol revision. The [configuration catalog](../config-catalog.md#deepseek-aidsh-mcp-client) lists accepted client fields and defaults.
+プロトコルのネゴシエーションは SDK がサポートするリビジョンに従う。プロトコルリビジョンを強制する製品設定は存在しない。[設定カタログ](../config-catalog.md#deepseek-aidsh-mcp-client)に、受け付けられるクライアントフィールドとデフォルト値が一覧されている。
 
 -----
 
 <a id="responsibilities-and-scope"></a>
-## Responsibilities and scope
+## 責務とスコープ
 
-The client is a per-server connection plugin and a consumer of the harness tool registry. It does not publish a shared `ctx.mcp` service. The external server implements MCP operations; the SDK owns protocol exchange; the client adapts discovered tools to harness execution.
+クライアントはサーバーごとの接続プラグインであり、harness の tool registry のコンシューマーである。共有の `ctx.mcp` サービスは公開しない。MCP 操作を実装するのは外部サーバーであり、プロトコル交換は SDK が所有し、クライアントは検出したツールを harness の実行に適合させる。
 
-`mcp-resources` owns the shared resource tools and selects providers in the caller's scope. Each MCP client supplies resource operations through its own connection. The first provider in a scope enables the local shared tools, and removing the last removes them; inherited providers remain visible. The service owns these tool registrations independently of any one client. Connection failures do not remove shared resource tools while a visible client entry remains active.
+`mcp-resources` は共有リソースツールを所有し、呼び出し元のスコープでプロバイダーを選択する。各 MCP クライアントは自身の接続を通じてリソース操作を提供する。スコープ内で最初のプロバイダーがローカルの共有ツールを有効にし、最後のプロバイダーを削除するとそれらも削除される。継承されたプロバイダーは可視のままである。サービスは、特定のクライアントから独立して、これらのツール登録を所有する。可視のクライアントエントリがアクティブである限り、接続障害が共有リソースツールを削除することはない。
 
-Configured `serverName` identifies a server in its registration scope. Two entries in that scope cannot reserve the same name; separate Agent scopes can reuse it. Public tool names include the configured server name, so equally named tools from different servers remain distinct. Registration effects own names and discovered tools; plugin disposal closes the connection and removes its contributions.
+設定された `serverName` は、その登録スコープ内でサーバーを識別する。同じスコープ内の 2 つのエントリが同じ名前を予約することはできない。別々の Agent スコープでは再利用できる。公開ツール名には設定済みサーバー名が含まれるため、異なるサーバーにある同名のツールも区別される。名前と検出されたツールは登録 effect が所有する。プラグインの破棄は接続を閉じ、そのコントリビューションを削除する。
 
-The [native Cua Driver provider](../../packages/experimental/computer-use-cua-driver-native/README.md) shares the client's exported result adapter without opening an MCP connection. Desktop provider selection belongs to the [computer-use subsystem](computer-use.md).
+[native Cua Driver プロバイダー](../../packages/experimental/computer-use-cua-driver-native/README.md)は、MCP 接続を開かずにクライアントがエクスポートする結果アダプターを共有する。デスクトッププロバイダーの選択は [computer-use サブシステム](computer-use.md)に属する。
 
 -----
 
 <a id="protocol-and-results"></a>
-## Protocol and results
+## プロトコルと結果
 
-Both stdio and Streamable HTTP use the official SDK's negotiation, discovery, protocol validation, and cancellation. Tool-list changes trigger discovery through legacy notifications or a modern subscription. A failed refresh retains the previous tool generation; connection recovery follows the [client lifecycle](../../packages/mcp/mcp-client/README.md#use-this-package).
+stdio と Streamable HTTP の両方が、公式 SDK のネゴシエーション、検出、プロトコル検証、キャンセルを使用する。ツールリストの変更は、レガシー通知またはモダンなサブスクリプションを通じて検出をトリガーする。更新に失敗した場合は以前のツール世代が保持される。接続の回復は [クライアントライフサイクル](../../packages/mcp/mcp-client/README.md#use-this-package)に従う。
 
-The result adapter retains canonical MCP JSON for programmatic callers and prepares ordinary tool content. Supported images use the attachment system; unsupported rich content produces explicit text diagnostics. The tool registry remains authoritative for policy failures and replaced results. The [tool contracts](tools.md) own recording and final presentation; the [client result reference](../../packages/mcp/mcp-client/README.md#use-this-package) owns MCP-specific projection details.
+結果アダプターは、プログラムによる呼び出し元向けに正規の MCP JSON を保持しつつ、通常のツールコンテンツを準備する。対応する画像は添付システムを使用し、対応しないリッチコンテンツは明示的なテキスト診断を生成する。ポリシー違反と置き換えられた結果については、tool registry が引き続き権威である。記録と最終表示は [ツールコントラクト](tools.md)が所有し、MCP 固有の射影の詳細は [クライアント結果リファレンス](../../packages/mcp/mcp-client/README.md#use-this-package)が所有する。
 
 -----
 
 <a id="resources-and-instructions"></a>
-## Resources and instructions
+## リソースと instructions
 
-Resource calls require an explicit configured server name. When system-prompt assembly is available, the resource service lists caller-visible names from the same registry used for dispatch, including servers with no tools or instructions. The shared registry resolves that name in the calling Agent's scope before dispatch; unavailable servers fail without a network request. Discovery and reads are on demand, including for servers that expose resources without tools. The [resource package](../../packages/mcp/mcp-resources/README.md) owns pagination and content rendering; its generated tool schemas live in the [tool catalog](../tool-catalog.md#deepseek-aidsh-mcp-resources).
+リソース呼び出しには、明示的に設定されたサーバー名が必要である。システムプロンプトの組み立てが利用可能な場合、リソースサービスは、ディスパッチに使用されるものと同じレジストリから呼び出し元に可視の名前を一覧する。ツールも instructions も持たないサーバーも含まれる。共有レジストリはディスパッチ前に呼び出し元 Agent のスコープでその名前を解決する。利用できないサーバーは、ネットワークリクエストを行わずに失敗する。検出と読み取りはオンデマンドであり、ツールなしでリソースを公開するサーバーも同様である。ページネーションとコンテンツのレンダリングは [リソースパッケージ](../../packages/mcp/mcp-resources/README.md)が所有する。生成されるツールスキーマは[ツールカタログ](../tool-catalog.md#deepseek-aidsh-mcp-resources)にある。
 
-Resource providers remain connection-owned. Scope disposal removes registrations; the MCP client controls cancellation and recovery. Canonical results retain complete JSON for programmatic callers, while the text projection replaces binary blobs with descriptions. Returned text enters ordinary tool history; content is not fetched merely because a server connects.
+リソースプロバイダーは引き続き接続が所有する。スコープの破棄は登録を削除する。キャンセルと回復は MCP クライアントが制御する。正規の結果はプログラムによる呼び出し元向けに完全な JSON を保持し、テキスト射影はバイナリ BLOB を説明に置き換える。返されたテキストは通常のツール履歴に入る。サーバーが接続したというだけではコンテンツは取得されない。
 
-When system-prompt assembly is composed, the client publishes nonblank server instructions as a scoped, server-attributed section. Instructions remain literal text and pass the configured size limit before publication. A replacement connection publishes instructions only after discovery succeeds; absent instructions add no section. The [system-prompt subsystem](system-prompt.md) owns assembly and recording.
+システムプロンプトの組み立てが構成されている場合、クライアントは空白でないサーバー instructions を、サーバーに帰属するスコープ付きセクションとして公開する。instructions はそのままのテキストとして扱われ、公開前に設定されたサイズ制限を通過する。置き換え接続は、検出が成功した後にのみ instructions を公開する。instructions が存在しない場合はセクションが追加されない。組み立てと記録は [システムプロンプトサブシステム](system-prompt.md)が所有する。
 
 -----
 
 <a id="resource-provider-types"></a>
-## Resource provider types
+## リソースプロバイダーの型
 
-The connection provider receives one operation and the original tool execution, including its caller and cancellation signal.
+接続プロバイダーは、1 つの操作と元のツール実行(呼び出し元とキャンセルシグナルを含む)を受け取る。
 
 ```ts type-equiv
 /** One supported resource operation, with server-owned cursors and URIs. */
@@ -96,20 +96,20 @@ interface McpResourceProvider {
 -----
 
 <a id="limits"></a>
-## Limits
+## 制限
 
-MCP prompt templates, human-input elicitation, task-based execution, and resource subscriptions are unsupported. Resource tools require a caller-visible configured server; binary resources remain programmatic data with text descriptions for the model. Servers without a tools capability connect with an empty tool set. Connection and discovery timeouts follow the SDK; the client has no separate settings for them.
+MCP のプロンプトテンプレート、人間入力の elicit、タスクベースの実行、リソースサブスクリプションはサポートされない。リソースツールには呼び出し元に可視の設定済みサーバーが必要である。バイナリリソースは、モデル向けのテキスト説明を伴うプログラム用データのままである。tools ケイパビリティを持たないサーバーは、空のツールセットで接続する。接続と検出のタイムアウトは SDK に従い、クライアントに別個の設定はない。
 
 -----
 
 <a id="further-reading"></a>
-## Further reading
+## 関連資料
 
-- [MCP package group](../../packages/mcp/README.md) — package entry points.
-- [MCP resources](../../packages/mcp/mcp-resources/README.md) — shared tools and resource-provider semantics.
-- [Resource visibility reference](../../packages/mcp/mcp-resources/README.md) — shared profile mounting and visibility from configured servers.
-- [Third-party memory servers](../user/guide/mcp-memory.md) — product configuration guide.
-- [Protocol negotiation reference](../../packages/mcp/mcp-client/README.md) — SDK ownership and compatibility decisions.
+- [MCP パッケージグループ](../../packages/mcp/README.md) — パッケージのエントリポイント。
+- [MCP resources](../../packages/mcp/mcp-resources/README.md) — 共有ツールとリソースプロバイダーのセマンティクス。
+- [リソース可視性リファレンス](../../packages/mcp/mcp-resources/README.md) — 共有プロファイルのマウントと設定済みサーバーからの可視性。
+- [サードパーティ製メモリサーバー](../user/guide/mcp-memory.md) — 製品設定ガイド。
+- [プロトコルネゴシエーションリファレンス](../../packages/mcp/mcp-client/README.md) — SDK の所有権と互換性の決定。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -117,13 +117,13 @@ MCP prompt templates, human-input elicitation, task-based execution, and resourc
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される(doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。再生成は `pnpm run gen-cordis-catalog`)。言語版の違いは、ロケール固有のペアドキュメントパスのみである。シグネチャブロックは `ts cordis-catalog` フェンスを使用し、元のソース JSDoc を保持する。ディスパッチモードは [primer](../cordis-primer.md#dispatch-modes) で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxmcpresources--mcpresourceruntime"></a>
 
 ### `ctx.mcpResources` — `McpResourceRuntime`
 
-Scoped resource access plus three tools shared by configured MCP servers.
+スコープ付きリソースアクセスと、設定済み MCP サーバーが共有する 3 つのツール。
 
 ```ts cordis-catalog
 /**
@@ -135,5 +135,5 @@ Scoped resource access plus three tools shared by configured MCP servers.
 register(server: string, provider: McpResourceProvider): () => void
 ```
 
-Source: [`packages/mcp/mcp-resources/src/index.ts`](../../packages/mcp/mcp-resources/src/index.ts)
+ソース: [`packages/mcp/mcp-resources/src/index.ts`](../../packages/mcp/mcp-resources/src/index.ts)
 <!-- END GENERATED cordis-surface -->

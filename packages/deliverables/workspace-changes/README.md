@@ -1,31 +1,31 @@
 ---
-description: "Summarize each top-level turn's changed files from git working-tree snapshots and whole-file captures around file-tool edits, announce them with a workspace/changes Session event, and serve the summary and per-file comparisons while the Session lives; configuration, repository requirement, and coverage rules."
+description: "git 作業ツリーのスナップショットと、ファイルツール編集前後のファイル全体キャプチャから、各トップレベルターンの変更ファイルを要約し、workspace/changes セッションイベントで通知し、Session が存続する間その要約とファイルごとの比較を提供する; 設定、リポジトリ要件、カバレッジ規則。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-workspace-changes
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This plugin summarizes which files each top-level turn changed, with per-file line counts, and serves each listed file's turn-start and turn-end comparison. Git snapshots of the working tree at turn start and turn end are diffed; every file a file tool edits is copied whole before its first edit and again at turn end, covering the files git does not. Without a repository or git, only file-tool edits are listed. The Session log receives one `workspace/changes` event naming the turn; summaries and comparisons stay on the Host until the Session is disposed. The Web changed-files card renders them.
+このプラグインは、各トップレベルターンがどのファイルを変更したかをファイルごとの行数付きで要約し、列挙された各ファイルのターン開始時とターン終了時の比較を提供する。ターン開始時とターン終了時の作業ツリーの git スナップショットが diff される; ファイルツールが編集するすべてのファイルは、最初の編集前に丸ごとコピーされ、ターン終了時に再度コピーされることで、git がカバーしないファイルを補う。リポジトリまたは git がない場合は、ファイルツールの編集だけが列挙される。セッションログはターンを名指す `workspace/changes` イベントを 1 つ受け取る; 要約と比較は Session が破棄されるまで Host 上にとどまる。Web の変更ファイルカードがそれらをレンダリングする。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [本パッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 本パッケージを使う
 
-The shipped Web bundle mounts this plugin. Mount it in any composition with the `subprocess` capability and a git executable on the Host:
+同梱の Web バンドルはこのプラグインをマウントする。`subprocess` ケイパビリティと Host 上の git 実行ファイルを持つ任意のコンポジションでこれをマウントする:
 
 ```yaml
 - name: '@deepseek-ai/dsh-workspace-changes'
@@ -33,74 +33,74 @@ The shipped Web bundle mounts this plugin. Mount it in any composition with the 
     maxFiles: 500
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `timeoutMs` | `30000` | Milliseconds one git command may run before the turn's record is abandoned |
-| `outputMaxBytes` | `8388608` | Bytes of git output retained per command; a larger diff listing abandons the record |
-| `maxFiles` | `500` | Maximum files carried by one summary; `total` still reports the complete count |
-| `maxFileBytes` | `2097152` | Bytes a file may hold to be captured around a file-tool edit or read from a snapshot for its comparison; a larger file gets no comparison, and one captured around a file-tool edit is also listed without counts |
-| `diffTimeoutMs` | `100` | Milliseconds a line comparison may run before it degrades to whole-file replacement |
+| `timeoutMs` | `30000` | ターンの記録が破棄されるまでに 1 つの git コマンドが実行できるミリ秒数 |
+| `outputMaxBytes` | `8388608` | コマンドごとに保持される git 出力のバイト数; それより大きい diff リストは記録を破棄する |
+| `maxFiles` | `500` | 1 つの要約が運ぶ最大ファイル数; `total` は依然として完全な件数を報告する |
+| `maxFileBytes` | `2097152` | ファイルツール編集の前後でキャプチャされ、または比較のためにスナップショットから読まれるファイルの最大バイト数; それより大きいファイルは比較を得ず、ファイルツール編集の前後でキャプチャされたものは件数なしで列挙される |
+| `diffTimeoutMs` | `100` | 行比較がファイル全体の置き換えに劣化するまでに実行できるミリ秒数 |
 
-This plugin requires the `subprocess` and `fs` services. Every Session with a working directory and no subagent origin is recorded; subagent Sessions are not. Snapshots are written through a private index into a temporary object directory owned by the Session, with the repository's own object store attached as a read-only alternate; the repository's index, objects, work tree, and refs stay untouched, and the user's earlier uncommitted changes never enter a summary. Session disposal removes the directory. Nested repositories and submodules inside the working directory are recorded as gitlinks, so their internal changes do not appear. A working directory outside any git repository takes no snapshots. Without git — or, on macOS, with only the developer-tools stub at `/usr/bin/git` — no repository is located either, and the plugin logs that once. Either way the summary lists the file-tool edits alone, as described next, with the working directory as the workspace; shell edits are absent.
+このプラグインは `subprocess` および `fs` サービスを必要とする。作業ディレクトリを持ち、subagent 由来でないすべての Session が記録される; subagent の Session は記録されない。スナップショットは、Session が所有する一時オブジェクトディレクトリへプライベートインデックスを通じて書き込まれ、リポジトリ自身のオブジェクトストアが読み取り専用の代替としてアタッチされる; リポジトリのインデックス、オブジェクト、作業ツリー、ref はそのまま保たれ、ユーザーの以前の未コミット変更が要約に入ることは決してない。Session の破棄がそのディレクトリを削除する。作業ディレクトリ内のネストされたリポジトリとサブモジュールは gitlink として記録されるため、それらの内部の変更は現れない。git リポジトリの外にある作業ディレクトリはスナップショットを取らない。git がない場合 — または macOS で `/usr/bin/git` にある developer-tools スタブしかない場合 — もリポジトリは特定されず、プラグインはそれを一度ログに記録する。いずれの場合も要約は、次に説明するとおり、ファイルツールの編集だけをワークスペースとしての作業ディレクトリとともに列挙する; シェルの編集は含まれない。
 
-After a `write`, `edit`, or mutating `str_replace_editor` call resolves its target and obtains its mutation guard, the recorder copies that exact file before the mutation into the Session's temporary directory, once per path per turn, and copies it again at turn end; the copies are named by the SHA-1 of their bytes, so identical content is stored once. This needs no git. Repository discovery and display paths retain the original project; file captures follow the operation's resolved target even after the Session changes directories. Paths the snapshots cover keep their git counts; the copies serve the other paths — files matching an ignore pattern, files outside the repository, and every file-tool edit when there is no snapshot — with counts from a line comparison of the two copies, so repeated edits to one file count once and a shell edit after a file-tool edit is included. A path whose content is unchanged at turn end is not listed. A copy larger than `maxFileBytes` is not stored: the file is listed with `oversized` and no counts, and a path whose both sides are that large is listed too, since unread content is never known to be unchanged. A path whose only difference is a missing final newline compares as unchanged, while git still counts that line. Files under `/tmp` or the platform temporary directory are excluded unless they lie inside the repository. Changes made only through shell commands outside the snapshot coverage are not recorded.
+レコーダーは、`write`、`edit`、または変更を加える `str_replace_editor` 呼び出しが対象を解決しミューテーションガードを取得した後、その正確なファイルをミューテーション前に Session の一時ディレクトリへ、ターンごとにパスあたり 1 回コピーし、ターン終了時に再度コピーする; コピーはそのバイトの SHA-1 で命名されるため、同一内容は 1 回だけ保存される。これに git は不要である。リポジトリ探索と表示パスは元のプロジェクトを維持する; ファイルキャプチャは Session がディレクトリを変更した後でも、操作が解決した対象に従う。スナップショットがカバーするパスは git の件数を保つ; コピーはその他のパス — 無視パターンに一致するファイル、リポジトリ外のファイル、スナップショットがない場合のすべてのファイルツール編集 — に、2 つのコピーの行比較による件数を与えるため、1 つのファイルへの繰り返しの編集は 1 回だけ数えられ、ファイルツール編集の後のシェル編集も含まれる。ターン終了時に内容が変化していないパスは列挙されない。`maxFileBytes` より大きいコピーは保存されない: そのファイルは `oversized` と件数なしで列挙され、両側がその大きさであるパスも、読まれていない内容が変化していないと判明することはないため、列挙される。唯一の違いが最終改行の欠落であるパスは変化なしとして比較されるが、git は依然としてその行を数える。`/tmp` またはプラットフォームの一時ディレクトリの下のファイルは、リポジトリ内にある場合を除いて除外される。スナップショットのカバレッジ外のシェルコマンドだけで行われた変更は記録されない。
 
-Each file carries a durable `path` — relative to the working directory inside it, absolute elsewhere — and a `display` path used for ordering and labels: the relative path, a `../` path for repository files above the working directory, a `~` path under the home directory, otherwise the absolute path. Files sort by `display` in code-unit order, which lists parent and absolute paths before the working directory's own files. The `workspace/changes` event carries only the turn number; `ctx.workspaceChanges.summary(sessionId, seq)` returns the summary the event with that sequence announced, or undefined once the Session is disposed or when this Host process never recorded it. `ctx.workspaceChanges.diff(sessionId, seq, index, signal)` compares the listed file at that index: hunks with three context lines from the two snapshot trees or the two copies, `binary` for a side git reported as binary or that holds a NUL byte, `oversized` for a side larger than `maxFileBytes`. A line comparison that runs longer than `diffTimeoutMs` degrades to one hunk replacing every line, marked `coarse`. A conversation reopened after a Host restart therefore has no card, and no comparison, for its earlier turns.
+各ファイルは、永続的な `path` — 作業ディレクトリの内側ではそれに対する相対パス、それ以外では絶対パス — と、順序付けとラベルに使われる `display` パスを運ぶ: 相対パス、作業ディレクトリより上のリポジトリファイルには `../` パス、ホームディレクトリの下では `~` パス、それ以外は絶対パスである。ファイルは `display` でコードユニット順にソートされ、作業ディレクトリ自身のファイルより親と絶対パスが先に列挙される。`workspace/changes` イベントはターン番号だけを運ぶ; `ctx.workspaceChanges.summary(sessionId, seq)` は、そのシーケンスのイベントが通知した要約を返す。Session が破棄された後、またはこの Host プロセスがそれを記録したことがない場合は undefined である。`ctx.workspaceChanges.diff(sessionId, seq, index, signal)` はそのインデックスの列挙されたファイルを比較する: 2 つのスナップショットツリーまたは 2 つのコピーからの 3 行のコンテキスト付きハンク、git がバイナリとして報告したか NUL バイトを含む側には `binary`、`maxFileBytes` より大きい側には `oversized`。`diffTimeoutMs` より長く実行された行比較は、すべての行を置き換える 1 つのハンクに劣化し、`coarse` とマークされる。したがって、Host 再起動後に再び開かれた会話は、以前のターンのカードも比較も持たない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-One `TurnRecorder` per Session serializes its git work. `turn/start` queues the baseline: `rev-parse` locates the repository once per Session and the Session's temporary object directory is created, then `add --all --ignore-errors` into a temporary index seeded from the repository's index and `write-tree` produce the tree id; an unreadable file is skipped and reported through git's exit code 1, which the snapshot accepts. Each turn holds its own state object, so a record still running for an interrupted turn keeps that turn's files when the next turn starts. Every command runs with `GIT_OBJECT_DIRECTORY` pointing at the temporary directory and `GIT_ALTERNATE_OBJECT_DIRECTORIES` at the repository's objects, so committed content is read from the repository and new objects never land there. Every `tools/pre-execute` waits for that queue before a tool runs, so no mutation can precede its baseline; the filesystem's `fs/write-intent` and `fs/edit-intent` waterfalls delegate the guard decision, then queue and await the capture of the resolved target before mutation, and `tool/result` events only mark that the turn has results to record. `agent/turn-stopping` records inside the turn: a second snapshot, `diff-tree -r -M --numstat` between the two trees, `check-ignore` for captured paths inside the work tree, a second copy and line comparison of each uncovered path, the appended event, and the summary kept under the event's sequence beside each listed file's two content sources, a path in a snapshot tree or a copy. A comparison is computed when asked for: `ls-tree -l` locates and sizes a snapshot side and `cat-file blob` reads it under `maxFileBytes`, copies are read from disk, and both sides go through the same line comparison with its timeout. `turn/end` records again only when tool results settled after the last record attempt, which covers aborted, failed, and steered turns without repeating a failed attempt; an empty list after an earlier record supersedes it. The repository's index is only read.
+Session ごとに 1 つの `TurnRecorder` がその git 作業を直列化する。`turn/start` はベースラインをキューに入れる: `rev-parse` が Session ごとに 1 回リポジトリを特定して Session の一時オブジェクトディレクトリが作成され、次にリポジトリのインデックスからシードされた一時インデックスへの `add --all --ignore-errors` と `write-tree` が tree id を生成する; 読めないファイルはスキップされ、git の終了コード 1 を通じて報告されるが、スナップショットはそれを受け入れる。各ターンは自身の状態オブジェクトを保持するため、中断されたターンのためにまだ実行中の記録は、次のターンが始まってもそのターンのファイルを保つ。すべてのコマンドは `GIT_OBJECT_DIRECTORY` が一時ディレクトリを、`GIT_ALTERNATE_OBJECT_DIRECTORIES` がリポジトリのオブジェクトを指す状態で実行されるため、コミット済みの内容はリポジトリから読まれ、新しいオブジェクトがそこに置かれることは決してない。すべての `tools/pre-execute` はツールの実行前にそのキューを待つため、どのミューテーションも自身のベースラインより先には進めない; ファイルシステムの `fs/write-intent` と `fs/edit-intent` の waterfall はガード判定を委譲した後、解決された対象のキャプチャをキューに入れて待ってからミューテーションを行い、`tool/result` イベントはターンに記録すべき結果があることをマークするだけである。`agent/turn-stopping` はターンの内側で記録する: 2 回目のスナップショット、2 つのツリー間の `diff-tree -r -M --numstat`、作業ツリー内のキャプチャ済みパスに対する `check-ignore`、カバーされていない各パスの 2 回目のコピーと行比較、追加されるイベント、およびイベントのシーケンスの下で、列挙された各ファイルの 2 つの内容ソース — スナップショットツリー内のパスまたはコピー — の隣に保たれる要約である。比較は要求されたときに計算される: `ls-tree -l` がスナップショット側を特定してサイズを測り、`cat-file blob` がそれを `maxFileBytes` の下で読み、コピーはディスクから読まれ、両側が同じタイムアウト付きの行比較を通る。`turn/end` は、最後の記録試行の後にツール結果が確定したときにのみ再度記録する。これは、失敗した試行を繰り返すことなく、中断、失敗、steering されたターンをカバーする; 以前の記録の後の空のリストはそれを置き換える。リポジトリのインデックスは読まれるだけである。
 
-Git runs through the `subprocess` capability with a scrubbed environment, `GIT_CONFIG_COUNT=0` (ambient indexed configuration is excluded because the credential scrub removes its key entries), `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, the configured timeout, and bounded output. A failing step abandons that turn's record with a warning; the next turn starts afresh. Session disposal and plugin disposal abort queued work, forget the summaries, and remove the temporary directory.
+Git は `subprocess` ケイパビリティを通じて、洗浄された環境、`GIT_CONFIG_COUNT=0` (クレデンシャル洗浄がキーエントリーを除去するため、周囲のインデックス付き設定は除外される)、`GIT_TERMINAL_PROMPT=0`、`GIT_OPTIONAL_LOCKS=0`、設定されたタイムアウト、および上限付き出力で実行される。失敗したステップは警告とともにそのターンの記録を破棄する; 次のターンは新たに開始する。Session の破棄とプラグインの破棄はキュー済みの作業を abort し、要約を忘れ、一時ディレクトリを削除する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Web deliverables](../../client/ui-deliverables/README.md) — the changed-files card that reads the served summary and opens its files.
-- [Subprocess capability](../../subprocess/README.md) — the seam git runs through.
-- [historical Turn changed-files card decision](../../../.agents/notes/archived/feature/2026-09-11-turn-changed-files-card.md) — snapshot design, coverage rules, the deferred shadow repository, and rejected alternatives.
+- [Web デリバラブル](../../client/ui-deliverables/README.md) — 提供された要約を読み、そのファイルを開く変更ファイルカード。
+- [Subprocess ケイパビリティ](../../subprocess/README.md) — git が実行されるシーム。
+- [Turn 変更ファイルカードの過去の記録](../../../.agents/notes/archived/feature/2026-09-11-turn-changed-files-card.md) — スナップショット設計、カバレッジ規則、先送りされた shadow リポジトリ、および却下された代替案。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the recorder appends a log-only `workspace/changes` event that only clients read and registers nothing model-facing.
+なし。レコーダーはクライアントだけが読むログ専用の `workspace/changes` イベントを追加し、モデル向けのものは何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Nothing here enters a model request, so provider cache reuse is unaffected.
+ここにあるものはモデルリクエストに入らないため、プロバイダーのキャッシュ再利用は影響を受けない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Summaries, snapshot trees, and captured copies live only as long as their Session in this Host process; earlier turns of a conversation reopened after a Host restart have no card and no comparison. This is the decided behavior: a card whose content the Host can no longer open is not shown.
-- Two git features still write into the repository's own git directory during a snapshot: `core.splitIndex` writes `sharedindex.*` files, and git-lfs runs its clean filter on changed files and stores their objects under `.git/lfs`.
-- git 2.13 or later is required for `rev-parse --absolute-git-dir`; an unsupported repository format or another git failure abandons the turn with a warning rather than being treated as a plain directory.
-- The first snapshot of a Session writes every untracked, non-ignored file of the work tree into the Session's temporary directory; a repository without a `.gitignore` that carries large build outputs costs that much temporary space until the Session is disposed.
-- Edits the user makes during a turn are attributed to that turn.
-- A working directory outside any git repository lists file-tool edits only, so shell edits are missing from its card; a shadow repository under the Harness home is deferred until its exclude rules can replace a missing `.gitignore` reliably.
-- Outside snapshot coverage only paths a file tool names are captured: a file only a shell command changes there is absent, and a file both changed before its first file-tool call is compared from that call onward.
-- Every file-tool edit copies its whole file once per turn, up to `maxFileBytes`, even for paths the snapshots also cover; the copies go with the Session's temporary directory.
-- A comparison serves the listed file's complete text to the client, including ignored files, repository files above the working directory, and files outside the workspace; the summary route serves only paths and counts. A deployment that must keep such content on the Host composes this plugin out.
-- A comparison that degrades to whole-file replacement carries every line of both sides, up to twice `maxFileBytes`.
-- Windows paths keep native separators in `path`; `display` is always slash-separated.
+- 要約、スナップショットツリー、キャプチャされたコピーは、この Host プロセス内の Session が存続する間だけ存在する; Host 再起動後に再び開かれた会話の以前のターンは、カードも比較も持たない。これが決定された挙動である: Host が内容を開けなくなったカードは表示されない。
+- 2 つの git 機能はスナップショット中にリポジトリ自身の git ディレクトリへまだ書き込む: `core.splitIndex` は `sharedindex.*` ファイルを書き込み、git-lfs は変更されたファイルに clean フィルターを実行し、そのオブジェクトを `.git/lfs` の下に保存する。
+- `rev-parse --absolute-git-dir` には git 2.13 以降が必要である; サポートされないリポジトリ形式やその他の git 失敗は、単なるディレクトリとして扱われるのではなく、警告とともにターンを破棄する。
+- Session の最初のスナップショットは、作業ツリーの未追跡かつ非無視のすべてのファイルを Session の一時ディレクトリへ書き込む; 大きなビルド出力を含む `.gitignore` のないリポジトリは、Session が破棄されるまでそれだけの一時領域を消費する。
+- ユーザーがターン中に行った編集はそのターンに帰属される。
+- git リポジトリの外にある作業ディレクトリはファイルツールの編集だけを列挙するため、そのカードからシェルの編集は欠落する; Harness ホームの下の shadow リポジトリは、その除外規則が欠落した `.gitignore` を確実に置き換えられるようになるまで先送りされる。
+- スナップショットのカバレッジ外では、ファイルツールが名指すパスだけがキャプチャされる: そこでシェルコマンドだけが変更したファイルは存在せず、最初のファイルツール呼び出しより前にも変更されていたファイルはその呼び出し以降から比較される。
+- すべてのファイルツール編集は、スナップショットもカバーするパスであっても、ターンごとにファイル全体を 1 回コピーする (最大 `maxFileBytes`); コピーは Session の一時ディレクトリとともにある。
+- 比較は、無視されたファイル、作業ディレクトリより上のリポジトリファイル、ワークスペース外のファイルを含め、列挙されたファイルの完全なテキストをクライアントへ提供する; 要約ルートはパスと件数だけを提供する。そのような内容を Host 上に保たなければならないデプロイメントは、このプラグインをコンポジションから外す。
+- ファイル全体の置き換えに劣化した比較は、両側のすべての行を最大 `maxFileBytes` の 2 倍まで運ぶ。
+- Windows のパスは `path` でネイティブの区切り文字を保つ; `display` は常にスラッシュ区切りである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

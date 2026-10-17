@@ -1,27 +1,27 @@
-# Client Resources
+# Client リソース
 
-English | [中文](client-resources.zh.md)
+日本語 | [English](client-resources.en.md) | [中文](client-resources.zh.md)
 
-The client resource model turns an address into live data for any Web Client component. [`dsh-client-resources`](../../packages/client/resources/README.md) provides the `ctx.resources` service and the `useResource` global standard hook; a package that owns a kind of content registers one **provider** for its **protocol**, and a component reads the content's current state by **address** without importing the owner's runtime. The right Sidebar's tabs are the model's first consumer ([Right Sidebar](sidebar-right.md)); the decision record is the [client resource model Agent Note](../../.agents/notes/implemented/architecture/2026-09-05-client-resource-model.md).
+クライアントリソースモデルはアドレスを任意 Web Client コンポーネント向けライブデータに変える。[`dsh-client-resources`](../../packages/client/resources/README.md) が `ctx.resources` サービスと `useResource` 全体標準フックを提供する。内容種を所有するパッケージはその**プロトコル**に **provider** を 1 件登録し、コンポーネントは所有者ランタイムのインポートなしに**アドレス**で内容の現行状態を読む。右 Sidebar の方法がモデルの最初のコンシューマーである ([Right Sidebar](sidebar-right.md))。決定記録は [client resource model Agent Note](../../.agents/notes/implemented/architecture/2026-09-05-client-resource-model.md) である。
 
-This page is the developer reference: how to write an address, how to register a provider, how to read a resource, what the states and failures mean, and how the model holds and releases a resource.
+このページは開発者リファレンスである。アドレスの書き方、provider の登録法、リソースの読み方、状態と失敗の意味、モデルがリソースを保持・解放する方法を扱う。
 
-## Addresses
+## アドレス
 
-A resource address is a `dsh-resource://<type>/…` URL. The host names the protocol and must be a key of `ResourceProtocolMap`; the path is the protocol's own, and its owner percent-encodes each segment. A protocol that needs a scope puts it in the path: the `file` protocol's addresses read `dsh-resource://file/session/<sessionId>/<path>`, where path is workspace-relative or absolute with its leading slashes preserved, built with `fileAddressFor(sessionId, cwd, path)` and read back with `parseFileAddress(address)` from [`dsh-util-workspace-path`](../../packages/util/workspace-path/README.md). The model itself reads only the scheme and the host: `protocolOf(address)` returns the lower-cased host of a `dsh-resource://` URL and `undefined` for anything else. Addresses under any other scheme — the Sidebar's `sidebar://guide` — name no resource and read as `none`.
+リソースアドレスは `dsh-resource://<type>/…` URL である。ホストはプロトコルを名指しし、`ResourceProtocolMap` のキーでなければならない。パスはプロトコル独自であり、その所有者は各 segment をパーセント符号化する。スコープを要するプロトコルはパスに置く。`file` プロトコルのアドレスは `dsh-resource://file/session/<sessionId>/<path>` と読み、`path` はワークスペース相対または先頭スラッシュ保持の絶対であり、[`dsh-util-workspace-path`](../../packages/util/workspace-path/README.md) の `fileAddressFor(sessionId, cwd, path)` で構築して `parseFileAddress(address)` で読み戻す。モデル自体は scheme とホストのみ読む。`protocolOf(address)` は `dsh-resource://` URL の小文字ホストを返し、それ以外は `undefined` を返す。他 scheme 配下のアドレス — Sidebar の `sidebar://guide` — はリソースを名指さず `none` と読まれる。
 
-| Address | Protocol key | Reads as |
+| アドレス | プロトコルキー | 読み方 |
 |---|---|---|
-| `dsh-resource://file/session/s1/notes/a.md` | `file` | the metadata of `notes/a.md` under session `s1`'s workspace root, when the `file` provider is registered |
-| `dsh-resource://file/absolute/home/me/notes.md` | `file` | parseable but fails with `workspace-file/unknown-workspace`: no authorizing Session, and neither current nor Tab Session is borrowed |
-| `DSH-RESOURCE://File/session/s1/a` | `file` | a distinct record: addresses compare as strings, and `openResource` accepts only the canonical lower-case spelling that `fileAddressFor` emits |
-| `dsh-resource://subagentchat/session/c1?parent=p1&mode=continuable` | `subagentchat` | an addressed subagent Conversation whose value owns a `SessionReference` until the resource closes |
-| `sidebar://guide` | — | `none`: a navigation address |
-| `/home/me/notes.md` | — | `none`: not a URL |
+| `dsh-resource://file/session/s1/notes/a.md` | `file` | `file` provider 登録時にセッション `s1` のワークスペースルート配下 `notes/a.md` のメタデータ |
+| `dsh-resource://file/absolute/home/me/notes.md` | `file` | パース可能だが `workspace-file/unknown-workspace` で失敗する。認可 Session なしであり、現行も方法 Session も借りない |
+| `DSH-RESOURCE://File/session/s1/a` | `file` | 別記録。アドレスは文字列比較であり、`openResource` は `fileAddressFor` が発する正準小文字綴りのみ受理する |
+| `dsh-resource://subagentchat/session/c1?parent=p1&mode=continuable` | `subagentchat` | アドレス付きサブエージェント Conversation であり、その値はリソース終了まで `SessionReference` を所有する |
+| `sidebar://guide` | — | `none`。ナビゲーションアドレス |
+| `/home/me/notes.md` | — | `none`。URL ではない |
 
-## Registering a provider
+## provider の登録
 
-The owner of a protocol declares its value type on `ResourceProtocolMap` and registers one provider inside its own `ctx.effect`, so the protocol lives exactly as long as the plugin ([provide a protocol](../../packages/client/resources/README.md#provide-a-protocol)). `open(address, { signal })` returns a stream of `RemoteResult` frames — the current state first, then one frame per change — and must stop when `signal` aborts. A failure is an `ok: false` frame carrying a `RemoteFailure`; a throw inside the stream is a programming error and is not caught.
+プロトコルの所有者は `ResourceProtocolMap` 上に値型を宣言し、独自 `ctx.effect` 内に provider 1 件を登録するため、プロトコルはプラグインと正確に同じ寿命で生きる ([provider を提供する](../../packages/client/resources/README.md#provide-a-protocol))。`open(address, { signal })` は `RemoteResult` フレームのストリームを返す — 現行状態を先に、次に変更ごとに 1 フレーム — `signal` abort で止まらなければならない。失敗は `RemoteFailure` を運ぶ `ok: false` フレームである。ストリーム内の throw はプログラミング誤りであり捕捉されない。
 
 ```ts ignore-check
 import type { Context } from '@deepseek-ai/cordis'
@@ -48,18 +48,18 @@ export function apply(ctx: Context): void {
 }
 ```
 
-A protocol has exactly one provider; a second registration throws. Registering while addresses of the protocol are already held opens their streams at once; disposing the provider ends those streams and the addresses read `none` until a provider returns.
+1 プロトコルに provider はちょうど 1 件であり、2 件目の登録は投げる。プロトコルのアドレスが既に保持される中での登録はそのストリームを一斉に開き、provider 破棄はそれらストリームを終え、provider 復帰までアドレスは `none` と読まれる。
 
-## Reading a resource
+## リソースの読み取り
 
-Every slot component receives `useResource` in its props, whatever its scope ([Slots](slots.md)). `useResource<P>(address)` names the protocol as the type argument and returns the address's current snapshot; subscribing is what holds the resource open, and a component that mounts while another holder keeps the resource alive reads the latest value at once without reopening the stream ([read a resource](../../packages/client/resources/README.md#read-a-resource)).
+すべてのスロットコンポーネントはスコープを問わず props に `useResource` を受け取る ([Slots](slots.md))。`useResource<P>(address)` は型引数でプロトコルを名指し、アドレスの現行スナップショットを返す。購読することがリソースを開いたままにし、別保持者がリソースを生かす間にマウントしたコンポーネントはストリーム再開なしに最新値を一斉に読む ([リソースを読む](../../packages/client/resources/README.md#read-a-resource))。
 
-| `status` | Meaning | `value` | `failure` |
+| `status` | 意味 | `value` | `failure` |
 |---|---|---|---|
-| `none` | No provider is registered for the address's protocol, or the address is not a resource address | `undefined` | `undefined` |
-| `loading` | The provider's stream is open and has not yielded yet | `undefined` | `undefined` |
-| `live` | The latest frame succeeded | the latest `ok` value | `undefined` |
-| `failed` | The latest frame reported a failure | the last `ok` value, kept | the frame's `RemoteFailure` |
+| `none` | アドレスのプロトコルに provider 登録なし、またはアドレスがリソースアドレスではない | `undefined` | `undefined` |
+| `loading` | provider ストリームは開いており、まだ yield していない | `undefined` | `undefined` |
+| `live` | 最新フレーム成功 | 最新 `ok` 値 | `undefined` |
+| `failed` | 最新フレームが失敗を報告 | 最後の `ok` 値、保持 | フレームの `RemoteFailure` |
 
 ```tsx ignore-check
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -79,14 +79,14 @@ export function FileHeader({ useTabInfo, useResource, t }: Props) {
 }
 ```
 
-A consumer presents `failed` itself: the model keeps the last value beside the failure so a body can show stale content with a notice rather than a blank, and the next `ok` frame clears the failure. Nothing in the model produces user-visible text.
+コンシューマーは `failed` を自ら表示する。モデルは失敗脇に最終値を保持するため、本体は空白ではなく古い内容に注意書きで示すことができ、次の `ok` フレームは失敗を消す。モデル内の何ものもユーザー可視文を生まない。
 
-## Holding and releasing
+## 保持と解放
 
-A resource is alive while it has a holder: a subscribed `useResource`, or a pin. `ctx.resources.pin(address, signal)` keeps a resource open without subscribing until `signal` aborts, and an already-aborted signal pins nothing; the right Sidebar pins every open tab record's address for the record's life, so switching tabs unmounts a body without closing its stream. The first holder opens the provider's stream; the last release aborts it, discards the value, and returns the snapshot to `loading` (provider present) or `none` (absent). A frame the provider yields after that release is dropped, and the iterator is returned. `ctx.resources.source(address)` is the bare observable behind the hook, reference-stable per address, for callers outside React; reading its snapshot does not hold the resource ([lifecycle](../../packages/client/resources/README.md#lifecycle)).
+リソースは保持者ある限り生きる。購読 `useResource`、またはピンである。`ctx.resources.pin(address, signal)` は `signal` abort まで購読なしにリソースを開いたままにし、既 abort 信号は何もピンしない。右 Sidebar は開いた方法記録すべてのアドレスを記録寿命の間ピンするため、方法切り替えは本体をアンマウントしてもストリームを閉じない。最初の保持者が provider ストリームを開き、最後の解放がそれを abort し、値を捨て、スナップショットを `loading` (provider あり) または `none` (不在) に戻す。その解放後に provider が yield したフレームは落とされ、イテレーターは終了される。`ctx.resources.source(address)` はフック背後の素オブザーバブルであり、アドレス単位に参照安定であり、React 外呼び出し元向けである。そのスナップショット読み取りはリソースを保持しない ([ライフサイクル](../../packages/client/resources/README.md#lifecycle))。
 
-Most streams carry metadata rather than content. The `file` provider's value is `WorkspaceFileStat { absolutePath, version, bytes? }`: the first frame comes from Host `stat`, and later observations update the version. A consumer reads content through the Workspace Files Remote namespace; Preview owns refresh independently per tab ([`dsh-api-workspace-files`](../../packages/api/workspace-files/README.md)). The `subagentchat` provider retains the addressed Session and yields its `SessionReference`, then releases that reference when the resource signal aborts.
+大半ストリームは内容ではなくメタデータを運ぶ。`file` provider の値は `WorkspaceFileStat { absolutePath, version, bytes? }` である。最初のフレームは Host `stat` 由来であり、後の観測は版を更新する。コンシューマーは Workspace Files Remote 名前空間経由で内容を読む。Preview は方法単位に独立更新を所有する ([`dsh-api-workspace-files`](../../packages/api/workspace-files/README.md))。`subagentchat` provider はアドレス指定 Session を保持してその `SessionReference` を yield し、リソース信号 abort でその参照を解放する。
 
-## Limits
+## 制限
 
-Records live for the page lifetime: an address's record stays after its last holder leaves, holding no stream and no value, so memory grows with the number of distinct addresses ever read. A provider that ignores `signal` keeps running until its next frame. The failure type is the Remote face's `RemoteFailure`, so a provider whose source is not a Remote call mints one. A misspelled protocol or a malformed address reads as `none` with no other diagnostic.
+記録はページ寿命で生きる。アドレスの記録は最終保持者退出後も残り、ストリームも値も保持しないため、メモリは読み取った相異アドレス数と共に増える。`signal` を無視する provider は次フレームまで動き続ける。失敗型は Remote 面の `RemoteFailure` のため、情報源が Remote 呼び出しでない provider はそれを発行する。綴り違いプロトコルや不正アドレスは他診断なしに `none` と読まれる。

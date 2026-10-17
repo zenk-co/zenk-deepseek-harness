@@ -1,39 +1,39 @@
 ---
-description: "The LSP capability seam (ctx.lsp): provider selection by file extension, four normalized code-navigation operations, and structured errors, for users and maintainers composing or extending code navigation."
+description: "LSP ケイパビリティシーム（ctx.lsp）: ファイル拡張子によるプロバイダー選択、4 つの正規化されたコードナビゲーション操作、構造化エラー。コードナビゲーションを構成または拡張するユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-lsp
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-lsp` to give agents language-server navigation for definitions, references, implementations, and hover documentation. Queries select the configured provider by file extension and return normalized results with structured failures, so backend changes do not alter the navigation request or model-visible response. Navigation is read-only and deliberately excludes generic JSON-RPC access, rename, formatting, diagnostics, and symbol lists. This package must be combined with a provider such as `dsh-lsp-stdio` and the model-facing `dsh-tool-lsp`; alone it provides no navigation.
+`dsh-lsp` を使ってエージェントに定義、参照、実装、ホバードキュメントの言語サーバーナビゲーションを与える。クエリはファイル拡張子によって構成されたプロバイダーを選び、構造化された失敗を伴う正規化された結果を返すため、バックエンドの変更がナビゲーションリクエストやモデル可視のレスポンスを変えることはない。ナビゲーションは読み取り専用であり、汎用 JSON-RPC アクセス、リネーム、フォーマット、診断、シンボル一覧を意図的に除外する。このパッケージは `dsh-lsp-stdio` のようなプロバイダーと、モデル向けの `dsh-tool-lsp` と組み合わせなければならない。単体ではナビゲーションを提供しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount a language-server provider and the `lsp` tool to give agents semantics-based code navigation that text search cannot reliably provide — distinguishing same-named functions, following import aliases, connecting an interface to its implementations, or reading inferred types. This package is the service those packages register against; it defines no UI, tool, or provider of its own.
+言語サーバープロバイダーと `lsp` ツールをマウントして、テキスト検索が確実に提供できないセマンティクスベースのコードナビゲーションをエージェントに与える — 同名関数の区別、インポートエイリアスの追跡、インターフェースとその実装の接続、推論された型の読み取り。このパッケージはそれらのパッケージが登録するサービスである。独自の UI、ツール、またはプロバイダーを定義しない。
 
-### When to choose it
+### いつ選ぶか
 
-Choose this service when a deployment wants model-visible code navigation backed by language servers. It covers read-only navigation — definitions, references, implementations, and hover — and deliberately omits mutations (rename, code actions, formatting), symbol lists, and diagnostics. The service is provider-neutral: local stdio servers, remote servers, and sandbox-native providers register the same way, so replacing the backend does not change what the model sees or how it asks.
+デプロイが言語サーバーに支えられたモデル可視のコードナビゲーションを望む場合にこのサービスを選ぶ。読み取り専用ナビゲーション — 定義、参照、実装、ホバー — をカバーし、ミューテーション（リネーム、コードアクション、フォーマット）、シンボル一覧、診断を意図的に省く。このサービスはプロバイダー中立である: ローカル stdio サーバー、リモートサーバー、サンドボックスネイティブプロバイダーは同じように登録するため、バックエンドを置き換えてもモデルが見るものや尋ね方は変わらない。
 
-### Composing a navigation stack
+### ナビゲーションスタックを構成する
 
-The seam needs a provider and a consumer to do anything. A minimal composition mounts the service, a stdio provider, and the tool:
+シームが何かをするにはプロバイダーとコンシューマーが必要である。最小構成はサービス、stdio プロバイダー、ツールをマウントする:
 
 ```yaml
 - name: '@deepseek-ai/dsh-fs-local'
@@ -43,97 +43,97 @@ The seam needs a provider and a consumer to do anything. A minimal composition m
 - name: '@deepseek-ai/dsh-tool-lsp'
 ```
 
-Server commands, extension mappings, and the filesystem/subprocess pairing are configured in the provider and tool packages; see [dsh-lsp-stdio](../lsp-stdio/README.md) and [dsh-tool-lsp](../tool-lsp/README.md).
+サーバーコマンド、拡張子マッピング、ファイルシステム/サブプロセスの組み合わせはプロバイダーとツールのパッケージで構成される。[dsh-lsp-stdio](../lsp-stdio/README.md) と [dsh-tool-lsp](../tool-lsp/README.md) を参照。
 
-### The four operations
+### 4 つの操作
 
-Each query asks one of four semantic questions at a cursor position in a source file; results are normalized locations or hover content, never raw protocol payloads.
+各クエリはソースファイルのカーソル位置で 4 つの意味論的な質問の 1 つを尋ねる。結果は正規化された位置またはホバーコンテンツであり、生のプロトコルペイロードであることは決してない。
 
-| Operation | What the agent gets |
+| 操作 | エージェントが得るもの |
 |---|---|
-| `goToDefinition` | The declaration site(s) of the symbol at the cursor |
-| `findReferences` | Every reference, always including the declaration |
-| `goToImplementation` | The concrete implementation site(s) |
-| `hover` | Normalized documentation for the symbol, or none |
+| `goToDefinition` | カーソル位置のシンボルの宣言サイト |
+| `findReferences` | すべての参照（常に宣言を含む） |
+| `goToImplementation` | 具体的な実装サイト |
+| `hover` | シンボルの正規化されたドキュメント、またはなし |
 
-`findReferences` always includes declarations, so impact analysis never misses the defining site. Positions are zero-based UTF-16 on the wire; the model-facing tool accepts one-based cursor coordinates and converts them.
+`findReferences` は常に宣言を含むため、影響分析が定義サイトを見逃すことは決してない。位置はワイヤ上では 0 ベースの UTF-16 である。モデル向けツールは 1 ベースのカーソル座標を受け付け、変換する。
 
-### Failures and recovery
+### 失敗と回復
 
-A query fails with the structured error `LSP_UNAVAILABLE` when no registered provider handles the file's extension — add a provider for that extension or query a supported file. Invalid or conflicting provider registrations fail with `LSP_INVALID_PROVIDER` or `LSP_CONFLICT` before any route is published, and a query against a disposed provider fails with `LSP_DISPOSED`. Consumers catch `LspError` and route on its stable `code`; through the tool, these surface as error results the model can read.
+登録されたプロバイダーがファイルの拡張子を処理しない場合、クエリは構造化エラー `LSP_UNAVAILABLE` で失敗する — その拡張子のプロバイダーを追加するか、サポートされるファイルをクエリする。無効または競合するプロバイダー登録は、ルートが公開される前に `LSP_INVALID_PROVIDER` または `LSP_CONFLICT` で失敗し、破棄されたプロバイダーへのクエリは `LSP_DISPOSED` で失敗する。コンシューマーは `LspError` をキャッチし、その安定した `code` でルーティングする。ツールを通じて、これらはモデルが読めるエラー結果として表面化する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the seam and where the code realizes them; observable behavior is covered in [Use this package](#use-this-package).
+このセクションではシームの背後にある設計判断と、コードがそれらをどこで実現するかを説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design philosophy
+### 設計思想
 
-- **Capability seam, Service Definition role.** The package owns `ctx.lsp` and the provider registry; providers register capabilities, not tools, and `dsh-tool-lsp` is the only owner of the model-facing surface.
-- **Atomic registration.** `registerProvider()` validates and conflict-checks everything before mutating: an invalid or conflicting registration publishes nothing, and its disposer releases the id and every extension reservation together.
-- **Order-independent selection.** `query()` routes by the file's final extension, normalized to lowercase leading-dot form; registration and HMR order never change routing. The language id only synchronizes the transient document and never participates in selection.
-- **Closed vocabulary.** The four-operation union is closed — adding an operation is a compile-enforced change across the seam, providers, and the tool. There is no JSON-RPC escape hatch, and every request field is required, so there is no `resolve()` step.
-- **Provider-owned workspace coordinate.** Location results carry the provider's canonical workspace URI, so consumers relativize file URIs in the execution world's namespace instead of applying host-platform path rules.
+- **ケイパビリティシーム、Service Definition の役割。** このパッケージは `ctx.lsp` とプロバイダーレジストリを所有する。プロバイダーはツールではなくケイパビリティを登録し、`dsh-tool-lsp` がモデル向けサーフェスの唯一の所有者である。
+- **アトミックな登録。** `registerProvider()` は変更の前にすべてを検証して競合チェックする: 無効または競合する登録は何も公開せず、そのディスポーザーは id とすべての拡張子予約を一緒に解放する。
+- **順序に依存しない選択。** `query()` はファイルの最終拡張子（小文字の先頭ドット形式に正規化）でルーティングする。登録と HMR の順序がルーティングを変えることは決してない。言語 id は一時ドキュメントを同期するだけで、選択に参加しない。
+- **閉じた語彙。** 4 操作のユニオンは閉じている — 操作の追加はシーム、プロバイダー、ツール全体にわたるコンパイル強制の変更である。JSON-RPC の抜け道はなく、すべてのリクエストフィールドは必須であるため、`resolve()` ステップはない。
+- **プロバイダー所有のワークスペース座標。** 位置の結果はプロバイダーの正規ワークスペース URI を運ぶため、コンシューマーはホストプラットフォームのパスルールを適用するのではなく、実行ワールドの名前空間でファイル URI を相対化する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Lsp` service, `registerProvider`/`query`, `finalExtension`, `LspError` codes |
-| [`src/types.ts`](src/types.ts) | Seam vocabulary: request, result, provider, and service contracts |
-| [`src/brand.ts`](src/brand.ts) | `LspProviderId` branded-id type and factory |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: `Lsp` サービス、`registerProvider`/`query`、`finalExtension`、`LspError` コード |
+| [`src/types.ts`](src/types.ts) | シームの語彙: リクエスト、結果、プロバイダー、サービスの契約 |
+| [`src/brand.ts`](src/brand.ts) | `LspProviderId` ブランド付き id 型とファクトリー |
 
-### Registration and selection lifecycle
+### 登録と選択のライフサイクル
 
-Registration and disposal run through `ctx.effect()`, so provider routes live and die with the registering fiber. `finalExtension()` splits on both path separators and returns `''` for names without an extension or leading-dot dotfiles, which no route matches. `LspError` extends `HarnessError` with stable codes (`LSP_INVALID_PROVIDER`, `LSP_CONFLICT`, `LSP_UNAVAILABLE`, `LSP_DISPOSED`, `LSP_UNSUPPORTED_OPERATION`, `LSP_MALFORMED_RESPONSE`) that callers route on instead of parsing `message`.
+登録と破棄は `ctx.effect()` を通じて実行されるため、プロバイダールートは登録するファイバーとともに生きて死ぬ。`finalExtension()` は両方のパス区切り文字で分割し、拡張子のない名前または先頭ドットのドットファイルには `''` を返す。これにマッチするルートはない。`LspError` は `HarnessError` を拡張し、呼び出し元が `message` を解析するのではなくルーティングする安定したコード（`LSP_INVALID_PROVIDER`、`LSP_CONFLICT`、`LSP_UNAVAILABLE`、`LSP_DISPOSED`、`LSP_UNSUPPORTED_OPERATION`、`LSP_MALFORMED_RESPONSE`）を持つ。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the package-level contract is not enough. They move from the shared navigation model to the provider and the tool.
+パッケージレベルの契約では足りないときにこれらのページを読む。共有ナビゲーションモデルからプロバイダーとツールへと進む。
 
-- [LSP navigation subsystem](../../../docs/subsystems/lsp.md) — operations, coordinates, requests and results, and `LspError` codes.
-- [dsh-lsp-stdio](../lsp-stdio/README.md) — the stdio provider that registers against this seam.
-- [dsh-tool-lsp](../tool-lsp/README.md) — the model-facing tool over this seam.
-- [lsp group map](../README.md) — the three-package family and its related documentation.
+- [LSP ナビゲーションサブシステム](../../../docs/subsystems/lsp.md) — 操作、座標、リクエストと結果、`LspError` コード。
+- [dsh-lsp-stdio](../lsp-stdio/README.md) — このシームに登録する stdio プロバイダー。
+- [dsh-tool-lsp](../tool-lsp/README.md) — このシーム上のモデル向けツール。
+- [lsp グループマップ](../README.md) — 3 パッケージファミリーとその関連ドキュメント。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-tool-lsp`, which owns the model-facing `lsp` schema, prompt guidance, and rendered results while this registry contributes no prompt or schema itself.
+間接的に、`dsh-tool-lsp` を通じて。それはモデル向けの `lsp` スキーマ、プロンプトガイダンス、レンダリングされた結果を所有し、このレジストリ自体はプロンプトやスキーマを提供しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; `dsh-tool-lsp` owns request-prefix changes.
+直接の無効化はない。`dsh-tool-lsp` がリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the seam's current scope. They are package constraints, not a task backlog.
+これらの制限はシームの現在のスコープを定義する。これらはパッケージ制約であり、タスクバックログではない。
 
-- **Exclusive extension ownership within one runtime** — two providers cannot both claim `.ts`, even with different language ids; overlaps fail registration. A deployment-configured selector above registrations is the intended extension, which can relax exclusive reservation without adding provider choice to model input.
-- **Four read-only operations only** — symbols and call hierarchy are deferred because they need different schemas; diagnostics need separate freshness and accumulation rules; mutations (rename, code actions, formatting) require separate tools with preview, permission, and write-policy integration.
-- **No observation API** — availability is observed only by running `query()` and routing the thrown `LspError` codes; there is no provider-change event or capability-status query.
+- **1 つのランタイム内での排他的な拡張子所有権** — 2 つのプロバイダーが異なる言語 id でも `.ts` を両方主張することはできない。重複は登録に失敗する。登録の上にあるデプロイ構成のセレクターが意図された拡張であり、モデル入力にプロバイダー選択を追加せずに排他予約を緩和できる。
+- **4 つの読み取り専用操作のみ** — シンボルとコール階層は異なるスキーマを必要とするため延期される。診断は別々のフレッシュネスと蓄積ルールを必要とする。ミューテーション（リネーム、コードアクション、フォーマット）はプレビュー、権限、書き込みポリシー統合を伴う別々のツールを必要とする。
+- **観察 API はない** — 可用性は `query()` を実行してスローされた `LspError` コードをルーティングすることでのみ観察される。プロバイダー変更イベントやケイパビリティステータスクエリはない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

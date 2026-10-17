@@ -5,74 +5,74 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-session-titles-bundle
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Generate experimental session titles from the conversation's eligible human prompts. This replaces the first-prompt title provider and applies across presets. It ships switched off in Web and Desktop. Select it in Plugins to enable it.
+会話の対象となる人間プロンプトから実験的セッションタイトルを生成する。先頭プロンプトのタイトルプロバイダーを置換し、プリセット横断で適用される。Web と Desktop ではオフのまま出荷される。有効にするには Plugins で選択する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-In Web or Desktop, open Plugins and enable **Conversation-following titles** in Official. Switch it off to remove its profile layer.
+Web または Desktop で Plugins を開き、Official 内の **Conversation-following titles** を有効にする。オフに切り替えるとプロファイル層が除去される。
 
-The switch changes the title provider for existing and new Sessions. Eligible human prompts or explicit refresh trigger title requests; the model is asked to keep an existing generated title exactly while it still describes the main topic or task. Automatic updates preserve user-pinned titles. Agent tool catalogs remain unchanged.
+切り替えにより、既存と新規セッションのタイトルプロバイダーが変わる。対象の人間プロンプトまたは明示的更新がタイトル要求を起動する。モデルには、既存の生成タイトルが主要トピックやタスクを表している間は正確に維持するよう求められる。自動更新はユーザーがピン留めしたタイトルを保持する。エージェントツールカタログは変わらない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation details — click to expand</summary>
+<summary>実装詳細 — クリックで展開</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) contributes the provider on the host. Later profile patches can override its settings. The [profile composer](../../boot/app-boot/README.md) owns patch ordering and errors. The layer disables `session-title-llm` before selecting its replacement; deselection restores the default provider.
+[`cordis.patch.yml`](cordis.patch.yml)はホスト上にプロバイダーを提供する。後のプロファイルパッチはその設定をオーバーライドできる。[プロファイルコンポーザー](../../boot/app-boot/README.md)がパッチ順序とエラーを所有する。層は置換を選択する前に `session-title-llm` を無効にする。選択解除でデフォルトプロバイダーが復元される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-[Capability implementation](../session-title-all-prompts-llm/README.md)
+[ケイパビリティ実装](../session-title-all-prompts-llm/README.md)
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the [capability implementation](../session-title-all-prompts-llm/README.md), which owns model context and results.
+[ケイパビリティ実装](../session-title-all-prompts-llm/README.md)を通じて間接的に関与する。同実装がモデルコンテキストと結果を所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The layer adds no request content directly; the capability implementation owns cache effects from tools, prompts, and results.
+層はリクエスト内容を直接追加しない。ツール・プロンプト・結果からのキャッシュ効果はケイパビリティ実装が所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Automatic title failures retain the previous title. The 4096-byte title-input budget includes the current generated title when supplied and rejects oversized input instead of truncating conversation history.
+- 自動タイトル失敗時は以前のタイトルを保持する。4096 バイトのタイトル入力予算には、提供された場合の現在の生成タイトルが含まれ、過大な入力は会話履歴を切り詰める代わりに拒否される。
 
 -----
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Maintainer context — click to expand</summary>
+<summary>メンテナー向けコンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

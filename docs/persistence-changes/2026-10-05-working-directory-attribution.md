@@ -1,25 +1,25 @@
 ---
-description: "Records a persistence type transition and its compatibility acknowledgement."
+description: "永続化型の遷移とその互換性承認を記録する。"
 kind: persistence-change
 ---
 
 # 2026-10-05-working-directory-attribution
 
-English | [中文](2026-10-05-working-directory-attribution.zh.md)
+日本語 | [English](2026-10-05-working-directory-attribution.en.md) | [中文](2026-10-05-working-directory-attribution.zh.md)
 
-## Summary
+## 概要
 
-Adds producer-owned working-directory notice attribution.
+プロデューサー所有の作業ディレクトリー通知アトリビューションを追加する。
 
-## Table of Contents
+## 目次
 
-- [Declaration](#declaration)
-- [Compatibility](#compatibility)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [宣言](#declaration)
+- [互換性](#compatibility)
+- [検証](#verification)
+- [開発メモ](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -45,16 +45,16 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-Existing records remain valid. The additive working-directory source kind is attribution only; the declared source policy preserves unknown attribution without interpreting it. The Session format remains unchanged.
+既存の記録は引き続き有効である。追加の作業ディレクトリーソース種別はアトリビューション専用であり、宣言されたソースポリシーは未知のアトリビューションを解釈せずに保持する。Session フォーマットは変更されていない。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-pnpm exec vitest run packages/session/working-directory/tests packages/shell/tool-bash/tests/tools.spec.ts packages/shell/tool-pwsh/tests/tools.spec.ts packages/subagent/subagent/tests/schedule-tools.spec.ts: 5 files and 207 tests passed.
+pnpm exec vitest run packages/session/working-directory/tests packages/shell/tool-bash/tests/tools.spec.ts packages/shell/tool-pwsh/tests/tools.spec.ts packages/subagent/subagent/tests/schedule-tools.spec.ts: 5 ファイル、207 テストが合格した。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
-None.
+なし。

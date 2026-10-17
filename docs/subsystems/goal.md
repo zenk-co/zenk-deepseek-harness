@@ -1,12 +1,12 @@
-# Same-session goals
+# 同一セッションの目標
 
-English | [中文](goal.zh.md)
+日本語 | [English](goal.en.md) | [中文](goal.zh.md)
 
-Types shared by the event-sourced goal service and its policy consumers. The [goal-domain reference](../../packages/goal/goal/README.md) owns the persistence and activation decisions; this page records the exact fields and variants from [`packages/goal/goal/src/types.ts`](../../packages/goal/goal/src/types.ts).
+イベントソースの目標サービスとそのポリシーコンシューマーが共有する型。永続化とアクティベーションの決定は [goal ドメイン参照](../../packages/goal/goal/README.md)が所有する; このページは [`packages/goal/goal/src/types.ts`](../../packages/goal/goal/src/types.ts) の正確なフィールドとバリアントを記録する。
 
-## Identity and lifecycle
+## ID とライフサイクル
 
-`GoalId` is a [branded id](core.md#branded-ids). A caller mutates one exact revision through `GoalRef`; every accepted durable mutation increments the revision.
+`GoalId` は[ブランド付き id](core.md#branded-ids) である。呼び出し元は `GoalRef` を通じて 1 つの正確なリビジョンをミューテートする; 受け入れられたすべての永続ミューテーションはリビジョンを増分する。
 
 ```ts type-equiv
 /** Compare-and-set identity for one exact goal revision. */
@@ -18,7 +18,7 @@ interface GoalRef {
 }
 ```
 
-The durable phase answers what happened to the objective. Process-local activation separately answers whether a continuation consumer may start another round.
+永続フェーズは目的に何が起きたかに答える。プロセスローカルなアクティベーションは、継続コンシューマーが別のラウンドを開始してよいかどうかに別途答える。
 
 ```ts type-equiv
 /** Durable continuation phase. Activation is process-local and separate. */
@@ -29,7 +29,7 @@ type GoalPhase =
   | 'complete'
 ```
 
-Blocking is the single durable stopped-by-a-problem state. Its policy-owned reason carries a stable lower-kebab-case code for routing and a free-form explanation for humans and models.
+ブロックは、問題によって停止した状態を表す唯一の永続的な状態である。そのポリシー所有の理由は、ルーティング用の安定した lower-kebab-case コードと、人間とモデル向けの自由形式の説明を運ぶ。
 
 ```ts type-equiv
 /** Machine-routable and human-readable explanation for a blocked goal. */
@@ -69,7 +69,7 @@ interface GoalView extends GoalSnapshot {
 }
 ```
 
-The service also publishes process-local activation edges without changing durable state; clients consume this event for live status.
+サービスは永続状態を変えずにプロセスローカルなアクティベーションエッジも公開する; クライアントはライブステータスのためにこのイベントを消費する。
 
 ```ts type-equiv
 /** Live process-local activation update forwarded to UI clients. */
@@ -88,9 +88,9 @@ interface GoalActivationChanged {
 }
 ```
 
-## Durable changes
+## 永続的な変更
 
-Every mutation is a durable `goal/change` session event whose payload is either a complete post-mutation snapshot or a clear tombstone. The strict fold and persisted projection derive lifecycle state only from these events; inbox mutations do not affect goal state.
+すべてのミューテーションは永続的な `goal/change` セッションイベントであり、そのペイロードはミューテーション後の完全なスナップショットかクリアのトゥームストーンのいずれかである。厳格な fold と永続化されたプロジェクションはこれらのイベントからのみライフサイクル状態を導出する; inbox のミューテーションは目標状態に影響しない。
 
 ```ts type-equiv
 /** Full-snapshot goal mutation committed by a durable `goal/change` event. */
@@ -116,7 +116,7 @@ interface GoalClearChangeMeta {
 }
 ```
 
-A continuation consumer attributes each admitted user-message turn with a positive, sequential round number and the current revision; only these admitted `user/message` events advance `roundsStarted`. Replay rejects non-positive rounds, gaps, stale revisions, stopped phases, and cap overflow.
+継続コンシューマーは、承認された各 user-message ターンを正の連番ラウンド番号と現在のリビジョンで帰属する; これらの承認された `user/message` イベントだけが `roundsStarted` を進める。リプレイは非正のラウンド、ギャップ、古いリビジョン、停止したフェーズ、および上限のオーバーフローを拒否する。
 
 ```ts type-equiv
 /** Message attribution for admitted continuation rounds. */
@@ -129,9 +129,9 @@ interface GoalMessageSource {
 }
 ```
 
-## Requests and notifications
+## リクエストと通知
 
-Creation separates caller omission from the deployment choice, which `create()` resolves internally. An edit is a partial replacement whose runtime validator requires at least one field. Every mutation notification carries the accepted operation and exact revision; clear omits `goal`.
+作成は呼び出し元の省略とデプロイメントの選択を分離し、`create()` がそれを内部で解決する。編集は部分置換であり、そのランタイムバリデータは少なくとも 1 つのフィールドを要求する。すべてのミューテーション通知は受け入れられた操作と正確なリビジョンを運ぶ; clear は `goal` を省略する。
 
 ```ts type-equiv
 /** Input whose omitted round cap is resolved by the service configuration. */
@@ -159,9 +159,9 @@ interface GoalChanged {
 }
 ```
 
-## Service behavior
+## サービスの挙動
 
-[`GoalService`](../../packages/goal/goal/src/index.ts) resolves creation defaults, reads strict replay from the optionally registered `goal` projection, enforces exact-live-agent identity and compare-and-set mutations, and emits contained `goal/changed` notifications. Its first dependent access fails if the projection registry or key is absent. The package [README](../../packages/goal/goal/README.md) defines the callable API and model-visible contract.
+[`GoalService`](../../packages/goal/goal/src/index.ts) は作成のデフォルトを解決し、省略可能で登録された `goal` プロジェクションから厳格なリプレイを読み、正確な生きたエージェントの同一性とコンペアアンドセットのミューテーションを強制し、封じ込められた `goal/changed` 通知を emit する。プロジェクションレジストリまたはキーが存在しない場合、最初の依存アクセスは失敗する。パッケージ [README](../../packages/goal/goal/README.md) が呼び出し可能な API とモデル可視の契約を定義する。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -169,13 +169,13 @@ interface GoalChanged {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される (doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証; `pnpm run gen-cordis-catalog` で再生成) — 言語版はロケール固有の対訳ドキュメントパスのみが異なる。シグネチャブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する; ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxgoals--goalservice"></a>
 
 ### `ctx.goals` — `GoalService`
 
-Goal service (`ctx.goals`) backed exclusively by the owning session log.
+所有するセッションログのみに裏付けられた目標サービス (`ctx.goals`)。
 
 ```ts cordis-catalog
 /**
@@ -264,19 +264,19 @@ block(agent: Agent, ref: GoalRef, reason: GoalBlockReason): GoalView
 @Remote('create') remoteExportCreate(agent: Agent, request: CreateGoalRequest): CreateGoalResult
 ```
 
-Types: [Agent](core.md)
+型: [Agent](core.md)
 
-Source: [`packages/goal/goal/src/index.ts`](../../packages/goal/goal/src/index.ts)
+ソース: [`packages/goal/goal/src/index.ts`](../../packages/goal/goal/src/index.ts)
 
 <a id="goal-events"></a>
 
-### `goal/*` events
+### `goal/*` イベント
 
 <a id="goalactivation-changed--emit"></a>
 
 #### `goal/activation-changed` — emit
 
-Process-local goal activation changed for one session.
+1 つのセッションのプロセスローカルな目標アクティベーションが変化した。
 
 ```ts cordis-catalog
 /**
@@ -287,13 +287,13 @@ Process-local goal activation changed for one session.
 'goal/activation-changed'(payload: GoalActivationChanged): void
 ```
 
-Source: [`packages/goal/goal/src/types.ts`](../../packages/goal/goal/src/types.ts)
+ソース: [`packages/goal/goal/src/types.ts`](../../packages/goal/goal/src/types.ts)
 
 <a id="goalchanged--emit"></a>
 
 #### `goal/changed` — emit
 
-Goal mutation accepted by one live agent. The matching `goal/change` session event has already committed. Listener failures are contained. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+1 つの生きたエージェントによって受け入れられた目標ミューテーション。対応する `goal/change` セッションイベントはすでにコミットされている。リスナーの失敗は封じ込められる。スコープフィルタリングされたディスパッチ (`@deepseek-ai/dsh-scope`): エージェントスコープのリスナーはそのエージェントだけを受け取る。
 
 ```ts cordis-catalog
 /**
@@ -307,7 +307,7 @@ Goal mutation accepted by one live agent. The matching `goal/change` session eve
 'goal/changed'(this: import('@deepseek-ai/dsh-scope').Scoped<Agent>, payload: { agent: Agent; change: GoalChanged }): void
 ```
 
-Types: [Agent](core.md) · [Scoped](scope.md)
+型: [Agent](core.md) · [Scoped](scope.md)
 
-Source: [`packages/goal/goal/src/domain.ts`](../../packages/goal/goal/src/domain.ts)
+ソース: [`packages/goal/goal/src/domain.ts`](../../packages/goal/goal/src/domain.ts)
 <!-- END GENERATED cordis-surface -->

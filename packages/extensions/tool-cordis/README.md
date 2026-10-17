@@ -1,77 +1,77 @@
 ---
-description: "Read-only runtime API discovery for agents developing and configuring installed Harness plugins."
+description: "インストール済みハーネスプラグインを開発・設定するエージェント向けの読み取り専用ランタイム API 探索。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-cordis
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Inspect Host and Client runtime APIs before writing plugin code. Creator mode provides these read-only tools alongside Plugin Manager, which owns persistent profile changes. The inspection registry is supplied by the Cordis host runner; browser queries need a connected page.
+プラグインコードを書く前にホストとクライアントのランタイム API を調べる。Creator モードはこれらの読み取り専用ツールをプラグインマネージャーと並べて提供し、永続的なプロファイル変更はプラグインマネージャーが所有する。検査レジストリは Cordis ホストランナーが供給し、ブラウザークエリには接続済みページが必要である。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Creator mode includes this toolset. Other compositions mount `@deepseek-ai/dsh-tool-cordis/host` once in the host composition beside the host runner that provides `cordisInspect`, and `@deepseek-ai/dsh-tool-cordis` in each agent preset that exposes the tools; a preset row alone registers no Host providers. Call `cordis_inspect_list` to discover providers, then `cordis_inspect_query` for a provider's exact methods and types. The Host `Config` provider lists live Loader entries in pages (`offset`, `limit` up to 100, optional exact plugin `name`; `total` and `nextOffset` bound the walk) with each entry's Loader id, the tree-local id patches address, and its Config status (`schema`, `absent`, `unsupported`, `tree` for group and include carriers, `inactive` for disabled, never imported, or disposed entries), and projects one entry's native Config into a self-contained JSON Schema document beside the entry's `packageDir`, the resolved directory holding the package README and built `lib/`, when the profile package lookup resolves it. Use [Plugin Manager](../../boot/plugin-manager/README.md) to install bundles containing plugin code or MCP configuration.
+Creator モードはこのツールセットを含む。他のコンポジションは `cordisInspect` を提供するホストランナーの横にホストコンポジションで `@deepseek-ai/dsh-tool-cordis/host` を一度マウントし、ツールを公開する各エージェントプリセットに `@deepseek-ai/dsh-tool-cordis` をマウントする。プリセット行だけではホストプロバイダーは登録されない。`cordis_inspect_list` を呼んでプロバイダーを探索し、プロバイダーの正確なメソッドと型には `cordis_inspect_query` を使う。ホスト `Config` プロバイダーは稼働 Loader エントリーをページ単位で列挙する（`offset`・`limit`（最大 100）・任意の完全一致プラグイン `name`。`total` と `nextOffset` が走査を区切る）。各エントリーの Loader id、ツリー内ローカル id（パッチが宛てるもの）、設定状態（`schema`・`absent`・`unsupported`・グループと include 担体の `tree`・無効・未インポート・破棄済みエントリーの `inactive`）を伴い、プロファイルパッケージ探索が解決した場合は 1 エントリーのネイティブ設定を自己完結 JSON Schema 文書に投影し、エントリーの `packageDir`（パッケージ README とビルド済み `lib/` を持つ解決済みディレクトリ）と並べる。プラグインコードや MCP 設定を含むバンドルのインストールには[プラグインマネージャー](../../boot/plugin-manager/README.md)を使う。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-Host providers combine generated Service/Event catalogs, the live Loader tree projected through the app-boot Config projector, and the requesting agent's tool registry. Client providers synchronize their manifests through the existing inspection registry and answer queries from a connected page. The host entry owns the Host provider registrations and the preset row owns the two tools, each through Cordis effects; the registry rejects a duplicate provider id, which is why the providers register once per process rather than per preset.
+ホストプロバイダーは生成済みサービス・イベントカタログ、アプリ起動の設定投影器越しの稼働 Loader ツリー、要求エージェントのツールレジストリを組み合わせる。クライアントプロバイダーは既存の検査レジストリ越しにマニフェストを同期し、接続済みページからのクエリに答える。ホストエントリーはホストプロバイダー登録を所有し、プリセット行は 2 つのツールを所有する。いずれも Cordis エフェクト経由であり、レジストリは重複プロバイダー id を拒否するため、プロバイダーはプリセットごとではなくプロセスごとに一度登録される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Plugin Manager](../../boot/plugin-manager/README.md) — persistent bundle installation and enablement.
-- [Cordis host runner](../cordis-host-runner/README.md) — inspection registry and existing runtime consumers.
+- [プラグインマネージャー](../../boot/plugin-manager/README.md) — 永続的なバンドルインストールと有効化。
+- [Cordis ホストランナー](../cordis-host-runner/README.md) — 検査レジストリと既存ランタイム利用者。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Runtime inspection
+### ランタイム検査
 
-#### What the model sees
+#### モデルが見るもの
 
-The [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-cordis) describes two read-only inspection tools. The plugin contributes no system prompt section: the tool descriptions state when to call each tool and that queries never invoke business methods. In the `cordis` preset, the first-turn skill catalog carries the descriptions of the two shipped skills, which route plugin, MCP, composition, and destination-less visual requests to the skill covering Plugin Manager, MCP setup, Client packaging, and slot registration. Query results contain the requested API declarations, live tool schemas, the live entry directory with Config status, or one entry's projected Config JSON Schema.
+[ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-cordis)は 2 つの読み取り専用検査ツールを説明する。プラグインはシステムプロンプト節に寄与しない。ツール説明が各ツールをいつ呼ぶべきか、クエリが業務メソッドを決して呼び出さないことを述べる。`cordis` プリセットでは、初ターンのスキルカタログが配布済み 2 スキルの説明を運び、プラグイン・MCP・コンポジション・宛先なし可視要求を、プラグインマネージャー・MCP セットアップ・クライアントパッケージ化・スロット登録を扱うスキルへ導く。クエリ結果は要求した API 宣言・稼働ツールスキーマ・設定状態付きの稼働エントリー一覧、または 1 エントリーの投影済み設定 JSON Schema を含む。
 
-#### Token effect
+#### トークン効果
 
-Only the two tool schemas enter model requests while this plugin is visible. Query results append to the transcript; exact queries avoid loading unrelated declarations.
+このプラグイン可視中は 2 つのツールスキーマのみがモデル要求に入る。クエリ結果は会話記録に追記され、的確なクエリは無関係な宣言の読み込みを避ける。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Unchanged tool schemas remain prefix-stable. Query results append to history; enabling other plugins can change subsequent tool schemas.
+変更のないツールスキーマは接頭辞安定のままである。クエリ結果は履歴に追記され、他のプラグイン有効化が後続ツールスキーマを変える場合がある。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Client queries need a responding page and use the Host runner's [bounded wait and retry policy](../cordis-host-runner/README.md#client-inspection). Inspection cannot invoke service methods, configure plugins, or execute generated code.
-- `Config.listConfigs` walks the profile Loader tree only. Agent preset `plugins` lists mount in detached preset trees, so a plugin present only inside a preset declaration is not listed unless the profile tree also mounts it.
+- クライアントクエリには応答するページが必要であり、ホストランナーの[上限付き待機・再試行方針](../cordis-host-runner/README.md#client-inspection)を使う。検査はサービスメソッドの呼び出し・プラグインの設定・生成コードの実行ができない。
+- `Config.listConfigs` はプロファイル Loader ツリーのみを歩く。エージェントプリセット `plugins` 一覧は分離プリセットツリーにマウントされるため、プリセット宣言内にだけあるプラグインはプロファイルツリーにもマウントされない限り一覧に出ない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
-None.
+なし。

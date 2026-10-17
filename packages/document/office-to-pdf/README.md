@@ -1,105 +1,105 @@
 ---
-description: "Host Office conversion with the independently published LibreOffice kit."
+description: "独立公開された LibreOffice キットによる Host での Office 変換。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-office-to-pdf
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Convert Office documents to PDFs on the Host computer. Targets with a declared native LibreOffice engine use it; other targets use Node WASM. The provider accepts DOC, DOCX, XLS, XLSX, PPT, and PPTX. OOXML conversion returns missing-font names; binary Office conversion returns an empty list.
+Host コンピューター上で Office ドキュメントを PDF に変換する。ネイティブ LibreOffice エンジンが宣言されたターゲットはそれを使い、他のターゲットは Node WASM を使う。このプロバイダーは DOC、DOCX、XLS、XLSX、PPT、PPTX を受け付ける。OOXML 変換は欠落フォント名を返し、バイナリ Office 変換は空のリストを返す。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The [Web bundle](../../bundle/web-app/README.md) mounts this provider as `office-to-pdf`. Independent compositions mount `@deepseek-ai/dsh-office-to-pdf` as a `cordis.yml` row.
+[Web バンドル](../../bundle/web-app/README.md)がこのプロバイダーを `office-to-pdf` としてマウントする。独立した構成では `@deepseek-ai/dsh-office-to-pdf` を `cordis.yml` の行としてマウントする。
 
-Callers submit authorized source identity, version, optional byte size, a deferred bounded read, Office extension, and scheduling priority through `ctx.officeToPdf.convert()`. A changed source version rejects conversion. Results contain caller-owned PDF bytes, missing fonts, a cache key, and a conversion generation that changes on configuration replacement. Cancellation rejects with its reason; conversion failures use `OfficeToPdfError`.
+呼び出し元は、認可されたソース ID、バージョン、任意のバイトサイズ、遅延された上限付き読み取り、Office 拡張子、スケジューリング優先度を `ctx.officeToPdf.convert()` を通じて送信する。変更されたソースバージョンは変換を拒否する。結果には呼び出し元所有の PDF バイト、欠落フォント、キャッシュキー、および設定置き換えで変わる変換ジェネレーションが含まれる。キャンセルはその理由で拒否し、変換失敗は `OfficeToPdfError` を使う。
 
-The provider depends on the independently published [`@deepseek-ai/libreoffice-kit`](https://github.com/deepseek-ai/dsh-libreoffice-kit) npm API at kit version `^0.1.5`. Application packaging selects the matching native package declared in the kit’s `optionalDependencies`, or WASM when no native package is declared for that target. A missing declared native engine rejects packaging without selecting WASM. The [release ownership decision](../../../.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.md) defines the independent kit and Harness responsibilities.
+プロバイダーは、独立公開された [`@deepseek-ai/libreoffice-kit`](https://github.com/deepseek-ai/dsh-libreoffice-kit) npm API のキットバージョン `^0.1.5` に依存する。アプリケーションのパッケージングは、キットの `optionalDependencies` で宣言された一致するネイティブパッケージを選ぶか、そのターゲットにネイティブパッケージが宣言されていない場合は WASM を選ぶ。宣言されたネイティブエンジンが欠落している場合、WASM を選ばずにパッケージングを拒否する。[リリース所有権の決定](../../../.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.md)が、独立したキットと Harness の責任を定義する。
 
-Browsers request PDFs through the `officeToPdf.render` Remote method with a Session identity, Office path, and priority. This entry uses `workspaceFiles` for authorization and source versions, then reads raw bytes through `fs.readBytes` within the conversion reservation. In-process `convert()` does not require those services. Responses retain the source path and version and carry native PDF bytes through the binary Remote multipart transport, plus missing fonts and conversion generation. The `officeToPdf.generation` Remote method returns the current provider generation; `api/remotes` mounts the generated Client descriptor.
+ブラウザーは、セッション ID、Office パス、優先度を伴う `officeToPdf.render` Remote メソッドで PDF を要求する。このエントリは認可とソースバージョンに `workspaceFiles` を使い、変換予約内で `fs.readBytes` を通じて生バイトを読む。プロセス内の `convert()` はこれらのサービスを必要としない。応答はソースパスとバージョンを保持し、バイナリ Remote マルチパートトランスポートを通じてネイティブ PDF バイトを運び、加えて欠落フォントと変換ジェネレーションを運ぶ。`officeToPdf.generation` Remote メソッドは現在のプロバイダージェネレーションを返し、`api/remotes` が生成された Client 記述子をマウントする。
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `maxConcurrentConversions` | `2` | Maximum active converters; queued calls remain cancellable. |
-| `timeoutMs` | `60000` | Conversion deadline after a converter is acquired. |
-| `maxInputBytes` | `52428800` | Maximum source bytes. |
-| `maxOutputBytes` | `104857600` | Maximum complete PDF bytes. |
-| `maxImageResolution` | `192` | Maximum raster-image DPI; overrides the kit default of `144`. |
-| `fontFallbacks` | Kit defaults | Ordered font-family preference groups; each group requires at least two names containing non-whitespace characters. |
+| `maxConcurrentConversions` | `2` | アクティブなコンバーターの最大数。キューに入った呼び出しはキャンセル可能なままである。 |
+| `timeoutMs` | `60000` | コンバーター取得後の変換デッドライン。 |
+| `maxInputBytes` | `52428800` | ソースバイトの最大数。 |
+| `maxOutputBytes` | `104857600` | 完全な PDF バイトの最大数。 |
+| `maxImageResolution` | `192` | ラスター画像の最大 DPI。キットのデフォルト `144` を上書きする。 |
+| `fontFallbacks` | キットのデフォルト | 順序付きフォントファミリー優先グループ。各グループは非空白文字を含む少なくとも 2 つの名前を必要とする。 |
 
-The [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-office-to-pdf) owns the full font, archive, and image settings. `fontDirectories` accepts absolute directories; omission uses the kit platform defaults. Explicit `fontFallbacks` replaces the kit's default groups. Installed requested fonts retain precedence, and other system fonts remain eligible for uncovered glyphs. Native engines can select installed metric-compatible fonts before these preferences.
+[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-office-to-pdf)がフォント、アーカイブ、画像の完全な設定を所有する。`fontDirectories` は絶対ディレクトリを受け付け、省略時はキットのプラットフォームデフォルトを使う。明示的な `fontFallbacks` はキットのデフォルトグループを置き換える。インストール済みの要求フォントは優先権を保持し、他のシステムフォントはカバーされないグリフのために引き続き適格である。ネイティブエンジンは、これらの優先設定の前に、インストール済みのメトリック互換フォントを選べる。
 
-The [bounded conversion decision](../../../.agents/notes/implemented/architecture/2026-09-15-bounded-office-conversion.md) explains queue admission, cache limits, and shared cancellation.
+[上限付き変換の決定](../../../.agents/notes/implemented/architecture/2026-09-15-bounded-office-conversion.md)が、キュー許可、キャッシュ制限、共有キャンセルを説明する。
 
-The provider retains successful PDFs by converter generation, Office extension, and SHA-256 of the exact source bytes. A bounded source-version index avoids rereading known content after an authorized stat; content identity also shares conversion across different source paths. Least-recently-used PDFs leave at either retention limit, together with their aliases. Failures and oversized cache entries are not retained. Every result has independent PDF/font buffers. Ready alias hits consume no reader slot; active source locators are released when their last reader leaves. Reopening a source after its final reader cancels rereads its bytes before sharing by digest, even if another source kept the conversion alive or its PDF is ready.
+プロバイダーは、コンバータージェネレーション、Office 拡張子、正確なソースバイトの SHA-256 によって成功した PDF を保持する。上限付きのソースバージョンインデックスは、認可された stat の後に既知のコンテンツを読み直すことを避ける。コンテンツ ID は異なるソースパス間で変換を共有もする。最も最近使われていない PDF は、どちらかの保持上限でエイリアスとともに退出する。失敗と過大なキャッシュエントリは保持されない。すべての結果は独立した PDF/フォントバッファーを持つ。レディなエイリアスヒットはリーダースロットを消費しない。アクティブなソースロケーターは、最後のリーダーが去ったときに解放される。最後のリーダーの後にソースを再度開くと、別のソースが変換を生かしたままにしていても、またはその PDF がレディでも、ダイジェストで共有する前にそのバイトを読み直す。
 
-Admission bounds queued metadata, outstanding readers, active source-byte reservations, and conversions before invoking a source read. Unknown source sizes reserve `maxInputBytes`; known sizes reserve their stat size. Reads receive that capacity and may read one overflow sentinel byte. `maxSourceBytes` must cover `maxInputBytes`. The final reader allowance is reserved for foreground work. Setting `maxBackgroundConversions` to zero rejects background joins to queued and running work; completed alias hits remain available. Background jobs wait while any foreground job is queued, including when it awaits source capacity. Foreground joins promote queued prewarming; when its last foreground reader leaves, the queued job returns to background priority and eligible work can start immediately. Foreground admission can evict queued speculation. Background concurrency leaves a foreground slot when total concurrency exceeds one. A running prewarm keeps its background admission slot until settlement, even after promotion. The final reader cancels shared work. Removing a queued foreground blocker immediately admits other eligible work; active reservations remain held until actual read/conversion cleanup settles.
+許可は、ソース読み取りを呼び出す前に、キューに入ったメタデータ、未処理のリーダー、アクティブなソースバイト予約、および変換を制限する。不明なソースサイズは `maxInputBytes` を予約し、既知のサイズはその stat サイズを予約する。読み取りはその容量を受け取り、オーバーフローセンチネル 1 バイトを読める。`maxSourceBytes` は `maxInputBytes` をカバーしなければならない。最後のリーダー許容量はフォアグラウンド作業のために予約される。`maxBackgroundConversions` をゼロに設定すると、キューに入ったおよび実行中の作業へのバックグラウンド参加を拒否する。完了したエイリアスヒットは引き続き利用可能である。バックグラウンドジョブは、フォアグラウンドジョブがキューにある間待つ。ソース容量を待っている場合も含む。フォアグラウンド参加はキューに入ったプリウォーミングを昇格させる。その最後のフォアグラウンドリーダーが去ると、キューに入ったジョブはバックグラウンド優先度に戻り、適格な作業が即座に開始できる。フォアグラウンド許可はキューに入った投機を追い出せる。バックグラウンド並行数は、合計並行数が 1 を超える場合、フォアグラウンドスロットを残す。実行中のプリウォームは、昇格後も確定までバックグラウンド許可スロットを保持する。最後のリーダーは共有作業をキャンセルする。キューに入ったフォアグラウンドブロッカーを削除すると、他の適格な作業が即座に許可される。アクティブな予約は、実際の読み取り/変換クリーンアップが確定するまで保持されたままである。
 
-The defaults retain 8 PDFs/128 MiB and 64 source aliases, admit 32 readers and 8 queued jobs, reserve at most 100 MiB of source bytes, and allow one background conversion. These limits bound owned requests and binary payloads, not engine RSS, multipart framing, caller-retained results, or PDF.js page rendering.
+デフォルトは 8 PDF/128 MiB と 64 ソースエイリアスを保持し、32 リーダーと 8 キュージョブを許可し、ソースバイトを最大 100 MiB 予約し、バックグラウンド変換を 1 つ許す。これらの制限は所有されたリクエストとバイナリペイロードを制限するもので、エンジン RSS、マルチパートフレーミング、呼び出し元が保持する結果、または PDF.js ページレンダリングは制限しない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-Invalid engine metadata, missing required assets, and conversion errors reject the request instead of switching engines. The shared WASM engine uses LibreOffice's CPU image filter. Native conversion uses its separate platform engine.
+無効なエンジンメタデータ、必須アセットの欠落、変換エラーは、エンジンを切り替えるのではなくリクエストを拒否する。共有 WASM エンジンは LibreOffice の CPU 画像フィルターを使う。ネイティブ変換は独自のプラットフォームエンジンを使う。
 
-Each concurrent slot lazily creates and reuses one kit converter. The provider writes authorized input into a private temporary directory, reads a bounded regular PDF, and removes the directory before settling. Canceling an admitted reader does not block later queued work. Reader cancellation releases only that reader; the final reader and provider disposal cancel shared work. Disposal reports `unavailable` to outstanding readers and joins conversions and converter teardown.
+各並行スロットは、1 つのキットコンバーターを遅延作成して再利用する。プロバイダーは認可された入力をプライベート一時ディレクトリに書き込み、上限付きの正規 PDF を読み、確定前にそのディレクトリを削除する。許可されたリーダーのキャンセルは、後からキューに入った作業をブロックしない。リーダーのキャンセルはそのリーダーのみを解放し、最後のリーダーとプロバイダーの破棄が共有作業をキャンセルする。破棄は未処理のリーダーに `unavailable` を報告し、変換とコンバーターのティアダウンを待ち合わせる。
 
-Remote file reads recheck content authorization and source version before consulting the conversion cache. Deferred reads run after conversion admission and verify the source version after reading. Source-read failures pass through; conversion failures return `document-render/failed` with a classified reason and no engine diagnostics. Unload cancels and joins authorization reads, Remote requests, and conversion work.
+リモートファイル読み取りは、変換キャッシュに問い合わせる前にコンテンツ認可とソースバージョンを再確認する。遅延読み取りは変換許可の後に実行され、読み取り後にソースバージョンを検証する。ソース読み取りの失敗はそのまま通過し、変換失敗は分類された理由とエンジン診断なしの `document-render/failed` を返す。アンロードは認可読み取り、Remote リクエスト、および変換作業をキャンセルして待ち合わせる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-- [Office to PDF](../../../docs/subsystems/office-to-pdf.md) — composition and input/result ownership.
-- [Workspace Files](../../api/workspace-files/README.md) — Session file authorization and bounded reads.
+- [Office to PDF](../../../docs/subsystems/office-to-pdf.md) — 構成と入出力の所有権。
+- [Workspace Files](../../api/workspace-files/README.md) — セッションファイルの認可と上限付き読み取り。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package converts bytes without model-facing tools, messages, or Session events.
+なし。このパッケージはモデル向けツール、メッセージ、セッションイベントなしでバイトを変換する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; conversion does not construct or modify model requests.
+なし。変換はモデルリクエストを構築または変更しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Conversion fidelity and installed native/WASM assets belong to `@deepseek-ai/libreoffice-kit`; this provider neither searches for system LibreOffice nor downloads an engine at runtime.
-- Queue waiting time is not bounded by `timeoutMs`, which starts only when kit conversion begins.
+- 変換忠実度とインストール済みのネイティブ/WASM アセットは `@deepseek-ai/libreoffice-kit` に属し、このプロバイダーはシステム LibreOffice の探索も実行時のエンジンダウンロードも行わない。
+- キューの待ち時間は `timeoutMs` で制限されない。それはキット変換が始まってから開始される。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

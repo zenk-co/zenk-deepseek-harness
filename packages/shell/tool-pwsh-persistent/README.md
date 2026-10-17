@@ -1,41 +1,41 @@
 ---
-description: "The model-facing persistent pwsh tool for users and maintainers choosing, configuring, or debugging owner-scoped PowerShell state that survives across calls."
+description: "呼び出しをまたいで存続するオーナースコープの PowerShell 状態を選択・設定・デバッグするユーザーとメンテナー向けの、モデルに公開される永続 pwsh ツール。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-pwsh-persistent
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-tool-pwsh-persistent` gives each agent a `pwsh` tool that preserves its current directory, environment variables, functions, and background jobs across calls. Commands for one agent run sequentially, while different agents keep separate shell state. Choose it for multi-step PowerShell work; use `dsh-tool-pwsh` when every command should start clean, and use a terminal tool when commands require interactive stdin. Configure a pwsh-capable backend and per-command timeout; timeout or explicit `exit` discards the shell, so the next call starts fresh.
+`dsh-tool-pwsh-persistent` は、各エージェントに、現在のディレクトリ、環境変数、関数、バックグラウンドジョブを呼び出しをまたいで保持する `pwsh` ツールを与えます。1 つのエージェントのコマンドは順番に実行され、異なるエージェントはそれぞれ別のシェル状態を保ちます。複数ステップの PowerShell 作業に適しています。すべてのコマンドをクリーンに開始したい場合は `dsh-tool-pwsh` を使い、コマンドが対話的 stdin を必要とする場合はターミナルツールを使ってください。pwsh 対応バックエンドとコマンドごとのタイムアウトを設定します。タイムアウトまたは明示的な `exit` はシェルを破棄するため、次の呼び出しは新しく開始します。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送りされた作業](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-A new shell starts in the Session's current working directory. Once created, its directory and environment remain independent of later Session directory changes.
+新しいシェルはセッションの現在の作業ディレクトリで開始します。一度作成されると、そのディレクトリと環境は以降のセッションのディレクトリ変更から独立したままです。
 
-Load this plugin in any composition where the agent should keep PowerShell state between commands — the persistent counterpart of `dsh-tool-pwsh` for work that needs cross-call state. It registers the `pwsh` tool and requires the `ctx.tools` and `ctx.terminals` services plus an owning agent session at execution time.
+エージェントがコマンド間で PowerShell 状態を保つべき構成ならどこでもこのプラグインをロードします — 呼び出しをまたぐ状態が必要な作業のための `dsh-tool-pwsh` の永続版です。`pwsh` ツールを登録し、実行時に `ctx.tools` と `ctx.terminals` サービス、および所有エージェントセッションを必要とします。
 
-### When to choose it
+### いつ選択するか
 
-Choose the persistent tool when work depends on cross-call PowerShell state, and choose `dsh-tool-pwsh` when every command should start from a known, clean environment. Commands that need interactive stdin are unsupported here — a foreground child that reads input blocks until the command timeout, which resets the shell — so interactive work belongs to the terminal tools.
+呼び出しをまたぐ PowerShell 状態に作業が依存する場合は永続ツールを選び、すべてのコマンドを既知のクリーンな環境から開始したい場合は `dsh-tool-pwsh` を選びます。対話的 stdin を必要とするコマンドはここではサポートされません — 入力を読むフォアグラウンドの子はコマンドタイムアウトまでブロックし、シェルをリセットします — そのため対話的な作業はターミナルツールに属します。
 
-### Minimal configuration
+### 最小構成
 
-The default `shell` backend starts a PowerShell shell through a `dsh-terminal-bash` instance configured with `shellDialect: pwsh`; deployments may register another pwsh-dialect PTY backend and select it by name.
+デフォルトの `shell` バックエンドは、`shellDialect: pwsh` で設定された `dsh-terminal-bash` インスタンスを通じて PowerShell シェルを起動します。デプロイは別の pwsh 方言の PTY バックエンドを登録し、名前で選択することもできます。
 
 ```yaml
 - name: '@deepseek-ai/dsh-terminal'
@@ -45,123 +45,123 @@ The default `shell` backend starts a PowerShell shell through a `dsh-terminal-ba
 - name: '@deepseek-ai/dsh-tool-pwsh-persistent'
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `backendType` | `shell` | Registered PTY backend used for each agent's shell |
-| `timeoutMs` | `300,000` | Wall-clock limit for one command; timeout closes the shell |
-| `maxOutputChars` | `16,000` | Maximum retained command-output characters; fixed diagnostics are added afterward |
-| `description` | `Run commands in a persistent PowerShell shell. State, including the current directory and exported environment variables, persists across calls for this agent.` | Model-facing environment contract; deployments may describe their environment |
+| `backendType` | `shell` | 各エージェントのシェルに使用される登録済み PTY バックエンド |
+| `timeoutMs` | `300,000` | 1 つのコマンドの実時間制限。タイムアウトはシェルを閉じます |
+| `maxOutputChars` | `16,000` | 保持されるコマンド出力の最大文字数。固定の診断が後から追加されます |
+| `description` | `Run commands in a persistent PowerShell shell. State, including the current directory and exported environment variables, persists across calls for this agent.` | モデル向けの環境契約。デプロイは自環境を記述できます |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-pwsh-persistent) is the exhaustive source for every accepted field and its JSDoc.
+生成される [設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-pwsh-persistent) が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源です。
 
-### What the agent can rely on
+### エージェントが依存できること
 
-Commands share one shell per agent, so cwd, `$env:` variables, functions, and background jobs persist across calls. Results exclude the private completion markers and the echoed input line. When the shell reads stdin again without having printed the completion marker — an interrupt, a replaced shell, or an interactive foreground child whose stdin wait the provider proves — the call returns the captured partial output, which can end with the backend's own prompt text. A non-zero wrapped command appends `[exit code: N]` — the exact native exit code when the command ran a native program, `1` for a terminating PowerShell error. A shell that exits before reporting that status instead appends `[shell exited: code N]`, `[shell killed by signal: SIG]`, or `[shell exited]` (Windows forced termination reports exit 1 without a signal), then resets and tells the agent the next call starts fresh. Long output keeps the earliest retained prefix plus a clipping notice; if the terminal has already dropped that prefix, the result says so explicitly.
+コマンドはエージェントごとに 1 つのシェルを共有するため、cwd、`$env:` 変数、関数、バックグラウンドジョブは呼び出しをまたいで存続します。結果からは、プライベートな完了マーカーとエコーされた入力行が除外されます。シェルが完了マーカーを出力せずに再び stdin を読む場合 — 割り込み、シェルの置き換え、またはプロバイダーが stdin 待ちを証明した対話的フォアグラウンドの子 — 呼び出しは捕捉された部分出力を返し、それはバックエンド自身のプロンプトテキストで終わる場合があります。ラップされたコマンドが非ゼロの場合、`[exit code: N]` が追加されます — コマンドがネイティブプログラムを実行した場合は正確なネイティブ終了コード、PowerShell の終了エラーの場合は `1` です。そのステータスを報告する前にシェルが終了した場合は代わりに `[shell exited: code N]`、`[shell killed by signal: SIG]`、または `[shell exited]`（Windows の強制終了はシグナルなしで終了 1 を報告します）が追加され、その後リセットされて、次の呼び出しは新しく開始することをエージェントに伝えます。長い出力は保持された最も早いプレフィックスとクリッピング通知を保ちます。ターミナルがすでにそのプレフィックスを破棄している場合、結果はそのことを明示的に述べます。
 
-### What can go wrong
+### 何がうまくいかないことがあるか
 
-A call without an owning agent session fails with `pwsh requires an owning agent session`, and a composition without a pwsh-dialect PTY backend activates the tool but fails its first call with `no PTY backend registered for "shell"`. A model redefinition of the `prompt` function removes the readiness marker, and the shell then settles on the silence tier instead of the marker fast path. Raw ESC characters inside a command are consumed by PSReadLine before execution and are unsupported. A timeout closes the uncertain shell and reports bounded partial output and the reset. Cancellation resets the shell and discards command output. After cleanup settles, ToolRuntime publishes `Error: tool call aborted` with code `ABORTED`; cancellation reasons are not rendered as command output. A queued cancelled call sends no command.
+所有エージェントセッションのない呼び出しは `pwsh requires an owning agent session` で失敗し、pwsh 方言の PTY バックエンドのない構成ではツールはアクティブ化されますが、最初の呼び出しが `no PTY backend registered for "shell"` で失敗します。モデルが `prompt` 関数を再定義するとレディネスマーカーが失われ、シェルはマーカーファストパスではなくサイレンス層に落ち着きます。コマンド内の生の ESC 文字は実行前に PSReadLine に消費され、サポートされません。タイムアウトは不確実なシェルを閉じ、上限付きの部分出力とリセットを報告します。キャンセルはシェルをリセットし、コマンド出力を破棄します。クリーンアップが落ち着いた後、ToolRuntime はコード `ABORTED` とともに `Error: tool call aborted` を発行します。キャンセル理由はコマンド出力としてレンダリングされません。キューに入ったキャンセル済み呼び出しはコマンドを送信しません。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the tool and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではツールの背後にある設計判断を説明し、それを実現するコードを示します。観測可能な動作は [このパッケージを使う](#use-this-package) で完全に説明されています。
 
-### Design philosophy
+### 設計哲学
 
-- **A deliberate twin of `dsh-tool-bash-persistent`.** The session registry, polling loop, and reset contract mirror the persistent bash tool by design ([pwsh persistent PTY Agent Note](../../../.agents/notes/archived/architecture/2026-08-11-pwsh-persistent-pty.md)).
-- **Backend-owned prompt readiness.** The shell's `prompt` function belongs to the backend: it prints a BEL-terminated OSC marker plus the controlled printable prompt. The backend accepts recognized prompt text through its fast path and otherwise uses its own readiness checks or silence tier. The tool neither installs nor matches a prompt of its own.
-- **Readiness after scrolling and restart.** The [Loader composition test](tests/loader-composition.spec.ts) checks the complete send-settlement sequence, including a command on the same shell after large output and the first command after `exit`. Its failure timeline distinguishes the bundled OpenConsole used on Windows from the unused system conhost.
-- **PSReadLine echo stripped by anchoring.** PowerShell renders submitted input back into the stream; the marker-anchored extraction and a wrapper-source strip remove the echo, and a wrapper that wraps across the terminal width may leave a partial echo in partial-output results.
-- **Reset, never repair.** Any uncertain state — an explicit `exit`, a timeout, a send failure, an abort — closes the shell and starts the next call fresh.
+- **`dsh-tool-bash-persistent` の意図的な双子。** セッションレジストリ、ポーリングループ、リセット契約は設計上、永続 bash ツールを鏡写しにしています ([pwsh persistent PTY Agent Note](../../../.agents/notes/archived/architecture/2026-08-11-pwsh-persistent-pty.md))。
+- **バックエンド所有のプロンプトレディネス。** シェルの `prompt` 関数はバックエンドに属します。それは BEL 終端の OSC マーカーと制御された印刷可能プロンプトを出力します。バックエンドは認識されたプロンプトテキストをファストパスで受け入れ、そうでなければ独自のレディネスチェックまたはサイレンス層を使用します。ツールは自身のプロンプトを設置も照合もしません。
+- **スクロールと再起動後のレディネス。** [Loader 構成テスト](tests/loader-composition.spec.ts) は send-settlement の完全なシーケンスを確認します。大量出力後の同じシェル上のコマンドや `exit` 後の最初のコマンドも含みます。その失敗タイムラインは、Windows で使われるバンドルされた OpenConsole と未使用のシステム conhost を区別します。
+- **アンカーリングによる PSReadLine エコーの除去。** PowerShell は送信された入力をストリームに描き戻します。マーカーアンカー抽出とラッパーソースの除去がエコーを取り除きます。ターミナル幅をまたいで折り返すラッパーは、部分出力結果に部分的なエコーを残す場合があります。
+- **修理せずリセット。** 不確実な状態 — 明示的な `exit`、タイムアウト、送信失敗、中止 — はシェルを閉じ、次の呼び出しを新しく開始します。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: shell registry, command wrapping, scrollback polling, extraction and rendering |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: シェルレジストリ、コマンドラッピング、スクロールバックポーリング、抽出とレンダリング |
 
-### Command flow
+### コマンドフロー
 
-A first command spawns the shell through `ctx.terminals.spawn`, whose pwsh startup installs the controlled `prompt` function and returns only once the shell reached readiness. Each command is wrapped into one physical line — `Write-Output` of the start marker, the body escaped with backtick escapes into a double-quoted string, and `Write-Output` of the end marker plus the exit status — so PSReadLine's echo of a wrapped line cannot fabricate completion. The parser accepts ASCII-space padding after the status digits but still requires LF or CRLF. Spaces in command output remain unchanged. The tool polls the scrollback in 1,000-line pages until a complete end-marker status line is available or the send settles as `stdin_read`, extracts the span, strips the echoed wrapper, and renders it with any status marker. A timeout aborts the deadline, captures the partial output, and resets the shell.
+最初のコマンドは `ctx.terminals.spawn` を通じてシェルを起動します。その pwsh 起動は制御された `prompt` 関数を設置し、シェルがレディネスに達した後にのみ戻ります。各コマンドは 1 つの物理行にラップされます — start マーカーの `Write-Output`、バッククォートエスケープで二重引用符文字列にエスケープされた本体、end マーカーと終了ステータスの `Write-Output` — これにより PSReadLine がラップされた行をエコーしても完了を捏造できません。パーサーはステータス数字の後の ASCII スペースパディングを受け入れますが、LF または CRLF は依然として要求します。コマンド出力内のスペースは変更されません。ツールは完全な end マーカーステータス行が得られるか、送信が `stdin_read` として確定するまで、スクロールバックを 1,000 行のページでポーリングし、範囲を抽出し、エコーされたラッパーを除去し、ステータスマーカーとともにレンダリングします。タイムアウトは期限を中止し、部分出力を捕捉し、シェルをリセットします。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the terminal family to the seam, the backends, and the design notes behind the persistent-shell design.
+パッケージレベルの契約では足りないときにこれらのページを読んでください。ターミナルファミリーからシーム、バックエンド、そして永続シェル設計の背後の設計ノートへと進みます。
 
-- [terminal package map](../../terminal/README.md) — the persistent PTY capability family.
-- [terminal seam](../../terminal/terminal/README.md) — the `ctx.terminals` service behind the tool.
-- [terminal-bash backend](../../terminal/terminal-bash/README.md) — the default backend, configured with `shellDialect: pwsh`.
-- [pwsh persistent PTY Agent Note](../../../.agents/notes/archived/architecture/2026-08-11-pwsh-persistent-pty.md) — the pwsh-side session design and its rationale.
-- [Persistent PTY sessions Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — the owner-scoped session design and its rationale.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-pwsh-persistent) — the exact `pwsh` argument schema.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-pwsh-persistent) — every accepted config field and its source declaration.
+- [terminal パッケージマップ](../../terminal/README.md) — 永続 PTY ケイパビリティファミリー。
+- [terminal シーム](../../terminal/terminal/README.md) — ツール背後の `ctx.terminals` サービス。
+- [terminal-bash バックエンド](../../terminal/terminal-bash/README.md) — `shellDialect: pwsh` で設定されるデフォルトバックエンド。
+- [pwsh persistent PTY Agent Note](../../../.agents/notes/archived/architecture/2026-08-11-pwsh-persistent-pty.md) — pwsh 側セッション設計とその根拠。
+- [Persistent PTY sessions Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — オーナースコープのセッション設計とその根拠。
+- [生成ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-pwsh-persistent) — 正確な `pwsh` 引数スキーマ。
+- [生成設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tool-pwsh-persistent) — 受け付けられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Tool schema
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The generated [`pwsh` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-pwsh-persistent), including the configured `description`. The plugin contributes no standalone system-prompt section; the deployment owns persona and environment guidance.
+生成される [`pwsh` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-pwsh-persistent)。設定された `description` を含みます。このプラグインは単独のシステムプロンプトセクションを提供しません。ペルソナと環境のガイダンスはデプロイが所有します。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost while `pwsh` is visible.
+`pwsh` が可視の間は固定のスキーマコストです。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the configured description and schema remain unchanged.
+設定された description とスキーマが変わらなければプレフィックス安定です。
 
-### Tool results
+### ツール結果
 
-#### What the model sees
+#### モデルが見るもの
 
-Commands share one shell per Agent, so cwd, `$env:` variables, functions, and background jobs persist across calls. Results exclude private completion markers and the echoed input line (PSReadLine renders submitted input back into the stream; the marker-anchored extraction and the wrapper-source strip remove it). When the shell reads stdin again without having printed the completion marker — an interrupt, a replaced shell, or an interactive foreground child whose stdin wait the provider proves — the call returns the captured partial output, which can end with the backend's own prompt text. A nonzero wrapped command appends `[exit code: N]` — the exact native exit code when the command ran a native program, `1` for a terminating PowerShell error. A shell that exits before reporting that status instead appends `[shell exited: code N]`, `[shell killed by signal: SIG]`, or `[shell exited]` when the backend supplies neither (Windows forced termination reports exit 1 without a signal), then resets and tells the model that the next call starts fresh. Long output keeps the earliest retained prefix plus a clipping notice; if the terminal has already dropped that prefix, the result says so explicitly. Timeout returns bounded partial output, closes the uncertain shell, and reports the reset.
+コマンドは Agent ごとに 1 つのシェルを共有するため、cwd、`$env:` 変数、関数、バックグラウンドジョブは呼び出しをまたいで存続します。結果からは、プライベートな完了マーカーとエコーされた入力行が除外されます（PSReadLine は送信された入力をストリームに描き戻し、マーカーアンカー抽出とラッパーソースの除去がそれを取り除きます）。シェルが完了マーカーを出力せずに再び stdin を読む場合 — 割り込み、シェルの置き換え、またはプロバイダーが stdin 待ちを証明した対話的フォアグラウンドの子 — 呼び出しは捕捉された部分出力を返し、それはバックエンド自身のプロンプトテキストで終わる場合があります。ラップされたコマンドが非ゼロの場合、`[exit code: N]` が追加されます — コマンドがネイティブプログラムを実行した場合は正確なネイティブ終了コード、PowerShell の終了エラーの場合は `1` です。そのステータスを報告する前にシェルが終了した場合は代わりに `[shell exited: code N]`、`[shell killed by signal: SIG]`、またはバックエンドがどちらも提供しない場合は `[shell exited]`（Windows の強制終了はシグナルなしで終了 1 を報告します）が追加され、その後リセットされて、次の呼び出しは新しく開始することをモデルに伝えます。長い出力は保持された最も早いプレフィックスとクリッピング通知を保ちます。ターミナルがすでにそのプレフィックスを破棄している場合、結果はそのことを明示的に述べます。タイムアウトは上限付きの部分出力を返し、不確実なシェルを閉じ、リセットを報告します。
 
-#### Token effect
+#### トークンへの影響
 
-Data-dependent. `maxOutputChars` bounds retained command output; fixed clipping, lost-prefix, status, timeout, and reset diagnostics can extend the result.
+データ依存です。`maxOutputChars` が保持されるコマンド出力を制限し、固定のクリッピング、損失プレフィックス、ステータス、タイムアウト、リセットの診断が結果を拡張する場合があります。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only tool results follow the reusable request prefix.
+追記専用のツール結果は再利用可能なリクエストプレフィックスに続きます。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送りされた作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the tool is a poor fit or needs special care. They are current package constraints, not a task backlog.
+これらの制限は、ツールが不向きな場合、または特別な注意が必要な場合を定義します。これらは現在のパッケージ制約であり、タスクバックログではありません。
 
-- **The tool requires an owning Agent and a real terminal backend with a pwsh dialect** — Windows ConPTY or a POSIX pwsh.
-- **Input echo is unavoidable** — PowerShell's PSReadLine renders submitted input back into the terminal stream, and there is no `stty -echo` equivalent. The marker-anchored extraction excludes the echo in complete results; the wrapper-source strip covers fallback paths, but a wrapper that wraps across the terminal width may leave a partial echo in partial-output results, bounded by `maxOutputChars`.
-- **Raw ESC characters inside model commands are unsupported** — PSReadLine consumes them before execution. The wrapper escapes the control bytes it needs (`[char]27`-built OSC markers, backtick escapes for the body).
-- **A model redefinition of the `prompt` function removes the readiness marker** — the shell then settles on the silence tier instead of the marker fast path.
-- **There is no interactive stdin during a command** — where the provider proves a foreground stdin wait, a child that reads input returns early with partial output and leaves the session open, so that child can consume the next call's command until the call reaches `timeoutMs` and resets the shell. Everywhere else the original call itself runs to `timeoutMs`, which resets the shell.
-- **SIGTSTP/SIGHUP are unavailable on Windows** (backend-rejected); SIGINT is delivered as a console-wide Ctrl-C input write, which at a prompt cancels the pending line instead of signalling a process.
-- **Under the Windows ACL sandbox's read-only mode, pwsh starts in ConstrainedLanguage**, which may deny the bootstrap's `[Console]::` encoding pin and prompt marker. Commands can still settle through the printable prompt and silence tier, but non-ASCII output may follow the host code page.
-- **The BEL-terminated OSC marker remains a readiness signal only** — a BEL event channel to the model stays deferred, aligned with the current implementation.
+- **このツールは所有 Agent と pwsh 方言を持つ実ターミナルバックエンドを必要とする** — Windows ConPTY または POSIX pwsh です。
+- **入力エコーは避けられない** — PowerShell の PSReadLine は送信された入力をターミナルストリームに描き戻し、`stty -echo` に相当するものはありません。マーカーアンカー抽出は完全な結果でエコーを除外し、ラッパーソースの除去はフォールバックパスをカバーしますが、ターミナル幅をまたいで折り返すラッパーは、部分出力結果に `maxOutputChars` で上限される部分的なエコーを残す場合があります。
+- **モデルのコマンド内の生の ESC 文字はサポートされない** — PSReadLine が実行前に消費します。ラッパーは必要な制御バイトをエスケープします（`[char]27` で構築される OSC マーカー、本体のバッククォートエスケープ）。
+- **モデルが `prompt` 関数を再定義するとレディネスマーカーが失われる** — シェルはマーカーファストパスではなくサイレンス層に落ち着きます。
+- **コマンド実行中の対話的 stdin はない** — プロバイダーがフォアグラウンドの stdin 待ちを証明する場合、入力を読む子は部分出力とともに早期に戻り、セッションを開いたままにするため、その子は呼び出しが `timeoutMs` に達してシェルをリセットするまで、次の呼び出しのコマンドを消費する可能性があります。それ以外の場所では元の呼び出し自体が `timeoutMs` まで実行され、シェルをリセットします。
+- **SIGTSTP/SIGHUP は Windows では利用できない**（バックエンドが拒否）。SIGINT はコンソール全体の Ctrl-C 入力書き込みとして配信され、プロンプトではプロセスにシグナルを送るのではなく保留中の行をキャンセルします。
+- **Windows ACL サンドボックスの読み取り専用モードでは、pwsh は ConstrainedLanguage で起動し**、ブートストラップの `[Console]::` エンコーディング固定とプロンプトマーカーを拒否する場合があります。コマンドは印刷可能プロンプトとサイレンス層を通じて確定できますが、非 ASCII 出力はホストのコードページに従う場合があります。
+- **BEL 終端の OSC マーカーはレディネス信号にとどまる** — モデルへの BEL イベントチャネルは先送りのままで、現在の実装と整合しています。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

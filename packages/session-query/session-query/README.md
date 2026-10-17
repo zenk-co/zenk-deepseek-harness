@@ -1,166 +1,166 @@
 ---
-description: "The unified session-history query service for consumers and backend authors: exact reads, relationship traces, and provider-independent filters over live and durable session logs."
+description: "コンシューマーとバックエンド作者向けの統合セッション履歴クエリサービス: ライブおよび永続セッションログに対する正確な読み取り、関係トレース、プロバイダー非依存のフィルター。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-query
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-session-query` lets application code list, filter, read, and search session history, inspect bounded event context, and trace session or event relationships. Reads prefer live sessions over persisted copies and return detached clones from one consistent observation. Exact reads, filters, and traces work with any supported storage setup; ranked full-text search requires a backend such as `dsh-session-query-sqlite`. Use it when application code needs programmatic access to the history presented to the model.
+`dsh-session-query` は、アプリケーションコードがセッション履歴を一覧表示、フィルター、読み取り、検索し、境界付きのイベントコンテキストを検査し、セッションやイベントの関係をトレースできるようにする。読み取りは永続化されたコピーよりライブセッションを優先し、1 つの一貫した観測からデタッチされたクローンを返す。正確な読み取り、フィルター、トレースはサポートされる任意のストレージ構成で動作する。ランク付き全文検索には `dsh-session-query-sqlite` などのバックエンドが必要である。アプリケーションコードがモデルに提示された履歴へプログラム的にアクセスする必要がある場合に使用する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use `ctx.sessionQuery` from application code when you need to read or search session history without touching the session service or a storage backend directly. The service is provided by a concrete backend plugin — the shipped composition mounts `@deepseek-ai/dsh-session-query-sqlite` ([README](../session-query-sqlite/README.md)) — so this package is never mounted alone. Everything below is available on `ctx.sessionQuery` once a backend is composed.
+セッションサービスやストレージバックエンドに直接触れることなくセッション履歴を読み取りまたは検索する必要がある場合、アプリケーションコードから `ctx.sessionQuery` を使用する。このサービスは具象バックエンドプラグインによって提供される — 同梱の構成は `@deepseek-ai/dsh-session-query-sqlite` ([README](../session-query-sqlite/README.md)) をマウントする — ので、このパッケージが単独でマウントされることはない。以下はバックエンドが構成されていれば `ctx.sessionQuery` で利用できる。
 
-### What you can do
+### できること
 
-| Operation | What you get |
+| 操作 | 得られるもの |
 |---|---|
-| `listSessions()` | Every logical session, newest first, with `live` and `persisted` availability flags and optional `formatStatus` |
-| `readSession(id)` | The complete replay-validated raw event log, without making the session live |
-| `filterSessions(filters)` | Sessions matching ANDed metadata and availability predicates |
-| `filterEvents(id, filters)` | Semantic event documents matching metadata and literal-text predicates |
-| `readTitleSnapshots(ids)` | The latest folded title per session, bound to its source header |
-| `listEvents(id)` / `readSurface(id)` | Lightweight per-event records, or the complete current model surface |
-| `readEvent(request)` | One full event plus a bounded raw-log window around it |
-| `traceSession(id)` | The known ancestor chain and recursive descendant trees |
-| `traceEvent(request)` | One event's positional replacements and cited source-event relationships |
-| `searchSessions(request)` / `searchEvents(request)` | Full-text search pages, implemented by the mounted backend |
+| `listSessions()` | すべての論理セッション (新しい順)。`live` と `persisted` の可用性フラグと任意の `formatStatus` 付き |
+| `readSession(id)` | セッションをライブにすることなく、リプレイ検証済みの完全な生イベントログ |
+| `filterSessions(filters)` | AND 結合されたメタデータと可用性述語に一致するセッション |
+| `filterEvents(id, filters)` | メタデータとリテラルテキスト述語に一致するセマンティックイベントドキュメント |
+| `readTitleSnapshots(ids)` | セッションごとの最新の折りたたみ済みタイトル。ソースヘッダーに束縛される |
+| `listEvents(id)` / `readSurface(id)` | 軽量なイベントごとのレコード、または完全な現在のモデルサーフェス |
+| `readEvent(request)` | 1 つの完全なイベントとその周辺の境界付き生ログウィンドウ |
+| `traceSession(id)` | 既知の祖先チェーンと再帰的な子孫ツリー |
+| `traceEvent(request)` | 1 つのイベントの位置的な置換と、引用されたソースイベントの関係 |
+| `searchSessions(request)` / `searchEvents(request)` | 全文検索ページ。マウントされたバックエンドによって実装される |
 
-Body-free records expose only `SessionHeader.isSeeded`. Reads that return event bodies (`readSession`, `readSurface`, `readEvent`) and retained `SessionObservation` values also carry the exact `inheritedEventCount`, so callers can distinguish inherited and owned events without inferring a cut from the log.
+ボディを持たないレコードは `SessionHeader.isSeeded` のみを公開する。イベントボディを返す読み取り (`readSession`、`readSurface`、`readEvent`) と保持された `SessionObservation` の値は、正確な `inheritedEventCount` も運ぶので、呼び出し元はログからカットを推測することなく、継承されたイベントと所有イベントを区別できる。
 
-### Filters
+### フィルター
 
-`SessionResultFilter` narrows sessions by id, nullable cwd, created-at range, nullable parent, or source availability; `SessionEventResultFilter` narrows events by seq/time range, event type, surface, or literal text. Filter arrays are ANDed and list values within one clause are ORed; empty list values match nothing, ranges are inclusive, and malformed ranges or unknown closed-union values fail with `SESSION_QUERY_INVALID_FILTER`.
+`SessionResultFilter` は id、nullable な cwd、作成時刻範囲、nullable な parent、またはソース可用性でセッションを絞り込む。`SessionEventResultFilter` は seq/time 範囲、イベント型、サーフェス、またはリテラルテキストでイベントを絞り込む。フィルター配列は AND 結合され、1 つの節内のリスト値は OR 結合される。空のリスト値は何にも一致せず、範囲は両端を含み、不正な範囲や未知の閉じたユニオンの値は `SESSION_QUERY_INVALID_FILTER` で失敗する。
 
-The text clause is a literal, case-insensitive, whitespace-flexible scan of extracted semantic text — not a full-text query. Use it for arbitrary substring recall; use the mounted backend's search methods when you need ranked full-text results.
+テキスト節は、抽出されたセマンティックテキストに対するリテラルで大文字小文字を区別せず空白を柔軟に扱うスキャンであり、全文クエリではない。任意の部分文字列の再現にはこれを使用し、ランク付き全文結果が必要な場合はマウントされたバックエンドの検索メソッドを使用する。
 
-### Configuration
+### 構成
 
-The inherited knobs are set through the mounted backend's config:
+継承される設定項目は、マウントされたバックエンドの構成を通して設定する:
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `readWindowMax` | `50` | Maximum `before`/`after` raw events accepted by `readEvent` |
-| `persistedReadConcurrency` | `4` | Concurrent persisted-log reads in one batch title read |
-| `preparedSessionCacheSize` | `5` | Cold prepared-Session observations retained for reuse across `observeSession` reads |
+| `readWindowMax` | `50` | `readEvent` が受け入れる `before`/`after` の生イベント最大数 |
+| `persistedReadConcurrency` | `4` | 1 回のバッチタイトル読み取りにおける並行永続ログ読み取り数 |
+| `preparedSessionCacheSize` | `5` | `observeSession` 読み取りをまたいで再利用するために保持されるコールド準備済み Session 観測数 |
 
-### Failures and recovery
+### 失敗とリカバリー
 
-Failures are typed with a stable `SessionQueryError.code`. The ones you will meet: `SESSION_QUERY_SESSION_NOT_FOUND` when an id is absent; `SESSION_QUERY_SOURCE_CONFLICT` when live and persisted observations of one session disagree on immutable headers; `SESSION_QUERY_PERSISTENCE_FAILED` when mounted persistence is unreadable; `SESSION_QUERY_CORRUPT_SESSION` when a durable record fails Session validation or a live or prepared observation fails projection computation; and `SESSION_QUERY_INVALID_SURFACE` when a loaded log breaks the surface contract. Projection failures retain the original error as `cause`. Reads targeting a known live session never consult persistence, so a failing backend cannot make current in-memory history unreadable.
+失敗は安定した `SessionQueryError.code` で型付けされる。遭遇するもの: id が存在しない場合の `SESSION_QUERY_SESSION_NOT_FOUND`、1 つのセッションのライブ観測と永続観測が不変ヘッダーで食い違う場合の `SESSION_QUERY_SOURCE_CONFLICT`、マウントされた永続化が読めない場合の `SESSION_QUERY_PERSISTENCE_FAILED`、永続レコードが Session 検証に失敗するか、ライブまたは準備済み観測が投影計算に失敗した場合の `SESSION_QUERY_CORRUPT_SESSION`、ロードされたログがサーフェス契約を破る場合の `SESSION_QUERY_INVALID_SURFACE`。投影の失敗は元のエラーを `cause` として保持する。既知のライブセッションを対象とする読み取りは永続化を参照しないので、失敗するバックエンドが現在のインメモリ履歴を読めなくすることはない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the service and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは、サービス背後の設計決定を説明し、それを実現するコードを示す。観察可能な挙動は[このパッケージを使う](#use-this-package)で完全に説明されている。
 
-### Design philosophy
+### 設計哲学
 
-The service is built on one separation and three commitments:
+このサービスは 1 つの分離と 3 つのコミットメントに基づいて構築されている:
 
-- **Live-preferred logical corpus.** Every read resolves one consistent observation: live `ctx.sessions` wins, optional `ctx.sessionPersistence` fills the rest, and conflicting immutable headers fail rather than merge.
-- **Detached results.** All returned headers, events, and records are cloned; nothing exposes live state or a retained subscription.
-- **Exact reads concrete, search abstract.** Reads, filters, and traces are implemented here once; the two full-text methods are the only abstract surface a backend owns.
-- **One canonical surface fold.** `listEvents`, `readSurface`, and `traceEvent` validate the whole log with the same `dsh-session` fold, so search and traces agree with model-history derivation.
+- **ライブ優先の論理コーパス。** すべての読み取りは 1 つの一貫した観測を解決する: ライブの `ctx.sessions` が優先し、任意の `ctx.sessionPersistence` が残りを埋め、競合する不変ヘッダーはマージではなく失敗する。
+- **デタッチされた結果。** 返されるすべてのヘッダー、イベント、レコードはクローンされる。ライブ状態や保持された購読を公開するものはない。
+- **正確な読み取りは具象、検索は抽象。** 読み取り、フィルター、トレースはここで 1 度実装される。バックエンドが所有する抽象サーフェスは 2 つの全文メソッドのみである。
+- **1 つの正規サーフェス折りたたみ。** `listEvents`、`readSurface`、`traceEvent` は同じ `dsh-session` 折りたたみでログ全体を検証するので、検索とトレースはモデル履歴の派生と一致する。
 
-The decision history lives in the [unified service decision](../../../.agents/notes/archived/architecture/2026-07-23-unified-session-query-service.md), the [tracing note](../../../.agents/notes/archived/feature/2026-07-13-session-query-tracing.md), and the [SQLite provider note](../../../.agents/notes/archived/feature/2026-07-10-sqlite-session-query-provider.md).
+決定の履歴は[統合サービス決定](../../../.agents/notes/archived/architecture/2026-07-23-unified-session-query-service.md)、[トレースノート](../../../.agents/notes/archived/feature/2026-07-13-session-query-tracing.md)、[SQLite プロバイダーノート](../../../.agents/notes/archived/feature/2026-07-10-sqlite-session-query-provider.md)にある。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service definition: the abstract `SessionQueryEngine`, concrete reads, config validation |
-| [`src/corpus.ts`](src/corpus.ts) | Live-preferred corpus resolution, optional persistence binding, batch projections |
-| [`src/observation.ts`](src/observation.ts) | Live-preferred point observations with a bounded revision-keyed prepared-Session cache |
-| [`src/cold-read.ts`](src/cold-read.ts) | Handle-based cold log read with in-memory interrupted-turn closers |
-| [`src/types.ts`](src/types.ts) | Public records, filters, requests, and page types |
-| [`src/config.ts`](src/config.ts) | Inherited config and the closed `SessionQueryError` taxonomy |
-| [`src/filters.ts`](src/filters.ts) | Provider-independent predicates and the literal text scan |
-| [`src/extraction.ts`](src/extraction.ts) | First-party semantic text extraction per event type |
-| [`src/documents.ts`](src/documents.ts) | Surface-aware semantic document projection |
-| [`src/tracing.ts`](src/tracing.ts) | One-shot session-lineage and event-relationship tracing |
-| [`src/sources.ts`](src/sources.ts) | Immutable-header compatibility check |
+| [`src/index.ts`](src/index.ts) | サービス定義: 抽象 `SessionQueryEngine`、具象読み取り、構成検証 |
+| [`src/corpus.ts`](src/corpus.ts) | ライブ優先のコーパス解決、任意の永続化バインディング、バッチ投影 |
+| [`src/observation.ts`](src/observation.ts) | 境界付きのリビジョンキー付き準備済み Session キャッシュを備えたライブ優先のポイント観測 |
+| [`src/cold-read.ts`](src/cold-read.ts) | インメモリの中断ターンクローザーを備えたハンドルベースのコールドログ読み取り |
+| [`src/types.ts`](src/types.ts) | 公開レコード、フィルター、リクエスト、ページ型 |
+| [`src/config.ts`](src/config.ts) | 継承構成と閉じた `SessionQueryError` 分類 |
+| [`src/filters.ts`](src/filters.ts) | プロバイダー非依存の述語とリテラルテキストスキャン |
+| [`src/extraction.ts`](src/extraction.ts) | イベント型ごとのファーストパーティのセマンティックテキスト抽出 |
+| [`src/documents.ts`](src/documents.ts) | サーフェス対応のセマンティックドキュメント投影 |
+| [`src/tracing.ts`](src/tracing.ts) | ワンショットのセッション系統とイベント関係のトレース |
+| [`src/sources.ts`](src/sources.ts) | 不変ヘッダーの互換性チェック |
 
-### Corpus resolution
+### コーパス解決
 
-`SessionCorpus` binds optional `ctx.sessionPersistence` through a fiber and resolves each read live-first: a known live target is snapshotted without consulting persistence; otherwise the session is listed, read completely through a short-lived read handle, and re-checked for a live attachment before cloning. A cold log whose writer crashed mid-turn is balanced in memory with `interruptedTurnClosers` — persistence is never mutated by a read. Header compatibility is asserted between listed and loaded observations. Batch title reads run one metadata listing and bounded-concurrency reads, isolating per-session failures while cancellation rejects the whole batch.
+`SessionCorpus` は任意の `ctx.sessionPersistence` をファイバーを通して束縛し、各読み取りをライブ優先で解決する: 既知のライブターゲットは永続化を参照せずにスナップショットされ、そうでなければセッションが一覧化され、短命な読み取りハンドルを通して完全に読み取られ、クローン前にライブアタッチメントの有無が再チェックされる。ターン途中でライターがクラッシュしたコールドログは、メモリ内で `interruptedTurnClosers` によって釣り合わされる — 永続化が読み取りによって変更されることはない。ヘッダーの互換性は、一覧化された観測とロードされた観測の間でアサートされる。バッチタイトル読み取りは 1 回のメタデータ一覧化と境界付き並行読み取りを実行し、セッションごとの失敗を分離しつつ、キャンセルはバッチ全体を拒否する。
 
-### Observation cache
+### 観測キャッシュ
 
-`observeSession` builds point observations without a listing preflight. A live observation fixes its cut as the current log length and materializes `events` on first read, so header-, cursor-, or projection-only consumers never copy the log; the log only appends, so a late first read still yields exactly that prefix. The cold path stats the stored session first and consults its own bounded cache keyed by the persistence instance and the `stat` revision: an unchanged revision reuses the restored unpublished Session without re-reading the log; a changed revision, or a replaced persistence instance, reloads through the handle seam and replaces the entry. The cache holds `preparedSessionCacheSize` entries with least-recently-used eviction, entries pinned by active observation leases are never evicted, and a session that goes live mid-read retries the live path.
+`observeSession` は一覧化の事前チェックなしでポイント観測を構築する。ライブ観測はカットを現在のログ長に固定し、最初の読み取りで `events` を具体化するので、ヘッダー、カーソル、または投影のみのコンシューマーがログをコピーすることはない。ログは追記しか行われないので、遅い最初の読み取りでも正確にそのプレフィックスが得られる。コールドパスはまず保存されたセッションを stat し、永続化インスタンスと `stat` リビジョンでキー付けされた自身の境界付きキャッシュを参照する: 変更のないリビジョンは、ログを再読み取りせずに復元された未公開 Session を再利用し、変更されたリビジョンまたは置き換えられた永続化インスタンスはハンドルシームを通して再ロードし、エントリーを置き換える。キャッシュは `preparedSessionCacheSize` 個のエントリーを LRU 追い出しで保持し、アクティブな観測リースにピン留めされたエントリーが追い出されることはなく、読み取り中にライブになったセッションはライブパスを再試行する。
 
-### Reads and traces
+### 読み取りとトレース
 
-`readSession` replays the log through `Session.create` to reuse resume's validation. `readSurface`, `listEvents`, and `traceEvent` share one `foldSurface` pass that classifies events as `current`, `shadowed`, or `log-only` and validates zero-based contiguous seqs, surface-marker eligibility, and replacement or citation integrity; any violation fails with `SESSION_QUERY_INVALID_SURFACE`. Traces are one-shot: session lineage reads the corpus once and walks parents and descendant trees deterministically, and event traces follow positional replacers to the final node while keeping cited-source links non-transitive.
+`readSession` は resume の検証を再利用するために `Session.create` を通してログをリプレイする。`readSurface`、`listEvents`、`traceEvent` は 1 つの `foldSurface` パスを共有し、イベントを `current`、`shadowed`、`log-only` に分類し、0 始まりの連続 seq、サーフェスマーカーの適格性、置換または引用の整合性を検証する。違反があれば `SESSION_QUERY_INVALID_SURFACE` で失敗する。トレースはワンショットである: セッション系統はコーパスを 1 度読み取り、親と子孫ツリーを決定論的にたどり、イベントトレースは位置的な置換子を最終ノードまでたどりつつ、引用元リンクを非推移的に保つ。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared query vocabulary to the concrete backend and the decision evidence.
+パッケージレベルの契約では足りないときにこれらのページを読む。共有クエリ語彙から具象バックエンドと決定の証拠へと進む。
 
-- [Session Query subsystem reference](../../../docs/subsystems/session-query.md) — the full type-level contract: records, filters, search pages, lineage, bounded reads, and errors.
-- [dsh-session-query-sqlite](../session-query-sqlite/README.md) — the shipped full-text backend and its index lifecycle.
-- [dsh-tool-session-query](../../experimental/tool-session-query/README.md) — the model-facing consumer built on this service.
-- [Session query relationship tracing](../../../.agents/notes/archived/feature/2026-07-13-session-query-tracing.md) — trace semantics and the validation boundary.
-- [SQLite FTS5 session search](../../../.agents/notes/archived/feature/2026-07-10-sqlite-session-query-provider.md) — how the search surface is implemented and reconciled.
+- [Session Query subsystem reference](../../../docs/subsystems/session-query.md) — 完全な型レベルの契約: レコード、フィルター、検索ページ、系統、境界付き読み取り、エラー。
+- [dsh-session-query-sqlite](../session-query-sqlite/README.md) — 同梱の全文バックエンドとそのインデックスライフサイクル。
+- [dsh-tool-session-query](../../experimental/tool-session-query/README.md) — このサービス上に構築されたモデル向けのコンシューマー。
+- [Session query relationship tracing](../../../.agents/notes/archived/feature/2026-07-13-session-query-tracing.md) — トレースのセマンティクスと検証境界。
+- [SQLite FTS5 session search](../../../.agents/notes/archived/feature/2026-07-10-sqlite-session-query-provider.md) — 検索サーフェスの実装と調整の方法。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the trusted query service exposes cloned records only to callers and registers nothing model-facing.
+なし。この信頼されたクエリサービスはクローンされたレコードを呼び出し元にのみ公開し、モデル向けのものを何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てることも送信することもない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this package is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+これらの制限は、このパッケージが不適切な選択となる、または特別な運用上の注意を要する条件を定義する。これらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **No caller authorization** — this is trusted context-wide infrastructure; a model tool or UI must constrain which sessions its caller may inspect.
-- **No provider coordinator or fallback** — the service is abstract over search, so a composition must mount a concrete backend; there is no search-provider registry or fallback implementation.
-- **Exact reads replay whole logs** — `readSession`, `readSurface`, `filterEvents`, and event traces load and validate the complete logical log, so very large histories pay full inspection per call; `listSessions` stays lightweight.
-- **Literal text scan, not full-text search** — the `text` filter scans extracted documents with a regular expression and does not rank; ranked search requires the mounted backend.
+- **呼び出し元の認可はない** — これは信頼されたコンテキスト全体のインフラストラクチャである。モデルツールや UI が、呼び出し元が検査できるセッションを制限しなければならない。
+- **プロバイダーコーディネーターやフォールバックはない** — サービスは検索に関して抽象的であるため、構成は具象バックエンドをマウントしなければならない。検索プロバイダーレジストリやフォールバック実装は存在しない。
+- **正確な読み取りはログ全体をリプレイする** — `readSession`、`readSurface`、`filterEvents`、イベントトレースは完全な論理ログをロードして検証するので、非常に大きな履歴は呼び出しごとに完全な検査コストを払う。`listSessions` は軽量のままである。
+- **リテラルテキストスキャンであり全文検索ではない** — `text` フィルターは抽出されたドキュメントを正規表現でスキャンし、ランク付けしない。ランク付き検索にはマウントされたバックエンドが必要である。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発者ノートはメンテナー向けの作業コンテキストである: 未解決の設計上の問いと、決定されていない方向性。明示的に非権威である — 出荷済みの挙動、制限、受け入れられた根拠は、上記のセクション、パッケージコード、リンクされた Agent Notes にある。
 
-#### Future: extractor and search-provider registries
+#### 将来: エクストラクターと検索プロバイダーのレジストリ
 
-Recursive traversal through cited source events, extractor and search-provider registries, and additional model-facing surfaces are deferred; the [tool-session-query README](../../experimental/tool-session-query/README.md) documents the current consumer surface.
+引用されたソースイベントを通る再帰的走査、エクストラクターと検索プロバイダーのレジストリ、追加のモデル向けサーフェスは先送りされている。[tool-session-query README](../../experimental/tool-session-query/README.md) が現在のコンシューマーサーフェスを文書化している。
 
 </details>

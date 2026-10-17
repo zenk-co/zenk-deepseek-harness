@@ -1,129 +1,129 @@
 ---
-description: "Session-telemetry capture seam for deployments and backend authors choosing a reporting backend, mounting redaction rules, or implementing the backend contract."
+description: "レポーティングバックエンドの選択、リダクションルールのマウント、バックエンド契約の実装を行うデプロイメントとバックエンド作者向けの、セッションテレメトリーキャプチャシーム。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-session-telemetry
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Session telemetry lets deployments send ordered copies of session activity for reporting while preserving the canonical session log. Deployments choose one reporting backend and can redact each outbound copy before delivery; without redaction rules, captured data leaves the process unchanged. The handoff is non-blocking, so reporting does not delay session processing. Delivery is best effort, and queued records may be lost if the process crashes.
+セッションテレメトリーにより、デプロイメントは正規のセッションログを保ちながら、レポーティング用にセッションアクティビティの順序付きコピーを送信できます。デプロイメントは 1 つのレポーティングバックエンドを選び、配信前に各アウトバウンドコピーをリダクションできます。リダクションルールがなければ、キャプチャされたデータは変更されずにプロセスを離れます。受け渡しはノンブロッキングなので、レポーティングがセッション処理を遅延させることはありません。配信はベストエフォートで、プロセスがクラッシュするとキューイングされたレコードは失われることがあります。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と保留作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-As a deployment, choose a backend, mount it, and add redaction rules when records must not leave the process as captured. As a backend author, implement the three-member contract and compose the coordinator with a capture mode.
+デプロイメントとしては、バックエンドを選んでマウントし、レコードがキャプチャされたままプロセスを離れてはならない場合はリダクションルールを追加します。バックエンド作者としては、3 メンバーの契約を実装し、コーディネーターをキャプチャモードと共にコンポーズします。
 
-### Choosing and mounting a backend
+### バックエンドの選択とマウント
 
-Load exactly one backend plugin; it registers `ctx.sessionTelemetry` with the capture coordinator and its delivery pipeline. A duplicate load throws. The required [`sharing` member](#the-sharing-disclosure) reports the deployment mode, not per-session admission or delivery. A consumer may report "not configured" only when no telemetry service is mounted. The `/feedback` command confirms recording without reading this policy.
+バックエンドプラグインをちょうど 1 つロードします。これがキャプチャコーディネーターとその配信パイプラインと共に `ctx.sessionTelemetry` を登録します。重複ロードは例外を投げます。必須の [`sharing` メンバー](#the-sharing-disclosure)はデプロイメントモードを報告し、セッションごとの受け入れや配信ではありません。コンシューマーが「未設定」を報告できるのは、テレメトリーサービスがマウントされていない場合だけです。`/feedback` コマンドはこのポリシーを読まずに記録を確認します。
 
-### The backend contract
+### バックエンド契約
 
-A backend implements three members: `emit(record)` must be a non-blocking enqueue because it runs synchronously on the session-event path; optional `flush()` is a fire-and-forget hint after a turn ends, which most backends omit in favor of their SDK's own batching schedule; `shutdown()` drains queued records and resolves when the SDK stops, and disposal awaits it. A backend that implements `flush()` must order concurrent flushes with the final `shutdown()` drain.
+バックエンドは 3 つのメンバーを実装します: `emit(record)` はセッションイベントパス上で同期的に実行されるため、ノンブロッキングのエンキューでなければなりません。任意の `flush()` はターン終了後の fire-and-forget ヒントで、多くのバックエンドは SDK 自身のバッチスケジュールを優先して省略します。`shutdown()` はキューイングされたレコードをドレインし、SDK が停止すると解決し、破棄はそれを待ちます。`flush()` を実装するバックエンドは、最終的な `shutdown()` ドレインと並行する flush を順序付けなければなりません。
 
-### What gets captured
+### キャプチャされるもの
 
-Capture runs in one of two modes. `live` capture follows session events as they are appended, replays already-live sessions at mount time, and records lifecycle markers; `on-demand` capture reads the canonical session log only when the backend requests a prefix through `captureSession(session, throughSeq?)`. Coordinator options select whether stored history is included. Every canonical session event maps to one ledger record in order. An `assistant/message` or `assistant/attempt` record carries its complete embedded compact stream, including failed and retried output. Each ledger record also carries `session.id`, `session.format_version`, the numeric event identity, optional header facts, and a pre-mapped severity (`error` for `tool/result.isError`, `turn/end` error reasons, and `agent-error`; `info` otherwise).
+キャプチャは 2 つのモードのいずれかで実行されます。`live` キャプチャは追記されるセッションイベントを追跡し、マウント時にすでにライブのセッションをリプレイし、ライフサイクルマーカーを記録します。`on-demand` キャプチャは、バックエンドが `captureSession(session, throughSeq?)` を通じてプレフィックスを要求したときにのみ、正規のセッションログを読み取ります。コーディネーターオプションが、保存済み履歴を含めるかどうかを選びます。正規のすべてのセッションイベントは順序どおりに 1 つの台帳レコードへマップされます。`assistant/message` または `assistant/attempt` のレコードは、失敗およびリトライされた出力を含む完全な埋め込みコンパクトストリームを運びます。各台帳レコードはさらに `session.id`、`session.format_version`、数値のイベントアイデンティティ、任意のヘッダー事実、および事前マップされた重大度 (`tool/result.isError`、`turn/end` のエラー理由、`agent-error` は `error`、それ以外は `info`) を運びます。
 
-Ledger records carry `sourceEvent` with the owning Session id and a copied event envelope excluding `data`. The redaction waterfall receives `body` as the only payload copy. Backends can reconstruct a complete exported event from the envelope and redacted body without bypassing redaction.
+台帳レコードは、所有するセッション ID と `data` を除くコピーされたイベントエンベロープを持つ `sourceEvent` を運びます。リダクションウォーターフォールは、唯一のペイロードコピーとして `body` を受け取ります。バックエンドは、リダクションを迂回せずにエンベロープとリダクション済みの body から完全なエクスポートイベントを再構築できます。
 
-### The sharing disclosure
+### sharing の開示
 
 <a id="the-sharing-disclosure"></a>
 
-Every backend discloses its deployment mode through `sharing`: `full`, `feedback-only`, or `disabled`. A backend may additionally restrict eligible Sessions. This property is not a delivery receipt; handoff is a non-blocking enqueue, and batching, retry, and loss policy belong to the backend SDK.
+すべてのバックエンドは `sharing` を通じてデプロイメントモードを開示します: `full`、`feedback-only`、または `disabled`。バックエンドはさらに適格なセッションを制限することがあります。このプロパティは配信レシートではありません。受け渡しはノンブロッキングのエンキューで、バッチ、リトライ、損失ポリシーはバックエンド SDK に属します。
 
-### Redacting records
+### レコードのリダクション
 
 <a id="the-redact-waterfall"></a>
 
-Every outbound record passes the `sessionTelemetry/record` waterfall after the coordinator copies its canonical event. This package ships no rules: with no listener mounted, records reach the backend exactly as captured, so exported data is as clean as the rules a deployment mounts. Listeners stack by transforming `next()`'s return value; a throwing listener withholds that one record fail-closed. Redaction applies to the outbound copy only — the canonical session log is never rewritten.
+すべてのアウトバウンドレコードは、コーディネーターが正規イベントをコピーした後に `sessionTelemetry/record` ウォーターフォールを通過します。このパッケージはルールを何も出荷しません: リスナーがマウントされていなければ、レコードはキャプチャされたままバックエンドに到達するため、エクスポートデータの清潔さはデプロイメントがマウントするルール次第です。リスナーは `next()` の戻り値を変換して積み重なります。例外を投げるリスナーは、その 1 つのレコードをフェイルクローズで保留します。リダクションはアウトバウンドコピーにのみ適用されます — 正規のセッションログが書き換えられることは決してありません。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains the capture design; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではキャプチャの設計を説明します。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱います。
 
-### Design concept
+### 設計概念
 
-The capture package owns complete event capture, redaction, and handoff cursors. Redaction rules must preserve `sourceEvent` for OTel upload; returning a fresh record without it withholds the event with a diagnostic. Its cloned envelope excludes `data`, which is carried only in `body`. The OTel backend owns byte/count scheduling and uses SDK transport/retries. The [historical revival Agent Note](../../../.agents/notes/archived/feature/2026-07-23-session-telemetry-otel-revival.md) records capture and redaction rationale.
+キャプチャパッケージは、完全なイベントキャプチャ、リダクション、受け渡しカーソルを所有します。リダクションルールは OTel アップロードのために `sourceEvent` を保たなければなりません。それなしの新しいレコードを返すと、イベントは診断付きで保留されます。クローンされたエンベロープは `data` を除外し、それは `body` にのみ運ばれます。OTel バックエンドはバイト/件数のスケジューリングを所有し、SDK のトランスポート/リトライを使います。[過去の復活の Agent Note](../../../.agents/notes/archived/feature/2026-07-23-session-telemetry-otel-revival.md)がキャプチャとリダクションの根拠を記録しています。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service Definition: `SessionTelemetryBackend`/`SessionTelemetrySink` contract, record vocabulary, `session-telemetry/record` waterfall declaration |
-| [`src/coordinator.ts`](src/coordinator.ts) | Capture: live listeners, lifecycle-local on-demand replay, redaction, handoff cursor, containment |
+| [`src/index.ts`](src/index.ts) | サービス定義: `SessionTelemetryBackend`/`SessionTelemetrySink` 契約、レコード語彙、`session-telemetry/record` ウォーターフォール宣言 |
+| [`src/coordinator.ts`](src/coordinator.ts) | キャプチャ: ライブリスナー、ライフサイクルローカルのオンデマンドリプレイ、リダクション、受け渡しカーソル、封じ込め |
 
-### Capture flow
+### キャプチャフロー
 
-Live capture registers Session events, flush hints, shutdown markers, and agent/error observers through the composing fiber’s effects. On-demand capture registers only the disposal effect and reads the requested canonical-log prefix under its history policy. Synchronous handlers contain failures so they cannot affect the agent loop or other listeners.
+ライブキャプチャは、コンポーズするファイバーのエフェクトを通じて、セッションイベント、flush ヒント、シャットダウンマーカー、agent/error オブザーバーを登録します。オンデマンドキャプチャは破棄エフェクトのみを登録し、その履歴ポリシーの下で要求された正規ログプレフィックスを読み取ります。同期ハンドラーは失敗を封じ込めるため、エージェントループや他のリスナーに影響できません。
 
-### The handoff cursor
+### 受け渡しカーソル
 
-A module-scope `WeakMap<Session, seq>` records the highest sequence handed off, not delivered. Re-adopting the same object resumes after that cursor. Capture starts at `firstLifecycleSeq`: a new fork includes its child-owned marker and closers, while a restored Session excludes its stored prefix, including prior child turns; explicit `includeHistory: true` starts an unhanded object at seq 0, including restored or fork history. The backend owns capture authorization. Stored history does not itself authorize capture; the OTel backend waits for new explicit feedback. Receivers deduplicate repeated records by `(session.id, session.format_version, event.seq)`.
+モジュールスコープの `WeakMap<Session, seq>` が、配信済みではなく受け渡し済みの最高シーケンスを記録します。同じオブジェクトを再採用すると、そのカーソルの後から再開します。キャプチャは `firstLifecycleSeq` から始まります: 新しいフォークはその子所有のマーカーとクローザーを含み、復元されたセッションは保存済みプレフィックス (以前の子ターンを含む) を除外します。明示的な `includeHistory: true` は、未受け渡しのオブジェクトを seq 0 から開始し、復元またはフォークの履歴を含みます。キャプチャの認可はバックエンドが所有します。保存済み履歴自体がキャプチャを認可することはなく、OTel バックエンドは新しい明示的なフィードバックを待ちます。レシーバーは `(session.id, session.format_version, event.seq)` で繰り返しレコードを重複排除します。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the seam contract is not enough. They move from the shipped backend to the subsystem reference and the decision evidence.
+シーム契約では足りないときに、これらのページを読んでください。出荷済みバックエンドからサブシステムリファレンスと決定の証拠へと進みます。
 
-- [OpenTelemetry telemetry backend](../session-telemetry-otel/README.md) — the shipped backend deployments load, with mode and exporter configuration.
-- [Session telemetry subsystem](../../../docs/subsystems/session-telemetry.md) — the capability split and type declarations.
-- [historical Session telemetry revival decision](../../../.agents/notes/archived/feature/2026-07-23-session-telemetry-otel-revival.md) — rationale, trade-offs, and rejected alternatives.
-- [Session package map](../README.md) — adjacent persistence, projection, title, and telemetry packages.
+- [OpenTelemetry テレメトリーバックエンド](../session-telemetry-otel/README.md) — デプロイメントがロードする出荷済みバックエンド。モードとエクスポーターの設定を伴う。
+- [セッションテレメトリーサブシステム](../../../docs/subsystems/session-telemetry.md) — ケイパビリティの分割と型宣言。
+- [過去のセッションテレメトリー復活の決定](../../../.agents/notes/archived/feature/2026-07-23-session-telemetry-otel-revival.md) — 根拠、トレードオフ、却下された代替案。
+- [session パッケージマップ](../README.md) — 隣接する永続化、プロジェクション、タイトル、テレメトリーのパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the seam observes the session stream and hands redacted copies outward; it registers nothing model-facing.
+なし。このシームはセッションストリームを観察し、リダクション済みコピーを外へ渡します。モデル向けのものを何も登録しません。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; the package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てることも送信することもありません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と保留作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the delivery and data-protection guarantees a deployment gets. They are current package constraints.
+これらの制限は、デプロイメントが得る配信とデータ保護の保証を定義します。これらは現在のパッケージ制約です。
 
-- **Best-effort delivery** — the cursor marks handed-off, not delivered; a session torn down inside a reload window cannot be re-adopted, and whatever sits in a backend queue at crash time is lost. A durable outbox (spool, per-sink cursors, at-least-once) is deferred until a deployment states a crash-loss requirement.
-- **No built-in redaction rules** — with no `sessionTelemetry/record` listener mounted, records leave the process exactly as captured, including any credentials embedded in file contents or command output; a deployment exporting to a shared collector owns its rule set.
-- **On-demand redaction uses current state** — uncaptured events exist only in the canonical session log; a later `captureSession()` deep-copies and redacts their current values with the policy mounted at that time, and there is no capture-time telemetry snapshot or durable pre-capture spool.
+- **ベストエフォート配信** — カーソルは配信済みではなく受け渡し済みを印します。リロードウィンドウ内でティアダウンされたセッションは再採用できず、クラッシュ時にバックエンドのキューにあるものは失われます。永続的なアウトボックス (スプール、シンクごとのカーソル、at-least-once) は、デプロイメントがクラッシュ損失の要件を述べるまで保留されます。
+- **組み込みのリダクションルールなし** — `sessionTelemetry/record` リスナーがマウントされていない場合、レコードはファイル内容やコマンド出力に埋め込まれた資格情報も含め、キャプチャされたままプロセスを離れます。共有コレクターへエクスポートするデプロイメントは、自らのルールセットを所有します。
+- **オンデマンドリダクションは現在の状態を使う** — 未キャプチャのイベントは正規のセッションログにのみ存在します。後続の `captureSession()` はそれらの現在の値を、その時点でマウントされているポリシーでディープコピーしてリダクションし、キャプチャ時点のテレメトリースナップショットや永続的なキャプチャ前スプールはありません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

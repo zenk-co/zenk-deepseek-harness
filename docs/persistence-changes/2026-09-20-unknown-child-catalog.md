@@ -5,13 +5,13 @@ kind: persistence-change
 
 # 2026-09-20-unknown-child-catalog
 
-English | [中文](2026-09-20-unknown-child-catalog.zh.md)
+日本語 | [English](2026-09-20-unknown-child-catalog.en.md) | [中文](2026-09-20-unknown-child-catalog.zh.md)
 
-## Summary
+## 概要
 
-Retain unreadable historical children in subagent/catalog with unknown mode.
+読み取り不能な履歴上の子を subagent/catalog に unknown モードで保持する。
 
-## Table of Contents
+## 目次
 
 - [Declaration](#declaration)
 - [Compatibility](#compatibility)
@@ -19,7 +19,7 @@ Retain unreadable historical children in subagent/catalog with unknown mode.
 - [Dev Note](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -33,16 +33,16 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-Catalog payload v0 remains unchanged. Payload v1 adds unknown mode, and current readers accept v0 and v1. Complete facts still use v0; migration emits v1 for unknown children. Existing logs need no rewrite, and the Session header remains V4. Older readers reject v1. The classifier allows higher event payload versions only when all old payload alternatives remain unchanged; same-version widening and removal of old readers stay breaking.
+カタログペイロード v0 は不変である。ペイロード v1 は unknown モードを追加し、現在のリーダーは v0 と v1 を受け付ける。完全なファクトは引き続き v0 を使う。移行は未知の子に v1 を出す。既存ログの書き換えは不要であり、セッションヘッダーは V4 のままである。古いリーダーは v1 を拒否する。分類器は、古いペイロード代替案がすべて不変のままの場合にのみ上位イベントペイロードバージョンを許す。同一バージョンでの拡張と古いリーダーの削除は引き続き破壊的である。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Migration, restoration, projection, and Web regressions retain unknown membership and child-local errors. Classifier tests accept higher payload versions with preserved predecessors and reject same-version additions, invalid versions, changed or removed old alternatives, and header/surface changes.
+移行、復元、投影、Web 回帰が未知メンバーシップと子ローカルエラーを保持する。分類器テストは、前任者を保持した上位ペイロードバージョンを受け付け、同一バージョン追加、無効バージョン、古い代替案の変更・削除、ヘッダー/サーフェス変更を拒否する。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 None.

@@ -1,41 +1,41 @@
 ---
-description: "The Agent Client Protocol package group: the automation-only server that exposes fresh harness agents to programmatic clients over JSON-RPC stdio."
+description: "Agent Client Protocol パッケージグループ: JSON-RPC stdio 越しにプログラム的クライアントへ新鮮な Harness エージェントを公開する自動化専用サーバー。"
 kind: "package-group"
 ---
 
-# acp/ — Agent Client Protocol automation
+# acp/ — Agent Client Protocol 自動化
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The acp group provides one package: a server that lets programs and automation run persistent DeepSeek Harness agents over the standard Agent Client Protocol. A client can create, list, resume, and close sessions; attach standard MCP servers; select model options; send text and image prompts; receive semantic updates; answer permission prompts; and cancel work without a human in the loop. The matching client for spawning such a server from another harness lives in `subagent/subagent-acp`. This page maps the group; the package README owns the per-package contract.
+acp グループは 1 パッケージを提供する。標準 Agent Client Protocol 越しにプログラムと自動化が永続的な DeepSeek Harness エージェントを動かせるサーバーである。クライアントはセッションの作成、一覧、再開、終了、標準 MCP サーバーの接続、モデル選択肢の選択、テキスト・イメージプロンプトの送信、意味的更新の受信、許可プロンプトへの回答、人手なしの作業キャンセルができる。別 Harness からそのようなサーバーを起動する対応クライアントは `subagent/subagent-acp` にある。このページはグループを対応付け、パッケージごとの契約はパッケージ README が所有する。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
 | Package | Role |
 |---|---|
-| [`acp/`](acp/README.md) | Lets programs manage persistent agents over ACP, attach MCP servers, select model options, prompt and cancel work, and receive semantic updates |
+| [`acp/`](acp/README.md) | ACP 越しにプログラムが永続エージェントを管理し、MCP サーバーを接続し、モデル選択肢を選び、作業にプロンプトしてキャンセルし、意味的更新を受け取れるようにする |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [dsh-subagent-acp](../subagent/subagent-acp/README.md) — the out-of-process ACP client that spawns and drives this server.
-- [ACP as an automation-only protocol](../../.agents/notes/implemented/simplification/2026-07-23-acp-automation-only-protocol.md) — the design record for the automation contract and its wire boundaries.
-- [Multiplex concurrent ACP sessions over one connection](../../.agents/notes/archived/feature/2026-06-14-acp-multi-session.md) — per-session isolation, ownership, and teardown decisions.
+- [dsh-subagent-acp](../subagent/subagent-acp/README.md) — このサーバーを起動して駆動するプロセス外 ACP クライアント。
+- [自動化専用プロトコルとしての ACP](../../.agents/notes/implemented/simplification/2026-07-23-acp-automation-only-protocol.md) — 自動化契約とそのワイヤー境界の設計記録。
+- [1 接続上の多重並行 ACP セッション](../../.agents/notes/archived/feature/2026-06-14-acp-multi-session.md) — セッションごとの分離、所有権、破棄の決定。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
-None.
+なし。

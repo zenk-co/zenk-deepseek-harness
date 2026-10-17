@@ -1,129 +1,129 @@
 ---
-description: "Add experimental per-call Auto review to a Web profile, using the current agent's model before tools execute with Full access."
+description: "Web プロファイルに experimental の呼び出しごとの Auto review を追加する。Full access でツールが実行される前に、現在のエージェントのモデルを使う。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-experimental-auto-review
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Add Auto review to the current-session permission pickers in a Web profile. Before each native or PTC inner tool call, the current agent's provider and model assess the pending action; an allowed call executes with Full access, and a denied call asks the user. The dsh installation ships this layer switched off; default Web keeps its three permission modes until it is switched on from the Web sidebar's Plugins page or installed explicitly. Auto review is experimental: it can allow unsafe actions, deny useful work, and spend additional tokens.
+Web プロファイルの現在セッションの権限ピッカーに Auto review を追加する。各ネイティブまたは PTC 内部ツール呼び出しの前に、現在のエージェントのプロバイダーとモデルが保留中のアクションを評価する。許可された呼び出しは Full access で実行され、拒否された呼び出しはユーザーに確認する。dsh インストールはこのレイヤーをオフの状態で出荷し、デフォルトの Web は Web サイドバーの Plugins ページから有効化するか明示的にインストールするまで、その 3 つの権限モードを保つ。Auto review は experimental である: 安全でないアクションを許可し、有用な作業を拒否し、追加のトークンを消費することがある。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The review environment records the Session's current working directory for the pending action.
+レビュー環境は保留中のアクションのために Session の現在の作業ディレクトリを記録する。
 
-### Install into a profile
+### プロファイルへのインストール
 
-From this source checkout, install the package into the Web profile through the existing CLI:
+このソースチェックアウトから、既存の CLI を使って Web プロファイルにパッケージをインストールする:
 
 ```sh
 pnpm dsh plugin --profile web add ./packages/experimental/auto-review
 ```
 
-The CLI initializes the profile when needed and appends this package's declared patch after the base and Web layers. Reconciliation activates the patch as a profile layer; a package without `dsh.bundle.patch` is only an installed dependency. Select `Auto review` with its `EXP` badge in the composer menu or `/permission` picker and confirm the current-session risk dialog. An explicit `/permission auto` command switches directly. General settings and future-session defaults do not offer Auto.
+CLI は必要に応じてプロファイルを初期化し、base と Web レイヤーの後にこのパッケージの宣言されたパッチを追記する。リコンシリエーションはパッチをプロファイルレイヤーとしてアクティベートする。`dsh.bundle.patch` のないパッケージはインストールされた依存関係にすぎない。コンポーザーメニューまたは `/permission` ピッカーで `EXP` バッジ付きの `Auto review` を選択し、現在セッションのリスクダイアログを確認する。明示的な `/permission auto` コマンドは直接切り替える。一般設定と将来セッションのデフォルトは Auto を提供しない。
 
-Remove the layer through the same CLI:
+同じ CLI でレイヤーを削除する:
 
 ```sh
 pnpm dsh plugin --profile web remove @deepseek-ai/dsh-experimental-auto-review
 ```
 
-### What you get
+### 得られるもの
 
-Auto reviews every supported call once before its body, including each started PTC `tools.*` inner call. It classifies actual effects: ordinary project-local work and exact cleanup of objects created in this Session are low risk and allowed; irreversible deletion of pre-existing objects, production operations, external writes, and security changes are medium risk and require explicit current human or direct-parent authorization of the action, target, and scope. Sensitive exfiltration across a trust boundary is high risk and always denied. Ambiguous effects and unresolved authorization conflicts are denied. Selecting Auto sets the `ask` approval policy, so a denied call asks the user and executes only after approval; a rejected or cancelled approval leaves its body unexecuted. A delegated in-process child pins the `never` policy, so its denials are final. Malformed reviewer responses and technical failures fail the call with their specific error and never execute it.
+Auto はサポートされるすべての呼び出しを、そのボディの前に 1 回レビューする（開始された各 PTC `tools.*` 内部呼び出しを含む）。実際の効果を分類する: 通常のプロジェクトローカルな作業とこの Session で作成されたオブジェクトの正確なクリーンアップは低リスクであり、許可される。既存オブジェクトの不可逆な削除、本番操作、外部書き込み、セキュリティ変更は中リスクであり、アクション、ターゲット、スコープについて現在の人間または直接の親による明示的な承認を必要とする。信頼境界を越える機微な持ち出しは高リスクであり、常に拒否される。曖昧な効果と未解決の承認競合は拒否される。Auto を選択すると `ask` 承認ポリシーが設定されるので、拒否された呼び出しはユーザーに確認し、承認後にのみ実行される。拒否またはキャンセルされた承認はそのボディを未実行のまま残す。プロセス内の委譲された子は `never` ポリシーをピン留めするので、その拒否は最終的である。不正なレビュアー応答と技術的失敗は、その固有のエラーで呼び出しを失敗させ、決して実行しない。
 
-A final denial uses the ordinary tool card. The collapsed row identifies Auto review; expanded output states that the body did not execute and displays the optional reason. [The Web permission package](../../client/ui-permission-presets/README.md) owns picker interaction, and [the tool UI](../../client/ui-tool/README.md) owns reason display.
+最終的な拒否は通常のツールカードを使う。折りたたまれた行は Auto review を識別し、展開された出力はボディが実行されなかったことを述べ、オプションの理由を表示する。[Web 権限パッケージ](../../client/ui-permission-presets/README.md)がピッカーの操作を所有し、[ツール UI](../../client/ui-tool/README.md)が理由の表示を所有する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) inserts the package itself as the `auto-review` row. [`src/index.ts`](src/index.ts) requires the approval, LLM, permission, Session, and tools services, then installs the preset contribution and prepended pre-execute listener in one effect. After the review settles, a denial reads the Session's approval policy: under `never` it is final; under `ask` the listener delegates to later pre-execute listeners and returns the tools pipeline's `ask` decision only when they allow the call, so a later denial, cancellation, or `ask` (with its own reason) takes precedence. The `ask` decision carries an English audited reason and localized prompt text that keeps the raw reviewer reason. The [permission owner](../../interaction/permission-presets/README.md) supplies the current identity and process catalog; Auto uses Full access's sandbox value with the `ask` approval policy and does not change tool definitions.
+[`cordis.patch.yml`](cordis.patch.yml) はパッケージ自体を `auto-review` 行として挿入する。[`src/index.ts`](src/index.ts) は approval、LLM、permission、Session、tools の各サービスを必要とし、1 つのエフェクトでプリセットコントリビューションと先頭に付加される pre-execute リスナーをインストールする。レビューが決着した後、拒否は Session の承認ポリシーを読む: `never` の下ではそれは最終的である。`ask` の下ではリスナーは後続の pre-execute リスナーに委譲し、それらが呼び出しを許可したときにだけ tools パイプラインの `ask` 決定を返すので、後続の拒否、キャンセル、または `ask`（自身の理由付き）が優先される。`ask` 決定は英語の監査済み理由と、生のレビュアー理由を保つローカライズ済みプロンプトテキストを運ぶ。[権限オーナー](../../interaction/permission-presets/README.md)が現在のアイデンティティとプロセスカタログを供給する。Auto は Full access のサンドボックス値と `ask` 承認ポリシーを使い、ツール定義を変更しない。
 
-The reviewer reconstructs five sections from the current Session surface and pending execution: fixed policy, cwd-only environment, sourced project constraints, filtered sourced history, and the complete pending action. Native schema comes from the latest request header. A PTC binding freezes its schema and carries it through the scheduler into transient execution metadata; start and settle events never serialize description or parameters. Main-agent `system/message` nodes, assistant text and reasoning, and tool results are excluded. The outer review input is a frozen `RequestUserInput` without durable identity or source; retained history keeps its original source attribution in the review text. [The decision record](../../../.agents/notes/implemented/feature/2026-08-28-auto-review.md) owns authority, lifecycle, and child-inheritance rationale.
+レビュアーは現在の Session サーフェスと保留中の実行から 5 つのセクションを再構成する: 固定ポリシー、cwd のみの環境、ソース付きのプロジェクト制約、フィルタリングされたソース付き履歴、完全な保留中のアクションである。ネイティブスキーマは最新のリクエストヘッダーから来る。PTC バインディングはそのスキーマを凍結し、スケジューラーを通じて一時的な実行メタデータへ運ぶ。start と settle のイベントは description や parameters を決してシリアライズしない。メインエージェントの `system/message` ノード、アシスタントのテキストと推論、ツール結果は除外される。外側のレビュー入力は耐久性アイデンティティやソースを持たない凍結された `RequestUserInput` であり、保持された履歴はレビューテキスト内で元のソース帰属を保つ。[決定記録](../../../.agents/notes/implemented/feature/2026-08-28-auto-review.md)が権限、ライフサイクル、子継承の根拠を所有する。
 
-Unloading closes selection and review admission, migrates live Auto Sessions to Full access through the existing preset writer, then aborts and drains reviews before withdrawing the listener and contribution. The migration writes the `never` approval policy through the Session writer without queuing a policy-change notice; the model sees the new policy in the next runtime-context snapshot. The sandbox value and persistent terminals survive the migration. A persisted Auto Session cannot publish without the complete integration; reopening it after installation is an explicit user action. Reinstalling the layer restores the option but does not switch live Sessions back to Auto.
+アンロードは選択とレビュー受理を閉じ、既存のプリセットライターを通じてライブの Auto Session を Full access に移行し、その後リスナーとコントリビューションを撤回する前にレビューを abort してドレインする。この移行はポリシー変更通知をキューに入れることなく Session ライターを通じて `never` 承認ポリシーを書き込む。モデルは次のランタイムコンテキストスナップショットで新しいポリシーを見る。サンドボックス値と永続ターミナルは移行を生き延びる。永続化された Auto Session は完全な統合なしには公開できず、インストール後に再度開くのは明示的なユーザー操作である。レイヤーを再インストールするとオプションは復元されるが、ライブ Session が Auto に戻ることはない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-- [Experimental packages](../README.md) — publication policy and dependency isolation.
-- [Web bundle](../../bundle/web-app/README.md) — the stable profile this patch extends.
-- [Auto review decision](../../../.agents/notes/implemented/feature/2026-08-28-auto-review.md) — fixed risk policy, authority, and lifecycle.
-- [Tools](../../core/tools/README.md) — execution, cancellation, and PTC result propagation.
+- [experimental パッケージ](../README.md) — 公開ポリシーと依存関係の分離。
+- [Web バンドル](../../bundle/web-app/README.md) — このパッチが拡張する安定プロファイル。
+- [Auto review の決定](../../../.agents/notes/implemented/feature/2026-08-28-auto-review.md) — 固定リスクポリシー、権限、ライフサイクル。
+- [ツール](../../core/tools/README.md) — 実行、キャンセル、PTC 結果の伝播。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Per-call reviewer
+### 呼び出しごとのレビュアー
 
-#### What the model sees
+#### モデルが見るもの
 
-The reviewer uses the latest `request/header.config` provider and model with the shipped adapter's default reasoning. Its fixed `REVIEW_POLICY` replaces human approval for exactly one action: allow executes immediately with Full access. The other four sections contain only the retained facts described above. It returns one strict JSON text object with `risk` and `decision`; deny may include a string `reason`. Reasoning blocks may precede that single text block. Only `low + allow`, `medium + allow/deny`, and `high + deny` are valid.
+レビュアーは最新の `request/header.config` のプロバイダーとモデルを、出荷アダプターのデフォルト推論で使う。その固定の `REVIEW_POLICY` はちょうど 1 つのアクションについて人間の承認を置き換える: allow は Full access で即時実行する。他の 4 つのセクションは上記の保持された事実のみを含む。`risk` と `decision` を持つ 1 つの厳格な JSON テキストオブジェクトを返す。deny は文字列の `reason` を含んでよい。推論ブロックはその単一のテキストブロックに先行してよい。有効なのは `low + allow`、`medium + allow/deny`、`high + deny` のみである。
 
-#### Token effect
+#### トークン効果
 
-One additional model request per supported call, without caching, retries, truncation, compaction, or a separate small output budget. An oversized request fails the call with the provider error.
+サポートされる呼び出しごとに 1 つの追加モデルリクエストがあり、キャッシュ、リトライ、切り詰め、compaction、別個の小さい出力予算はない。過大なリクエストはプロバイダーエラーで呼び出しを失敗させる。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-The fixed reviewer policy can share a prefix; retained history and the pending action vary per call. Auto adds no dedicated runtime context or mode-switch prompt to the main agent.
+固定のレビュアーポリシーはプレフィックスを共有できる。保持された履歴と保留中のアクションは呼び出しごとに変化する。Auto はメインエージェントに専用のランタイムコンテキストやモード切り替えプロンプトを追加しない。
 
-### Tool denial
+### ツール拒否
 
-#### What the model sees
+#### モデルが見るもの
 
-Under the `ask` approval policy, the model sees only the approval outcome, such as `the user rejected tool "<name>"`, or the approved call's ordinary result. A final denial message is `Auto review rejected tool "<name>"; its body was not executed`. A reviewer failure message is `Auto review of tool "<name>" failed; its body was not executed: <error>`. Ordinary native error rendering prefixes each message with `Error: `. PTC uses the existing inner-call exception and catch behavior; a caught denial does not force the outer `run_code` to fail. The raw optional reason is durable structured error detail for users, never main-model content. Risk, reviewer prompt, reasoning, and raw response are not persisted.
+`ask` 承認ポリシーの下で、モデルは承認の結果のみを見る。例えば `the user rejected tool "<name>"`、または承認された呼び出しの通常の結果である。最終的な拒否メッセージは `Auto review rejected tool "<name>"; its body was not executed` である。レビュアー失敗のメッセージは `Auto review of tool "<name>" failed; its body was not executed: <error>` である。通常のネイティブエラーレンダリングは各メッセージの前に `Error: ` を付ける。PTC は既存の内部呼び出し例外と catch 挙動を使う。捕捉された拒否は外側の `run_code` を失敗させない。生のオプション理由はユーザー向けの耐久性のある構造化エラー詳細であり、メインモデルのコンテンツではない。リスク、レビュアープロンプト、推論、生の応答は永続化されない。
 
-#### Token effect
+#### トークン効果
 
-A denied or failed call contributes only its ordinary error result to the main conversation.
+拒否または失敗した呼び出しは、通常のエラー結果のみをメインの conversation に寄与する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-The denial appends an ordinary tool result; it does not rewrite earlier context or hide existing model-visible information.
+拒否は通常のツール結果を追記する。以前のコンテキストを書き換えたり、既存のモデル可視情報を隠したりしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Auto requires this Web layer switched on; it is absent from default Web, Headless, General settings, and new-session defaults.
-- Auto provides no file sandbox. The outer `run_code` transport and direct Node effects inside a PTC program do not pass through inner-tool review.
-- Model classification can be wrong. There are no deterministic tool exemptions, persistent grants, configurable policy, or retry layer.
-- In-process Auto children review their own calls. Out-of-process children retain their native permission systems after the parent delegation call is allowed.
-- The reviewer reads the Session action history through the deprecated synchronous `snapshotEvents()` reader under a line-scoped waiver. Prior calls, PTC starts, and the direct parent's initial prompt have no projection or paged reader yet, so the migration stays deferred by [the synchronous-read decision](../../../.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md).
+- Auto はこの Web レイヤーを有効化することを必要とする。デフォルトの Web、Headless、一般設定、新規セッションのデフォルトには存在しない。
+- Auto はファイルサンドボックスを提供しない。PTC プログラム内の外側の `run_code` トランスポートと直接の Node 効果は内部ツールレビューを通らない。
+- モデルによる分類は間違うことがある。決定論的なツール免除、永続的な許可、設定可能なポリシー、リトライレイヤーはない。
+- プロセス内の Auto の子は自身の呼び出しをレビューする。プロセス外の子は、親の委譲呼び出しが許可された後も自身のネイティブ権限システムを保つ。
+- レビュアーは Session のアクション履歴を、行スコープのウェイバーの下で非推奨の同期 `snapshotEvents()` リーダーを通じて読む。以前の呼び出し、PTC 開始、直接の親の初期プロンプトにはまだプロジェクションやページングされたリーダーがないので、この移行は[同期読み取りの決定](../../../.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md)によって先送りのままである。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

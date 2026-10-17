@@ -5,13 +5,13 @@ kind: persistence-change
 
 # 2026-09-14-workspace-changes-event
 
-English | [中文](2026-09-14-workspace-changes-event.zh.md)
+日本語 | [English](2026-09-14-workspace-changes-event.en.md) | [中文](2026-09-14-workspace-changes-event.zh.md)
 
-## Summary
+## 概要
 
-Adds the log-only workspace/changes event that records the files a top-level turn changed.
+トップレベルターンが変更したファイルを記録するログのみ workspace/changes イベントを追加する。
 
-## Table of Contents
+## 目次
 
 - [Declaration](#declaration)
 - [Compatibility](#compatibility)
@@ -19,7 +19,7 @@ Adds the log-only workspace/changes event that records the files a top-level tur
 - [Dev Note](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -33,16 +33,16 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-A new root in the same Session format version. Existing logs contain no such event and stay valid; readers that predate it refuse a log carrying it, as every required-on-read event does. The event is appended only by the Web bundle's workspace-changes plugin and is never model-visible; the Web changed-files card is its only consumer and reads the latest event per turn.
+同一セッションフォーマットバージョン内の新しいルート。既存ログはそのようなイベントを含まず引き続き有効であり、それ以前のリーダーはそれを運ぶログを拒否する。すべての読み取り必須イベントと同様である。イベントは Web バンドルの workspace-changes プラグインによってのみ追加され、モデル可視になることは決してない。Web 変更ファイルカードが唯一のコンシューマーであり、ターンごとの最新イベントを読む。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-pnpm exec vitest run packages/deliverables/workspace-changes packages/client/ui-deliverables: 165 tests passed; snapshots/web/changed-files-turn replays the recorded event through the Web profile.
+pnpm exec vitest run packages/deliverables/workspace-changes packages/client/ui-deliverables: 165 テスト合格。snapshots/web/changed-files-turn は記録済みイベントを Web プロファイル経由でリプレイする。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 None.

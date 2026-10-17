@@ -1,138 +1,138 @@
 ---
-description: "Durable image and file attachments for users and maintainers attaching, reusing, or debugging uploads in prompts and commands."
+description: "プロンプトとコマンドでアップロードを添付、再利用、またはデバッグするユーザーとメンテナーのための、永続的な画像とファイルの添付。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-attachment
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Attach images and generic files to prompts and commands, then reuse them after restarting the same session, without extra setup in the shipped `dsh` composition. Images are validated and normalized before the message is accepted; PNG, JPEG, WebP, and GIF are supported within deployment limits. Other files are stored byte-for-byte without format or size limits, and models read them on demand through saved read-only paths instead of receiving their bytes. Durable session events exclude browser paths, provider URLs, local storage paths, and base64. Stored attachments are never deleted automatically; audio and video have no dedicated handling.
+プロンプトとコマンドに画像と汎用ファイルを添付し、同じセッションを再起動した後もそれらを再利用できる。出荷済みの `dsh` コンポジションでは追加のセットアップは不要である。画像はメッセージが受け入れられる前に検証され正規化される; PNG、JPEG、WebP、および GIF がデプロイメントの制限内でサポートされる。その他のファイルは形式やサイズの制限なしにバイト単位で保存され、モデルはそのバイトを受け取る代わりに、保存された読み取り専用パスを通じてオンデマンドでそれらを読む。永続的なセッションイベントはブラウザパス、プロバイダー URL、ローカルストレージパス、および base64 を除外する。保存された添付は自動的に削除されることは決してない; 音声と動画には専用の扱いがない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [本パッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 本パッケージを使う
 
-Image attachments work end to end: attach an image to a prompt or a command, and it is saved, shown in history, and sent to the model without any further action from you. In the default `dsh` composition everything is already wired; when you compose your own setup, one plugin enables the capability.
+画像添付はエンドツーエンドで機能する: プロンプトまたはコマンドに画像を添付すると、それ以上の操作なしに保存され、履歴に表示され、モデルへ送信される。デフォルトの `dsh` コンポジションではすべてが既に配線されている; 独自のセットアップをコンポーズする場合、1 つのプラグインがこのケイパビリティを有効にする。
 
-### Attach images to a prompt
+### プロンプトに画像を添付する
 
-Attach one or more images to a user prompt in the client UI. Each source is checked, normalized to a provider-independent 8-bit sRGB/sRGBA raster, and saved before your message is processed; if any image is refused, the whole message fails and nothing is published. Supported source formats are PNG, JPEG, WebP, and GIF; a deployment controls source limits separately from normalized-storage and route-specific request limits. The one plugin below enables durable image attachments (the shipped base composition already mounts it):
+クライアント UI でユーザープロンプトに 1 つ以上の画像を添付する。各ソースはメッセージが処理される前にチェックされ、プロバイダー非依存の 8 ビット sRGB/sRGBA ラスターに正規化され、保存される; いずれかの画像が拒否されると、メッセージ全体が失敗し何も公開されない。サポートされるソース形式は PNG、JPEG、WebP、および GIF である; デプロイメントはソース制限を、正規化ストレージおよびルート固有のリクエスト制限とは別に制御する。下の 1 つのプラグインが永続的な画像添付を有効にする (出荷済みのベースコンポジションは既にこれをマウントしている):
 
 ```yaml
 - name: '@deepseek-ai/dsh-attachment-local'
 ```
 
-### Attach any other file to a prompt
+### プロンプトにその他のファイルを添付する
 
-Any non-image file attaches to a prompt as a generic file: the exact bytes are saved read-only under the harness home, the message records the file name, byte size, and content digest, and the model receives one line naming the saved path so it can read the content with its file tools only when needed. There is no file-type whitelist and no size limit; what you attach is stored verbatim.
+画像以外のファイルは汎用ファイルとしてプロンプトに添付される: 正確なバイトが Harness ホームの下に読み取り専用で保存され、メッセージはファイル名、バイトサイズ、およびコンテンツダイジェストを記録し、モデルは保存されたパスを名指す 1 行を受け取るため、必要なときにのみ自身のファイルツールで内容を読むことができる。ファイルタイプのホワイトリストはなくサイズ制限もない; 添付したものはそのまま保存される。
 
-### Pass attachments to commands
+### コマンドに添付を渡す
 
-Commands declaring attachment input receive images and generic files in selection order. Commands that do not accept attachments return an error and retain the composer's draft and cards.
+添付入力を宣言するコマンドは、選択順に画像と汎用ファイルを受け取る。添付を受け付けないコマンドはエラーを返し、コンポーザーの下書きとカードを保持する。
 
-### Reuse images across the session
+### セッションをまたいで画像を再利用する
 
-Saved normalized images stay in conversation history and are projected into deterministic, route-sized request versions in later turns; after a restart, a resumed session shows and reuses the same images. When the current execution filesystem maps the stored host object, the request descriptor also carries a read-only process path that the model can inspect. When history or a request version is read back, the stored bytes are checked against what was recorded, so a missing, corrupted, or swapped image surfaces as an error rather than wrong bytes.
+保存された正規化画像は会話履歴にとどまり、後のターンで決定論的なルートサイズのリクエストバージョンへ投影される; 再起動後、再開されたセッションは同じ画像を表示し再利用する。現在の実行ファイルシステムが保存されたホストオブジェクトをマップする場合、リクエスト記述子はモデルが検査できる読み取り専用プロセスパスも運ぶ。履歴またはリクエストバージョンが読み戻される際、保存されたバイトは記録された内容と照合されるため、欠落、破損、またはすり替えられた画像は誤ったバイトではなくエラーとして表面化する。
 
-### What can go wrong
+### 何がうまくいかないことがあるか
 
-An image can be refused when you attach it — unsupported format, over the size, pixel, or dimension limits, or bytes that do not match their declared type — and the message then fails as a whole. Later, a history read can fail if the stored image was deleted or corrupted on disk. Failures carry stable codes so the client and protocol adapters can explain them in their own words.
+画像は添付時に拒否されることがある — サポートされない形式、サイズ・ピクセル・寸法の制限超過、または宣言された型と一致しないバイト — その場合メッセージは全体として失敗する。後から、保存された画像がディスク上で削除または破損していると履歴の読み取りが失敗しうる。失敗は安定したコードを運ぶため、クライアントとプロトコルアダプターが独自の言葉でそれらを説明できる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the seam and the service operations that realize the user-visible behavior; observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションはシームの背後の設計上の決定と、ユーザー可視の挙動を実現するサービス操作を説明する; 観察可能な挙動は[本パッケージを使う](#use-this-package)で完全に扱う。
 
-### Design decisions
+### 設計上の決定
 
-- **Normalize and persist before event.** Every source is prepared and verified before the batch publishes in order, so the session log never references a partial or failed normalization.
-- **Immutable and retention-neutral.** Objects are immutable once published; resumed and forked sessions may share them, so reference-aware garbage collection is deferred rather than tied to any one session's deletion.
-- **Verify on read.** Reads check bytes and metadata against the logged reference before returning them, and request projections fully decode cached bytes, so a missing, corrupted, or swapped object fails closed.
-- **Role-neutral image blocks.** The `ImageBlock` content block in `dsh-llm` carries an `ImageAttachmentRef`; provider adapters resolve it into deterministic request versions at an explicit route-chosen target size and byte target, while execution filesystems may map the immutable host object to a model-readable process path.
-- **Error routing by code.** `AttachmentError` re-implements the `HarnessError` shape instead of extending it because the base lives in `dsh-llm`, which depends on this package; consumers use `isAttachmentError` and route on `code`, never on the prototype chain.
-- **Files are verbatim, images are normalized.** `saveFile` commits an existing byte array, `saveFileStream` commits bounded chunks with backpressure and cancellation, `readFileStream` verifies and returns bounded chunks, and `fileHostPath` locates the stored object for read-on-demand projection; neither file write path applies admission limits. The image path keeps its separate normalization, limits, and request-version pipeline. The `FileBlock` content block in `dsh-llm` carries a `FileAttachmentRef`, and request assembly projects it to deterministic handle text for every route.
+- **イベントの前に正規化して永続化する。** すべてのソースはバッチが順に公開する前に準備され検証されるため、セッションログが部分的または失敗した正規化を参照することは決してない。
+- **不変で保持中立。** オブジェクトは公開後は不変である; 再開およびフォークされたセッションはそれらを共有しうるため、参照を考慮したガベージコレクションは、いずれか 1 つのセッションの削除に結び付けられるのではなく延期されている。
+- **読み取り時に検証する。** 読み取りはバイトとメタデータを返す前にログ済み参照と照合し、リクエスト投影はキャッシュされたバイトを完全にデコードするため、欠落、破損、またはすり替えられたオブジェクトはフェイルクローズドする。
+- **役割中立の画像ブロック。** `dsh-llm` の `ImageBlock` コンテンツブロックは `ImageAttachmentRef` を運ぶ; プロバイダーアダプターはそれを、明示的にルートが選んだターゲットサイズとバイトターゲットで決定論的なリクエストバージョンに解決し、実行ファイルシステムは不変のホストオブジェクトをモデルが読めるプロセスパスにマップしてよい。
+- **コードによるエラールーティング。** `AttachmentError` は `HarnessError` を拡張するのではなくその形を再実装する。基底がこのパッケージに依存する `dsh-llm` にあるためである; コンシューマーは `isAttachmentError` を使い、プロトタイプチェーンではなく `code` でルーティングする。
+- **ファイルはそのまま、画像は正規化される。** `saveFile` は既存のバイト配列をコミットし、`saveFileStream` は背圧とキャンセルを伴う上限付きチャンクをコミットし、`readFileStream` は検証して上限付きチャンクを返し、`fileHostPath` は読み取りオンデマンド投影のために保存されたオブジェクトを位置特定する; どちらのファイル書き込み経路もアドミッション制限を適用しない。画像経路は独自の正規化、制限、およびリクエストバージョンのパイプラインを保つ。`dsh-llm` の `FileBlock` コンテンツブロックは `FileAttachmentRef` を運び、リクエスト組み立てがそれをすべてのルートに対して決定論的なハンドルテキストへ投影する。
 
-### Service operations
+### サービス操作
 
-The service family runs one admission-and-storage flow: every entry point enforces source batch limits and canonical base64, prepares provider-independent normalized attachments before publishing any member, and commits them durably in input order without partial results. Host prompt consumers pass ordered text, encoded images, and already resolved file references to `ctx.attachments.admitPromptContent()`; the method persists images and passes file references unchanged. Encoded protocol adapters call `ctx.attachments.admitEncodedFile()`, which checks canonical base64 before delegating to `saveFile`; adapters recognize attachment failures through `ctx.attachments.isAttachmentError()`. Generic-file callers choose `saveFile` for existing bytes or `saveFileStream` for a bounded asynchronous byte source; both return the same durable reference, while `readFileStream` verifies its digest and length during a bounded read. `readImageRequest` derives deterministic route-sized variants whose identity includes the attachment id, transform version, target dimensions, byte target, and encoder settings. The pure `requestImageDimensions` and `longEdgeDimensions` exports compute aspect-preserving dimensions from a total-pixel budget or an exact long edge, so routes and request pricing share one geometry. `imageHostPath` exposes an implementation-owned host location only to trusted same-process consumers that need execution-world mapping. Callers compose ordered batches while the implementation owns compression concurrency, caching, and singleflight. Reads, streamed writes, and projections preserve caller cancellation. Failures carry stable machine-readable codes, and the caller-correctable admission subset is recognizable at runtime so each protocol adapter maps its own vocabulary; the exact per-operation contracts live in [`src/index.ts`](src/index.ts) and [`src/error.ts`](src/error.ts).
+サービスファミリーは 1 つのアドミッションとストレージのフローを実行する: すべてのエントリーポイントがソースバッチ制限と正規の base64 を強制し、いずれかのメンバーを公開する前にプロバイダー非依存の正規化添付を準備し、部分的な結果なしに入力順で永続的にコミットする。Host プロンプトコンシューマーは順序付きテキスト、エンコード済み画像、および既に解決されたファイル参照を `ctx.attachments.admitPromptContent()` へ渡す; このメソッドは画像を永続化し、ファイル参照を変更せずに渡す。エンコードされたプロトコルアダプターは `ctx.attachments.admitEncodedFile()` を呼び、これは `saveFile` に委任する前に正規の base64 をチェックする; アダプターは `ctx.attachments.isAttachmentError()` を通じて添付の失敗を認識する。汎用ファイルの呼び出し元は、既存のバイトには `saveFile` を、上限付きの非同期バイトソースには `saveFileStream` を選ぶ; どちらも同じ永続参照を返し、`readFileStream` は上限付き読み取り中にそのダイジェストと長さを検証する。`readImageRequest` は、添付 id、変換バージョン、ターゲット寸法、バイトターゲット、およびエンコーダー設定を含む同一性を持つ決定論的なルートサイズのバリアントを導出する。純粋な `requestImageDimensions` と `longEdgeDimensions` エクスポートは、合計ピクセル予算または正確な長辺からアスペクト比を保った寸法を計算するため、ルートとリクエスト価格設定が 1 つのジオメトリを共有する。`imageHostPath` は、実行ワールドのマッピングを必要とする信頼された同一プロセスコンシューマーにのみ、実装が所有するホスト位置を公開する。呼び出し元は順序付きバッチをコンポーズし、実装は圧縮の並行性、キャッシュ、および singleflight を所有する。読み取り、ストリーミング書き込み、および投影は呼び出し元のキャンセルを保つ。失敗は安定した機械可読コードを運び、呼び出し元が修正可能なアドミッションサブセットは実行時に認識可能であるため、各プロトコルアダプターが自身の語彙をマップできる; 操作ごとの正確な契約は [`src/index.ts`](src/index.ts) と [`src/error.ts`](src/error.ts) にある。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: abstract `AttachmentStore` service and re-exports |
-| [`src/types.ts`](src/types.ts) | Durable vocabulary: references, limits, upload and store payloads |
-| [`src/admission.ts`](src/admission.ts) | Canonical-base64 enforcement and store delegation for encoded image and file uploads |
-| [`src/error.ts`](src/error.ts) | `AttachmentError` class and the `isImageAdmissionError` runtime subset |
-| [`src/brand.ts`](src/brand.ts) | `AttachmentId` branded opaque identifier |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: 抽象 `AttachmentStore` サービスと再エクスポート |
+| [`src/types.ts`](src/types.ts) | 永続的な語彙: 参照、制限、アップロードおよびストアのペイロード |
+| [`src/admission.ts`](src/admission.ts) | エンコードされた画像およびファイルアップロードのための正規 base64 強制とストア委任 |
+| [`src/error.ts`](src/error.ts) | `AttachmentError` クラスと `isImageAdmissionError` ランタイムサブセット |
+| [`src/brand.ts`](src/brand.ts) | `AttachmentId` ブランド付き不透明識別子 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-For the full service contract and payload types, read the subsystem reference; for the storage that backs this capability, read the local backend.
+完全なサービス契約とペイロード型についてはサブシステムリファレンスを、このケイパビリティを支えるストレージについてはローカルバックエンドを読む。
 
-- [Attachment subsystem reference](../../../docs/subsystems/attachment.md) — service contract, payload types, and the `ctx.attachments` Cordis surface.
-- [Local filesystem backend](../attachment-local/README.md) — where your attached images are stored on this machine.
-- [Capability seams](../../../docs/capability-seams.md) — how this capability family is split into roles.
+- [Attachment サブシステムリファレンス](../../../docs/subsystems/attachment.md) — サービス契約、ペイロード型、および `ctx.attachments` Cordis 面。
+- [ローカルファイルシステムバックエンド](../attachment-local/README.md) — 添付した画像がこのマシンのどこに保存されるか。
+- [ケイパビリティシーム](../../../docs/capability-seams.md) — このケイパビリティファミリーがどのように役割に分割されるか。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the provider adapter, which resolves each durable image reference into an exact request version and sends its stable attachment id and actual dimensions beside the image. When the execution filesystem maps the stored object, the descriptor also includes a read-only process path and a matching extension for a writable copy. A generic file never reaches the provider as bytes: every route receives one deterministic handle line naming the file, its byte size, its digest prefix, and the saved read-only path to read with file tools.
+間接的に、プロバイダーアダプターを通じて。それは各永続画像参照を正確なリクエストバージョンに解決し、画像の傍らにその安定した添付 id と実際の寸法を送る。実行ファイルシステムが保存されたオブジェクトをマップする場合、記述子は読み取り専用プロセスパスと、書き込み可能コピー用の一致する拡張子も含む。汎用ファイルはバイトとしてプロバイダーに到達することは決してない: すべてのルートが、ファイルとそのバイトサイズ、ダイジェストプレフィックス、およびファイルツールで読むための保存された読み取り専用パスを名指す 1 つの決定論的ハンドル行を受け取る。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Adding an image changes the provider request and therefore invalidates the affected request suffix.
+画像を追加するとプロバイダーリクエストが変わるため、影響を受けるリクエストサフィックスを無効化する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits describe what attachments can and cannot do; they are current package constraints, not a task backlog.
+これらの制限は添付ができることとできないことを述べる; それらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **Raster image limits apply to images only** — PNG, JPEG, WebP, and GIF are accepted as images under deployment limits; every other file is stored verbatim with no type or size limit, and audio and video have no dedicated handling yet.
-- **Attachments are never deleted** — stored images and files are retained indefinitely; nothing removes them automatically.
-- **Unsent drafts are not saved** — a composer draft stays in the browser until you submit the message.
+- **ラスター画像の制限は画像のみに適用される** — PNG、JPEG、WebP、および GIF がデプロイメント制限内で画像として受け入れられる; その他のすべてのファイルは型やサイズの制限なしにそのまま保存され、音声と動画にはまだ専用の扱いがない。
+- **添付は決して削除されない** — 保存された画像とファイルは無期限に保持される; 何もそれらを自動的に削除しない。
+- **未送信の下書きは保存されない** — コンポーザーの下書きはメッセージを送信するまでブラウザにとどまる。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-This Dev Note is working context for maintainers: undecided directions and open questions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and the package code.
+この開発メモはメンテナー向けの作業コンテキストである: 未決定の方向性と未解決の質問。明示的に非権威である — 出荷済みの挙動と制限は上記のセクションとパッケージコードにある。
 
-#### Future: reference-aware garbage collection
+#### 将来: 参照を考慮したガベージコレクション
 
-Resumed and forked sessions may share immutable objects, so any retention policy needs a reference model that accounts for session lineage before objects can be collected. No decision is recorded yet; the local backend currently retains everything.
+再開およびフォークされたセッションは不変オブジェクトを共有しうるため、どの保持ポリシーも、オブジェクトを回収できるようになる前にセッションの系譜を考慮する参照モデルを必要とする。決定はまだ記録されていない; ローカルバックエンドは現在すべてを保持する。
 
-#### Future: audio, video, and assistant-side output
+#### 将来: 音声、動画、および assistant 側の出力
 
-Audio and video would need dedicated lifecycle and provider contracts beyond the verbatim file path, and the role-neutral `ImageBlock` leaves assistant-side image output as forward compatibility — current production adapters declare text-only output, so only user content carries images. Both directions are undecided.
+音声と動画には、そのままのファイル経路を超えた専用のライフサイクルとプロバイダー契約が必要であり、役割中立の `ImageBlock` は assistant 側の画像出力を前方互換性として残す — 現在のプロダクションアダプターはテキストのみの出力を宣言するため、画像を運ぶのはユーザー内容だけである。どちらの方向も未決定である。
 
 </details>

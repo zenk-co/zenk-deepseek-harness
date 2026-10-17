@@ -1,16 +1,16 @@
-# Cookbook: extension plugin shapes
+# クックブック: 拡張プラグインの形
 
-English | [中文](extension-cookbook.zh.md)
+日本語 | [English](extension-cookbook.en.md) | [中文](extension-cookbook.zh.md)
 
-Reference patterns for harness extensions. The snippets omit imports and helper implementations and are not copy-paste-complete. For concrete authoring paths, see the [package checklist](adding-a-package.md), [first-tool tutorial](../user/develop/basic/tool.md), [tool reference](adding-a-tool.md), [LLM adapter guide](adding-an-llm-adapter.md), and [Session format version tutorial](adding-a-session-format-version.md); the [architecture](../architecture.md) owns the system and extension-point map.
+harness 拡張のリファレンスパターン。スニペットは import とヘルパー実装を省略しており、コピー＆ペーストで完結しない。具体的な作成手順については、[パッケージチェックリスト](adding-a-package.md)、[初めてのツールのチュートリアル](../user/develop/basic/tool.md)、[ツールリファレンス](adding-a-tool.md)、[LLM アダプターガイド](adding-an-llm-adapter.md)、[Session フォーマットバージョンのチュートリアル](adding-a-session-format-version.md) を参照。[アーキテクチャ](../architecture.md) がシステムと拡張ポイントのマップを所有する。
 
-## A tool plugin
+## ツールプラグイン
 
-A tool registers on `ctx.tools`. The annotated `defineTool` example (typed `execute` arguments, result construction, the `run_in_background` pattern) lives in [adding-a-tool.md](adding-a-tool.md) — that guide is the source of truth for tool definitions. Raw JSON-Schema `ToolDefinition`s are also accepted by `ctx.tools.register()` directly (that is how MCP-sourced tools arrive); `defineTool` is the typed helper for first-party tools.
+ツールは `ctx.tools` に登録する。アノテーション付きの `defineTool` の例（型付き `execute` 引数、結果の構築、`run_in_background` パターン）は [adding-a-tool.md](adding-a-tool.md) にある。そのガイドがツール定義の信頼できるソースである。生の JSON-Schema の `ToolDefinition` も `ctx.tools.register()` に直接受け入れられる（MCP 由来のツールはこうして届く）。`defineTool` はファーストパーティツール向けの型付きヘルパーである。
 
-## A hook plugin (permission-gate example)
+## フックプラグイン（パーミッションゲートの例）
 
-This permission gate is one example of a hook plugin. It returns a typed decision from the `tools/pre-execute` gate to allow or deny a call; sandbox, permission, and plan-mode plugins can use this extension point. Hook plugins can intercept other extension points and are not inherently permission gates. A "native hook" is an ordinary Cordis plugin on an interception point; it needs no external protocol.
+このパーミッションゲートはフックプラグインの一例である。これは `tools/pre-execute` ゲートから型付きの決定を返して呼び出しを許可または拒否する。sandbox、permission、plan-mode の各プラグインがこの拡張ポイントを使える。フックプラグインは他の拡張ポイントもインターセプトでき、本質的にパーミッションゲートであるわけではない。「native hook」はインターセプションポイント上の通常の Cordis プラグインであり、外部プロトコルを必要としない。
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -30,11 +30,11 @@ export function apply(ctx: Context) {
 }
 ```
 
-This waterfall is the reorderable policy layer. Use `ctx.tools.guard()` when an invariant needs a monotonic final denial, `tools/execute` when a plugin must wrap the dispatch lifetime (timeouts/retries/metrics; only `exec.signal` is replaceable), `tools/post-execute` for explicit result transformation, and `tools/result` for contained observation of the immutable final outcome. The [adding-a-tool guide](adding-a-tool.md#execution-policy-and-observation) gives the selection rule.
+このウォーターフォールは並べ替え可能なポリシーレイヤーである。不変条件に単調な最終拒否が必要な場合は `ctx.tools.guard()` を、プラグインがディスパッチのライフタイムを包む必要がある場合（タイムアウト／リトライ／メトリクス。置換可能なのは `exec.signal` だけ）は `tools/execute` を、明示的な結果変換には `tools/post-execute` を、不変の最終結果の封じ込められた観察には `tools/result` を使う。[adding-a-tool ガイド](adding-a-tool.md#execution-policy-and-observation) が選択ルールを示す。
 
-## A UI plugin
+## UI プラグイン
 
-A UI plugin combines durable `session/event` records (Assistant settlements, turn/step boundaries, and tool activity) with transient `agent/assistant-stream` frames for live token presentation, and drives input back in via `agent.followup()` / `agent.steer()`. A browser plugin contributing a business row to the built-in Web Client instead registers a `ConversationNodeDefinition` and keyed Chat renderer; follow the [Conversation subsystem reference](../subsystems/conversation.md).
+UI プラグインは、durable な `session/event` レコード（Assistant の確定、ターン／ステップ境界、ツール活動）と、ライブのトークン表示のための一時的な `agent/assistant-stream` フレームを組み合わせ、`agent.followup()` / `agent.steer()` を通じて入力を戻す。ビルトイン Web Client にビジネス行を貢献するブラウザープラグインは、代わりに `ConversationNodeDefinition` とキー付き Chat レンダラーを登録する。[Conversation サブシステムリファレンス](../subsystems/conversation.md) に従う。
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -61,11 +61,11 @@ export function apply(ctx: Context) {
 }
 ```
 
-## An external protocol driver
+## 外部プロトコルドライバー
 
-A *protocol driver* adapts a wire peer to `ctx.agents`; it may serve a UI or an automation client. A stdio driver owns stdout, creates or resumes agents through the factory, and maps protocol requests to `followup()` or `cancel()`. A low-level prompt request returns its durable enqueue receipt; it does not acquire a result by correlating `MessageId` with `turn/end`. Publish whole-agent status separately. An automation method may wait from its receipt through the next idle and summarize that explicitly owned interval, while a UI normally keeps observing the open-ended event stream. Tear agents down with `AgentHandle.dispose()` so disposal reaches quiescence.
+*プロトコルドライバー* はワイヤーのピアを `ctx.agents` に適合させる。UI に奉仕することも、オートメーションクライアントに奉仕することもある。stdio ドライバーは stdout を所有し、ファクトリーを通じてエージェントを作成または再開し、プロトコルリクエストを `followup()` または `cancel()` にマップする。低レベルのプロンプトリクエストは durable なエンキュー受領証を返す。`MessageId` と `turn/end` を相関させて結果を取得することはない。エージェント全体のステータスは別に公開する。オートメーションメソッドは、その受領証から次のアイドルまで待ち、その明示的に所有する区間を要約できる。一方 UI は通常、終わりのないイベントストリームを観察し続ける。`AgentHandle.dispose()` でエージェントを解体し、破棄が静止状態に達するようにする。
 
-[`packages/acp/acp`](../../packages/acp/acp) is the automation-only worked example: it exposes fresh text sessions over Agent Client Protocol JSON-RPC stdio, emits committed assistant text, and registers a one-shot machine permission answerer for agents it owns. Its [README](../../packages/acp/acp/README.md) defines the exact methods, event order, and lifecycle contract.
+[`packages/acp/acp`](../../packages/acp/acp) はオートメーション専用の実例である。Agent Client Protocol の JSON-RPC stdio 上で fresh なテキストセッションを公開し、コミットされたアシスタントテキストを発行し、自身が所有するエージェント用にワンショットのマシンパーミッション回答者を登録する。その [README](../../packages/acp/acp/README.md) が正確なメソッド、イベント順序、ライフサイクルコントラクトを定義する。
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -91,42 +91,42 @@ export function apply(ctx: Context) {
 }
 ```
 
-## Runnable wirings
+## 実行可能な配線
 
-Shipped applications contribute profile layers through `packages/bundle/*/cordis.patch.yml`, and the product `dsh` launcher owns Web, ACP, SDK, and one-shot headless execution through named profiles. Optional user-facing overlays live under `apps/cli/config/examples/`; profile integration tests live under `apps/cli/tests/profiles/`, while package-specific Loader compositions stay with their package tests.
+出荷済みアプリケーションは `packages/bundle/*/cordis.patch.yml` を通じてプロファイルレイヤーを貢献し、プロダクトの `dsh` ランチャーが名前付きプロファイルを通じて Web、ACP、SDK、ワンショット headless 実行を所有する。省略可能なユーザー向けオーバーレイは `apps/cli/config/examples/` にあり、プロファイル統合テストは `apps/cli/tests/profiles/` にある。パッケージ固有の Loader 構成はそのパッケージのテストにとどまる。
 
-## The feature → mechanism map
+## フィーチャー → メカニズムのマップ
 
-Every product feature maps to a listener on a documented extension point — the microkernel claim made checkable ([microkernel reference](../architecture.md)). No row modifies the loop.
+すべてのプロダクトフィーチャーは、文書化された拡張ポイント上のリスナーにマップされる。これはマイクロカーネルの主張を検証可能にしたものである（[マイクロカーネルリファレンス](../architecture.md)）。どの行もループを変更しない。
 
-`system-prompt/assemble` is an expert cooperative whole-assembly transform: its returned assembly is authoritative, so listener authors own preserving active PTC mode and structured-output protocol contributions. Prefer `ctx.tools.restrict()` for tool filtering that must stay aligned across presentation, lookup, and execution.
+`system-prompt/assemble` はエキスパート向けの協調的な全体アセンブリ変換である。返されたアセンブリが権威となるので、リスナー作者はアクティブな PTC モードと構造化出力プロトコルの貢献を保持する責任を負う。プレゼンテーション、ルックアップ、実行にまたがって整列し続ける必要のあるツールフィルタリングには `ctx.tools.restrict()` を優先する。
 
-| Product feature | Plugin mechanism |
+| プロダクトフィーチャー | プラグインメカニズム |
 |---|---|
-| Hook system (user + project level) | listeners on `agent/created`, `agent/pre-step`, `agent/request`, `tools/pre-execute`, `tools/post-execute`, and `agent/turn-stopping`; the waterfalls return typed decisions, while `agent/turn-stopping` may steer another step; the `dsh-hooks-claude-code` / `dsh-hooks-codex` bridges map hook config files onto these extension points |
-| `/goal` | `ctx.goals` owns durable state, `dsh-goal-round-driver` schedules same-session rounds through the public `Agent`, and separate command/tool producers expose human/model control |
-| `/loop` | on the `turn/end` session event, `followup()` the next iteration; or force-continue |
-| Dynamic workflow | `ctx.workflowEngine` + the PTC workflow engine + the `workflow` tool; structured in-process children enforce output with scoped prompt/tool registrations, a monotonic tool guard, final `tools/result` commit (including enclosing `run_code`), and the structured-output execution's monotonic `concludeTurn()` marker |
-| Queued + steering messages | core `Agent.followup()` / `Agent.steer()` |
-| Context compaction (auto + manual) | the `ctx.compaction` seam + `dsh-compaction-basic`; automatic pressure runs on serial `agent/pre-step`, canonical overflow recovery runs on `agent/request-error`, and manual callers use the same compact service ([compaction reference](../../packages/compaction/compaction/README.md)) |
-| System prompt configurability | `ctx.systemPrompt.section()` with ordering and scope-local shadowing |
-| AGENTS.md (root) | a section provider reading the file |
-| AGENTS.md (subdir, on-touch) + file-change notices | `agent.inject()` from a watcher / tool-result listener |
-| Built-in tools | `ctx.tools.register()`; schemas flow into the assembly automatically — the `dsh-tool-*` families (bash, fs, web, subagent, todo) are the shipped examples |
-| ToolSearch / progressive disclosure | replace a scoped `ctx.tools.restrict()` registration as the visible set changes; the registry keeps presentation, lookup, and execution aligned |
-| Tool deadline / retry / metrics | wrap core dispatch with `tools/execute`; a wrapper may replace `exec.signal`, delegate, and inspect the normalized result in one lexical lifetime |
-| Final tool-result metrics / audit / capture | observe immutable authoritative outcomes with `tools/result`; use `tools/post-execute` instead only when the plugin must transform the result or attach context |
-| Monotonic terminal turn policy | call `ToolExecution.concludeTurn()` from the successful terminal tool; later tool calls in the same response remain guardable, and the loop stops after the step |
-| Subprocess sandbox (landlock / sandbox-exec) | use a `ctx.sandbox` backend through `dsh-bash-sandbox`; use `tools/pre-execute` for capability-level denial |
-| Permission system / AskUserQuestion | return `ask` from `tools/pre-execute` and answer through `ctx.approval`; register a separate model-facing ask tool for ordinary user questions |
-| Plan mode | [`@deepseek-ai/dsh-plan-mode`](../../packages/plan/plan-mode/README.md) — logged `plan/mode` state, the `plan:policy` guidance section, `/plan [message]` entry, `/plan off` direct exit, and the user-reviewed `exit_plan_mode` exit; enforcement stays on the independent sandbox/approval axes |
-| Sub-agent delegation | the `ctx.subagents` provider registry (`dsh-subagent-spawn-in-process`/`dsh-subagent-fork-in-process`/`dsh-subagent-acp`/`dsh-subagent-codex`/`dsh-subagent-claude-code`/`dsh-subagent-dsh-sdk`) + `dsh-tool-subagent` exposing one configured provider to the model |
-| MCP | one plugin per server: discover tools → `ctx.tools.register()` |
-| Skills | section + tool registration; `inject()` skill content on invocation |
-| Memory | section provider + tool |
-| Scheduled tasks (cron) | a plugin registers model-callable scheduling tools; a due timer delivers through `followup(…, {source: {kind: 'schedule'}})` |
-| UI (GUI; CLI emits JSONL) | listen to `agent/assistant-stream` for live chunks and `session/event` for durable settlements, boundaries, and tool activity; input → `followup()` |
-| Web Client Chat business node | register a `ConversationNodeDefinition` and `conversation.chat.node` keyed renderer |
-| SessionTelemetryBackend / replayable trace | `session/event` → JSONL; replay = `sessions.create(id, { seed })` |
-| Model adapters | `LlmAdapter` subclass via `registerAdapter` (`dsh-llm-deepseek`, `dsh-llm-pi-ai`) |
-| Plugin hot-reload | every registration is a `ctx.effect` → vendored HMR just works |
+| フックシステム（ユーザー + プロジェクトレベル） | `agent/created`、`agent/pre-step`、`agent/request`、`tools/pre-execute`、`tools/post-execute`、`agent/turn-stopping` 上のリスナー。ウォーターフォールは型付きの決定を返し、`agent/turn-stopping` は別のステップを steer できる。`dsh-hooks-claude-code` / `dsh-hooks-codex` ブリッジがフック設定ファイルをこれらの拡張ポイントにマップする |
+| `/goal` | `ctx.goals` が durable 状態を所有し、`dsh-goal-round-driver` が公開 `Agent` を通じて同一セッションのラウンドをスケジュールし、別個のコマンド／ツールプロデューサーが人間／モデルの制御を公開する |
+| `/loop` | `turn/end` セッションイベントで次のイテレーションを `followup()` する。または強制継続 |
+| 動的ワークフロー | `ctx.workflowEngine` + PTC ワークフローエンジン + `workflow` ツール。構造化されたインプロセスの子は、スコープ付きプロンプト／ツール登録、単調なツールガード、最終 `tools/result` コミット（外側の `run_code` を含む）、構造化出力実行の単調な `concludeTurn()` マーカーで出力を強制する |
+| キュー済み + steering メッセージ | コアの `Agent.followup()` / `Agent.steer()` |
+| コンテキスト圧縮（自動 + 手動） | `ctx.compaction` シーム + `dsh-compaction-basic`。自動の圧迫は直列 `agent/pre-step` で実行され、正規のオーバーフロー回復は `agent/request-error` で実行され、手動の呼び出し元は同じ compaction サービスを使う（[compaction リファレンス](../../packages/compaction/compaction/README.md)） |
+| システムプロンプトの構成可能性 | 順序とスコープローカルのシャドーイングを備えた `ctx.systemPrompt.section()` |
+| AGENTS.md（ルート） | ファイルを読むセクションプロバイダー |
+| AGENTS.md（サブディレクトリ、オンダッチ）+ ファイル変更通知 | ウォッチャー／ツール結果リスナーからの `agent.inject()` |
+| ビルトインツール | `ctx.tools.register()`。スキーマは自動的にアセンブリに流れ込む。`dsh-tool-*` ファミリー（bash、fs、web、subagent、todo）が出荷済みの例である |
+| ToolSearch / プログレッシブディスクロージャー | 可視セットの変化に応じてスコープ付き `ctx.tools.restrict()` 登録を置き換える。レジストリがプレゼンテーション、ルックアップ、実行を整列させ続ける |
+| ツールの期限／リトライ／メトリクス | `tools/execute` でコアディスパッチを包む。ラッパーは 1 つの字句的ライフタイム内で `exec.signal` を置き換え、委譲し、正規化された結果を検査できる |
+| 最終ツール結果のメトリクス／監査／キャプチャ | `tools/result` で不変の権威ある結果を観察する。プラグインが結果を変換したりコンテキストを付加したりする必要がある場合にのみ、代わりに `tools/post-execute` を使う |
+| 単調な終端ターンポリシー | 成功した終端ツールから `ToolExecution.concludeTurn()` を呼ぶ。同じレスポンス内の以降のツール呼び出しはガード可能なままで、ループはそのステップの後に停止する |
+| サブプロセスサンドボックス（landlock / sandbox-exec） | `dsh-bash-sandbox` を通じて `ctx.sandbox` バックエンドを使う。ケイパビリティレベルの拒否には `tools/pre-execute` を使う |
+| パーミッションシステム / AskUserQuestion | `tools/pre-execute` から `ask` を返し、`ctx.approval` を通じて回答する。通常のユーザーの質問には別個のモデル向け ask ツールを登録する |
+| プランモード | [`@deepseek-ai/dsh-plan-mode`](../../packages/plan/plan-mode/README.md) — ログに記録される `plan/mode` 状態、`plan:policy` ガイダンスセクション、`/plan [message]` エントリ、`/plan off` の直接終了、ユーザーレビュー付きの `exit_plan_mode` 終了。強制は独立した sandbox／approval の軸にとどまる |
+| サブエージェント委譲 | `ctx.subagents` プロバイダーレジストリ（`dsh-subagent-spawn-in-process`/`dsh-subagent-fork-in-process`/`dsh-subagent-acp`/`dsh-subagent-codex`/`dsh-subagent-claude-code`/`dsh-subagent-dsh-sdk`）+ 1 つの構成済みプロバイダーをモデルに公開する `dsh-tool-subagent` |
+| MCP | サーバーごとに 1 つのプラグイン: ツールを発見 → `ctx.tools.register()` |
+| スキル | セクション + ツール登録。呼び出し時にスキル内容を `inject()` する |
+| メモリ | セクションプロバイダー + ツール |
+| スケジュールタスク（cron） | プラグインがモデルから呼び出し可能なスケジューリングツールを登録する。期限の来たタイマーが `followup(…, {source: {kind: 'schedule'}})` を通じて配信する |
+| UI（GUI。CLI は JSONL を出力） | ライブチャンクには `agent/assistant-stream` を、durable な確定、境界、ツール活動には `session/event` をリッスンする。入力 → `followup()` |
+| Web Client Chat ビジネスノード | `ConversationNodeDefinition` と `conversation.chat.node` キー付きレンダラーを登録する |
+| SessionTelemetryBackend / リプレイ可能トレース | `session/event` → JSONL。リプレイ = `sessions.create(id, { seed })` |
+| モデルアダプター | `registerAdapter` 経由の `LlmAdapter` サブクラス（`dsh-llm-deepseek`、`dsh-llm-pi-ai`） |
+| プラグインホットリロード | すべての登録が `ctx.effect` → ベンダリング済み HMR がそのまま動作する |

@@ -1,12 +1,12 @@
-# Services and dependencies
+# サービスと依存関係
 
-English | [中文](service.zh.md)
+日本語 | [English](service.en.md) | [中文](service.zh.md)
 
-A service is a capability one plugin exposes to other plugins. `inject` declares the services a plugin requires.
+サービスは 1 プラグインが他プラグインに公開するケイパビリティです。`inject` はプラグインが必要とするサービスを宣言します。
 
-## What is a service?
+## サービスとは何か
 
-In Harness, `tools`, `llm`, and `agents` are services. Each is a named capability mounted on `ctx`:
+Harness では `tools`、`llm`、`agents` はサービスです。各々は `ctx` 上の名前付きケイパビリティです:
 
 ```ts ignore-check
 ctx.tools    // ToolRuntime service
@@ -14,11 +14,11 @@ ctx.llm      // LLM service
 ctx.agents   // Agent service
 ```
 
-Any plugin can provide a service for other plugins to consume.
+任意のプラグインは他プラグインが消費するサービスを提供できます。
 
-## Consume a service
+## サービスの消費
 
-Declare `inject` to use an existing service:
+既存サービスを使うには `inject` を宣言します:
 
 ```ts ignore-check
 export const inject = ['tools']
@@ -29,11 +29,11 @@ export function apply(ctx: Context) {
 }
 ```
 
-When `apply` runs, every service declared by `inject` is ready. If a service is not ready, the plugin waits instead of running.
+`apply` 実行時、`inject` が宣言するすべてのサービスは準備完了です。サービスが未準備の場合、プラグインは実行せず待機します。
 
-## Provide a service
+## サービスの提供
 
-### Extend Service
+### Service の拡張
 
 ```ts
 import { Service, type Context } from '@deepseek-ai/cordis'
@@ -52,7 +52,7 @@ export default class MetricsService extends Service {
 }
 ```
 
-After loading this plugin, consumers access the service as `ctx.metrics`:
+このプラグイン読込み後、コンシューマーはサービスに `ctx.metrics` としてアクセスします:
 
 ```ts ignore-check
 export const inject = ['metrics']
@@ -62,9 +62,9 @@ export function apply(ctx: Context) {
 }
 ```
 
-### Declare its type
+### 型の宣言
 
-Use TypeScript declaration merging to type `ctx.metrics`:
+TypeScript 宣言マージで `ctx.metrics` の型を付けます:
 
 ```ts
 import { Service, type Context } from '@deepseek-ai/cordis'
@@ -84,9 +84,9 @@ export default class MetricsService extends Service {
 }
 ```
 
-## Dependency behavior
+## 依存関係の動作
 
-### Required and optional dependencies
+### 必須および任意の依存関係
 
 ```ts ignore-check
 // Required: the plugin does not load while the service is absent.
@@ -99,18 +99,18 @@ export function apply(ctx: Context) {
 }
 ```
 
-### When a service disappears
+### サービスが消えるとき
 
-If a required service disappears while the application is running, for example because its provider unloads:
+アプリケーション実行中に必要なサービスが消えた場合、たとえばそのプロバイダーがアンロードされた場合:
 
-1. Dependent plugins dispose automatically.
-2. They load again when the service returns.
+1. 依存プラグインは自動破棄されます。
+2. サービス復帰時に再読込します。
 
-This prevents a plugin from calling a service that no longer exists.
+これにより存在しなくなったサービスをプラグインが呼ぶことを防ぎます。
 
-## Service isolation
+## サービス分離
 
-`cordis.yml` can isolate services so separate plugin groups see separate instances of the same service:
+`cordis.yml` はサービスを分離できるため、別プラグイン群は同じサービスの別インスタンスを見ます:
 
 ```yaml
 - id: group-a
@@ -136,13 +136,13 @@ This prevents a plugin from calling a service that no longer exists.
     - name: './src/plugin-b.ts'
 ```
 
-`plugin-a` and `plugin-b` each see the Bash instance in their own group, with no cross-group effect.
+`plugin-a` と `plugin-b` はそれぞれ自グループの Bash インスタンスを見、群またぎの効果はありません。
 
-## Built-in Harness services
+## 組込み Harness サービス
 
-The repository generates the service names, public methods, and source locations into each service's [subsystem page](../../../subsystems/core.md). Use those generated regions and the service's TypeScript interface while developing a plugin; do not maintain a second static list.
+リポジトリーはサービス名、公開メソッド、ソース位置を各サービスの[サブシステムページ](../../../subsystems/core.md)に生成します。プラグイン開発中はそれら生成領域とサービスの TypeScript インターフェースを使います。2 つ目の静的一覧を維持しません。
 
-## Next steps
+## 次の手順
 
 - [Event system](./events.md) — communicate between plugins without tight coupling
 - [Capability layering](../practice/index.md) — use services as capability interfaces

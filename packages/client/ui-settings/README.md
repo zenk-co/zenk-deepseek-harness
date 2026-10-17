@@ -1,118 +1,118 @@
 ---
-description: "Settings domain base plugin: shared configuration forms, schema service, and the canonical settings slot-type contract for the dsh web client."
+description: "設定ドメイン基盤プラグイン。dsh Web クライアント向け共有設定フォーム、スキーマサービス、正準設定スロット型契約。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-settings
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package lets web-client features expose editable preferences backed by the Host settings document without implementing their own transport or schema handling. Each feature gets namespace-scoped reads and writes, atomic multi-field updates, schema validation, and protection against silently overwriting concurrent changes. It also provides the standard extension points for settings chrome, pages, header actions, plugin tabs, and onboarding while rendering no interface itself. Any preference-owning feature can use it without depending on a presentation package; a separate package provides the settings shell.
+このパッケージは、Web クライアント機能が独自の転送やスキーマ処理を実装せずに、Host 設定文書に裏打ちされた編集可能設定を公開できるようにする。各機能は名前空間スコープの読み書き、アトミックな複数フィールド更新、スキーマ検証、同時変更への黙った上書き防止を得る。また設定 chrome・ページ・ヘッダーアクション・プラグイン方法・オンボーディングの標準拡張点を提供し、自らは何も描画しない。設定を持つ任意の機能は、表示パッケージに依存せずこれを使える。設定シェルは別パッケージが提供する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Feature plugins use this package to store and edit their preferences without re-implementing transport or schema handling. Mount it once per composition; it injects the `remote` service with its `settings` namespace and owns the single `settings.describe` reader in the browser.
+機能プラグインは、転送やスキーマ処理を再実装せずに好みを保存・編集するためこのパッケージを使う。合成ごとに 1 回マウントする。`remote` サービスをその `settings` 名前空間で注入し、ブラウザー内の単一 `settings.describe` リーダーを所有する。
 
-### Configuration forms
+### 設定フォーム
 
-`ctx.configForms.developerTools` owns the Coding Tools switch and the shared Web and desktop preference `ui-settings.enabled`, defaulting to `true`. Its `enabled` observable publishes accepted choices and `setEnabled` uses the same ordered settings writes. Desktop and every authenticated Web browser persist to the Host document. This controls presentation and HTML preview permissions, not Host authorization or Session recording. Host-backed clients keep developer features disabled until the first accepted schema-resolved value arrives; missing or failed initial responses do not enable them. Later refreshes retain the last accepted choice.
+`ctx.configForms.developerTools` は Coding Tools スイッチと共有 Web・desktop 設定 `ui-settings.enabled` (既定 `true`) を所有する。その `enabled` オブザーバブルは受理済み選択を公開し、`setEnabled` は同じ順序付き設定書き込みを使う。Desktop とすべての認証済み Web ブラウザーは Host 文書に永続化する。これは表示と HTML プレビュー権限を制御し、Host 認可や Session 記録は制御しない。Host 支援クライアントは、最初の受理済みスキーマ解決値が届くまで開発者機能を無効のままにする。初期応答の欠落や失敗は有効化しない。後のリフレッシュは最後の受理済み選択を保持する。
 
-Feature adapters use `ctx.configForms.get(entryId)` to obtain accepted values and a write queue shared by every editor of that Host entry. Snapshots contain resolved `value`, inherited `base`, raw `user`, revision, and writability. `set` and `unset` submit one operation; `mutate` submits one atomic operation list. Staged editors pass the revision read before editing; conflicts preserve their drafts. Unsetting removes the override and restores inheritance.
+機能アダプターは `ctx.configForms.get(entryId)` を使い、その Host エントリーの全エディターが共有する受理済み値と書き込みキューを得る。スナップショットは解決済み `value`、継承 `base`、生 `user`、リビジョン、書き込み可否を含む。`set` と `unset` は 1 操作を、`mutate` は 1 アトミック操作リストを送る。ステージングエディターは編集前に読んだリビジョンを渡し、競合はドラフトを保持する。アンセットは上書きを除去して継承を復元する。
 
-A configuration form persists through the Host settings service for every authenticated browser; the [authenticated-browser Host preferences note](../../../.agents/notes/implemented/bug-fix/2026-09-15-authenticated-browser-host-preferences.md) owns that policy. `settings.describe.writable` is the authority on whether a write is accepted.
+設定フォームはすべての認証済みブラウザー向けに Host 設定サービス経由で永続化される。このポリシーは[認証済みブラウザー Host 設定 Note](../../../.agents/notes/implemented/bug-fix/2026-09-15-authenticated-browser-host-preferences.md)が所有する。書き込み受理可否の権威は `settings.describe.writable` である。
 
-### Following served namespaces
+### 提供名前空間への追従
 
-A page that edits a namespace another plugin owns registers through `ctx.configForms.whileServed(namespaces, register)`: `register` runs once any listed namespace is in the shared mirror, receives the set of namespaces the Host serves, and returns the registration's disposer, which runs when none of them is served any more or when the disposer `whileServed` returns runs. The caller owns that returned disposer and wraps it in `ctx.effect`; unlike `get`, the service registers nothing on the caller's context. A deployment that never composed the owner therefore shows no trace of the page, and a namespace the Host stops serving withdraws it. The four official pages on the Plugins page ride it, one companion package each.
+別プラグインが所有する名前空間を編集するページは `ctx.configForms.whileServed(namespaces, register)` 経由で登録する。`register` は列挙名前空間のいずれかが共有ミラーに入った時点で 1 回動き、Host が提供する名前空間集合を受け取り、登録の disposer を返す。その disposer は、どれも提供されなくなった時点か、`whileServed` が返す disposer が動く時点で動く。呼び出し元は返された disposer を所有し `ctx.effect` で包む。`get` と異なり、サービスは呼び出し元コンテキストに何も登録しない。所有者を合成しなかったデプロイではページの痕跡は出ず、Host が提供を止めた名前空間は引っ込む。Plugins ページ上の 4 つの公式ページはこれに乗り、コンパニオンパッケージごとに 1 つである。
 
-### Filling the settings slots
+### 設定スロットの充填
 
-A settings surface registers into the slot types this package declares. The shell (`sidebar.settings` occupant, navigation, chrome) lives in ui-settings-general; feature pages register `settings.section` contributions; the Plugins section hosts `settings.plugins.tab` pages; onboarding steps register `settings.onboarding`. Cross-namespace surfaces (schema introspection, the served-namespace directory, `hasDocument`) read the same mirror through `ctx.configForms.describe()`.
+設定サーフェスはこのパッケージが宣言するスロット型に登録する。シェル (占有者 `sidebar.settings`、ナビゲーション、chrome) は ui-settings-general にあり、機能ページは `settings.section` 貢献を登録する。Plugins セクションは `settings.plugins.tab` ページをホストし、オンボーディング手順は `settings.onboarding` を登録する。横断名前空間サーフェス (スキーマ内観、提供名前空間ディレクトリ、`hasDocument`) は同じミラーを `ctx.configForms.describe()` 経由で読む。
 
-### Observable success and failures
+### 観測可能な成功と失敗
 
-A committed write folds its answer into the shared mirror. Refused writes refresh the latest Host values. Browser validation uses the serialized Config schema; the Host validates complete configuration, including checks that cannot be serialized.
+コミット済み書き込みはその回答を共有ミラーに折り込む。拒否された書き込みは最新の Host 値をリフレッシュする。ブラウザー検証は直列化 Config スキーマを使い、Host は直列化できない検査を含む完全構成を検証する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-The optional `settings.launcher` contribution receives sidebar geometry, whether the open Settings panel covers the sidebar, the settings navigation callbacks, and the effective Settings key labels and accessible combination. The shell omits shortcut presentation for an unbound command and retains its plain Settings trigger when no launcher is registered.
+任意 `settings.launcher` 貢献は、サイドバージオメトリ、開いた Settings パネルがサイドバーを覆うか、設定ナビゲーションコールバック、実効 Settings キーラベルとアクセス可能組み合わせを受け取る。シェルは、束縛なしコマンドのショートカット表示を省き、launcher 登録なしでは素の Settings トリガーを保持する。
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The package realizes one ownership rule: the browser keeps one shared mirror of the settings document, and every derived surface reads that single source, so any moment in time shows the same document revision.
+このパッケージは 1 つの所有権規則を実現する。ブラウザーは設定文書の共有ミラーを 1 つ保持し、すべての派生サーフェスはその単一情報源を読むため、任意の瞬間に同じ文書リビジョンを示す。
 
-### The describe mirror
+### describe ミラー
 
-The Host Config of the `ui-settings` entry declares the default-on `enabled` preference. The Client plugin injects `remote` with its `settings` namespace and owns the one `settings.describe` reader in the browser: a shared mirror refreshed on every forwarded `settings/document-updated` event and on `connection/reset` (the first connection included, closing the window where a commit lands between the eager read and the SSE subscription). Cross-namespace surfaces read it through `ctx.configForms.describe()`, a read/fold face (`getSnapshot`/`subscribe`/`ensure`, plus `acceptView` folding a write answer in).
+`ui-settings` エントリーの Host Config は既定オン `enabled` 設定を宣言する。Client プラグインは `remote` をその `settings` 名前空間で注入し、ブラウザー内の唯一 `settings.describe` リーダーを所有する。転送済み `settings/document-updated` イベントごとと `connection/reset` 時 (初回接続を含む、積極読み取りと SSE 購読の間にコミットが着地する窓を閉じる) にリフレッシュされる共有ミラーである。横断名前空間サーフェスは `ctx.configForms.describe()` 経由でそれを読む。読み/折り込み面 (`getSnapshot`/`subscribe`/`ensure`、書き込み回答を折り込む `acceptView` 付き) である。
 
-### Shared entry writes
+### 共有エントリー書き込み
 
-The provider owns one controller per Host entry, including its subscription and write queue; repeated `get(entryId)` calls return the same form. Consumers release their own view subscriptions. No caller-scoped configuration binding is created. The startup RPC budget covers the shared describe reader.
+プロバイダーは Host エントリーごとに購読と書き込みキューを含むコントローラーを 1 つ所有する。繰り返しの `get(entryId)` は同じフォームを返す。コンシューマーは独自ビュー購読を解放する。呼び出し元スコープ設定束縛は作られない。起動 RPC 予算は共有 describe リーダーを扱う。
 
-### Schema service
+### スキーマサービス
 
-`ctx.settingsSchema` rehydrates schemas, validates drafts, and edits nested values. Invalid wire values do not replace accepted values.
+`ctx.settingsSchema` はスキーマを再水和し、ドラフトを検証し、入れ子値を編集する。無効な wire 値は受理済み値を置き換えない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the settings surface family and the durable seam behind it.
+これらのページは設定サーフェスファミリーとその背後の耐久シームを扱う。
 
-- [ui-settings-general](../ui-settings-general/README.md) — the settings shell: trigger chrome, navigation, General section, onboarding projection.
-- [ui-settings-plugins](../ui-settings-plugins/README.md) — the Built-in plugins section shell around the inventory tab.
-- [ui-settings-shell](../ui-settings-shell/README.md), [ui-settings-agent-loop](../ui-settings-agent-loop/README.md), [ui-settings-subagent](../ui-settings-subagent/README.md), [ui-settings-web-search](../ui-settings-web-search/README.md) — the official configuration pages on the Plugins page, each following its namespaces through `whileServed`.
-- [ui-settings-models](../ui-settings-models/README.md) — the Models page and DeepSeek onboarding over this base.
-- [settings](../../settings/README.md) — the durable user-settings seam and its file provider.
-- [ui-sidebar](../ui-sidebar/README.md) — the sidebar shell whose bottom seat hosts the settings trigger.
+- [ui-settings-general](../ui-settings-general/README.md) — 設定シェル。トリガー chrome、ナビゲーション、General セクション、オンボーディング投影。
+- [ui-settings-plugins](../ui-settings-plugins/README.md) — 目録方法周りの Built-in plugins セクションシェル。
+- [ui-settings-shell](../ui-settings-shell/README.md)、[ui-settings-agent-loop](../ui-settings-agent-loop/README.md)、[ui-settings-subagent](../ui-settings-subagent/README.md)、[ui-settings-web-search](../ui-settings-web-search/README.md) — Plugins ページ上の公式設定ページ。各々 `whileServed` で名前空間を追う。
+- [ui-settings-models](../ui-settings-models/README.md) — Models ページとこの基盤上の DeepSeek オンボーディング。
+- [settings](../../settings/README.md) — 耐久ユーザー設定シームとそのファイルプロバイダー。
+- [ui-sidebar](../ui-sidebar/README.md) — 設定トリガーを下部座席にホストするサイドバーシェル。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+なし。このパッケージはブラウザー側 UI プラグイン層であり、モデルに面した登録は一切ない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the settings transport's reach and who shares a settings document; they are current package constraints.
+これらの制限は設定転送の到達範囲と設定文書共有者を定義する。これらは現在のパッケージ制約である。
 
-- **Host preferences are shared across authenticated entries** — browsers accessing the same settings document share its persisted preferences, rather than retaining per-browser choices.
+- **Host 設定は認証済みエントリー横断で共有される** — 同じ設定文書に触るブラウザーは永続設定を共有し、ブラウザー単位選択は保持しない。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

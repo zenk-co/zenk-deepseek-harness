@@ -5,84 +5,84 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-browser-use
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-A deployment can enable one browser-use provider at a time. Loading another provider fails with the registered provider name. Each provider supplies its own tools and owns browser sessions. This package adds no model-visible tools or browser operations.
+デプロイでは一度に 1 つの browser-use プロバイダーを有効にできる。別のプロバイダーを読み込むと、登録済みプロバイダー名で失敗する。各プロバイダーは独自のツールを提供し、ブラウザーセッションを所有する。このパッケージはモデル可視のツールやブラウザー操作を追加しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しにした作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the service once beside the chosen provider in a Cordis composition:
+選択したプロバイダーと並べて、サービスを 1 回マウントする（Cordis 構成内）:
 
 ```yaml
 - name: '@deepseek-ai/dsh-browser-use'
 ```
 
-The service has no configuration. Provider plugins inject `browserUse` and call `ctx.browserUse.register(BrowserUseProviderName(name))`; the brand is exported from `@deepseek-ai/dsh-browser-use/brand`. The returned effect disposer releases that registration.
+このサービスに設定はない。プロバイダープラグインは `browserUse` をインジェクトし、`ctx.browserUse.register(BrowserUseProviderName(name))` を呼び出す。このブランドは `@deepseek-ai/dsh-browser-use/brand` からエクスポートされる。返されるエフェクト破棄子がその登録を解放する。
 
-Providers stop admitting tool calls, close their resources, and await owned work before releasing the registration. `ctx.browserUse.providerName` reports the registered name until release.
+プロバイダーはツール呼び出しの受け付けを停止し、リソースを閉じ、登録を解放する前に所有する作業を待機する。`ctx.browserUse.providerName` は解放まで登録名を報告する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-One private name owns the slot. Cordis effects remove contributions when their plugin unloads; a repeated disposer cannot remove a later registration. The [source](src/index.ts) contains no browser object, operation interface, resource lifecycle, or provider selector.
+1 つのプライベート名がスロットを所有する。プラグインのアンロード時に Cordis エフェクトが提供物を除去し、繰り返された破棄子が後の登録を除去することはない。[ソース](src/index.ts)にはブラウザーオブジェクト、操作インターフェース、リソースライフサイクル、プロバイダーセレクターは含まれない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Browser use](../../../docs/subsystems/browser-use.md) — provider selection and Session ownership.
-- [Playwright MCP provider](../../experimental/browser-use-playwright-mcp/README.md) — Playwright browser tools.
-- [Chrome DevTools MCP provider](../../experimental/browser-use-chrome-devtools-mcp/README.md) — Chromium inspection and control.
-- [Stagehand provider](../../experimental/browser-use-stagehand-native/README.md) — native browser operations with AI assistance.
+- [Browser use](../../../docs/subsystems/browser-use.md) — プロバイダー選択とセッション所有権。
+- [Playwright MCP プロバイダー](../../experimental/browser-use-playwright-mcp/README.md) — Playwright ブラウザーツール。
+- [Chrome DevTools MCP プロバイダー](../../experimental/browser-use-chrome-devtools-mcp/README.md) — Chromium の検査と制御。
+- [Stagehand プロバイダー](../../experimental/browser-use-stagehand-native/README.md) — AI 支援付きネイティブブラウザー操作。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this registry only records provider names.
+なし。このレジストリーはプロバイダー名を記録するだけである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Registration does not alter model requests. Provider-owned tools and guidance determine their own request-prefix effects.
+登録によってモデルリクエストは変わらない。プロバイダー所有のツールとガイダンスが、それぞれのリクエストプレフィックスへの影響を決定する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しにした作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-The service limits registrations within its Cordis service instance.
+このサービスは Cordis サービスインスタンス内での登録を制限する。
 
-- **Browser ownership** — providers own browser resources and enforce Session isolation; this service stores no browser state.
-- **Provider selection** — configuration selects the provider; the model cannot switch registered backends at runtime.
+- **ブラウザー所有権** — プロバイダーはブラウザーリソースを所有し、セッション分離を強制する。このサービスはブラウザー状態を格納しない。
+- **プロバイダー選択** — プロバイダーは設定で選択する。モデルは実行時に登録済みバックエンドを切り替えられない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

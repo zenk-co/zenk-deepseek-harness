@@ -5,13 +5,13 @@ kind: persistence-change
 
 # 2026-10-05-ptc-operation-metadata
 
-English | [中文](2026-10-05-ptc-operation-metadata.zh.md)
+日本語 | [English](2026-10-05-ptc-operation-metadata.en.md) | [中文](2026-10-05-ptc-operation-metadata.zh.md)
 
-## Summary
+## 概要
 
-Adds optional pure presentation metadata to persisted nested PTC tool results so history retains operation-time directories and file targets.
+永続化されたネスト PTC ツール結果に任意の純粋表示用メタデータを追加し、履歴が操作時のディレクトリとファイル対象を保持できるようにする。
 
-## Table of Contents
+## 目次
 
 - [Declaration](#declaration)
 - [Compatibility](#compatibility)
@@ -19,7 +19,7 @@ Adds optional pure presentation metadata to persisted nested PTC tool results so
 - [Dev Note](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -33,16 +33,16 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-Existing tool/ptc-dispatch records without meta remain valid. The optional JsonValue field does not change canonical program values, model-visible content, tool identities or message ordering. Historical calls without a recorded relative target keep safe unavailable navigation. The writer and accepted baseline stay at V4.
+meta の無い既存 tool/ptc-dispatch 記録は引き続き有効である。任意の JsonValue フィールドは正規プログラム値、モデル可視コンテンツ、ツール同一性、メッセージ順序を変更しない。記録された相対対象の無い履歴呼び出しは安全な利用不能ナビゲーションを保つ。ライターと承認済みベースラインは V4 のままである。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-963 focused tests passed with per-file 100% coverage of the six affected runtime/UI sources; actual nested shell and relative filesystem regressions, frozen metadata controls, TypeScript SDK 45 tests, Python SDK 29 tests and three owning keyless refresh/replays passed.
+963 件の対象テストが影響する 6 ランタイム/UI ソースのファイル単位 100% カバレッジで合格した。実際のネストシェルと相対ファイルシステム回帰、凍結メタデータ制御、TypeScript SDK 45 テスト、Python SDK 29 テスト、所有する 3 件のキーレス refresh/replay が合格した。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 None.

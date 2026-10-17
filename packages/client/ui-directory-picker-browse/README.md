@@ -1,87 +1,87 @@
 ---
-description: "In-app directory-browsing surface: the Miller-column Select Workspace Directory dialog that fills workspace directory flows; for users and maintainers of the Web picking experience."
+description: "アプリ内ディレクトリ閲覧面:ワークスペースディレクトリフローを満たす Miller カラムのワークスペースディレクトリ選択ダイアログ。Web 選択体験の利用者と保守者向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-directory-picker-browse
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package provides the in-app directory-browsing surface for the Web GUI: a Select Workspace Directory dialog that lists, navigates, and creates folders through the local Host, with no operating-system chooser involved. It fills the two directory-flow slots declared by `ui-workspace`, composing the client side of the browse picking interaction in one cordis.yml row. Choose it when the browser is remote or in-process and no local OS chooser exists; local deployments may prefer the [`-native`](../ui-directory-picker-native/README.md) surface.
+このパッケージは Web GUI 向けのアプリ内ディレクトリ閲覧面を提供する。ローカルホスト越しにフォルダーを一覧・移動・作成するワークスペースディレクトリ選択ダイアログであり、OS の選択部品は介在しない。`ui-workspace` が宣言する 2 つのディレクトリフロー用スロットを満たし、1 つの cordis.yml 行で閲覧選択操作のクライアント側を合成する。ブラウザーがリモートまたはプロセス内にあり、ローカル OS 選択部品がない場合に選ぶこと。ローカルデプロイでは [`-native`](../ui-directory-picker-native/README.md) 面が好ましい場合がある。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin alongside `ui-workspace` and the host backend [`dsh-host-directory-picker-browse`](../../host/directory-picker-browse/README.md); one cordis.yml row then composes the whole browse picking interaction. When a workspace flow opens a directory request, the user sees the in-app dialog: a header with the path breadcrumb and an editable path zone, then a single full-width level until a row is selected, after which the row splits into level and children columns.
+`ui-workspace` とホストバックエンド [`dsh-host-directory-picker-browse`](../../host/directory-picker-browse/README.md) と並べてこのプラグインをマウントすると、1 つの cordis.yml 行で閲覧選択操作全体が合成される。ワークスペースフローがディレクトリ要求を開くと、利用者はアプリ内ダイアログを見る。パス表示と編集可能パス域を持つヘッダー、次に行選択までは単一全幅水準、行選択後は水準と子水準に割れる列である。
 
-### Navigating and creating
+### 移動と作成
 
-Step through folders, edit the path directly, or filter the last pane by prefix; a Host-flagged hidden entry stays hidden until the footer toggle reveals it. **New folder** opens a nested create dialog targeting the selected folder and selects what it creates; **Open** adopts the selected folder, falling back to the listed level. Confirming a directory is the picked path; dismissing the dialog is the cancellation.
+フォルダーを辿るか、パスを直接編集するか、最終ペインを接頭辞で絞る。ホストが隠し指定したエントリーは、フッターの切り替えで表示するまで隠れたままである。**新規フォルダー**は選択フォルダーを対象とする入れ子の作成ダイアログを開き、作成したものを選択する。**開く**は選択フォルダーを採用し、なければ一覧水準にフォールバックする。ディレクトリの確定が選択パスであり、ダイアログの破棄が取り消しである。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-The dialog is a 680×500 Miller-column view (clamped on short or narrow viewports), driven by the host `listDirectory` and `createDirectory` primitives through `ctx.workspaces`. Both registrations install as one transactional effect through nested `ctx.slots.inject()` calls, because either declaring entry may activate later or replace its declaration; the dialog's copy lives in this package's own locale namespace so the two dictionaries land as a unit. Browse failures stay inside the dialog's own alert surfaces, so this occupant never drives the owner's `onError` arm. The node half is an empty `apply` that keeps the plugin on the host roster.
+ダイアログは 680×500 の Miller カラムビュー（短い・狭いビューポートでは収める）であり、`ctx.workspaces` 越しのホスト `listDirectory`・`createDirectory` プリミティブで駆動する。両登録は入れ子の `ctx.slots.inject()` 呼び出しで 1 トランザクション効果として設置される。宣言エントリーのいずれも後から有効化・宣言置換がありうるためである。ダイアログのコピーはこのパッケージ独自のロケール名前空間にあり、2 辞書が 1 単位で着地する。閲覧失敗はダイアログ独自の警告面内に留まるため、この占有者は所有者の `onError` 側を駆動しない。ノード側はホスト名簿にプラグインを保つ空 `apply` である。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the picking surface is not enough. They move from the browser half to the host backend and the slots it fills.
+選択面だけでは足りないときにこれらのページを読む。ブラウザー側からホストバックエンドとそれが満たすスロットへ進む。
 
-- [dsh-host-directory-picker-browse](../../host/directory-picker-browse/README.md) — the directory-listing backend this surface drives.
-- [ui-workspace](../ui-workspace/README.md) — declares the directory-flow slots and owns the picking conversation.
-- [ui-directory-picker-native](../ui-directory-picker-native/README.md) — the native OS-chooser alternative for local deployments.
-- [Web client architecture](../../../docs/subsystems/web-client.md) — how browser plugin rows load and register slots.
+- [dsh-host-directory-picker-browse](../../host/directory-picker-browse/README.md) — この面が駆動するディレクトリ一覧バックエンド。
+- [ui-workspace](../ui-workspace/README.md) — ディレクトリフロー用スロットを宣言し、選択会話を所有する。
+- [ui-directory-picker-native](../ui-directory-picker-native/README.md) — ローカルデプロイ向けのネイティブ OS 選択肢。
+- [Web クライアントアーキテクチャ](../../../docs/subsystems/web-client.md) — ブラウザープラグイン行の読み込みとスロット登録。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the directory browser is browser chrome; nothing here reaches a model request.
+なし。ディレクトリブラウザーはブラウザー装飾であり、ここの何もモデル要求に届かないため。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダー要求を組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the current browse surface. They are current package constraints, not a general file-browser comparison or a task backlog.
+現在の閲覧面を定める制限である。汎用ファイルブラウザー比較でもタスクのバックログでもなく、現在のパッケージ制約である。
 
-- **No search, no multi-select, and no rename or delete** — the dialog lists and creates directories; a target is reached by navigating, editing the path, or filtering the last pane by prefix.
-- **Hidden-entry filtering is client-side** — the Host always lists hidden entries and flags them, so the toggle changes only what the dialog renders.
+- **検索・複数選択・名前変更や削除なし** — ダイアログはディレクトリを一覧・作成する。対象には移動・パス編集・最終ペインの接頭辞絞り込みで到達する。
+- **隠しエントリーの絞り込みはクライアント側** — ホストは常に隠しエントリーを一覧して印を付けるため、切り替えはダイアログの描画のみを変える。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

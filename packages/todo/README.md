@@ -5,13 +5,13 @@ kind: "package-group"
 
 # packages/todo
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The todo group gives agents a session-level task list to plan with: add tasks, mark them in progress, and check them off, with the same list persisting across turns and reopened sessions. It is one product package that provides the `todo_write` tool; the list belongs to the agent session that created it, and each update replaces the whole list. Interactive hosts show the standing plan from the list, while the group itself ships no UI.
+todo グループはエージェントにセッションレベルのタスクリストを計画用に与える: タスクを追加し、進行中に印を付け、完了にチェックし、同じリストがターンや再開したセッションをまたいで持続する。`todo_write` ツールを提供する一つの製品パッケージであり、リストはそれを作成したエージェントセッションに属し、各更新はリスト全体を置き換える。対話型ホストはリストから現在の計画を表示するが、グループ自体は UI を出荷しない。
 
-## Table of Contents
+## 目次
 
 - [Packages](#packages)
 - [Related documentation](#related-documentation)
@@ -20,26 +20,26 @@ The todo group gives agents a session-level task list to plan with: add tasks, m
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`tool-todo`](tool-todo/README.md) | Lets the agent maintain a session task list: plan tasks, update status, and track progress | registers on `ctx.tools` |
+| [`tool-todo`](tool-todo/README.md) | エージェントにセッションタスクリストを維持させる: タスクを計画し、状態を更新し、進捗を追跡する | registers on `ctx.tools` |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [Todo subsystem](../../docs/subsystems/todo.md) — the `todo/write` event payload, ownership rules, and `TodoItem`.
-- [Generated tool catalog](../../docs/tool-catalog.md#deepseek-aidsh-tool-todo) — the `todo_write` schema the model receives.
-- [Generated configuration catalog](../../docs/config-catalog.md#deepseek-aidsh-tool-todo) — every accepted config field.
-- [todo_write tool Agent Note](../../.agents/notes/archived/feature/2026-06-29-todo-write-tool.md) — the original design and its alternatives.
+- [Todo サブシステム](../../docs/subsystems/todo.md) — `todo/write` イベントペイロード、所有権規則、`TodoItem`。
+- [生成ツールカタログ](../../docs/tool-catalog.md#deepseek-aidsh-tool-todo) — モデルが受け取る `todo_write` スキーマ。
+- [生成設定カタログ](../../docs/config-catalog.md#deepseek-aidsh-tool-todo) — 受け付けるすべての設定フィールド。
+- [todo_write ツール Agent Note](../../.agents/notes/archived/feature/2026-06-29-todo-write-tool.md) — 本来の設計と代替案。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

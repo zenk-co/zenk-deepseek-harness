@@ -1,122 +1,122 @@
 ---
-description: "Outbound HTTP proxy support for the harness: how one policy resolved from the launch environment reaches every request Node's fetch would otherwise send direct."
+description: "ハーネスのアウトバウンド HTTP プロキシサポート: 起動環境から解決された 1 つのポリシーが、Node の fetch がそうでなければ直接送るであろうすべてのリクエストにどのように届くか。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-http-proxy
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to apply one outbound HTTP proxy policy to Harness requests that use Node's built-in `fetch`, including LLM, web-search, and HTTP MCP traffic. The launcher reads standard proxy environment variables once, and ordinary `fetch` callers require no extra imports or changes. Local loopback traffic stays direct, while unsupported proxy URLs are reported and skipped for the affected scheme. Public helpers let callers route transports with their own proxy settings, prepare child-process environments, or clear proxy variables for isolated replays.
+このパッケージは、Node の組み込み `fetch` を使う Harness リクエスト — LLM、web-search、HTTP MCP トラフィックを含む — に 1 つのアウトバウンド HTTP プロキシポリシーを適用するために使う。ランチャーは標準のプロキシ環境変数を一度読み、通常の `fetch` 呼び出し元は追加のインポートも変更も必要としない。ローカルループバックトラフィックは直接のままにとどまり、サポートされないプロキシ URL は報告され、影響を受けるスキームについてスキップされる。公開ヘルパーにより、呼び出し元は自身のプロキシ設定でトランスポートをルーティングし、子プロセス環境を準備し、または分離されたリプレイ用にプロキシ変数をクリアできる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Nothing to mount, and nothing to configure. The `dsh` launcher resolves and installs the policy for every profile before the first plugin loads, so a user who exports `HTTPS_PROXY` is proxied everywhere. This is a library rather than a plugin because transport policy has one answer per process: there is no second implementation to swap and no scope narrower than the process to give one.
+マウントするものも、構成するものもない。`dsh` ランチャーは最初のプラグインがロードされる前にすべてのプロファイルについてポリシーを解決してインストールするため、`HTTPS_PROXY` を export したユーザーはどこでもプロキシされる。これがプラグインではなくライブラリーであるのは、トランスポートポリシーはプロセスごとに 1 つの答えを持つからである: 差し替える第 2 の実装も、プロセスより狭いスコープに答えを与えることもない。
 
-### Writing a new outbound call
+### 新しいアウトバウンド呼び出しを書く
 
-Plain `fetch()` is proxied, and so is any SDK that reaches `globalThis.fetch` — the MCP HTTP transport and the pi-ai provider stack both do. Verify each SDK's actual transport; exceptions belong under [Known Limitations and Deferred Work](#known-limitations-and-deferred-work).
+素の `fetch()` はプロキシされ、`globalThis.fetch` に到達する SDK も同様である — MCP HTTP トランスポートと pi-ai プロバイダースタックはどちらもそうする。各 SDK の実際のトランスポートを検証すること。例外は[既知の制限と延期された作業](#known-limitations-and-deferred-work)に属する。
 
-| You are writing | Use |
+| 書いているもの | 使うもの |
 |---|---|
-| A plain request, or an SDK that reaches `globalThis.fetch` | nothing — the global dispatcher already routes it |
-| A call that must branch on whether this request is proxied | `proxyRouteFor(url)` |
-| An SDK that takes a proxy URL of its own | `proxyRouteFor(url)`, and pass `route.proxy` |
-| A spawn whose environment you build yourself | apply `proxyEnvironmentForChild()` to it (`undefined` means remove) |
-| A harness that must reach its own fixture server | apply `clearedProxyEnv()` to the spawn |
+| 素のリクエスト、または `globalThis.fetch` に到達する SDK | なし — グローバルディスパッチャーがすでにルーティングする |
+| このリクエストがプロキシされるかで分岐する必要がある呼び出し | `proxyRouteFor(url)` |
+| 独自のプロキシ URL を取る SDK | `proxyRouteFor(url)`、そして `route.proxy` を渡す |
+| 環境を自分で組み立てる spawn | それに `proxyEnvironmentForChild()` を適用する (`undefined` は除去を意味する) |
+| 自身のフィクスチャサーバーに到達しなければならないハーネス | spawn に `clearedProxyEnv()` を適用する |
 
-`proxyRouteFor` answers with the transport that answer assumed, not just the answer: its proxied arm carries the dispatcher already routing by this policy. A caller that read the policy and then built its own transport could have an unmount land between the two and send the request somewhere its branch never cleared.
+`proxyRouteFor` は答えだけでなく、その答えが前提としたトランスポートも返す: そのプロキシ側の腕は、このポリシーによってすでにルーティングしているディスパッチャーを運ぶ。ポリシーを読んでから独自のトランスポートを組み立てた呼び出し元は、その間にアンマウントが入り込み、その分岐が決してクリアしなかった場所にリクエストを送る可能性がある。
 
-Constructing `new Agent(...)` and passing it as `dispatcher` overrides the global one and silently bypasses the proxy. `verify-no-bare-dispatcher` rejects that outside this package. One call site legitimately owns its transport — `web-fetch-http` pins a request to addresses it validated, which is per-request state a process-wide dispatcher cannot hold — and says so with a `proxy-exempt:` comment on the line.
+`new Agent(...)` を構築して `dispatcher` として渡すと、グローバルなものを上書きし、プロキシを暗黙にバイパスする。`verify-no-bare-dispatcher` はこのパッケージの外でのそれを拒否する。1 つの呼び出し箇所が正当に自身のトランスポートを所有する — `web-fetch-http` はリクエストを自身が検証したアドレスに固定する。これはプロセス全体のディスパッチャーが保持できないリクエストごとの状態である — そしてその行に `proxy-exempt:` コメントを付けてそう明言する。
 
-That gate cannot see inside an SDK, so each outbound call site carries an `egress.spec.ts` that drives its actual transport through a fake proxy and checks the observed route. Every new outbound call site must include that transport test. Telemetry asserts its direct-route exception. These tests detect dependency changes that alter routing without changing the call site.
+そのゲートは SDK の内側を見ることができないため、各アウトバウンド呼び出し箇所は `egress.spec.ts` を持ち、実際のトランスポートを偽のプロキシを通して駆動し、観測されたルートをチェックする。新しいアウトバウンド呼び出し箇所はすべてそのトランスポートテストを含めなければならない。Telemetry は自身の直接ルートの例外を表明する。これらのテストは、呼び出し箇所を変えずにルーティングを変える依存の変更を検出する。
 
-### What the policy reads
+### ポリシーが読むもの
 
-`http_proxy`, `https_proxy`, `no_proxy`, and `all_proxy`, lowercase first and uppercase as the fallback, with a blank value treated as unset. `ALL_PROXY` backs both schemes, and HTTPS falls back to the HTTP proxy last — neither Node nor undici derives the first of these on its own. Values come from the launcher's snapshot: an exported variable first, then `$DSH_HOME/.env`. A project's own `.env` cannot carry these names — that file arrives with a clone, and the launcher refuses to start rather than let a repository choose where the harness sends its traffic.
+`http_proxy`、`https_proxy`、`no_proxy`、`all_proxy` で、小文字が先で大文字がフォールバックであり、空の値は未設定として扱われる。`ALL_PROXY` は両方のスキームを支え、HTTPS は最後に HTTP プロキシへフォールバックする — Node も undici もこれらのうち前者を自ら導出しない。値はランチャーのスナップショットから来る: まず export された変数、次に `$DSH_HOME/.env`。プロジェクト自身の `.env` はこれらの名前を運べない — そのファイルはクローンとともに届き、ランチャーはリポジトリにハーネスのトラフィックの送り先を選ばせるより起動を拒否する。
 
-Loopback is always bypassed — `localhost`, the whole `127.0.0.0/8` range, `::1`, `0.0.0.0`, and the IPv4-mapped spellings of those. The harness's own Web UI, Connection transport, and every local test server would otherwise route through the proxy and loop. The published bypass list names only the four literal entries an environment reader can match; `proxyForUrl` recognises the range itself, because a list entry cannot express one.
+ループバックは常にバイパスされる — `localhost`、`127.0.0.0/8` 範囲全体、`::1`、`0.0.0.0`、およびそれらの IPv4 マップ表記。そうでなければハーネス自身の Web UI、Connection トランスポート、すべてのローカルテストサーバーがプロキシ経由でルーティングされ、ループする。公開されるバイパスリストは、環境リーダーがマッチできる 4 つのリテラルエントリーのみを名指す。`proxyForUrl` は範囲自体を認識する。リストエントリーは範囲を表現できないからである。
 
-### Failures
+### 失敗
 
-A proxy value the package cannot use — a SOCKS or PAC URL, an unparseable string, an unsupported scheme — is reported and skipped, and that scheme connects directly. The variable may have been exported for other tools, so it must not stop the agent from starting.
+パッケージが使えないプロキシ値 — SOCKS または PAC URL、パース不能な文字列、サポートされないスキーム — は報告されスキップされ、そのスキームは直接接続する。その変数は他のツールのために export された可能性があるため、agent の起動を止めてはならない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-### Design philosophy
+### 設計思想
 
-**One resolution, one matcher.** `proxyForUrl()` and the installed dispatcher must never disagree about a URL, or `dsh-web-fetch-http` would pin a connection the dispatcher meant to tunnel. The dispatcher is therefore an `Agent` whose per-origin `factory` calls `proxyForUrl()` itself, so there is no second parser to drift from the first. undici's `EnvHttpProxyAgent` cannot serve here: with no `HTTPS_PROXY` present it reuses the HTTP proxy for `https:`, which would tunnel a scheme this package keeps direct after refusing the URL the user named for it.
+**1 つの解決、1 つのマッチャー。** `proxyForUrl()` とインストールされたディスパッチャーは URL について決して食い違ってはならない。さもなければ `dsh-web-fetch-http` が、ディスパッチャーがトンネルするつもりだった接続を固定してしまう。したがってディスパッチャーは、オリジンごとの `factory` が `proxyForUrl()` 自体を呼ぶ `Agent` であり、最初のものからドリフトする第 2 のパーサーは存在しない。undici の `EnvHttpProxyAgent` はここでは機能しない: `HTTPS_PROXY` が存在しないとき、`https:` に HTTP プロキシを再利用し、ユーザーがそのために名指した URL を拒否した後にこのパッケージが直接のまま保つスキームをトンネルしてしまう。
 
-**A child inherits the user's own values, and the resolved policy for what they left unset.** A scheme the user named in either casing reaches a child exactly as they wrote it, so a SOCKS proxy `curl` uses is never replaced by an HTTP one named for another scheme. A scheme they named in neither casing carries the resolved value instead, because otherwise the child's routing diverges from its parent's: Node's `NODE_USE_ENV_PROXY` does not read `ALL_PROXY`. The bypass list is always the resolved one — it only ever adds the loopback entries, so nothing the user wrote is lost. The cost of one routing answer for parent and child alike is that `curl` also sees the `https:` proxy this package derives from the HTTP one. One exception protects the child itself: when a value it receives is one this package refused — a SOCKS URL kept for `curl` — the `NODE_USE_ENV_PROXY` flag is withheld, because Node parses `HTTP_PROXY` and `HTTPS_PROXY` under that flag before running the program and exits on such a value. A child Node then connects directly, as this process already reported for that scheme, instead of failing to start.
+**子はユーザー自身の値と、ユーザーが未設定のままにしたものについての解決済みポリシーを継承する。** ユーザーがどちらかのケーシングで名指したスキームは、ユーザーが書いたとおりに子に届くため、`curl` が使う SOCKS プロキシが別のスキーム用に名指された HTTP のものに置き換えられることは決してない。どちらのケーシングでも名指されなかったスキームは代わりに解決済みの値を運ぶ。そうでなければ子のルーティングが親から乖離するからである: Node の `NODE_USE_ENV_PROXY` は `ALL_PROXY` を読まない。バイパスリストは常に解決済みのものである — ループバックエントリーを加えるだけなので、ユーザーが書いたものは何も失われない。親と子の両方に 1 つのルーティングの答えを与えるコストは、`curl` がこのパッケージが HTTP から導出した `https:` プロキシも見てしまうことである。1 つの例外が子自体を保護する: 子が受け取る値がこのパッケージが拒否したもの — `curl` 用に保たれた SOCKS URL — である場合、`NODE_USE_ENV_PROXY` フラグは差し控えられる。Node はそのフラグの下でプログラムを実行する前に `HTTP_PROXY` と `HTTPS_PROXY` をパースし、そのような値で終了するからである。子 Node はそのスキームについてこのプロセスがすでに報告したように直接接続し、起動に失敗することはない。
 
-### Source map
+### ソースマップ
 
-| File | Holds |
+| ファイル | 内容 |
 |---|---|
-| `src/policy.ts` | Resolution and bypass matching; a diagnostic names the variable, never its value. Imports no transport, so it stays loadable where undici is absent. |
-| `src/install.ts` | The global dispatcher, the active-policy record, the route, and the child environment. Imports undici dynamically. |
-| `src/index.ts` | The package face: four functions and one type. |
+| `src/policy.ts` | 解決とバイパスマッチング。診断は変数を名指し、その値を名指すことは決してない。トランスポートをインポートしないため、undici が存在しない場所でもロード可能なままである。 |
+| `src/install.ts` | グローバルディスパッチャー、アクティブポリシーレコード、ルート、および子環境。undici を動的にインポートする。 |
+| `src/index.ts` | パッケージのフェイス: 4 つの関数と 1 つの型。 |
 
-### Bypass matching
+### バイパスマッチング
 
-An entry names a host and matches it together with every subdomain under it: `NO_PROXY=example.com` also bypasses `api.example.com`. A leading `.` or `*.` is accepted and means the same thing. An entry may carry a `:port`, and `*` bypasses everything. A bracketed or bare IPv6 literal matches either way — a bare `::1` is *not* read as host `:` port `1`, which is how undici's own matcher fails and why the resolved list carries both `::1` and `[::1]`. CIDR is not matched: an operating system's bypass list often carries `10.0.0.0/8`, which has to be rewritten as suffixes.
+エントリーはホストを名指し、それとその下のすべてのサブドメインにマッチする: `NO_PROXY=example.com` は `api.example.com` もバイパスする。先頭の `.` または `*.` は受け入れられ、同じ意味である。エントリーは `:port` を運ぶことができ、`*` はすべてをバイパスする。ブラケット付きまたはベアの IPv6 リテラルはどちらでもマッチする — ベアの `::1` はホスト `:` ポート `1` として*読まれない*。これは undici 自身のマッチャーが失敗する方法であり、解決済みリストが `::1` と `[::1]` の両方を運ぶ理由である。CIDR はマッチされない: オペレーティングシステムのバイパスリストはしばしば `10.0.0.0/8` を運び、これはサフィックスとして書き換えなければならない。
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-- [Network proxy guide](../../../docs/user/guide/network-proxy.md) — what to export, and why a browser is proxied when a terminal is not.
-- [`dsh-web-fetch-http`](../../web/web-fetch-http/README.md) — the one consumer whose safety rules change under a proxy.
+- [ネットワークプロキシガイド](../../../docs/user/guide/network-proxy.md) — 何を export すべきか、そしてターミナルがプロキシされないのにブラウザーがプロキシされる理由。
+- [`dsh-web-fetch-http`](../../web/web-fetch-http/README.md) — プロキシの下で安全ルールが変わる唯一のコンシューマー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as transport policy only: it changes how bytes reach the network and registers no prompt, schema, or result text.
+なし。トランスポートポリシーに限られる: バイトがネットワークに届く方法を変え、prompt、スキーマ、結果テキストを登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation: the package contributes no request tokens and never mutates a request prefix, so provider cache reuse is unaffected.
+直接の無効化はない: このパッケージはリクエストトークンを寄与せず、リクエストプレフィックスを変更することも決してないため、プロバイダーのキャッシュ再利用は影響を受けない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the package is a poor fit. They are current package constraints.
+これらの制限は、このパッケージが不適切な選択となる状況を定義する。それらは現在のパッケージの制約である。
 
-- **No SOCKS, PAC, or operating-system proxy detection** — only `http(s)://` proxy URLs from the environment. A macOS or Windows system-proxy setting is not read, so a user who only toggled it in a proxy application must still export the variables; a SOCKS URL is reported and that scheme stays direct rather than borrowing another scheme's proxy.
-- **No custom certificate authority** — a TLS-intercepting corporate proxy needs `NODE_EXTRA_CA_CERTS` set on the process before launch, which this package neither sets nor validates.
-- **A spawned child honors the policy only on a new enough runtime, and only when every value it inherits is one Node accepts** — it reads the published environment through Node's `NODE_USE_ENV_PROXY` (22.21+, 24+), and the engines range admits 22.19 and 22.20, where such a child stays direct. A user whose environment also names a SOCKS or otherwise refused proxy leaves every child Node direct: the flag is withheld so the child can start at all. A child also matches bypass entries with Node's own `NO_PROXY` rules, which differ from this package's in their separators and IPv4-range support. Nothing in this process depends on a Node version: every in-process request reaches the global dispatcher.
-- **Telemetry is direct by design** — the OTLP exporter posts through `node:http`, which no global dispatcher reaches. Routing it would need either an `http.Agent` whose `proxyEnv` option post-dates the lowest supported Node, or the SDK's `fetch` transport, which has no compression while the shipped profile enables gzip. Telemetry is the one channel whose loss costs the user nothing, so it stays where it was; `DSH_TELEMETRY_MODE=DISABLED` turns it off.
-- **Model-authored programs receive no proxy settings** — the Node ptc-runtime process and workflow worker do not inherit a proxy URL that may contain `user:password`. Their direct requests need their own configuration and remain subject to the execution sandbox.
-- **The regression gate sees source, not dependencies** — `verify-no-bare-dispatcher` parses `packages/*/*/src` and `apps/*/src`; tests, scripts, and the internals of a third-party SDK are outside it. That is why every outbound call site also carries an `egress.spec.ts`.
+- **SOCKS、PAC、オペレーティングシステムのプロキシ検出なし** — 環境からの `http(s)://` プロキシ URL のみ。macOS や Windows のシステムプロキシ設定は読まれないため、プロキシアプリで切り替えただけのユーザーは依然として変数を export しなければならない。SOCKS URL は報告され、そのスキームは別のスキームのプロキシを借りるのではなく直接のままにとどまる。
+- **カスタム認証局なし** — TLS を傍受する企業プロキシは起動前にプロセスへ `NODE_EXTRA_CA_CERTS` が設定されている必要があり、このパッケージはそれを設定も検証もしない。
+- **spawn された子がポリシーを尊重するのは、十分に新しいランタイム上で、かつ継承するすべての値が Node の受け入れるものである場合だけ** — 子は Node の `NODE_USE_ENV_PROXY` (22.21+、24+) を通じて公開された環境を読み、engines 範囲は 22.19 と 22.20 を許容し、そこではそのような子は直接のままにとどまる。環境が SOCKS またはその他の拒否されたプロキシも名指すユーザーは、すべての子 Node を直接のままにする: 子が起動できるようにフラグが差し控えられる。子は Node 自身の `NO_PROXY` ルールでバイパスエントリーにもマッチし、それは区切り文字と IPv4 範囲サポートにおいてこのパッケージのものと異なる。このプロセス内の何も Node バージョンに依存しない: プロセス内のすべてのリクエストはグローバルディスパッチャーに届く。
+- **Telemetry は設計上直接** — OTLP exporter は `node:http` を通じて post し、グローバルディスパッチャーはそこに届かない。ルーティングするには、`proxyEnv` オプションがサポートされる最低の Node より後に導入された `http.Agent`、または SDK の `fetch` トランスポートが必要であり、後者は出荷されるプロファイルが gzip を有効にする一方で圧縮を持たない。Telemetry は損失がユーザーに何も損させない唯一のチャネルであるため、そのままの位置にとどまる。`DSH_TELEMETRY_MODE=DISABLED` がそれをオフにする。
+- **モデルが書いたプログラムはプロキシ設定を受け取らない** — Node ptc-runtime プロセスと workflow ワーカーは `user:password` を含み得るプロキシ URL を継承しない。それらの直接リクエストは独自の構成を必要とし、実行サンドボックスに従うままである。
+- **回帰ゲートが見るのはソースであり、依存ではない** — `verify-no-bare-dispatcher` は `packages/*/*/src` と `apps/*/src` を解析する。テスト、スクリプト、サードパーティ SDK の内部はその外にある。だからこそ、すべてのアウトバウンド呼び出し箇所が `egress.spec.ts` も持つ。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-Reaching Node's built-in `fetch` from a userland undici relies on both writing the legacy `Symbol.for('undici.globalDispatcher.1')` slot. That is an implicit cross-version coupling, not a contract — see [corepack#834](https://github.com/nodejs/corepack/issues/834) for it breaking. `tests/install.spec.ts` asserts a real request reaches a loopback proxy, so a version bump that breaks the coupling fails there rather than in the field.
+ユーザーランドの undici から Node の組み込み `fetch` に到達するのは、両方がレガシーの `Symbol.for('undici.globalDispatcher.1')` スロットを書くことに依存している。これは暗黙のバージョン間カップリングであり、contract ではない — それが壊れた例は [corepack#834](https://github.com/nodejs/corepack/issues/834) を参照。`tests/install.spec.ts` は実際のリクエストがループバックプロキシに届くことを表明しているため、カップリングを壊すバージョンアップはフィールドではなくそこで失敗する。
 
 </details>

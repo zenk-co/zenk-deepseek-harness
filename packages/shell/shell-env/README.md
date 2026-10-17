@@ -1,39 +1,39 @@
 ---
-description: "The managed DSH_* shell environment for users and maintainers choosing, configuring, or extending the environment every model shell call runs with."
+description: "すべてのモデルシェル呼び出しが実行される環境を選択・設定・拡張するユーザーとメンテナー向けの、管理された DSH_* シェル環境。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-shell-env
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-shell-env` provides the trusted `DSH_*` environment that every model shell call — bash or pwsh — runs with: built-in facts such as `DSH_HOME`, `DSH_SHELL=1`, the agent's `DSH_SESSION_ID`, and the launched profile's `DSH_PROFILE` and `DSH_PROFILE_DIR`. Plugin authors can register their own facts with declared keys, collected per execution and disposed with their plugin; duplicate ownership or undeclared runtime keys fail loudly instead of silently overwriting. The registry changes nothing else the model sees — the shell tools own their own schemas and prompts. Choose it in any composition that mounts a model shell tool; configuration only picks the Harness home directory.
+`dsh-shell-env` は、すべてのモデルシェル呼び出し — bash または pwsh — が実行される信頼された `DSH_*` 環境を提供する: `DSH_HOME`、`DSH_SHELL=1`、エージェントの `DSH_SESSION_ID`、起動されたプロファイルの `DSH_PROFILE` と `DSH_PROFILE_DIR` といった組み込みファクトである。プラグイン作者は宣言されたキーを持つ独自のファクトを登録でき、それらは実行ごとに収集され、プラグインとともに破棄される。重複する所有権や未宣言の実行時キーは、黙って上書きするのではなく大きく失敗する。このレジストリはモデルが見る他の何も変えない — シェルツールが自身のスキーマとプロンプトを所有する。モデルシェルツールをマウントするあらゆるコンポジションでこれを選ぶ。設定が選ぶのは Harness ホームディレクトリのみである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Load this plugin in any composition that mounts a model shell tool (`dsh-tool-bash` or `dsh-tool-pwsh`): each foreground or background shell call then runs with a freshly collected managed environment instead of whatever `DSH_*` values the process inherited.
+モデルシェルツール（`dsh-tool-bash` または `dsh-tool-pwsh`）をマウントするあらゆるコンポジションでこのプラグインをロードする: すると各フォアグラウンドまたはバックグラウンドのシェル呼び出しが、プロセスが継承した `DSH_*` 値ではなく、新しく収集された管理環境で実行される。
 
-### What every shell call receives
+### すべてのシェル呼び出しが受け取るもの
 
-Every call receives `DSH_HOME` (the absolute Harness home), `DSH_SHELL=1`, and, for agent calls, `DSH_SESSION_ID` (the calling session's id). When the launcher provided a profile context, every call also receives `DSH_PROFILE` (the profile name) and `DSH_PROFILE_DIR` (its absolute directory; its `node_modules` holds only profile-installed packages, while the harness's own bundles resolve from the dsh installation); compositions booted without a profile omit both.
+すべての呼び出しが `DSH_HOME`（Harness ホームの絶対パス）、`DSH_SHELL=1`、およびエージェント呼び出しでは `DSH_SESSION_ID`（呼び出しているセッションの id）を受け取る。ランチャーがプロファイルコンテキストを提供した場合、すべての呼び出しは `DSH_PROFILE`（プロファイル名）と `DSH_PROFILE_DIR`（その絶対ディレクトリ。その `node_modules` はプロファイルでインストールされたパッケージのみを保持し、ハーネス自身のバンドルは dsh インストールから解決される）も受け取る。プロファイルなしで起動されたコンポジションは両方とも省略する。
 
-### Adding your own environment facts
+### 独自の環境ファクトを追加する
 
-Other plugins contribute facts by registering a contributor with a stable name, the complete set of `DSH_*` keys it may return, a description per key, and a resolver that computes values for one execution:
+他のプラグインは、安定した名前、返しうる `DSH_*` キーの完全な集合、キーごとの説明、および 1 回の実行の値を計算するリゾルバーを持つコントリビューターを登録することでファクトを提供する:
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -50,90 +50,90 @@ export function apply(ctx: Context): void {
 }
 ```
 
-Contributors must declare every key they return; returning an undeclared or non-string value fails the call. Registration is disposed with the registering plugin, so hot-reloading a plugin removes its facts.
+コントリビューターは返すすべてのキーを宣言しなければならない。未宣言または非文字列の値を返すと呼び出しは失敗する。登録は登録したプラグインとともに破棄されるため、プラグインのホットリロードはそのファクトを除去する。
 
-### Choosing the Harness home
+### Harness ホームの選択
 
-The single config field picks the home directory exposed as `DSH_HOME`; the default resolution order is the `dshHome` config, then ambient `$DSH_HOME`, then `~/.dsh`.
+単一の設定フィールドが `DSH_HOME` として公開されるホームディレクトリを選ぶ。デフォルトの解決順序は `dshHome` 設定、次に環境の `$DSH_HOME`、次に `~/.dsh` である。
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `dshHome` | `$DSH_HOME`, then `~/.dsh` | Absolute Harness home exposed as `DSH_HOME` |
+| `dshHome` | `$DSH_HOME`、次に `~/.dsh` | `DSH_HOME` として公開される Harness ホームの絶対パス |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-shell-env) is the exhaustive source for every accepted field and its JSDoc.
+生成される [設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-shell-env) が、受け付けられるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
-### What can go wrong
+### 何がうまくいかないことがあるか
 
-Two contributors declaring the same key, or a contributor claiming a reserved built-in (`DSH_HOME`, `DSH_SHELL`, `DSH_SESSION_ID`, `DSH_PROFILE`, `DSH_PROFILE_DIR`), fails plugin load loudly. A `DSH_*` key must be all-caps with underscores (for example `DSH_REGION`), and a missing description fails registration.
+2 つのコントリビューターが同じキーを宣言する、またはコントリビューターが予約済みの組み込み（`DSH_HOME`、`DSH_SHELL`、`DSH_SESSION_ID`、`DSH_PROFILE`、`DSH_PROFILE_DIR`）を主張すると、プラグインのロードが大きく失敗する。`DSH_*` キーはアンダースコア付きのすべて大文字（たとえば `DSH_REGION`）でなければならず、説明の欠落は登録を失敗させる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the registry and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではレジストリ背後の設計判断を説明し、それを実現するコードを指し示す。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計哲学
 
-- **Trusted namespace, rebuilt per call.** The environment is a Harness-owned `DSH_*` namespace: the shell executor discards inherited `DSH_*` values and merges the registry's current snapshot for each execution, so nested harnesses and concurrent parent/child agents cannot leak stale identities, and `process.env` is never modified.
-- **Declared ownership, loud conflicts.** Contributors declare their keys up front so duplicate ownership is detected before the first command; resolvers may only return declared keys.
-- **Built-ins stay here.** `DSH_HOME`, `DSH_SHELL`, `DSH_SESSION_ID`, `DSH_PROFILE`, and `DSH_PROFILE_DIR` are reserved for the registry; contributors cannot claim them.
+- **信頼された名前空間、呼び出しごとに再構築。** 環境は Harness 所有の `DSH_*` 名前空間である: シェルエグゼキューターは継承された `DSH_*` 値を破棄し、実行ごとにレジストリの現在のスナップショットをマージするため、ネストしたハーネスと並行する親/子エージェントが古いアイデンティティを漏らすことはできず、`process.env` が変更されることも決してない。
+- **宣言された所有権、大きな競合。** コントリビューターはキーを事前に宣言するため、重複する所有権は最初のコマンドの前に検出される。リゾルバーは宣言されたキーしか返せない。
+- **組み込みはここにとどまる。** `DSH_HOME`、`DSH_SHELL`、`DSH_SESSION_ID`、`DSH_PROFILE`、`DSH_PROFILE_DIR` はレジストリのために予約されており、コントリビューターはそれらを主張できない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry, `ShellEnvRegistry` service, and the built-in facts |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー、`ShellEnvRegistry` サービス、組み込みファクト |
 
-### Collection
+### 収集
 
-`collect(execution)` starts from the built-ins, adds the session id when the execution carries an agent, then merges each registered contributor's resolved values sorted by contributor name. The result is a frozen, key-sorted snapshot passed through `ShellExecRequest.dshEnv`. `list()` enumerates declarations without running resolvers, so it cannot reflect execution-dependent values.
+`collect(execution)` は組み込みから始め、実行がエージェントを運ぶときはセッション id を加え、その後、登録された各コントリビューターの解決済み値をコントリビューター名でソートしてマージする。結果は凍結されたキーソート済みスナップショットであり、`ShellExecRequest.dshEnv` を通じて渡される。`list()` はリゾルバーを実行せずに宣言を列挙するため、実行依存の値を反映できない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shell family to the executor seam and the generated catalogs.
+パッケージレベルの契約では不十分なときにこれらのページを読む。シェルファミリーからエグゼキューターのシームと生成カタログへと進む。
 
-- [shell package map](../README.md) — the bash capability family and its roles.
-- [Bash executor subsystem](../../../docs/subsystems/shell.md) — the `ctx.shell` seam the tools execute through.
-- [tool-bash](../tool-bash/README.md) — the bash tool that consumes this environment.
-- [tool-pwsh](../tool-pwsh/README.md) — the pwsh tool that consumes this environment.
-- [home paths package](../../util/home-paths/README.md) — how `DSH_HOME` is resolved.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-shell-env) — every accepted config field and its source declaration.
+- [shell パッケージマップ](../README.md) — bash ケイパビリティファミリーとその役割。
+- [Bash エグゼキューターサブシステム](../../../docs/subsystems/shell.md) — ツールが実行を通す `ctx.shell` シーム。
+- [tool-bash](../tool-bash/README.md) — この環境を消費する bash ツール。
+- [tool-pwsh](../tool-pwsh/README.md) — この環境を消費する pwsh ツール。
+- [home paths パッケージ](../../util/home-paths/README.md) — `DSH_HOME` の解決方法。
+- [生成される設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-shell-env) — 受け付けられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the shell tools (`dsh-tool-bash`, `dsh-tool-pwsh`), which expose this registry's managed `DSH_*` facts in every shell-tool call.
+間接的に、シェルツール（`dsh-tool-bash`、`dsh-tool-pwsh`）を通じて。これらがすべてのシェルツール呼び出しでこのレジストリの管理された `DSH_*` ファクトを公開する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The managed environment never enters the request prefix, so it does not invalidate provider cache reuse; the shell tools' definitions and the current request envelope own any prefix change.
+管理環境は決してリクエストプレフィックスに入らないため、プロバイダーのキャッシュ再利用を無効化しない。プレフィックスの変更を所有するのはシェルツールの定義と現在のリクエストエンベロープである。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the registry is a poor fit or needs care. They are current package constraints, not a task backlog.
+これらの制限は、レジストリが不向きになる、または注意を要する状況を定義する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **`list()` enumerates plugin-contributed variables only** — registry-owned built-ins (`DSH_HOME`, `DSH_SHELL`, `DSH_SESSION_ID`, `DSH_PROFILE`, `DSH_PROFILE_DIR`) are not included, so diagnostics, prompt, or UI code must not treat `list()` as an exhaustive environment catalog.
+- **`list()` はプラグインがコントリビュートした変数のみを列挙する** — レジストリ所有の組み込み（`DSH_HOME`、`DSH_SHELL`、`DSH_SESSION_ID`、`DSH_PROFILE`、`DSH_PROFILE_DIR`）は含まれないため、診断、プロンプト、UI のコードは `list()` を網羅的な環境カタログとして扱ってはならない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,33 +1,33 @@
 ---
-description: "The model-facing ask_user_question tool over the user-questions seam, for users and maintainers composing or debugging interactive agent surfaces."
+description: "user-questions シーム上のモデル向け ask_user_question ツール。対話的なエージェント面を構成またはデバッグするユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-ask-user
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`ask_user_question` asks the user for confirmation, a choice, or missing information. It waits for an answer by default. With `mode: timed`, a deadline can release the model to continue independent work while the question stays answerable; `timeout: -1` waits indefinitely. A live child agent cannot call the tool. Callers provide the answer UI.
+`ask_user_question` は、ユーザーに確認、選択、または不足情報を求める。デフォルトでは回答を待つ。`mode: timed` では、デッドラインによってモデルが独立した作業を続行する一方で、質問は回答可能なままにできる。`timeout: -1` は無期限に待つ。生きた子エージェントはこのツールを呼び出せない。回答 UI は呼び出し元が提供する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Compose this plugin with `ctx.userQuestions` when the model needs a user decision. Without an answerer, blocking calls fail; finite timed calls return pending at their deadline.
+モデルがユーザーの判断を必要とする場合、このプラグインを `ctx.userQuestions` とともに構成する。回答者がいない場合、ブロッキング呼び出しは失敗し、有限の timed 呼び出しはデッドラインで pending を返す。
 
-Shipped presets use blocking mode. To enable timed mode, set `mode: timed` on the `tool-ask-user` row in the active preset's `config.plugins` list:
+出荷済みプリセットはブロッキングモードを使用する。timed モードを有効にするには、アクティブなプリセットの `config.plugins` リストで `tool-ask-user` 行に `mode: timed` を設定する:
 
 ```yaml
 - id: tool-ask-user
@@ -37,11 +37,11 @@ Shipped presets use blocking mode. To enable timed mode, set `mode: timed` on th
     timeout: 120
 ```
 
-This is a plugin row, not a top-level `--patch` entry. In the Web profile, change the `preset-standard` plugin list or use the Agent Preset editor. `mode: legacy` or omitted config keeps the blocking schema. The row's `timeout` applies to each timed call by default; `-1` waits indefinitely unless the model supplies a positive timeout. A model-supplied `-1` applies only to that call, including all its questions.
+これはトップレベルの `--patch` エントリではなく、プラグイン行である。Web プロファイルでは `preset-standard` プラグインリストを変更するか、Agent Preset エディターを使う。`mode: legacy` または設定の省略はブロッキングスキーマを維持する。行の `timeout` はデフォルトで各 timed 呼び出しに適用され、`-1` はモデルが正の timeout を指定しない限り無期限に待つ。モデルが指定した `-1` はその呼び出し（すべての質問を含む）にのみ適用される。
 
-### When to call the tool
+### ツールを呼び出すタイミング
 
-Send one or more questions with ids unique within the call; the answer echoes those ids. Put a recommended option first and append `(Recommended)` to its label. The optional per-call `timeout` is in seconds; use `-1` when work cannot safely continue without an answer. A timeout is never approval. In the Web card, editing or choosing Take time also holds that Client's wait until submission or cancellation.
+呼び出し内で一意な ID を持つ 1 つ以上の質問を送る。回答はそれらの ID をエコーする。推奨オプションを先頭に置き、そのラベルに `(Recommended)` を付ける。任意の呼び出しごとの `timeout` は秒単位である。回答なしでは安全に作業を続行できない場合は `-1` を使う。タイムアウトが承認になることは決してない。Web カードでは、編集または Take time の選択も、送信またはキャンセルまでそのクライアントの待機を保持する。
 
 ```json
 {
@@ -59,110 +59,110 @@ Send one or more questions with ids unique within the call; the answer echoes th
 }
 ```
 
-### What the model gets back
+### モデルが返されるもの
 
-An answer returns one item per question. `selected` holds option labels; `custom` supplements a multi-select answer or replaces a single-select choice. A skipped item has empty `selected` and no `custom`.
+回答は質問ごとに 1 つの項目を返す。`selected` はオプションのラベルを保持し、`custom` は複数選択の回答を補足するか、単一選択の選択肢を置き換える。スキップされた項目は空の `selected` を持ち、`custom` を持たない。
 
-For a finite timed call, `{ "pending": true, "callId": "…" }` means the foreground wait ended without an answer. The question remains answerable, and the model may continue independent work. A later answer arrives as a user message identified by `kind`, `tool`, and `callId`. Web chat pairs its questions and answers; other consumers receive compact JSON text.
+有限の timed 呼び出しでは、`{ "pending": true, "callId": "…" }` はフォアグラウンドの待機が回答なしで終了したことを意味する。質問は回答可能なままで、モデルは独立した作業を続行できる。後からの回答は `kind`、`tool`、`callId` で識別されるユーザーメッセージとして届く。Web チャットはその質問と回答を対にする。他のコンシューマーはコンパクトな JSON テキストを受け取る。
 
 ```json
 { "answers": [{ "id": "cleanup", "selected": ["Yes, delete them (Recommended)"] }] }
 ```
 
-### When the call fails
+### 呼び出しが失敗するとき
 
-Legacy and `timeout: -1` calls wait for an answer or cancellation; without an accepting answerer, they return an error. A finite timed call without an answerer returns pending at its deadline. Cancellation and a caller that is not the exact live runtime root also return errors. A live child agent is rejected with `DELEGATED_CALLER` and must include the unresolved decision in its final result.
+legacy および `timeout: -1` の呼び出しは回答またはキャンセルを待つ。受け入れる回答者がいない場合、エラーを返す。回答者のいない有限の timed 呼び出しは、デッドラインで pending を返す。キャンセル、および呼び出し元が正確な生きたランタイムルートでない場合もエラーを返す。生きた子エージェントは `DELEGATED_CALLER` で拒否され、未解決の判断を自身の最終結果に含めなければならない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The observable behavior is covered in [Use this package](#use-this-package); this section explains the tool definition and its relationship to the seam.
+観察可能な動作は[このパッケージを使う](#use-this-package)で扱う。このセクションではツール定義と、それがシームとどう関係するかを説明する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Default blocking tool definition and mode selection |
-| [`src/timed.ts`](src/timed.ts) | Opt-in timed tool definition and result rendering |
+| [`src/index.ts`](src/index.ts) | デフォルトのブロッキングツール定義とモード選択 |
+| [`src/timed.ts`](src/timed.ts) | オプトインの timed ツール定義と結果レンダリング |
 
-### Consumer role
+### コンシューマーの役割
 
-The plugin registers one tool definition. Legacy mode calls `ask()`; timed mode calls `askTimed()` for positive timeouts and `ask()` for `-1`. Both forward the calling agent and turn signal to `ctx.userQuestions`. Timed requests include the tool call id in `wait`, so a Client can reopen their card. The projection identifies timed native calls from the `timeout` field in the recorded tool schema, even when a call omits that argument.
+このプラグインは 1 つのツール定義を登録する。legacy モードは `ask()` を呼び、timed モードは正のタイムアウトには `askTimed()` を、`-1` には `ask()` を呼ぶ。どちらも呼び出し元エージェントとターンシグナルを `ctx.userQuestions` へ転送する。timed リクエストはツール呼び出し ID を `wait` に含めるため、クライアントはカードを再び開ける。プロジェクションは、記録されたツールスキーマの `timeout` フィールドから timed のネイティブ呼び出しを識別する。呼び出しがその引数を省略しても同様である。
 
-### Result rendering
+### 結果のレンダリング
 
-The `render` output projects the structured value to a single text block via `JSON.stringify`, which is why the model-facing result is compact JSON rather than a richer content-block vocabulary.
+`render` 出力は構造化値を `JSON.stringify` 経由で単一のテキストブロックへ射影する。これが、モデル向けの結果がよりリッチなコンテンツブロック語彙ではなくコンパクトな JSON である理由である。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the package-level contract is not enough. They move from the tool surface to the seam contract and its answerer waterfall.
+パッケージレベルの契約では足りないときにこれらのページを読む。ツールの面からシーム契約とその回答者ウォーターフォールへと進む。
 
-- [User interaction subsystem reference](../../../docs/subsystems/user-questions.md) — the service contract, question vocabulary, and answerer waterfall behind this tool.
-- [Tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-ask-user) — the generated `ask_user_question` schema.
-- [user-questions package](../user-questions/README.md) — the seam this tool consumes.
-- [Interaction group map](../README.md) — adjacent approval and command surfaces.
+- [ユーザー対話サブシステムリファレンス](../../../docs/subsystems/user-questions.md) — このツールの背後にあるサービス契約、質問語彙、回答者ウォーターフォール。
+- [ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-ask-user) — 生成された `ask_user_question` スキーマ。
+- [user-questions パッケージ](../user-questions/README.md) — このツールが消費するシーム。
+- [interaction グループのマップ](../README.md) — 隣接する承認とコマンドの面。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Tool schema
+### ツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-The shipped presets expose the original blocking [`ask_user_question` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-ask-user). A custom Cordis row with `mode: timed` switches to the alternate schema, including question ids, prompts, headings, options, multi-select flags, `timeout`, and the pending result; the model sees only the selected definition.
+出荷済みプリセットは元のブロッキング [`ask_user_question` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tool-ask-user)を公開する。`mode: timed` を設定したカスタム Cordis 行は代替スキーマに切り替わる。そこには質問 ID、プロンプト、見出し、オプション、複数選択フラグ、`timeout`、pending 結果が含まれ、モデルは選択された定義だけを見る。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed schema cost on every request where the tool is visible.
+ツールが可視であるすべてのリクエストに固定のスキーマコスト。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the definition and visibility are unchanged. Plugin lifecycle or scoped restrictions may invalidate reuse from this schema.
+定義と可視性が変わらない限りプレフィックスは安定する。プラグインライフサイクルまたはスコープ付き制限が、このスキーマ以降の再利用を無効にする場合がある。
 
-### Tool-call history and result
+### ツール呼び出し履歴と結果
 
-#### What the model sees
+#### モデルが見るもの
 
-The assistant tool call retains the questions. An answer during the wait appears in the next step as compact `{"answers":[{"id":"<id>","selected":["<label>"],"custom":"<text>"}]}` JSON; unused `custom` is omitted. A timed-out call returns `{"pending":true,"callId":"<pending-call-id>","message":"<instruction>"}`. A later answer arrives as a user message with `kind: "answer_to_pending_question"`, `tool: "ask_user_question"`, the call id, the original questions, and the answers. UI activity before submission is not model context.
+アシスタントのツール呼び出しは質問を保持する。待機中の回答は次のステップでコンパクトな `{"answers":[{"id":"<id>","selected":["<label>"],"custom":"<text>"}]}` JSON として現れる。未使用の `custom` は省略される。タイムアウトした呼び出しは `{"pending":true,"callId":"<pending-call-id>","message":"<instruction>"}` を返す。後からの回答は、`kind: "answer_to_pending_question"`、`tool: "ask_user_question"`、呼び出し ID、元の質問、回答を伴うユーザーメッセージとして届く。送信前の UI アクティビティはモデルコンテキストではない。
 
-#### Token effect
+#### トークンへの影響
 
-Arguments and answer JSON are data-dependent retained tokens; there is no token cost while waiting for the human.
+引数と回答 JSON はデータ依存の保持トークンである。人間を待っている間のトークンコストはない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+追記のみ。新たに可視になる内容は再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリを無効にしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the tool is a poor fit. They are current package constraints, not a UI backlog.
+これらの制限は、このツールが不向きな場合を定義する。これらは現在のパッケージ制約であり、UI バックログではない。
 
-- **The legacy tool never reports pending** — it returns an answer or an error. Native legacy calls do not enter the `userQuestions` projection, and interrupted calls cannot take late answers.
-- **An interrupted PTC wait may lose its question** — if the `run_code` process ends before an `ask_user_question` sub-call records its `tool/ptc-dispatch` result, the projection cannot reconstruct that sub-call for a late answer.
-- **Runtime-owned subagents cannot ask the user** — `ask_user_question` rejects a live child owned by another agent with `DELEGATED_CALLER`; the child must include the unresolved question or decision in its final result. Durable lineage does not decide this boundary, so a lineage-bearing session resumed as a runtime root may ask normally.
-- **Native answers render as JSON text** — the canonical value remains structured, but the model-facing result uses compact JSON rather than a richer content-block vocabulary.
+- **legacy ツールは pending を報告しない** — 回答かエラーを返す。ネイティブ legacy 呼び出しは `userQuestions` プロジェクションに入らず、中断された呼び出しは遅れての回答を受け取れない。
+- **中断された PTC 待機は質問を失うことがある** — `run_code` プロセスが、`ask_user_question` サブ呼び出しの `tool/ptc-dispatch` 結果を記録する前に終了すると、プロジェクションはそのサブ呼び出しを遅れての回答のために再構築できない。
+- **ランタイム所有のサブエージェントはユーザーに質問できない** — `ask_user_question` は別のエージェントが所有する生きた子を `DELEGATED_CALLER` で拒否する。子は未解決の質問や判断を自身の最終結果に含めなければならない。永続的リネージはこの境界を決めないため、リネージを持ちランタイムルートとして再開されたセッションは通常どおり質問できる。
+- **ネイティブの回答は JSON テキストとしてレンダリングされる** — 正規の値は構造化されたままであるが、モデル向けの結果はよりリッチなコンテンツブロック語彙ではなくコンパクトな JSON を使う。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-The [`userQuestions` projection](../user-questions/src/projection.ts) reads each recorded tool schema rather than the call arguments: timed calls may omit `timeout`, and timed `-1` calls still use the timed schema. Changes to the projection fold require a `stateVersion` bump so stored caches refold from the log.
+[`userQuestions` プロジェクション](../user-questions/src/projection.ts)は、呼び出し引数ではなく記録された各ツールスキーマを読む: timed 呼び出しは `timeout` を省略する場合があり、timed の `-1` 呼び出しも timed スキーマを使う。プロジェクション折り畳みの変更には `stateVersion` のバンプが必要で、保存されたキャッシュはログから再折り畳みされる。
 
 </details>

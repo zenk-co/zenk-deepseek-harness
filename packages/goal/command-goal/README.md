@@ -1,56 +1,56 @@
 ---
-description: "The human-facing /goal slash command for users and maintainers choosing, composing, or debugging goal control in UI command planes."
+description: "UI コマンドプレーンでのゴール制御を選択、構成、またはデバッグするユーザーとメンテナー向けの、人間向け /goal スラッシュコマンド。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-command-goal
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-command-goal` gives users the `/goal` command to create, edit, pause, resume, clear, and inspect the current goal directly in an interactive UI. Commands and their direct output stay in the UI and do not enter model requests. Accepted changes persist, and ordered image or file attachments on a create or edit become one ordinary user message that later goal rounds can read. Use this package in interactive deployments with a command adapter; headless and automation apps without one do not need it.
+`dsh-command-goal` は、対話的 UI で現在のゴールを直接作成、編集、一時停止、再開、クリア、検査するための `/goal` コマンドをユーザーに提供する。コマンドとその直接出力は UI に留まり、モデルリクエストに入らない。受け入れられた変更は永続化し、作成または編集時の順序付きの画像またはファイル添付は、以降のゴールラウンドが読める 1 つの通常のユーザーメッセージになる。コマンドアダプターを備えた対話的デプロイでこのパッケージを使い、それのない headless および自動化アプリには不要である。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use `dsh-command-goal` in interactive deployments that mount a command adapter — the shipped Web client is the reference. It gives users direct control over the goal lifecycle without a model turn: commands execute in the UI command plane and the adapter renders their results directly.
+コマンドアダプターをマウントする対話的デプロイで `dsh-command-goal` を使う — 出荷済み Web クライアントが参照例である。これはモデルターンなしでゴールライフサイクルをユーザーが直接制御できるようにする: コマンドは UI コマンドプレーンで実行され、アダプターがその結果を直接レンダリングする。
 
-### Command reference
+### コマンドリファレンス
 
-Every sub-command runs against the current goal of the invoking agent; a bare `/goal` shows usage when no goal exists.
+すべてのサブコマンドは、呼び出したエージェントの現在のゴールに対して実行される。ゴールが存在しない場合、素の `/goal` は使用方法を表示する。
 
-| Input | Result |
+| 入力 | 結果 |
 |---|---|
-| `/goal` | Shows the current objective, durable phase, round count and cap, process-local activation, and valid next commands; a blocked goal also shows its policy code and explanation |
-| `/goal <objective>` | Creates and arms a goal, or replaces a completed goal with a fresh identity |
-| `/goal edit <objective>` | Edits the current objective without changing its phase or activation |
-| `/goal pause` | Pauses an active goal and disarms continuation |
-| `/goal resume` | Resumes a stopped goal, or rearms an active goal after session resume or fork, subject to its remaining round cap |
-| `/goal clear` | Clears the current goal while retaining its durable history |
+| `/goal` | 現在の目標、永続フェーズ、ラウンド数と上限、プロセスローカルのアクティベーション、有効な次のコマンドを表示する。ブロックされたゴールはそのポリシーコードと説明も表示する |
+| `/goal <objective>` | ゴールを作成してアームする、または完了したゴールを新しい識別子で置き換える |
+| `/goal edit <objective>` | フェーズやアクティベーションを変えずに現在の目標を編集する |
+| `/goal pause` | アクティブなゴールを一時停止し、継続をディスアームする |
+| `/goal resume` | 停止したゴールを再開する、またはセッションの再開や fork 後にアクティブなゴールを再アームする（残りのラウンド上限を条件とする） |
+| `/goal clear` | 永続履歴を保持したまま現在のゴールをクリアする |
 
-### Input grammar
+### 入力文法
 
-Control words (`clear`, `pause`, `resume`, `edit`) are recognized only when they occupy the complete input; any other non-empty suffix is an objective, so `/goal pause after verification` creates that literal objective. `edit` takes its replacement inline and refuses to replace an unfinished goal directly. Expected domain rejections become stable, direct command errors without exposing branded ids or revisions; unexpected implementation failures still fail dispatch so adapters can report them as command failures.
+制御語（`clear`、`pause`、`resume`、`edit`）は入力全体を占めるときにのみ認識される。その他の空でないサフィックスは目標であるため、`/goal pause after verification` はそのリテラルの目標を作成する。`edit` は置換をインラインで取り、未完了のゴールを直接置き換えることを拒否する。想定されるドメイン拒否は、ブランド付き ID やリビジョンを露出せずに、安定した直接のコマンドエラーになる。予期しない実装失敗はディスパッチを失敗させたままにし、アダプターがコマンド失敗として報告できるようにする。
 
-### Attachments
+### 添付
 
-`/goal` declares attachment support. Attachments accompany only an objective: after a successful create or edit, the command submits one user followup carrying the admitted image and file blocks in selection order plus the fixed text `Reference attachments for the goal objective.` Later goal rounds read that ordinary session history; the goal domain stores no attachment state. Every other sub-command, and any refused create or edit, returns a direct error before a domain mutation and leaves the dispatching composer's draft and cards intact.
+`/goal` は添付サポートを宣言する。添付は目標にのみ付随する: 作成または編集が成功した後、コマンドは、選択順の受け入れられた画像とファイルブロック、および固定テキスト `Reference attachments for the goal objective.` を運ぶ 1 つのユーザーフォローアップを送信する。以降のゴールラウンドはその通常のセッション履歴を読む。ゴールドメインは添付状態を保存しない。その他のすべてのサブコマンド、および拒否された作成または編集は、ドメイン変更の前に直接エラーを返し、ディスパッチしたコンポーザーのドラフトとカードを無傷のまま残す。
 
-### Compose it
+### 構成する
 
-The command injects the commands registry and the goal service. A custom app mounts their owners plus this plugin; automatic continuation remains an independent choice:
+このコマンドは commands レジストリとゴールサービスを注入する。カスタムアプリはその所有者にこのプラグインを加えてマウントする。自動継続は独立した選択のままである:
 
 ```yaml
 - id: commands
@@ -61,80 +61,80 @@ The command injects the commands registry and the goal service. A custom app mou
   name: '@deepseek-ai/dsh-command-goal'
 ```
 
-The shipped `dsh` base enables the persisted-goal stack and this command. The Web bundle keeps the goal service and driver on the Host, disables the base command producer, and mounts the producer in the `standard`, `code`, and `cordis` agent presets; `minimal` omits it. The ACP automation app enables the domain and model tools without a command adapter. The standalone `sdk-minimal` profile omits the complete goal stack so its result API still settles one correlated physical turn.
+出荷済みの `dsh` ベースは永続ゴールスタックとこのコマンドを有効にする。Web バンドルはゴールサービスとドライバーを Host 上に保ち、ベースのコマンドプロデューサーを無効にし、プロデューサーを `standard`、`code`、`cordis` のエージェントプリセットでマウントする。`minimal` はそれを省略する。ACP 自動化アプリはコマンドアダプターなしでドメインとモデルツールを有効にする。スタンドアロンの `sdk-minimal` プロファイルはゴールスタック全体を省略するため、その結果 API は依然として 1 つの相関した物理ターンで確定する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the command parses input and renders output; the observable contract is covered in [Use this package](#use-this-package).
+このセクションではコマンドが入力を解析して出力をレンダリングする方法を説明する。観察可能な契約は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design
+### 設計
 
-- **Grammar, not free text.** The parser recognizes only the exact control words (`clear`, `pause`, `resume`, `edit`) when they fill the whole input; every other non-empty suffix is an objective. `edit` alone is invalid, and `edit` refuses to replace an unfinished goal directly.
-- **Domain rejections become stable errors.** `GoalError` outcomes are converted into direct command errors with a fixed message; unexpected failures rethrow so adapters report a command failure rather than a domain result. Rendered output never exposes branded ids or revisions.
-- **Attachments accompany the objective.** On a successful create or edit, the command submits one user followup carrying the admitted image and file blocks in selection order plus the fixed text `Reference attachments for the goal objective.` Every other path submits nothing, so the dispatching composer keeps the draft and cards.
+- **文法であり、自由テキストではない。** パーサーは、入力全体を埋めるときの正確な制御語（`clear`、`pause`、`resume`、`edit`）のみを認識し、その他の空でないサフィックスは目標である。`edit` 単体は無効であり、`edit` は未完了のゴールを直接置き換えることを拒否する。
+- **ドメイン拒否は安定したエラーになる。** `GoalError` の結果は固定メッセージを持つ直接のコマンドエラーに変換され、予期しない失敗は再スローされ、アダプターはドメイン結果ではなくコマンド失敗を報告する。レンダリングされた出力はブランド付き ID やリビジョンを決して露出しない。
+- **添付は目標に付随する。** 作成または編集が成功すると、コマンドは、選択順の受け入れられた画像とファイルブロック、および固定テキスト `Reference attachments for the goal objective.` を運ぶ 1 つのユーザーフォローアップを送信する。その他のすべてのパスは何も送信しないため、ディスパッチしたコンポーザーはドラフトとカードを保つ。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: command grammar, status rendering, attachment submission |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: コマンド文法、ステータスレンダリング、添付送信 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-The command is a thin adapter over the goal domain; read these pages for the state it mutates and the registry it plugs into.
+このコマンドはゴールドメイン上の薄いアダプターである。それが変更する状態と、それが接続するレジストリについてはこれらのページを読む。
 
-- [Goal service](../goal/README.md) — the state and lifecycle the command mutates.
-- [Commands service](../../interaction/commands/README.md) — the command registry contract and dispatch.
-- [historical Harness-level goal-execution Agent Note](../../../.agents/notes/archived/feature/2026-07-16-harness-level-loop.md) — the UX and composition decisions.
+- [ゴールサービス](../goal/README.md) — このコマンドが変更する状態とライフサイクル。
+- [Commands サービス](../../interaction/commands/README.md) — コマンドレジストリの契約とディスパッチ。
+- [歴史的な Harness レベル goal-execution Agent Note](../../../.agents/notes/archived/feature/2026-07-16-harness-level-loop.md) — UX と構成の決定。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Human `/goal` control
+### 人間による `/goal` 制御
 
-#### What the model sees
+#### モデルが見るもの
 
-The slash input, mutation, and direct status/error output are absent from model requests. The goal domain records the mutation as `goal/change`; an enabled same-session driver may expose the resulting state in a later continuation prompt. Presentation text is never logged. When a create or edit carries attachments, the model sees one ordinary user message: the ordered image and file blocks followed by the text `Reference attachments for the goal objective.` It precedes the next goal round in session history.
+スラッシュ入力、変更、および直接のステータス/エラー出力はモデルリクエストに存在しない。ゴールドメインは変更を `goal/change` として記録し、有効な同一セッションドライバーが結果の状態を以降の継続プロンプトで露出することがある。プレゼンテーションテキストがログに記録されることは決してない。作成または編集が添付を運ぶ場合、モデルは 1 つの通常のユーザーメッセージを見る: 順序付きの画像とファイルブロック、続いてテキスト `Reference attachments for the goal objective.`。それはセッション履歴で次のゴールラウンドの前に位置する。
 
-#### Token effect
+#### トークンへの影響
 
-Reading status, mutating a goal, or receiving a direct command error adds no model tokens. An enabled same-session driver may add later goal-round prompts. An objective's attachments add one ordinary user message with the normal text, image, and file-handle costs.
+ステータスの読み取り、ゴールの変更、または直接のコマンドエラーの受信はモデルトークンを追加しない。有効な同一セッションドライバーは以降のゴールラウンドプロンプトを追加することがある。目標の添付は、通常のテキスト、画像、ファイルハンドルのコストを持つ 1 つの通常のユーザーメッセージを追加する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Command discovery, mutations, and direct output do not affect the cache. Later continuation prompts follow the driver's ordinary request history.
+コマンドの発見、変更、および直接出力はキャッシュに影響しない。以降の継続プロンプトはドライバーの通常のリクエスト履歴に従う。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the command is a poor fit or needs special care. They are current package constraints, not a task backlog.
+これらの制限は、このコマンドが不向きまたは特別な注意が必要な場合を定義する。これらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- **Plain-text interaction only** — the generic command registry has no modal edit form or replacement-confirmation callback; inline edit and explicit clear keep destructive intent deterministic across adapters.
-- **No per-command round-cap argument** — `defaultMaxGoalRounds` remains deployment config, while a direct human request may ask the model to edit `max_goal_rounds` through the separately authorized goal tool.
-- **No continuous status widget** — bare `/goal` is the portable observation API; no adapter-specific badges or reconnectable command output are provided.
-- **Web command adapter only in the shipped apps** — headless, ACP automation, and JSON-RPC adapters do not consume `ctx.commands`. Ordinary prompts can still authorize model-facing goal tools when those are composed.
+- **プレーンテキスト対話のみ** — 汎用コマンドレジストリにはモーダル編集フォームや置き換え確認コールバックがない。インライン編集と明示的クリアにより、破壊的意図はアダプター間で決定論的であり続ける。
+- **コマンドごとのラウンド上限引数はない** — `defaultMaxGoalRounds` はデプロイ設定のままである。直接の人間の要求は、別途認可されたゴールツールを通じてモデルに `max_goal_rounds` の編集を依頼できる。
+- **継続的なステータスウィジェットはない** — 素の `/goal` がポータブルな観察 API である。アダプター固有のバッジや再接続可能なコマンド出力は提供されない。
+- **出荷済みアプリでは Web コマンドアダプターのみ** — headless、ACP 自動化、および JSON-RPC アダプターは `ctx.commands` を消費しない。それらが構成されている場合、通常のプロンプトが依然としてモデル向けゴールツールを認可できる。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers; it is explicitly non-authoritative. Open, undecided: a continuous status widget and per-command round-cap input; both are deferred UI and configuration work.
+この開発メモはメンテナー向けの作業コンテキストであり、明示的に非権威である。未解決で未決定: 継続的なステータスウィジェットとコマンドごとのラウンド上限入力。どちらも延期された UI と設定の作業である。
 
 </details>

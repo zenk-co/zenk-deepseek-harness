@@ -1,109 +1,109 @@
 ---
-description: "Scope-grouped read-only plugin inventory tab in Web Plugins settings for the dsh web client: agent-preset compositions first, the global plane behind a disclosure, search across both."
+description: "dsh Web クライアント向け Web Plugins 設定内スコープ別読み取り専用プラグイン目録方法。エージェントプリセット合成を先に、開示背後に全体プレーン、両方横断の検索付き。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-settings-plugin-inventory
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The **Plugin list** tab lets Web users inspect plugins without changing their configuration. It lists agent presets, open by default, then the collapsed global inventory; a search opens both. Cards show localized titles and descriptions when available, identify instances by stable entry id, and expose enablement, source details, runtime status, disabled conditions, and discovery failures; preset-provided global entries name their presets. Search covers both groups and points to matches in other presets. The tab handles loading, empty, no-match, failure, and retry states without exposing transport details, and still shows the global inventory without a preset roster.
+**Plugin list** 方法は Web ユーザーが設定を変更せずプラグインを検査できるようにする。エージェントプリセットを既定で開いて列挙し、次に折り畳まれた全体目録を置く。検索は両方を開く。カードは利用可能ならローカライズ済みタイトルと説明を示し、安定エントリー id でインスタンスを識別し、有効化・ソース詳細・ランタイム状態・無効条件・探索失敗を公開する。プリセット提供の全体エントリーはプリセットを名指しする。検索は両グループを覆い、他プリセット内の一致を指す。方法はローディング・空・不一致・失敗・再試行状態を転送詳細を出さず扱い、プリセット名簿なしでも全体目録を示す。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-Open the Plugins section in Settings and select the **Plugin list** tab to inspect the Host's plugin inventory. The tab reads no Remote during plugin activation — selecting it for the first time mounts the component and lazily calls `ctx.remote.pluginInventory.list()` through `api-remotes`.
+設定で Plugins セクションを開き、Host プラグイン目録を検査するため **Plugin list** 方法を選ぶ。方法はプラグイン活性化中に Remote を読まない — 初回選択でコンポーネントをマウントし、`api-remotes` 経由で `ctx.remote.pluginInventory.list()` を遅延呼び出しする。
 
-A failed installation with pending pnpm build permissions offers **Allow these scripts and retry**. The action displays the exact package names and persistent permission scope, then retries the original package spec and activation choice. One click approves the entire displayed group, which can include pending packages from earlier attempts. Closing the page grants no permission.
+pnpm ビルド権限待ちの失敗インストールは **Allow these scripts and retry** を提示する。このアクションは正確なパッケージ名と永続権限スコープを表示し、元のパッケージ指定と活性化選択を再試行する。1 クリックは表示グループ全体を承認し、以前試行の待ちパッケージを含みうる。ページを閉じても権限は付与されない。
 
-### Reading a card
+### カードの読み方
 
-Each collapsed card uses the plugin's localized title and description when available; a description shows at most two lines until its card is expanded. Settings shortens literal package-name or module-name fallbacks by removing the npm scope and the `cordis:`, `cordis-plugin-`, or `dsh-`/`dsh-host-`/`dsh-client-` prefix; locale titles remain unchanged. The Host supplies locale and package-field fallbacks in `meta`; the Client selects the current language. Full module specifiers remain available in details and search. Missing descriptions are omitted, and metadata diagnostics appear with the card. This compact naming applies only to Settings, not the sidebar's Plugins page.
+各折り畳みカードは利用可能ならプラグインのローカライズ済みタイトルと説明を使う。説明はカード展開まで最大 2 行表示である。設定は、リテラルパッケージ名やモジュール名フォールバックを、npm スコープと `cordis:`、`cordis-plugin-`、`dsh-`/`dsh-host-`/`dsh-client-` 接頭辞の除去で短縮する。ロケールタイトルは不変のままである。Host は `meta` 内にロケールとパッケージフィールドフォールバックを提供し、Client は現行言語を選ぶ。完全モジュール指定子は詳細と検索に残る。欠落説明は省かれ、メタデータ診断はカードと共に現れる。この compact 命名は設定のみに適用され、サイドバーの Plugins ページには適用されない。
 
-A small enablement tag marks only the states that differ from plainly enabled: disabled, conditional, provided by presets, and failed; a plainly enabled row carries no tag. A colored root-fiber status dot marks the live phases no tag states: `pending` maps to idle, while `loading` and `unloading` map to ongoing; an `active` or `failed` fiber shows no dot. The stable entry id appears in a code chip at the card's bottom-left, in line with the title, only when it differs from the title: a composition-generated id drops its leading `include:` marker there, and an id that then repeats the title is omitted. Whenever the chip shows, its hover text and the card's accessible name carry the complete id; search and expanded details always retain it. Long entry ids truncate in the chip and remain available on hover. Expanding one card reveals its full description, the declared entry id, the full module specifier, and the state facts: a preset row names the preset it comes from, its runtime status when the composition is live, and its disable condition when it carries one; a preset-provided global row explains that agent presets provide it per session, names the presets that enable it. Preset names resolve through the shared `presetDisplayText` fold (`dsh-agent-preset-registry/display`) over [`ui-agent-preset`](../ui-agent-preset/README.md)'s dictionaries: shipped presets follow the active locale while user-authored ones keep their own metadata, so an English surface never echoes the preset declarations' Chinese names. Search filters both groups by localized title and description, module name, and entry id.
+小さな有効化タグは素直な有効と異なる状態のみに印付けする。無効、条件付き、プリセット提供、失敗であり、素直な有効行はタグを運ばない。色付きルートファイバー状態ドットはタグが述べないライブ段階に印付けする。`pending` は idle に対応し、`loading` と `unloading` は進行中に対応する。`active` や `failed` ファイバーはドットを示さない。安定エントリー id はタイトルと異なる場合のみタイトルと並んでカード左下のコードチップに現れる。合成生成 id はそこで先頭 `include:` 印を落とし、その後タイトルと重複する id は省かれる。チップ表示時は常に、そのホバーテキストとカードのアクセス可能名が完全 id を運び、検索と展開詳細は常にそれを保持する。長いエントリー id はチップで切り詰められ、ホバーで利用可能なままである。1 枚のカード展開は完全説明、宣言エントリー id、完全モジュール指定子、状態事実を明かす。プリセット行は由来プリセットを名指しし、合成ライブ時のランタイム状態と、運ぶ場合の無効条件を示す。プリセット提供全体行は、エージェントプリセットがセッション単位でそれを提供することを説明し、有効化するプリセットを名指しする。プリセット名は [`ui-agent-preset`](../ui-agent-preset/README.md) 辞書上の共有 `presetDisplayText` fold (`dsh-agent-preset-registry/display`) 経由で解決される。出荷プリセットは有効ロケールに従い、ユーザー作成ものは独自メタデータを保持するため、英語面がプリセット宣言の中国語名を反響することは決してない。検索はローカライズ済みタイトルと説明、モジュール名、エントリー id で両グループを絞る。
 
-### The preset switcher
+### プリセット切り替え器
 
-The switcher is the same selector-pill-plus-menu control the General settings rows use. It lists every roster preset — the default suffixed as such, broken ones marked — and changes only what the list shows: it writes no settings, and selecting a broken preset shows the discovery-reported reason in place of rows. Choosing the default preset or a session's preset stays where it was: the Agent presets section and the new-session screen.
+切り替え器は General 設定行が使うのと同じセレクターピル + メニュー制御である。名簿プリセットすべてを列挙する — 既定はその旨接尾辞付き、壊れたものは印付き — 一覧表示内容のみを変える。設定を書かず、壊れたプリセット選択は行の代わりに探索報告理由を示す。既定プリセットやセッションのプリセット選択は居場所を保つ。Agent presets セクションと新規セッション画面である。
 
-### Retrying a failed read
+### 失敗読み取りの再試行
 
-A failed read renders the shared error marker inside the tab. Loading shows skeleton cards in the card grid, and current-page synchronization uses the shared ongoing loader. Retrying re-runs the lazy `list()` call without exposing transport details.
+失敗読み取りは方法内に共有エラーマーカーを描画する。ローディングはカードグリッドに skeleton カードを示し、現ページ同期は共有進行中ローダーを使う。再試行は転送詳細を出さず遅延 `list()` 呼び出しを再実行する。
 
-The Plugin list also shows synchronization failures on the current page. Its retry reapplies the latest client graph without changing Host enablement or refreshing the page.
+Plugin list は現ページの同期失敗も示す。その再試行は Host 有効化を変えずページ更新もせず最新クライアントグラフを再適用する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The tab is a read-only projection of a Host-owned snapshot; it performs no Remote read during plugin activation and takes the snapshot on first selection.
+方法は Host 所有スナップショットの読み取り専用投影であり、プラグイン活性化中に Remote 読み取りを行わず、初回選択でスナップショットを取る。
 
-### Registration
+### 登録
 
-The browser plugin registers one localized `settings.plugins.tab` contribution with id `all`; the Plugins section owns the navigation entry and tab chrome. Registration uses `ctx.slots.inject()`, so it follows late tab declaration, redeclaration, locale changes, and teardown without importing the section owner.
+ブラウザープラグインは id `all` のローカライズ済み `settings.plugins.tab` 貢献を 1 件登録する。Plugins セクションがナビゲーションエントリーと方法 chrome を所有する。登録は `ctx.slots.inject()` を使うため、遅延方法宣言・再宣言・ロケール変更・ teardown に、セクション所有者のインポートなしで追従する。
 
-### Rendering
+### 描画
 
-Row keys are scope-qualified (`global:`, `preset:<id>:<index>`), so one module appearing in both scopes keeps distinct disclosure state; a declared entry id appears in expanded details and, after removal of a leading composition `include:` marker, supplies the collapsed id chip when the result differs from the title, while a row without one stays unlabeled. The preset-provided marking is derived client-side: a global entry carries it when it is disabled there while at least one preset row for the same module specifier is actually enabled, so a module every preset gates off (or declares only conditionally) stays plainly disabled rather than over-claiming provision.
+行キーはスコープ修飾 (`global:`、`preset:<id>:<index>`) のため、両スコープに現れる 1 モジュールは別々の開示状態を保つ。宣言エントリー id は展開詳細に現れ、先頭合成 `include:` 印除去後にタイトルと結果が異なる場合に折り畳み id チップを提供し、持たない行はラベルなしのままである。プリセット提供印はクライアント側で導出される。全体エントリーは、同じモジュール指定子の少なくとも 1 プリセット行が実際に有効な一方で全体で無効の場合にそれを運ぶため、すべてのプリセットがゲートオフする (または条件付き宣言のみの) モジュールは、提供の過剰主張ではなく素直な無効のままである。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the settings section, the remote call, and the Host-side projection.
+これらのページは設定セクション、リモート呼び出し、Host 側投影を扱う。
 
-- [ui-settings-plugins](../ui-settings-plugins/README.md) — the Plugins section this tab registers into.
-- [ui-settings](../ui-settings/README.md) — the domain base declaring `settings.plugins.tab`.
-- [api-remotes](../../api/remotes/README.md) — the Remote BFF surface behind `pluginInventory.list()`.
-- [plugin-inventory](../../host/plugin-inventory/README.md) — the Host-side read-only Loader projection this tab renders.
+- [ui-settings-plugins](../ui-settings-plugins/README.md) — この方法が登録する Plugins セクション。
+- [ui-settings](../ui-settings/README.md) — `settings.plugins.tab` を宣言するドメイン基盤。
+- [api-remotes](../../api/remotes/README.md) — `pluginInventory.list()` 背後の Remote BFF 面。
+- [plugin-inventory](../../host/plugin-inventory/README.md) — この方法が描画する Host 側読み取り専用 Loader 投影。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side inventory projection that registers nothing model-facing.
+なし。このパッケージはブラウザー側目録投影であり、モデルに面した登録は一切ない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the freshness and reach of the inventory view; they are current package constraints.
+これらの制限は目録ビューの鮮度と到達範囲を定義する。これらは現在のパッケージ制約である。
 
-- **One snapshot per Settings mount or retry** — the tab does not subscribe to Loader changes or automatically refetch after reconnect; switching tabs preserves the current snapshot, while reopening Settings obtains a new one.
-- **Read-only in both planes** — the tab shows global and preset enablement but mutates neither; enable/disable controls that write a custom preset's own composition file are deliberate follow-up work.
+- **Settings マウントや再試行ごとに 1 スナップショット** — 方法は Loader 変更を購読せず、再接続後に自動再取得しない。方法切り替えは現行スナップショットを保持し、Settings 再開は新規を取得する。
+- **両プレーンとも読み取り専用** — 方法は全体とプリセット有効化を示すが、どちらも変更しない。カスタムプリセット独自合成ファイルを書く有効/無効制御は意図的な後続作業である。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,108 +1,104 @@
 ---
-description: "Web @file and @session reference source for the composer: candidates, ordering, and atomic inline references (unified file/session picking)."
+description: "コンポーザー向け Web @file・@session 参照ソース。候補、順序、原子インライン参照（統合ファイル・セッション選択）。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-reference
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-client-ui-reference` when Web users need to mention files, folders, or sessions from one `@` completion menu. It lists files before sessions and keeps either group available when the other cannot load. Picking a file, folder, or session inserts an atomic reference with a stable clipboard form; folder rows also let users descend without closing completion. File rows omit redundant root locations, and session rows show a workspace only when it differs from the current one. Session mentions are validated before model context is captured, while browsing candidates has no model effect.
+Web ユーザーが 1 つの `@` 補完メニューからファイル・フォルダー・セッションに言及する必要がある場合に、`dsh-client-ui-reference` を使う。ファイルをセッションより先に列挙し、他方が読み込めない場合もいずれかのグループを利用可能に保つ。ファイル・フォルダー・セッションの選択は安定したクリップボード形式を持つ原子参照を挿入し、フォルダー行では補完を閉じずに降りることもできる。ファイル行は冗長なルート位置を省き、セッション行は現行と異なる場合にのみワークスペースを示す。セッション言及はモデルコンテキスト取得前に検証され、候補閲覧はモデル効果を持たない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The source is active whenever the composition mounts this package and a Host `ctx.fileReferences` provider is available. Type `@` followed by an unquoted token to see files first, then sessions; open `@"…` to search files only. The candidate list is a completion menu, not a search result page: pick once and keep typing.
+構成がこのパッケージをマウントし、Host `ctx.fileReferences` プロバイダーが利用可能な場合に、ソースは有効である。引用なしトークンに続けて `@` を打つとファイルが先に次にセッションが見え、`@"…` を開くとファイルのみ検索する。候補一覧は検索結果ページではなく補完メニューである。1 回選んで入力を続ける。
 
-### What a pick inserts
+### 選択が挿入するもの
 
-A file closes completion as an atomic inline reference displayed with a file glyph and business-color filename. A directory row carries two verbs: the settling pick (row click or Enter) resolves the folder itself as the same kind of atomic reference — folder glyph, trailing-slash label, canonical `@dir/` mention as its serialized form — while the drill action (Tab or the row's chevron) keeps plain editable path text with a folder glyph and the menu active at its trailing slash, so you can descend another level. Paths containing whitespace use `@"path with spaces"`, and a quote the user opened explicitly remains quoted.
+ファイルはファイル glyph と業務色ファイル名で表示される原子インライン参照として補完を閉じる。ディレクトリ行は 2 動詞を運ぶ。確定選択（行クリックまたは Enter）はフォルダー自体を同じ種の原子参照として解決する。すなわちフォルダー glyph、末尾スラッシュ付きラベル、直列形式としての正規 `@dir/` 言及である。一方ドリル動作（Tab または行シェブロン）はフォルダー glyph 付きの素の編集可能パステキストのままメニューを末尾スラッシュで有効に保つため、さらに 1 階層降りられる。空白を含むパスは `@"path with spaces"` を使い、ユーザーが明示開いた引用は引用されたままである。
+セッション選択は、隠れ `ref` とクリップボード表現が Host 返却の正規 `@[label](dsh-session:…)` 言及である原子インライン参照を挿入する。可視形式は chat バブル glyph とセッションタイトルである。送信は `session.prompt` 経由で言及を運び、セッション参照サービスはそれを検証して `agent/pre-step` 時点でモデルコンテキストを取得する。
 
-A session pick inserts an atomic inline reference whose hidden `ref` and clipboard representation is the canonical `@[label](dsh-session:…)` mention returned by the Host; its visible form is a chat-bubble glyph plus the session title. Sending carries the mention through `session.prompt`, and the session-reference service validates it and captures model context at `agent/pre-step`.
+### 失敗動作
 
-### Failure behavior
-
-One unavailable or failed candidate domain yields no rows for that domain while the other still lists. A session-reference preparation failure occurs after prompt acceptance and terminates that agent turn.
-
-Click a file reference in the composer to preview its current contents in the right Sidebar. Quoted paths retain their spaces, and paths resolve in the composer Session. Folder and Session references retain their editing behavior.
+利用不可または失敗した候補ドメインが 1 件あると、そのドメインの行はなく他方は依然として列挙される。セッション参照準備失敗はプロンプト受諾後に起き、そのエージェントターンを終了させる。
+コンポーザー内のファイル参照をクリックすると、現内容のプレビューが右サイドバーに開く。引用パスは空白を保持し、パスはコンポーザーセッションで解決される。フォルダーとセッション参照は編集動作を保持する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-The source keeps candidate encoding internal to the registration effect: the `/client` export is the plugin body (`apply`/`inject`) only.
+ソースは候補符号化を登録エフェクト内に保つ。`/client` 公開はプラグイン本体（`apply`/`inject`）のみである。
 
-### Candidate flow
+### 候補フロー
 
-For an unquoted token, the browser starts the `fileReferences/list` and `sessionReferenceResolver/candidates` Remote calls together, then deterministically orders files, direct subagents of the current Session, and other Sessions. Rows use the resolver's display title, which prefers a subagent's creation label while ordinary Sessions retain their projected title, and render under locale-owned group headings without a redundant raw `reference` source title. A session row is dated from the Host session list's `updatedAt` through the same relative-time bucket that list uses, so one session reads the same age on both surfaces; a session the list does not carry falls back to the candidate's creation time. A drilled query publishes a breadcrumb from the workspace root to the current directory; each crumb carries the drill payload a folder row would, so returning to a step and descending into one are one outcome.
+引用なしトークンでは、ブラウザーは `fileReferences/list` と `sessionReferenceResolver/candidates` リモート呼び出しを共に開始し、次にファイル、現セッションの直接サブエージェント、その他セッションの順に確定的に順序付ける。行はリゾルバーの表示タイトルを使い、サブエージェントの生成ラベルを優先し、通常セッションは射影タイトルを保持し、素の `reference` ソースタイトルを重複させずロケール所有グループ見出し下に描画する。セッション行の日付は Host セッション一覧の `updatedAt` から、その一覧が使うものと同じ相対時刻バケット経由で付けられるため、1 セッションは両面で同じ年齢に読める。一覧が運ばないセッションは候補の生成時刻にフォールバックする。ドリル済みクエリーはワークスペースルートから現ディレクトリまでのパンくずを公開する。各 crumb はフォルダー行が持つドリルペイロードを運ぶため、段階へ戻ることとそこへ降りることは 1 結果である。
+候補要求は既存の保持クライアントセッションを要求し、1 つの一時的 `referenceCandidates` 参照を共有する。両検出呼び出しはそのセッションの初期履歴 open 成功を待つ。保持されていないセッションや失敗した open は両 RPC を妨げる。候補要求のキャンセル信号は履歴待機と両呼び出しをカバーし、一時的参照は検索決着時に解放される。
 
-Candidate requests require an existing retained Client Session and share one temporary `referenceCandidates` reference. Both discovery calls wait for that Session's initial history open to succeed; an unretained Session or failed open prevents both RPCs. The candidate request's cancellation signal covers the history wait and both calls, and the temporary reference is released when the lookup settles.
+### 直列化
 
-### Serialization
-
-File picks preserve the natural text defined by the shared `@path` grammar as the hidden serialized and clipboard form. Session picks use the canonical `@[label](dsh-session:…)` mention; serialization never reconstructs identity from the visible title.
-
-The plugin also registers file and folder matchers with [UserText](../ui-conversation/README.md#sent-user-text) and owns their `conversation.user.text.node` renderers. Each query returns the next complete reference at an original-text offset without file discovery; the shared evaluator resolves overlaps by source position. Interactive file nodes receive a Session-bound `openFile` injection; navigation failures keep the reference visible and offer a local retry/close dialog. Folder nodes remain labels.
+ファイル選択は共有 `@path` 文法が定める自然テキストを隠れ直列・クリップボード形式として保持する。セッション選択は正規 `@[label](dsh-session:…)` 言及を使う。直列化は可視タイトルから identity を再構成しない。
+プラグインはさらに [UserText](../ui-conversation/README.md#sent-user-text) にファイルとフォルダーの照合子を登録し、その `conversation.user.text.node` レンダラーを所有する。各クエリーはファイル検出なしに元テキストオフセット位置の次の完全参照を返す。共有評価子はソース位置により重なりを解決する。対話ファイルノードはセッション束縛 `openFile` 注入を受け、移動失敗は参照を可視に保ちローカル再試行・閉じるダイアログを提供する。フォルダーノードはラベルのままである。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the suggestion machinery, the reference seams, and the input pipeline.
+これらのページは提案機構、参照シーム、入力パイプラインを扱う。
 
-- [ui-input-trigger](../ui-input-trigger/README.md) — the inline suggestion machinery the source registers into.
-- [file-reference](../../context/file-reference/README.md) — the `@file` seam and its provider contract.
-- [session-reference](../../context/session-reference/README.md) — the `@session` seam and prepared snapshot semantics.
-- [Web input machine and slash pipeline](../../../.agents/notes/archived/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md) — how references and commands share the input machine.
+- [ui-input-trigger](../ui-input-trigger/README.md) — ソースが登録するインライン提案機構。
+- [file-reference](../../context/file-reference/README.md) — `@file` シームとそのプロバイダー契約。
+- [session-reference](../../context/session-reference/README.md) — `@session` シームと準備済みスナップショット意味。
+- [Web 入力機構とスラッシュパイプライン](../../../.agents/notes/archived/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md) — 参照とコマンドが入力機構を共有する仕組み。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through Host-owned providers, which own the file guidance and session snapshot preparation this package's reference selection delegates to them.
+間接的に、Host 所有プロバイダーを通じてである。このパッケージの参照選択が委譲するファイルガイダンスとセッションスナップショット準備をそれらが所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Candidate browsing has no model effect. A selected file or session changes only the new user-message suffix and any Host-prepared session-reference context that follows that message; earlier target history remains unchanged.
+候補閲覧はモデル効果を持たない。選択されたファイルやセッションは新しいユーザーメッセージ接尾辞と、そのメッセージに続く Host 準備済みセッション参照コンテキストのみ変える。以前の対象履歴は不変のままである。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the reference source cannot help; they are current package constraints.
+参照ソースが助けにならない場合を定める。これらは現在のパッケージ制約である。
 
-- **Candidate failure is intentionally quiet** — one unavailable or failed Remote discovery call yields no rows for that domain. A session-reference preparation failure occurs after prompt acceptance and terminates that agent turn.
-- **No browser-side file scan** — Web completion requires a mounted Host `ctx.fileReferences` provider; the browser cannot fall back to its own filesystem.
-- **Session search remains metadata-only** — discovery filters session id, cwd, and the latest log-backed title through `ctx.sessionReferenceResolver`; message bodies and full transcripts are not searched.
+- **候補失敗は意図的に静かである** — 利用不可または失敗したリモート検出呼び出しが 1 件あると、そのドメインの行はなくなる。セッション参照準備失敗はプロンプト受諾後に起き、そのエージェントターンを終了させる。
+- **ブラウザー側ファイル走査なし** — Web 補完はマウント済み Host `ctx.fileReferences` プロバイダーを要求する。ブラウザーは自身ファイルシステムへフォールバックできない。
+- **セッション検索はメタデータのみのまま** — 検出は `ctx.sessionReferenceResolver` 経由でセッション id、cwd、最新ログ裏付けタイトルを絞る。メッセージ本体と完全 transcript は検索されない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

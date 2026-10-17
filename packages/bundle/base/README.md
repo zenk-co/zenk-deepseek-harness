@@ -1,35 +1,35 @@
 ---
-description: "The shared dsh core: model access, tools, durable sessions, and safety defaults for every dsh --profile surface, for users composing or customizing a profile."
+description: "共有 dsh コア: モデルアクセス、ツール、耐久性のあるセッション、すべての dsh --profile サーフェス向けの安全デフォルト。プロファイルを構成・カスタマイズするユーザー向け。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-base
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Every base-backed `dsh --profile` surface runs on `dsh-base`, so those surfaces share a model connection, the full tool set, durable session history, and workspace safety defaults. The shipped `sdk-minimal` profile deliberately uses a complete standalone tree instead. You rarely touch this bundle directly — shipped base-backed profiles already include it, and a custom base-backed profile names it first. When you need different defaults, change your profile patch or add a later bundle; this package is not a library you import.
+base に裏付けられたすべての `dsh --profile` サーフェスは `dsh-base` 上で実行されるので、それらのサーフェスはモデル接続、完全なツールセット、耐久性のあるセッション履歴、ワークスペースの安全デフォルトを共有する。同梱の `sdk-minimal` プロファイルは意図的に完全なスタンドアロンツリーを使う。このバンドルを直接触ることはほとんどない — 同梱の base ベースのプロファイルはすでにこれを含んでおり、カスタムの base ベースプロファイルはこれを最初に指名する。異なるデフォルトが必要なときは、プロファイルのパッチを変更するか、後続のバンドルを追加する。このパッケージはインポートするライブラリではない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-You get the dsh core automatically: the shipped `web`, `headless`, `sdk`, and `acp` profiles already include it, and a custom profile names it as its first bundle. After that, everything works with no further configuration.
+dsh コアは自動的に手に入る: 同梱の `web`、`headless`、`sdk`、`acp` プロファイルはすでにこれを含んでおり、カスタムプロファイルはそれを最初のバンドルとして指名する。あとは追加設定なしですべてが機能する。
 
-### A minimal custom profile
+### 最小のカスタムプロファイル
 
-To build a profile on the shared core, create a profile with a `package.json` that names `@deepseek-ai/dsh-base` first:
+共有コア上にプロファイルを構築するには、`@deepseek-ai/dsh-base` を最初に指名する `package.json` を持つプロファイルを作成する:
 
 ```json
 {
@@ -43,15 +43,15 @@ To build a profile on the shared core, create a profile with a `package.json` th
 }
 ```
 
-Run `dsh --profile my-profile "your task"` and you get a working agent with model access, tools, persistence, and the default permission policy. The shipped `web`, `headless`, `sdk`, and `acp` profiles are created for you on first use. To add more bundles, run `dsh plugin --profile <name> add <package>`; in-box bundles resolve from the dsh installation. The profile contract is documented in the [app-boot profile section](../../boot/app-boot/README.md).
+`dsh --profile my-profile "your task"` を実行すると、モデルアクセス、ツール、永続化、デフォルトの権限ポリシーを備えた動作するエージェントが得られる。同梱の `web`、`headless`、`sdk`、`acp` プロファイルは初回使用時に自動で作成される。さらにバンドルを追加するには `dsh plugin --profile <name> add <package>` を実行する。in-box のバンドルは dsh インストールから解決される。プロファイル契約は [app-boot プロファイルのセクション](../../boot/app-boot/README.md)で文書化されている。
 
-### What you get
+### 得られるもの
 
-Out of the box, every profile built on this core provides: a DeepSeek model connection (the provider and model are configurable, and you can enable extra providers from your settings), the full tool set — file editing, shell commands, web search, public HTTP(S) fetch, subagents, task and goal tracking — durable sessions that survive restarts, and the default permission policy that confines file writes to your workspace and asks before risky actions. Web fetch runs without per-call approval; its provider rejects non-public destinations. Feedback stays in the Session log. [OTel session upload](../../session/session-telemetry-otel/README.md) defaults to `FEEDBACK_ONLY` for all users, including `deepseek-official`: new text feedback, message ratings, edits, and withdrawals release the complete canonical prefix through that event, including context. Later records wait for the next explicit feedback; sending an authorized batch needs no further interaction or model call. `DISABLED` prevents OTel capture. The default-on [DeepSeek session-log contributor](../../session/session-log-deepseek/README.md) remains a separate request path.
+すぐに使える状態で、このコア上に構築されたすべてのプロファイルは次を提供する: DeepSeek モデル接続（プロバイダーとモデルは設定可能で、設定から追加のプロバイダーを有効化できる）、完全なツールセット — ファイル編集、シェルコマンド、Web 検索、公開 HTTP(S) フェッチ、subagent、タスクとゴールの追跡 — 再起動を生き延びる耐久性のあるセッション、そしてファイル書き込みをワークスペースに限定し危険な操作の前に確認するデフォルトの権限ポリシー。Web フェッチは呼び出しごとの承認なしに実行され、そのプロバイダーは非公開の宛先を拒否する。フィードバックは Session ログに留まる。[OTel セッションアップロード](../../session/session-telemetry-otel/README.md)はすべてのユーザー（`deepseek-official` を含む）についてデフォルトで `FEEDBACK_ONLY` である: 新しいテキストフィードバック、メッセージ評価、編集、撤回が、そのイベントを通じてコンテキストを含む完全な正規プレフィックスを解放する。それ以降のレコードは次の明示的なフィードバックを待ち、認可済みバッチの送信にはそれ以上の操作もモデル呼び出しも必要ない。`DISABLED` は OTel キャプチャを防ぐ。デフォルトで有効な [DeepSeek セッションログコントリビューター](../../session/session-log-deepseek/README.md)は別個のリクエスト経路のままである。
 
-Both `subagent` and `subagent_fork` create managed children and return a child id immediately. Use `send_message` to steer active children or continue their conversations after completion. [Delegation-tool behavior](../../subagent/tool-subagent/README.md) describes result delivery and backend capabilities.
+`subagent` と `subagent_fork` はどちらも管理された子を作成し、子 id を即座に返す。アクティブな子をステアする、または完了後の会話を続けるには `send_message` を使う。[委譲ツールの挙動](../../subagent/tool-subagent/README.md)が結果配信とバックエンドのケイパビリティを説明する。
 
-The built-in `working_directory` tool changes the directory for subsequent operations while existing processes and write permissions remain independent. Current directory information appears in user context. Default file editing uses `read`, `write`, and `edit`. The `str_replace_editor` tool remains available as an explicit opt-in. To add it to a base-backed profile, put this entry in the profile, home, or invocation patch:
+ビルトインの `working_directory` ツールは以降の操作のディレクトリを変更するが、既存のプロセスと書き込み権限は独立したままである。現在のディレクトリ情報はユーザーコンテキストに現れる。デフォルトのファイル編集は `read`、`write`、`edit` を使う。`str_replace_editor` ツールは明示的なオプトインとして利用可能なままである。base ベースのプロファイルにそれを追加するには、プロファイル、ホーム、または呼び出しのパッチにこのエントリーを入れる:
 
 ```yaml
 - insert:
@@ -61,88 +61,88 @@ The built-in `working_directory` tool changes the directory for subsequent opera
         maxOutputChars: 16000
 ```
 
-The bundle mounts [MCP resources](../../mcp/mcp-resources/README.md) once. Configure only [MCP client entries](../../mcp/mcp-client/README.md) for the servers you need. Clients mounted by another provider also count as configured in their scope. Callers with no configured server in scope receive no MCP tools or prompt text.
+このバンドルは [MCP リソース](../../mcp/mcp-resources/README.md)を 1 回マウントする。必要なサーバーについて設定するのは [MCP クライアントエントリー](../../mcp/mcp-client/README.md)だけである。別のプロバイダーがマウントしたクライアントもそのスコープ内で設定済みとして数えられる。スコープ内に設定済みサーバーのない呼び出し元は MCP ツールもプロンプトテキストも受け取らない。
 
-### Shell tools per platform
+### プラットフォームごとのシェルツール
 
-On macOS and Linux you get the bash shell tools; on Windows you get the PowerShell twins instead, so exactly one shell stack is available per machine. The safety behavior is identical on every platform. A Windows host that prefers the unconfined PowerShell executor can switch the shell rows in its profile patch — the switch must disable both PowerShell rows and re-enable both bash rows, otherwise the profile fails to load.
+macOS と Linux では bash シェルツールが手に入り、Windows では代わりに PowerShell の双子が手に入るので、マシンごとにちょうど 1 つのシェルスタックが利用可能である。安全挙動はすべてのプラットフォームで同一である。非閉じ込めの PowerShell エグゼキューターを好む Windows ホストはプロファイルパッチでシェル行を切り替えられる — この切り替えは両方の PowerShell 行を無効化し、両方の bash 行を再有効化しなければならず、そうでなければプロファイルはロードに失敗する。
 
-### Changing the defaults
+### デフォルトの変更
 
-To change what a profile built on this core provides — a different default model, a stricter permission mode, extra or fewer tools — edit your profile's `cordis.patch.yml` or add a later bundle. Each patch entry replaces the target's whole configuration, so restate every setting you want to keep. Keep the sandboxed filesystem provider as the single file-write path: adding the plain filesystem provider on top of it makes the profile fail to load.
+このコア上に構築されたプロファイルが提供するもの — 別のデフォルトモデル、より厳格な権限モード、追加または削減したツール — を変更するには、プロファイルの `cordis.patch.yml` を編集するか、後続のバンドルを追加する。各パッチエントリーはターゲットの設定全体を置き換えるので、保持したいすべての設定を再記述すること。サンドボックス化されたファイルシステムプロバイダーを唯一のファイル書き込み経路として保つこと: その上にプレーンなファイルシステムプロバイダーを追加するとプロファイルはロードに失敗する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The bundle is a static patch document: one `insert` list applied over the empty profile root. It mounts no service, emits no events, and holds no mutable state; each inserted row's package owns that row's behavior and invariants.
+このバンドルは静的なパッチドキュメントである: 空のプロファイルルート上に適用される 1 つの `insert` リストである。サービスをマウントせず、イベントを emit せず、可変状態を持たない。挿入された各行の挙動と不変条件はその行のパッケージが所有する。
 
-### Composition mechanics
+### 構成の仕組み
 
-A patch replaces the targeted row's whole `config` rather than merging into it. Later bundle layers and the user's profile `cordis.patch.yml` override rows by id, with the last write winning per row. Rows whose value differs by mode do not live here: each mode bundle restates its complete configuration, keeping any single row down to one bundle layer plus the user's. The full row set and its rationale are documented inline in [`cordis.patch.yml`](cordis.patch.yml); the [generated composition graph](../../../apps/cli/composition.md) renders it.
+パッチはターゲット行の `config` 全体をマージではなく置き換える。後続のバンドルレイヤーとユーザーのプロファイル `cordis.patch.yml` は id で行を上書きし、行ごとに最後の書き込みが勝つ。値がモードによって異なる行はここには住まない: 各モードのバンドルが完全な構成を再記述し、任意の 1 行を 1 つのバンドルレイヤーとユーザーのものだけに保つ。完全な行セットとその根拠は [`cordis.patch.yml`](cordis.patch.yml) にインラインで文書化されており、[生成された構成グラフ](../../../apps/cli/composition.md)がそれをレンダリングする。
 
-### Platform gating
+### プラットフォームゲーティング
 
-The patch gates the two shell stacks by platform on its own rows: `bash-sandbox` and `tool-bash` carry `disabled: !!js process.platform === 'win32'`, and their twins `pwsh-sandbox` and `tool-pwsh` mount on win32 only with the inverted expression. The permission surface stays identical to POSIX: the sandbox policy executes the same file-effect policy through the Windows ACL restricted-token runner (`dsh-sandbox-local` → `@deepseek-ai/dsh-sandbox-windows-acl`), and `fs-sandbox` keeps fencing `ctx.fs` writes — mounting `dsh-fs-local` alongside it would double-register `ctx.fs` and fail the load.
+パッチは自身の行で 2 つのシェルスタックをプラットフォームによってゲートする: `bash-sandbox` と `tool-bash` は `disabled: !!js process.platform === 'win32'` を持ち、その双子の `pwsh-sandbox` と `tool-pwsh` は反転した式で win32 のみでマウントする。権限サーフェスは POSIX と同一のままである: サンドボックスポリシーは Windows ACL の restricted-token ランナー（`dsh-sandbox-local` → `@deepseek-ai/dsh-sandbox-windows-acl`）を通じて同じファイルエフェクトポリシーを実行し、`fs-sandbox` は `ctx.fs` の書き込みをフェンシングし続ける — それと並べて `dsh-fs-local` をマウントすると `ctx.fs` が二重登録され、ロードに失敗する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`cordis.patch.yml`](cordis.patch.yml) | The bundle substance: the base plugin rows, with per-row rationale as inline comments |
-| [`src/index.ts`](src/index.ts) | Package entry; carries no runtime API |
-| [`tests/base.spec.ts`](tests/base.spec.ts) | Manifest declaration and platform-gating checks |
+| [`cordis.patch.yml`](cordis.patch.yml) | バンドルの本体: ベースプラグイン行と、行ごとの根拠をインラインコメントとして |
+| [`src/index.ts`](src/index.ts) | パッケージエントリー。ランタイム API を持たない |
+| [`tests/base.spec.ts`](tests/base.spec.ts) | マニフェスト宣言とプラットフォームゲーティングのチェック |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when you want to go deeper into profiles, the surfaces built on this core, or the exact composition.
+プロファイル、このコア上に構築されたサーフェス、正確な構成をより深く知りたいときにこれらのページを読むこと。
 
-- [app-boot profile section](../../boot/app-boot/README.md) — how profiles are resolved, layered, and customized.
-- [Bundle package map](../README.md) — the surfaces built on this core.
-- [Generated composition graph](../../../apps/cli/composition.md) — the exact plugin set each shipped profile uses.
-- [Profile plugin bundles note](../../../.agents/notes/implemented/architecture/2026-08-05-profile-plugin-bundles.md) — the profile and bundle composition design.
-- [Codex and Claude Code provider bundles](../../subagent/README.md) — optional provider bundles you can install on top.
+- [app-boot プロファイルのセクション](../../boot/app-boot/README.md) — プロファイルがどう解決、階層化、カスタマイズされるか。
+- [バンドルパッケージマップ](../README.md) — このコア上に構築されたサーフェス。
+- [生成された構成グラフ](../../../apps/cli/composition.md) — 同梱の各プロファイルが使う正確なプラグインセット。
+- [プロファイルプラグインバンドルのノート](../../../.agents/notes/implemented/architecture/2026-08-05-profile-plugin-bundles.md) — プロファイルとバンドルの構成設計。
+- [Codex と Claude Code のプロバイダーバンドル](../../subagent/README.md) — 上にインストールできるオプションのプロバイダーバンドル。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through each inserted row's package, which owns that row's model-facing behavior.
+間接的に、挿入された各行のパッケージを通じて。その行のモデル向け挙動はそのパッケージが所有する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-The bundle itself adds no request prefix; each inserted row's package owns any cache effect.
+バンドル自体はリクエストプレフィックスを追加せず、挿入された各行のパッケージがキャッシュ効果を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits tell you when the core needs extra care or where an override must go. They are current package constraints, not a general comparison or a task backlog.
+これらの制限は、コアが追加の注意を必要とする場合や、上書きをどこに置かなければならないかを伝える。これらは現在のパッケージ制約であり、一般的な比較やタスクバックログではない。
 
-- **Overrides replace whole settings blocks** — a patch entry replaces the target's entire configuration, so your override must restate every setting you want to keep; nothing merges automatically.
-- **Per-surface settings belong to the surface's bundle** — a default that differs between the web GUI and headless mode lives in that surface's bundle, not in the shared core.
-- **Windows temp grants are private per-session subdirectories** — `workspace-write` confines writes to the workspace plus the session's own temp subdirectory (`<temp>\dsh-<hash>`, TMP/TEMP rewritten for confined children); `read-only` grants nothing. See `@deepseek-ai/dsh-sandbox-windows-acl`.
-- **Adding the plain filesystem provider on top of the sandboxed one fails the profile** — the two register the same service, so the profile refuses to load; use one or the other.
+- **上書きは設定ブロック全体を置き換える** — パッチエントリーはターゲットの設定全体を置き換えるので、上書きは保持したいすべての設定を再記述しなければならない。何も自動でマージされない。
+- **サーフェスごとの設定はそのサーフェスのバンドルに属する** — Web GUI とヘッドレスモードで異なるデフォルトは、共有コアではなくそのサーフェスのバンドルに住む。
+- **Windows の一時許可はセッションごとのプライベートサブディレクトリ** — `workspace-write` は書き込みをワークスペースとそのセッション自身の一時サブディレクトリ（`<temp>\dsh-<hash>`、閉じ込められた子のために TMP/TEMP が書き換えられる）に限定し、`read-only` は何も許可しない。`@deepseek-ai/dsh-sandbox-windows-acl` を参照。
+- **サンドボックス化されたものの上にプレーンなファイルシステムプロバイダーを追加するとプロファイルが失敗する** — 両者は同じサービスを登録するのでプロファイルはロードを拒否する。どちらか一方を使うこと。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>
 
-The base composition mounts authorization and the platform account provider alongside credentials. The provider opens a callback listener only during an explicit login attempt.
+base の構成は認可とプラットフォームアカウントプロバイダーをクレデンシャルと並べてマウントする。プロバイダーは明示的なログイン試行の間だけコールバックリスナーを開く。

@@ -1,45 +1,45 @@
 ---
-description: "Ready-made dsh profile bundles for the shared core, browser GUI, one-shot task, ACP, and SDK application surfaces."
+description: "共有コア、ブラウザー GUI、ワンショットタスク、ACP、SDK アプリケーション面向けの出来合い dsh プロファイルバンドル。"
 kind: "package-group"
 ---
 
-# bundle/ — profile plugin bundles
+# bundle/ — プロファイルプラグインバンドル
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This group maps the installable patch layers used by `dsh --profile`. Each package declares `dsh.bundle.patch`; the launcher stacks those patch documents to assemble a named profile. The `web`, `headless`, `acp`, and `sdk` profiles build on `dsh-base`, while `sdk-minimal` supplies its complete tree in one bundle. Domain packages can declare additional layers outside this directory.
+このグループは `dsh --profile` が使うインストール可能なパッチ層を対応付ける。各パッケージは `dsh.bundle.patch` を宣言し、ランチャーはそれらのパッチ文書を積み重ねて名前付きプロファイルを組み立てる。`web`、`headless`、`acp`、`sdk` の各プロファイルは `dsh-base` 上に構築され、`sdk-minimal` は完全なツリーを 1 バンドルで供給する。ドメインパッケージはこのディレクトリの外に追加層を宣言できる。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発者ノート](#dev-note)
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`base`](base/README.md) | Shared core for base-backed profiles | — (patch only) |
-| [`acp-app`](acp-app/README.md) | Automation-only ACP stdio application over base | mounts the ACP bridge |
-| [`web-app`](web-app/README.md) | Browser application layer over base | mounts Web rows |
-| [`headless`](headless/README.md) | One-shot command-line task application over base | `headless-runner` |
-| [`sdk-app`](sdk-app/README.md) | SDK JSON-RPC stdio application over base | mounts the SDK server |
-| [`sdk-minimal`](sdk-minimal/README.md) | Standalone minimal SDK application without base or Web | — (complete patch tree) |
+| [`base`](base/README.md) | base 派生プロファイル向けの共有コア | —（パッチのみ） |
+| [`acp-app`](acp-app/README.md) | base 上の自動化専用 ACP stdio アプリケーション | ACP ブリッジをマウントする |
+| [`web-app`](web-app/README.md) | base 上のブラウザーアプリケーション層 | Web 行をマウントする |
+| [`headless`](headless/README.md) | base 上のワンショットコマンドラインタスクアプリケーション | `headless-runner` |
+| [`sdk-app`](sdk-app/README.md) | base 上の SDK JSON-RPC stdio アプリケーション | SDK サーバーをマウントする |
+| [`sdk-minimal`](sdk-minimal/README.md) | base も Web も使わない独立の最小 SDK アプリケーション | —（完全なパッチツリー） |
 
-In-box bundles resolve from the dsh installation; out-of-tree bundles install into a profile through `dsh plugin --profile <name> add <package>`.
+インボックスのバンドルは dsh インストールから解決される。ツリー外のバンドルは `dsh plugin --profile <name> add <package>` でプロファイルにインストールする。
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-- [dsh app](../../apps/cli/README.md) — the `dsh` command that starts a profile.
-- [app-boot](../boot/app-boot/README.md) — how profiles are resolved, layered, and customized.
-- [Profile plugin bundles note](../../.agents/notes/implemented/architecture/2026-08-05-profile-plugin-bundles.md) — the profile and bundle composition design.
-- [Generated composition graph](../../apps/cli/composition.md) — the exact composition each shipped profile uses.
+- [dsh アプリ](../../apps/cli/README.md) — プロファイルを開始する `dsh` コマンド。
+- [app-boot](../boot/app-boot/README.md) — プロファイルの解決、層化、カスタマイズ方法。
+- [プロファイルプラグインバンドル Note](../../.agents/notes/implemented/architecture/2026-08-05-profile-plugin-bundles.md) — プロファイルとバンドルの構成設計。
+- [生成構成グラフ](../../apps/cli/composition.md) — 出荷プロファイルが使う正確な構成。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
-None.
+なし。

@@ -1,14 +1,14 @@
-# Tools
+# ツール
 
-English | [中文](tools.zh.md)
+日本語 | [English](tools.en.md) | [中文](tools.zh.md)
 
-The tool pipeline of [dsh-tools](../../packages/core/tools). [core.md](core.md) introduces `ToolDefinition` as the pipeline-authoring type shared by the core packages; the model-facing [`ToolSchema`](llm-streaming.md#the-model-request-and-result) wire type is declared with the model request. This page documents every `ToolDefinition` field, the typed schema DSL that builds it, the guarded execution types, and the UI-presentation types.
+[dsh-tools](../../packages/core/tools) のツールパイプライン。[core.md](core.md) は `ToolDefinition` をコアパッケージ間で共有されるパイプライン記述用の型として導入している。モデル向けの [`ToolSchema`](llm-streaming.md#the-model-request-and-result) ワイヤ型はモデルリクエストとともに宣言される。このページではすべての `ToolDefinition` フィールド、それを構築する型付きスキーマ DSL、ガード付き実行型、UI 表示型を説明する。
 
 Source: [`packages/core/tools/src/index.ts`](../../packages/core/tools/src/index.ts) · [`packages/core/tools/src/schema.ts`](../../packages/core/tools/src/schema.ts) · [`packages/core/tools/src/presentation.ts`](../../packages/core/tools/src/presentation.ts)
 
-## `ToolDefinition` — a registered tool
+## `ToolDefinition` — 登録済みツール
 
-A `ToolSchema` (the model-facing fields) plus a mandatory canonical output declaration, the `execute` function, host-only scheduler metadata, an optional final-content callback, and optional UI presenters. The registry holds these; the loop dispatches calls through them. The registry's `schemas()` builds the model-facing `ToolSchema[]` by an explicit allowlist — `output`/`execute`/`projectContent`/`finalizeContent`/`timeoutMs`/`isConcurrencySafe`/`presentCall`/`presentResult` must never leak into a model request.
+`ToolSchema`（モデル向けフィールド）に必須の正規出力宣言、`execute` 関数、ホスト専用スケジューラーメタデータ、任意の最終コンテンツコールバック、任意の UI プレゼンターを加えたもの。レジストリがこれらを保持し、ループはこれらを通じて呼び出しをディスパッチする。レジストリの `schemas()` は明示的な許可リストでモデル向け `ToolSchema[]` を構築する — `output`/`execute`/`projectContent`/`finalizeContent`/`timeoutMs`/`isConcurrencySafe`/`presentCall`/`presentResult` をモデルリクエストに漏らしてはならない。
 
 ```ts type-equiv
 /** Tool-owned canonical output contract used after the body returns a JSON value. */
@@ -103,11 +103,11 @@ interface ToolDefinition extends ToolSchema {
 }
 ```
 
-`execute` receives `args: unknown` — a raw `ToolDefinition` validates its own input. First-party tools don't write that by hand; they use `defineTool`, which validates and narrows the arguments, infers the body return from `output.schema`, and types both output projectors. `finalizeContent` deliberately receives the immutable execution instead of typed arguments because invalid-input and outer pipeline failures reach it too; it may enforce a tool-owned content bound while preserving `isError`, canonical value, structured error identity, deferred contexts, and presentation metadata.
+`execute` は `args: unknown` を受け取る — 素の `ToolDefinition` は自身の入力を検証する。ファーストパーティのツールはこれを手書きせず、`defineTool` を使う。これは引数を検証して絞り込み、`output.schema` から本体の戻り値を推論し、両方の出力プロジェクターに型を付ける。`finalizeContent` は型付き引数ではなく不変の実行情報を意図的に受け取る。不正入力や外側パイプラインの失敗もここに届くためであり、`isError`、正規値、構造化エラー同一性、遅延コンテキスト、表示メタデータを保ちながらツール所有のコンテンツ上限を強制できる。
 
-## The unified JSON-value schema DSL
+## 統一 JSON 値スキーマ DSL
 
-Plugin authors use one vocabulary for typed parameters and typed output values. `ValueSchemaSpec` supports `string`, `number`, `integer`, `boolean`, `null`, `array`, `object`, author-only `json`, and exact-one `oneOf`; scalar `enum` and `const` values must match their node type. An explicit object node always declares `additionalProperties: true | false`. Parameter definitions remain an implicit open object property map, with `required: true` attached to each required property.
+プラグイン作者は型付きパラメーターと型付き出力値に1つの語彙を使う。`ValueSchemaSpec` は `string`、`number`、`integer`、`boolean`、`null`、`array`、`object`、作者専用の `json`、厳密に1つの `oneOf` をサポートする。スカラーの `enum` と `const` の値はノード型と一致しなければならない。明示的なオブジェクトノードは必ず `additionalProperties: true | false` を宣言する。パラメーター定義は暗黙のオープンなオブジェクトプロパティマップのままで、必須プロパティごとに `required: true` を付ける。
 
 Source: [`packages/core/tools/src/schema.ts`](../../packages/core/tools/src/schema.ts)
 
@@ -141,7 +141,7 @@ type ParameterSchemaSpec = {
 }
 ```
 
-`{ type: 'json' }` infers `JsonValue` and compiles to an annotation-only unconstrained raw schema. Output roots can be objects, arrays, scalars, or null. `InferValue<S>` honors literal constraints and object openness through 16 container levels, then falls back to `JsonValue` instead of exhausting TypeScript's type-instantiation stack. `InferArgs<P>` turns per-property requiredness into required and optional string keys:
+`{ type: 'json' }` は `JsonValue` に推論され、注釈のみの無制約 raw スキーマにコンパイルされる。出力ルートはオブジェクト、配列、スカラー、null のいずれにもできる。`InferValue<S>` は16コンテナレベルまでリテラル制約とオブジェクトの開放性を尊重し、その後は TypeScript の型インスタンス化スタックを使い果たす代わりに `JsonValue` にフォールバックする。`InferArgs<P>` はプロパティごとの必須性を必須および任意の文字列キーに変換する。
 
 ```ts type-equiv
 /**
@@ -156,13 +156,13 @@ type InferValue<S> = InferValueAt<S, []>
 type InferArgs<S> = InferProperties<S, []>
 ```
 
-`defineTool({ name, description, parameters, output, execute, … })` ties parameter inference to `parameterSchemaSpecToJsonSchema()` and `validateArgs()`, and ties `execute`/`render`/`presentationMeta` to `InferValue<OutputSchema>`. Schema records contain only own enumerable string keys, and schema arrays are dense intrinsic arrays, so inference, compilation, and validation observe the same declaration. Inference stays exact through 16 container levels and then widens to `JsonValue`; runtime validation keeps walking the complete schema. `valueSchemaSpecToJsonSchema()` compiles output declarations through the same enforced raw subset. A parameter mismatch throws `ToolArgsError` (`INVALID_ARGS`); an invalid body or post-policy value throws `ToolOutputError` (`INVALID_TOOL_OUTPUT`). Both use the normal tool-error path. Raw JSON Schema remains open by default; unsupported keywords reject instead of being accepted without enforcement.
+`defineTool({ name, description, parameters, output, execute, … })` はパラメーター推論を `parameterSchemaSpecToJsonSchema()` と `validateArgs()` に結び付け、`execute`/`render`/`presentationMeta` を `InferValue<OutputSchema>` に結び付ける。スキーマレコードは自身の列挙可能な文字列キーのみを含み、スキーマ配列は密な組み込み配列であるため、推論、コンパイル、検証は同じ宣言を参照する。推論は16コンテナレベルまで厳密で、その後は `JsonValue` に拡大する。ランタイム検証はスキーマ全体をたどり続ける。`valueSchemaSpecToJsonSchema()` は出力宣言を同じ強制 raw サブセットでコンパイルする。パラメーター不一致は `ToolArgsError`（`INVALID_ARGS`）を投げ、不正な本体やポストポリシー値は `ToolOutputError`（`INVALID_TOOL_OUTPUT`）を投げる。どちらも通常のツールエラーパスを使う。Raw JSON Schema は既定でオープンのまま。未サポートのキーワードは強制なしに受け入れられるのではなく拒否される。
 
-Registration is a trusted same-process contract. The registry borrows the typed definition as readonly input, requires `output`, validates its raw schema, and checks semantic requirements such as a positive finite `timeoutMs`; `schemas()` constructs the model-facing projection when building a request, so execution and presentation share one resolved definition without leaking callbacks onto the wire.
+登録は信頼された同一プロセス内の契約である。レジストリは型付き定義を読み取り専用入力として借用し、`output` を必須とし、その raw スキーマを検証し、正の有限な `timeoutMs` などの意味要件を確認する。`schemas()` はリクエスト構築時にモデル向けプロジェクションを構築するため、実行と表示はコールバックをワイヤ上に漏らすことなく1つの解決済み定義を共有する。
 
-## `ToolRestriction` — one scope's live filter over what it inherits
+## `ToolRestriction` — 継承に対するスコープごとのライブフィルター
 
-`ToolRestriction` applies to the tools a scope inherits: the deployment-global layer plus every ancestor scope on its chain. The registry compiles readonly names into private sets, intersects multiple restrictions, then overlays the scope's OWN registrations, which stay exempt so a delegated child keeps the tools it answers through. A deny-only filter admits later unlisted inherited tools, while an allow-list excludes them.
+`ToolRestriction` はスコープが継承するツールに適用される。デプロイ全体のグローバル層にチェーン上のすべての祖先スコープを加えたものが対象である。レジストリは読み取り専用名をプライベート集合にコンパイルし、複数の制限を交叉させ、その後にスコープ自身の登録を重ねる。自身の登録は除外対象外のままなので、委譲された子は応答に使うツールを保持する。拒否のみのフィルターは後に追加された未掲載の継承ツールを許容し、許可リストはそれらを除外する。
 
 ```ts type-equiv
 /**
@@ -177,9 +177,9 @@ interface ToolRestriction {
 }
 ```
 
-## Execution: extensible waterfalls plus monotonic policy
+## 実行: 拡張可能なウォーターフォールと単調ポリシー
 
-`ctx.tools.execute()` accepts a caller-owned `ToolExecutionInput` with a required readonly `signal`, materializes its parsed JSON arguments once into a pipeline-owned `ToolExecution`, and runs that call through `tools/pre-execute` (the reorderable allow/deny/ask waterfall) → registered monotonic guards → `tools/execute` (around-dispatch wrappers) → `projectContent` → `tools/post-execute` (inspect/replace the result) → optional definition-owned `finalizeContent` → `tools/result` (the immutable authoritative outcome). Only the `tools/execute` view may replace the required signal. The outcome is a `ToolExecutionResult`.
+`ctx.tools.execute()` は呼び出し元所有の `ToolExecutionInput` を受け取る。必須の読み取り専用 `signal` を持ち、解析済み JSON 引数を1回だけパイプライン所有の `ToolExecution` に実体化し、その呼び出しを `tools/pre-execute`（並べ替え可能な allow/deny/ask ウォーターフォール）→ 登録済み単調ガード → `tools/execute`（ディスパッチ包囲ラッパー）→ `projectContent` → `tools/post-execute`（結果の検査/置換）→ 任意の定義所有 `finalizeContent` → `tools/result`（不変の権威ある結果）の順に実行する。必須シグナルを置換できるのは `tools/execute` ビューのみである。結果は `ToolExecutionResult` である。
 
 ```ts type-equiv
 /** Opaque call identity that permits correlation without exposing mutable execution state. */
@@ -221,7 +221,7 @@ interface ToolExecutionInput {
 }
 ```
 
-A tool body receives the runtime extension. `deferContext()` attaches context to the execution's own result — the composite-tool nested-dispatch channel, also usable by a leaf tool minting a plugin-sourced instruction — without injecting inside the still-open outer call.
+ツール本体はランタイム拡張を受け取る。`deferContext()` はコンテキストをその実行自身の結果に付加する — 複合ツールの入れ子ディスパッチチャネルであり、プラグイン由来命令を新たに発行するリーフツールも使える — まだ開いている外側呼び出しの内部には注入しない。
 
 ```ts type-equiv
 /**
@@ -252,7 +252,7 @@ interface ToolRunContext extends ToolExecution {
 }
 ```
 
-The agent loop asks the registry for each pending call's execution mode and uses it to form exclusive barriers and rolling-pool parallel runs:
+エージェントループは保留中の各呼び出しの実行モードをレジストリに問い合わせ、それを使って排他バリアとローリングプールの並列実行を構成する。
 
 ```ts type-equiv
 /**
@@ -264,7 +264,7 @@ type ToolExecutionMode =
   | { kind: 'exclusive' }
 ```
 
-PTC bindings freeze their ToolSchema at construction and pass it through the scheduler into `ToolExecution.schema`; it is transient execution metadata. Before policy, each actually started sub-dispatch records only pairing ids, name, and normalized arguments. Neither start nor settle events serialize description, parameters, or schema. The bridge later exposes the settled call to the `tools/ptc-dispatch-log` waterfall, which may change the durable content copy while preserving the program value, model-visible outer result, and structured failure identity:
+PTC バインディングは構築時に ToolSchema を凍結し、スケジューラーを通じて `ToolExecution.schema` に渡す。これは一過性の実行メタデータである。ポリシー前に、実際に開始された各サブディスパッチはペアリング ID、名前、正規化引数のみを記録する。開始イベントも確定イベントも説明、パラメーター、スキーマを直列化しない。ブリッジは後に確定した呼び出しを `tools/ptc-dispatch-log` ウォーターフォールに公開する。これはプログラム値、モデル可視の外側結果、構造化失敗同一性を保ちながら永続コンテンツコピーを変更できる。
 
 ```ts type-equiv
 /**
@@ -320,9 +320,9 @@ interface ToolDispatchExecution extends Omit<ToolExecution, 'signal'> {
 }
 ```
 
-`ToolExecutionToken` is an opaque runtime `Symbol` used only for identity comparison. Before policy, `execute()` materializes and freezes arguments, rejects non-JSON input, and assigns the token. Identity fields, the required caller signal, and the optional parent token remain readonly. A `ToolDispatchExecution` wrapper may replace but not remove the signal; the registry re-fuses the caller signal before invoking the body. Final observers receive the frozen execution identity.
+`ToolExecutionToken` は同一性比較にのみ使う不透明なランタイム `Symbol` である。ポリシー前に `execute()` は引数を実体化して凍結し、非 JSON 入力を拒否し、トークンを割り当てる。同一性フィールド、必須の呼び出し元シグナル、任意の親トークンは読み取り専用のままである。`ToolDispatchExecution` ラッパーはシグナルを置換できるが削除はできない。レジストリは本体呼び出し前に呼び出し元シグナルを再融合する。最終オブザーバーは凍結された実行同一性を受け取る。
 
-A `ToolGuard` is scope-aware final pre-dispatch policy. Its return type deliberately has no allow result: `undefined` preserves the waterfall decision, while a returned reason can only reduce permission, so a later listener cannot undo it.
+`ToolGuard` はスコープ対応の最終ディスパッチ前ポリシーである。その戻り型には意図的に許可結果がない。`undefined` はウォーターフォール決定を維持し、返された理由は権限を縮小する方向にしか働かないため、後のリスナーがそれを取り消すことはできない。
 
 ```ts type-equiv
 /**
@@ -389,13 +389,13 @@ interface ToolErrorInfo {
 }
 ```
 
-The result carries only the outcome. Call identity remains on the immutable `ToolExecution` that accompanies it through every hook and on the durable `tool/call` / `tool/result` session events, so wrappers cannot create a second, disagreeing identity. The canonical `value` is execution-local: the loop persists only `content`, `error`, and `meta`, while `tool/ptc-dispatch` stores the sub-call's rendered `content`, `isError`, optional structured `error`, and presentation `meta`. Replay reproduces presentation but cannot reconstruct canonical intermediate values. Optional `ToolErrorInfo.reason` retains raw user-facing detail without adding it to model-facing content.
+結果が運ぶのは結果のみである。呼び出し同一性はすべてのフックを通じて同伴する不変の `ToolExecution` 上と、永続の `tool/call` / `tool/result` セッションイベント上に残るため、ラッパーが食い違う第2の同一性を作ることはできない。正規の `value` は実行ローカルである。ループは `content`、`error`、`meta` のみを永続化し、`tool/ptc-dispatch` はサブ呼び出しの描画済み `content`、`isError`、任意の構造化 `error`、表示 `meta` を格納する。リプレイは表示を再現するが正規の中間値は復元できない。任意の `ToolErrorInfo.reason` は生のユーザー向け詳細を保持するが、モデル向けコンテンツには加えない。
 
-On success the registry snapshots and validates the body value, freezes it, and invokes the pure renderer plus the optional presentation metadata projector for native and nested calls. It separately materializes the durable presentation fields immediately before `tools/result`; an invalid value, renderer/projector failure, or non-JSON presentation becomes a JSON-safe `isError`. The final live observer therefore sees the exact execution-local value beside fields safe for the later durable append.
+成功時、レジストリは本体値をスナップショットして検証し、凍結し、ネイティブおよび入れ子呼び出し向けに純粋レンダラーと任意の表示メタデータプロジェクターを呼び出す。`tools/result` の直前に永続表示フィールドを別途実体化する。不正な値、レンダラー/プロジェクターの失敗、非 JSON 表示は JSON 安全な `isError` になる。したがって最終ライブオブザーバーは、後の永続追記に安全なフィールドと並んで厳密な実行ローカル値を参照する。
 
-Before final content, the registry materializes the candidate result; a failure in content, structured error, additional context, or presentation metadata becomes a JSON-safe `isError` result that still reaches `finalizeContent`. The registry invokes that callback exactly once, then materializes and freezes the accepted result immediately before `tools/result`, so the observed live outcome is safe for the later durable `tool/result` append.
+最終コンテンツの前に、レジストリは候補結果を実体化する。コンテンツ、構造化エラー、追加コンテキスト、表示メタデータの失敗は JSON 安全な `isError` 結果になり、それでも `finalizeContent` に届く。レジストリはそのコールバックを厳密に1回呼び出し、その後受け入れ結果を `tools/result` の直前に実体化して凍結するため、観測されるライブ結果は後の永続 `tool/result` 追記に安全である。
 
-Each interception waterfall returns a typed **Decision** (the idiom shared with the `agent/*` waterfalls). `tools/pre-execute` listeners receive `(exec, next)` and return a `PreToolDecision`; `tools/execute` wrappers return a `ToolExecutionResult`; `tools/post-execute` listeners receive `(exec, result, next)` and return a `PostToolDecision`:
+各介入ウォーターフォールは型付き **Decision** を返す（`agent/*` ウォーターフォールと共有される慣用句）。`tools/pre-execute` リスナーは `(exec, next)` を受け取り `PreToolDecision` を返し、`tools/execute` ラッパーは `ToolExecutionResult` を返し、`tools/post-execute` リスナーは `(exec, result, next)` を受け取り `PostToolDecision` を返す。
 
 ```ts type-equiv
 /**
@@ -425,13 +425,13 @@ type PostToolDecision =
   | { kind: 'block'; feedback: ContentBlock[]; additionalContexts?: UserMessage[] }
 ```
 
-Call `next()` for the default or return a decision to short-circuit. Pre-policy may deny or ask; only `allowed-once` proceeds, while a non-grant, missing approval channel or service, or agent-less request becomes a denial. A deny may attach structured identity and user-facing detail without changing its model-facing reason. Guards may still impose a final denial. Arguments cannot be rewritten because history, audit, UI, and execution must agree.
+既定には `next()` を呼び出し、短絡には決定を返す。事前ポリシーは拒否または問い合わせができる。進行するのは `allowed-once` のみであり、非付与、承認チャネルやサービスの欠落、エージェントなしリクエストは拒否になる。拒否はモデル向け理由を変えずに構造化同一性とユーザー向け詳細を付加できる。ガードは依然として最終拒否を課せる。履歴、監査、UI、実行の一致が必要なため引数は書き換えできない。
 
-Post-policy may replace either content or value, never both. Content replacement preserves the canonical value and existing metadata; value replacement is revalidated and recomputes content/metadata; a block removes the value and becomes an `isError` containing corrective feedback. Content replacement is presentation policy, not confidentiality policy: a listener that must hide the programmatic value blocks or replaces it. `tools/result` receives the frozen execution and result after normalization; observers cannot transform them, and observer failures are contained. Unknown and throwing tools both become structured errors (`ToolNotFoundError` maps to `UNKNOWN_TOOL`), so the call fails without ending the turn.
+事後ポリシーはコンテンツまたは値のどちらかを置換でき、両方はできない。コンテンツ置換は正規値と既存メタデータを保持し、値置換は再検証されてコンテンツ/メタデータを再計算し、ブロックは値を除去して修正フィードバックを含む `isError` になる。コンテンツ置換は表示ポリシーであり機密性ポリシーではない。プログラム値を隠す必要があるリスナーはブロックまたは置換する。`tools/result` は正規化後の凍結された実行と結果を受け取る。オブザーバーはそれらを変換できず、オブザーバーの失敗は封じ込められる。不明ツールと例外ツールはどちらも構造化エラーになる（`ToolNotFoundError` は `UNKNOWN_TOOL` に対応する）ため、呼び出しはターンを終了させずに失敗する。
 
-## The enforced raw JSON Schema subset
+## 強制される raw JSON Schema サブセット
 
-Raw schemas from subagents, workflows, MCP, and dynamic registrations use the wire-level counterpart of the author DSL. `assertSupportedJsonSchema()` accepts any JSON root, `validateJsonSchemaValue()` enforces it, and `JsonSchemaError` reports every unsupported or malformed schema path. The empty annotation-only node means unconstrained lossless JSON. `oneOf` requires at least two branches and a value must match exactly one. Consumers that still require an object root call `assertObjectJsonSchema()` and carry `ObjectJsonSchema`; this is how subagent/workflow caller-defined structured output remains object-rooted without restricting the shared vocabulary.
+サブエージェント、ワークフロー、MCP、動的登録からの raw スキーマは、作者 DSL のワイヤレベル対応物を使う。`assertSupportedJsonSchema()` は任意の JSON ルートを受け入れ、`validateJsonSchemaValue()` はそれを強制し、`JsonSchemaError` は未サポートまたは不正なスキーマパスをすべて報告する。空の注釈のみノードは無制約のロスレス JSON を意味する。`oneOf` は少なくとも2分岐を要求し、値は厳密に1つに一致しなければならない。依然としてオブジェクトルートを要求するコンシューマーは `assertObjectJsonSchema()` を呼び出し `ObjectJsonSchema` を運ぶ。こうしてサブエージェント/ワークフローの呼び出し元定義の構造化出力は、共有語彙を制限せずオブジェクトルートのままである。
 
 ```ts type-equiv
 /** Scalar JSON values supported by `enum` and `const`. */
@@ -482,16 +482,16 @@ interface JsonSchemaNode {
 type ObjectJsonSchema = JsonSchemaNode & { type: 'object' }
 ```
 
-## Tool-presentation UI vocabulary
+## ツール表示 UI ボキャブラリー
 
-How a tool wants its call shown in a UI (an editor tool-call card, a CLI log line), provider-neutral so a tool describes itself without depending on any client protocol. `presentCall`/`presentResult` return a **`card`-tagged render intent** — a discriminated union a UI bridge switches on:
+ツールが自身の呼び出しを UI（エディターのツール呼び出しカード、CLI ログ行）にどう表示したいかを、プロバイダー中立に記述する。ツールはクライアントプロトコルに依存せず自身を記述できる。`presentCall`/`presentResult` は **`card` タグ付き描画意図** — UI ブリッジが切り替える判別共用体 — を返す。
 
-- `ToolCallView` (pending): `{ card: 'generic', title, kind?, rawInput?, content?, locations? }` (the default card; `locations` is `{ path, line? }[]` files the call reads/modifies, for editor follow-along), `{ card: 'terminal', title, description?, cwd? }` (a shell command → a terminal card), or `{ card: 'diff', title, diffs, locations? }` (a file create/modify → an inline diff card; `diffs` is `{ path, oldText, newText }[]`, `oldText: null` for a new file).
-- `ToolResultView` (completed): `{ card: 'generic', title?, content? }`, `{ card: 'terminal', title?, output?, exitCode?, signal? }` (the captured run output + exit; a capable UI shows an exit-status pill, while another may derive a fenced ` ```console ` fallback), `{ card: 'diff', title?, diffs }` (a completed file mutation → the change to show, typically the applied hunks with context lines computed from the before/after content, or a whole-file diff when there is no before-image), `{ card: 'search', shape, title?, truncated, total, … }` (a completed discovery search → grouped-by-file matches for `shape: 'matches'` (grep) or a flat path list for `shape: 'paths'` (glob); `truncated`/`total` report whether the inline result was capped so a UI never presents a partial result as complete; the view carries no result text — a UI without a search card falls back to the raw result content), `{ card: 'read', title?, path, offset, lines, totalLines, lang?, content? }` (a completed file read → a line-numbered, optionally syntax-highlighted code view; `offset` is the 1-based first line the window requested, kept even when `lines` is empty; `lang` is a language hint from the extension, and `content` is the envelope-stripped text a UI without read support falls back to), or `{ card: 'web', kind: 'search' | 'fetch', title?, … }` (a completed web retrieval; `kind: 'search'` carries the structured `sources`/`answer?`/`truncated`, `kind: 'fetch'` carries `url`/`statusCode`/`truncated`, and a UI without the `web` capability falls back to the raw result content — the body is not duplicated into the view). Completed views replace pending views, so mutation tools return a diff result even when it duplicates the call-time snippet; a search and a web retrieval have no `card` call-time analogue (their pending state stays a generic card, since the structured result exists only after `execute`).
+- `ToolCallView`（保留中）: `{ card: 'generic', title, kind?, rawInput?, content?, locations? }`（既定カード。`locations` は呼び出しが読み書きするファイルの `{ path, line? }[]` で、エディター追従用）、`{ card: 'terminal', title, description?, cwd? }`（シェルコマンド → ターミナルカード）、または `{ card: 'diff', title, diffs, locations? }`（ファイル作成/変更 → インライン差分カード。`diffs` は `{ path, oldText, newText }[]` で、新規ファイルでは `oldText: null`）。
+- `ToolResultView`（完了）: `{ card: 'generic', title?, content? }`、`{ card: 'terminal', title?, output?, exitCode?, signal? }`（捕捉した実行出力＋終了。対応 UI は終了ステータスピルを表示し、他はフェンス付き ` ```console ` フォールバックを導出できる）、`{ card: 'diff', title?, diffs }`（完了したファイル変更 → 表示すべき変更。通常は変更前後内容から計算したコンテキスト行付き適用ハンク、変更前イメージがなければファイル全体差分）、`{ card: 'search', shape, title?, truncated, total, … }`（完了した探索検索 → `shape: 'matches'`（grep）ならファイル別グループ化一致、`shape: 'paths'`（glob）ならフラットパス一覧。`truncated`/`total` はインライン結果が上限打ち切りかを報告するため UI が部分結果を完全として提示しない。ビューは結果テキストを運ばない — 検索カードなし UI は raw 結果コンテンツにフォールバックする）、`{ card: 'read', title?, path, offset, lines, totalLines, lang?, content? }`（完了したファイル読み取り → 行番号付きで任意に構文強調したコードビュー。`offset` はウィンドウが要求した1始まり先頭行で `lines` が空でも保持される。`lang` は拡張子由来の言語ヒント、`content` は読み取り対応なし UI がフォールバックするエンベロープ除去テキスト）、または `{ card: 'web', kind: 'search' | 'fetch', title?, … }`（完了したウェブ取得。`kind: 'search'` は構造化 `sources`/`answer?`/`truncated` を運び、`kind: 'fetch'` は `url`/`statusCode`/`truncated` を運ぶ。`web` 機能なし UI は raw 結果コンテンツにフォールバックする — 本体はビューに重複しない）。完了ビューは保留ビューを置換するため、変更ツールは呼び出し時スニペットと重複しても差分結果を返す。検索とウェブ取得には `card` の呼び出し時対応物がない（構造化結果は `execute` 後にのみ存在するため保留状態は汎用カードのまま）。
 
-`ToolCallKind` (`'read' | 'edit' | 'delete' | 'move' | 'search' | 'execute' | 'fetch' | 'other'`) picks an icon on a generic card. `FileLocation` (`{ path, line? }`), `FileDiff` (`{ path, oldText, newText }`), and `ReadFileLine` (`{ number, text }`, one 1-based numbered line of a read window) are the shared file-card vocabulary. The design is pinned in [the render-intent-union Agent Note](../../.agents/notes/implemented/architecture/2026-07-02-tool-render-intent-union.md); host/client runtimes project this neutral vocabulary into their own views.
+`ToolCallKind`（`'read' | 'edit' | 'delete' | 'move' | 'search' | 'execute' | 'fetch' | 'other'`）は汎用カード上のアイコンを選ぶ。`FileLocation`（`{ path, line? }`）、`FileDiff`（`{ path, oldText, newText }`）、`ReadFileLine`（`{ number, text }`、読み取りウィンドウの1始まり番号付き1行）は共有ファイルカード語彙である。設計は [render-intent-union Agent Note](../../.agents/notes/implemented/architecture/2026-07-02-tool-render-intent-union.md) に固定されている。ホスト/クライアントランタイムはこの中立語彙を各自のビューに投影する。
 
-The full presentation field docs live in [`packages/core/tools/src/presentation.ts`](../../packages/core/tools/src/presentation.ts). The `bash` schema and executor are on [shell.md](shell.md); generic background controls are on [jobs.md](jobs.md).
+表示フィールドの完全な説明は [`packages/core/tools/src/presentation.ts`](../../packages/core/tools/src/presentation.ts) にある。`bash` スキーマと実行器は [shell.md](shell.md)、汎用バックグラウンド制御は [jobs.md](jobs.md) を参照。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -499,13 +499,13 @@ The full presentation field docs live in [`packages/core/tools/src/presentation.
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によりソースから生成される（doc-sync 内の `pnpm run verify-cordis-catalog` で鮮度を検証、`pnpm run gen-cordis-catalog` で再生成）。言語面の差異はロケール固有の対訳文書パスのみである。署名ブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは [primer](../cordis-primer.md#dispatch-modes) で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxtools--toolruntime"></a>
 
 ### `ctx.tools` — `ToolRuntime`
 
-Tool registry and execution pipeline. Scoped registrations shadow globals; one visibility resolver feeds presentation, lookup, and dispatch.
+ツールレジストリと実行パイプライン。スコープ登録はグローバルを隠蔽する。1つの可視性リゾルバーが表示、検索、ディスパッチに供給する。
 
 ```ts cordis-catalog
 /**
@@ -607,7 +607,7 @@ Source: [`packages/core/tools/src/index.ts`](../../packages/core/tools/src/index
 
 #### `tools/change` — emit
 
-A tool was registered or unregistered, or a scoped restriction changed (the available tool set changed — possibly for one scope only). An UNFILTERED registry-subject notification, deliberately not scope-filtered dispatch: a global change concerns every agent's next assembly, so a scoped listener subscribing here sees every change, not just its own scope's.
+ツールが登録または登録解除された、あるいはスコープ付き制限が変更された（利用可能ツール集合が変更された — 1つのスコープのみの可能性もある）。UNFILTERED なレジストリ主体通知であり、意図的にスコープフィルター済みディスパッチではない。グローバル変更はすべてのエージェントの次回アセンブリに関わるため、ここに購読するスコープ付きリスナーは自身のスコープだけでなくすべての変更を参照する。
 
 ```ts cordis-catalog
 /**
@@ -628,7 +628,7 @@ Source: [`packages/core/tools/src/index.ts`](../../packages/core/tools/src/index
 
 #### `tools/execute` — waterfall
 
-Around-dispatch waterfall for timeout, retry, or metrics. `next()` returns a normalized result; wrappers may change only `exec.signal`, while call identity remains immutable. The registry re-fuses the original caller signal before the body, so replacement cannot detach caller cancellation; wrappers must still restore their signal and reach quiescence. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent's calls.
+タイムアウト、再試行、メトリクス用のディスパッチ包囲ウォーターフォール。`next()` は正規化結果を返す。ラッパーが変更できるのは `exec.signal` のみであり、呼び出し同一性は不変のままである。レジストリは本体前に元の呼び出し元シグナルを再融合するため、置換で呼び出し元キャンセルを切り離せない。ラッパーは依然として自身のシグナルを復元し静止に到達しなければならない。スコープフィルター済みディスパッチ（`@deepseek-ai/dsh-scope`）: エージェントスコープのリスナーはそのエージェントの呼び出しのみを受け取る。
 
 ```ts cordis-catalog
 /**
@@ -652,7 +652,7 @@ Source: [`packages/core/tools/src/index.ts`](../../packages/core/tools/src/index
 
 #### `tools/post-execute` — waterfall
 
-Accept, replace, enrich, or block a normalized dispatch result. `next()` accepts it unchanged; thrown tools still reach this waterfall as errors. Async listeners must observe `exec.signal`; after they settle, caller cancellation replaces only a successful accepted outcome with the code selected by whether the tool body was invoked. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent's calls.
+正規化済みディスパッチ結果を受け入れ、置換、拡充、またはブロックする。`next()` はそれを変更なしに受け入れる。例外ツールもエラーとしてこのウォーターフォールに届く。非同期リスナーは `exec.signal` を監視しなければならない。それらが確定した後、呼び出し元キャンセルは成功した受け入れ結果のみを、ツール本体が呼び出されたかどうかで選ばれるコードに置換する。スコープフィルター済みディスパッチ（`@deepseek-ai/dsh-scope`）: エージェントスコープのリスナーはそのエージェントの呼び出しのみを受け取る。
 
 ```ts cordis-catalog
 /**
@@ -677,7 +677,7 @@ Source: [`packages/core/tools/src/index.ts`](../../packages/core/tools/src/index
 
 #### `tools/pre-execute` — waterfall
 
-Allow, deny, cancel, or ask before dispatch. `next()` delegates to allow; `cancel` selects the canonical pre-dispatch cancellation result, and missing approval support turns `ask` into denial. Async gates must observe `exec.signal`; the registry rechecks cancellation after they settle but never abandons their promise. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent's calls.
+ディスパッチ前に許可、拒否、取り消し、問い合わせを行う。`next()` は許可に委譲する。`cancel` は正規のディスパッチ前取り消し結果を選び、承認対応の欠落は `ask` を拒否に変える。非同期ゲートは `exec.signal` を監視しなければならない。レジストリはそれら確定後にキャンセルを再確認するが、それらのプロミスを放棄しない。スコープフィルター済みディスパッチ（`@deepseek-ai/dsh-scope`）: エージェントスコープのリスナーはそのエージェントの呼び出しのみを受け取る。
 
 ```ts cordis-catalog
 /**
@@ -701,7 +701,7 @@ Source: [`packages/core/tools/src/index.ts`](../../packages/core/tools/src/index
 
 #### `tools/ptc-dispatch-log` — waterfall
 
-Allow a listener to replace content in the DURABLE LOG COPY of one `run_code` sub-dispatch outcome before the bridge appends its `tool/ptc-dispatch` event. `next()` keeps the content unchanged; a listener may return replacement blocks (e.g. the spill policy's preview + locator for an oversized text result). Only the logged copy is affected — the program already received the complete value, and the model sees neither. A throwing listener is contained: the bridge falls back to logging the original settled content. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent's dispatches.
+ブリッジが `tool/ptc-dispatch` イベントを追記する前に、1つの `run_code` サブディスパッチ結果の永続ログコピー内のコンテンツをリスナーが置換できる。`next()` はコンテンツを変更なしに保つ。リスナーは置換ブロックを返せる（例: 巨大テキスト結果に対するスピルポリシーのプレビュー＋ロケーター）。影響を受けるのは記録コピーのみである — プログラムは既に完全な値を受け取っており、モデルはどちらも参照しない。例外リスナーは封じ込められる。ブリッジは元の確定コンテンツの記録にフォールバックする。スコープフィルター済みディスパッチ（`@deepseek-ai/dsh-scope`）: エージェントスコープのリスナーはそのエージェントのディスパッチのみを受け取る。
 
 ```ts cordis-catalog
 /**
@@ -728,7 +728,7 @@ Source: [`packages/core/tools/src/index.ts`](../../packages/core/tools/src/index
 
 #### `tools/result` — emit
 
-Observe the frozen, lossless-JSON final outcome. Listener failures are contained. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): keyed by `exec.agent`.
+凍結されたロスレス JSON 最終結果を観測する。リスナーの失敗は封じ込められる。スコープフィルター済みディスパッチ（`@deepseek-ai/dsh-scope`）: `exec.agent` でキー付けされる。
 
 ```ts cordis-catalog
 /**

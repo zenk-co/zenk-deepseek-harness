@@ -1,96 +1,96 @@
 ---
-description: "Share per-Session browser ownership and MCP activation across experimental browser providers."
+description: "実験的ブラウザープロバイダー間でセッションごとのブラウザー所有権と MCP 有効化を共有する。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-experimental-browser-use-runtime
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Browser providers use this library to reuse a browser across one Session's turns and close its resources when that Session's runtime is disposed. Operations for one Session run in order, while isolated Sessions can proceed independently. Attachment mode reserves one external browser for a single Session. The library also connects provider-owned MCP servers and discovers their tools before the Session's first model request.
+ブラウザープロバイダーはこのライブラリを使い、1 セッションのターン間でブラウザーを再利用し、そのセッションのランタイム破棄時にリソースを閉じる。1 セッションの操作は順序どおりに実行され、分離されたセッションは独立に進行できる。添付モードは 1 件の外部ブラウザーを単一セッションに予約する。このライブラリはプロバイダー所有 MCP サーバーも接続し、セッション最初のモデルリクエストの前にそのツールを検出する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-This public experimental library is a dependency of the browser providers. It has no plugin entry or mount configuration. The [browser-use service](../../browser-use/browser-use/README.md) remains independent of the library.
+この公開実験ライブラリはブラウザープロバイダーの依存関係である。プラグイン入口やマウント設定はない。[browser-use サービス](../../browser-use/browser-use/README.md)はライブラリから独立したままである。
 
-Native providers construct `SessionResources` from the package root, supplying resource acquisition and cleanup callbacks. Calls pass the exact live Agent to `run()`; stale owners and a second owner of an exclusive attachment fail before acquisition. Canceling an acquisition wait leaves initialization available to other callers in the same Session; Session disposal aborts and awaits that initialization. Providers keep their registration until `dispose()` finishes.
+ネイティブプロバイダーはパッケージルートから `SessionResources` を構築し、リソース取得とクリーンアップコールバックを提供する。呼び出しは正確なライブエージェントを `run()` に渡す。古い所有者と排他添付の第 2 所有者は取得前に失敗する。取得待ちのキャンセルは同セッションの他呼び出しに初期化を利用可能に残し、セッション破棄はその初期化を中断して待つ。プロバイダーは `dispose()` 完了まで登録を保持する。
 
-MCP providers use `mountSessionMcp` from `@deepseek-ai/dsh-experimental-browser-use-runtime/mcp`, supplying their fixed server name, executable, arguments, and ownership policy. The mounting context must provide `workingDirectory`. Acquisition uses the [working-directory service](../../session/working-directory/README.md) to validate or recover the current directory and set the MCP server process's initial directory. Retained servers keep that directory when the Session later selects another. The helper awaits one scoped client startup and discovery attempt within each future Agent's `agent/created` event. Agent creation or resume completes after discovery, before queued input runs; a successful client remains owned by that Session across turns.
+MCP プロバイダーは `@deepseek-ai/dsh-experimental-browser-use-runtime/mcp` から `mountSessionMcp` を使い、固定サーバー名・実行可能ファイル・引数・所有権ポリシーを提供する。マウントコンテキストは `workingDirectory` を提供しなければならない。取得は[作業ディレクトリサービス](../../session/working-directory/README.md)を使い現行ディレクトリを検証または回復し、MCP サーバープロセスの初期ディレクトリを設定する。保持サーバーはセッションが後に他ディレクトリを選んでもそのディレクトリを保持する。ヘルパーは将来エージェントごとの `agent/created` イベント内でスコープ付きクライアント起動と検出試行を 1 件待つ。エージェント作成または再開は検出後、キュー済み入力実行前に完了し、成功クライアントはターン越えでそのセッション所有のまま残る。
 
-A busy attachment skips startup permanently for that live activation while its other work continues. Releasing the attachment does not retry skipped activations; a newly created or resumed Agent can acquire it. Startup failure or cancellation rejects Agent creation or resume and triggers creation rollback, including client cleanup. Reconnection is disabled. Loading or reloading a provider applies only to future Agent activations.
+多忙な添付はそのライブ有効化に対する起動を恒久的に省き、他の作業は続ける。添付の解放は省いた有効化を再試行しない。新規作成または再開エージェントはそれを取得できる。起動失敗またはキャンセルはエージェント作成または再開を拒否し、クライアントクリーンアップを含む作成ロールバックを起こす。再接続は無効である。プロバイダーの読み込みや再読み込みは将来のエージェント有効化にのみ適用される。
 
-Callers can inspect prompt assembly and scoped tool definitions after awaited Agent creation or resume completes.
+呼び出し側は待機済みエージェント作成または再開の完了後にプロンプト組み立てとスコープ付きツール定義を検査できる。
 
-Browser tools and resource requests targeting this server use the same queue and require the calling Session's own connection. Other MCP servers remain usable. Inherited server instructions are omitted without ownership; the shared server-name inventory keeps its normal scope behavior.
+このサーバーを対象とするブラウザーツールとリソース要求は同一キューを使い、呼び出しセッション自身の接続を要求する。他 MCP サーバーは利用可能なままである。継承サーバー指示は所有権なしで省略され、共有サーバー名目録は通常スコープ動作を保つ。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The [resource manager](src/index.ts) keys ownership by live Agent identity and joins operation cancellation with owner disposal. Each resource has one acquisition promise and one operation queue. Failed acquisition releases its reservation only after the provider callback rolls back acquired resources.
+[リソース管理器](src/index.ts)は所有権をライブエージェント同一性でキー付けし、操作キャンセルと所有者破棄を結合する。各リソースは取得プロミス 1 件と操作キュー 1 件を持つ。取得失敗はプロバイダーコールバックが取得済みリソースをロールバックした後にのみ予約を解放する。
 
-Disposed-cause cancellation starts resource cleanup before AgentHandle waits for idle. Cleanup closes resources before waiting for running operations, allowing connection teardown to interrupt upstream APIs without abort support. A failed close rejects disposal and retains ownership. Agent-scoped cleanup prevents a resumed Session with the same durable id from inheriting a previous browser.
+破棄起因キャンセルは AgentHandle が idle を待つ前にリソースクリーンアップを開始する。クリーンアップは実行中操作を待つ前にリソースを閉じ、接続破棄が中断対応のない上流 API を中断できるようにする。失敗した close は破棄を拒否し、所有権を保持する。エージェントスコープのクリーンアップは同一耐久 id の再開セッションが以前のブラウザーを継承しないようにする。
 
-The [MCP helper](src/mcp.ts) connects within serial `agent/created`; [AgentLoop](../../core/agent-loop/README.md#understand-the-implementation) holds queued input and owns creation rollback. Prompt assembly reads the initialized catalog. The helper retains the provider registration through resource cleanup and uses the [MCP client](../../mcp/mcp-client/README.md) for transport, schema discovery, result conversion, and durable image admission.
+[MCP ヘルパー](src/mcp.ts)は直列 `agent/created` 内で接続する。[AgentLoop](../../core/agent-loop/README.md#understand-the-implementation)はキュー済み入力を保持し、作成ロールバックを所有する。プロンプト組み立ては初期化済みカタログを読む。ヘルパーはリソースクリーンアップを通じてプロバイダー登録を保持し、転送・スキーマ検出・結果変換・耐久画像承認に [MCP クライアント](../../mcp/mcp-client/README.md) を使う。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [Browser use](../../../docs/subsystems/browser-use.md) — provider selection and Session ownership.
-- [MCP client](../../mcp/mcp-client/README.md) — discovery, cancellation, and result admission.
-- [Browser ownership decision](../../../.agents/notes/implemented/architecture/2026-09-12-browser-use-provider-registration.md) — registration-only service and resource lifetime.
+- [Browser use](../../../docs/subsystems/browser-use.md) — プロバイダー選択とセッション所有権。
+- [MCP クライアント](../../mcp/mcp-client/README.md) — 検出・キャンセル・結果承認。
+- [ブラウザー所有権決定](../../../.agents/notes/implemented/architecture/2026-09-12-browser-use-provider-registration.md) — 登録専用サービスとリソース寿命。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through provider-owned browser tools discovered before model request assembly and through [working-directory recovery](../../session/working-directory/README.md); providers and the MCP client own tool descriptions, schemas, results, and image behavior, while the directory service owns directory context.
+間接的に、モデルリクエスト組み立て前に検出されるプロバイダー所有ブラウザーツールと[作業ディレクトリ回復](../../session/working-directory/README.md)を通じて。プロバイダーと MCP クライアントがツール説明・スキーマ・結果・画像動作を所有し、ディレクトリサービスがディレクトリ文脈を所有する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Discovered tool schemas and provider guidance determine request-prefix changes; ordinary browser resource reuse does not alter those schemas. Directory recovery appends user context without replacing the system-prompt prefix.
+検出ツールスキーマとプロバイダー指針がリクエストプレフィックス変更を決める。通常のブラウザーリソース再利用はそれらスキーマを変更しない。ディレクトリ回復はシステムプロンプトプレフィックスを置換せずにユーザー文脈を追記する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-Providers remain responsible for the browser operations they supply.
+ブラウザー操作の責任はプロバイダーに残る。
 
-- **MCP activation** — providers do not adopt existing live Agents; a busy attachment is not retried within that activation.
-- **Attachment scope** — exclusive ownership applies to one resource manager, not separate providers, processes, or external browser clients.
-- **Cancellation** — abort signals and connection closure cannot undo browser actions already delivered. An upstream operation that ignores both can delay cleanup.
-- **Recovery** — a failed close retains ownership; this manager does not retry disposal or restore browser state from the Session log.
-- **Shared host runtimes** — a profile installs this package beside the dsh installation, so `@deepseek-ai/dsh-scope` and `@deepseek-ai/dsh-mcp-client` stay peer dependencies. A dependency edge ships a second `dsh-scope` copy whose scope tags host registries cannot read: each Agent's MCP tools would register in the global tool layer and the second Agent's creation would fail.
+- **MCP 有効化** — プロバイダーは既存ライブエージェントを採用しない。多忙な添付はその有効化内で再試行されない。
+- **添付スコープ** — 排他所有権は 1 件のリソース管理器に適用され、別プロバイダー・プロセス・外部ブラウザークライアントには適用されない。
+- **キャンセル** — 中止シグナルと接続終了は既に配送されたブラウザー操作を取り消せない。両方を無視する上流操作はクリーンアップを遅延させ得る。
+- **回復** — 失敗した close は所有権を保持する。この管理器は破棄を再試行せず、セッションログからブラウザー状態を復元しない。
+- **共有ホストランタイム** — プロファイルは dsh インストールのそばにこのパッケージを置くため、`@deepseek-ai/dsh-scope` と `@deepseek-ai/dsh-mcp-client` はピア依存のままである。依存辺は第 2 の `dsh-scope` 複製を出荷し、そのスコープタグをホストレジストリは読めない。各エージェントの MCP ツールはグローバルツール層に登録され、第 2 エージェントの作成は失敗する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,91 +1,91 @@
 ---
-description: "The Web feedback surface: the Like/Dislike pair in the finalized assistant message's action row, the feedback dialog behind both ratings and `/feedback`, and its acknowledgement and failure toasts; for users and maintainers of the feedback experience."
+description: "Web フィードバック面。確定済みアシスタントメッセージ操作行の Like/Dislike 対、その背後のフィードバックダイアログ（`/feedback` 対応）と承認・失敗トースト。フィードバック体験のユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-message-feedback
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package is the Web GUI's feedback surface: the Like/Dislike pair in the finalized assistant message's action strip, the feedback dialog with its acknowledgement and failure toasts in the composer overlay, and a decoration that opens the dialog from a bare `/feedback`. Like and Dislike both open the dialog, which collects a category and an optional description before recording the selected rating. One surface per Session backs every entry, so a single list read seeds the whole transcript and one dialog serves the Session and its messages. Ratings, categories, and notes are log-only Session events that never enter model context.
+このパッケージは Web GUI のフィードバック面である。確定済みアシスタントメッセージの操作帯にある Like/Dislike 対、コンポーザーオーバーレイ内の承認・失敗トースト付きフィードバックダイアログ、素の `/feedback` からダイアログを開く装飾である。Like と Dislike はどちらもダイアログを開き、選択した評価を記録する前にカテゴリと任意の説明を集める。セッションごとに 1 面がすべてのエントリを支えるため、1 回の一覧読み取りが転写全体に種付けし、1 件のダイアログがセッションとそのメッセージに使える。評価・カテゴリ・記録はモデル文脈に決して入らないログ専用セッションイベントである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin alongside `ui-conversation` and `ui-commands`; the Like/Dislike pair then appears in the action row of each turn's closing assistant message, between copy and branch, and Feedback in the composer menu opens the same dialog. Mounting `session-log-export` also adds Feedback to the Session Header's more-actions menu. A recorded rating shows the filled glyph and stays visible without hover. Like and Dislike both open the dialog: seven category chips and a detail box are optional, and Submit records the selected judgment with whatever was filled in before the toast thanks the user; the conversation log travels with every feedback event. Clicking the recorded rating retracts it without opening the dialog. A bare `/feedback`, picked from the menu or typed and sent without text, opens the same dialog for the Session; `/feedback <text>` keeps the Host command path and its acknowledgement row.
+`ui-conversation` と `ui-commands` のそばにこのプラグインをマウントする。Like/Dislike 対は各ターンの締めアシスタントメッセージの操作行にコピーと分岐の間に現れ、コンポーザーメニューのフィードバックは同一ダイアログを開く。`session-log-export` のマウントはセッションヘッダーの追加操作メニューにもフィードバックを追加する。記録済み評価は塗りつぶしグリフを表示し、ホバーなしで見えるままである。Like と Dislike はどちらもダイアログを開く。7 件のカテゴリチップと詳細欄は任意であり、送信は記入内容とともに選択判断を記録してからトーストで謝意を示す。会話ログはすべてのフィードバックイベントとともに運ばれる。記録済み評価のクリックはダイアログを開かずに撤回する。メニューから選ぶか本文なしで入力送信した素の `/feedback` はセッション用に同一ダイアログを開き、`/feedback <text>` はホストコマンドパスとその承認行を保つ。
 
-### Failures
+### 失敗
 
-A rating or list-load failure shows inline in the row; a submission failure shows in a warning toast while the dialog stays open so the draft can be corrected. Only finalized messages reach the message entry — an interruption-frozen partial carries no `messageId` and therefore no feedback controls.
+評価や一覧読み込みの失敗は行内に表示され、送信失敗は警告トーストに表示されながらダイアログは開いたままなので下書きを修正できる。メッセージ入口に届くのは確定済みメッセージのみである。中断凍結の部分は `messageId` を持たないためフィードバック制御を持たない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The package contributes the `feedback` entry (order 10) of `conversation.chat.assistant-actions`, declared by ui-conversation and rendered inside the finalized assistant message's IconActions row, and the `feedback-dialog` entry (order 2) of `conversation.input.overlay`, which renders the Modal and Toast primitives through body portals and centers the toast over the composer card it mounts inside. The `feedbackUi.openSession(sessionId)` Client service opens that same Session-scoped dialog without recording feedback; the Header menu and command decoration both use it. The `/feedback` decoration is an `action` registered through `ctx.commandUi.decorate`, so a menu pick or a bare Enter consumes the trigger token and opens the dialog while an argued line still reaches the Host command.
+このパッケージは ui-conversation が宣言し確定済みアシスタントメッセージの IconActions 行内に描画される `conversation.chat.assistant-actions` の `feedback` エントリ（順序 10）と、body ポータル経由でモーダルとトースト primitives を描画しマウントしたコンポーザーカード上にトーストを中央配置する `conversation.input.overlay` の `feedback-dialog` エントリ（順序 2）を提供する。`feedbackUi.openSession(sessionId)` クライアントサービスはフィードバックを記録せずに同一セッションスコープのダイアログを開く。ヘッダーメニューとコマンド装飾はどちらもそれを使う。`/feedback` 装飾は `ctx.commandUi.decorate` 経由で登録された `action` であり、メニュー選択や素の Enter はトリガートークンを消費してダイアログを開き、引数付き行は依然ホストコマンドに届く。
 
-Per Session, one `MessageFeedbackController` backs every message control and one `FeedbackDialogController` owns the dialog draft, the submission, and the toast sequence. The message controller reads `messageFeedback.list` once, deferred to the first hover or focus rather than fired on mount, and serializes mutations so each carries the version last observed; a `version-conflict` reply carries the authoritative item and reconciles the view without refetching. Before either rating action proceeds, the row checks the committed item: the matching rating calls `retract`, which rechecks the rating in the serialized queue and becomes a no-op after a concurrent change, while any other state opens the dialog with the requested rating. The dialog controller submits by target: a message target puts that rating with the dialog's note and category through the message controller, and the Session target records through `ctx.remote.sessionFeedback`. Success closes the draft and raises the acknowledgement toast; a late success from a superseded draft raises that toast without closing the new draft; a failure keeps the draft open and raises a longer-lived warning toast.
+セッションごとに 1 件の `MessageFeedbackController` がすべてのメッセージ制御を支え、1 件の `FeedbackDialogController` がダイアログ下書き・送信・トースト順序を所有する。メッセージコントローラーは `messageFeedback.list` を 1 回読み、マウント時発火ではなく最初のホバーやフォーカスに遅延し、変更を直列化して各々が最終観測バージョンを運ぶ。`version-conflict` 応答は権威アイテムを運び、再取得なしでビューを調停する。いずれの評価操作の前にも行はコミット済みアイテムを確認する。一致する評価は `retract` を呼び、直列キュー内で評価を再確認し、並行変更後は無操作になる。他の状態は要求評価でダイアログを開く。ダイアログコントローラーは対象別に送信する。メッセージ対象はその評価をダイアログの記録とカテゴリとともにメッセージコントローラー経由で置き、セッション対象は `ctx.remote.sessionFeedback` 経由で記録する。成功は下書きを閉じて承認トーストを上げる。置換済み下書きからの遅い成功は新規下書きを閉じずにそのトーストを上げ、失敗は下書きを開いたまま長寿命の警告トーストを上げる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the feedback surface is not enough. They move from the browser strip to the Session-log backends and the conversation shell.
+フィードバック面だけでは足りない場合にこれらのページを読む。ブラウザー帯からセッションログバックエンドと会話シェルへ進む。
 
-- [dsh-message-feedback](../../feedback/message-feedback/README.md) — the Session-log backend that owns per-item compare-and-set and persistence.
-- [dsh-command-feedback](../../feedback/command-feedback/README.md) — the `/feedback` command, the `sessionFeedback` Remote, and the category taxonomy.
-- [ui-commands](../ui-commands/README.md) — the command decoration contract the `/feedback` row goes through.
-- [ui-conversation](../ui-conversation/README.md) — declares the assistant-actions strip and the composer overlay.
-- [Client package map](../README.md) — adjacent browser UI packages.
+- [dsh-message-feedback](../../feedback/message-feedback/README.md) — アイテムごとの compare-and-set と永続化を所有するセッションログバックエンド。
+- [dsh-command-feedback](../../feedback/command-feedback/README.md) — `/feedback` コマンド、`sessionFeedback` リモート、カテゴリ分類。
+- [ui-commands](../ui-commands/README.md) — `/feedback` 行が経るコマンド装飾契約。
+- [ui-conversation](../ui-conversation/README.md) — アシスタント操作帯とコンポーザーオーバーレイを宣言する。
+- [クライアントパッケージマップ](../README.md) — 隣接ブラウザー UI パッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as ratings, categories, and notes are log-only events, not model input. Optional Session-log delivery uses request metadata rather than model context.
+なし。評価・カテゴリ・記録はモデル入力ではなくログ専用イベントであるためである。任意のセッションログ配送はモデル文脈ではなくリクエストメタデータを使う。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; feedback mutations leave the model-visible history unchanged.
+なし。フィードバック変更はモデル可視履歴を変更しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the current feedback surface. They are current package constraints, not a general rating comparison or a task backlog.
+現行フィードバック面をこれらの制限が定義する。これらは一般評価比較でもタスクバックログでもなく現行パッケージ制約である。
 
-- **Note size is a Host policy** — the deployment configures `maxNoteBytes` (8192 in the Web bundle) and the Host rejects an oversized note with `note-too-large`. The dialog does not pre-check the limit, so an oversized description for a message fails on submit rather than while typing; a Session remark has no bound.
-- **No cross-tab push** — a second tab's rating becomes visible on reconnect or on the next conflict reply, not immediately; the controller does not consume feedback log events.
-- **Chat view only** — the trajectory and waterfall views render no feedback controls even though their assistant nodes carry the same `messageId`.
+- **記録サイズはホストポリシー** — 配置は `maxNoteBytes` を設定し（Web バンドルでは 8192）、ホストは過大記録を `note-too-large` で拒否する。ダイアログは制限を事前検査しないため、メッセージ用に過大な説明は入力中ではなく送信時に失敗する。セッション所感に上限はない。
+- **タブ間プッシュなし** — 第 2 タブの評価は即時ではなく再接続時や次の競合応答時に見えるようになる。コントローラーはフィードバックログイベントを消費しない。
+- **チャットビューのみ** — 軌跡とウォーターフォールビューは同一 `messageId` を持つアシスタントノードでもフィードバック制御を描画しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

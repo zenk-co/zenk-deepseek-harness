@@ -1,35 +1,35 @@
 ---
-description: "The default agent driver for users and maintainers choosing, configuring, or debugging how agents are created and how turns and steps run."
+description: "エージェントがどのように作成され、ターンとステップがどのように実行されるかを選択・設定・デバッグするユーザーとメンテナー向けの、デフォルトのエージェントドライバー。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-agent-loop
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-agent-loop` creates fresh agents or resumes persisted sessions, then drives each turn through model requests, streamed responses, tool execution, and durable session history. Mount it for standard agent compositions; declarative entries start agents at boot, while the public `ctx.agents` API supports programmatic creation and resume. `maxParallelToolCalls` limits concurrent parallel-safe calls, and exclusive calls retain ordering. Cancellation preserves streamed text already delivered to the user. Choose a custom `Agent` implementation only when the standard "call model, run tools, repeat" lifecycle is insufficient.
+`dsh-agent-loop` は新しいエージェントを作成するか永続化されたセッションを再開し、各ターンをモデルリクエスト、ストリーミング応答、ツール実行、永続セッション履歴を通じて駆動する。標準的なエージェント構成ではこれをマウントする。宣言的なエントリーは起動時にエージェントを開始し、公開 `ctx.agents` API はプログラマティックな作成と再開をサポートする。`maxParallelToolCalls` は並列安全な呼び出しの同時実行数を制限し、排他的な呼び出しは順序を保つ。キャンセルは、すでにユーザーへ配信されたストリーミングテキストを保持する。カスタム `Agent` 実装を選ぶのは、標準の「モデルを呼び出し、ツールを実行し、繰り返す」ライフサイクルでは不十分な場合に限る。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount `dsh-agent-loop` in any composition that should run agents. It supplies the driver behind `ctx.agents` and starts any agents you declare in its config; both [`dsh-base`](../../bundle/base/README.md) and [`dsh-sdk-minimal`](../../bundle/sdk-minimal/README.md) mount it as an explicit row.
+エージェントを実行するすべての構成で `dsh-agent-loop` をマウントする。これは `ctx.agents` の背後のドライバーを提供し、設定で宣言したエージェントを開始する。[`dsh-base`](../../bundle/base/README.md) と [`dsh-sdk-minimal`](../../bundle/sdk-minimal/README.md) はいずれもこれを明示的な行としてマウントする。
 
-### Configure declarative agents
+### 宣言的エージェントを設定する
 
-Agents declared in the config start automatically when the plugin loads. Each entry needs an `id` label; a model call additionally requires both `provider` and `model` (`agent/request` may supply a missing pair before dispatch).
+設定で宣言したエージェントは、プラグインのロード時に自動で開始する。各エントリーには `id` ラベルが必要で、モデル呼び出しにはさらに `provider` と `model` の両方が必要である（欠けているペアは `agent/request` がディスパッチ前に補うことがある）。
 
 ```yaml
 - name: '@deepseek-ai/dsh-agent-loop'
@@ -43,22 +43,22 @@ Agents declared in the config start automatically when the plugin loads. Each en
         cwd: /workspace
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `maxParallelToolCalls` | `10` | Parallel-safe tool calls in flight per step; `1` is serial |
-| `agents[].id` | required | Stable label; a fresh session mints `${id}-session-<uuid>` unless `sessionId` is set |
-| `agents[].provider` / `agents[].model` | — | Model route; both required before dispatch |
-| `agents[].reasoningEffort` | — | Non-empty initial reasoning effort; `agent/request` may override it |
-| `agents[].maxTokens` | — | Positive per-request output-token cap |
-| `agents[].cwd` | — | Workspace directory for a fresh session |
-| `agents[].sessionId` | — | Exact identity: first use creates, a remount resumes materialized history |
-| `agents[].resumeSessionId` | — | Load this persisted session instead of creating one; mutually exclusive with `sessionId` |
+| `maxParallelToolCalls` | `10` | ステップごとに同時実行中の並列安全なツール呼び出し数。`1` は直列 |
+| `agents[].id` | required | 安定したラベル。`sessionId` を設定しない限り、新しいセッションは `${id}-session-<uuid>` を生成する |
+| `agents[].provider` / `agents[].model` | — | モデルルート。ディスパッチ前に両方必要 |
+| `agents[].reasoningEffort` | — | 空でない初期 reasoning effort。`agent/request` が上書きすることがある |
+| `agents[].maxTokens` | — | 正の、リクエストごとの出力トークン上限 |
+| `agents[].cwd` | — | 新しいセッションのワークスペースディレクトリ |
+| `agents[].sessionId` | — | 厳密なアイデンティティ。初回使用で作成し、再マウントで実体化済み履歴を再開する |
+| `agents[].resumeSessionId` | — | 新規作成の代わりにこの永続化済みセッションをロードする。`sessionId` と相互排他 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-agent-loop) lists every accepted field. `maxParallelToolCalls` is a volatile Config field sampled for the next tool group; `agents` remains startup configuration.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-agent-loop)には、受け付けられるすべてのフィールドが列挙されている。`maxParallelToolCalls` は次のツールグループのためにサンプリングされる揮発性の Config フィールドであり、`agents` は起動構成のままである。
 
-### Create or resume agents programmatically
+### エージェントをプログラマティックに作成・再開する
 
-Plugins and hosts create agents through `ctx.agents.create()` and resume persisted sessions through `ctx.agents.resume()`; both return an `AgentHandle` whose `dispose()` owns exact teardown. The loop runs each created agent to completion — the handle is only needed when the caller must tear the agent down itself.
+プラグインと Host は `ctx.agents.create()` でエージェントを作成し、`ctx.agents.resume()` で永続化されたセッションを再開する。どちらも `AgentHandle` を返し、その `dispose()` が正確なテアダウンを所有する。ループは作成された各エージェントを完了まで実行する。呼び出し元自身がエージェントをテアダウンする必要がある場合にのみ、ハンドルが必要になる。
 
 ```text
 const handle = await ctx.agents.create({
@@ -68,163 +68,163 @@ const handle = await ctx.agents.create({
 })
 ```
 
-Every inbox mutation commits one normalized `agent/inbox/spliced` event. The projection registry folds that event synchronously, so the live projection reflects the splice when `Session.append()` returns. Insertions, edits, removals, claiming, and cancellation replay through the same standard splice coordinates. Ordinary removals carry `outcome: 'canceled'` and emit `agent/inbox/discarded { message }`; claiming uses pure deletions with no outcome and emits `agent/inbox/claimed`. Every insertion emits `agent/inbox/inserted { message }`. `MessageId` stays unique across both pending lists. Consumers that need a removed message use the claimed or discarded notification instead of depending on a pre-splice `session/event` view.
+すべての受信箱の変更は、正規化された 1 つの `agent/inbox/spliced` イベントをコミットする。プロジェクションレジストリはそのイベントを同期的に畳み込むため、`Session.append()` が戻った時点でライブプロジェクションはスプライスを反映している。挿入、編集、削除、クレーム、キャンセルは、同じ標準のスプライス座標を通じて再生される。通常の削除は `outcome: 'canceled'` を伴い `agent/inbox/discarded { message }` を発行し、クレームは outcome のない純粋な削除を用いて `agent/inbox/claimed` を発行する。すべての挿入は `agent/inbox/inserted { message }` を発行する。`MessageId` は両方の保留リストを通じて一意のままである。削除されたメッセージを必要とするコンシューマーは、スプライス前の `session/event` ビューに依存せず、クレームまたは破棄の通知を使用する。
 
-### What a step does
+### ステップが行うこと
 
-Each step sends the session's derived history — with the latest non-empty `system/message` node as the effective prompt, or no system messages when the rendered prompt is empty — and its visible tool schemas; the model's tool calls run through the guarded tool pipeline and every accepted fact is appended to the session log before the next step derives from it. Parallel-safe calls may overlap up to `maxParallelToolCalls`; exclusive calls run alone as ordering barriers. Cancellation is cooperative: `agent.cancel()` aborts the current activity and, unless `keepInbox` is set, clears pending work; a cancelled stream finalizes the text already delivered to the user.
+各ステップは、セッションの派生履歴 — 最新の空でない `system/message` ノードを有効なプロンプトとし、レンダリングされたプロンプトが空の場合はシステムメッセージなし — と、可視のツールスキーマを送信する。モデルのツール呼び出しはガード付きツールパイプラインを通じて実行され、受け付けられたあらゆる事実は、次のステップがそこから派生する前にセッションログへ追記される。並列安全な呼び出しは最大 `maxParallelToolCalls` まで重複してよいが、排他的な呼び出しは順序バリアとして単独で実行される。キャンセルは協調的である。`agent.cancel()` は現在のアクティビティを中止し、`keepInbox` が設定されていない限り保留中の作業をクリアする。キャンセルされたストリームは、すでにユーザーへ配信されたテキストを確定する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains how the package realizes the behavior above; the observable contract is covered in [Use this package](#use-this-package).
+このセクションでは、このパッケージが上記の動作をどのように実現するかを説明する。観察可能な契約は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design concept
+### 設計概念
 
-The package is the one concrete implementation of the public `Agent` contract. It registers itself as the `AgentFactory` on `ctx.agents`, so consumers never import this package; ownership of each created agent lives with the caller fiber and the loop provider, converging on one memoized quiescence boundary. Every observable effect happens through session events and the `agent/*` taxonomy — package internals are never part of the public surface.
+このパッケージは、公開 `Agent` 契約の唯一の具象実装である。自身を `ctx.agents` 上の `AgentFactory` として登録するため、コンシューマーがこのパッケージをインポートすることはない。作成された各エージェントの所有権は呼び出し元ファイバーとループプロバイダーにあり、単一のメモ化された静止境界に収束する。観察可能なすべての効果は、セッションイベントと `agent/*` タクソノミーを通じて発生する。パッケージ内部が公開面の一部になることはない。
 
-### Request headers and adapter defaults
+### リクエストヘッダーとアダプターデフォルト
 
-After `agent/request`, `ctx.llm.prepareCall()` validates adapter-owned fields and resolves reasoning-effort and output-token defaults under the active turn signal. The loop retains that exact adapter through resolution, `request/header` logging, and dispatch. It writes a full header for the first request, a changed envelope (config or tools — the prompt is not part of the header), an explicit message-series start, a request after a surface replacement or image-offload decision, and resume; unchanged steps, retries, and ordinary later turns in the same series inherit the latest header, and an in-history prompt append is not a replacement, so the request that follows it inherits the header too. Beside the header, the loop logs `request/context` — provider, model, `contextWindow`, and the route's `systemPromptUpdate` mode from `prepareCall()` — only when one of those differs from the latest snapshot. Before the next waterfall, the loop removes adapter-default fields so the current route resolves them again, while explicit settings persist. An unhandled route still fails with `NO_ADAPTER`.
+`agent/request` の後、`ctx.llm.prepareCall()` がアダプター所有のフィールドを検証し、アクティブなターンシグナルの下で reasoning effort と出力トークンのデフォルトを解決する。ループは、解決、`request/header` ログ記録、ディスパッチを通じてその正確なアダプターを保持する。ループが完全なヘッダーを書き込むのは、最初のリクエスト、変更されたエンベロープ（config または tools。プロンプトはヘッダーの一部ではない）、明示的なメッセージ系列の開始、サーフェス置換または画像オフロード決定の後のリクエスト、および再開である。変更されていないステップ、リトライ、および同じ系列内の通常の後続ターンは最新のヘッダーを継承し、履歴内プロンプトの追記は置換ではないため、それに続くリクエストもヘッダーを継承する。ヘッダーに加えて、ループは `request/context` — `prepareCall()` からの provider、model、`contextWindow`、およびルートの `systemPromptUpdate` モード — を、それらのいずれかが最新のスナップショットと異なる場合にのみログに記録する。次のウォーターフォールの前に、ループはアダプターデフォルトのフィールドを除去し、現在のルートがそれらを再び解決できるようにするが、明示的な設定は持続する。未処理のルートは依然として `NO_ADAPTER` で失敗する。
 
-The loop deep-freezes each derived message identity on its first request and reuses that proof only within the same agent. Restored messages keep their identity; request construction does not freeze their containing event wrappers. Each request freezes its local canonical header, fresh message array, and envelope while leaving the cancellation signal live. The [archived request-freeze decision](../../../.agents/notes/archived/simplification/2026-09-06-agent-request-freeze-evidence.md) explains ownership and measurement.
+ループは各派生メッセージのアイデンティティを最初のリクエスト時にディープフリーズし、その証明は同じエージェント内でのみ再利用する。復元されたメッセージはアイデンティティを保つ。リクエスト構築は、それらを含むイベントラッパーをフリーズしない。各リクエストは、ローカルの正規ヘッダー、新しいメッセージ配列、エンベロープをフリーズするが、キャンセルシグナルはライブのままにする。[アーカイブされたリクエストフリーズの決定](../../../.agents/notes/archived/simplification/2026-09-06-agent-request-freeze-evidence.md)が所有権と測定について説明している。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `AgentLoop` service, config schema, declarative agent startup, factory registration |
-| [`src/agent.ts`](src/agent.ts) | The concrete `ReactLoopAgent` driver: inbox, turn/step machine, cancellation |
-| [`src/inbox.ts`](src/inbox.ts) | Package-internal `ReactLoopInbox`: durable projection, structural commands, and loop-only claim state |
-| [`src/tool-calls.ts`](src/tool-calls.ts) | Tool scheduling: exclusive barriers and the bounded parallel pool |
-| [`src/runtime-context.ts`](src/runtime-context.ts) | Per-step runtime-context snapshot handling |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー。`AgentLoop` サービス、設定スキーマ、宣言的エージェント起動、ファクトリ登録 |
+| [`src/agent.ts`](src/agent.ts) | 具象 `ReactLoopAgent` ドライバー。受信箱、ターン/ステップマシン、キャンセル |
+| [`src/inbox.ts`](src/inbox.ts) | パッケージ内部の `ReactLoopInbox`。永続プロジェクション、構造コマンド、ループ専用のクレーム状態 |
+| [`src/tool-calls.ts`](src/tool-calls.ts) | ツールスケジューリング。排他バリアと境界付き並列プール |
+| [`src/runtime-context.ts`](src/runtime-context.ts) | ステップごとのランタイムコンテキストスナップショットの処理 |
 | [`src/constants.ts`](src/constants.ts) | `DEFAULT_MAX_PARALLEL_TOOL_CALLS` |
 
-### Creation and teardown
+### 作成とテアダウン
 
-Creation is one rollback-covered transaction: construct a private session, concrete agent, and scoped context; await optional setup; enter both registries; announce `session/created`; await serial `agent/created` listeners; then release queued input. A caller creating a runtime child sets `options.parentAgent`; the caller Context separately owns the transaction and live handle. Setup, commit, or listener failure and owner disposal roll back the prepared resources. Announcements already delivered remain observable and receive matching disposal notifications. Teardown stops and drains the driver, unwinds the scope, closes the session's write path, detaches the agent, then detaches the session. Every detach binds the exact entered object, so a stale disposer cannot remove a later same-id replacement.
+作成はロールバックで保護された 1 つのトランザクションである。プライベートセッション、具象エージェント、スコープ付き Context を構築し、任意のセットアップを待機し、両方のレジストリへ入り、`session/created` を通知し、直列の `agent/created` リスナーを待機してから、キューに入った入力を解放する。ランタイム子を作成する呼び出し元は `options.parentAgent` を設定する。呼び出し元の Context はトランザクションとライブハンドルを別途所有する。セットアップ、コミット、またはリスナーの失敗とオーナーの破棄は、準備されたリソースをロールバックする。すでに配信された通知は観察可能なままであり、対応する破棄通知を受け取る。テアダウンはドライバーを停止してドレインし、スコープを巻き戻し、セッションの書き込みパスを閉じ、エージェントをデタッチしてから、セッションをデタッチする。すべてのデタッチは、入った正確なオブジェクトを束縛するため、古いディスポーザーが後から同じ id で置き換えられたオブジェクトを削除することはできない。
 
-Factory unload retains the inbox and turn-boundary projections through scope cleanup, including cancellation from scoped abort listeners, until every Agent teardown and startup task settles. Cleanup failures do not release those projections early. Caller unload, factory unload, and handle disposal await the same teardown.
+ファクトリのアンロードは、すべての Agent のテアダウンと起動タスクが決着するまで、スコープのクリーンアップを通じて受信箱とターン境界のプロジェクションを保持する（スコープ付き abort リスナーからのキャンセルを含む）。クリーンアップの失敗がそれらのプロジェクションを早く解放することはない。呼び出し元のアンロード、ファクトリのアンロード、ハンドルの破棄は、同じテアダウンを待機する。
 
-### Persistence integration
+### 永続化との統合
 
-The loop is the production acquisition point for session write handles. When `ctx.sessionPersistence` is mounted, `create`/`createAgent` call `persistence.create(header)` — storing the durable identity and taking write ownership before publication — and append the constructor seed through the handle; `resume` calls `persistence.open(id, 'write')` first (excluding a concurrent resume of the same id), reads the physically valid log through the handle, and appends `interruptedTurnClosers` for a log crashed mid-turn as an ordinary batch — semantic crash repair is the agent layer's job, not a storage entry point. Immediately before publication, `appendUnstoredSuffix` stores any events appended during the setup window (seed markers, delegation policy records), which never re-emit through `session/event`. Once published, the mounted backend routes the session's `session/event` batches, `session/flush` barriers, and `session/disposed` retirement into the active write handle by session id; the loop touches storage only through the handle it owns. With the backend still mounted, teardown closes the handle after the driver commits its closing events; close drains the routed buffer and releases write ownership. Without a backend, sessions are memory-only and nothing else changes.
+ループは、セッション書き込みハンドルの本番取得ポイントである。`ctx.sessionPersistence` がマウントされている場合、`create`/`createAgent` は `persistence.create(header)` を呼び出し — 公開前に永続アイデンティティを保存して書き込み所有権を取得する —、ハンドルを通じてコンストラクターシードを追記する。`resume` は先に `persistence.open(id, 'write')` を呼び出し（同じ id の並行再開を除外する）、ハンドルを通じて物理的に有効なログを読み取り、ターン途中でクラッシュしたログに対して `interruptedTurnClosers` を通常のバッチとして追記する — 意味論的なクラッシュ修復はエージェント層の仕事であり、ストレージのエントリーポイントではない。公開の直前に、`appendUnstoredSuffix` がセットアップ期間中に追記されたイベント（シードマーカー、委譲ポリシーレコード）を保存する。これらは `session/event` を通じて再発行されることはない。公開後は、マウントされたバックエンドが、セッションの `session/event` バッチ、`session/flush` バリア、`session/disposed` リタイアメントを、セッション id によってアクティブな書き込みハンドルへルーティングする。ループは自身が所有するハンドルを通じてのみストレージに触れる。バックエンドがマウントされたままの場合、テアダウンはドライバーが終了イベントをコミットした後にハンドルを閉じる。close はルーティングされたバッファをドレインし、書き込み所有権を解放する。バックエンドがない場合、セッションはメモリのみになり、それ以外は何も変わらない。
 
-### Turn and step flow
+### ターンとステップのフロー
 
-The driver owns one agent for its lifetime and runs inside `ctx.agents.withInitiator(agent, ...)`. `AgentLoop` registers the standard `inbox` projection for its service lifetime, so cold reads work before any Agent exists and after all Agents unload. Its package-internal `ReactLoopInbox` uses that shared projection for structural commands and loop-only claims. At a turn boundary it opens the durable turn, then atomically claims pending next-step input plus one queued prompt; between steps it claims only next-step input. The driver assembles the prompt and tools and runs `agent/pre-step`; the fallback projects runtime context after listeners run. A rejected decision or empty first batch opens no step. On the first attempt after acceptance, `step/start` precedes the `agent/request` waterfall and `prepareCall()`; neither async phase sees the pending system prompt or accepted users committed to history, and cancellation during either commits neither. For every attempt, the loop then synchronously reconciles the rendered prompt against the surviving `system/message` nodes using the prepared call capability, refreshes registered runtime facts without reassembling the bound prompt or tools, appends the accepted `user/message` batch only on the first attempt with its owned context candidate replaced in place, and restores removed runtime context, logs the header and context as needed, and derives and freezes the request before streaming through that bound prepared call. Retries reuse the same rendered assembly without repeating assembly, `agent/pre-step`, or user admission. Reconciliation sees pre-step and retry compaction; a broken series consolidates the prompt at the head rather than appending an update after already-committed users. The request is `header.config`, `deriveMessages()`, and `header.tools`; it carries no `system` field. Each model attempt emits one process-local `start`, emits every `chunk` only after the matching durable assistant-frame settlement, and emits exactly one terminal `end`; final assembly or message-append failure settles it as `aborted`, while `committed` follows the durable `assistant/message`. Each successful model call appends one message anchor, and a cancelled stream appends an `interrupted: true` anchor with the delivered prefix so the next request contains what the user saw. Within a step, exclusive calls form barriers and parallel-safe calls use the bounded rolling pool; policy, durable results... (line truncated to 2000 chars)
+ドライバーは存続期間中 1 つのエージェントを所有し、`ctx.agents.withInitiator(agent, ...)` の内部で実行される。`AgentLoop` はサービス存続期間中、標準の `inbox` プロジェクションを登録するため、Agent が存在する前も、すべての Agent がアンロードされた後もコールドリードが機能する。パッケージ内部の `ReactLoopInbox` は、構造コマンドとループ専用のクレームにその共有プロジェクションを使う。ターン境界では永続ターンを開き、次に保留中の次ステップ入力と 1 つのキュー済みプロンプトをアトミックにクレームする。ステップ間では次ステップ入力のみをクレームする。ドライバーはプロンプトとツールを組み立て、`agent/pre-step` を実行する。フォールバックはリスナー実行後にランタイムコンテキストを投影する。拒否された決定または空の最初のバッチはステップを開かない。受け入れ後の最初の試行では、`step/start` が `agent/request` ウォーターフォールと `prepareCall()` に先行する。どちらの非同期フェーズも、保留中のシステムプロンプトや履歴にコミットされた承認済みユーザーを見ることはなく、いずれの間のキャンセルもどちらもコミットしない。すべての試行について、ループは次に、準備済み呼び出しケイパビリティを用いてレンダリングされたプロンプトを残存する `system/message` ノードと同期的に調整し、束縛されたプロンプトやツールを組み立て直すことなく登録済みランタイムファクトを再取得し、最初の試行にのみ所有するコンテキスト候補をその場で置換して承認された `user/message` バッチを追記し、削除されたランタイムコンテキストを復元し、必要に応じてヘッダーとコンテキストをログに記録し、その束縛された準備済み呼び出しを通じてストリーミングする前にリクエストを派生させてフリーズする。リトライは、組み立て、`agent/pre-step`、ユーザー承認を繰り返すことなく、同じレンダリング済みアセンブリを再利用する。調整はプリステップとリトライのコンパクションを見る。壊れた系列は、すでにコミットされたユーザーの後ろに更新を追記するのではなく、先頭でプロンプトを統合する。リクエストは `header.config`、`deriveMessages()`、`header.tools` であり、`system` フィールドを持たない。各モデル試行は 1 つのプロセスローカルな `start` を発行し、一致する永続アシスタントフレームの確定後にのみ各 `chunk` を発行し、正確に 1 つの終端 `end` を発行する。最終組み立てまたはメッセージ追記の失敗は `aborted` として確定し、`committed` は永続 `assistant/message` に従う。成功した各モデル呼び出しは 1 つのメッセージアンカーを追記し、キャンセルされたストリームは配信済みプレフィックスを持つ `interrupted: true` アンカーを追記するため、次のリクエストにはユーザーが見たものが含まれる。ステップ内では、排他的呼び出しがバリアを形成し、並列安全な呼び出しは境界付きローリングプールを使用する。ポリシー、永続的な結果...（2000 文字で切り詰め）
 
-Prompt admission uses the actual `prepareCall()` result, not the preceding `request/context`. With no system node, even an empty prompt is appended (reserving node 0 without a wire message). On an incapable route or at a new request series, a non-empty rendering is consolidated at the first system node: each non-empty later system node receives a logged per-node empty replacement, then the head is rewritten if needed. Dormant empty tails need no replacement and do not determine the effective text. Consolidation applies even when the latest effective text is unchanged. On a continuing `in-history` series, an unchanged effective prompt produces no event and a non-empty change appends. An empty rendering clears every non-empty later system node through a logged per-node empty replacement, then empties the head if needed, regardless of route or series state. No older instructions remain model-visible. An empty head with no active later system node means no prompt; repeated clears and resume leave it empty. A restored non-empty prompt follows the same route/series rule: a continuing capable route may append it, while an incapable route or new series refills the head. A step starts a series when the pre-step decision declares `startsRequestSeries` or `session.surface.contentGeneration` changed since attachment or the last request (a replacement or image-offload decision). Visible tool-schema changes force prompt consolidation only when the prepared route lacks `toolUpdate`. Routes supporting both tool and system-prompt updates can append a changed prompt and activate added tools without rewriting earlier messages. If another admission condition replaces a system node, the request starts a new series with current tool declarations. Resume and a provider or model swap alone continue the series; the prepared route still governs admission. Per-node empty replacements preserve intervening history without a surface delete operation.
+プロンプトの承認は、直前の `request/context` ではなく、実際の `prepareCall()` の結果を使用する。システムノードがない場合は、空のプロンプトでも追記される（wire メッセージなしでノード 0 を予約する）。能力のないルートまたは新しいリクエスト系列では、空でないレンダリングは最初のシステムノードで統合される。後続の空でない各システムノードは、ログ記録されたノード単位の空置換を受け取り、必要に応じて先頭が書き換えられる。休眠中の空テールは置換を必要とせず、有効なテキストを決定しない。統合は、最新の有効テキストが変更されていない場合でも適用される。継続中の `in-history` 系列では、変更されていない有効プロンプトはイベントを生成せず、空でない変更は追記される。空のレンダリングは、ルートや系列の状態に関わらず、ログ記録されたノード単位の空置換を通じて後続の空でないすべてのシステムノードをクリアし、必要に応じて先頭を空にする。古い指示はモデル可視のまま残らない。後続のアクティブなシステムノードがない空の先頭は、プロンプトなしを意味する。繰り返しのクリアと再開はそれを空のままにする。復元された空でないプロンプトは同じルート/系列ルールに従う。継続中の能力のあるルートはそれを追記してよく、能力のないルートまたは新しい系列は先頭を再充填する。ステップは、プリステップ決定が `startsRequestSeries` を宣言した場合、または `session.surface.contentGeneration` がアタッチメントまたは最後のリクエスト以降に変更された場合（置換または画像オフロード決定）に、系列を開始する。可視のツールスキーマの変更は、準備済みルートに `toolUpdate` がない場合にのみプロンプト統合を強制する。ツール更新とシステムプロンプト更新の両方をサポートするルートは、以前のメッセージを書き換えることなく、変更されたプロンプトを追記し、追加されたツールをアクティブ化できる。別の承認条件がシステムノードを置換する場合、リクエストは現在のツール宣言で新しい系列を開始する。再開およびプロバイダーまたはモデルの交換だけでは系列が継続し、準備済みルートが依然として承認を統治する。ノード単位の空置換は、サーフェス削除操作なしでその間の履歴を保持する。
 
-### Failure and cancellation
+### 失敗とキャンセル
 
-`turn/end` declares `TurnEndCancelCause`; cancellation records a fresh `AgentCancelCause` there, retaining the caller's `kind` and the hook's `reason` text. The live `AbortSignal.reason` remains the caller's object, which a transport may extend — Node's fetch assigns a `stack` onto it — so the copy keeps that trace out of the log and keeps the ending appendable.
+`turn/end` は `TurnEndCancelCause` を宣言する。キャンセルはそこに新しい `AgentCancelCause` を記録し、呼び出し元の `kind` とフックの `reason` テキストを保持する。ライブの `AbortSignal.reason` は呼び出し元のオブジェクトのままであり、トランスポートがそれを拡張することがある（Node の fetch は `stack` を割り当てる）。そのためコピーはそのトレースをログの外に保ち、終了イベントを追記可能に保つ。
 
-Final adapter selection, dispatch, and iteration failures arrive as terminal finishes and enter `agent/request-error`; a handling listener returns `{ kind: 'retry' }` without calling `next()`, while an unhandled failure is terminal. Middleware, result-processing, tool, and other extension failures remain thrown and close the turn directly — plugin failure ends the turn, not the loop. Undispatched model tool calls after cancellation receive synthetic `tool/call` plus `ABORTED_BEFORE_DISPATCH` result pairs.
+最終的なアダプター選択、ディスパッチ、反復の失敗は終端フィニッシュとして到達し、`agent/request-error` に入る。処理するリスナーは `next()` を呼ばずに `{ kind: 'retry' }` を返し、未処理の失敗は終端である。ミドルウェア、結果処理、ツール、その他の拡張の失敗は throw されたままターンを直接閉じる。プラグインの失敗はループではなくターンを終了させる。キャンセル後にディスパッチされなかったモデルのツール呼び出しは、合成の `tool/call` と `ABORTED_BEFORE_DISPATCH` の結果ペアを受け取る。
 
-Before closing a failed step, the driver records an error result for each unanswered assistant tool call. A recorded `tool/call` without a committed result receives `TOOL_OUTCOME_UNKNOWN`; a request without a call record receives `TOOL_NOT_STARTED`. Committed results remain intact, started dispatches settle before recovery, and the turn retains the original failure. These results let later requests use paired tool history without automatically retrying uncertain operations.
+失敗したステップを閉じる前に、ドライバーは未回答のアシスタントツール呼び出しごとにエラー結果を記録する。コミットされた結果のない記録済み `tool/call` は `TOOL_OUTCOME_UNKNOWN` を受け取り、呼び出しレコードのないリクエストは `TOOL_NOT_STARTED` を受け取る。コミット済みの結果はそのまま残り、開始済みのディスパッチはリカバリーの前に決着し、ターンは元の失敗を保持する。これらの結果により、後のリクエストは不確実な操作を自動的に再試行することなく、対になったツール履歴を使用できる。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-The package-level contract is enough for most consumers; read these when you need the surrounding domain and the design rationale.
+ほとんどのコンシューマーにはパッケージレベルの契約で十分である。周辺ドメインと設計根拠が必要なときにこれらを読む。
 
-- [agent package](../agent/README.md) — the `Agent` handle, registry, and `agent/*` events this loop implements.
-- [Core subsystem](../../../docs/subsystems/core.md) — the turn flow and interception decisions.
-- [Session subsystem](../../../docs/subsystems/session.md) — the durable log the loop writes and derives from.
-- [Tools subsystem](../../../docs/subsystems/tools.md) — the pipeline the loop dispatches through.
-- [Core group map](../README.md) — how the core packages compose.
+- [agent package](../agent/README.md) — このループが実装する `Agent` ハンドル、レジストリ、`agent/*` イベント。
+- [Core subsystem](../../../docs/subsystems/core.md) — ターンフローとインターセプトの決定。
+- [Session subsystem](../../../docs/subsystems/session.md) — ループが書き込み、派生元とする永続ログ。
+- [Tools subsystem](../../../docs/subsystems/tools.md) — ループがディスパッチするパイプライン。
+- [Core group map](../README.md) — コアパッケージがどのように構成されるか。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Complete conversation request
+### 完全な会話リクエスト
 
-#### What the model sees
+#### モデルが見るもの
 
-For each step, the loop sends the session's derived messages and visible tool schemas. Non-empty `system/message` nodes carry the prompt, with the latest as the effective version; an empty rendering clears all prompt versions from derived history. It supplies `provider` and `model` variable values but no additional fixed prose. The working-directory service contributes the active directory as user context. The request header always records active tools. Comparing their names with the preceding header emits one `developer/message` for additions and removals, independently of model capability; additions reference the new header. Requests also carry `Session.toolHistory()` for the LLM runtime to construct provider declarations.
+各ステップで、ループはセッションの派生メッセージと可視のツールスキーマを送信する。空でない `system/message` ノードがプロンプトを運び、最新のものが有効バージョンである。空のレンダリングは派生履歴からすべてのプロンプトバージョンをクリアする。ループは `provider` と `model` の変数値を提供するが、追加の固定文言は提供しない。作業ディレクトリサービスはアクティブなディレクトリをユーザーコンテキストとして寄与する。リクエストヘッダーは常にアクティブなツールを記録する。その名前を直前のヘッダーと比較すると、モデルの能力に関わらず、追加と削除について 1 つの `developer/message` が発行される。追加は新しいヘッダーを参照する。リクエストはまた、LLM ランタイムがプロバイダー宣言を構築するための `Session.toolHistory()` を運ぶ。
 
-#### Token effect
+#### トークンへの影響
 
-System text and schemas are paid again on every step, and on an `in-history` route every retained prompt version is paid until compaction shadows it or prompt reconciliation empties it. Per-agent scoping chooses the contributions, while the authoritative assembly waterfall can alter the final request and makes its listener responsible for protocol coherence.
+システムテキストとスキーマはステップごとに再び課金され、`in-history` ルートでは、保持されたすべてのプロンプトバージョンが、コンパクションがそれを影で覆うか、プロンプト調整がそれを空にするまで課金される。エージェント単位のスコープが寄与を選び、権威ある組み立てウォーターフォールが最終リクエストを変更でき、そのリスナーにプロトコルの一貫性の責任を負わせる。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix reuse requires earlier messages and declarations to stay byte-identical under the same provider and model route. An unchanged rendered prompt keeps the cached prefix unless an incapable route or a new request series must consolidate retained in-history system nodes. A prompt change that replaces a system node in place makes the request differ from that node's first token — in full when the node is node 0 — so the provider prefix cache misses from there; when the prepared call declares `systemPromptUpdate: 'in-history'`, a non-empty prompt change inside a continuing request series is appended after the cached history, so the prefix through that history stays reusable. Changing a retained tool definition or rebuilding declarations invalidates reuse from the first altered request token.
+プレフィックスの再利用には、同じプロバイダーとモデルルートの下で、以前のメッセージと宣言がバイト単位で同一であることが必要である。変更されていないレンダリング済みプロンプトは、能力のないルートまたは新しいリクエスト系列が保持された in-history システムノードを統合する必要がない限り、キャッシュされたプレフィックスを保つ。システムノードをその場で置換するプロンプト変更は、そのノードの最初のトークンからリクエストを異ならせる（ノードがノード 0 の場合は全体が異なる）ため、プロバイダーのプレフィックスキャッシュはそこからミスする。準備済み呼び出しが `systemPromptUpdate: 'in-history'` を宣言している場合、継続中のリクエスト系列内での空でないプロンプト変更はキャッシュされた履歴の後に追記されるため、その履歴までのプレフィックスは再利用可能なままである。保持されたツール定義の変更または宣言の再構築は、変更された最初のリクエストトークンから再利用を無効化する。
 
-### Retained message history
+### 保持されるメッセージ履歴
 
-#### What the model sees
+#### モデルが見るもの
 
-Accepted user messages, assistant messages, tool calls and results, injected context, and steering are logged and sent on later steps. Raw stream chunks, lifecycle boundaries, and other log-only events are excluded.
+承認されたユーザーメッセージ、アシスタントメッセージ、ツール呼び出しとその結果、注入されたコンテキスト、ステアリングはログに記録され、後のステップで送信される。生のストリームチャンク、ライフサイクル境界、その他のログ専用イベントは除外される。
 
-#### Token effect
+#### トークンへの影響
 
-Input grows with every surface message until a compaction replacement shadows older nodes; a multi-step tool turn resends the accumulated history each step.
+入力は、コンパクションによる置換が古いノードを影で覆うまで、サーフェスメッセージごとに増加する。複数ステップのツールターンは、各ステップで蓄積された履歴を再送する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Ordinary history growth is append-only and preserves reusable entries. A surface replacement or compaction invalidates reuse from the first shadowed history token.
+通常の履歴の増加は追記のみであり、再利用可能なエントリーを保持する。サーフェス置換またはコンパクションは、影で覆われた最初の履歴トークンから再利用を無効化する。
 
-### Undispatched calls after cancellation
+### キャンセル後にディスパッチされなかった呼び出し
 
-#### What the model sees
+#### モデルが見るもの
 
-If a later request replays an aborted step, each tool call that cancellation prevented from dispatching has error code `ABORTED_BEFORE_DISPATCH` and result text `Error: tool call aborted before dispatch`.
+後のリクエストが中止されたステップを再生する場合、キャンセルによってディスパッチされなかった各ツール呼び出しは、エラーコード `ABORTED_BEFORE_DISPATCH` と結果テキスト `Error: tool call aborted before dispatch` を持つ。
 
-#### Token effect
+#### トークンへの影響
 
-One fixed error result per skipped call remains in history until compaction shadows it.
+スキップされた呼び出しごとに 1 つの固定のエラー結果が、コンパクションが影で覆うまで履歴に残る。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; each synthetic result follows the reusable request prefix and does not invalidate existing KV Cache entries.
+追記のみ。各合成結果は再利用可能なリクエストプレフィックスに従い、既存の KV キャッシュエントリーを無効化しない。
 
-### Unanswered calls after step failure
+### ステップ失敗後の未回答の呼び出し
 
-#### What the model sees
+#### モデルが見るもの
 
-Each unanswered tool call receives an error result in later history. For a recorded call, the result states `Its outcome is unknown.` and permits retries only for read-only or idempotent operations; possible side effects require checking external state or asking the user first. A call without a start record states `The tool call was interrupted before the Harness recorded it as started. Retry it if it is still needed.`
+未回答の各ツール呼び出しは、後の履歴でエラー結果を受け取る。記録済みの呼び出しには、結果が `Its outcome is unknown.` と述べ、読み取り専用または冪等な操作にのみ再試行を許可する。副作用の可能性がある場合は、外部状態を確認するか、先にユーザーに尋ねる必要がある。開始レコードのない呼び出しには、`The tool call was interrupted before the Harness recorded it as started. Retry it if it is still needed.` と述べられる。
 
-#### Token effect
+#### トークンへの影響
 
-One recovery result per unanswered call remains in history until compaction shadows it.
+未回答の呼び出しごとに 1 つのリカバリー結果が、コンパクションが影で覆うまで履歴に残る。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Recovery results append after the existing history and preserve its reusable prefix.
+リカバリー結果は既存の履歴の後に追記され、その再利用可能なプレフィックスを保つ。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the loop needs special care. They are current package constraints, not a task backlog.
+これらの制限は、ループが特別な注意を必要とする状況を定義する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Classification is unary** — calls whose safety depends on comparing siblings or resources must remain exclusive ([rationale](../../../.agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.md)).
-- **Root shutdown persistence** — shutting down the root context with an active Agent can leave its final `turn/end` in memory but absent from the persisted log. Agent teardown completing does not guarantee that this event was saved.
-- **Previously closed inconsistent history** — failed-step recovery does not rewrite unanswered calls in already-closed historical turns.
-- **Config labels are fresh by default** — omitting `sessionId` creates a fresh `${id}-session-<uuid>` on every startup; exact resume-or-create behavior requires an explicit stable `sessionId`, while `resumeSessionId` requires existing persisted history.
-- **Config agents have no per-agent persona field or setup hook** — they use the deployment persona; scoped persona and tool composition are available only through the programmatic `ctx.agents.create()` / `resume()` factory options.
-- **No built-in turn budget** — tool calls or steering continue the current turn; a policy that bounds runaway turns must cancel from an existing lifecycle extension point such as `agent/turn-stopping`.
+- **分類は単項である** — 安全性が兄弟やリソースの比較に依存する呼び出しは、排他的なままでなければならない（[根拠](../../../.agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.md)）。
+- **ルートシャットダウンの永続化** — アクティブな Agent を伴うルート Context のシャットダウンは、その最後の `turn/end` をメモリに残したまま、永続化されたログには存在しない状態にすることがある。Agent のテアダウンが完了しても、このイベントが保存されたことは保証されない。
+- **以前に閉じられた不整合な履歴** — 失敗したステップのリカバリーは、すでに閉じられた履歴ターン内の未回答の呼び出しを書き換えない。
+- **設定ラベルはデフォルトで新規になる** — `sessionId` を省略すると、起動のたびに新しい `${id}-session-<uuid>` が作成される。正確な再開または作成の動作には明示的な安定した `sessionId` が必要であり、`resumeSessionId` には既存の永続化済み履歴が必要である。
+- **設定エージェントにはエージェント単位のペルソナフィールドやセットアップフックがない** — それらはデプロイのペルソナを使用する。スコープ付きのペルソナとツール構成は、プログラマティックな `ctx.agents.create()` / `resume()` ファクトリオプションを通じてのみ利用できる。
+- **組み込みのターン予算はない** — ツール呼び出しまたはステアリングは現在のターンを継続する。暴走するターンを制限するポリシーは、`agent/turn-stopping` などの既存のライフサイクル拡張ポイントからキャンセルする必要がある。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

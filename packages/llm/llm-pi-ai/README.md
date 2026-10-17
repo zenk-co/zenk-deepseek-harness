@@ -1,41 +1,41 @@
 ---
-description: "The pi-ai-backed multi-provider adapter for users and maintainers routing the harness LLM service through pi-ai catalogs and hand-declared gateways."
+description: "harness LLM サービスを pi-ai カタログと手動宣言ゲートウェイ経由でルーティングする、ユーザーとメンテナー向けの pi-ai ベースのマルチプロバイダーアダプター。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-llm-pi-ai
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`@deepseek-ai/dsh-llm-pi-ai` routes model requests to multiple pi-ai providers, OpenAI-compatible gateways, or self-hosted servers from one configuration. Installed pi-ai providers supply endpoint, protocol, and model-catalog defaults; custom routes can declare those values without code changes. Profiles and credentials are resolved for each request, so settings changes take effect on the next request without a restart. Supported providers can use stored OAuth or interactive-key sign-in with cross-process refresh locking. The package may start with no routes and activate when user settings add them.
+`@deepseek-ai/dsh-llm-pi-ai` は、1 つの設定から複数の pi-ai プロバイダー、OpenAI 互換ゲートウェイ、またはセルフホストサーバーへモデルリクエストをルーティングする。インストール済み pi-ai プロバイダーがエンドポイント、プロトコル、モデルカタログの既定値を供給し、カスタムルートはコード変更なしにそれらの値を宣言できる。プロファイルと資格情報はリクエストごとに解決されるため、設定変更は再起動なしに次のリクエストから有効になる。サポート対象プロバイダーは、プロセス横断の更新ロック付きで、保存済み OAuth または対話型キーによるサインインを利用できる。このパッケージはルートなしで開始し、ユーザー設定がルートを追加すると有効化される。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin when a composition routes model requests through pi-ai's provider catalogs or through gateways that pi-ai's installed catalog does not describe. The `providers` dictionary is the whole configuration surface: each key is the provider route name a request selects with `GenerateOptions.provider`.
+モデルリクエストを pi-ai のプロバイダーカタログ経由、または pi-ai のインストール済みカタログに記載のないゲートウェイ経由でルーティングする構成では、このプラグインをマウントする。`providers` 辞書が設定サーフェス全体であり、各キーはリクエストが `GenerateOptions.provider` で選択するプロバイダールート名である。
 
-The adapter accepts the LLM service's [request-only user inputs](../llm/README.md#use-this-package) alongside durable history. User identity and attribution do not enter pi-ai content; assistant replay metadata and tool-call correlation remain attached to durable messages.
+アダプターは、永続履歴と並んで LLM サービスの[リクエスト専用ユーザー入力](../llm/README.md#use-this-package)を受け入れる。ユーザーアイデンティティとアトリビューションは pi-ai コンテンツに入らず、アシスタントのリプレイメタデータとツール呼び出しの相関は永続メッセージに付属したままである。
 
-### When to choose it
+### どちらを選ぶべきか
 
-Choose this adapter when the same composition serves several providers, when a route needs pi-ai's catalog defaults with a few fields corrected, or when a hand-declared gateway must be reached through its own endpoint and protocol. Choose `dsh-llm-deepseek` for the direct DeepSeek route when the deployment needs no other provider. Both adapters can be mounted together because their route names do not collide; registering a route another adapter already owns fails plugin loading.
+同じ構成で複数のプロバイダーを扱う場合、ルートに pi-ai のカタログ既定値といくつかのフィールド修正が必要な場合、または手動宣言ゲートウェイに独自のエンドポイントとプロトコルで到達する必要がある場合に、このアダプターを選ぶ。他のプロバイダーが不要なデプロイで直接の DeepSeek ルートを使う場合は `dsh-llm-deepseek` を選ぶ。ルート名が衝突しないため、両方のアダプターは同時にマウントできる。別のアダプターが既に所有するルートを登録するとプラグイン読み込みが失敗する。
 
-### Configure provider routes
+### プロバイダールートを設定する
 
-Each profile may set a `retryPolicy`; omission uses normal mode with five retries. `apiKeyEnv` is a credential reference resolved per request through the harness credential seam, so no secret enters the configuration file; a reference that resolves to nothing fails the request with `MISSING_CREDENTIAL`. Omitting it leaves the route configured-but-keyless, which for an installed catalog route defers to pi-ai's provider-native ambient discovery.
+各プロファイルは `retryPolicy` を設定でき、省略時は 5 回再試行の normal モードになる。`apiKeyEnv` は harness 資格情報シーム経由でリクエストごとに解決される資格情報参照であり、秘密情報は設定ファイルに入らない。何も解決しない参照はリクエストを `MISSING_CREDENTIAL` で失敗させる。これを省略するとルートは設定済みだがキーレスのままとなり、インストール済みカタログルートでは pi-ai のプロバイダーネイティブなアンビエント検出に委ねられる。
 
 ```yaml
 - name: '@deepseek-ai/dsh-llm-pi-ai'
@@ -72,103 +72,103 @@ Each profile may set a `retryPolicy`; omission uses normal mode with five retrie
               high: high
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `apiKeyEnv` | absent | Credential reference resolved per request; omission defers to pi-ai ambient discovery |
-| `displayName` | provider name | Label shown by selector surfaces |
-| `api` | catalog protocol | Wire protocol; only needed for routes the catalog does not supply |
-| `baseURL` | catalog endpoint | Endpoint of every model on the route |
-| `models` | installed catalog | Replaces the route's catalog wholesale; each entry defaults from the installed model |
-| `modelOverrides` | none | Reshapes individual installed-catalog models without replacing the rest |
-| `compat` | catalog detection | Wire-compatibility switches for unrecognized endpoints |
-| `defaultContextWindow` | `262,144` | Capacity fallback for undescribed models |
-| `defaultMaxTokens` | `32,768` | Output-cap fallback for undescribed models |
-| `requestImagePixelBudget` | `4,194,304` | Total-pixel budget for each deterministic request image |
-| `requestImageMaxBytes` | `1 MiB` | Encoded-byte target for each request image before base64 expansion |
-| `maxRequestImageBytes` | `20 MiB` | Aggregate base64 image-payload bound; a request whose retained images exceed it fails with `IMAGE_OFFLOAD_REQUIRED` |
-| `retryPolicy` | normal, 5 retries | Provider-owned retry policy executed by `dsh-llm-retry` |
+| `apiKeyEnv` | なし | リクエストごとに解決される資格情報参照。省略時は pi-ai のアンビエント検出に委ねられる |
+| `displayName` | プロバイダー名 | セレクターサーフェスに表示されるラベル |
+| `api` | カタログのプロトコル | ワイヤプロトコル。カタログにないルートでのみ必要 |
+| `baseURL` | カタログのエンドポイント | ルート上の全モデルのエンドポイント |
+| `models` | インストール済みカタログ | ルートのカタログを全体置換する。各エントリはインストール済みモデルから既定値を取る |
+| `modelOverrides` | なし | 残りを置換せずにインストール済みカタログの個別モデルを整形する |
+| `compat` | カタログ検出 | 認識できないエンドポイント向けのワイヤ互換性スイッチ |
+| `defaultContextWindow` | `262,144` | 記載のないモデルの容量フォールバック |
+| `defaultMaxTokens` | `32,768` | 記載のないモデルの出力上限フォールバック |
+| `requestImagePixelBudget` | `4,194,304` | 決定的リクエスト画像ごとの総ピクセル予算 |
+| `requestImageMaxBytes` | `1 MiB` | base64 展開前のリクエスト画像ごとのエンコードバイト目標 |
+| `maxRequestImageBytes` | `20 MiB` | base64 画像ペイロード合計の上限。これを超える保持画像があるリクエストは `IMAGE_OFFLOAD_REQUIRED` で失敗する |
+| `retryPolicy` | normal、5 回再試行 | `dsh-llm-retry` が実行するプロバイダー所有の再試行ポリシー |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-llm-pi-ai) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-llm-pi-ai)が、受け入れ可能な全フィールドとその JSDoc の網羅的な情報源である。
 
-### Sign in to a provider
+### プロバイダーにサインインする
 
-A provider pi-ai ships a login for can be signed into through the harness authorization seam: the flow offers OAuth or an interactive key prompt (a key is typed into pi-ai's own login prompt, not into the settings form), and the resulting credential is stored in the harness credential store at `llm-pi-ai/<provider id>`. The stored sign-in authenticates its route beneath any `apiKeyEnv` override and refreshes itself under the store's cross-process lock; signing out deletes the stored record. A hand-declared route key outside the record grammar — a lowercase hyphenated identifier — cannot be signed into, because a record write for it refuses with `LlmError('UNSTORABLE_PROVIDER_ID')`; such a route authenticates through `apiKeyEnv` or ambient provider settings instead.
+pi-ai がログインを用意しているプロバイダーには harness 認可シーム経由でサインインできる。フローは OAuth または対話型キープロンプトを提供し（キーは設定フォームではなく pi-ai 自身のログインプロンプトに入力する）、結果の資格情報は harness 資格情報ストアの `llm-pi-ai/<provider id>` に保存される。保存済みサインインは `apiKeyEnv` オーバーライドの下位でルートを認証し、ストアのプロセス横断ロックの下で自身を更新する。サインアウトは保存済みレコードを削除する。レコード文法外の手動宣言ルートキー（小文字ハイフン区切り識別子）にはサインインできない。そのレコード書き込みは `LlmError('UNSTORABLE_PROVIDER_ID')` で拒否されるためであり、そのようなルートは代わりに `apiKeyEnv` またはアンビエントなプロバイダー設定で認証する。
 
-### Resolve the model catalog
+### モデルカタログを解決する
 
-A profile's `models` list replaces the route's installed catalog rather than extending it; each entry defaults its unset fields from the installed model of the same id, so narrowing a route to two models, correcting one capacity, or adding a model newer than the installed catalog are one-line edits. `modelOverrides` reshapes individual installed-catalog models without that cost — correct one model, keep the other thirty-seven — and is refused when set beside a `models` list, on a hand-declared route, or naming a model the catalog does not describe, because a silently unchanged model would be a typo someone hunts for later.
+プロファイルの `models` リストはルートのインストール済みカタログを拡張ではなく置換する。各エントリの未設定フィールドは同じ id のインストール済みモデルから既定値を取るため、ルートを 2 モデルに絞る、1 つの容量を修正する、インストール済みカタログより新しいモデルを追加する、といった作業は 1 行編集で済む。`modelOverrides` はそのコストなしにインストール済みカタログの個別モデルを整形する（1 モデルを修正し、残り 37 モデルを維持する）。`models` リストとの併設、手動宣言ルートでの指定、カタログに記載のないモデルの指定では拒否される。無言で変更されないモデルは後で誰かが追うタイポになるためである。
 
-### Run with reasoning and wire compatibility
+### 推論とワイヤ互換性を使った実行
 
-`reasoningEfforts` declares a model's selectable thinking levels: each key is a level selectors offer, its value the spelling dispatch sends on the wire, so `max: ultra` renames a level for a gateway with its own vocabulary. Omitting the field keeps the installed catalog entry's capability; `false` declares a non-reasoning model. `compat` switches reshape the request for endpoints pi-ai cannot recognize — which role carries the system prompt, which field caps output, how a thinking level travels — configurable per route and per model. A model neither the entry nor the installed catalog sizes takes the route's `defaultContextWindow` and `defaultMaxTokens` fallbacks.
+`reasoningEfforts` はモデルの選択可能な思考レベルを宣言する。各キーはセレクターが提供するレベル、値はディスパッチがワイヤ上に送る綴りであり、`max: ultra` は独自語彙を持つゲートウェイ向けにレベル名を変更する。このフィールドを省略するとインストール済みカタログエントリのケイパビリティが維持され、`false` は非推論モデルを宣言する。`compat` スイッチは pi-ai が認識できないエンドポイント向けにリクエストを整形する（どのロールがシステムプロンプトを運ぶか、どのフィールドが出力を制限するか、思考レベルをどう運ぶか）。ルートごと・モデルごとに設定できる。エントリにもインストール済みカタログにもサイズ記載のないモデルは、ルートの `defaultContextWindow` と `defaultMaxTokens` フォールバックを使う。
 
-Exact-model metadata lists `reasoning.efforts` from least to greatest selectable effort. A configuration function can select from that list before `prepareCall()` validates the concrete effort. The adapter receives only the resolved controls. Selecting `off` does not guarantee disabled reasoning: a protocol that expresses it by omitting the reasoning field leaves the gateway's default in effect. Reasoning tokens at any selected level count toward the request's output cap.
+厳密モデルメタデータは `reasoning.efforts` を選択可能な最小エフォートから最大エフォートの順に列挙する。設定関数は `prepareCall()` が具体的なエフォートを検証する前にこのリストから選択できる。アダプターが受け取るのは解決済みコントロールのみである。`off` の選択は推論無効化を保証しない。推論フィールドの省略で表現するプロトコルではゲートウェイの既定値が有効のままになる。選択したどのレベルでも推論トークンはリクエストの出力上限に計上される。
 
-For self-hosted Chat Completions endpoints, `thinkingTokenBudgetField` selects the reasoning-budget parameter, and `vllmPriority` sets an integer scheduler priority when the server enables priority scheduling. Template arguments accept `$var: thinking.budget`. `openai-responses` gateways can set `supportsMaxOutputTokens: false` to omit `max_output_tokens`; Azure and Codex transports ignore this shared compatibility field. These controls are opt-in; catalog-owned Anthropic effort and fallback capabilities are not configurable switches.
+セルフホストの Chat Completions エンドポイントでは、`thinkingTokenBudgetField` が推論バジェットパラメーターを選択し、`vllmPriority` はサーバーが優先度スケジューリングを有効化している場合に整数スケジューラー優先度を設定する。テンプレート引数は `$var: thinking.budget` を受け入れる。`openai-responses` ゲートウェイは `supportsMaxOutputTokens: false` を設定して `max_output_tokens` を省略できる。Azure と Codex トランスポートはこの共有互換性フィールドを無視する。これらのコントロールはオプトインであり、カタログ所有の Anthropic エフォートとフォールバックケイパビリティは設定可能なスイッチではない。
 
-### Change configuration at runtime
+### 実行時に設定を変更する
 
-Each operation captures the current `providers` Config reference. New or changed provider profiles are validated before form persistence; unchanged catalog failures remain editable. Route-set or retry-policy changes update registration atomically, preserving previous routes if another adapter owns a requested route.
+各操作は現在の `providers` 設定参照をキャプチャーする。新規または変更されたプロバイダープロファイルはフォーム永続化の前に検証され、変更のないカタログ障害は編集可能なままである。ルート集合や再試行ポリシーの変更は登録をアトミックに更新し、要求されたルートを別のアダプターが所有している場合は以前のルートを維持する。
 
-### Discover models from endpoints
+### エンドポイントからモデルを検出する
 
-The plugin answers "which models can this provider serve?" for a route a configuration surface is editing or drafting. A route the installed catalog ships is answered from that catalog with no network call, preserving its `input` array as discovery `inputModalities`; only a route the catalog does not describe is interrogated over the wire. `openai-completions` and `openai-responses` use `GET {baseURL}/models` with bearer auth, while `anthropic-messages` uses native `GET /v1/models?limit=1000` semantics with `x-api-key` and `anthropic-version`; its listing URL accepts the API root with or without a trailing `/v1` because gateway documentation publishes both spellings, and only that listing URL normalizes the segment, so model requests receive the configured `baseURL` unchanged. A named configured route supplies its stored credential and profile `headers` inside the Host, so deployment headers configured through `cordis.patch.yml` or Cordis config reach model discovery without becoming discovery-request or Models-page fields; a key typed into the form still wins over the stored credential. The parser accepts either the standard `data` array or an enriched `models` map, normalizing each candidate's id, display name, context window, and output-token cap; Anthropic's `max_input_tokens` and `max_tokens` feed the same capacity fields, a map key remains the request id even when its entry names a different canonical id, primitive-valued map properties are ignored, and a missing display name falls back to that request id. The reply is candidate metadata a surface may offer for adoption — nothing is stored, and `cordis.patch.yml` remains the only thing that decides what a route serves.
+プラグインは、設定サーフェスが編集中または起草中のルートについて「このプロバイダーはどのモデルを提供できるか」に答える。インストール済みカタログにあるルートはネットワーク呼び出しなしにそのカタログから回答し、その `input` 配列を検出用 `inputModalities` として保持する。カタログに記載のないルートのみがワイヤ越しに問い合わせられる。`openai-completions` と `openai-responses` はベアラー認証で `GET {baseURL}/models` を使い、`anthropic-messages` は `x-api-key` と `anthropic-version` を使ったネイティブな `GET /v1/models?limit=1000` セマンティクスを使う。その一覧 URL は末尾 `/v1` の有無にかかわらず API ルートを受け入れる。ゲートウェイ文書が両方の綴りを公開しているためであり、その一覧 URL のみがセグメントを正規化するため、モデルリクエストは設定済み `baseURL` を変更されずに受け取る。名前付きの設定済みルートは保存済み資格情報とプロファイル `headers` を Host 内部で供給するため、`cordis.patch.yml` や Cordis 設定で構成されたデプロイヘッダーは、検出リクエストや Models ページのフィールドになることなくモデル検出に届く。フォームに入力されたキーは保存済み資格情報より依然として優先される。パーサーは標準の `data` 配列または拡張された `models` マップのいずれかを受け入れ、各候補の id、表示名、コンテキストウィンドウ、出力トークン上限を正規化する。Anthropic の `max_input_tokens` と `max_tokens` は同じ容量フィールドに入り、マップキーはエントリが異なる正規 id を名乗っていてもリクエスト id のまま残り、プリミティブ値のマッププロパティは無視され、表示名がない場合はそのリクエスト id にフォールバックする。応答はサーフェスが採用のために提供できる候補メタデータであり、何も保存されず、ルートが何を提供するかを決めるのは `cordis.patch.yml` のみである。
 
-### Failures and recovery
+### 障害と回復
 
-A route pi-ai does not ship needs `api`, `baseURL`, and a non-empty `models` list; an unserviceable profile is refused where it is written, naming the route and model. Failures carry stable codes: a credential that cannot be used fails with `INVALID_CREDENTIAL` naming the route and reference, a route whose `apiKeyEnv` reference resolves to nothing fails with `MISSING_CREDENTIAL`, an unconfigured model fails with `UNKNOWN_MODEL`, and terminal provider failures distinguish `QUOTA` from transient `RATE_LIMIT`. `GenerateOptions.stop` is rejected with `UNSUPPORTED_OPTION` because pi-ai's common streaming UI cannot guarantee it across providers.
+pi-ai にないルートには `api`、`baseURL`、非空の `models` リストが必要であり、提供不能なプロファイルは書き込まれる場所でルート名とモデル名を示して拒否される。障害は安定したコードを持つ。使用できない資格情報はルートと参照を名指しして `INVALID_CREDENTIAL` で失敗し、`apiKeyEnv` 参照が何も解決しないルートは `MISSING_CREDENTIAL` で失敗し、未設定のモデルは `UNKNOWN_MODEL` で失敗し、終端的なプロバイダー障害は一過性の `RATE_LIMIT` と区別して `QUOTA` となる。`GenerateOptions.stop` は `UNSUPPORTED_OPTION` で拒否される。pi-ai の共通ストリーミング UI がプロバイダー横断でそれを保証できないためである。
 
-Config updates strictly validate changed providers. Initial loading retains stored catalog failures as editable provider diagnostics; unchanged failed providers do not block edits elsewhere. Serviceable models remain selectable, and unresolved models fail before network I/O. Repairing or deleting the offending configuration clears its diagnostic.
+設定更新は変更されたプロバイダーを厳密に検証する。初期読み込みは保存済みカタログ障害を編集可能なプロバイダー診断として保持し、変更のない失敗プロバイダーは他箇所の編集を妨げない。提供可能なモデルは選択可能なままであり、未解決のモデルはネットワーク I/O の前に失敗する。問題のある設定を修復または削除するとその診断は消える。
 
-Changing `displayName`, `apiKeyEnv`, or `baseURL` without resolving the provider's model errors still rejects the save. For example, renaming an OpenRouter route whose model `111` needs an `api` cannot be saved on its own: repair or remove that model in the same editor draft, then save the complete provider configuration. Intermediate repairs remain in the draft until the whole provider validates; other providers can be saved independently.
+`displayName`、`apiKeyEnv`、`baseURL` の変更は、プロバイダーのモデルエラーを解決しなければ保存が拒否されたままである。たとえば、モデル `111` に `api` が必要な OpenRouter ルートの名前変更だけでは保存できない。同じエディター下書きでそのモデルを修復または削除してから、完全なプロバイダー設定を保存する。中間的な修復はプロバイダー全体が検証されるまで下書きに残り、他のプロバイダーは独立に保存できる。
 
-Model discovery resolves each route’s credential configuration. A missing required credential yields an empty catalog; other resolution errors propagate. Routes with native authentication or no required key retain their configured catalog. This check does not probe the inference endpoint.
+モデル検出は各ルートの資格情報構成を解決する。必須資格情報がない場合は空のカタログとなり、その他の解決エラーは伝播する。ネイティブ認証のルートや必須キーのないルートは設定済みカタログを維持する。このチェックは推論エンドポイントを探査しない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design behind the adapter; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではアダプターの背後にある設計を説明する。観測可能な動作は[このパッケージを使う](#use-this-package)で完全に扱っている。
 
-### Design philosophy
+### 設計思想
 
-The adapter is built on immutable snapshots and per-operation resolution. Each operation captures a whole snapshot — the profiles plus a `createModels()` collection holding the `Provider` each route built — before its first `await`, and a configuration change builds a new collection rather than mutating the one in use, so a request that started under one configuration never finishes under another. A route's own credential reference resolves through the harness seam and rides as the request's `apiKey` option, which pi-ai treats as the highest-priority auth override — that is what keeps the fail-loud reference semantics. Everything that override does not cover reaches pi-ai through the collection's own auth: the credential store holds the records a login wrote and a refresh rotates (addressed as `llm-pi-ai/<provider id>`), and the auth context answers the ambient questions a provider asks while resolving. Both are stable across snapshots, so a configuration change rebuilds the collection without forgetting who is signed in. Runtime imports use pi-ai's provider, API, and utility entry points; `src/models.ts` supplies the small model-helper subset this adapter needs without evaluating pi-ai's aggregate entry point.
+アダプターは不変スナップショットと操作ごとの解決の上に構築されている。各操作は最初の `await` の前にスナップショット全体（プロファイルと、各ルートが構築した `Provider` を保持する `createModels()` コレクション）をキャプチャーし、設定変更は使用中のコレクションを変更するのではなく新しいコレクションを構築するため、ある設定で開始したリクエストが別の設定で終了することはない。ルート自身の資格情報参照は harness シーム経由で解決され、リクエストの `apiKey` オプションとして運ばれる。pi-ai はこれを最優先の認証オーバーライドとして扱い、これがフェイルラウドな参照セマンティクスを保っている。オーバーライドがカバーしないものはすべてコレクション自身の認証経由で pi-ai に届く。資格情報ストアはログインが書き込み、更新がローテーションするレコードを保持し（`llm-pi-ai/<provider id>` でアドレス指定）、認証コンテキストは解決中にプロバイダーが尋ねるアンビエントな質問に答える。どちらもスナップショット横断で安定しているため、設定変更はサインイン状態を忘れずにコレクションを再構築する。実行時インポートは pi-ai のプロバイダー、API、ユーティリティエントリーポイントを使い、`src/models.ts` は pi-ai の集約エントリーポイントを評価せずにこのアダプターが必要とする小さなモデルヘルパーサブセットを供給する。
 
-Initial prompt text and active tools use pi-ai's `Context.systemPrompt` and `Context.tools`; later system and tool updates remain in `Context.messages`. pi-ai normalizes these fields and applies the selected protocol's serialization rules.
+初期プロンプトテキストと有効ツールは pi-ai の `Context.systemPrompt` と `Context.tools` を使い、後続のシステム更新とツール更新は `Context.messages` に残る。pi-ai はこれらのフィールドを正規化し、選択されたプロトコルの直列化規則を適用する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Config snapshots, directory and route registration |
-| [`src/auth.ts`](src/auth.ts) | The credential store and ambient auth context over the harness credential plane |
-| [`src/login.ts`](src/login.ts) | Authorization flows for the installed providers that ship a login |
-| [`src/config.ts`](src/config.ts) | Profile schema, resolution, and serviceability checks |
-| [`src/catalog.ts`](src/catalog.ts) | Installed-catalog integration and drift gates |
-| [`src/provider-data.ts`](src/provider-data.ts) | Generated authentication and endpoint metadata for configuration surfaces |
-| [`src/models.ts`](src/models.ts) | Model collections, static providers, and reasoning levels over narrow pi-ai entry points |
-| [`src/provider.ts`](src/provider.ts) | The supported-protocol table and provider construction |
-| [`src/context.ts`](src/context.ts) | Harness-to-pi-ai context conversion, image handling, replay restore |
-| [`src/stream.ts`](src/stream.ts) | pi-ai event conversion into harness `StreamChunk` values |
-| [`src/replay.ts`](src/replay.ts) | Versioned `ReplayEnvelope` storage and validation |
-| [`src/discovery.ts`](src/discovery.ts) | Endpoint interrogation for configuration surfaces |
+| [`src/index.ts`](src/index.ts) | 設定スナップショット、ディレクトリとルート登録 |
+| [`src/auth.ts`](src/auth.ts) | harness 資格情報プレーン上の資格情報ストアとアンビエント認証コンテキスト |
+| [`src/login.ts`](src/login.ts) | ログインを用意するインストール済みプロバイダー向けの認可フロー |
+| [`src/config.ts`](src/config.ts) | プロファイルスキーマ、解決、提供可能性チェック |
+| [`src/catalog.ts`](src/catalog.ts) | インストール済みカタログ統合とドリフトゲート |
+| [`src/provider-data.ts`](src/provider-data.ts) | 設定サーフェス向けの生成済み認証・エンドポイントメタデータ |
+| [`src/models.ts`](src/models.ts) | 狭い pi-ai エントリーポイント上のモデルコレクション、静的プロバイダー、推論レベル |
+| [`src/provider.ts`](src/provider.ts) | サポート対象プロトコル表とプロバイダー構築 |
+| [`src/context.ts`](src/context.ts) | harness から pi-ai へのコンテキスト変換、画像処理、リプレイ復元 |
+| [`src/stream.ts`](src/stream.ts) | pi-ai イベントから harness `StreamChunk` 値への変換 |
+| [`src/replay.ts`](src/replay.ts) | バージョン付き `ReplayEnvelope` の保存と検証 |
+| [`src/discovery.ts`](src/discovery.ts) | 設定サーフェス向けのエンドポイント問い合わせ |
 
-### Registration and directory
+### 登録とディレクトリ
 
-The plugin declares every installed catalog provider it can authenticate in the configurable-provider directory, joined with every route the current profiles declare, so configuration surfaces can offer the full catalog before any route exists. A catalog provider whose catalog lists models but no chat model, such as one of classifier models alone, is left out and gets no sign-in flow, because this adapter dispatches chat requests only. Each entry carries `declared` — whether pi-ai ships nothing under that key — because only the adapter can distinguish a hand-declared route from a narrowed catalog route. A catalog entry carries `defaultBaseURL` for a fixed provider endpoint or a fixed endpoint shared by all its models, `baseURLEnv` for endpoint configuration variables, and `nativeAuth` for authentication variables and OAuth availability. Different model endpoints and unresolved URL templates are not presented as one fixed default. Route registration is atomic: a candidate set that collides with another adapter leaves the previous routes serving. A bare mount with zero routes is the dormant posture: nothing registers until the Config supplies profiles, and routes drop when it empties.
+プラグインは、認証可能なインストール済みカタログプロバイダーをすべて設定可能プロバイダーディレクトリに宣言し、現在のプロファイルが宣言する全ルートと結合するため、設定サーフェスはルートが存在する前に完全なカタログを提供できる。カタログにモデルはあるがチャットモデルがないカタログプロバイダー（分類モデルのみのものなど）は除外され、サインインフローも持たない。このアダプターはチャットリクエストのみをディスパッチするためである。各エントリは `declared`（そのキーの下に pi-ai が何も出荷していないかどうか）を持つ。手動宣言ルートと絞り込みカタログルートを区別できるのはアダプターだけであるためである。カタログエントリは、固定プロバイダーエンドポイントまたは全モデル共有の固定エンドポイント向けに `defaultBaseURL`、エンドポイント設定変数向けに `baseURLEnv`、認証変数と OAuth 可用性向けに `nativeAuth` を持つ。モデルごとに異なるエンドポイントや未解決 URL テンプレートは 1 つの固定既定値としては提示されない。ルート登録はアトミックであり、別のアダプターと衝突する候補集合では以前のルートが提供を続ける。ルートゼロの素のマウントは休眠姿勢であり、設定がプロファイルを供給するまで何も登録されず、空になるとルートは落ちる。
 
 <a id="generated-provider-metadata"></a>
-### Generated provider metadata
+### 生成されたプロバイダーメタデータ
 
-[`scripts/gen-provider-data.ts`](scripts/gen-provider-data.ts) owns [`src/provider-data.generated.ts`](src/provider-data.generated.ts). It uses public resolvers with synthetic `AuthContext` answers to discover environment reads across empty, individual and suffix configurations. Resolver failures use `findEnvKeys` through the temporary compatibility entry. All current authentication variables come from resolvers; no authentication supplement is needed. The generator reports fallback use and fails if fallback metadata is missing. It does not read real credentials, start a login flow, or send a model request. Probing covers the installed resolvers; it does not prove all possible value-dependent branches.
+[`scripts/gen-provider-data.ts`](scripts/gen-provider-data.ts)は[`src/provider-data.generated.ts`](src/provider-data.generated.ts)を所有する。合成 `AuthContext` 回答を使った公開リゾルバーで、空・個別・サフィックス構成横断の環境読み取りを検出する。リゾルバー障害は一時互換性エントリー経由の `findEnvKeys` を使う。現在の認証変数はすべてリゾルバー由来であり、認証サプリメントは不要である。ジェネレーターはフォールバック使用を報告し、フォールバックメタデータがなければ失敗する。実際の資格情報の読み取り、ログインフローの開始、モデルリクエストの送信は行わない。プロービングはインストール済みリゾルバーをカバーし、値依存分岐のすべてを証明するものではない。
 
-Endpoint data comes from the public provider/model catalog and uppercase URL placeholders. Azure, Vertex and Bedrock need small supplements for variables read outside the auth context. Runtime directory reads execute no probes. The dependency range remains unchanged. A provider added by a newer consumer installation has no generated authentication hints until regeneration. For an existing provider, changed environment names and endpoints also remain at the generated snapshot until regeneration. Environment hints check only the listed credential references; they do not inspect provider-managed files such as AWS profiles or Google application-default credentials.
+エンドポイントデータは公開プロバイダー／モデルカタログと大文字 URL プレースホルダー由来である。Azure、Vertex、Bedrock は認証コンテキスト外で読まれる変数向けに小さなサプリメントを必要とする。実行時ディレクトリ読み取りはプローブを実行しない。依存関係レンジは変更されない。新しいコンシューマーインストールで追加されたプロバイダーには、再生成まで生成済み認証ヒントがない。既存プロバイダーでも、変更された環境名とエンドポイントは再生成まで生成時スナップショットのままである。環境ヒントは列挙された資格情報参照のみを調べ、AWS プロファイルや Google アプリケーション既定資格情報のようなプロバイダー管理ファイルは検査しない。
 
-After updating pi-ai or changing the generator, install the updated locked dependencies, then run these commands from the repository root:
+pi-ai を更新した後やジェネレーターを変更した後は、更新されたロック済み依存関係をインストールし、リポジトリルートから次のコマンドを実行する。
 
 ```sh
 pnpm run gen-provider-data
@@ -176,98 +176,98 @@ pnpm run verify-provider-data
 git add packages/llm/llm-pi-ai/src/provider-data.generated.ts
 ```
 
-Review the generated diff and stage the dependency or generator changes with it. Do not edit the generated file by hand. Generation errors must be resolved before committing.
+生成差分をレビューし、依存関係やジェネレーターの変更と一緒にステージする。生成ファイルを手で編集しない。生成エラーはコミット前に解決しなければならない。
 
-The `pre-commit` hook runs `node_modules/.bin/tsx packages/llm/llm-pi-ai/scripts/gen-provider-data.ts --check --cached` when `pnpm-lock.yaml`, this package's `package.json`, the generator, or the generated file is staged. It compares the staged generated file with expected data computed from the installed dependency and current generator. It does not rewrite files or stage them. Updating only the working file is insufficient; stage the generated file too. If the check reports stale metadata, rerun the commands above before retrying the commit. CI runs `pnpm run verify-provider-data` against the checkout and installed lockfile dependencies even when the local hook was not triggered.
+`pre-commit` フックは、`pnpm-lock.yaml`、このパッケージの `package.json`、ジェネレーター、または生成ファイルがステージされると `node_modules/.bin/tsx packages/llm/llm-pi-ai/scripts/gen-provider-data.ts --check --cached` を実行する。ステージされた生成ファイルを、インストール済み依存関係と現在のジェネレーターから算出した期待データと比較する。ファイルの書き換えやステージは行わない。作業ファイルだけの更新では不十分であり、生成ファイルもステージする。チェックが古いメタデータを報告したら、コミット再試行の前に上記コマンドを再実行する。ローカルフックが発動しなくても、CI はチェックアウトとインストール済みロックファイル依存関係に対して `pnpm run verify-provider-data` を実行する。
 
-### Replay and vocabulary
+### リプレイと語彙
 
-Successful assistant responses store a versioned, lossless-JSON replay state beside the provider and model that produced them — response-level facts plus one per-block entry per streamed block. At request time, `LlmRuntime` passes replay state only when the same adapter instance owns both routes; the adapter validates it and restores native response ids, provider signatures, and optional `providerThinkingLevel` effort metadata, keeping absent effort metadata absent. Replay validates the requested model identity against the assistant source and uses it to retain same-model signatures; provider-reported response models remain diagnostic metadata. Absent or unusable replay state degrades to provider-neutral content while preserving the assistant source’s required provider and model. pi-ai tool-call arguments are parsed objects, so the adapter parses input and re-stringifies output to the harness raw-JSON convention; pi-ai in-stream error events map to terminal `finish` chunks. Protocol conversion operates on request-local copies. Switching from A to B and back to A preserves the stored content, including empty text blocks, tool ids, original block order, and native replay metadata; unsupported signatures are omitted only from the foreign request.
+成功したアシスタント応答は、それを生成したプロバイダーとモデルの傍らにバージョン付きのロスレス JSON リプレイ状態を保存する（応答レベルの事実と、ストリームされたブロックごとのブロック単位エントリ）。リクエスト時、`LlmRuntime` は同じアダプターインスタンスが両ルートを所有する場合にのみリプレイ状態を渡し、アダプターはそれを検証してネイティブ応答 ID、プロバイダー署名、任意の `providerThinkingLevel` エフォートメタデータを復元する。存在しないエフォートメタデータは存在しないままにする。リプレイは要求モデルアイデンティティをアシスタントソースと照合して検証し、同一モデル署名の保持に使う。プロバイダー報告の応答モデルは診断メタデータのままである。存在しない、または使用不能なリプレイ状態はプロバイダーニュートラルな内容に低下しつつ、アシスタントソースの必須プロバイダーとモデルを保持する。pi-ai のツール呼び出し引数はパース済みオブジェクトのため、アダプターは入力をパースして出力を harness の raw JSON 規約に再文字列化する。pi-ai ストリーム内エラーイベントは終端 `finish` チャンクに対応する。プロトコル変換はリクエストローカルなコピー上で動作する。A から B へ、再び A へ切り替えると、空テキストブロック、ツール ID、元のブロック順、ネイティブリプレイメタデータを含む保存内容が保持され、サポート外の署名は外部リクエストからのみ省略される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the service contract to the twin adapter and the shared types.
+パッケージレベルの契約では足りない場合にこれらのページを読む。サービス契約から双子アダプター、共有型へと進む。
 
-- [dsh-llm service](../llm/README.md) — the provider-neutral service this adapter registers on.
-- [llm-deepseek adapter](../llm-deepseek/README.md) — the direct DeepSeek twin for the `deepseek-official` route.
-- [LLM streaming subsystem](../../../docs/subsystems/llm-streaming.md) — the `StreamChunk` protocol and adapter contract.
-- [llm-retry](../llm-retry/README.md) — the retry executor that applies each profile's `retryPolicy`.
-- [Twin LLM adapters](../../../.agents/notes/implemented/architecture/2026-06-13-twin-llm-adapters.md) — why the DeepSeek route ships two structurally different adapters.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-llm-pi-ai) — every accepted config field and its source declaration.
+- [dsh-llm サービス](../llm/README.md) — このアダプターが登録するプロバイダーニュートラルなサービス。
+- [llm-deepseek アダプター](../llm-deepseek/README.md) — `deepseek-official` ルート向けの直接 DeepSeek 双子。
+- [LLM ストリーミングサブシステム](../../../docs/subsystems/llm-streaming.md) — `StreamChunk` プロトコルとアダプター契約。
+- [llm-retry](../llm-retry/README.md) — 各プロファイルの `retryPolicy` を適用する再試行エグゼキューター。
+- [双子 LLM アダプター](../../../.agents/notes/implemented/architecture/2026-06-13-twin-llm-adapters.md) — DeepSeek ルートが構造の異なる 2 つのアダプターを出荷する理由。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-llm-pi-ai) — 受け入れ可能な全設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Provider request through pi-ai
+### pi-ai 経由のプロバイダーリクエスト
 
-#### What the model sees
+#### モデルが見ているもの
 
-The selected catalog model receives system-message text, conversation history, tools, and supported sampling fields. The adapter preserves later system messages in history order; pi-ai owns protocol-specific placement and concatenates them at the beginning for models without mid-conversation system support. One-shot `GenerateOptions.system` precedes the initial history prompt. Repeated system messages remain repeated; empty system messages are skipped without discarding earlier text. Tool-update capabilities select the shared historical declaration projection; pi-ai receives initially active tools and grouped developer updates carrying additions and supported removals. When every projected declaration of an Anthropic request with tool updates is deferred, the initially active tools are one placeholder, `DeferredToolPlaceholder`, whose description tells the model never to call it; a call reaches the ordinary unknown-tool result. Anthropic receives later tool definitions inline in the update message. Replay preserves tool-call namespaces for dynamically loaded Responses tools. Each retained image is preceded by text naming its complete attachment id and actual request dimensions. When the current execution filesystem maps the attachment provider's host object, the text also carries a read-only normalized-object path and warns that normalization or request projection may have resized or re-encoded the upload. Each occurrence selected by a logged image-offload decision keeps its own identity and currently resolved access in replacement text, and its normalized attachment is not read or transformed. When the retained occurrences' exact base64 payload still exceeds the route's `maxRequestImageBytes`, the call fails with `IMAGE_OFFLOAD_REQUIRED` so `dsh-compaction-image-offload` records the selected occurrences in an `image/offload` event and retries the step. Provider-native replay metadata is restored only when the adapter validates it for the historical content. `imageRequestTarget(provider, model, image)` exposes the same request-image dimensions and byte target to screenshot consumers; adapters without image resizing preserve the normalized source.
+選択されたカタログモデルはシステムメッセージ文、会話履歴、ツール、サポート対象サンプリングフィールドを受け取る。アダプターは後続のシステムメッセージを履歴順に保持し、pi-ai はプロトコル固有の配置を持ち、会話途中システムに対応しないモデル向けにそれらを先頭で連結する。ワンショットの `GenerateOptions.system` は初期履歴プロンプトに先行する。繰り返されたシステムメッセージは繰り返しのまま残り、空のシステムメッセージは先行テキストを破棄せずにスキップされる。ツール更新ケイパビリティは共有の履歴宣言プロジェクションを選択し、pi-ai は初期有効ツールと、追加およびサポート対象削除を運ぶグループ化された developer 更新を受け取る。ツール更新付き Anthropic リクエストの投影宣言がすべて遅延される場合、初期有効ツールは 1 つのプレースホルダー `DeferredToolPlaceholder` となり、その説明はモデルに決して呼び出さないよう告げる。その呼び出しは通常の不明ツール結果に到達する。Anthropic は後続のツール定義を更新メッセージ内にインラインで受け取る。リプレイは動的読み込み Responses ツール向けにツール呼び出し名前空間を保持する。保持された各画像の前には、完全な添付ファイル id と実際のリクエスト寸法を名指しするテキストが付く。現在の実行ファイルシステムが添付ファイルプロバイダーのホストオブジェクトをマップしている場合、テキストは読み取り専用の正規化オブジェクトパスも運び、正規化やリクエストプロジェクションがアップロードをリサイズまたは再エンコードした可能性を警告する。ログ記録された画像オフロード決定で選択された各出現は、置換テキスト内で自身のアイデンティティと現在解決されたアクセスを保持し、その正規化添付ファイルは読み取りも変換もされない。保持された出現の正確な base64 ペイロードがそれでもルートの `maxRequestImageBytes` を超える場合、呼び出しは `IMAGE_OFFLOAD_REQUIRED` で失敗し、`dsh-compaction-image-offload` が選択された出現を `image/offload` イベントに記録してステップを再試行する。プロバイダーネイティブなリプレイメタデータは、アダプターが履歴内容向けに検証した場合にのみ復元される。`imageRequestTarget(provider, model, image)` は同じリクエスト画像寸法とバイト目標をスクリーンショット消費者に公開し、画像リサイズなしのアダプターは正規化ソースを保持する。
 
-#### Token effect
+#### トークンへの影響
 
-Provider tokenization governs exact input. Retained images add the stable attachment and coordinate descriptor; the offload placeholder replaces an omitted image's visual tokens. Replay metadata may let a native API reuse provider-side state.
+正確な入力はプロバイダーのトークン化に従う。保持された画像は安定した添付ファイルと座標記述子を追加し、オフロードプレースホルダーは省略された画像の視覚トークンを置換する。リプレイメタデータによりネイティブ API がプロバイダー側状態を再利用できる場合がある。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Conversion preserves logical request order, while image handles and offload placeholders add model-visible text. A changed execution-world path rewrites a historical handle and can prevent reuse from that image even when attachment identity and request bytes stay stable. Changing adapter instance, provider, model, or another upstream token has the same suffix effect. An offload decision turns an earlier image into placeholder text, so reuse ends at that message; the omission never reverts, so the prefix stays stable afterwards.
+変換は論理リクエスト順を保持しつつ、画像ハンドルとオフロードプレースホルダーはモデル可視テキストを追加する。変更された実行ワールドパスは履歴ハンドルを書き換え、添付ファイルアイデンティティとリクエストバイトが安定していてもその画像からの再利用を妨げる場合がある。アダプターインスタンス、プロバイダー、モデル、または他の上流トークンの変更も同じサフィックス効果を持つ。オフロード決定は以前の画像をプレースホルダーテキストに変えるため、再利用はそのメッセージで終わる。省略が元に戻ることはないため、プレフィックスはその後安定したままである。
 
-### Provider response
+### プロバイダーの応答
 
-#### What the model sees
+#### モデルが見ているもの
 
-pi-ai events become harness reasoning, text, tool-call, usage, and finish chunks. The adapter passes parsed tool arguments to the harness as raw JSON strings.
+pi-ai イベントは harness の推論、テキスト、ツール呼び出し、使用量、終了チャンクになる。アダプターはパース済みツール引数を raw JSON 文字列として harness に渡す。
 
-#### Token effect
+#### トークンへの影響
 
-Generated content affects later inputs only after the loop records it. pi-ai folds reasoning tokens into output usage when the provider does not report them separately, and preserves its exact `totalTokens` value unchanged.
+生成内容はループが記録した後にのみ後続入力に影響する。pi-ai はプロバイダーが個別に報告しない場合に推論トークンを出力使用量に折りたたみ、その正確な `totalTokens` 値を変更せずに保持する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Recorded response content appends to the next request and does not invalidate its earlier reusable prefix. Unrecorded transport metadata and usage accounting do not affect cache identity.
+記録された応答内容は次のリクエストに付加され、それ以前の再利用可能なプレフィックスを無効化しない。記録されないトランスポートメタデータと使用量会計はキャッシュアイデンティティに影響しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the adapter stops and future work begins. They are current package constraints, not a general pi-ai comparison or a task backlog.
+これらの制限はアダプターがどこで止まり、将来の作業がどこから始まるかを定める。pi-ai 一般との比較やタスクバックログではなく、現在のパッケージ制約である。
 
-- **`maxRequestImageBytes` counts base64 image payload only** — text, tools, descriptors, and JSON structure ride outside the bound, so it must sit below the gateway's request-body cap with headroom.
-- **A sign-in lives only in the process that started it** — an authorization attempt is not durable, so reloading the page mid-login abandons it and the human starts over. Signing out is `deleteRecord` on the stored record, which forgets it locally without telling the issuer.
-- **OpenAI offers no ChatGPT sign-in** — pi-ai's Sign in with ChatGPT identifies the installation to OpenAI with a stable UUID the app supplies, and the harness keeps no installation ID meant for a third-party account sign-in; the `openai` route signs in with an API key.
-- **Provider-native discovery answers through this plugin's ambient context** — a route naming no credential defers to the catalog provider's own resolution, which asks for environment values (`AZURE_OPENAI_API_KEY`, `AWS_PROFILE`, and each provider's own set) and for local credential files. Both questions are answered here: the credential seam is consulted before the process environment, and file existence is checked against the host process's filesystem with `~` expanded. What it cannot do is *read* a credential file's contents — a provider that parses `~/.aws/credentials` itself does so directly, outside the seam.
-- **Reset restores inherited configuration** — resetting a route supplied by a lower profile layer restores that route.
-- **Complete Config replacement can remove inherited dictionary entries** — a field reset instead restores its inherited value.
-- **`headers` can carry a credential the redactor never sees** — profile resolution rejects names and values Fetch cannot represent, but the dict remains plain strings; store credentials as `apiKeyEnv` references.
-- **Discovery does not change configured models** — adopt discovery results explicitly into the route configuration.
-- **Anthropic discovery reads at most 1,000 models** — the request uses the API's maximum page size but does not traverse `has_more`; entries beyond the first page must be added by hand.
-- **Uncataloged models need an unambiguous protocol** — catalog routes preserve each model's protocol, including both Azure APIs under `azure`. A model absent from a mixed-protocol catalog needs an explicit route-level `api`, which overrides every model on the route and must be one of the supported custom protocols. For Azure deployment names, keep the catalog model ID and set `AZURE_OPENAI_DEPLOYMENT_NAME_MAP`.
-- **A modality declaration is not verified** — a model declaring `image` its gateway does not serve is refused by the provider after prompt admission. The durable image remains in history and the same misdeclared model can fail again; switching to a text-only model remains possible because the shared LLM runtime projects image references into stable text for that request.
-- **An unauthenticated route depends on its protocol** — a route naming no credential resolves as configured-but-keyless, but pi-ai's OpenAI-compatible implementation still requires an API key or an `Authorization` header, so a keyless local server needs a placeholder credential referenced by `apiKeyEnv` or an `Authorization` entry in `headers`.
-- **`GenerateOptions.stop` is unsupported** — pi-ai's common stream options cannot guarantee stop-sequence behavior across providers.
-- **Conversation update support comes only from the installed pi-ai catalog** — a route receives in-history prompt and tool updates only when its catalog model declares the mid-conversation compat flags, and profiles cannot set them; hand-declared routes and unflagged models receive the concatenated system messages and the complete current tool list at the start of each request.
-- **Images are accepted only in user and tool-result messages** — images in system, developer, or assistant history fail with `UNSUPPORTED_CONTENT` on both conversion paths.
-- **Provider HTTP status is unavailable** — pi-ai error events do not expose a stable HTTP status across providers.
-- **Retry policy is provider-owned, not an SDK retry** — pi-ai SDK retries stay disabled so durable agent steps and `llm/retry` events own every visible attempt, and direct `ctx.llm.stream()` calls remain single-attempt.
-- **Streamed JSON tool-call arguments avoid per-delta reparsing** — the installed pi-ai carries [`patches/@earendil-works__pi-ai@1.1.0.patch`](../../../patches/@earendil-works__pi-ai@1.1.0.patch), which removes the per-delta re-parse of the whole accumulated argument JSON in every stream adapter (upstream [earendil-works/pi#9265](https://github.com/earendil-works/pi/issues/9265)); unpatched, a multi-megabyte argument stream costs O(n²) CPU on the event loop and stalls every session in the process. Completion events supply parsed arguments; Responses may parse at both argument completion and output-item completion. This adapter reads only delta strings and finalized arguments. Re-apply or retire the patch on every pi-ai upgrade.
+- **`maxRequestImageBytes` は base64 画像ペイロードのみを数える** — テキスト、ツール、記述子、JSON 構造は上限外となるため、ゲートウェイのリクエストボディ上限より余裕を持って低く設定しなければならない。
+- **サインインは開始したプロセス内でのみ有効** — 認可試行は永続化されないため、ログイン途中のページ再読み込みはそれを破棄し、人間は最初からやり直す。サインアウトは保存済みレコードに対する `deleteRecord` であり、発行者に通知せずローカルで忘却する。
+- **OpenAI に ChatGPT サインインはない** — pi-ai の Sign in with ChatGPT はアプリが供給する安定 UUID でインストールを OpenAI に対して識別し、harness はサードパーティアカウントサインイン向けのインストール ID を保持しない。`openai` ルートは API キーでサインインする。
+- **プロバイダーネイティブな検出はこのプラグインのアンビエントコンテキスト経由で回答する** — 資格情報を名指ししないルートはカタログプロバイダー自身の解決に委ねられ、環境値（`AZURE_OPENAI_API_KEY`、`AWS_PROFILE`、各プロバイダー固有の集合）とローカル資格情報ファイルを尋ねる。両方の問いにはここで答える。プロセス環境より先に資格情報シームが参照され、ファイル存在は `~` 展開付きでホストプロセスのファイルシステムに対して確認される。できないことは資格情報ファイル内容の*読み取り*であり、`~/.aws/credentials` を自らパースするプロバイダーはシーム外で直接行う。
+- **リセットは継承設定を復元する** — 下位プロファイル層が供給するルートのリセットはそのルートを復元する。
+- **完全な設定置換は継承辞書エントリを削除できる** — フィールドリセットは代わりに継承値を復元する。
+- **`headers` は秘匿化子が見ない資格情報を運べる** — プロファイル解決は Fetch が表現できない名前と値を拒否するが、辞書はプレーン文字列のままである。資格情報は `apiKeyEnv` 参照として保存する。
+- **検出は設定済みモデルを変更しない** — 検出結果はルート設定に明示的に取り込む。
+- **Anthropic 検出は最大 1,000 モデルを読む** — リクエストは API の最大ページサイズを使うが `has_more` をたどらない。最初のページを超えるエントリは手で追加しなければならない。
+- **未カタログモデルには曖昧さのないプロトコルが必要** — カタログルートは `azure` 下の両 Azure API を含め各モデルのプロトコルを保持する。混合プロトコルカタログにないモデルには明示的なルートレベル `api` が必要であり、ルート上の全モデルをオーバーライドして、サポート対象カスタムプロトコルのいずれかでなければならない。Azure デプロイ名についてはカタログモデル ID を維持し `AZURE_OPENAI_DEPLOYMENT_NAME_MAP` を設定する。
+- **モダリティ宣言は検証されない** — ゲートウェイが提供しない `image` を宣言するモデルは、プロンプト受領後にプロバイダーに拒否される。永続画像は履歴に残り、同じ誤宣言モデルは再び失敗し得る。共有 LLM ランタイムがそのリクエスト向けに画像参照を安定テキストに投影するため、テキスト専用モデルへの切り替えは可能である。
+- **未認証ルートはプロトコルに依存する** — 資格情報を名指ししないルートは設定済みだがキーレスとして解決されるが、pi-ai の OpenAI 互換実装は依然として API キーまたは `Authorization` ヘッダーを要求するため、キーレスのローカルサーバーには `apiKeyEnv` で参照されるプレースホルダー資格情報または `headers` 内の `Authorization` エントリが必要である。
+- **`GenerateOptions.stop` は未サポート** — pi-ai の共通ストリームオプションはプロバイダー横断で停止シーケンス動作を保証できない。
+- **会話更新サポートはインストール済み pi-ai カタログからのみ得られる** — ルートが履歴内プロンプト更新とツール更新を受け取るのは、そのカタログモデルが会話途中互換フラグを宣言している場合のみであり、プロファイルはそれらを設定できない。手動宣言ルートとフラグなしモデルは、各リクエスト開始時に連結されたシステムメッセージと完全な現在ツールリストを受け取る。
+- **画像はユーザーおよびツール結果メッセージでのみ受け入れられる** — システム、developer、アシスタント履歴内の画像は両変換パスで `UNSUPPORTED_CONTENT` により失敗する。
+- **プロバイダー HTTP ステータスは利用できない** — pi-ai エラーイベントはプロバイダー横断で安定した HTTP ステータスを公開しない。
+- **再試行ポリシーはプロバイダー所有であり、SDK 再試行ではない** — pi-ai SDK 再試行は無効のままとなり、永続エージェントステップと `llm/retry` イベントが可視の全試行を所有し、直接の `ctx.llm.stream()` 呼び出しは単一試行のままである。
+- **ストリームされた JSON ツール呼び出し引数はデルタごとの再パースを避ける** — インストール済み pi-ai は[`patches/@earendil-works__pi-ai@1.1.0.patch`](../../../patches/@earendil-works__pi-ai@1.1.0.patch)を持ち、すべてのストリームアダプターで蓄積引数 JSON 全体のデルタごと再パースを除去する（上流 [earendil-works/pi#9265](https://github.com/earendil-works/pi/issues/9265)）。パッチなしでは、数メガバイトの引数ストリームがイベントループ上で O(n²) CPU を消費し、プロセス内の全セッションを停滞させる。完了イベントはパース済み引数を供給し、Responses は引数完了時と出力アイテム完了時の両方でパースする場合がある。このアダプターはデルタ文字列と確定引数のみを読む。pi-ai アップグレードのたびにパッチを再適用または引退させる。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is non-authoritative working context: undecided directions and notes for maintainers. Shipped behavior and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発メモは非権威の作業コンテキストであり、未決定の方向性とメンテナー向けメモである。出荷済み動作と受け入れ済み根拠は上記セクション、パッケージコード、リンクされたエージェントノートにある。
 
-- The offered protocol set is deliberately narrower than pi-ai's full API set: Bedrock, Vertex, Azure, and Codex authenticate through flows a profile cannot completely describe with a key, an endpoint, and headers; catalog routes still reach them through their own provider, and only an explicit override is refused. Codex is sign-in-able through the authorization flow's OAuth grant.
-- The `compat` switch set is pinned to pi-ai's compat types by drift gates; an upstream upgrade that adds a field, gives a further protocol a compat type, or widens a value union fails the build until someone classifies it.
+- 提供プロトコル集合は意図的に pi-ai の完全 API 集合より狭い。Bedrock、Vertex、Azure、Codex はプロファイルがキー、エンドポイント、ヘッダーだけでは完全に記述できないフローで認証する。カタログルートは依然として自身のプロバイダー経由でそれらに到達し、明示的オーバーライドのみが拒否される。Codex は認可フローの OAuth 付与経由でサインイン可能である。
+- `compat` スイッチ集合はドリフトゲートにより pi-ai の互換型にピン留めされている。フィールド追加、さらなるプロトコルへの互換型付与、値ユニオン拡大を伴う上流アップグレードは、誰かが分類するまでビルドを失敗させる。
 
 </details>

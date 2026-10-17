@@ -1,115 +1,115 @@
 ---
-description: "Shared Workspace browser and picker plugin for the dsh web client: grouped or flat session rows, management actions, the slot-composed Session row actions, and directory picking."
+description: "dsh Web クライアント向けの共有 Workspace ブラウザー兼ピッカープラグイン: グループ化またはフラットなセッション行、管理アクション、スロット構成の Session 行アクション、ディレクトリ選択。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-workspace
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Desktop product events use the optional [product analytics service](../product-analytics/README.md); ordinary Web interactions are excluded.
+Desktop のプロダクトイベントはオプションの[プロダクト分析サービス](../product-analytics/README.md)を使用します。通常の Web インタラクションは対象外です。
 
-## Summary
+## 概要
 
-This package lets users browse grouped or flat Session lists, choose a Workspace for a new Session, and manage Workspaces and Sessions through add, rename, reorder, search, fork, archive, and Workspace deletion; the Session row menu and its hover buttons are slot lists that client plugins extend. Pending interactions appear as warning dots, and subagent-origin Sessions remain hidden. An idle, unarchived Session row with active scheduled tasks shows a clock mark, and its hover card lists those tasks. Canonically distinct folder paths remain separate Workspaces. Adding a Workspace requires a composed directory picker; without one, adding is unavailable.
+このパッケージでは、グループ化またはフラットなセッション一覧の閲覧、新しいセッション用のワークスペースの選択、追加・名前変更・並べ替え・検索・フォーク・アーカイブ・ワークスペース削除によるワークスペースとセッションの管理ができます。セッション行メニューとそのホバーボタンは、クライアントプラグインが拡張するスロットリストです。保留中のインタラクションは警告ドットとして表示され、サブエージェント由来のセッションは非表示のままです。アクティブなスケジュール済みタスクを持つアイドル状態の未アーカイブセッション行には時計マークが表示され、そのホバーカードにそれらのタスクが一覧表示されます。正規形が異なるフォルダーパスは別々のワークスペースとして維持されます。ワークスペースの追加には構成済みのディレクトリピッカーが必要で、ピッカーがなければ追加は利用できません。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しの作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use the sidebar to browse Workspaces and their Sessions, reorder them, and start new ones; use the picker in the Session Intent hero to choose a Workspace for a new session. An open Workspace shows its first non-blank Sessions in list order up to a per-Workspace watermark, initially five. The watermark rises to cover the last Session within the first 50 that is running, has a running child, awaits the user, has an unread completion, or is open in the main view; a Session opened from search raises it to that Session at any position. The watermark is a row count that never falls on its own, so the rows stay visible after a run or notification ends; a reorder that moves a Session past the watermark hides it. Each **Show more** click raises it by five, without the 50-row limit, and reveals the rest when five or fewer remain; after the final batch, **Show less** resets it. Folding a Workspace resets its watermark and those of its nested Workspaces; a reset watermark still covers the qualifying Sessions. The selected blank **New Session** is an extra row outside the watermark until its first prompt. Watermarks are not persisted; any unmount of the grouped tree resets them.
+サイドバーでワークスペースとそのセッションを閲覧・並べ替え・新規作成し、Session Intent ヒーロー内のピッカーで新しいセッション用のワークスペースを選択します。開いたワークスペースは、ワークスペースごとのウォーターマークまで、リスト順で先頭の非ブランクセッションを表示し、初期値は 5 です。ウォーターマークは、先頭 50 件の中で実行中・実行中の子を持つ・ユーザーを待っている・未読の完了がある・メインビューで開いている、のいずれかに該当する最後のセッションをカバーするまで上昇し、検索から開いたセッションに対しては位置を問わずそのセッションまで上昇します。ウォーターマークは自動では下がらない行数であるため、実行や通知が終わっても行は表示されたままになり、ウォーターマークより後ろへセッションを移動する並べ替えではそのセッションが隠れます。**Show more** をクリックするごとに 5 ずつ上昇し、50 行の制限は適用されず、残りが 5 件以下になると残りをすべて表示し、最後のバッチの後では **Show less** でリセットします。ワークスペースを折りたたむと、そのワークスペースと配下のネストしたワークスペースのウォーターマークがリセットされますが、リセット後のウォーターマークも条件を満たすセッションはカバーします。選択中のブランクの **New Session** は、最初のプロンプトまではウォーターマーク外の追加行です。ウォーターマークは永続化されず、グループ化ツリーのアンマウントがあればリセットされます。
 
-History rows without a stored title use the localized unnamed label (未命名 / Untitled), rather than a directory name. The current blank row remains New Session; other blank rows remain hidden. Rename drafts use the stored title, or start empty when unnamed; unnamed rows do not offer title copying.
+保存済みタイトルを持たない履歴行は、ディレクトリ名ではなくローカライズされた未命名ラベル (未命名 / Untitled) を使用します。現在のブランク行は New Session のまま残り、他のブランク行は非表示のままです。名前変更のドラフトは保存済みタイトルを使用し、未命名の場合は空から開始します。未命名の行ではタイトルのコピーは提供されません。
 
-### Reordering and view options
+### 並べ替えと表示オプション
 
-Pinned Sessions lead ordinary Sessions in both grouped and flat views. **Last updated** sorts each partition strictly by the latest user prompt or steer time, newest first; pin time does not affect it. **Manual** uses the relative positions in one complete Session sequence, including hidden archives. Returning to Last updated discards the manual layout, and entering Manual again freezes the then-current chronological order. The browser defaults to Last updated and remembers the selected mode across reloads.
+ピン留めセッションは、グループ化表示とフラット表示のいずれでも通常セッションより前に表示されます。**Last updated** は各パーティション内を最新のユーザープロンプトまたはステア時刻の厳密な降順で並べ替え、新しいものが先頭になり、ピン留め時刻は影響しません。**Manual** は、非表示のアーカイブを含む完全なセッションシーケンス全体での相対位置を使用します。Last updated に戻すと手動レイアウトは破棄され、再度 Manual に入るとその時点の時系列順が固定されます。ブラウザーは既定で Last updated を使用し、選択したモードをリロード後も記憶します。
 
-Pinning moves the Session to the front of its complete saved sequence without changing the selected mode. It leads the pinned partition in Manual but need not lead it in Last updated. Unpinning leaves the saved position unchanged. Dragging either a pinned or ordinary row edits that same complete sequence and selects Manual; hidden archived members are retained. Missing pinned members prepend in pin-array order. New ordinary forks precede their sources in the complete sequence without inheriting pin membership; visible pins still lead ordinary rows. Other missing members append by recency with missing archives last. Supplementation stays in memory until a Session-order write records the complete result. Archive filtering alone changes neither saved positions nor account membership.
+ピン留めは、選択中のモードを変えずに、セッションを保存済みの完全なシーケンスの先頭へ移動します。Manual ではピン留めパーティションの先頭になりますが、Last updated では先頭になるとは限りません。ピン外しは保存済み位置を変更しません。ピン留め行と通常行のいずれのドラッグも同じ完全なシーケンスを編集して Manual を選択し、非表示のアーカイブメンバーは保持されます。欠落したピン留めメンバーはピン配列順で先頭に補完されます。新規の通常フォークは、ピン留めメンバーシップを引き継がずに、完全なシーケンス内でソースより前に配置されます。可視のピンは通常行より前に表示されたままです。その他の欠落メンバーは新しさ順で末尾に追加され、欠落したアーカイブは最後になります。補完は、セッション順の書き込みで完全な結果が記録されるまでメモリー内にとどまります。アーカイブフィルターだけでは保存済み位置もアカウントメンバーシップも変わりません。
 
-The selected blank **New Session** retains its provisional first slot and cannot be dragged; after its first prompt it becomes an ordinary draggable row, retaining that position in Manual or following its current timestamp in Last updated. A collapsed-group drag uses the target Session identity and keeps the source visible. Session display orders for real Workspaces, Ungrouped, and the flat list are browser-local; Workspace group drag order remains Host-durable.
+選択中のブランクの **New Session** は仮の先頭スロットを保持し、ドラッグできません。最初のプロンプトの後は通常のドラッグ可能な行になり、Manual ではその位置を保持し、Last updated では現在のタイムスタンプに従います。折りたたまれたグループへのドラッグはターゲットのセッションアイデンティティを使用し、ソースは表示されたままです。実際のワークスペース、Ungrouped、フラットリストのセッション表示順はブラウザーローカルで、ワークスペースグループのドラッグ順は Host 側で永続化されます。
 
-### Workspace hierarchy
+### ワークスペース階層
 
-Choose **Add workspace** and select a directory to register it and open a Session. **View options → Group by** defaults to **WorkSpace**, which lists Workspaces as sibling sections. Select **Workspace Tree** to nest each Workspace under its nearest registered ancestor, including Workspaces added later. Each Workspace keeps its own Sessions and row actions. Child Workspaces appear before the parent's own Sessions. Ancestors start expanded unless a saved collapsed state exists. A saved collapse also hides the current Session; ancestor folder icons stay highlighted when a descendant Workspace contains it. Row fills and hit targets span the same width at every level; only the contents indent. Workspace dragging reorders siblings; dropping on a descendant targets the nearest compatible ancestor, so an expanded parent can be moved past without collapsing it. Search-result navigation expands every ancestor. Grouping and expansion are saved in the current browser; switching modes preserves each Workspace's expansion preference, and the single-list view stays flat.
+**Add workspace** を選んでディレクトリを選択すると、それが登録されてセッションが開きます。**View options → Group by** の既定は **WorkSpace** で、ワークスペースを兄弟セクションとして一覧表示します。**Workspace Tree** を選択すると、後から追加されたワークスペースも含め、各ワークスペースが最も近い登録済み祖先の下にネストされます。各ワークスペースは独自のセッションと行アクションを保持します。子ワークスペースは親自身のセッションより前に表示されます。祖先は、保存済みの折りたたみ状態がなければ開始時は展開されます。保存済みの折りたたみは現在のセッションも隠し、子孫ワークスペースが現在のセッションを含む場合、祖先フォルダーアイコンはハイライトされたままです。行の塗りとヒットターゲットはすべてのレベルで同じ幅に広がり、内容だけがインデントされます。ワークスペースのドラッグは兄弟内での並べ替えになり、子孫へのドロップは最も近い互換性のある祖先を対象とするため、展開した親を折りたたまずに移動できます。検索結果のナビゲーションではすべての祖先が展開されます。グループ化と展開は現在のブラウザーに保存され、モード切替時も各ワークスペースの展開設定は保持され、単一リスト表示はフラットのままです。
 
-Hierarchy uses registered canonical paths only. It does not scan for projects or resolve symlink aliases. Nesting does not change Session working directories, logs, or Workspace membership. Deleting a parent Workspace leaves its child Workspaces registered and places them under their next registered ancestor, or at the root.
+階層は登録済みの正規パスのみを使用します。プロジェクトのスキャンやシンボリックリンク別名の解決はしません。ネストしてもセッションの作業ディレクトリ、ログ、ワークスペースメンバーシップは変わりません。親ワークスペースを削除しても子ワークスペースは登録されたまま残り、次の登録済み祖先の下か、なければルートに配置されます。
 
-### Search
+### 検索
 
-Collapsed search is one header action beside the view and add actions: activating it expands the field across the header. A non-blank query replaces either browsing mode with one flat result list — case-insensitive title and Workspace substring matches appear immediately, while a 250 ms debounced Host request adds ranked current-conversation content matches and snippets. Each new query aborts the preceding request; a failed content search leaves metadata matches visible without an additional warning. The list is capped at 20. Choosing an unarchived result clears and collapses search, opens the Session, and scrolls its row into view in the configured browsing mode; grouped browsing also expands its Workspace and the full Session list when required. Archived results offer Unarchive; attempting to open one explains that restriction without clearing the query or navigating.
+折りたたまれた検索は、ビューと追加アクションの横にある 1 つのヘッダーアクションで、有効化するとフィールドがヘッダー全体に広がります。空でないクエリーはどちらの閲覧モードも 1 つのフラットな結果リストに置き換えます。大文字小文字を区別しないタイトルとワークスペースの部分一致は即座に表示され、250 ms デバウンスの Host リクエストでランク付けされた現在の会話内容の一致とスニペットが追加されます。新しいクエリーごとに直前のリクエストは中断され、内容検索が失敗しても警告を追加せずにメタデータ一致は表示されたままです。リストは最大 20 件です。未アーカイブの結果を選ぶと検索がクリアされて折りたたまれ、セッションが開いて設定された閲覧モードで行までスクロールします。グループ化閲覧では必要に応じてワークスペースと完全なセッションリストも展開されます。アーカイブ済み結果には Unarchive が提供され、開こうとするとクエリーをクリアせずナビゲートもせずにその制限が説明されます。
 
-### Managing sessions
+### セッションの管理
 
-The final built-in item in a Session row's "..." menu is Copy Session ID. It closes the menu and copies the complete ID directly, without opening a dialog. Clipboard success or failure appears in the global toast; a failed copy can be retried from the menu. Copying does not retain the Session, load its history, or call the Host.
+セッション行の「...」メニューにある最後の組み込み項目は Copy Session ID です。メニューを閉じてダイアログを開かずに完全な ID を直接コピーします。クリップボードの成功・失敗はグローバルなトーストに表示され、失敗したコピーはメニューから再試行できます。コピーしてもセッションの保持、履歴の読み込み、Host の呼び出しは行われません。
 
-The Session row's Rename action opens a dialog prefilled with the row's display title; confirming an unchanged title is deliberately allowed — it pins the current automatic title against regeneration. Double-clicking a title also opens Rename; for an unarchived Session, the preceding clicks open its conversation. Rename uses a temporary `workspaceOperation` reference and awaits its initial history opening. The row's Fork action reads ordinary cold history normally. When the Host reports that source migration is required, an app-wide Toast offers to open that Session; the action only navigates and does not retry fork. A successful fork uses the source's last completed turn and increments the inherited persisted title through Session Controller without retaining the child, opening its history, or changing selection. Workspace Delete opens a confirmation that states the retention boundary; success removes the group while its Sessions remain under Ungrouped. Pin, Rename, Fork, Archive, and Copy Session ID are themselves entries of the `sidebar.workspaces.session.menu.item` list (pin and archive also of `sidebar.workspaces.session.row.action`), so a client plugin's action takes whatever position its `order` gives it.
+セッション行の Rename アクションは、行の表示タイトルを事前入力したダイアログを開きます。変更のないタイトルの確定は意図的に許可されています。これは現在の自動タイトルを固定して再生成を防ぐためです。タイトルのダブルクリックでも Rename が開き、未アーカイブのセッションではそれより前のクリックで会話が開きます。Rename は一時的な `workspaceOperation` 参照を使用し、初回の履歴オープン待ちを行います。行の Fork アクションは通常のコールド履歴をそのまま読み取ります。Host がソースの移行が必要と報告した場合、アプリ全体のトーストがそのセッションを開くよう促します。このアクションはナビゲートのみでフォークを再試行しません。成功したフォークはソースの最後に完了したターンを使用し、Session Controller を通じて継承した永続タイトルをインクリメントします。子を保持したり履歴を開いたり選択を変更したりしません。Workspace Delete は保持境界を示す確認を開き、成功するとグループを削除しますが、そのセッションは Ungrouped 配下に残ります。Pin、Rename、Fork、Archive、Copy Session ID 自体が `sidebar.workspaces.session.menu.item` リストのエントリーであり (pin と archive は `sidebar.workspaces.session.row.action` のエントリーでもあります)、そのためクライアントプラグインのアクションは `order` が与える位置に配置されます。
 
-Archive commits without a confirmation dialog for a quiet Session and retains the Session's account position. A Session with running work is the one case that asks first: the Host refuses the plain archive and names that work, and the sidebar opens a stop-and-archive dialog listing it by family — the turn in progress, running subagents, background jobs, scheduled reminders, each with its labels — with the restore path stated; confirming asks the Host to stop the work the way the stop button does and archives once the archive set is durable, while the stops settle in the background, and cancelling leaves the Session running and visible. View options control visibility through one explicit three-way choice: Hide archived (the default) hides archived Sessions, All conversations (show archived) includes them, and Archived only hides ordinary Sessions and drops Workspaces without an archived Session; in tree grouping, children of a dropped Workspace nest under the nearest shown ancestor. Visible archived rows are grayed and carry an accessible explanation that they cannot be opened until restored; Rename, Fork, and Unarchive remain available. A successful archive shows a notice with an undo action and — while archived rows are hidden — a "filter archived sessions" action that switches the filter to All conversations (show archived); a stop-and-archive shows the same notice under its own wording, and undo restores the Session without resuming the stopped work. Unarchive removes the archive mark without restoring a pin or changing the saved position. An empty list shows a centered glyph-over-text placeholder; the Archived-only view names its own emptiness (No archived sessions yet) and adds a View other sessions text action that switches the filter back to Hide archived.
+アーカイブは、静かなセッションでは確認ダイアログなしで確定し、セッションのアカウント位置を保持します。実行中の作業があるセッションだけが事前に確認を求める唯一のケースです。Host が通常のアーカイブを拒否してその作業を名指しし、サイドバーがファミリー別にそれを列挙する stop-and-archive ダイアログを開きます。進行中のターン、実行中のサブエージェント、バックグラウンドジョブ、スケジュール済みリマインダーをそれぞれラベル付きで示し、復元パスも明記します。確定すると停止ボタンと同じ方法で作業を停止するよう Host に依頼し、アーカイブセットが永続化され次第アーカイブします。停止はバックグラウンドで収束し、キャンセルするとセッションは実行中のまま表示されます。表示オプションは明示的な 3 択で可視性を制御します。Hide archived (既定) はアーカイブ済みセッションを隠し、All conversations (show archived) はそれらを含め、Archived only は通常セッションを隠してアーカイブ済みセッションを持たないワークスペースを落とします。ツリーグループ化では、落とされたワークスペースの子は最も近い表示中の祖先の下にネストされます。可視のアーカイブ済み行はグレー表示になり、復元するまで開けないことがアクセシブルに説明されます。Rename、Fork、Unarchive は引き続き利用できます。アーカイブが成功すると元に戻すアクション付きの通知が表示され、アーカイブ済み行が隠れている間はフィルターを All conversations (show archived) に切り替える「filter archived sessions」アクションも付きます。stop-and-archive も独自の文言で同じ通知を表示し、元に戻すと停止した作業を再開せずにセッションだけを復元します。Unarchive はピンや保存済み位置を復元せずにアーカイブマークを外します。リストが空の場合は中央に glyph-over-text のプレースホルダーが表示され、Archived-only ビューは独自の空表示 (No archived sessions yet) を名乗り、フィルターを Hide archived に戻す View other sessions テキストアクションを追加します。
 
-Session update times use the tertiary label color, including on archived rows. A Session title wider than its row is clipped with an ellipsis at rest. Hovering the row scrolls the title to its far edge — the incremented title of a fork, for example — and reveals it without the ellipsis; leaving the row returns the title to its start.
+セッションの更新時刻は三次のラベル色を使用し、アーカイブ済み行も同様です。行より幅の広いセッションタイトルは、静止時は省略記号で切り詰められます。行にホバーするとタイトルが端までスクロールします。たとえばフォークでインクリメントされたタイトルなどです。省略記号なしで表示され、行から離れるとタイトルは先頭に戻ります。
 
-The keyboard reference exposes New Session, Search sessions, Add workspace, Rename session, Fork session, and Archive session. Desktop defaults use the platform's primary modifier, with Mod+K for search; Windows and macOS Web use the [shortcut service’s platform defaults](../shortcuts/README.md); Linux Web leaves these commands unbound until configured. Button tooltips and Session row menus display the effective bindings. Clicking a menu item targets that row; pressing its shortcut targets the main Session. Desktop and Windows/macOS Web rename use Mod+Alt+G, leaving Mod+Shift+R to browser reload. Rename requires a nonblank main Conversation with no modal obscuring it; a retained Session behind another main panel is unavailable. Other Windows and macOS Desktop bindings also execute from terminal input and modal dialogs; other environments follow the command's region and modal restrictions. Search and rename requests belong to this package; input drafts remain in the browser. The directory picker rejects another open while selection or Workspace adoption is pending. Fork captures the retained main-view Session, for which navigation has requested history opening, and keeps automatic migration. It uses the row action's Host operation to select its last completed turn, without loading older Client history. Missing or blank Sessions are unavailable; the Host rejects a source with no completed turn. A rejected shortcut fork preserves the current selection, displays a localized notification, and can be retried; unexpected failures also retain diagnostic logging. Its notification shares the frame-wide Workspace notice channel: only the latest notice remains visible, and removing the browsing region does not dismiss it.
+キーボードリファレンスは New Session、Search sessions、Add workspace、Rename session、Fork session、Archive session を公開します。Desktop の既定はプラットフォームのプライマリ修飾キーを使用し、検索は Mod+K です。Windows と macOS の Web では[ショートカットサービスのプラットフォーム既定値](../shortcuts/README.md)を使用し、Linux Web では設定するまでこれらのコマンドは未バインドです。ボタンのツールチップとセッション行メニューには有効なバインドが表示されます。メニュー項目のクリックはその行を対象とし、ショートカットの押下はメインセッションを対象とします。Desktop と Windows/macOS Web の名前変更は Mod+Alt+G を使用し、Mod+Shift+R はブラウザーリロードに譲ります。Rename には、モーダルに覆われていない非ブランクのメイン会話が必要です。他のメインパネルの背後に保持されたセッションは利用できません。その他の Windows と macOS Desktop バインドは、ターミナル入力やモーダルダイアログからも実行できます。その他の環境はコマンドのリージョンとモーダルの制限に従います。検索と名前変更のリクエストはこのパッケージに属し、入力ドラフトはブラウザー内に残ります。選択やワークスペース採用が保留中の間、ディレクトリピッカーは次のオープンを拒否します。Fork は、ナビゲーションが履歴オープンを要求した保持済みメイン表示セッションを捕捉し、自動移行を維持します。行アクションの Host 操作で最後に完了したターンを選択し、古いクライアント履歴は読み込みません。セッションが存在しない場合やブランクの場合は利用できず、完了したターンのないソースは Host が拒否します。拒否されたショートカットフォークは現在の選択を保持し、ローカライズされた通知を表示して再試行できます。予期しない失敗も診断ログを保持します。その通知はフレーム全体のワークスペース通知チャネルを共有します。表示されるのは最新の通知のみで、閲覧リージョンを削除しても消去されません。
 
-### Pending interactions
+### 保留中のインタラクション
 
-Session rows render the runtime's live `pendingInteraction` classification: approvals report **Waiting for approval**, plan reviews report **Plan awaiting review**, and ordinary questions report **Waiting for answer**. While an interaction is pending, the row uses the shared warning dot and replaces its trailing update time with **Approval**, **Plan review**, or **Answer**; the full status and relative time remain in hover details. Pending interaction takes precedence over the shared ongoing loader; a finished-but-unviewed Session uses done, while idle remains dot-free in the row and uses the shared idle dot in its hover details. The leading seat renders only while the row's primary status is idle — no pending interaction, no own or descendant activity, and no unviewed completion — so an occupant there never appears beside the row's own status dot. An archived row keeps that cell blank: it shows neither a status dot nor the seat, and its live status appears on the hover card only.
+セッション行はランタイムのライブな `pendingInteraction` 分類を表示します。承認は **Waiting for approval**、プランレビューは **Plan awaiting review**、通常の質問は **Waiting for answer** を報告します。インタラクションが保留中の間、行は共有の警告ドットを使用し、末尾の更新時刻を **Approval**、**Plan review**、**Answer** に置き換えます。完全なステータスと相対時刻はホバー詳細に残ります。保留中のインタラクションは共有の進行中ローダーより優先され、終了済みだが未表示のセッションは done を使用し、アイドルは行内ではドットなしでホバー詳細では共有のアイドルドットを使用します。先頭シートは行のプライマリステータスがアイドル (保留中のインタラクションなし、自身や子孫のアクティビティなし、未表示の完了なし) の間のみ表示されるため、そこに表示される占有物が行自身のステータスドットと並ぶことはありません。アーカイブ済み行はそのセルを空白のままにします。ステータスドットもシートも表示せず、ライブステータスはホバーカードにのみ表示されます。
 
-### Active Schedule markers
+### アクティブなスケジュールマーカー
 
-Grouped and flat Session rows show a clock mark when the Session has active scheduled tasks. It is an occupant of the row's `sidebar.session.row.leading` seat, so it renders only on a row whose primary status is idle and never beside the row's own status dot; an archived row keeps that cell blank, and a search result has no leading seat and shows no mark. It is not a button, has no tab stop, and a press on its area does not open the row. The mark's own read and the meaning of its active-task condition belong to [ui-schedule](../ui-schedule/README.md).
+グループ化およびフラットなセッション行は、セッションにアクティブなスケジュール済みタスクがある場合に時計マークを表示します。これは行の `sidebar.session.row.leading` シートの占有物であるため、プライマリステータスがアイドルの行にのみ表示され、行自身のステータスドットと並ぶことはありません。アーカイブ済み行はそのセルを空白のままにし、検索結果には先頭シートがなくマークも表示されません。ボタンではなく、タブストップもなく、その領域の押下で行が開くこともありません。マーク自体の読み取りとアクティブタスク条件の意味は [ui-schedule](../ui-schedule/README.md) に属します。
 
 -----
 
-`ctx.uiWorkspace.openSession(target)` synchronously replaces the owned `mainView` reference and returns the main area to Conversation without waiting for `reference.ready`, so history loading renders inside the selected Session view. The target may be a known Session id or a durable direct-parent subagent address; an explicit address does not require a preloaded parent catalog. `openWorkspace(id, beforeOpen?, options?)` opens a Workspace blank only if no later navigation has superseded the request; an explicit New Session creates a fresh Session. `forkSession(id)` creates the child without navigating or superseding a pending navigation. The optional synchronous preparation callback runs after the target is retained and only for a current Workspace request, so superseded requests do not move composer drafts. Navigation or owner disposal suppresses the late UI commit, not the underlying Session creation. Startup restoration retains its main reference without changing the selected panel or cancelling a later navigation. Archiving the main Session releases its reference and clears the main selection. Selection failure leaves a global panel visible. Session rows read `usePanelInfo` to suppress their selected appearance while a global panel is active; search and directory-picker focus alone do not leave that panel.
+`ctx.uiWorkspace.openSession(target)` は所有する `mainView` 参照を同期的に置き換え、`reference.ready` を待たずにメイン領域を会話に戻すため、履歴読み込みは選択されたセッション表示内で表示されます。ターゲットは既知のセッション ID か、永続的な直接親サブエージェントアドレスで、明示的なアドレスに事前読み込みされた親カタログは不要です。`openWorkspace(id, beforeOpen?, options?)` は、後のナビゲーションに置き換えられていない場合にのみワークスペースブランクを開きます。明示的な New Session は新しいセッションを作成します。`forkSession(id)` はナビゲートせず保留中のナビゲーションを置き換えないまま子を作成します。オプションの同期準備コールバックはターゲット保持後に実行され、現在のワークスペースリクエストに対してのみ実行されるため、置き換えられたリクエストはコンポーザードラフトを移動しません。ナビゲーションや所有者の破棄は、基盤のセッション作成ではなく遅延した UI コミットを抑制します。起動時の復元はメイン参照を保持しますが、選択パネルの変更や後のナビゲーションのキャンセルはしません。メインセッションのアーカイブはその参照を解放してメイン選択をクリアします。選択失敗ではグローバルパネルが表示されたままになります。セッション行は `usePanelInfo` を読み、グローバルパネルがアクティブな間は選択表示を抑制します。検索やディレクトリピッカーのフォーカスだけではそのパネルを離れません。
 
-Navigation and startup restoration obtain the selected Session's projections from its `follow`; neither issues a separate projection refresh for that Session or its parent, except that restoring a saved blank first reloads that Session's projections, because listed values are cached hints that can lag its log after an unclean Host exit.
+ナビゲーションと起動時復元は、選択されたセッションのプロジェクションをその `follow` から取得します。そのセッションや親に対する個別のプロジェクション更新は発行しません。ただし保存済みブランクの復元ではそのセッションのプロジェクションを先に再読み込みします。一覧値はキャッシュされたヒントで、Host の異常終了後にログより遅れることがあるためです。
 
-Workspace reopening and explicit draft preparation name the first eligible blank in catalog order when they ask the Host for a Session; startup restoration names the saved blank. The Host reuses the named blank under the requested preset, or under its default when the request names none, and creates another Session when the blank has started, left the Workspace, or is held by another writer; navigation opens the returned Session without trying other blanks. `startSession` with draft options, `openWorkspace`, and `connectWorkspace` accept `{ agentPreset }` for a flow that knows its preset before it starts, such as the creator entry; a connection joins the latest in-flight connection to its Workspace only when both request the same preset, so the latest request always reaches the Host. Startup restoration passes the preset the saved blank's log recorded, so the draft keeps that preset; when the Host reports the preset as missing (`agent-preset/not-found`) or failing to activate (`agent-preset/invalid`), restoration asks again without a preset and the draft continues under the Host default. Other failures abort the request: an explicit New Session or hero Workspace pick shows the failure as a transient notice quoting the Host's code and message (for example a preset that fails to mount) or, for a failure that is not a Host refusal, that failure's own message; a request a later navigation or owner disposal superseded raises no notice, and startup restoration reports only to the console. Released blanks retain their slash-command state when reused. Later navigation cancels a pending startup selection.
+ワークスペースの再オープンと明示的なドラフト準備は、カタログ順で最初の該当ブランクを名指しして Host にセッションを要求します。起動時復元は保存済みブランクを名指しします。Host は要求されたプリセット配下で名指しされたブランクを再利用し、要求にプリセットがなければ既定で再利用します。ブランクが開始済み・ワークスペース外・他のライター保持の場合は別のセッションを作成し、ナビゲーションは返されたセッションを開いて他のブランクは試しません。ドラフトオプション付き `startSession`、`openWorkspace`、`connectWorkspace` は `{ agentPreset }` を受け付け、作成者エントリーなど開始前にプリセットが判明しているフロー用です。接続は、同じワークスペースへの最新の進行中接続と両方が同じプリセットを要求する場合にのみ結合されるため、最新の要求は必ず Host に届きます。起動時復元は保存済みブランクのログが記録したプリセットを渡すため、ドラフトはそのプリセットを維持します。Host がプリセット欠落 (`agent-preset/not-found`) や有効化失敗 (`agent-preset/invalid`) を報告した場合、復元はプリセットなしで再要求し、ドラフトは Host 既定で続行します。その他の失敗は要求を中止します。明示的な New Session やヒーローのワークスペース選択では、Host のコードとメッセージを引用した一時的通知 (マウント失敗するプリセットなど) として失敗を表示し、Host 拒否でない失敗はその失敗自身のメッセージを表示します。後のナビゲーションや所有者破棄に置き換えられた要求は通知を出しません。起動時復元はコンソールにのみ報告します。解放済みブランクは再利用時にスラッシュコマンド状態を保持します。後のナビゲーションは保留中の起動選択をキャンセルします。
 
-Once both Workspace and Session startup baselines are ready, an empty installation calls `workspaces.initializeDefault` and creates or reuses its blank Session. The composer becomes editable when that Session is selected; no message is submitted automatically. Later navigation or owner disposal prevents startup from selecting its result. Ineligible first use leaves the folder picker available without an error. Default Workspace creation failure shows a transient notice directing the user to Choose workspace, and is not retried until the next startup. Session creation failures use the ordinary restoration error handling. The registered Workspace remains available if Session creation or later submission fails.
+ワークスペースとセッションの起動ベースラインの両方が準備できると、空のインストールは `workspaces.initializeDefault` を呼び出してブランクセッションを作成または再利用します。そのセッションが選択されるとコンポーザーが編集可能になりますが、メッセージは自動送信されません。後のナビゲーションや所有者破棄は起動がその結果を選択するのを防ぎます。初回使用に該当しない場合もエラーを出さずにフォルダーピッカーを利用できます。既定ワークスペースの作成失敗は Choose workspace へ誘導する一時的通知を表示し、次回起動まで再試行しません。セッション作成失敗は通常の復元エラー処理を使用します。登録済みワークスペースは、セッション作成や後の送信が失敗しても利用可能なままです。
 
-The first-use directory name and its stored title are fixed, so neither follows the reader's language: `workspaces.initializeDefault` carries no names, and one installation keeps one on-disk path and one stored title across language switches. A Workspace still carrying that automatic title is labeled with the localized default name wherever this package shows it — sidebar rows and their hover card, search result meta, the hero picker menu, and the rename and delete dialogs — through the controller's `workspaceDisplayTitle`. The rename dialog is seeded with the label on screen while the stored title decides whether confirming saves, so confirming the untouched prefill on such a Workspace pins that name and the row stops following the language; the duplicate-title check excludes the target by Workspace identity rather than by title.
+初回使用のディレクトリ名と保存済みタイトルは固定で、読者の言語には追従しません。`workspaces.initializeDefault` は名前を持たず、1 つのインストールは言語切替後も 1 つのディスク上パスと 1 つの保存済みタイトルを維持します。その自動タイトルを保持するワークスペースは、このパッケージが表示するすべての場所、すなわちサイドバー行とホバーカード、検索結果メタ、ヒーローピッカーメニュー、名前変更と削除ダイアログで、コントローラーの `workspaceDisplayTitle` を通じてローカライズされた既定名でラベル付けされます。名前変更ダイアログは画面上のラベルで初期化されますが、確定で保存するかどうかは保存済みタイトルで判断するため、そのようなワークスペースで無変更の事前入力を確定するとその名前が固定され、行は言語追従を止めます。重複タイトルチェックはタイトルではなくワークスペースアイデンティティで対象を除外します。
 
-The package injects the Client `remoteAccess` service and provides the root standard Hook `useWorkspaceAccess(workspaceId, action)`, which answers whether the current Peer may call `action` on one Workspace resource; its snapshot semantics belong to [`dsh-api-remote-access`](../../api/remote-access/README.md#client-face).
+このパッケージはクライアントの `remoteAccess` サービスを注入し、ルート標準フック `useWorkspaceAccess(workspaceId, action)` を提供します。これは現在のピアが 1 つのワークスペースリソース上で `action` を呼び出せるかに答えます。そのスナップショット意味は [`dsh-api-remote-access`](../../api/remote-access/README.md#client-face) に属します。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The package is one composition: both target slots are declared by other plugins, so `apply` uses `slots.inject()` to register for each declaration lifetime and re-register after a declaring slot is restored.
+このパッケージは 1 つのコンポジションです。両方のターゲットスロットは他のプラグインが宣言するため、`apply` は `slots.inject()` を使用して各宣言の有効期間に登録し、宣言スロットが復元された後に再登録します。
 
-The browser entry also declares two root-scoped `list` child seats on each Session row: `sidebar.session.row.leading`, rendered only while that row's primary status is idle and left blank on an archived row, and `sidebar.session.row.hover`, mounted only while that row's hover card is open. Both take the row's Session identity and nothing else, so an occupant reads its own data by that id; a Session-scoped seat would force a Session binding, which would activate and retain every listed Session.
+ブラウザーエントリーは各セッション行に 2 つのルートスコープ `list` 子シートも宣言します。`sidebar.session.row.leading` はその行のプライマリステータスがアイドルの間のみ表示され、アーカイブ済み行では空白のままになり、`sidebar.session.row.hover` はその行のホバーカードが開いている間のみマウントされます。両方とも行のセッションアイデンティティのみを受け取り、それ以外は受け取らないため、占有物はその ID で自身のデータを読み取ります。セッションスコープのシートにするとセッションバインドが強制され、一覧の全セッションが有効化・保持されてしまいます。
 
-Client callers can pass `prompt` and `clearPreviousDraft` in the second argument to `uiWorkspace.startSession`. A prompt is plain text; structured drafts are handled internally during restoration and Workspace transfer. Without clearing, existing text or attachments are preserved; explicit clearing replaces only the target Session's text and inline references, leaving attachments intact. Option values are captured before asynchronous creation and applied to the exact retained binding before navigation commits. Superseded navigation does not write content; a submission-blocked input refuses preparation and keeps the previous selection. Calls without options create a fresh Session using the current Agent preset definition. Workspace reconnection and explicit draft preparation may reuse an existing blank Session. The [draft initialization decision](../../../.agents/notes/implemented/architecture/2026-09-30-structured-draft-initialization.md) describes the input owner's data flow.
+クライアント呼び出し元は `uiWorkspace.startSession` の第 2 引数に `prompt` と `clearPreviousDraft` を渡せます。プロンプトはプレーンテキストで、構造化ドラフトは復元とワークスペース転送の間に内部で処理されます。クリアしなければ既存のテキストや添付は保持され、明示的なクリアは対象セッションのテキストとインライン参照のみを置き換え、添付はそのまま残します。オプション値は非同期作成の前に捕捉され、ナビゲーション確定の前に正確な保持バインドに適用されます。置き換えられたナビゲーションは内容を書き込みません。送信ブロックされた入力は準備を拒否して直前の選択を維持します。オプションなしの呼び出しは現在のエージェントプリセット定義で新しいセッションを作成します。ワークスペース再接続と明示的なドラフト準備は既存のブランクセッションを再利用できます。[ドラフト初期化の決定](../../../.agents/notes/implemented/architecture/2026-09-30-structured-draft-initialization.md)は入力所有者のデータフローを説明します。
 
-### The directory-flow hole
+### ディレクトリフローの穴
 
-Each registration declares a **directory-flow child hole** (`single` kind: `conversation.hero.workspace.directoryFlow` / `sidebar.workspaces.directoryFlow`) that the composed picker package's client half fills with its picking interaction — the `-native` backend's renderless OS-chooser driver, an in-app browsing dialog under a `-browse` composition. The flat **Add workspace...** action renders only while the surface's hole is occupied; an empty hole means the composition has no picking affordance. The sidebar Add workspace action preserves an existing blank Session and its draft. This package owns the trigger and the adoption: the occupant reports one picked path per open through the hole's owner conversation (`open`/`busy`/`onPicked`/`onCancel`/`onError`), and the owner adopts it through the object layer, selecting the committed Workspace only after its list projection has refreshed.
+各登録は**ディレクトリフロー子ホール** (`single` 種別: `conversation.hero.workspace.directoryFlow` / `sidebar.workspaces.directoryFlow`) を宣言し、構成されたピッカーパッケージのクライアント側がその選択インタラクションを埋めます。`-native` バックエンドのレンダーレス OS チューザードライバー、`-browse` 構成下のアプリ内ブラウジングダイアログです。フラットな **Add workspace...** アクションは、その面のホールが占有されている間のみ表示されます。ホールが空とは、その構成に選択手段がないことです。サイドバーの Add workspace アクションは既存のブランクセッションとそのドラフトを保持します。このパッケージはトリガーと採用を所有します。占有物はホールの所有者会話 (`open`/`busy`/`onPicked`/`onCancel`/`onError`) を通じて 1 オープンあたり 1 選択パスを報告し、所有者はオブジェクト層を通じてそれを採用し、リストプロジェクションが更新された後に確定したワークスペースのみを選択します。
 
-### Session row actions
+### セッション行アクション
 
-The Session row's "..." menu and its hover buttons are two `list` slots declared by the WorkspaceBrowser entry: `sidebar.workspaces.session.menu.item` and `sidebar.workspaces.session.row.action`. Every menu row and every hover button is an entry, this package's own actions included: `apply` registers `pin` (menu 100, button 200), `rename` (200), `fork` (300), `archive` (menu 400, button 100), and `session-id` (450) the way a client plugin registers its actions, so a plugin action lands wherever its `order` says, and reusing a shipped id at another `priority` shadows that action.
+セッション行の「...」メニューとそのホバーボタンは、WorkspaceBrowser エントリーが宣言する 2 つの `list` スロットです。`sidebar.workspaces.session.menu.item` と `sidebar.workspaces.session.row.action` です。すべてのメニュー行とすべてのホバーボタンがエントリーで、このパッケージ自身のアクションも同様です。`apply` は `pin` (メニュー 100、ボタン 200)、`rename` (200)、`fork` (300)、`archive` (メニュー 400、ボタン 100)、`session-id` (450) を、クライアントプラグインが自身のアクションを登録するのと同じ方法で登録するため、プラグインアクションは `order` の示す位置に配置され、出荷済み ID を別の `priority` で再利用するとそのアクションをシャドウします。
 
-An entry receives only the row identity (`sessionId`, `displayTitle`) and owns everything else. It reads the Host state it cares about through its own injected hooks (the pin and archive sets, as Sets derived once per Workspace snapshot), decides its own visibility (pin renders nothing on an archived row, because the Host keeps the two sets exclusive, and fork renders nothing when `useSessionAccess(sessionId, 'session/fork')` is false), carries its whole behavior in its registration's `inject` face (a pin also fronts the Session in its saved orders; an archive raises the notice), and raises its own surfaces: the rename dialog, the stop-and-archive dialog, and the row-action notice are this package's `shell.overlay` entries, fed by the requests the actions inject. A menu entry renders one `role="menuitem"` button (this package's rows use `MenuItemButton` from ui-primitives, which adds the host styling and `separatorBefore` for a group start; the hairline comes and goes with the row) and dismisses the menu through the slot-level `useMenuOpenState` hook, the menu's own open state bound from the row's render occurrence; a hover button entry renders one icon button, and the strip keeps its clicks from opening the row. The browser passes no action callbacks to its rows; its remaining verbs are the search results' restore button and the title double-click, which raises the same rename request.
+エントリーは行アイデンティティ (`sessionId`、`displayTitle`) のみを受け取り、それ以外はすべて自分で所有します。関心のある Host 状態は自身が注入したフックを通じて読み取り (ピンとアーカイブのセット、ワークスペーススナップショットごとに 1 回導出される Set として)、自身の可視性を自分で判断します (Host が両セットを排他的に保つため、pin はアーカイブ済み行では何も表示せず、`useSessionAccess(sessionId, 'session/fork')` が false の場合 fork は何も表示しません)。動作全体を登録の `inject` フェースに保持し (pin は保存順でもセッションを先頭に出し、archive は通知を上げます)、自身のサーフェスを上げます。名前変更ダイアログ、stop-and-archive ダイアログ、行アクション通知はこのパッケージの `shell.overlay` エントリーで、アクションが注入する要求で給電されます。メニューエントリーは 1 つの `role="menuitem"` ボタンを表示します (このパッケージの行は ui-primitives の `MenuItemButton` を使用し、ホスト styling とグループ開始用の `separatorBefore` を追加します。ヘアラインは行と共に現れては消えます)。スロットレベルの `useMenuOpenState` フック (行のレンダー出現からバインドされたメニュー自身のオープン状態) を通じてメニューを閉じます。ホバーボタンエントリーは 1 つのアイコンボタンを表示し、ストリップはクリックが行を開かないよう抑止します。ブラウザーは行にアクションコールバックを渡しません。残りの動詞は検索結果の復元ボタンとタイトルのダブルクリックで、同じ名前変更要求を上げます。
 
-The existing notice overlay dispatches `workspace.toast` by notice kind. Keyed registrations inject localized display mappings and their own actions; only archive notices subscribe to the viewing filter. They render the package-local `workspace.toast.content` Factory, which reuses the Toast primitive once for all presentations. The existing notice state, display sequence, latest-notice replacement, and dismissal remain shared; locale or filter changes do not restart the same notice's timer.
+既存の通知オーバーレイは通知種別ごとに `workspace.toast` をディスパッチします。キー付き登録はローカライズされた表示マッピングと独自アクションを注入し、アーカイブ通知のみが表示フィルターを購読します。これらはパッケージローカルの `workspace.toast.content` ファクトリーを表示し、すべての表示でトーストプリミティブを 1 度だけ再利用します。既存の通知状態、表示順序、最新通知置換、解除は共有されたままです。ロケールやフィルターの変更で同じ通知のタイマーが再開することはありません。
 
-#### Packaged client plugin
+#### パッケージ化されたクライアントプラグイン
 
-Declare `ui-workspace`, `ui-slots`, `ui-renderer`, `client-locale`, and `ui-primitives` as browser/type development dependencies according to the Client dependency policy. The type-only `ui-workspace/client` import loads this package's `SlotMap` declaration; without it, an independently compiled plugin does not know the slot keys. Keep the Component at module scope and own visible copy in the contributing package's locale namespace.
+クライアント依存ポリシーに従い、`ui-workspace`、`ui-slots`、`ui-renderer`、`client-locale`、`ui-primitives` をブラウザー/型の開発依存として宣言します。型のみの `ui-workspace/client` インポートはこのパッケージの `SlotMap` 宣言を読み込みます。これがないと、独立コンパイルされたプラグインはスロットキーを認識しません。コンポーネントはモジュールスコープに置き、可視コピーは寄与パッケージのロケール名前空間で所有します。
 
 ```tsx
 import type { Context } from '@deepseek-ai/cordis'
@@ -168,67 +168,67 @@ export function apply(ctx: Context): void {
 }
 ```
 
-`ctx.slots.inject()` is required even if the owner is normally present: it waits for the declaration, removes the contribution when that declaration collapses, and registers it again after restoration. The registration's `inject` factory may close over the plugin's declared Cordis services; the Component receives only the projected data and callbacks. A hover button registers into `sidebar.workspaces.session.row.action` the same way and renders one icon button.
+`ctx.slots.inject()` は所有者が通常存在する場合でも必要です。宣言を待ち、宣言が崩壊したら寄与を除去し、復元後に再登録します。登録の `inject` ファクトリーはプラグインの宣言済み Cordis サービスにクローズオーバーでき、コンポーネントは投影されたデータとコールバックのみを受け取ります。ホバーボタンも同じ方法で `sidebar.workspaces.session.row.action` に登録し、1 つのアイコンボタンを表示します。
 
-#### Dynamic client package
+#### 動的クライアントパッケージ
 
-A dynamically loaded browser half follows the same component contract; which modules it can reach depends on its lane. A Module Loader package (`factory(require)`, as in the real Loader/Web fixture) gets `@deepseek-ai/dsh-client-ui-primitives` as an implicit baseline external: resolve `MenuItemButton` through the loader's `require`, do not list the primitive as a runtime dependency or bundle another copy, and declare a development dependency only when source compilation needs its types. A `cordis-client-runner` closure (the audience of the generated Client Slot catalog) cannot import anything: it renders its own `role="menuitem"` `<button>` with `React.createElement`, styles it through `styles.insert`, and dismisses the menu through the same `useMenuOpenState` hook, as the catalog's example shows.
+動的に読み込まれるブラウザー側も同じコンポーネント契約に従います。到達できるモジュールはレーンに依存します。Module Loader パッケージ (`factory(require)`、実際の Loader/Web フィクスチャーのように) は暗黙のベースライン外部として `@deepseek-ai/dsh-client-ui-primitives` を取得します。ローダーの `require` を通じて `MenuItemButton` を解決し、プリミティブをランタイム依存として列挙したり別コピーをバンドルしたりせず、ソースコンパイルに型が必要な場合のみ開発依存を宣言します。`cordis-client-runner` クロージャー (生成された Client Slot カタログの利用者) は何もインポートできません。独自の `role="menuitem"` の `<button>` を `React.createElement` で表示し、`styles.insert` でスタイルし、カタログの例が示すとおり同じ `useMenuOpenState` フックを通じてメニューを閉じます。
 
-### View state
+### 表示状態
 
-Once the Workspace baseline is ready, browser-persisted expansion and Session-order records retain only current Workspace ids plus Ungrouped and the flat-list account. `WorkspaceView.sessionIds` supplies real-Workspace membership, not Session display order. View actions receive complete account orders, never filtered rows. A new member without a Session summary waits for that summary, while a saved position survives a temporarily missing summary. Archive visibility is applied only when deriving rows. Pin and drag writes save complete orders; ordinary derivation does not write them. The selected blank Session remains an explicit position write, including during Workspace reconnection, when other saved members are retained until the baseline establishes membership. Ordering remains mounted while the sidebar is a rail or search replaces its body. Last updated derives from current summaries without reading saved positions; equal timestamps use Session ids as a stable tie-break.
+ワークスペースベースラインの準備ができると、ブラウザー永続の展開とセッション順レコードは、現在のワークスペース ID と Ungrouped およびフラットリストアカウントのみを保持します。`WorkspaceView.sessionIds` は実際のワークスペースメンバーシップを提供し、セッション表示順ではありません。ビューアクションは完全なアカウント順を受け取り、フィルター済み行は受け取りません。セッション概要のない新規メンバーはその概要を待ち、保存済み位置は一時的に概要が欠けても残ります。アーカイブ可視性は行導出時のみ適用されます。ピンとドラッグの書き込みは完全な順序を保存し、通常の導出では書き込みません。選択中のブランクセッションは、ワークスペース再接続中も含め、他の保存済みメンバーがベースラインでメンバーシップを確立するまで保持される場合も含めて、明示的な位置書き込みのままです。順序付けは、サイドバーがレールの間や検索が本体を置き換える間もマウントされたままです。Last updated は保存済み位置を読まずに現在の概要から導出され、同値タイムスタンプはセッション ID を安定したタイブレークに使用します。
 
-The sidebar hides durable summaries with `origin: 'subagent'`. A visible ordinary row shows the shared ongoing loader from running direct children in its loaded parent catalog, never from summary lineage. Child activity uses the latest UI status, falling back to the Session summary until that status is known.
+サイドバーは `origin: 'subagent'` の永続概要を隠します。可視の通常行は、読み込まれた親カタログ内の実行中の直接の子から共有の進行中ローダーを表示し、概要系統からは表示しません。子アクティビティは最新の UI ステータスを使用し、そのステータスが判明するまではセッション概要にフォールバックします。
 
-Row motion belongs to [AnimatedRows](src/client/rows/AnimatedRows.tsx). It measures keyed rows before and after React commits that change their membership or order, and uses native movement and opacity animations. Removed rows fade as inert copies outside the scrolling list; they do not delay React unmounting or extend its scroll range. Initial loading, drag commits, overflow expansion, and view-option changes settle immediately. The animator has no layout observers or polling and does not measure content-only updates or scrolling.
+行モーションは [AnimatedRows](src/client/rows/AnimatedRows.tsx) に属します。メンバーシップや順序を変える React コミットの前後でキー付き行を測定し、ネイティブの移動と不透明度アニメーションを使用します。削除された行はスクロールリスト外の不活性コピーとしてフェードし、React のアンマウントを遅らせたりスクロール範囲を拡張したりしません。初期読み込み、ドラッグ確定、オーバーフロー展開、表示オプション変更は即座に確定します。アニメーターはレイアウトオブザーバーもポーリングも持たず、内容のみの更新やスクロールは測定しません。
 
-### Hover cards
+### ホバーカード
 
-Workspace and Session hover cards copy the value their row clips: activating a Workspace card writes its full directory path, while activating a non-blank Session card writes its full display title. A provisional blank New Session card remains read-only because its localized label is a placeholder rather than session content. A Session card also renders its `sidebar.session.row.hover` seat between the relative time and the trailing status lines whenever the card is open, independent of the row's own state. The first Workspace or Session card in a physical list waits 800ms; after a card is displayed, moving to another Workspace or Session in the same list replaces it immediately. The list and its active portaled card form one pointer interaction: entering the card to read or copy preserves immediate handoff to a neighboring Workspace or Session. After the pointer leaves both, the shared dwell resets when the active card closes through its existing pointer-grace and close lifecycle, with no separate group timer. Leaving a list with no active card resets the dwell immediately. Small action tooltips coexist with the right-side hover card; pin, archive, Workspace new-session, and search-result unarchive tooltips use portals to stay above it. Hovering actions, including More, preserves the card; opening the More menu or starting a Session drag dismisses it.
+ワークスペースとセッションのホバーカードは、行が切り詰めた値をコピーします。ワークスペースカードの有効化は完全なディレクトリパスを書き込み、非ブランクのセッションカードの有効化は完全な表示タイトルを書き込みます。仮のブランク New Session カードは読み取り専のままです。そのローカライズラベルはセッション内容ではなくプレースホルダーだからです。セッションカードは、カードが開いている間は常に行自身の状態とは独立に、相対時刻と末尾ステータス行の間に `sidebar.session.row.hover` シートも表示します。物理リスト内の最初のワークスペースまたはセッションカードは 800ms 待機し、カード表示後に同じリスト内の別のワークスペースやセッションへ移動すると即座に置き換わります。リストとアクティブなポータル化カードは 1 つのポインターインタラクションを形成します。読み取りやコピーのためにカードに入っても、隣のワークスペースやセッションへの即時ハンドオフは保持されます。両方からポインターが離れた後は、既存のポインター猶予とクローズライフサイクルを通じてアクティブカードが閉じると共有ドウェルがリセットされ、個別のグループタイマーはありません。アクティブカードなしでリストを離れるとドウェルは即座にリセットされます。小さなアクションのツールチップは右側ホバーカードと共存し、ピン、アーカイブ、ワークスペース新規セッション、検索結果のアーカイブ解除のツールチップはポータルを使用してその上に表示されます。More を含むアクションへのホバーはカードを保持し、More メニューを開くかセッションドラッグを開始すると解除されます。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the sidebar host, the hero surface, and the picking backends.
+これらのページではサイドバーホスト、ヒーロー面、選択バックエンドを扱います。
 
-- [ui-sidebar](../ui-sidebar/README.md) — the sidebar shell hosting the `sidebar.workspaces` hole.
-- [ui-conversation](../ui-conversation/README.md) — the chat surface hosting the Session Intent hero's picker hole.
-- [directory-picker-native](../../host/directory-picker-native/README.md) — the OS-chooser backend filling the directory-flow hole.
-- [Workspace Controller](../../api/workspace-controller/README.md) — the Host mutations and framework-neutral Client projection that own Workspaces, membership, and Workspace group order.
+- [ui-sidebar](../ui-sidebar/README.md) — `sidebar.workspaces` ホールをホストするサイドバーシェル。
+- [ui-conversation](../ui-conversation/README.md) — Session Intent ヒーローのピッカーホールをホストするチャット面。
+- [directory-picker-native](../../host/directory-picker-native/README.md) — ディレクトリフローホールを埋める OS チューザーバックエンド。
+- [Workspace Controller](../../api/workspace-controller/README.md) — ワークスペース、メンバーシップ、ワークスペースグループ順序を所有する Host ミューテーションとフレームワーク中立のクライアントプロジェクション。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+モデル向きに登録するものがないブラウザー側 UI プラグイン層であるため、なし。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てず送信もしません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しの作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the search depth, the archive surface, and the picking carrier; they are current package constraints.
+これらの制限は検索深度、アーカイブ面、選択キャリアーを定義します。これらは現在のパッケージ制約です。
 
-- **No fuzzy content search or event deep links** — the content backend uses literal token/phrase matching, and selecting a result opens the Session rather than the matching event.
-- **No Session deletion** — sessions can be archived but never deleted; archived rows stay recoverable in place through the archived view filter and the search results' unarchive action, and Workspace registration deletion does not delete Sessions.
-- **Pending user interaction is not aggregated into collapsed groups** — a waiting row inside a collapsed group lights no group-header indicator and becomes visible only after that group is expanded.
-- **Native folder selection depends on the local Host carrier** — under the `-native` composition, in-process or remote browser deployments cannot open a local operating-system dialog; remote-capable picking is the `-browse` composition's in-app flow.
+- **ファジーな内容検索やイベントディープリンクなし** — 内容バックエンドはリテラルなトークン/フレーズ一致を使用し、結果の選択は一致イベントではなくセッションを開きます。
+- **セッション削除なし** — セッションはアーカイブできても削除はできません。アーカイブ済み行はアーカイブ表示フィルターと検索結果のアーカイブ解除アクションでその場で回復可能に残り、ワークスペース登録の削除はセッションを削除しません。
+- **保留中のユーザーインタラクションは折りたたみグループに集約されません** — 折りたたみグループ内の待機行はグループヘッダーインジケーターを点灯させず、そのグループを展開するまで表示されません。
+- **ネイティブのフォルダー選択はローカル Host キャリアーに依存します** — `-native` 構成では、インプロセスやリモートのブラウザーデプロイはローカルのオペレーティングシステムダイアログを開けません。リモート対応の選択は `-browse` 構成のアプリ内フローです。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>保守者向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

@@ -3,15 +3,15 @@ description: "Package map for Host Office conversion and reusable PDF results."
 kind: "package-group"
 ---
 
-# document/ — Office conversion
+# document/ — Office 変換
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Convert authorized Office files to reusable PDFs on the Host. The shared service converts through LibreOffice kit. Targets with a declared native engine use it; other targets use Node WASM.
+Host で承認済み Office ファイルを再利用可能な PDF に変換する。共有サービスは LibreOffice kit 経由で変換する。宣言済みネイティブエンジンを持つ対象はそれを使い、他の対象は Node WASM を使う。
 
-## Table of Contents
+## 目次
 
 - [Packages](#packages)
 - [Related documentation](#related-documentation)
@@ -20,27 +20,27 @@ Convert authorized Office files to reusable PDFs on the Host. The shared service
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-Each package owns its configuration and lifetime rules; the subsystem reference describes their shared conversion operation.
+各パッケージは独自の設定とライフタイム規則を所有する。共有変換操作はサブシステムリファレンスが表す。
 
 | Package | Role | ctx key |
 |---|---|---|
-| [office-to-pdf](office-to-pdf/README.md) | Authorized Office bytes to complete PDFs with bounded queues and caching | `ctx.officeToPdf` |
+| [office-to-pdf](office-to-pdf/README.md) | 承認済み Office バイトから有界キューとキャッシュで完全な PDF を作る | `ctx.officeToPdf` |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Consumers own source authorization and presentation.
+コンシューマーはソース承認と表示を所有する。
 
-- [Document conversion](../../docs/subsystems/office-to-pdf.md) — shared operation and generated service reference.
-- [Independent kit ownership](../../.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.md) — engine distribution and application integration.
-- [Workspace Files](../api/workspace-files/README.md) — authorized bounded source reads.
+- [ドキュメント変換](../../docs/subsystems/office-to-pdf.md) — 共有操作と生成サービスリファレンス。
+- [独立した kit 所有](../../.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.md) — エンジン配布とアプリケーション統合。
+- [Workspace Files](../api/workspace-files/README.md) — 承認され有界なソース読み取り。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

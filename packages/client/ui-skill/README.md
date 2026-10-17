@@ -1,118 +1,118 @@
 ---
-description: "Web skill references and the dedicated skill tool row for the dsh web client: the /-triggered skill source and the skill call card."
+description: "dsh web クライアント向けの Web skill 参照と専用 skill ツール行: / トリガーの skill ソースと skill 呼び出しカード。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-skill
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-client-ui-skill` lets users invoke a skill by choosing it from the `/` suggestions or typing `/name` directly. The same literal command loads the skill consistently from the Web composer, TUI, and ACP, while a name shared with a host command continues to resolve as that command. Skill calls appear in the conversation as expandable `Instructions` cards whose settled contents remain stable when the installed skill catalog changes.
+`dsh-client-ui-skill` は、ユーザーが `/` サジェスチョンから skill を選ぶか `/name` を直接入力することで skill を起動できるようにする。同じリテラルコマンドが Web コンポーザー、TUI、ACP から一貫して skill をロードし、ホストコマンドと共有される名前は引き続きそのコマンドとして解決される。skill 呼び出しは conversation に展開可能な `Instructions` カードとして現れ、その確定済みコンテンツはインストール済み skill カタログが変わっても安定したままである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Type `/` in the composer and pick a skill from the suggestions, or type `/name` directly; the sent message carries the literal text, and the host loads the skill the same way for a menu pick or a hand-typed token. A name shared with a host command still resolves to the command — adjudication claims the line client-side before it ever becomes a prompt.
+コンポーザーで `/` を入力してサジェスチョンから skill を選ぶか、`/name` を直接入力する。送信されたメッセージはリテラルテキストを運び、ホストはメニュー選択でも手入力のトークンでも同じように skill をロードする。ホストコマンドと共有される名前は依然としてコマンドに解決される — 裁定はそれがプロンプトになる前にクライアント側でその行を獲得する。
 
-### What the source offers
+### ソースが提供するもの
 
-Ordinary-session candidates come from the `skills/list` Remote; the host serves every user-invocable skill, and a `modelInvocable: false` entry (a `disable-model-invocation` skill, whose only entry point is this path) wears the user-only marker as a description prefix in the active language. Results rank through the `/` menu's shared name ranker, `rankByName` from ui-primitives: the query matches a case-insensitive ordered subsequence of the skill name, prefix hits rank first, and ties keep the host order ([ranking decision](../../../.agents/notes/archived/feature/2026-08-04-web-slash-command-fuzzy-discovery.md)). A failed `skills/list` call is logged and folded into a silent menu-group drop — the menu shows only pending/ready states.
+通常セッションの候補は `skills/list` Remote から来る。ホストはすべてのユーザー起動可能な skill を提供し、`modelInvocable: false` のエントリー（`disable-model-invocation` skill、その唯一のエントリーポイントがこの経路である）は、アクティブな言語で説明のプレフィックスとして user-only マーカーをまとう。結果は `/` メニューの共有名ランカー `rankByName`（ui-primitives 由来）でランク付けされる: クエリは skill 名の大文字小文字を区別しない順序付きサブシーケンスに一致し、プレフィックスヒットが最初にランクされ、同点はホストの順序を保つ（[ランキングの決定](../../../.agents/notes/archived/feature/2026-08-04-web-slash-command-fuzzy-discovery.md)）。失敗した `skills/list` 呼び出しはログに記録され、メニューグループの黙示的なドロップに畳み込まれる — メニューは pending/ready 状態のみを表示する。
 
-### The skill tool row
+### skill ツール行
 
-The `preparing` stage shows only the skill icon and title, with no requested skill name or expansion. The `start` and `result` stages use the recorded arguments and output described below; preparation does not consult the installed catalog.
+`preparing` ステージは skill アイコンとタイトルのみを表示し、要求された skill 名も展開もない。`start` と `result` のステージは以下に述べる記録済みの引数と出力を使い、準備はインストール済みカタログを参照しない。
 
-A collapsed row renders the skill glyph, `Skill` title, and requested skill name on the same secondary font-size axis, line height, row height, and glyph scaling as ordinary Tool rows. Every lifecycle state retains the ordinary skill glyph; running calls carry one left-to-right highlight across the title, separator, and skill name, while failures replace the name with the first error line and interruptions retain their explicit status text. A settled row expands into a bounded `Instructions` card containing the exact durable tool output, with the standard trajectory `Inspect` affordance when available; this expanded card keeps its own typography. The row derives its name, lifecycle, and body only from the frozen call/result slice supplied by ui-tool, never from the current catalog, so replay stays stable when installed skills or their descriptions change. Text and icons are tertiary at rest and secondary on hover; error and interruption text retains its semantic color.
+折りたたまれた行は、通常の Tool 行と同じセカンダリーフォントサイズ軸、行の高さ、行高、グリフスケーリングで、skill グリフ、`Skill` タイトル、要求された skill 名をレンダリングする。すべてのライフサイクル状態が通常の skill グリフを保ち、実行中の呼び出しはタイトル、区切り、skill 名を横切る 1 つの左から右へのハイライトを運び、失敗は名前を最初のエラー行に置き換え、中断は明示的なステータステキストを保つ。確定した行は展開すると、正確な耐久性のあるツール出力を含む上限付きの `Instructions` カードになり、利用可能な場合は標準の trajectory `Inspect` アフォーダンスを備える。この展開されたカードは自身のタイポグラフィを保つ。行はその名前、ライフサイクル、ボディを ui-tool が供給する凍結された call/result スライスからのみ導出し、現在のカタログからは決して導出しないので、インストール済み skill やその説明が変わってもリプレイは安定したままである。テキストとアイコンは静止時はターシャリー、ホバー時はセカンダリーであり、エラーと中断のテキストはそのセマンティックカラーを保つ。
 
-Hovering over `/name` highlights the entire reference. Clicking a known skill opens its provider-supplied `SKILL.md` path in the right Sidebar while keeping the token editable. An uncached click shares the per-Session catalog fetch and opens when it completes, retaining the clicked Session address. Preset changes, plugin manager operations, connection resets, and plugin disposal cancel pending previews; a later click fetches the current catalog again. Skills without a file path remain invocable but have no file preview.
+`/name` にホバーすると参照全体がハイライトされる。既知の skill をクリックすると、トークンを編集可能なまま保ちつつ、プロバイダーが供給する `SKILL.md` パスを右 Sidebar で開く。未キャッシュのクリックは per-Session のカタログフェッチを共有し、完了時に開き、クリックされた Session アドレスを保持する。プリセット変更、plugin manager 操作、接続リセット、プラグイン破棄は保留中のプレビューをキャンセルする。後のクリックは現在のカタログを再びフェッチする。ファイルパスのない skill は起動可能なままだが、ファイルプレビューを持たない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The source implements no adjudication hooks and no reference codec: the pick lands literal text and the prompt ships the same literal, so determinism lives host-side ([slash pipeline note](../../../.agents/notes/archived/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md)).
+このソースは裁定フックも参照コーデックも実装しない: 選択はリテラルテキストを着地させ、プロンプトは同じリテラルを送るので、決定論はホスト側にある（[slash パイプラインのノート](../../../.agents/notes/archived/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md)）。
 
-### Candidate flow
+### 候補のフロー
 
-Catalogs cache per ordinary session with a single-flight fetch; the scope-birth `warm` hook prewarms the session's entry, the forwarded `agent-preset/selected` owner event drops that one session's entry (the catalog belongs to the preset, and a blank session may switch after the warm), the forwarded `plugin-manager/changed` event clears everything (a manager operation may add or remove skill providers that every session reads), and `connection/reset` clears everything. Catalog-addressed continuable children resolve no skill candidates locally because the existing skill RPC requires an attached session; viewing their persisted history must not activate them. The list RPC rides the plugin's root-context connection captured at registration; draft chip visuals derive from the `lexicon` scan.
+カタログは通常セッションごとに単一フライトのフェッチでキャッシュされる。スコープ誕生の `warm` フックがセッションのエントリーを事前ウォームし、転送された `agent-preset/selected` オーナーイベントがその 1 セッションのエントリーを落とし（カタログはプリセットに属し、空のセッションがウォーム後に切り替えることがある）、転送された `plugin-manager/changed` イベントがすべてをクリアし（マネージャー操作はすべてのセッションが読む skill プロバイダーを追加または削除しうる）、`connection/reset` がすべてをクリアする。カタログでアドレス指定された継続可能な子は、既存の skill RPC がアタッチされたセッションを必要とするため、ローカルで skill 候補を解決しない。その永続化された履歴を表示しても、それらをアクティベートしてはならない。リスト RPC は登録時に取得されたプラグインのルートコンテキスト接続に乗る。ドラフトチップの外観は `lexicon` スキャンから導出される。
 
-Each catalog fetch requires an existing retained Client Session and waits for its initial history open to succeed before sending `skills/list`. A temporary `skillCatalog` reference holds that Session until the fetch settles. An unretained Session or a failed open rejects without sending the RPC; preset invalidation, plugin manager operations, connection reset, and plugin disposal also cancel a pending history wait.
+各カタログフェッチは既存の保持された Client Session を必要とし、`skills/list` を送る前にその初期履歴オープンの成功を待つ。一時的な `skillCatalog` 参照がフェッチが決着するまでその Session を保持する。保持されていない Session または失敗したオープンは RPC を送らずに拒否する。プリセットの無効化、plugin manager 操作、接続リセット、プラグイン破棄も保留中の履歴待機をキャンセルする。
 
-### Registration
+### 登録
 
-The `/client` exports are the plugin body (`apply`/`inject`) only; the source object is internal to the registration effect. The tool row registers the `skill` wire name in ui-tool's keyed `tool.call.toolview` slot.
+`/client` のエクスポートはプラグインボディ（`apply`/`inject`）のみであり、ソースオブジェクトは登録エフェクトの内部にある。ツール行は `skill` wire 名を ui-tool のキー付きスロット `tool.call.toolview` に登録する。
 
-For sent text, the plugin registers a UserText matcher that returns one next original-text candidate using caller-confirmed `skillNames` and owns the `skill` entry in `conversation.user.text.node`. The renderer receives `openSkill` from its own Session-bound injection and delegates to this source’s preview operation, not to Chat owner props. Non-interactive previews remain labels. [UserText](../ui-conversation/README.md#sent-user-text) owns evaluation and node dispatch.
+送信されたテキストについて、プラグインは呼び出し元が確認した `skillNames` を使って 1 つの次の元テキスト候補を返す UserText マッチャーを登録し、`conversation.user.text.node` の `skill` エントリーを所有する。レンダラーは自身の Session に束縛されたインジェクションから `openSkill` を受け取り、Chat のオーナープロップではなくこのソースのプレビュー操作に委譲する。非対話的なプレビューはラベルのままである。[UserText](../ui-conversation/README.md#sent-user-text)が評価とノードディスパッチを所有する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-These pages cover the input machinery, the tool row host, and the host-side skill tool.
+これらのページは入力機構、ツール行のホスト、ホスト側 skill ツールを扱う。
 
-- [ui-input-trigger](../ui-input-trigger/README.md) — the inline suggestion machinery the source registers into.
-- [ui-tool](../ui-tool/README.md) — the tool-call presentation layer hosting the `tool.call.toolview` slot.
-- [tool-skill](../../skill/tool-skill/README.md) — the host-side `skill` tool owning the pre-step gesture boundary.
-- [Web input machine and slash pipeline](../../../.agents/notes/archived/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md) — how references and commands share the input machine.
+- [ui-input-trigger](../ui-input-trigger/README.md) — ソースが登録されるインラインサジェスチョン機構。
+- [ui-tool](../ui-tool/README.md) — `tool.call.toolview` スロットをホストするツール呼び出しプレゼンテーションレイヤー。
+- [tool-skill](../../skill/tool-skill/README.md) — pre-step ジェスチャー境界を所有するホスト側 `skill` ツール。
+- [Web 入力マシンと slash パイプライン](../../../.agents/notes/archived/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md) — 参照とコマンドが入力マシンをどう共有するか。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### User-explicit skill invocation
+### ユーザー明示の skill 起動
 
-#### What the model sees
+#### モデルが見るもの
 
-The user's message reaches the model verbatim, `/name` literal included. The host's pre-step boundary (`dsh-tool-skill`) then appends the canonical `<skill_content>` block — the same `renderSkillContent` output the `skill` tool returns — as injected instructions context at the end of that step's injections, closest to the model's answer. Loading is deterministic: the model receives the full body without being asked to call the `skill` tool, and the catalog tells it not to re-load an inline-injected skill.
+ユーザーのメッセージは `/name` リテラルを含めてそのままモデルに届く。ホストの pre-step 境界（`dsh-tool-skill`）がその後、`skill` ツールが返すのと同じ `renderSkillContent` 出力である正規の `<skill_content>` ブロックを、そのステップのインジェクションの末尾、モデルの回答に最も近い位置に注入された instructions コンテキストとして追記する。ロードは決定論的である: モデルは `skill` ツールを呼ぶよう求められることなく完全なボディを受け取り、カタログはインラインで注入された skill を再ロードしないよう伝える。
 
-#### Token effect
+#### トークン効果
 
-One invocation adds the rendered skill body to that turn as injected context — the same cost as the model loading the skill through the tool, paid unconditionally instead of at the model's discretion. Menu browsing and the candidate fetch add zero model tokens.
+1 回の起動はレンダリングされた skill ボディを注入コンテキストとしてそのターンに追加する — モデルがツールを通じて skill をロードするのと同じコストであり、モデルの裁量ではなく無条件に支払われる。メニューの閲覧と候補フェッチはモデルトークンをゼロ追加する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Append-only: the injected message lands after the reusable history prefix. This package never edits earlier request tokens.
+追記のみ: 注入されたメッセージは再利用可能な履歴プレフィックスの後に着地する。このパッケージは以前のリクエストトークンを決して編集しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the reference and the row fall back to generic behavior; they are current package constraints.
+これらの制限は、参照と行が汎用挙動にフォールバックする場合を定義する。これらは現在のパッケージ制約である。
 
-- **Result-only history pages use the generic row** — keyed dispatch needs the paired call in the runtime window; pagination that leaves the call outside has no tool identity. This client presentation feature does not extend the history wire contract to recover it.
-- **Text is the truth** — the reference is plain draft text; a hand-typed identical token is the same reference, and the host gesture boundary judges the sent text, not the menu interaction. Chip visuals derive from the lexicon scan; no occurrence identity, position tracking, or structured reference payload exists on the prompt wire.
-- **A menu opened before the prewarm settles** shows no skill candidates for that keystroke; the next keystroke re-polls the settled cache.
-- **Catalog changes without a forwarded event keep cached catalogs** — an HMR reload after a CLI or hand edit announces no `plugin-manager/changed` event, and adding or removing a `SKILL.md` on disk forwards no event at all, so an open session lists its previous skills until a preset switch, plugin manager operation, or connection reset.
-- **Draft skill highlighting waits for the next catalog fetch** — a preset switch, plugin manager operation, or connection reset empties the session's lexicon, so with the menu closed an existing `/name` in the draft loses its skill highlight until the `/` menu fetches the catalog again; an open menu fetches it immediately.
+- **結果のみの履歴ページは汎用行を使う** — キー付きディスパッチはランタイムウィンドウ内の対になる呼び出しを必要とする。呼び出しを外に残すページネーションにはツールアイデンティティがない。このクライアント側プレゼンテーション機能は、それを回復するために履歴 wire 契約を拡張しない。
+- **テキストが真実** — 参照はプレーンなドラフトテキストである。手入力の同一トークンは同じ参照であり、ホストのジェスチャー境界はメニュー操作ではなく送信されたテキストを判定する。チップの外観は lexicon スキャンから導出される。プロンプト wire 上に出現アイデンティティ、位置追跡、構造化参照ペイロードは存在しない。
+- **プリウォームが決着する前に開いたメニュー**はそのキーストロークに対して skill 候補を表示しない。次のキーストロークが決着済みキャッシュを再ポーリングする。
+- **転送イベントのないカタログ変更はキャッシュ済みカタログを保つ** — CLI または手動編集後の HMR リロードは `plugin-manager/changed` イベントを通知せず、ディスク上の `SKILL.md` の追加や削除はイベントを一切転送しないので、開いているセッションはプリセット切り替え、plugin manager 操作、または接続リセットまで以前の skill を一覧する。
+- **ドラフトの skill ハイライトは次のカタログフェッチを待つ** — プリセット切り替え、plugin manager 操作、または接続リセットがセッションの lexicon を空にするので、メニューが閉じているとドラフト内の既存の `/name` は `/` メニューがカタログを再フェッチするまで skill ハイライトを失う。開いているメニューはすぐにフェッチする。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

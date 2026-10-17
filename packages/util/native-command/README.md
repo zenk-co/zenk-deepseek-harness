@@ -1,33 +1,33 @@
 ---
-description: "Host-native command and path-opening utilities with shell-free execution, cancellation, desktop detection, and WSL path handoff."
+description: "シェルを使わない実行、キャンセル、デスクトップ検出、WSL パス受け渡しを備えたホストネイティブのコマンドおよびパスオープンユーティリティ。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-native-command
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-native-command` runs host executables without a shell and opens Host filesystem paths through the desktop. The command runner captures utf8 output, propagates cancellation, and requires explicit Windows startup visibility. The path opener supports default-application and text-editor intents, browser-renderable documents, WSL translation, and desktop availability checks. It is a library, not a plugin: no `ctx`, no state, no events.
+`dsh-native-command` は、シェルなしでホスト実行可能ファイルを実行し、デスクトップを通じて Host ファイルシステムパスを開く。コマンドランナーは utf8 出力をキャプチャし、キャンセルを伝播し、明示的な Windows 起動可視性を要求する。パスオープナーは、デフォルトアプリケーションとテキストエディターの意図、ブラウザーでレンダリング可能なドキュメント、WSL 変換、デスクトップ可用性チェックをサポートする。これはプラグインではなくライブラリである: `ctx` なし、状態なし、イベントなし。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use this runner when a host-side integration must execute one native command and needs its output, its failure, or both — and must never involve a shell.
+ホスト側の統合が 1 つのネイティブコマンドを実行し、その出力、その失敗、またはその両方を必要とし、シェルを決して介してはならない場合にこのランナーを使う。
 
-### Running a command
+### コマンドの実行
 
 ```ts
 import { runNativeCommand } from '@deepseek-ai/dsh-native-command'
@@ -37,86 +37,86 @@ declare const signal: AbortSignal
 const { stdout, stderr } = await runNativeCommand('osascript', ['-e', script], signal, 'hidden')
 ```
 
-On exit 0 the call resolves with captured stdout and stderr. On any failure it rejects with the exit `code` and both captured streams attached, so a caller can tell a missing tool (`ENOENT`), a cancellation (`ABORT_ERR`), and a real command failure apart without re-running the command. The required fourth argument, `window: 'hidden' | 'visible'`, controls Windows startup visibility and has no effect on other platforms. Background commands pass `'hidden'`; GUI launchers pass `'visible'`. The path opener selects `'visible'` for Explorer, including WSL handoffs and file selection, because hiding Explorer also hides its folder window.
+終了コード 0 では、呼び出しはキャプチャされた stdout と stderr で解決する。失敗時は、終了 `code` とキャプチャされた両ストリームを添えて拒否する。そのため呼び出し元は、コマンドを再実行せずに、ツールの欠落（`ENOENT`）、キャンセル（`ABORT_ERR`）、実際のコマンド失敗を区別できる。必須の第 4 引数 `window: 'hidden' | 'visible'` は Windows の起動可視性を制御し、他のプラットフォームには影響しない。バックグラウンドコマンドは `'hidden'` を渡し、GUI ランチャーは `'visible'` を渡す。パスオープナーは Explorer に対して `'visible'` を選ぶ。WSL の受け渡しとファイル選択を含む。Explorer を隠すとそのフォルダーウィンドウも隠れるためである。
 
-### Injecting the command boundary
+### コマンド境界の注入
 
-The `NativeCommandRunner` type is the injectable command boundary for host integrations: pass the function (or a wrapper) where the integration needs a testable boundary, so tests can substitute a fake runner.
+`NativeCommandRunner` 型は、ホスト統合のための注入可能なコマンド境界である: 統合がテスト可能な境界を必要とする場所に関数（またはラッパー）を渡し、テストが偽のランナーを差し替えられるようにする。
 
-### Opening a Host path
+### Host パスを開く
 
-`openNativePath(path, signal)` hands a path to the default application and prefers the named default browser for HTML and SVG where the platform can identify one. `openNativeAssociatedPath(path, signal)` always uses the file-type association, without a browser override. `openNativeTextFile(path, signal)` selects text-editor intent; on macOS it uses `open -t`. Windows hands every intent to Explorer, so the shell's own default-application resolution — the one a double-click uses — picks the application; Explorer receives the target as an encoded file URI and its exit code 1 counts as a delegated handoff, while cancellation, missing executables, and other exit codes still reject. This acknowledgement does not prove that an application opened the file. WSL paths are translated with `wslpath -w` before the Windows desktop receives them. `canOpenNativePath()` reports whether the current Host plausibly has a desktop target.
+`openNativePath(path, signal)` はパスをデフォルトアプリケーションに渡し、HTML と SVG ではプラットフォームが特定できる場合に名前付きのデフォルトブラウザーを優先する。`openNativeAssociatedPath(path, signal)` は常にファイルタイプの関連付けを使い、ブラウザーの上書きはしない。`openNativeTextFile(path, signal)` はテキストエディターの意図を選び、macOS では `open -t` を使う。Windows はすべての意図を Explorer に渡すため、シェル自身のデフォルトアプリケーション解決 — ダブルクリックが使うもの — がアプリケーションを選ぶ。Explorer は対象をエンコードされた file URI として受け取り、その終了コード 1 は委譲された受け渡しとして扱われる。キャンセル、実行可能ファイルの欠落、その他の終了コードは依然として拒否する。この確認応答は、アプリケーションがファイルを開いたことを証明するものではない。WSL パスは、Windows デスクトップが受け取る前に `wslpath -w` で変換される。`canOpenNativePath()` は、現在の Host にデスクトップターゲットがもっともらしくあるかどうかを報告する。
 
-`revealNativePath(path, signal)` selects the file in Finder or Explorer, including WSL path translation, and opens its parent directory through `xdg-open` on desktop Linux. `nativeFileManager()` identifies that action for Host-derived UI labels; desktop availability remains a separate `canOpenNativePath()` check. Callers must authorize the absolute file path before invoking either operation. Platform dispatch is covered by injected-runner tests; native desktop verification belongs to the corresponding platform. Explorer receives an encoded file URI as a separate argument. Its exit code 1 is accepted as a delegated handoff; cancellation, missing executables, and other exit codes still reject. This acknowledgement does not prove that an application opened the file or that a window selected it.
+`revealNativePath(path, signal)` は Finder または Explorer でファイルを選択し（WSL パス変換を含む）、デスクトップ Linux では `xdg-open` で親ディレクトリを開く。`nativeFileManager()` は Host 由来の UI ラベル用にそのアクションを識別する。デスクトップ可用性は別の `canOpenNativePath()` チェックのままである。呼び出し元はどちらの操作を呼ぶ前にも絶対ファイルパスを認可しなければならない。プラットフォームのディスパッチは注入されたランナーのテストでカバーされ、ネイティブデスクトップの検証は対応するプラットフォームに属する。Explorer はエンコードされた file URI を別の引数として受け取る。その終了コード 1 は委譲された受け渡しとして受け入れられる。キャンセル、実行可能ファイルの欠落、その他の終了コードは依然として拒否する。この確認応答は、アプリケーションがファイルを開いたこと、またはウィンドウがそれを選択したことを証明するものではない。
 
-`nativeFileApplications(path, signal)` returns registered applications, localized names, icons, and the current default. macOS 12 and later use LaunchServices; Windows uses Shell association handlers and resolves a packaged application’s indirect icon reference before extraction; Linux uses GIO with shared XDG desktop-entry and icon lookup. On macOS, copies sharing a bundle identifier and display name (staged self-updates, per-version installs) collapse to the system default, else the highest version; deliberate side-by-side installs keep distinct display names and both entries. `openNativeFileApplication(path, application, signal)` revalidates the handler against the complete registered list, so copies collapsed out of the display list stay openable, and never changes the system default. Windows delegates invocation to the Shell, and Linux delegates argument expansion to `gio launch`. WSL translates the path and uses the Windows adapter. Callers authorize the local file path. Native integration tests use private Windows file associations and Linux XDG roots on their respective platforms.
+`nativeFileApplications(path, signal)` は登録済みアプリケーション、ローカライズされた名前、アイコン、および現在のデフォルトを返す。macOS 12 以降は LaunchServices を使い、Windows は Shell の関連付けハンドラーを使い、パッケージ化されたアプリケーションの間接的なアイコン参照を抽出前に解決する。Linux は GIO を使い、XDG デスクトップエントリとアイコンの共有ルックアップを行う。macOS では、バンドル識別子と表示名を共有するコピー（段階的な自己更新、バージョンごとのインストール）はシステムデフォルトに、そうでなければ最高バージョンに集約される。意図的なサイドバイサイドインストールは異なる表示名を保ち、両方のエントリを持つ。`openNativeFileApplication(path, application, signal)` は、完全な登録リストに対してハンドラーを再検証するため、表示リストから集約されたコピーも開ける状態のままである。システムデフォルトを変更することは決してない。Windows は呼び出しを Shell に委譲し、Linux は引数展開を `gio launch` に委譲する。WSL はパスを変換し、Windows アダプターを使う。呼び出し元はローカルファイルパスを認可する。ネイティブ統合テストは、それぞれのプラットフォームでプライベートな Windows ファイル関連付けと Linux XDG ルートを使う。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The command runner is a thin wrapper over Node's `execFile`. The path opener selects one shell-free command from platform and environment facts, while callers retain authority over which path may be opened.
+コマンドランナーは Node の `execFile` の薄いラッパーである。パスオープナーはプラットフォームと環境の事実からシェルなしの 1 つのコマンドを選び、どのパスを開けるかの権限は呼び出し元が保持し続ける。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Public command-runner and path-opener exports |
-| [`src/runner.ts`](src/runner.ts) | Shell-free `execFile` adapter |
-| [`src/path-opener.ts`](src/path-opener.ts) | Desktop detection, open intents, browser preference, and WSL translation |
+| [`src/index.ts`](src/index.ts) | 公開コマンドランナーとパスオープナーのエクスポート |
+| [`src/runner.ts`](src/runner.ts) | シェルなしの `execFile` アダプター |
+| [`src/path-opener.ts`](src/path-opener.ts) | デスクトップ検出、オープン意図、ブラウザー優先、WSL 変換 |
 
-### What execFile gives the runner
+### execFile がランナーに与えるもの
 
-`execFile` spawns the executable directly with an argv array — no shell string, no shell interpretation of the arguments. The `signal` option terminates the child when the caller's abort fires; the runner maps `window` to Node's `windowsHide` option. On a non-zero exit or spawn error, the callback attaches `code`, `stdout`, and `stderr` to the rejected error and keeps the original error as `cause`.
+`execFile` は argv 配列を持つ実行可能ファイルを直接スポーンする — シェル文字列も、引数のシェル解釈もない。`signal` オプションは呼び出し元のアボートが発火したときに子プロセスを終了させ、ランナーは `window` を Node の `windowsHide` オプションにマッピングする。非ゼロ終了またはスポーンエラーの場合、コールバックは `code`、`stdout`、`stderr` を拒否エラーに添付し、元のエラーを `cause` として保持する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when you need the consumers or the general subprocess capability this utility deliberately is not.
+コンシューマー、またはこのユーティリティが意図的にそうではない一般的なサブプロセスケイパビリティを必要とする場合にこれらのページを読む。
 
-- [Native directory picker](../../host/directory-picker-native/README.md) — the OS chooser commands this runner executes.
-- [Session Controller](../../api/session-controller/README.md) — resolves Session-relative workspace paths before opening them.
-- [Settings Controller](../../api/settings-controller/README.md) — selects settings documents.
-- [Subprocess capability](../../subprocess/subprocess/README.md) — the general subprocess seam, of which this package is not a part.
+- [ネイティブディレクトリピッカー](../../host/directory-picker-native/README.md) — このランナーが実行する OS チューザーコマンド。
+- [Session Controller](../../api/session-controller/README.md) — 開く前にセッション相対のワークスペースパスを解決する。
+- [Settings Controller](../../api/settings-controller/README.md) — 設定ドキュメントを選択する。
+- [サブプロセスケイパビリティ](../../subprocess/subprocess/README.md) — 一般的なサブプロセスシーム。このパッケージはその一部ではない。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the host-side utilities register nothing model-facing.
+ホスト側のユーティリティはモデル向けのものを何も登録しないため、なし。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Nothing here enters a request prefix; this package neither assembles nor sends a provider request.
+ここにあるものはリクエストプレフィックスに入らない。このパッケージはプロバイダーリクエストを組み立てたり送信したりしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-Linux association discovery and explicit launching require GIO. Missing native commands reject the query, and missing artwork returns null; callers can retain file-manager reveal as their fallback.
+Linux の関連付け検出と明示的起動には GIO が必要である。ネイティブコマンドが欠落している場合、クエリは拒否され、アートワークが欠落している場合は null を返す。呼び出し元はフォールバックとしてファイルマネージャーでの表示を残せる。
 
 
-These limits define when this runner is not the right tool. They are current package constraints, not a task backlog.
+これらの制限は、このランナーが正しいツールではない場合を定義する。これらは現在のパッケージ制約であり、タスクのバックログではない。
 
-- Command output uses Node’s `execFile` buffer limit; oversized replies reject. Use the subprocess capability for streaming output.
-- A Windows handler icon appears only when the Shell resolves its indirect reference; an unresolved reference falls back to the handler executable, and a handler that names none — a packaged handler may report an AUMID or family name — yields no icon.
-- A Windows host needs an interactive desktop session. In a non-interactive session — a service, or a scheduled task without an interactive logon — `explorer.exe` invokes no file association and still exits 1 after about a second (an SSH session 0 on Windows 11 ARM64 build 26200), so an open reports success having opened nothing; a caller's abort signal turns that wait into a timeout rather than a hang. An `Invoke-Item` command resolves the association in-process there, and its directory failure arrives as a non-zero exit code. No fallback for that session is implemented.
+- コマンド出力は Node の `execFile` バッファー上限を使う。過大な応答は拒否される。ストリーミング出力にはサブプロセスケイパビリティを使う。
+- Windows のハンドラーアイコンは、Shell がその間接参照を解決したときにのみ現れる。解決されない参照はハンドラーの実行可能ファイルにフォールバックし、何も名指ししないハンドラー — パッケージ化されたハンドラーは AUMID やファミリ名を報告することがある — はアイコンを生成しない。
+- Windows ホストには対話的デスクトップセッションが必要である。非対話セッション（サービス、または対話ログオンなしのスケジュールタスク）では、`explorer.exe` はファイル関連付けを呼び出さず、約 1 秒後に終了コード 1 で終わる（Windows 11 ARM64 build 26200 上の SSH セッション 0）。そのため open は何も開かずに成功を報告する。呼び出し元のアボートシグナルは、その待機をハングではなくタイムアウトに変える。そこでは `Invoke-Item` コマンドがプロセス内で関連付けを解決し、そのディレクトリの失敗は非ゼロ終了コードとして届く。そのセッション向けのフォールバックは実装されていない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

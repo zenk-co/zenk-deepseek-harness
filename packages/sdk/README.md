@@ -1,49 +1,49 @@
 ---
-description: "Package map for the SDK family: JSON-RPC protocol plus the TypeScript client and server used by out-of-process SDKs."
+description: "SDK ファミリーのパッケージマップ: JSON-RPC プロトコルと、プロセス外 SDK が使う TypeScript クライアントおよびサーバー。"
 kind: "package-group"
 ---
 
-# sdk/ — drive a Harness runtime from another process
+# sdk/ — 別プロセスから Harness ランタイムを駆動する
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The SDK family lets another process drive a complete DeepSeek Harness runtime over newline-delimited JSON-RPC. Its protocol package defines the public messages, the TypeScript client launches `dsh` with a named profile and ordered patches, and the server accepts SDK requests over stdio. Clients can open sessions, send prompts, and observe session events, agent status changes, and subagent completions. The TypeScript client and [Python SDK](../../python/README.md) use the same protocol, and these packages do not create developer projects or define another application.
+SDK ファミリーにより、別プロセスは改行区切り JSON-RPC 経由で完全な DeepSeek Harness ランタイムを駆動できる。そのプロトコルパッケージは公開メッセージを定義し、TypeScript クライアントは名前付きプロファイルと順序付きパッチで `dsh` を起動し、サーバーは stdio 経由で SDK リクエストを受け付ける。クライアントはセッションを開き、プロンプトを送り、セッションイベント、エージェント状態変化、サブエージェント完了を観測できる。TypeScript クライアントと [Python SDK](../../python/README.md) は同じプロトコルを使い、これらのパッケージは開発者プロジェクトの作成や別アプリケーションの定義を行わない。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-Each package README describes what you can do with its part of the stack.
+スタックの各部位で何ができるかは各パッケージ README が記述する。
 
-| Package | Role |
+| パッケージ | 役割 |
 |---|---|
-| [`protocol/`](protocol/README.md) | Wire protocol: the newline-delimited JSON-RPC transport and the named request, result, and notification types |
-| [`client/`](client/README.md) | TypeScript client that spawns a runtime subprocess and drives agent turns through the high-level and protocol-level APIs |
-| [`server/`](server/README.md) | `jsonrpc` plugin that serves out-of-process SDK clients over stdio |
+| [`protocol/`](protocol/README.md) | ワイヤープロトコル: 改行区切り JSON-RPC トランスポートと、名前付きリクエスト・結果・通知型 |
+| [`client/`](client/README.md) | ランタイムサブプロセスを起動し、高水準 API とプロトコル水準 API でエージェントターンを駆動する TypeScript クライアント |
+| [`server/`](server/README.md) | stdio 経由でプロセス外 SDK クライアントにサーブする `jsonrpc` プラグイン |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Start with the Python SDK (the sibling implementation of the client contract), then the runnable application and the decision records behind the group's boundary.
+クライアント契約の兄弟実装である Python SDK、実行可能なアプリケーション、グループ境界の背後にある決定記録から読み進めること。
 
-- [Python SDK](../../python/README.md) — the Python counterpart that speaks the same protocol and ships a bundled runtime.
-- [SDK application bundle](../bundle/sdk-app/README.md) — the `dsh --profile sdk` application that boots the JSON-RPC server.
-- [Architecture](../../docs/architecture.md) — why the packaged Python client launches the same named profiles.
-- [SDK project toolchain removal](../../.agents/notes/archived/simplification/2026-08-11-remove-sdk-project-toolchain.md) — why this group never creates, configures, or builds developer projects.
-- [SDK subagent provider](../subagent/subagent-dsh-sdk/README.md) — a harness-internal consumer of the TypeScript client.
+- [Python SDK](../../python/README.md) — 同じプロトコルを話し、バンドル済みランタイムを出荷する Python 側の対応物。
+- [SDK アプリケーションバンドル](../bundle/sdk-app/README.md) — JSON-RPC サーバーを起動する `dsh --profile sdk` アプリケーション。
+- [アーキテクチャ](../../docs/architecture.md) — パッケージ済み Python クライアントが同じ名前付きプロファイルを起動する理由。
+- [SDK プロジェクトツールチェーンの削除](../../.agents/notes/archived/simplification/2026-08-11-remove-sdk-project-toolchain.md) — このグループが開発者プロジェクトの作成、設定、ビルドを行わない理由。
+- [SDK サブエージェントプロバイダー](../subagent/subagent-dsh-sdk/README.md) — TypeScript クライアントのハーネス内消費者。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発ノート
 
-None.
+なし。

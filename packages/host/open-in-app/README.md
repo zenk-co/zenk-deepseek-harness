@@ -1,37 +1,37 @@
 ---
-description: "Host half of open-in-app: resolving installed editors, Git GUIs, terminals, and file managers to verified launchers on macOS, Windows, and Linux, and serving the catalog, icons, and launch endpoint as three webServer routes."
+description: "open-in-app の Host 側: インストール済みのエディター、Git GUI、ターミナル、ファイルマネージャーを macOS、Windows、Linux 上で検証済みのランチャーに解決し、カタログ、アイコン、起動エンドポイントを 3 つの webServer ルートとして提供する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-host-open-in-app
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-host-open-in-app` with its [browser companion](../../client/ui-open-in-app/README.md) to let users open a workspace directory in an installed editor, Git GUI, terminal, or file manager. It offers a fixed application catalog and shows only entries that the host can verify; newly installed applications appear after restart, while missing launchers are removed when detected. Requests require the deployment's browser authentication and host-origin trust checks. Detection and launch commands use configurable deadlines and do not pass inherited credentials to launched applications.
+`dsh-host-open-in-app` を[ブラウザー側の対となるパッケージ](../../client/ui-open-in-app/README.md)と一緒に使うと、ユーザーはワークスペースディレクトリをインストール済みのエディター、Git GUI、ターミナル、ファイルマネージャーで開ける。本パッケージは固定のアプリケーションカタログを提供し、Host が検証できるエントリだけを表示する。新たにインストールしたアプリケーションは再起動後に現れ、見つからなくなったランチャーは検出時に削除される。リクエストにはデプロイのブラウザー認証と Host オリジンの信頼チェックが必要である。検出と起動のコマンドは設定可能な期限を使用し、起動したアプリケーションに継承済みの資格情報を渡さない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the package in a composition that carries `webServer`, `connection`, and `subprocess`, normally beside its browser surface [`dsh-client-ui-open-in-app`](../../client/ui-open-in-app/README.md); the pair puts an "Open In..." split button in the Web Session header whenever the host resolved at least one installed catalog application.
+本パッケージは、`webServer`、`connection`、`subprocess` を備えたコンポジションにマウントする。通常はブラウザー側の [`dsh-client-ui-open-in-app`](../../client/ui-open-in-app/README.md) の隣に置く。Host がカタログ内のインストール済みアプリケーションを少なくとも 1 つ解決できていれば、この 2 つが Web の Session ヘッダーに “Open In...” スプリットボタンを表示する。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it for a Web deployment whose users work beside a local editor, Git GUI, terminal, or file manager and want the workspace directory opened there in one click. Avoid it for opening one path with the OS-default application from host code — that is `dsh-apiproxy`'s `openPath`; this package's subject is *which* application, with per-application resolution and launchers.
+ローカルのエディター、Git GUI、ターミナル、ファイルマネージャーの隣で作業するユーザーがいて、ワークスペースディレクトリをそこへワンクリックで開きたい Web デプロイに選ぶ。Host 側のコードから OS 既定のアプリケーションで 1 つのパスを開く用途には選ばない。それは `dsh-apiproxy` の `openPath` である。本パッケージの主題は *どの* アプリケーションで開くかであり、アプリケーションごとの解決とランチャーを扱う。
 
-### Minimal configuration
+### 最小構成
 
 ```yaml
 - name: '@deepseek-ai/dsh-host-open-in-app'
@@ -41,85 +41,85 @@ Choose it for a Web deployment whose users work beside a local editor, Git GUI, 
     launchWatchMs: 1000
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `probeTimeoutMs` | required | Per-command deadline in milliseconds for catalog-resolution host commands (`xcode-select`, the Windows registry reads). |
-| `iconTimeoutMs` | required | Per-command deadline in milliseconds for icon-extraction host commands (`plutil`/`sips` on macOS, the PowerShell extraction on Windows). |
-| `launchWatchMs` | required | Early-failure watch window per launch: a launcher still running when the window closes counts as launched and keeps running, so this bounds how long the open route holds a successful launch. |
+| `probeTimeoutMs` | 必須 | カタログ解決の Host コマンド（`xcode-select`、Windows のレジストリ読み取り）に対するコマンドごとの期限（ミリ秒）。 |
+| `iconTimeoutMs` | 必須 | アイコン抽出の Host コマンド（macOS では `plutil`/`sips`、Windows では PowerShell による抽出）に対するコマンドごとの期限（ミリ秒）。 |
+| `launchWatchMs` | 必須 | 起動ごとの早期失敗の監視ウィンドウ。ウィンドウが閉じた時点でまだ実行中のランチャーは起動成功とみなされ、そのまま実行を続ける。したがってこの値は、open ルートが起動成功を保持する時間の上限を定める。 |
 
-The three deadlines are independent so tuning one operation never changes another's response time; timeouts are failure bounds, not latency budgets, so the conservative resolution/icon values cost nothing when commands are healthy. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-host-open-in-app) is the exhaustive source for every accepted field.
+3 つの期限は独立しているため、1 つの操作を調整しても別の操作の応答時間は変わらない。タイムアウトは失敗の上限でありレイテンシ予算ではないので、控えめな解決/アイコンの値はコマンドが正常なときには何のコストもかからない。生成される[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-host-open-in-app)が、受け付けるすべてのフィールドの網羅的な情報源である。
 
-### The catalog and how it resolves
+### カタログとその解決方法
 
-The catalog is a fixed whitelist covering editors and IDEs (Cursor, VS Code and Insiders, Windsurf, Zed, Sublime Text, Xcode, Android Studio, and the JetBrains IDEs IntelliJ IDEA, PyCharm, WebStorm, PhpStorm, GoLand, Rider, RustRover), Git GUIs (Fork, Sourcetree, GitHub Desktop, Tower, GitKraken, SmartGit, Sublime Merge), terminals (Ghostty, Warp, iTerm2, kitty, Terminal, Windows Terminal, Git Bash, GNOME Terminal, Konsole), and per-platform file managers (Finder, File Explorer, `xdg-open`). Each entry declares per-platform launcher sources tried in order, and every source yields a **verified launcher** — an artifact this host actually holds — never a bare install record:
+カタログは固定のホワイトリストで、エディターと IDE（Cursor、VS Code と Insiders、Windsurf、Zed、Sublime Text、Xcode、Android Studio、JetBrains の IntelliJ IDEA、PyCharm、WebStorm、PhpStorm、GoLand、Rider、RustRover）、Git GUI（Fork、Sourcetree、GitHub Desktop、Tower、GitKraken、SmartGit、Sublime Merge）、ターミナル（Ghostty、Warp、iTerm2、kitty、Terminal、Windows Terminal、Git Bash、GNOME Terminal、Konsole）、およびプラットフォームごとのファイルマネージャー（Finder、File Explorer、`xdg-open`）を網羅する。各エントリはプラットフォームごとのランチャー候補を優先順に宣言し、どの候補も **検証済みランチャー**——この Host が実際に保持している成果物——を返す。素のインストール記録は返さない:
 
-- **macOS** checks the known application directories (`/Applications`, `~/Applications`) for the entry's bundle spellings and launches `open -a <resolved bundle>`; Xcode follows `xcode-select -p`, so Beta or renamed installs are found. No Launch Services query and no disk scan runs.
-- **Windows** reads the `App Paths` registry keys, then the Uninstall records (kept only when they prove an executable on disk), then well-known install paths and the newest versioned install directory where an application uses one. GitHub Desktop resolves its versioned executable together with the packaged `cli.js` and invokes the supported `github open <path>` behavior without a command shell. Registry reads are batched, one `reg.exe query` per root per resolution pass.
-- **Linux and Windows CLI names** resolve in-process through the composition's subprocess capability (PATH/PATHEXT stat, no shell, no `which`); Linux GUI entries whose CLI is off PATH fall back to their XDG desktop entry's verified `TryExec`/`Exec` executable, and the `xdg-open` file-manager entry appears only when the host announces a display server.
+- **macOS** は既知のアプリケーションディレクトリ（`/Applications`、`~/Applications`）でエントリのバンドル綴りを確認し、`open -a <解決済みバンドル>` を起動する。Xcode は `xcode-select -p` に従うため、Beta 版や名前を変更したインストールも見つかる。Launch Services への問い合わせやディスクスキャンは実行しない。
+- **Windows** は `App Paths` レジストリキーを読み、次にアンインストール記録（ディスク上の実行ファイルを証明できるものだけを保持）、次に既知のインストールパス、そしてバージョン付きインストールディレクトリを使うアプリケーションでは最新のものを読む。GitHub Desktop はバージョン付き実行ファイルを同梱の `cli.js` とともに解決し、コマンドシェルを介さずにサポート対象の `github open <path>` 動作を呼び出す。レジストリの読み取りはバッチ化され、解決パスごとにルートごと 1 回の `reg.exe query` で済む。
+- **Linux と Windows の CLI 名**はコンポジションの subprocess ケイパビリティを通じてプロセス内で解決する（PATH/PATHEXT の stat。シェルも `which` も使わない）。CLI が PATH 上にない Linux の GUI エントリは、その XDG デスクトップエントリの検証済み `TryExec`/`Exec` 実行ファイルにフォールバックする。`xdg-open` ファイルマネージャーエントリは、Host がディスプレイサーバーを通知している場合にのみ現れる。
 
-### What to expect
+### 何を期待すべきか
 
-When the inherited process layer of the [launch environment](../../util/launch-environment/README.md) contains a non-empty `SSH_CONNECTION` or `SSH_TTY`, the application list is empty and the Web header hides Open In, including any remembered choice. Project and user `.env` values do not establish an SSH launch. The host skips application probing and refuses icon and launch requests for unavailable applications. This rule also applies when an SSH session carries a display or VS Code IPC connection; it does not identify remote deployments whose launchers remove both SSH markers.
+[起動環境](../../util/launch-environment/README.md)の継承プロセス層に空でない `SSH_CONNECTION` または `SSH_TTY` が含まれる場合、アプリケーション一覧は空になり、Web ヘッダーは記憶された選択も含めて Open In を非表示にする。プロジェクトおよびユーザーの `.env` の値は SSH 起動を成立させない。Host はアプリケーションのプローブを省略し、利用できないアプリケーションに対するアイコン要求と起動要求を拒否する。この規則は、SSH セッションがディスプレイや VS Code の IPC 接続を伴う場合にも適用される。ランチャーが SSH マーカーを両方とも取り除くリモートデプロイは識別できない。
 
-Resolution runs lazily, once per host process, on the first request that needs it; installing an application takes effect on the next restart, while an uninstalled one heals immediately — a launch that finds its executable gone re-resolves that one entry and drops it from the list when nothing proves it anymore. The icon route serves the real application icon on every platform where one is extractable: the bundle's `.icns` as a 128px PNG on macOS, the executable's associated icon as a 32px PNG on Windows, and the desktop entry's hicolor-theme icon (PNG or SVG) on Linux; a missing icon answers 404 and the browser surface renders a generic glyph.
+解決は遅延実行され、Host プロセスごとに 1 回、それを必要とする最初のリクエストで行われる。アプリケーションのインストールは次の再起動で有効になり、アンインストールは即座に自己修復する——起動時に実行ファイルが消えていることを検出すると、そのエントリだけを再解決し、もはや何も証明できなければ一覧から落とす。アイコンルートは抽出可能なすべてのプラットフォームで本物のアプリケーションアイコンを配信する。macOS ではバンドルの `.icns` を 128px PNG として、Windows では実行ファイルに関連付けられたアイコンを 32px PNG として、Linux ではデスクトップエントリの hicolor テーマのアイコン（PNG または SVG）を配信する。アイコンが欠けている場合は 404 を返し、ブラウザー側は汎用グリフを描画する。
 
-### The `./shared` subpath
+### `./shared` サブパス
 
-The route paths and wire payload types are published as the browser-safe `./shared` subpath (constants and types only, no runtime identity); the browser package inlines it into its client bundle. A route or payload change lands in `src/shared.ts` and both packages pick it up from there.
+ルートパスとワイヤペイロードの型は、ブラウザーセーフな `./shared` サブパスとして公開される（定数と型のみで、ランタイムの実体はない）。ブラウザー側パッケージはこれをクライアントバンドルにインライン化する。ルートまたはペイロードの変更は `src/shared.ts` に入り、両方のパッケージがそこから取り込む。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-Linux desktop-entry fields and icons use the shared [native-command](../../util/native-command/README.md) helpers. Directory launchers come from this package’s installed application catalog; file handlers come from the operating system’s associations.
+Linux のデスクトップエントリのフィールドとアイコンは共有の [native-command](../../util/native-command/README.md) ヘルパーを使用する。ディレクトリ用のランチャーは本パッケージのインストール済みアプリケーションカタログから、ファイルハンドラーはオペレーティングシステムの関連付けから来る。
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The package splits into a data table and three roles. [`src/catalog.ts`](src/catalog.ts) is the compile-time table: each entry's per-platform locator chain (`fixed`, `app`, `xcode`, `cli`, `file`, `scan`, `app-paths`, `install-record`, `github-desktop`, `desktop`) plus, on Linux, the desktop-entry id owning its icon. [`src/resolver.ts`](src/resolver.ts) resolves the table against this host: one pass yields a map of catalog id to verified launch (primary and optional fallback argv plus the icon source), sharing one batched Windows-registry read; argv launches spawn detached with a credential-scrubbed environment (`scrubbedParentEnv`) plus explicit adapter entries, and keep Windows GUI processes visible unless the adapter hides a CLI process that launches the GUI separately. `shell-open` launches (the file managers) run the OS shell's open verb through `dsh-native-command`'s path opener under the same watch window, and a spawn `ENOENT` is classified as `missing` so the routes can refresh a stale entry. [`src/icons.ts`](src/icons.ts) extracts icons per platform: `plutil`/`sips` over the resolved bundle on macOS, a generated PowerShell `ExtractAssociatedIcon` script over the resolved executable on Windows (positional `-File` args keep paths out of command-line parsing), and desktop-entry/hicolor/pixmaps filesystem lookup on Linux.
+本パッケージはデータテーブルと 3 つの役割に分かれる。[`src/catalog.ts`](src/catalog.ts) はコンパイル時のテーブルである。各エントリのプラットフォームごとのロケーター連鎖（`fixed`、`app`、`xcode`、`cli`、`file`、`scan`、`app-paths`、`install-record`、`github-desktop`、`desktop`）に加え、Linux ではアイコンを所有するデスクトップエントリ id を持つ。[`src/resolver.ts`](src/resolver.ts) はテーブルをこの Host に対して解決する。1 回のパスでカタログ id から検証済み起動（プライマリと任意のフォールバックの argv、およびアイコンソース）へのマップを生成し、バッチ化された Windows レジストリの読み取りを 1 回共有する。argv による起動は、資格情報を除去した環境（`scrubbedParentEnv`）と明示的なアダプター項目でデタッチして spawn し、アダプターが GUI を別途起動する CLI プロセスを隠さない限り Windows の GUI プロセスを可視のまま保つ。`shell-open` 起動（ファイルマネージャー）は、同じ監視ウィンドウの下で `dsh-native-command` のパスオープナーを通じて OS シェルの open 動詞を実行する。spawn の `ENOENT` は `missing` として分類されるため、ルートは古いエントリを更新できる。[`src/icons.ts`](src/icons.ts) はプラットフォームごとにアイコンを抽出する。macOS では解決済みバンドルに対する `plutil`/`sips`、Windows では解決済み実行ファイルに対する生成された PowerShell の `ExtractAssociatedIcon` スクリプト（位置引数の `-File` によりパスがコマンドライン解析に入らない）、Linux ではデスクトップエントリ/hicolor/pixmaps のファイルシステム探索である。
 
-[`src/index.ts`](src/index.ts) registers the three routes on `ctx.webServer`: `GET /open-in-app/apps` (the resolution map's keys), `GET /open-in-app/icon/<id>` (the extracted icon, cached in memory per process), and `POST /open-in-app/open` (launches the map's verified launcher directly — never a re-detection). Every route asks the composition's `connection` service for a rejection first; the complete trust story — the Host/Origin fence and browser authentication — has one home in the [`src/index.ts`](src/index.ts) module comment. On top of that fence the open route validates its body at the wire: an `application/json` media type, a 64 KiB ceiling, a resolved-available catalog id, and an absolute path naming an existing directory. Resolution and icon commands run through [`@deepseek-ai/dsh-native-command`](../../util/native-command/README.md) (argv, never a shell) under their respective deadlines; PATH names go through `ctx.subprocess.resolveExecutable()` in-process.
+[`src/index.ts`](src/index.ts) は 3 つのルートを `ctx.webServer` に登録する。`GET /open-in-app/apps`（解決マップのキー）、`GET /open-in-app/icon/<id>`（抽出されたアイコン。プロセスごとにメモリ内でキャッシュ）、`POST /open-in-app/open`（マップの検証済みランチャーを直接起動する。再検出は決してしない）。すべてのルートはまずコンポジションの `connection` サービスに拒否判定を求める。完全な信頼の話——Host/Origin フェンスとブラウザー認証——の唯一の拠り所は [`src/index.ts`](src/index.ts) のモジュールコメントにある。このフェンスに加えて、open ルートはワイヤ上でボディを検証する。`application/json` メディアタイプ、64 KiB の上限、解決済みで利用可能なカタログ id、既存ディレクトリを指す絶対パスである。解決とアイコンのコマンドはそれぞれの期限の下、[`@deepseek-ai/dsh-native-command`](../../util/native-command/README.md)（argv のみで、シェルは使わない）を通じて実行される。PATH 名はプロセス内の `ctx.subprocess.resolveExecutable()` を通る。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [dsh-client-ui-open-in-app](../../client/ui-open-in-app/README.md) — the browser split button consuming these routes.
-- [dsh-subprocess](../../subprocess/subprocess/README.md) — the capability providing in-process PATH resolution and the scrubbed child environment.
-- [dsh-native-command](../../util/native-command/README.md) — the no-shell host command runner for resolution and icon commands.
-- [dsh-host-webserver](../webserver/README.md) — the route registry carrying the three HTTP endpoints.
-- [Host package map](../README.md) — the GUI-host family this package belongs to.
+- [dsh-client-ui-open-in-app](../../client/ui-open-in-app/README.md) — これらのルートを消費するブラウザー側のスプリットボタン。
+- [dsh-subprocess](../../subprocess/subprocess/README.md) — プロセス内 PATH 解決とクリーンアップ済みの子環境を提供するケイパビリティ。
+- [dsh-native-command](../../util/native-command/README.md) — 解決とアイコンのコマンド用のシェルなし Host コマンドランナー。
+- [dsh-host-webserver](../webserver/README.md) — 3 つの HTTP エンドポイントを運ぶルートレジストリ。
+- [Host パッケージマップ](../README.md) — 本パッケージが属する GUI Host ファミリー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package opens host applications for a human and touches no prompt, message, schema, stream, or tool result.
+なし。本パッケージは人間のために Host アプリケーションを開くだけで、プロンプト、メッセージ、スキーマ、ストリーム、ツール結果のいずれにも触れない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; the package never assembles or sends provider requests.
+なし。本パッケージはプロバイダーリクエストを組み立てたり送信したりしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **The catalog is fixed at build time.** A deployment cannot add its own editor or Git GUI from cordis.yml; extending the list means extending `OPEN_IN_APP_CATALOG` and the browser package's dictionaries together. The operating system can locate known applications but cannot establish that every installed application accepts a workspace directory or which launch protocol it requires, so the package does not enumerate an unrestricted OS application list. Configurable custom handlers remain deferred; their user-supplied labels are user data rather than locale-owned product copy.
-- **macOS detection is known-paths only.** A bundle renamed beyond the catalog's spellings or moved outside `/Applications` and `~/Applications` is not detected; there is no Launch Services query (a native LaunchServices/NSWorkspace lookup needs an addon the repository does not carry) and deliberately no disk scan.
-- **Icon fidelity is platform-bound.** Windows icons come from `ExtractAssociatedIcon` at 32px — the most the stock .NET surface yields without a native addon — which can render slightly soft on high-DPI displays; Linux icons follow the hicolor theme and pixmaps only, not the user's active icon theme; several entries (CLI-only launchers without a desktop entry) have no icon source and keep the generic glyph.
-- **New installs appear after a restart.** Resolution runs once per host process; only the uninstall direction self-heals (a missing launcher re-resolves its one entry on the spot).
+- **カタログはビルド時に固定される。** デプロイが独自のエディターや Git GUI を cordis.yml から追加することはできない。リストを拡張するには `OPEN_IN_APP_CATALOG` とブラウザー側パッケージの辞書を同時に拡張する。オペレーティングシステムは既知のアプリケーションを特定できるが、インストール済みのすべてのアプリケーションがワークスペースディレクトリを受け入れるか、どの起動プロトコルを必要とするかまでは確立できない。そのため本パッケージは OS のアプリケーション一覧を無制限に列挙しない。構成可能なカスタムハンドラーは引き続き先送りである。ユーザーが指定するラベルはロケール所有の製品コピーではなくユーザーデータである。
+- **macOS の検出は既知パスのみ。** カタログの綴りを超えて改名されたバンドルや、`/Applications` と `~/Applications` の外へ移動されたバンドルは検出されない。Launch Services への問い合わせはなく（ネイティブの LaunchServices/NSWorkspace 参照にはリポジトリが持たないアドオンが必要）、ディスクスキャンは意図的に行わない。
+- **アイコンの忠実度はプラットフォームに縛られる。** Windows のアイコンは `ExtractAssociatedIcon` による 32px で、ネイティブアドオンなしで標準 .NET が出せる最大であり、高 DPI ディスプレイではややぼやけて表示されうる。Linux のアイコンは hicolor テーマと pixmaps のみに従い、ユーザーが選択中のアイコンテーマには従わない。いくつかのエントリ（デスクトップエントリを持たない CLI 専用ランチャー）にはアイコンソースがなく、汎用グリフのままである。
+- **新規インストールは再起動後に現れる。** 解決は Host プロセスごとに 1 回実行される。自己修復するのはアンインストール方向だけである（欠けたランチャーはその場でその 1 エントリを再解決する）。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-The promotion decisions — the host/`ui-` package split, why raw webServer routes instead of a Typert Remote, why the catalog stays compile-time fixed, the resolver redesign (verified launchers, one resolution pass, no per-click re-detection), the three-deadline configuration, and the per-platform icon strategies with their rejected alternatives — are recorded in the [historical promotion Agent Note](../../../.agents/notes/archived/feature/2026-08-25-promote-open-anywhere-plugin.md).
+昇格の決定——Host と `ui-` パッケージの分割、Typert Remote ではなく素の webServer ルートを使う理由、カタログをコンパイル時固定に保つ理由、リゾルバーの再設計（検証済みランチャー、1 回の解決パス、クリックごとの再検出なし）、3 つの期限による構成、プラットフォームごとのアイコン戦略と却下した代替案——は[歴史的な昇格の Agent Note](../../../.agents/notes/archived/feature/2026-08-25-promote-open-anywhere-plugin.md) に記録されている。
 
 </details>

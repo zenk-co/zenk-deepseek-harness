@@ -1,77 +1,77 @@
-# AGENTS.md — The documentation standard
+# AGENTS.md — ドキュメント標準
 
-This file defines document structure, Markdown tiers, writing rules, and `verify-doc-budgets` ceilings. Use [dsh-doc](../.agents/skills/dsh-doc/SKILL.md) for placement and validation, and [dsh-prose-standard](../.agents/skills/dsh-prose-standard/SKILL.md) for required coverage and editorial judgment; the [archived doc-tiers Agent Note](../.agents/notes/archived/process/2026-07-04-doc-tiers-and-budgets.md) records the historical rationale.
+このファイルはドキュメントの構造、Markdown の階層、執筆ルール、`verify-doc-budgets` の上限を定義する。配置と検証には [dsh-doc](../.agents/skills/dsh-doc/SKILL.md) を、必要な網羅範囲と編集上の判断には [dsh-prose-standard](../.agents/skills/dsh-prose-standard/SKILL.md) を使う。[アーカイブされた doc-tiers Agent Note](../.agents/notes/archived/process/2026-07-04-doc-tiers-and-budgets.md) が歴史的な根拠を記録している。
 
-## Document structure
+## ドキュメント構造
 
-These rules apply to human-facing documentation; [Agent Notes](../.agents/notes/README.md) remain outside their scope. A [postmortem](postmortem/README.md) is an incident-scoped reference; chronology records evidence, not a teaching sequence. A document's subject and tree position fix its scope: describe its own subject at appropriate detail and direct children only by purpose, responsibility, and high-level behavior; link to the owning descendant for lower-level detail. Document type does not widen that scope. A reference may be exhaustive only about its own subject. Testing mechanisms, fixtures, and harnesses belong at the lowest owning level; higher documents link there.
+これらのルールは人間向けドキュメントに適用され、[Agent Notes](../.agents/notes/README.md) はその範囲外のままである。[postmortem](postmortem/README.md) はインシデント単位のリファレンスであり、時系列は教育の順序ではなく証拠を記録する。ドキュメントの主題とツリー内の位置がその範囲を固定する: 自身の主題を適切な詳細で記述し、直接の子については目的、責任、高レベルの動作のみを記述する。より低レベルの詳細は所有する子孫へリンクする。ドキュメント種別がその範囲を広げることはない。リファレンスが網羅的でよいのは自身の主題についてのみである。テストの仕組み、フィクスチャ、ハーネスは最も低い所有レベルに属し、上位のドキュメントはそこへリンクする。
 
-Classify every in-scope document as a tutorial or reference. Tutorials follow an ordered path to an outcome and introduce only what each step needs. References define a lookup scope and current behavior without a teaching sequence. Separate substantial tutorial and reference content; label a section when either part is small.
+範囲内のすべてのドキュメントをチュートリアルまたはリファレンスに分類する。チュートリアルは成果までの順序付けられた経路をたどり、各ステップが必要とするものだけを導入する。リファレンスは教育の順序なしに参照範囲と現在の動作を定義する。実質的なチュートリアルとリファレンスの内容は分離し、どちらかの部分が小さい場合はセクションにラベルを付ける。
 
-Before writing a tutorial, privately classify the reader's starting knowledge and each concept as beginner, intermediate, or advanced. Establish prerequisites before dependent concepts, increase difficulty gradually, and move unnecessary advanced material to a later tutorial or reference.
+チュートリアルを書く前に、読者の出発点の知識と各概念を非公開で初心者、中級者、上級者に分類する。前提条件を依存する概念より先に確立し、難易度を段階的に上げ、不要な上級資料は後のチュートリアルまたはリファレンスへ移す。
 
-Author in this order: locate the document in the tree; set its permitted detail; choose tutorial or reference; for a tutorial, order concepts by prerequisite and difficulty; relocate descendant-owned detail; replace lower-level explanations with links to their owners.
+この順序で執筆する: ドキュメントをツリー内に位置付ける。許される詳細度を設定する。チュートリアルかリファレンスかを選ぶ。チュートリアルなら概念を前提条件と難易度で並べる。子孫が所有する詳細を移す。下位レベルの説明を、その所有者へのリンクに置き換える。
 
-## The tier taxonomy: one home per fact
+## 階層タクソノミー: 事実ごとに 1 つのホーム
 
-Each fact has one home: the tier whose job it is; elsewhere, link there.
+各事実には 1 つのホームがある: それを役割とする階層である。他の場所ではそこへリンクする。
 
-| Tier | Job | Does NOT belong there |
+| 階層 | 役割 | ここに属さないもの |
 |---|---|---|
-| Root `AGENTS.md` | Standing orders: rules an agent needs in context in every session, one to three lines each, linking its home | Stories, worked examples, situational procedures, anything restated from a linked home |
-| Subtree `AGENTS.md` (`packages/`, `docs/`, `.agents/notes/`) | Orders specific to that subtree | Repo-wide rules the root file already carries |
-| [architecture.md](architecture.md) | Ordered map: composition, core packages, loop, seams, extension points; read before changing `packages/` | Type definitions (→ subsystems), per-package detail (→ package READMEs), decision rationale (→ Agent Notes), implementation-status annotations |
-| [subsystems/](subsystems/README.md) | One reference page per subsystem: type definitions, semantics, and the generated Cordis API | Behavior narration (→ architecture.md) |
-| [Agent Notes](../.agents/notes/README.md) | Active decision records: the why, what-was-given-up, and required verification; `implemented/` notes describe shipped reality in present tense | Migration plans, acceptance-task checklists, fixture walkthroughs, and spec-speak ("should…") once the decision has shipped; archived notes are frozen history, never current authority |
-| [defensive-patterns/](defensive-patterns/README.md) | Rules this repository enforces in review, split by artifact: one general bug-class page plus per-domain pages | Type definitions and semantics (→ subsystems), decision rationale (→ Agent Notes) |
-| [postmortem/](postmortem/README.md) | Incident stories — the only tier where war-story narrative belongs | — |
-| [Persistence history](persistence-changes/README.md) and [format references](persistence-changes/historical-formats/README.md) | Type-change acknowledgements, release comparisons, and complete historical format schemas | Behavior-only changes; current runtime contracts |
-| [cookbook/](cookbook/adding-a-package.md) | Step-by-step how-tos with numbered verify steps | Design rationale (→ the Agent Note each guide links) |
-| [user/](user/index.md) | Product-facing guides published by the documentation website | Generated reference tables, contributor procedures, decision history |
-| Package README | The per-package contract: config, semantics, limitations, extension points, and [Model Experience](cookbook/adding-a-package.md#4-write-the-package-readme) | JSDoc restatement, generated-catalog restatement (event/tool tables), other packages' concerns |
-| [development.md](development.md) | Contributor setup, daily workflow, and a summary of CI; a bilingual pair under the [i18n contract](i18n/README.md) | Runtime/version rationale (→ Agent Notes), check-by-check lists that drift from `package.json` scripts |
-| Generated reference: the per-page `cordis-surface` regions in [subsystems/](subsystems/README.md), the [Cordis core API + inherited tier](cordis-api/context.md), [tool-catalog](tool-catalog.md), [config-catalog](config-catalog.md), [persistence-catalog](persistence-catalog.md), [module-graph.md](module-graph.md), [cli-help](cli-help.md) | Exhaustive English sources regenerated from source and freshness-gated; reviewed Chinese counterparts follow the [pairing workflow](i18n/README.md#scope-and-exclusions) | Hand edits to generated English sources or regions; Chinese counterparts update through pairing only |
-| Skills (`.agents/skills/`) | Reusable workflows and specialized decision standards | Product and runtime contracts (→ docs or source) |
+| ルート `AGENTS.md` | 常設の指示: エージェントが毎セッションでコンテキストに必要とするルール。それぞれ 1〜3 行で、そのホームにリンクする | ストーリー、実例、状況依存の手順、リンクされたホームから再掲されたもの |
+| サブツリー `AGENTS.md`（`packages/`、`docs/`、`.agents/notes/`） | そのサブツリー固有の指示 | ルートファイルがすでに運んでいるリポジトリ全体のルール |
+| [architecture.md](architecture.md) | 順序付きの地図: コンポジション、コアパッケージ、ループ、シーム、拡張ポイント。`packages/` を変更する前に読む | 型定義（→ subsystems）、パッケージごとの詳細（→ パッケージ README）、決定の根拠（→ Agent Notes）、実装状態の注記 |
+| [subsystems/](subsystems/README.md) | サブシステムごとに 1 つのリファレンスページ: 型定義、セマンティクス、生成される Cordis API | 動作のナレーション（→ architecture.md） |
+| [Agent Notes](../.agents/notes/README.md) | アクティブな決定記録: 理由、何を諦めたか、必要な検証。`implemented/` ノートは出荷済みの現実を現在時制で記述する | マイグレーション計画、受け入れタスクのチェックリスト、フィクスチャのウォークスルー、および決定が出荷された後の仕様語（「should…」）。アーカイブされたノートは凍結された歴史であり、現在の権威ではない |
+| [defensive-patterns/](defensive-patterns/README.md) | このリポジトリがレビューで強制するルール。成果物ごとに分割: 一般的なバグクラスのページ 1 つとドメインごとのページ群 | 型定義とセマンティクス（→ subsystems）、決定の根拠（→ Agent Notes） |
+| [postmortem/](postmortem/README.md) | インシデントのストーリー — 戦記的な語りが属する唯一の階層 | — |
+| [永続化の履歴](persistence-changes/README.md)と[フォーマットリファレンス](persistence-changes/historical-formats/README.md) | 型変更の承認、リリース比較、完全な歴史的フォーマットスキーマ | 動作のみの変更、現在のランタイム契約 |
+| [cookbook/](cookbook/adding-a-package.md) | 番号付きの検証手順を伴うステップバイステップのハウツー | 設計根拠（→ 各ガイドがリンクする Agent Note） |
+| [user/](user/index.md) | ドキュメントウェブサイトが公開する製品向けガイド | 生成されるリファレンステーブル、コントリビューター手順、決定の履歴 |
+| パッケージ README | パッケージごとの契約: 設定、セマンティクス、制限、拡張ポイント、[モデル体験](cookbook/adding-a-package.md#4-write-the-package-readme) | JSDoc の再掲、生成カタログの再掲（イベント/ツールテーブル）、他パッケージの関心事 |
+| [development.md](development.md) | コントリビューターのセットアップ、日常のワークフロー、CI の要約。[i18n 契約](i18n/README.md)の下のバイリンガルペア | ランタイム/バージョンの根拠（→ Agent Notes）、`package.json` スクリプトから乖離するチェック単位のリスト |
+| 生成リファレンス: [subsystems/](subsystems/README.md) のページごとの `cordis-surface` 領域、[Cordis コア API + 継承階層](cordis-api/context.md)、[tool-catalog](tool-catalog.md)、[config-catalog](config-catalog.md)、[persistence-catalog](persistence-catalog.md)、[module-graph.md](module-graph.md)、[cli-help](cli-help.md) | ソースから再生成され最新性がゲートされる網羅的な英語ソース。レビュー済みの中文対訳は[ペアリングワークフロー](i18n/README.md#scope-and-exclusions)に従う | 生成された英語ソースまたは領域への手編集。中文対訳はペアリングを通じてのみ更新される |
+| Skills（`.agents/skills/`） | 再利用可能なワークフローと特殊な決定基準 | 製品とランタイムの契約（→ docs またはソース） |
 
-Placement: bugs → postmortems; rationale → Agent Notes; procedures → cookbooks; type definitions → subsystems; package contracts → READMEs; standing orders → root `AGENTS.md` with a rationale link; review-enforced rules → `defensive-patterns/`.
+配置: バグ → postmortem。根拠 → Agent Notes。手順 → cookbook。型定義 → subsystems。パッケージ契約 → README。常設の指示 → 根拠リンク付きでルート `AGENTS.md`。レビューで強制されるルール → `defensive-patterns/`。
 
-## Writing rules
+## 執筆ルール
 
-- **Document current state.** Keep history in commits, PRs, Agent Notes, postmortems, or scoped persistence records. Other prose names live mechanisms, not changes or stack positions. General Session-format prose links [version/status authority](session-format-status.md); retain numbers for version-specific contracts, examples, or evidence.
-- **Apply the Agent Note creation criteria.** Mechanical/local edits are exempt, including local UI changes; keep existing owning notes accurate ([scope](../.agents/notes/README.md#when-to-write-one)).
-- **One physical line per paragraph** (`verify-md-wrap`): use editor soft-wrap. Code blocks, tables, and list structure keep their formatting; code comments stay under the linter's column limit.
-- **Fenced `ts` blocks must compile** (`doc-typecheck`); a pasted type declaration and its original JSDoc use ` ```ts type-equiv `, while a body-stripped public class declaration uses ` ```ts public-api `; register either in the manifest so neither can drift ([mechanics](development.md#documenting-types-verbatim-ts-type-equiv)).
-- **The owning [subsystems page](subsystems/README.md) updates in the same change** that reshapes a documented type. `verify-type-equiv` catches drifted pastes, not never-documented new types; a type is documented on its declaring package group's page ([page scoping](../scripts/verify-subsystem-pages.ts)).
-- **Pairs update together**: [Terminology-guided](i18n/terminology.md), single-pass active-agent work repositions first-use annotations, preserves untouched prose, and re-records; `dsh-translate-docs` remains user-invoked ([contract](i18n/README.md)).
-- **Comments and JSDoc state complete contracts, not reasoning transcripts.** Preserve behavior, failure, timing, ownership, modality, exceptions, consequences, and non-obvious orientation; delete narration, test walkthroughs, review analysis, and code restatement. Keep the local contract and link its rationale. Use [dsh-prose-standard](../.agents/skills/dsh-prose-standard/SKILL.md) for details.
-- Write directly: name actors and facts ([reference](../.agents/skills/dsh-prose-standard/SKILL.md)). Reserve `seam` for the defined capability. Name the exact check, type, API, operation, or behavior instead of metaphorical "gate", "vocabulary", or "surface".
+- **現在の状態を記述する。** 履歴はコミット、PR、Agent Notes、postmortem、またはスコープ付きの永続化レコードに保つ。その他の散文は変更やスタック上の位置ではなく、生きたメカニズムを名指しする。一般的な Session フォーマットの散文は[バージョン/ステータスの権威](session-format-status.md)へリンクする。バージョン固有の契約、例、証拠には番号を保持する。
+- **Agent Note の作成基準を適用する。** 機械的/ローカルな編集は除外され、ローカルの UI 変更も含まれる。既存の所有ノートは正確なまま保つ（[範囲](../.agents/notes/README.md#when-to-write-one)）。
+- **1 段落 1 物理行**（`verify-md-wrap`）: エディターのソフトラップを使う。コードブロック、テーブル、リスト構造はその整形を保ち、コードコメントはリンターの列制限以下に保つ。
+- **フェンス付き `ts` ブロックはコンパイルできなければならない**（`doc-typecheck`）。貼り付けた型宣言とその元の JSDoc は ` ```ts type-equiv ` を、本体を削った公開クラス宣言は ` ```ts public-api ` を使う。どちらもマニフェストに登録し、乖離できないようにする（[仕組み](development.md#documenting-types-verbatim-ts-type-equiv)）。
+- **所有する [subsystems ページ](subsystems/README.md)は、文書化された型を作り変える同じ変更で更新する。** `verify-type-equiv` が捉えるのは乖離した貼り付けであり、一度も文書化されていない新しい型ではない。型はそれを宣言するパッケージグループのページに文書化される（[ページのスコープ](../scripts/verify-subsystem-pages.ts)）。
+- **ペアは一緒に更新する**: [用語ガイド付き](i18n/terminology.md)の単一パスのアクティブエージェント作業が初出注釈を再配置し、未変更の散文を保持して再記録する。`dsh-translate-docs` はユーザー起動のままである（[契約](i18n/README.md)）。
+- **コメントと JSDoc は推論の記録ではなく完全な契約を述べる。** 動作、失敗、タイミング、所有権、モダリティ、例外、帰結、非自明な方向付けを保持し、ナレーション、テストのウォークスルー、レビュー分析、コードの再掲を削除する。ローカルの契約を保ち、その根拠にリンクする。詳細は [dsh-prose-standard](../.agents/skills/dsh-prose-standard/SKILL.md) を使う。
+- 直接的に書く: 行為者と事実を名指しする（[リファレンス](../.agents/skills/dsh-prose-standard/SKILL.md)）。`seam` は定義されたケイパビリティのために取っておく。比喩的な「gate」「vocabulary」「surface」ではなく、正確なチェック、型、API、操作、動作を名指しする。
 
-## Wordcount Budgets
+## 語数予算
 
-[scripts/doc-budgets.manifest.json](../scripts/doc-budgets.manifest.json) sets standing-doc ceilings; `pnpm run verify-doc-budgets` rejects excess or missing files.
+[scripts/doc-budgets.manifest.json](../scripts/doc-budgets.manifest.json) が常設ドキュメントの上限を設定し、`pnpm run verify-doc-budgets` が超過または欠落したファイルを拒否する。
 
-When the gate goes red:
+ゲートが赤になった場合:
 
-1. **Relocate** content that belongs in another tier; leave a one-line link if needed.
-2. **Condense** content that belongs here but can be shorter.
-3. **Raise** the ceiling only when the words need the space; justify the manifest diff in the PR. A too-low ceiling is a budget bug.
+1. **移す** — 別の階層に属する内容を移す。必要なら 1 行のリンクを残す。
+2. **凝縮する** — ここに属するがもっと短くできる内容を短くする。
+3. **上限を上げる** — 言葉にそのスペースが本当に必要な場合のみ。PR でマニフェストの差分を正当化する。低すぎる上限は予算のバグである。
 
-Ceilings are guardrails, not reduction targets. At or below target, retain at least 5% headroom; above target, freeze the ceiling until relocation or condensation brings the document under target. Lower a ceiling only when the document still has room. Targets: root `AGENTS.md` ≤ 2,080; `architecture.md` ≤ 2,400; subtree `AGENTS.md` ≤ 600, except `packages/AGENTS.md` ≤ 810 and this file ≤ 1,430; `packages/README.md` ≤ 994; plus `cordis-primer.md` 600, `testing.md` 1,300, `examples/AGENTS.md` 310. Review governs unbudgeted tiers.
+上限はガードレールであり、削減目標ではない。目標値以下では少なくとも 5% の余裕を保つ。目標値を超える場合は、移転または凝縮によってドキュメントを目標値未満に戻すまで上限を凍結する。上限を下げるのは、ドキュメントにまだ余裕がある場合のみとする。目標: ルート `AGENTS.md` ≤ 2,080、`architecture.md` ≤ 2,400、サブツリー `AGENTS.md` ≤ 600（ただし `packages/AGENTS.md` ≤ 810、およびこのファイル ≤ 1,430）、`packages/README.md` ≤ 994。加えて `cordis-primer.md` 600、`testing.md` 1,300、`examples/AGENTS.md` 310。予算のない階層はレビューが統治する。
 
-## The slop checklist
+## スロップチェックリスト
 
-Hunt these in any doc; [dsh-doc](../.agents/skills/dsh-doc/SKILL.md) runs this list as an audit:
+どのドキュメントでもこれらを探す。[dsh-doc](../.agents/skills/dsh-doc/SKILL.md) はこのリストを監査として実行する:
 
-- Duplicated rules: search a distinctive phrase; keep one home and link the rest.
-- History outside its permitted tier: state current facts and link the historical owner.
-- Implementation-status annotations in prose or diagrams ("implemented!", "future: …"). Status rots; the repo layout and package manifests carry it.
-- Hand-restated catalogs, JSDoc, or inventories of tests, packages, and status when source or a generator is authoritative.
-- Reasoning transcripts: step-by-step implementation narration, proof of obvious branches, test walkthroughs, or rejected local alternatives. Keep the resulting contract or durable rationale; delete the path used to derive it.
-- Rationale repeated beside sibling methods instead of once at the owning capability or helper.
-- Paragraph walls: one paragraph carrying several rules and parenthetical asides. Split it or demote the detail to its home.
-- Emphasis inflation: bold, CAPS, or "critically" everywhere means nothing stands out. Reserve emphasis for the clause that changes behavior.
-- Spec-speak in `implemented/` Agent Notes: "should", migration plans, acceptance checklists. An implemented Agent Note describes what is, per the [implemented-note instructions](../.agents/notes/implemented/AGENTS.md).
+- 重複したルール: 特徴的なフレーズを検索する。ホームを 1 つに保ち、残りはリンクする。
+- 許された階層の外にある履歴: 現在の事実を述べ、歴史的な所有者にリンクする。
+- 散文または図の中の実装状態の注記（「実装済み!」、「future: …」）。状態は腐る。リポジトリレイアウトとパッケージマニフェストがそれを運ぶ。
+- ソースまたは生成器が権威である場合の、手で再掲されたカタログ、JSDoc、テスト・パッケージ・状態の目録。
+- 推論の記録: ステップバイステップの実装ナレーション、明白な分岐の証明、テストのウォークスルー、却下されたローカル代替案。結果として得られた契約または耐久性のある根拠を保ち、それを導出するのに使った道筋を削除する。
+- 所有するケイパビリティまたはヘルパーのそばで 1 回だけ書くべき根拠が、兄弟メソッドのそばで繰り返されている。
+- 段落の壁: 複数のルールと挿入的な補足を 1 段落が運んでいる。分割するか、詳細をそのホームへ降格する。
+- 強調のインフレ: 太字、大文字、あちこちの「critically」は、何も目立たないことを意味する。強調は動作を変える節のために取っておく。
+- `implemented/` Agent Notes における仕様語: 「should」、マイグレーション計画、受け入れチェックリスト。実装済みの Agent Note は[実装済みノートの指示](../.agents/notes/implemented/AGENTS.md)に従い、あるがままを記述する。
 
-## Repository references
+## リポジトリ参照
 
-Use relative Markdown links for current files and tags or PR numbers for historical references. `verify-md-links` checks local targets. [Reference validation](../scripts/verify-repository-references.ts) rejects actual commit identifiers and disallowed organization URLs in maintained files.
+現在のファイルには相対 Markdown リンクを、歴史的な参照にはタグまたは PR 番号を使う。`verify-md-links` がローカルターゲットを確認する。[参照検証](../scripts/verify-repository-references.ts)は、維持されるファイル内の実際のコミット識別子と許可されない組織 URL を拒否する。

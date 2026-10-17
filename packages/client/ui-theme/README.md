@@ -1,142 +1,142 @@
 ---
-description: "Theme, font-size, and font-family settings for the dsh web client: --dsw-* token stylesheets, ThemeRuntime state, General settings rows, and the pre-plugin bootstrap."
+description: "dsh Web Client のテーマ、フォントサイズ、フォントファミリー設定: --dsw-* トークンのスタイルシート、ThemeRuntime の状態、全般設定の行、プラグイン読み込み前のブートストラップ。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-theme
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-client-ui-theme` lets Web GUI users choose `light`, `dark`, or `system`, and set the font and font size of text, code, and the terminal separately in Settings. Every authenticated browser stores these values in the `ui-theme` settings namespace, which the local provider persists in `$DSH_HOME/cordis.patch.yml` by default. The plugin resolves `system` through `prefers-color-scheme` and publishes immutable `ThemeSnapshot`s; ui-layout applies each snapshot to the document. The package also ships the `--dsw-*` token stylesheets and injects a synchronous bootstrap so the selected palette, font size, and fonts apply before the shell loads. Third-party themes can register alias-token overrides through `ctx.theme`.
+`dsh-client-ui-theme` は、Web GUI のユーザーが `light`、`dark`、`system` を選択し、設定でテキスト・コード・ターミナルのフォントとフォントサイズをそれぞれ個別に設定できるようにする。認証済みの各ブラウザーはこれらの値を `ui-theme` 設定名前空間に保存し、ローカルプロバイダーは既定で `$DSH_HOME/cordis.patch.yml` に永続化する。プラグインは `system` を `prefers-color-scheme` で解決し、不変の `ThemeSnapshot` を発行する。ui-layout が各スナップショットをドキュメントに適用する。このパッケージは `--dsw-*` トークンのスタイルシートも同梱し、選択されたパレット、フォントサイズ、フォントがシェルの読み込み前に適用されるよう同期ブートストラップを注入する。サードパーティのテーマは `ctx.theme` を通じてエイリアストークンのオーバーライドを登録できる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Users switch the color scheme, font sizes, and fonts from rows in Settings (General section); the choices persist across restarts in every authenticated browser. Feature plugins consume the current snapshot through `ctx.theme` and read the `--dsw-*` tokens in CSS; they do not manage theme state themselves.
+ユーザーは設定（全般セクション）の行から配色、フォントサイズ、フォントを切り替える。選択は認証済みの各ブラウザーで再起動をまたいで永続化される。機能プラグインは `ctx.theme` を通じて現在のスナップショットを利用し、CSS で `--dsw-*` トークンを読む。テーマ状態を自ら管理することはない。
 
-### Appearance and font size
+### 外観とフォントサイズ
 
-The plugin registers Appearance preference cubes and the text font-size stepper in the General section. A More font settings button after the stepper expands a region below it, collapsed on every settings open, with a font row for each of text, code, and the terminal, plus the code and terminal font-size steppers. The text stepper accepts integer values from 10 through 22 px and defaults to 14 px. It changes conversation headings and base text by the same increment, including the user bubble and composer draft; flow-row titles, summaries, and tables follow one step under the body size, while small text keeps a fixed size. The code stepper (10–16 px, default 11) sets the code-block size; inline code stays 1 px larger, and the small tool-output variant uses the same size. The terminal stepper (10–20 px, default 13) sets the sidebar terminal cell font size; changing it keeps the shell and output and refits the grid. Each accepted change writes through the Host settings API. Rapid changes serialize in gesture order with namespace revisions, and a rejected latest write reloads the durable values.
+プラグインは全般セクションに外観設定のキューブとテキストフォントサイズのステッパーを登録する。ステッパーの後の「その他のフォント設定」ボタンは、その下の領域を展開する。領域は設定を開くたびに折りたたまれ、テキスト・コード・ターミナルそれぞれのフォント行と、コードおよびターミナルのフォントサイズステッパーを含む。テキストのステッパーは 10〜22 px の整数値を受け付け、既定は 14 px。会話の見出しと基本テキストを同じ増分で変更する（ユーザーバブルとコンポーザーの下書きを含む）。フロー行のタイトル、要約、表は本文サイズより 1 段下に従い、小さいテキストは固定サイズを保つ。コードのステッパー（10〜16 px、既定 11）はコードブロックのサイズを設定する。インラインコードは 1 px 大きいまま、ツール出力の小型版も同じサイズを使う。ターミナルのステッパー（10〜20 px、既定 13）はサイドバーターミナルのセルのフォントサイズを設定する。変更してもシェルと出力は保たれ、グリッドは再フィットされる。受け入れられた各変更は Host 設定 API を通じて書き込まれる。急速な変更は名前空間リビジョン付きでジェスチャーの順序どおりに直列化され、最新の書き込みが拒否されると耐久値が再読み込みされる。
 
-Desktop's fixed `Cmd`/`Ctrl` + `+` (or `=`) and `Cmd`/`Ctrl` + `-` shortcuts change the text, code, and terminal font sizes together by 1 px, each within its own range. Each physical key press saves the changed fields in one settings mutation; holding a key does not repeat the adjustment. The actions appear in the shortcut reference and work in the main document, including dialogs and text inputs, unless a local control consumes the input; terminal input retains its own key handling. Web retains the browser's zoom shortcuts.
+Desktop の固定ショートカット `Cmd`/`Ctrl` + `+`（または `=`）と `Cmd`/`Ctrl` + `-` は、テキスト・コード・ターミナルのフォントサイズをまとめて 1 px 変更する。それぞれ自身の範囲内で行う。物理キーを 1 回押すごとに変更されたフィールドが 1 回の設定変更で保存され、キーを押し続けても調整は繰り返されない。この操作はショートカット一覧に表示され、メインドキュメント内（ダイアログやテキスト入力欄を含む）で機能する。ただしローカルコントロールが入力を消費する場合を除く。ターミナル入力は独自のキー処理を保持する。Web はブラウザーのズームショートカットを保持する。
 
-### Fonts
+### フォント
 
-Three rows set the text font (interface and conversation text), the code font (code blocks, inline code, and other `--ds-font-family-code` text), and the sidebar terminal font independently. Each field takes comma-separated family names and commits on blur or Enter; an empty field restores the built-in stack. The service normalizes each list by dropping quotes, backslashes, angle brackets, and control characters and double-quoting every name except CSS generic families, then stores it in `textFontFamily`, `codeFontFamily`, or `terminalFontFamily`. The user list precedes the role's built-in stack, so a font missing on the machine falls back to the default. The field accepts any installed font name; it does not enumerate local fonts.
+3 つの行が、テキストフォント（インターフェースと会話のテキスト）、コードフォント（コードブロック、インラインコード、その他の `--ds-font-family-code` テキスト）、サイドバーターミナルのフォントをそれぞれ独立に設定する。各フィールドはカンマ区切りのフォントファミリー名を受け付け、フォーカスを外すか Enter で確定する。空のフィールドは組み込みスタックを復元する。サービスは各リストを正規化して、引用符、バックスラッシュ、山括弧、制御文字を取り除き、CSS の総称フォントファミリー以外のすべての名前を二重引用符で囲み、`textFontFamily`、`codeFontFamily`、`terminalFontFamily` のいずれかに保存する。ユーザーリストはそのロールの組み込みスタックの前に置かれるため、マシンにないフォントは既定にフォールバックする。フィールドはインストール済みの任意のフォント名を受け付けるが、ローカルフォントを列挙することはない。
 
-### Registering a theme
+### テーマの登録
 
-A composition can register a third-party theme id with alias-token overrides through `ctx.theme`; the override layer folds into the active snapshot's tokens in registration order. Removing one never overwrites the last durable built-in preference. Third-party theme ids remain an in-process extension and do not cross the built-in settings schema.
+コンポジションは `ctx.theme` を通じて、エイリアストークンのオーバーライド付きのサードパーティテーマ id を登録できる。オーバーライド層は登録順にアクティブスナップショットのトークンへ畳み込まれる。1 つを削除しても、最後の耐久組み込みプリファレンスが上書きされることは決してない。サードパーティテーマ id はプロセス内拡張のままであり、組み込み設定スキーマを跨ぐことはない。
 
-### Pre-plugin palette
+### プラグイン前パレット
 
-When the host composition includes an HTTP server, the host half embeds the registered `ui-theme` settings, or schema defaults, into each index response. Head CSS selects the document canvas color scheme before any script runs, including a `prefers-color-scheme` query for the `system` preference. A body script then sets `body[data-ds-dark-theme]`, `--dsh-content-font-size`, `--dsh-code-font-size`, `--dsh-terminal-font-size`, and each non-empty `--dsh-font-family-<role>` list before the loading page and application scripts, so the first paint uses the selected palette and text and code sizes, and `ThemeRuntime` starts from the saved sizes and fonts instead of rendering the defaults first.
+Host コンポジションが HTTP サーバーを含む場合、Host 側の半分は登録された `ui-theme` 設定、またはスキーマの既定値を各 index レスポンスに埋め込む。Head CSS はどのスクリプトよりも前にドキュメントキャンバスの配色を選択し、`system` プリファレンス用の `prefers-color-scheme` クエリも含む。その後 body スクリプトが、読み込みページとアプリケーションスクリプトより前に `body[data-ds-dark-theme]`、`--dsh-content-font-size`、`--dsh-code-font-size`、`--dsh-terminal-font-size`、および空でない各 `--dsh-font-family-<role>` リストを設定する。これにより最初の描画が選択されたパレットとテキスト・コードのサイズを使い、`ThemeRuntime` は既定を先に描画するのではなく保存されたサイズとフォントから開始する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-Shared menus use `--dsw-menu-surface-fill` and blur through `MenuSurface`; platform code must preserve those token values. Sticky menu group headings can use `--dsw-alias-menu-group-header-fill`, a 94%-opaque light or dark fill, independently of the menu material. Other overlays consume `--dsw-specific-menu`, which keeps a nearly opaque macOS fill without a menu backing. The enforced source rules are defined in the [styling reference](../../../docs/web-styling.md#component-rules). Modal masks retain their dark translucent fill without background blur.
+共有メニューは `--dsw-menu-surface-fill` を使い、`MenuSurface` を通じてぼかす。プラットフォームコードはこれらのトークン値を保持しなければならない。スティッキーなメニューグループ見出しは `--dsw-alias-menu-group-header-fill`（94% 不透明のライトまたはダークの塗り）を使える。これはメニューの素材とは独立である。他のオーバーレイは `--dsw-specific-menu` を使う。これはメニューの下地なしでほぼ不透明の macOS 塗りを保つ。強制されるソースルールは[スタイリングリファレンス](../../../docs/web-styling.md#component-rules)で定義されている。モーダルマスクは背景ぼかしなしの暗い半透明の塗りを保つ。
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The service owns theme, font-size, and font-family state and publishes snapshots. The ui-layout presenter applies those snapshots, and the token sheets own the color and conversation text scales.
+サービスがテーマ、フォントサイズ、フォントファミリーの状態を所有し、スナップショットを発行する。ui-layout のプレゼンターがそれらのスナップショットを適用し、トークンシートが色と会話テキストのスケールを所有する。
 
-### Stylesheets
+### スタイルシート
 
-`base.css` owns the shared radius scale, the font tokens, and settings-card material aliases. `--dsh-font-family-text-default` and `--dsh-font-family-code-default` hold the built-in stacks on `:root`; on `body`, `--dsw-font-family` and `--ds-font-family-code` place `--dsh-font-family-text` and `--dsh-font-family-code` ahead of those stacks, and an unset list resolves to the built-in stack (repeated once, which font matching ignores). The material aliases resolve on `body`, alongside the active palette. Follow [Web styling](../../../docs/web-styling.md#corner-radii-and-settings-cards) when choosing component radii.
+`base.css` は共有の角丸スケール、フォントトークン、設定カードの素材エイリアスを所有する。`--dsh-font-family-text-default` と `--dsh-font-family-code-default` は `:root` に組み込みスタックを保持し、`body` では `--dsw-font-family` と `--ds-font-family-code` が `--dsh-font-family-text` と `--dsh-font-family-code` をそれらのスタックの前に置く。未設定のリストは組み込みスタックに解決される（1 回繰り返されるが、フォントマッチングはこれを無視する）。素材エイリアスはアクティブパレットと同じく `body` で解決される。コンポーネントの角丸半径を選ぶ際は [Web スタイリング](../../../docs/web-styling.md#corner-radii-and-settings-cards)に従うこと。
 
-`src/styles/` holds eight sheets imported in order by ui-theme's dynamic client entry: `base.css`, `corner-shape.css`, `design-platform.css`, `focus.css`, `onboarding.css`, `scrollbar.css`, `gradient-shadow-text.css`, and `shiki.css`. The client bundle compiles and injects them as plugin-owned global styles, so unload and HMR remove them with ui-theme. `scrollbar.css` consumes the `--dsw-alias-scrollbar-*` tokens and must follow `design-platform.css`, which declares them. Status marks use their own semantic state tokens. `--dsw-alias-bg-document-selection` uses blue-500 at 40% opacity in both themes for selections over original document colors. `design-platform.css` also owns the code-diff fill aliases and their static alpha palette entries, plus the `--dsw-alias-file-diff-*` code, gutter, and marker palette for file comparisons; `shiki.css` owns syntax colors.
+`src/styles/` は ui-theme の動的 Client エントリーによって順にインポートされる 8 つのシートを保持する: `base.css`、`corner-shape.css`、`design-platform.css`、`focus.css`、`onboarding.css`、`scrollbar.css`、`gradient-shadow-text.css`、`shiki.css`。Client バンドルはそれらをプラグイン所有のグローバルスタイルとしてコンパイル・注入するため、アンロードと HMR は ui-theme と一緒にそれらを除去する。`scrollbar.css` は `--dsw-alias-scrollbar-*` トークンを使い、それらを宣言する `design-platform.css` の後に続かなければならない。ステータスマークは独自の意味論的状態トークンを使う。`--dsw-alias-bg-document-selection` は、元のドキュメント色の上の選択範囲用に、両テーマで blue-500 を 40% 不透明度で使う。`design-platform.css` はコード差分の塗りエイリアスとその静的アルファパレット項目、さらにファイル比較用の `--dsw-alias-file-diff-*` コード、ガター、マーカーパレットも所有する。`shiki.css` は構文色を所有する。
 
-[`focus.css`](src/styles/focus.css) provides a `:focus-visible` fallback that names the ring colour through `var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary))` and the standard width through `--dsw-focus-ring-width`, never the outline style — so a control that disables its outline stays paintless, and one that declares no ring keeps the standard geometry instead of Chromium's `auto 1px`. The theme resolves this blue to `#4176E6` in light mode and `#7AAAFF` in dark mode. Component outlines and focus-ring shadows use the same colour expression, including rings on descendants and pseudo-elements. `--dsw-focus-ring-width` (2px) is the standard width; dense tables and toolbars may keep 1px, and offsets remain component-owned.
+[`focus.css`](src/styles/focus.css) は `:focus-visible` フォールバックを提供する。リング色は `var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary))` で、標準幅は `--dsw-focus-ring-width` で指定し、outline style は決して使わない。したがってアウトラインを無効にしたコントロールは塗りを持たないままになり、リングを宣言しないコントロールは Chromium の `auto 1px` ではなく標準ジオメトリを保つ。テーマはこの青をライトモードで `#4176E6`、ダークモードで `#7AAAFF` に解決する。コンポーネントのアウトラインとフォーカスリングのシャドウも同じ色式を使い、子孫や疑似要素のリングも含む。`--dsw-focus-ring-width`（2px）が標準幅である。密な表とツールバーは 1px を保ってよく、オフセットはコンポーネント所有のままである。
 
-In pointer modality, `html[data-input-modality='pointer'] body :focus-visible:not(:read-write)` makes the ring colour transparent. Descendants and pseudo-elements inherit that value; the rule does not clear `box-shadow`, so elevation and selected-state borders remain independent of ring visibility. Editable text controls matching `:read-write` retain their own focus feedback on click. [Input modality](../ui-primitives/README.md#input-modality) determines when keyboard focus styling resumes; it does not move DOM focus.
+ポインター入力モダリティでは、`html[data-input-modality='pointer'] body :focus-visible:not(:read-write)` がリング色を透明にする。子孫と疑似要素はその値を継承する。このルールは `box-shadow` をクリアしないため、エレベーションと選択状態のボーダーはリングの可視性とは独立のままである。`:read-write` に一致する編集可能テキストコントロールはクリック時に自身のフォーカスフィードバックを保つ。[入力モダリティ](../ui-primitives/README.md#input-modality)がキーボードフォーカススタイリングを再開する時期を決める。DOM フォーカスは移動しない。
 
-Menu icons use `--dsw-alias-menu-icon`: neutral-bluish 800 in light mode and `label-primary-dimmed` in dark mode.
+メニューアイコンは `--dsw-alias-menu-icon` を使う。ライトモードでは neutral-bluish 800、ダークモードでは `label-primary-dimmed` である。
 
-`base.css` suppresses only the outline of focused elements marked `data-dsh-automatic-focus` by the [primitive focus helper](../ui-primitives/README.md); ordinary keyboard focus styling, borders, shadows, and error states remain intact.
+`base.css` は [プリミティブフォーカスヘルパー](../ui-primitives/README.md)が `data-dsh-automatic-focus` とマークしたフォーカス要素のアウトラインだけを抑制する。通常のキーボードフォーカススタイリング、ボーダー、シャドウ、エラー状態は無傷のままである。
 
-System toasts use `--dsw-alias-toast-bg` and `--dsw-alias-toast-label` for a shared background and text color across callers. Document previews pair `--dsw-alias-bg-document-preview` with `--dsw-alias-label-document-preview` so the backdrop and status text follow the same theme. Tooltip keycaps use `--dsw-alias-tooltip-key-bg`, a lighter fill derived from the tooltip background in each palette. Switch thumbs read `--dsw-alias-switch-thumb`: white in light mode and neutral-bluish 400 in dark mode, so an off switch stays lighter than its track without the glare of pure white.
+システムトーストは `--dsw-alias-toast-bg` と `--dsw-alias-toast-label` を使い、呼び出し元間で共有の背景色とテキスト色にする。ドキュメントプレビューは `--dsw-alias-bg-document-preview` と `--dsw-alias-label-document-preview` を組み合わせ、背景とステータステキストが同じテーマに従うようにする。ツールチップのキーキャップは `--dsw-alias-tooltip-key-bg` を使う。各パレットのツールチップ背景から派生した、より明るい塗りである。スイッチのつまみは `--dsw-alias-switch-thumb` を読む: ライトモードでは白、ダークモードでは neutral-bluish 400。これによりオフのスイッチは、純白のまぶしさなしにトラックより明るいままになる。
 
-`--dsw-alias-label-shimmer` supplies an overlay for the shared text shimmer: black at 30% alpha in the light palette and white at 45% alpha in the dark palette. `--dsw-alias-label-deep-diving` and `--dsw-alias-label-deep-diving-shimmer` supply the blue activity label and sweep; the dark palette uses a lighter, less saturated label with a brighter blue sweep.
+`--dsw-alias-label-shimmer` は共有テキストシマー用のオーバーレイを提供する: ライトパレットでは 30% アルファの黒、ダークパレットでは 45% アルファの白。`--dsw-alias-label-deep-diving` と `--dsw-alias-label-deep-diving-shimmer` は青いアクティビティラベルとスイープを提供する。ダークパレットはより明るく彩度の低いラベルと、より明るい青のスイープを使う。
 
-The `--dsw-alias-turn-trigger-*` tokens provide separate resting and hover backgrounds for Turn-trigger notices in each palette. Dark notices use brighter interactive layers so the resting card remains distinct from the transcript background.
+`--dsw-alias-turn-trigger-*` トークンは、各パレットで Turn トリガー通知用の休止背景とホバー背景を別々に提供する。ダークの通知はより明るいインタラクティブ層を使い、休止カードがトランスクリプト背景から区別されたままになるようにする。
 
-`brand-font.css` exports the local Montserrat Light, Regular and Medium faces (normal style, weights 300, 400 and 500), with `montserrat-light.woff2`, `montserrat-regular.woff2`, `montserrat-medium.woff2` and its SIL Open Font License in `lib/styles/`. Desktop bundles the same stylesheet, font and license for offline welcome brand text; ordinary UI keeps its system font stack.
+`brand-font.css` はローカルの Montserrat Light、Regular、Medium フェイス（normal スタイル、ウェイト 300、400、500）をエクスポートし、`lib/styles/` に `montserrat-light.woff2`、`montserrat-regular.woff2`、`montserrat-medium.woff2` とその SIL Open Font License を置く。Desktop はオフラインのウェルカムブランドテキスト用に同じスタイルシート、フォント、ライセンスをバンドルする。通常の UI はシステムフォントスタックを保つ。
 
-`corner-shape.css` smooths every rounded corner: inside `@supports (corner-shape: superellipse(1.5))` it defines `--dsw-corner-shape` and applies it to all elements and their `::before`/`::after` through the universal selector, so engines without `corner-shape` keep circular corners. Full-round shapes — `border-radius: 50%` circles and pill radii — pair `corner-shape: round` with their radius in the owning component sheet because a superellipse deforms them; the corner-shape stylesheet spec enforces that pairing across every package stylesheet.
+`corner-shape.css` はすべての角丸を滑らかにする: `@supports (corner-shape: superellipse(1.5))` の中で `--dsw-corner-shape` を定義し、ユニバーサルセレクターを通じてすべての要素とその `::before`/`::after` に適用するため、`corner-shape` を持たないエンジンは円形の角を保つ。完全な円形形状 — `border-radius: 50%` の円とピル半径 — は所有コンポーネントシートで `corner-shape: round` をその半径と組み合わせる。superellipse がそれらを変形させるためである。corner-shape スタイルシートの仕様は、すべてのパッケージスタイルシートにわたってその組み合わせを強制する。
 
-`gradient-shadow-text.css` derives `--dsh-content-font-delta` from `--dsh-content-font-size` and shifts the Markdown heading and base-text ladder by that increment. It also derives the secondary tier `--dsh-content-font-size-secondary` (setting −1 at ≤14, setting −2 above; 13px at the default) with its own `--dsh-content-font-delta-secondary` for the table variants and the flow rows one step under the body. Dense small variants stay fixed. The code variants (`--dsw-font-markdown-code`, `-code-block`, `-code-block-small`) shift size and line height by `--dsh-code-font-delta`, the difference between `--dsh-code-font-size` and 11 px. Outside the ladder, the user bubble and composer draft read the body pair directly, and flow-row titles and summaries read the secondary pair. The sheet also owns the shadow scale (`--dsw-shadow-lv*`), the translucent-menu `--dsw-menu-backdrop-filter`, and the elevation tokens: `--dsw-elevation-stroke` draws a 0.5px hairline through the rebindable `--dsw-elevation-stroke-color`, and `--dsw-elevation-panel`/`--dsw-elevation-prominent`/`--dsw-elevation-soft` (the composer's larger-blur, lower-alpha tier) layer two faint soft shadows over that stroke, so elevated surfaces set `border: 0` and carry no layout-consuming outline; the derived tokens are re-declared per element so a surface's stroke-color rebind takes effect. An elevated surface that paints `--dsw-specific-menu` also applies `backdrop-filter: var(--dsw-menu-backdrop-filter)` ([styling reference](../../../docs/web-styling.md#component-rules)). Dark menus use a 45%-opaque gray fill and the `border-l3` stroke; light menus retain their `border-l1` stroke.
+`gradient-shadow-text.css` は `--dsh-content-font-size` から `--dsh-content-font-delta` を導出し、Markdown 見出しと基本テキストのはしごをその増分だけずらす。また第 2 階層 `--dsh-content-font-size-secondary`（設定値 14 以下なら −1、それより上なら −2。既定では 13px）を独自の `--dsh-content-font-delta-secondary` とともに導出し、表のバリアントと本文より 1 段下のフロー行に使う。密な small バリアントは固定のままである。コードバリアント（`--dsw-font-markdown-code`、`-code-block`、`-code-block-small`）はサイズと行高を `--dsh-code-font-delta`（`--dsh-code-font-size` と 11 px の差）だけずらす。はしごの外では、ユーザーバブルとコンポーザー下書きが本文ペアを直接読み、フロー行のタイトルと要約が secondary ペアを読む。このシートはシャドウスケール（`--dsw-shadow-lv*`）、半透明メニューの `--dsw-menu-backdrop-filter`、およびエレベーショントークンも所有する: `--dsw-elevation-stroke` は再バインド可能な `--dsw-elevation-stroke-color` を通じて 0.5px のヘアラインを描き、`--dsw-elevation-panel`/`--dsw-elevation-prominent`/`--dsw-elevation-soft`（コンポーザーの、より大きいぼかし・より低いアルファの階層）はそのストロークの上に 2 つの淡いソフトシャドウを重ねる。したがってエレベートされたサーフェスは `border: 0` を設定し、レイアウトを消費するアウトラインを持たない。派生トークンは要素ごとに再宣言されるため、サーフェスの stroke-color 再バインドが効く。`--dsw-specific-menu` を描くエレベートサーフェスは `backdrop-filter: var(--dsw-menu-backdrop-filter)` も適用する（[スタイリングリファレンス](../../../docs/web-styling.md#component-rules)）。ダークメニューは 45% 不透明のグレーの塗りと `border-l3` ストロークを使い、ライトメニューは `border-l1` ストロークを保つ。
 
-`brand-font.css` references the bundled `montserrat-regular.woff2` / `montserrat-light.woff2` / `montserrat-medium.woff2`, Montserrat Regular, Light, and Medium under the SIL Open Font License shipped with the stylesheet and WOFF2 under `lib/styles/`. `--dsw-font-family-brand` selects this face for brand text; ordinary UI keeps the system font stack. The source is Google Fonts' Montserrat distribution. The Web entry imports the package's `./brand-font.css` export so Vite emits and resolves the font asset; the Web build also includes its license. The Web application, including Desktop onboarding, loads the font offline. The native credential welcome retains its system font.
+`brand-font.css` はバンドルされた `montserrat-regular.woff2` / `montserrat-light.woff2` / `montserrat-medium.woff2` を参照する。Montserrat Regular、Light、Medium はスタイルシートに同梱の SIL Open Font License と `lib/styles/` 配下の WOFF2 による。`--dsw-font-family-brand` はブランドテキスト用にこのフェイスを選択し、通常の UI はシステムフォントスタックを保つ。ソースは Google Fonts の Montserrat ディストリビューションである。Web エントリーはパッケージの `./brand-font.css` エクスポートをインポートするため、Vite がフォントアセットを出力して解決する。Web ビルドはそのライセンスも含む。Web アプリケーションは Desktop オンボーディングを含め、フォントをオフラインで読み込む。ネイティブ資格情報のウェルカムはシステムフォントを保つ。
 
-`onboarding.css` owns the onboarding accent, named violet/blue/cyan gradients, and light/dark card, checkbox, and secondary-action colors. The feature owns card shadow offsets and blur sizes.
+`onboarding.css` はオンボーディングのアクセント、violet/blue/cyan の名前付きグラデーション、およびライト/ダークのカード、チェックボックス、副次アクションの色を所有する。カードのシャドウオフセットとぼかしサイズは機能側が所有する。
 
-### Scrollbar rebinding
+### スクロールバーの再バインド
 
-`scrollbar.css` binds `--dsh-scrollbar-thumb` and `--dsh-scrollbar-thumb-hover` on `body` to the l1 base-surface tokens; an elevated surface (menu, popover, dialog) rebinds them to the l2 tokens on its own container, and the pair's other legal target is `transparent` (ui-sidebar rebinds its column that way while the pointer is elsewhere). WebKit-based browsers use a 5px default `--dsh-scrollbar-width` and also read `--dsh-scrollbar-thumb-border` and `--dsh-scrollbar-track-margin`; a scroll surface may rebind them to keep a wide draggable rail around a narrower visible thumb or to inset the track from rounded ends. The two rendering paths are mutually exclusive by construction: Firefox takes the standard thin scrollbar inside `@supports not selector(::-webkit-scrollbar)`, and WebKit-based engines take the pseudo-elements, so geometry and hover customization apply only through the pseudo-element path.
+`scrollbar.css` は `body` 上の `--dsh-scrollbar-thumb` と `--dsh-scrollbar-thumb-hover` を l1 ベースサーフェストークンにバインドする。エレベートサーフェス（メニュー、ポップオーバー、ダイアログ）は自身のコンテナ上でそれらを l2 トークンに再バインドし、このペアのもう 1 つの正当なターゲットは `transparent` である（ui-sidebar はポインターが他所にある間、その列をそう再バインドする）。WebKit ベースのブラウザーは 5px の既定 `--dsh-scrollbar-width` を使い、`--dsh-scrollbar-thumb-border` と `--dsh-scrollbar-track-margin` も読む。スクロールサーフェスはそれらを再バインドして、より細い可視サムの周りに広いドラッグ可能レールを保つか、丸い端からトラックを内側に寄せることができる。2 つのレンダリング経路は構造上相互排他的である: Firefox は `@supports not selector(::-webkit-scrollbar)` 内の標準シンスクロールバーを取り、WebKit ベースのエンジンは疑似要素を取る。したがってジオメトリとホバーのカスタマイズは疑似要素経路にのみ適用される。
 
-### Preference persistence
+### プリファレンスの永続化
 
-The service provides itself immediately with the schema defaults, then loads the `ui-theme` namespace and writes each accepted theme, font-size, or font-family change through the Host settings API. Pushed settings changes and reconnects refetch the namespace. While its own writes are pending, the service ignores refetched sections, so an echo of an earlier write cannot revert a later change; it adopts the durable section once the writes settle. The persistence boundary is owned by the [Host-backed preferences reference](../ui-settings/README.md).
+サービスはまずスキーマの既定値で自身を即座に提供し、その後 `ui-theme` 名前空間を読み込み、受け入れられた各テーマ、フォントサイズ、フォントファミリーの変更を Host 設定 API を通じて書き込む。プッシュされた設定変更と再接続は名前空間を再取得する。自身の書き込みが保留中の間、サービスは再取得されたセクションを無視するため、以前の書き込みのエコーが後の変更を取り消すことはできない。書き込みが落ち着くと耐久セクションを採用する。永続化の境界は [Host ベースのプリファレンスリファレンス](../ui-settings/README.md)が所有する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-These pages cover the layout presenter, the token consumers, and the styling rules.
+これらのページはレイアウトプレゼンター、トークンの利用側、スタイリングルールを扱う。
 
-- [ui-layout](../ui-layout/README.md) — the presenter that applies the resolved theme snapshot.
-- [ui-sidebar](../ui-sidebar/README.md) — a consumer of the scrollbar rebinding contract.
-- [ui-conversation](../ui-conversation/README.md) — a consumer of `--dsh-scrollbar-width` for the composer seat.
-- [Web styling](../../../docs/web-styling.md) — the authoritative styling rules for web client components.
-- [Authenticated-browser Host preferences](../../../.agents/notes/implemented/bug-fix/2026-09-15-authenticated-browser-host-preferences.md) — the persistence policy decision.
+- [ui-layout](../ui-layout/README.md) — 解決済みテーマスナップショットを適用するプレゼンター。
+- [ui-sidebar](../ui-sidebar/README.md) — スクロールバー再バインド契約の利用側。
+- [ui-conversation](../ui-conversation/README.md) — コンポーザーシートのために `--dsh-scrollbar-width` を利用する側。
+- [Web スタイリング](../../../docs/web-styling.md) — Web Client コンポーネントの権威あるスタイリングルール。
+- [認証済みブラウザーの Host プリファレンス](../../../.agents/notes/implemented/bug-fix/2026-09-15-authenticated-browser-host-preferences.md) — 永続化ポリシーの決定。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+なし。このパッケージはブラウザー側の UI プラグイン層であり、モデルに面するものを何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the theme extension surface and the color authority; they are current package constraints.
+これらの制限がテーマ拡張サーフェスと色の権威を定義する。これらは現在のパッケージ制約である。
 
-- **Third-party themes are an extension point, not a product** — registering one means overriding same-named alias variables; no validation exists that an override set is complete.
-- **The token sheets are the sole color authority** — values absent from the design system are deliberately not appended; the nearest semantic token wins, and design-owner-approved additions enter as a static step plus a semantic alias in the same change.
+- **サードパーティテーマは拡張点であり、製品ではない** — 登録とは同名のエイリアス変数をオーバーライドすることであり、オーバーライドセットが完全であることを検証する仕組みは存在しない。
+- **トークンシートが唯一の色の権威である** — デザインシステムにない値は意図的に追加されない。最も近い意味論的トークンが優先され、デザインオーナー承認済みの追加は同じ変更で静的ステップと意味論的エイリアスとして入る。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

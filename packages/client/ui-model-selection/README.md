@@ -1,121 +1,121 @@
 ---
-description: "Model selection for the Web GUI: the /model popup and the composer model seat over one per-session provider-grouped directory; for users and maintainers of model routing."
+description: "Web GUI のモデル選択: セッションごとのプロバイダー別ディレクトリの上にある /model ポップアップとコンポーザーのモデルシート。モデルルーティングのユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-model-selection
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Desktop product events use the optional [product analytics service](../product-analytics/README.md); ordinary Web interactions are excluded.
+デスクトップ製品のイベントは任意の [product analytics サービス](../product-analytics/README.md)を使用する。通常の Web 操作は対象外である。
 
-## Summary
+## 概要
 
-The Web GUI lets users switch the model and reasoning effort for an existing session through either the `/model` popup or the composer's model control. Both surfaces present the same provider-grouped choices, and the selected model determines the available effort names and default. A complete selection applies to the next request; a running step keeps the model and effort it started with.
+Web GUI では、`/model` ポップアップまたはコンポーザーのモデルコントロールのどちらからでも、既存のセッションのモデルと推論エフォートを切り替えられる。どちらのサーフェスも同じプロバイダー別の選択肢を提示し、選択したモデルが利用可能なエフォート名と既定値を決める。完全な選択は次のリクエストに適用される。実行中のステップは開始時のモデルとエフォートを維持する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-DeepSeek account and API-key routes appear as separate provider groups, each exposing the same configured model catalog.
+DeepSeek アカウント経由と API キー経由のルートは別々のプロバイダーグループとして現れ、それぞれが同じ構成済みモデルカタログを公開する。
 
-When no model is selected or the saved selection is absent from the catalog, the composer shows “Select model” in regular weight and hides the reasoning effort caption. Clicking it opens the model list directly; Escape and Shift+Tab close it. An empty catalog displays “No models available.”
+モデルが選択されていない場合、または保存された選択がカタログに存在しない場合、コンポーザーは “モデルを選択” を標準の太さで表示し、推論エフォートのキャプションを隠す。クリックするとモデル一覧が直接開き、Escape と Shift+Tab で閉じる。カタログが空の場合は “利用可能なモデルがありません” と表示する。
 
-Mount this plugin alongside `ui-conversation` and the commands package; the composer then shows the model seat next to the pending indicator, and `/model` opens the same directory as a popup. While the seat's menu is open, `↑`/`↓` move focus through root and effort rows, or move the model-list highlight without leaving search. Enter and Tab settle the highlighted model or focused row; Escape and `Shift+Tab` leave a drilled pane first and otherwise close back to the trigger. Drilling focuses model search when shown, otherwise the current model or effort row, and going back lands on the cell that opened the pane left. The composer shows the catalog name while the selected model is available. Removing a model or provider, including account sign-out, preserves the stored provider, model, and reasoning effort without displaying their IDs. Restoring the catalog entry restores its name and effort caption.
+このプラグインは `ui-conversation` とコマンドパッケージと並べてマウントする。するとコンポーザーは pending インジケーターの隣にモデルシートを表示し、`/model` が同じディレクトリをポップアップとして開く。シートのメニューが開いている間、`↑`/`↓` はルート行とエフォート行の間でフォーカスを移動し、検索から離れることなくモデル一覧のハイライトも移動できる。Enter と Tab はハイライトされたモデルまたはフォーカス中の行を確定する。Escape と `Shift+Tab` はまず掘り下げたペインから離れ、そうでなければトリガーへ戻って閉じる。掘り下げると、検索が表示されていればモデル検索に、そうでなければ現在のモデルまたはエフォート行にフォーカスする。戻ると、ペインを開いたセルに着地する。選択したモデルが利用可能な間、コンポーザーはカタログ名を表示する。モデルまたはプロバイダーの削除は、アカウントのサインアウトも含め、保存されたプロバイダー、モデル、推論エフォートを ID を表示せずに保持する。カタログエントリが復元されると、その名前とエフォートのキャプションが復元される。
 
-Mouse selection uses native browser clicks, including their cancellation behavior; a press alone never selects. Opening the root menu focuses its trigger, and clicking the trigger again closes the menu and returns focus there. Root rows and the search-clear button show the same fill for keyboard focus and hover, without a native outline. Selecting a model or effort returns focus to the trigger without a focus ring; leaving the trigger or reopening the menu restores its normal focus indication. While a selection from either entry is pending, focus stays on the trigger, the trigger shows a spinner in place of its chevron, and each row whose value the selection carries shows one in place of its check; a rejected selection leaves the menu open. Tab returns to model search with the current model highlighted when search is shown, otherwise to the current row.
+マウス選択はブラウザーネイティブのクリックを使い、そのキャンセル挙動も含む。押下だけでは決して選択されない。ルートメニューを開くとトリガーにフォーカスし、トリガーを再度クリックするとメニューが閉じてフォーカスがそこへ戻る。ルート行と検索クリアボタンは、キーボードフォーカスとホバーで同じ塗りを表示し、ネイティブのアウトラインは出さない。モデルまたはエフォートを選択すると、フォーカスリングなしでフォーカスがトリガーに戻る。トリガーを離れるかメニューを開き直すと、通常のフォーカス表示が復元される。どちらかの入口からの選択が pending の間、フォーカスはトリガーに留まり、トリガーはシェブロンの代わりにスピナーを表示し、選択が運ぶ値を持つ各行はチェックの代わりにスピナーを表示する。拒否された選択はメニューを開いたままにする。Tab は、検索が表示されていれば現在のモデルをハイライトしたモデル検索に戻り、そうでなければ現在の行に戻る。
 
-### Model and effort
+### モデルとエフォート
 
-The button's model menu shows search only when its full catalog contains more than four models; smaller catalogs focus the current model or first row and support keyboard navigation directly. The `/model` command always keeps its search field. Both search fields match model names case-insensitively, including nonconsecutive characters in order; leading and trailing spaces are ignored. Within each provider, prefix matches come first, followed by alignment score and then catalog order. Empty groups are hidden. Empty catalogs and queries without matches are announced through a status region. Search keeps focus while arrow keys cycle the highlighted result across provider groups; Enter or Tab selects it. Left and right arrows keep their native caret behavior. Opening highlights the current model or the first available row, and editing the query resets the highlight to the first result. Reopening the model pane clears the query.
+ボタンのモデルメニューは、完全なカタログに 4 つを超えるモデルが含まれる場合にのみ検索を表示する。より小さいカタログでは現在のモデルまたは先頭行にフォーカスし、キーボードナビゲーションを直接サポートする。`/model` コマンドは常に検索フィールドを保持する。両方の検索フィールドはモデル名を大文字小文字を区別せずに照合し、連続しない文字も順序どおりに一致させる。先頭と末尾のスペースは無視される。各プロバイダー内では、前方一致が先に来て、次に整列スコア、次にカタログ順となる。空のグループは隠される。空のカタログと一致のないクエリはステータス領域を通じて通知される。検索はフォーカスを保持したまま、矢印キーがプロバイダーグループをまたいでハイライトされた結果を循環させる。Enter または Tab でそれを選択する。左右の矢印はネイティブのキャレット挙動を保つ。開くと現在のモデルまたは最初の利用可能な行がハイライトされ、クエリを編集するとハイライトが最初の結果に戻る。モデルペインを開き直すとクエリがクリアされる。
 
-Model and reasoning-effort names use weight 400 (regular) in the composer menu, including the selected item. The search field follows the command popup's compact treatment with transparent background and border in both palettes, with no leading icon and a caption-tone placeholder. The clear button appears for a nonempty query and restores the full list with focus in the search field.
+モデル名と推論エフォート名は、コンポーザーメニューでは選択中の項目も含めて太さ 400（標準）を使う。検索フィールドはコマンドポップアップのコンパクトな扱いに従い、両パレットで背景とボーダーを透明にし、先頭アイコンを持たず、キャプショントーンのプレースホルダーを持つ。クリアボタンはクエリが空でないときに現れ、検索フィールドにフォーカスを置いて完全なリストを復元する。
 
-Both entries group models by provider, with DeepSeek Account first and DeepSeek second; third-party providers retain their catalog order. Both use the shared, asynchronously observed sticky headings from [ui-primitives](../ui-primitives/README.md#understand-the-implementation): transparent at rest, with the theme's 94%-opaque fill only while pinned, and `md` corners outside macOS Desktop. The composer menu shows model and effort names only. Navigation chevrons use `--dsw-alias-menu-icon`. The `/model` popup shows provider names as group headings and model names as rows, without repeating the provider on each row or showing catalog descriptions. Its search placeholder, no-match text, and empty-catalog text use the same localized labels as the composer model menu. The popup applies the selected model's default effort; the composer can then choose any advertised effort. An adapter without reasoning metadata leaves the Effort row absent; there is no arbitrary effort input.
+どちらの入口もモデルをプロバイダー別にグループ化し、DeepSeek Account が先頭、DeepSeek が 2 番目、サードパーティプロバイダーはカタログ順を保つ。どちらも [ui-primitives](../ui-primitives/README.md#understand-the-implementation) の共有された非同期観測のスティッキーヘッダーを使う。静止時は透明で、固定中のみテーマの 94% 不透明の塗りを持ち、macOS Desktop 以外では `md` の角丸となる。コンポーザーメニューはモデル名とエフォート名のみを表示する。ナビゲーションのシェブロンは `--dsw-alias-menu-icon` を使う。`/model` ポップアップはプロバイダー名をグループ見出しとして、モデル名を行として表示し、各行でプロバイダーを繰り返さず、カタログの説明も表示しない。その検索プレースホルダー、一致なしのテキスト、空カタログのテキストは、コンポーザーのモデルメニューと同じローカライズ済みラベルを使う。ポップアップは選択したモデルの既定エフォートを適用し、その後コンポーザーは通知された任意のエフォートを選択できる。推論メタデータのないアダプターではエフォート行が存在しない。任意のエフォート入力はない。
 
-The composer replaces the model and effort text with the Models icon when the expanded controls cannot share one line, and restores the text when space permits. The full selection remains available in the trigger's accessible name, tooltip, and menu.
+展開されたコントロールが 1 行を共有できない場合、コンポーザーはモデルとエフォートのテキストを Models アイコンに置き換え、スペースが許せばテキストを復元する。完全な選択内容はトリガーのアクセシブル名、ツールチップ、メニューで引き続き利用できる。
 
-### Model label extensions
+### モデルラベルの拡張
 
-`conversation.input.model.label` is a session-scoped, inline `single` slot for the composer trigger (`placement: 'trigger'`), the root menu's current value (`'menu'`), and each model option (`'option'`). Its owner props provide `provider: { id, name }`, the exact catalog `model`, `placement`, and `selected`. Provider names are localized display names; match channels by `provider.id`, and identify a model by the provider/model ID pair. Connection URLs and credentials are not passed to the slot.
+`conversation.input.model.label` はセッションスコープのインライン `single` スロットで、コンポーザーのトリガー（`placement: 'trigger'`）、ルートメニューの現在値（`'menu'`）、および各モデルオプション（`'option'`）に使われる。そのオーナー props は `provider: { id, name }`、正確なカタログの `model`、`placement`、`selected` を提供する。プロバイダー名はローカライズされた表示名である。チャネルは `provider.id` で照合し、モデルはプロバイダー/モデル ID の対で識別する。接続 URL と資格情報はスロットに渡されない。
 
-Contributions must render non-interactive inline content, such as a colored name or badge. The selector owns clicks, search, focus, disabled states, check marks, reasoning effort, and trigger accessibility text. An absent contribution, including after plugin disposal, displays the catalog name. The trigger and root-menu value use the slot only when the selected model is present in the displayed catalog; otherwise they keep the built-in placeholder. During refresh, retained catalog entries continue to use the slot. Open menus track label size changes to stay inside the viewport. `/model` command rows use the command popup's separate rendering API.
+コントリビューションは、色付きの名前やバッジなど、非インタラクティブなインラインコンテンツをレンダリングしなければならない。クリック、検索、フォーカス、無効状態、チェックマーク、推論エフォート、トリガーのアクセシビリティテキストはセレクターが所有する。コントリビューションが存在しない場合（プラグインの破棄後も含む）は、カタログ名を表示する。トリガーとルートメニューの値は、選択中のモデルが表示中のカタログに存在する場合にのみスロットを使い、そうでなければ組み込みのプレースホルダーを保つ。リフレッシュ中、保持されたカタログエントリは引き続きスロットを使う。開いているメニューは、ビューポート内に収まるようラベルサイズの変化を追跡する。`/model` コマンドの行はコマンドポップアップの別のレンダリング API を使う。
 
-Import this package's `/client` declarations type-only, then register through `ctx.slots.inject('conversation.input.model.label', () => ctx.slots.register({ name: 'conversation.input.model.label' }, ModelLabel))`. Derive `ModelLabel` props from `PropsRuntime<'conversation.input.model.label'>`; use provider IDs to choose CSS Module classes and retain `model.name` as the text. Registration follows the declaration and contributing plugin lifetimes. Without a component replacement, styles can target the enclosing label's `data-provider-id` and `data-model-id` attributes in all three placements.
+このパッケージの `/client` 宣言を型のみでインポートし、`ctx.slots.inject('conversation.input.model.label', () => ctx.slots.register({ name: 'conversation.input.model.label' }, ModelLabel))` で登録する。`ModelLabel` の props は `PropsRuntime<'conversation.input.model.label'>` から導出する。CSS Module クラスの選択にはプロバイダー ID を使い、テキストとして `model.name` を保持する。登録は宣言とコントリビューションを行うプラグインのライフタイムに従う。コンポーネントを置き換えない場合、スタイルは 3 つすべてのプレースメントで外側のラベルの `data-provider-id` 属性と `data-model-id` 属性を対象にできる。
 
-### Unroutable sessions
+### ルーティング不能なセッション
 
-Catalog availability does not block sending with a saved selection; request execution reports missing credentials or unavailable models. Refreshes and refresh failures retain the last displayed selection and groups. A Host reset clears that display. Sign-out hides the account provider from the picker while preserving the saved provider/model ID and reasoning effort. Signing in restores the catalog name when that model is available again. Existing session logs remain unchanged.
+カタログの可用性は、保存された選択での送信を妨げない。リクエスト実行が資格情報の欠落や利用不可のモデルを報告する。リフレッシュとリフレッシュ失敗は、最後に表示された選択とグループを保持する。Host のリセットはその表示をクリアする。サインアウトは、保存されたプロバイダー/モデル ID と推論エフォートを保ったまま、アカウントプロバイダーをピッカーから隠す。サインインすると、そのモデルが再び利用可能な場合にカタログ名が復元される。既存のセッションログは変更されない。
 
-### Selection failures
+### 選択の失敗
 
-When another writer owns the Session, model-selection failures tell the user to quit other running DSH instances and retry.
+別のライターがその Session を所有している場合、モデル選択の失敗は、実行中の他の DSH インスタンスを終了して再試行するようユーザーに伝える。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
-Menus use the shared `MenuSurface` material, including the macOS backing for background blur; custom content follows the [menu rules](../../../docs/web-styling.md#component-rules).
+メニューは共有の `MenuSurface` マテリアルを使い、背景ブラー用の macOS の裏付けも含む。カスタムコンテンツは[メニューのルール](../../../docs/web-styling.md#component-rules)に従う。
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The composer `ModelSelect` and `/model` option builder share [provider ordering](src/client/provider-order.ts), while both searches use `rankByName` within each provider. The command supplies optional groups and `searchMode: 'fuzzy-label'` through the [popupSelect API](../ui-commands/README.md#use-this-package); both entries use `MenuGroup` and rebuild its sticky observer when the rendered groups change. The command popup fills the composer overlay, while the button retains its compact menu.
+コンポーザーの `ModelSelect` と `/model` のオプションビルダーは[プロバイダーの順序](src/client/provider-order.ts)を共有し、両方の検索は各プロバイダー内で `rankByName` を使う。コマンドはオプションのグループと `searchMode: 'fuzzy-label'` を [popupSelect API](../ui-commands/README.md#use-this-package)を通じて供給する。どちらの入口も `MenuGroup` を使い、レンダリングされたグループが変わるとそのスティッキーオブザーバーを再構築する。コマンドポップアップはコンポーザーのオーバーレイを埋め、ボタンはコンパクトなメニューを保つ。
 
-Two entries over ONE per-session directory owned by `ModelDirectoryResolver` (`ctx.modelDirectories`): the `/model` popupSelect contribution (registered through `ctx.commandUi`) and the composer's named `conversation.input.model` seat both load the session's available directory through `session.models` and submit through `session.selectModel` via the same `ModelDirectory` instance, so a switch made in either entry is what the other shows next. Directory loads and selections share a generation counter so an older response never overwrites a newer one. The directory publishes the latest submitted selection as `pending` until it settles or a connection reset invalidates it; a connection reset drops every resident projection and repulls the Host-restored selection before display. Directories are per-session, resolved lazily, and disposed with the session scope; addressed subagent sessions expose neither entry. Every resident directory refetches directly on forwarded `llm/adapters-updated`, `settings/document-updated`, and credential update events.
+2 つの入口は、`ModelDirectoryResolver`（`ctx.modelDirectories`）が所有する 1 つのセッションごとのディレクトリの上に載る。`/model` の popupSelect コントリビューション（`ctx.commandUi` を通じて登録）とコンポーザーの名前付き `conversation.input.model` シートは、どちらも同一の `ModelDirectory` インスタンスを通じて、セッションの利用可能なディレクトリを `session.models` 経由で読み込み、`session.selectModel` 経由で送信する。そのため、どちらかの入口で行った切り替えが次に他方へ表示される。ディレクトリの読み込みと選択は世代カウンターを共有するので、古い応答が新しい応答を上書きすることはない。ディレクトリは、最後に送信された選択を、それが決着するか接続リセットがそれを無効にするまで `pending` として公開する。接続リセットはすべての常駐プロジェクションを破棄し、表示前に Host が復元した選択を再取得する。ディレクトリはセッションごとで、遅延解決され、セッションスコープとともに破棄される。アドレス指定されたサブエージェントセッションはどちらの入口も公開しない。常駐するすべてのディレクトリは、転送された `llm/adapters-updated`、`settings/document-updated`、資格情報更新の各イベントで直接再取得する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the model surface is not enough. They move from the browser surfaces to the command popup shell and the selection contract.
+モデルサーフェスで足りない場合はこれらのページを読む。ブラウザーサーフェスからコマンドポップアップシェルと選択契約へと進む。
 
-- [ui-commands](../ui-commands/README.md) — the popupSelect shell the `/model` contribution registers into.
-- [ui-conversation](../ui-conversation/README.md) — declares the composer's `conversation.input.model` seat.
-- [dsh-agent-default-model](../../core/agent-default-model/README.md) — the default-model service for sessions that never choose.
-- [Client package map](../README.md) — adjacent browser UI packages.
+- [ui-commands](../ui-commands/README.md) — `/model` コントリビューションが登録する popupSelect シェル。
+- [ui-conversation](../ui-conversation/README.md) — コンポーザーの `conversation.input.model` シートを宣言する。
+- [dsh-agent-default-model](../../core/agent-default-model/README.md) — モデルを決して選ばないセッションのための既定モデルサービス。
+- [Client パッケージマップ](../README.md) — 隣接するブラウザー UI パッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the `session.selectModel` selection both entries submit: the Host snapshots the complete `ModelSelection` at the next prompt-assembly boundary and owns the model-visible effect, while a running step keeps its assembled selection.
+間接的。両方の入口が送信する `session.selectModel` の選択を通じて。Host は次のプロンプト組み立て境界で完全な `ModelSelection` をスナップショットし、モデルに見える効果を所有する。実行中のステップは組み立て時の選択を維持する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Switching the route can reduce or invalidate provider-side cache reuse for subsequent requests; the prompt prefix itself is untouched.
+ルートを切り替えると、後続リクエストのプロバイダー側のキャッシュ再利用が減少または無効化されうる。プロンプトプレフィックス自体は変わらない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits define the current model surface. They are current package constraints, not a general model-router comparison or a task backlog.
+これらの制限は現在のモデルサーフェスを定義する。一般的なモデルルーターの比較やタスクバックログではなく、現在のパッケージの制約である。
 
-- **No create-time or addressed-subagent selection** — both entries require an existing ordinary session's Agent; there is no draft-phase model choice to fold into session creation, and subagent continuation deliberately exposes no independent model-selection contract.
-- **Directory names are presentation-only** — selection and persistence use provider/model/effort ids; a provider whose catalog or exact-model metadata lookup fails lists as an unselectable failure row until reload.
-- **No arbitrary effort input** — the composer offers only the exact model's adapter-advertised levels; an adapter without reasoning metadata leaves the Effort row absent.
+- **作成時の選択やアドレス指定されたサブエージェントの選択はない** — どちらの入口も既存の通常セッションの Agent を必要とする。セッション作成に折り込むドラフト段階のモデル選択はなく、サブエージェントの継続は独立したモデル選択契約を意図的に公開しない。
+- **ディレクトリ名は表示専用** — 選択と永続化はプロバイダー/モデル/エフォートの id を使う。カタログや正確なモデルメタデータの照会に失敗したプロバイダーは、再読み込みまで選択不可の失敗行として一覧される。
+- **任意のエフォート入力はない** — コンポーザーはそのモデルのアダプターが通知する正確なレベルだけを提供する。推論メタデータのないアダプターではエフォート行が存在しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

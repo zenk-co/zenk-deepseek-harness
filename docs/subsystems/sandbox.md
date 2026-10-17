@@ -1,14 +1,14 @@
-# Process Sandbox
+# プロセスサンドボックス
 
-English | [中文](sandbox.zh.md)
+日本語 | [English](sandbox.en.md) | [中文](sandbox.zh.md)
 
-The process-sandbox seam of [dsh-sandbox](../../packages/sandbox/sandbox) wraps a same-world subprocess argv in a file-effect policy without coupling consumers to a platform runner. [dsh-sandbox-local](../../packages/sandbox/sandbox-local) supplies Linux bwrap/Landlock, macOS Seatbelt, and the Windows ACL restricted-token backend; [dsh-bash-sandbox](../../packages/shell/bash-sandbox) and [dsh-pwsh-sandbox](../../packages/shell/pwsh-sandbox) consume it. [dsh-sandbox-ssh](../../packages/ssh/sandbox-ssh/README.md) applies the same policy through a remote backend paired with the SSH filesystem and subprocess providers.
+[dsh-sandbox](../../packages/sandbox/sandbox) のプロセスサンドボックスシームは、同じワールドのサブプロセス argv をファイル効果ポリシーでラップし、コンシューマーをプラットフォームランナーに結合しない。[dsh-sandbox-local](../../packages/sandbox/sandbox-local) は Linux bwrap/Landlock、macOS Seatbelt、Windows ACL 制限トークンバックエンドを提供し、[dsh-bash-sandbox](../../packages/shell/bash-sandbox) と [dsh-pwsh-sandbox](../../packages/shell/pwsh-sandbox) がそれを消費する。[dsh-sandbox-ssh](../../packages/ssh/sandbox-ssh/README.md) は、SSH ファイルシステムおよびサブプロセスプロバイダーと対になるリモートバックエンドを通して同じポリシーを適用する。
 
-Source: [`packages/sandbox/sandbox/src/index.ts`](../../packages/sandbox/sandbox/src/index.ts)
+ソース: [`packages/sandbox/sandbox/src/index.ts`](../../packages/sandbox/sandbox/src/index.ts)
 
-## Modes and enforcement
+## モードと強制
 
-`SandboxMode` governs filesystem effects only. `read-only` asks the backend to deny writes — the POSIX runners additionally grant the `/dev/null` sink their shells require, while the Windows ACL runner grants no explicit writable root and reports partial enforcement for its ambient ACL gaps; `workspace-write` permits writes under the workspace root and the backend's promised temp area; `danger-full-access` bypasses confinement. Network and process visibility are outside this vocabulary.
+`SandboxMode` はファイルシステム効果のみを統治する。`read-only` はバックエンドに書き込みの拒否を求める — POSIX ランナーはさらに、シェルが必要とする `/dev/null` シンクを許可し、Windows ACL ランナーは明示的な書き込み可能ルートを許可せず、アンビエント ACL ギャップに対して部分的な強制を報告する。`workspace-write` はワークスペースルートとバックエンドが約束する一時領域の下での書き込みを許可し、`danger-full-access` は閉じ込めをバイパスする。ネットワークとプロセス可視性はこの語彙の対象外である。
 
 ```ts type-equiv
 /**
@@ -20,14 +20,14 @@ Source: [`packages/sandbox/sandbox/src/index.ts`](../../packages/sandbox/sandbox
 type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'
 ```
 
-Only the first two modes can be sent to a provider. A `danger-full-access` consumer spawns its original argv and does not call `ctx.sandbox`.
+プロバイダーに送信できるのは最初の 2 つのモードのみである。`danger-full-access` のコンシューマーは元の argv を spawn し、`ctx.sandbox` を呼び出さない。
 
 ```ts type-equiv
 /** A confining (non-`danger-full-access`) mode — the modes a {@link SandboxPolicy} can carry. */
 type ConfinedSandboxMode = Exclude<SandboxMode, 'danger-full-access'>
 ```
 
-Enforcement is a reported fact. `full` means the backend governs every file effect promised by the mode; `partial` means an active backend or older kernel ABI governs only a subset, so consumers that require the absolute promise must reject or surface that distinction. Older Landlock ABIs and the Windows ACL runner's hard-link, unconfined-read, and AppContainer-ACL boundaries are current partial cases.
+強制は報告される事実である。`full` はバックエンドがモードの約束するすべてのファイル効果を統治することを意味し、`partial` はアクティブなバックエンドまたは古いカーネル ABI が一部のみを統治することを意味するので、絶対的な約束を必要とするコンシューマーはその区別を拒否するか表面化しなければならない。古い Landlock ABI と、Windows ACL ランナーのハードリンク、非閉じ込め読み取り、AppContainer ACL の境界が現在の partial ケースである。
 
 ```ts type-equiv
 /**
@@ -38,9 +38,9 @@ Enforcement is a reported fact. `full` means the backend governs every file effe
 type SandboxEnforcement = 'full' | 'partial'
 ```
 
-## Per-call policy
+## 呼び出しごとのポリシー
 
-The complete execution policy is resolved and carried per capability call. It includes `danger-full-access` so a consumer can resolve policy once before deciding whether to bypass confinement. Normal tool calls derive `workspaceRoot` from the calling session's immutable cwd; deployment configuration is the agentless fallback. The resolver preserves absolute execution-world spelling. Enforcing providers canonicalize the root where the files exist, so a cwd containing `symlink/..` identifies the directory where the paired subprocess provider actually runs.
+完全な実行ポリシーは、ケイパビリティ呼び出しごとに解決され、運ばれる。これには `danger-full-access` が含まれるので、コンシューマーは閉じ込めをバイパスするかどうかを決める前にポリシーを 1 度解決できる。通常のツール呼び出しは呼び出し元セッションの不変 cwd から `workspaceRoot` を派生させる。デプロイメント構成はエージェントレス呼び出しのフォールバックである。リゾルバーは実行ワールドの絶対的な綴りを維持する。強制するプロバイダーは、ファイルが存在する場所でルートを正規化するので、`symlink/..` を含む cwd は、対になるサブプロセスプロバイダーが実際に実行されるディレクトリを識別する。
 
 ```ts type-equiv
 /**
@@ -64,7 +64,7 @@ interface SandboxExecutionPolicy {
 }
 ```
 
-`ctx.sandboxPolicy.resolve()` accepts the active session and, for an approved retry, an explicit mode. The service owns precedence and root fallback so bash and fs do not repeat it.
+`ctx.sandboxPolicy.resolve()` はアクティブなセッションと、承認されたリトライの場合は明示的なモードを受け取る。このサービスが優先順位とルートフォールバックを所有するので、bash と fs がそれを繰り返すことはない。
 
 ```ts type-equiv
 /** Inputs that select the sandbox policy for one capability call. */
@@ -76,7 +76,7 @@ interface SandboxPolicyRequest {
 }
 ```
 
-Only a confined execution reaches `ctx.sandbox`; its provider policy narrows the mode while retaining the same root. This permits concurrent sessions, consumers, and one-shot escalated retries to ask the same provider for different boundaries without mutating provider state.
+`ctx.sandbox` に到達するのは閉じ込められた実行のみである。そのプロバイダーポリシーは同じルートを保ちながらモードを狭める。これにより、同時セッション、コンシューマー、ワンショットのエスカレートされたリトライが、プロバイダー状態を変更せずに同じプロバイダーへ異なる境界を要求できる。
 
 ```ts type-equiv
 /**
@@ -95,9 +95,9 @@ interface SandboxPolicy extends SandboxExecutionPolicy {
 
 <a id="wrapped-argv-and-classification-dialects"></a>
 
-## Wrapped argv and classification dialects
+## ラップされた argv と分類ダイアレクト
 
-`RunnerFailureRule` combines evidence that a runner failed before executing the command. A consumer requires a nonzero exit, the optional allowed-exit-code gate, and a case-insensitive fatal signature within one remaining stderr line. Case-insensitive exact full-line informational exclusions are removed first, so a benign runner notice cannot prove failure by itself. The matched line remains available as error detail; classification does not rewrite stderr.
+`RunnerFailureRule` は、ランナーがコマンドを実行する前に失敗したという証拠を組み合わせる。コンシューマーは、非ゼロ終了、任意の許可終了コードゲート、および残っている 1 つの stderr 行内での大文字小文字を区別しない致命的シグネチャを要求する。大文字小文字を区別しない完全行一致の情報的除外が最初に除去されるので、無害なランナーの通知がそれだけで失敗を証明することはできない。一致した行はエラー詳細として利用可能なままである。分類は stderr を書き換えない。
 
 ```ts type-equiv
 /**
@@ -117,7 +117,7 @@ interface RunnerFailureRule {
 }
 ```
 
-`ConfinedArgv` is what the consumer spawns. Besides the replacement argv, it carries the backend's enforcement fact and two orthogonal stderr classifiers. `denialSignatures` identify the confined command being blocked while the sandbox works correctly. `runnerFailureRules` identify the sandbox runner refusing or failing before it executes the command; consumers check these first and surface a sandbox infrastructure failure, never an ordinary task failure.
+`ConfinedArgv` はコンシューマーが spawn するものである。置換 argv に加えて、バックエンドの強制の事実と 2 つの直交する stderr 分類器を運ぶ。`denialSignatures` は、サンドボックスが正しく動作している状態で閉じ込められたコマンドがブロックされていることを識別する。`runnerFailureRules` は、サンドボックスランナーがコマンドを実行する前に拒否または失敗していることを識別する。コンシューマーはこれらを最初にチェックし、サンドボックスインフラストラクチャの失敗を表面化し、通常のタスク失敗として扱うことは決してない。
 
 ```ts type-equiv
 /**
@@ -149,13 +149,13 @@ interface ConfinedArgv {
 }
 ```
 
-The [local provider](../../packages/sandbox/sandbox-local/README.md) owns operator configuration and maps its runner dialect into these rules. The [sandboxed bash consumer](../../packages/shell/bash-sandbox/README.md) owns spawn and result attribution.
+[ローカルプロバイダー](../../packages/sandbox/sandbox-local/README.md)がオペレーター構成を所有し、そのランナーダイアレクトをこれらのルールにマッピングする。[サンドボックス化された bash コンシューマー](../../packages/shell/bash-sandbox/README.md)が spawn と結果の帰属を所有する。
 
-## Provider and fail-closed errors
+## プロバイダーとフェイルクローズドエラー
 
-`await ctx.sandbox.confine(argv, policy, signal)` resolves policy paths and returns a `ConfinedArgv` from the execution world, or rejects with `SandboxUnavailableError` and code `SANDBOX_UNAVAILABLE` when no usable backend exists. The optional signal cancels resolution before launch. Consumers may also classify a failure while spawning or observing the returned argv; that attribution belongs to the consumer contract. Silent unconfined passthrough is never legal for a confined policy.
+`await ctx.sandbox.confine(argv, policy, signal)` はポリシーパスを解決し、実行ワールドから `ConfinedArgv` を返すか、使用可能なバックエンドが存在しない場合は `SandboxUnavailableError` とコード `SANDBOX_UNAVAILABLE` で拒否する。任意のシグナルは起動前の解決をキャンセルする。コンシューマーは、返された argv の spawn 中または観測中の失敗を分類してもよい。その帰属はコンシューマー契約に属する。閉じ込めポリシーに対して、暗黙の非閉じ込めパススルーが合法となることは決してない。
 
-Provider selection, probing, caching, and backend-specific enforcement reports belong to the [local provider](../../packages/sandbox/sandbox-local/README.md).
+プロバイダー選択、プローブ、キャッシュ、バックエンド固有の強制レポートは[ローカルプロバイダー](../../packages/sandbox/sandbox-local/README.md)に属する。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

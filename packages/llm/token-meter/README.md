@@ -1,159 +1,159 @@
 ---
-description: "Replay-aware token and context-pressure measurement for users and maintainers sizing prompts or building compaction and occupancy displays."
+description: "プロンプトのサイズ見積もりや、コンパクションと占有量表示の構築を行うユーザーとメンテナー向けの、リプレイ対応のトークンおよびコンテキスト圧力計測。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-token-meter
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `ctx.tokenMeter` to estimate a session's current request and context pressure or price one message. Measurements replay the durable session log, remain deterministic, and make no model calls, so compaction, occupancy displays, and telemetry can share one result. When session projections are available, consumers can read `tokenUsage`, `contextPressure`, and `contextBreakdown`; text and routes without image pricing use an approximate fixed heuristic, declared visual-token pricing applies when available, and files are priced as model-visible handle text. Provider-reported usage is reused only for an identical request envelope; the package adds no model-visible content and makes no loop decisions.
+`ctx.tokenMeter` を使うと、セッションの現在のリクエストとコンテキスト圧力を推定したり、1 つのメッセージの価格を計算したりできる。計測は永続セッションログをリプレイし、決定的であり、モデル呼び出しを行わないため、コンパクション、占有量表示、テレメトリーが 1 つの結果を共有できる。セッションプロジェクションが利用可能な場合、コンシューマーは `tokenUsage`、`contextPressure`、`contextBreakdown` を読むことができる。テキストと画像価格を持たないルートは近似の固定ヒューリスティックを使い、宣言されたビジュアルトークン価格は利用可能な場合に適用され、ファイルはモデル可視のハンドルテキストとして価格付けされる。プロバイダーが報告した使用量は同一のリクエストエンベロープに対してのみ再利用される。このパッケージはモデル可視のコンテンツを追加せず、ループの決定を行わない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin when a consumer needs token or context pressure for compaction decisions, occupancy displays, or telemetry. The estimator has no settings and adds no model-visible surface; model capacity belongs to the adapter that owns the exact provider/model route and is available through `ctx.llm.resolveModelInfo().context`.
+コンパクションの決定、占有量表示、テレメトリーのためにトークンやコンテキスト圧力を必要とするコンシューマーがあるときにこのプラグインをマウントする。推定器に設定はなく、モデル可視のサーフェスを追加しない。モデル容量は正確なプロバイダー/モデルルートを所有するアダプターに属し、`ctx.llm.resolveModelInfo().context` を通じて利用できる。
 
-### When to choose it
+### 選ぶべきとき
 
-Choose it when several plugins should agree on one replay-based measurement — compaction planning, occupancy UIs, and pressure checks all read the same fold. The measurements replay the durable session log, so they are deterministic, cost no model calls, and reflect exactly what is logged. Text and undeclared image routes use a fixed heuristic; reach for a provider tokenizer when a deployment needs exact billing-grade counts.
+複数のプラグインが 1 つのリプレイベースの計測に合意すべきときに選ぶ — コンパクションプランニング、占有量 UI、圧力チェックはすべて同じ fold を読む。計測は永続セッションログをリプレイするため、決定的で、モデル呼び出しのコストがかからず、ログに記録された内容を正確に反映する。テキストと宣言されていない画像ルートは固定ヒューリスティックを使う。デプロイメントが請求グレードの正確なカウントを必要とする場合は、プロバイダーのトークナイザーに頼ること。
 
-### Measuring pressure
+### 圧力を計測する
 
-`ctx.tokenMeter` exposes two operations. `measure(session, requestHeader?)` returns a detached, deeply immutable snapshot at one consumed-log revision: `totalTokens` is request-and-response pressure, and `surfaceTokens` is the surface-only route-priced total equal to the sum of `nodes[].tokens`. An optional `requestHeader` override selects the priced route and pressure fields; the node set still describes the current session. `estimateMessage(message)` prices one message with the fixed heuristic. Every call clones the positional surface nodes, so measurement is O(surface).
+`ctx.tokenMeter` は 2 つの操作を公開する。`measure(session, requestHeader?)` は、1 つの消費済みログリビジョンでの分離された深く不変なスナップショットを返す: `totalTokens` はリクエストとレスポンスの圧力で、`surfaceTokens` はサーフェスのみのルート価格付き合計で `nodes[].tokens` の合計に等しい。任意の `requestHeader` オーバーライドは価格付けされるルートと圧力フィールドを選択するが、ノードセットは依然として現在のセッションを記述する。`estimateMessage(message)` は固定ヒューリスティックで 1 つのメッセージを価格付けする。すべての呼び出しは位置サーフェスノードをクローンするため、計測は O(surface) である。
 
 ```text
 const { totalTokens, surfaceTokens, nodes } = ctx.tokenMeter.measure(session)
 const price = ctx.tokenMeter.estimateMessage(message)
 ```
 
-Each measurement resolves the effective envelope's provider/model through the optional `llm` service. Image occurrences use the routed request's visual-token price plus model-visible text when the adapter declares pricing, and occurrences selected by an `image/offload` event are priced as the route's placeholder text exactly as the surface sends them; other routes keep the fixed heuristic. File occurrences use the exact route-independent handle text that the same `llm` service resolves for adapter dispatch, including its current execution-world path or explicit no-path message. Each node also carries route-independent `heuristicTokens` for replacement shadow prices. Provider usage is reused only when the latest successful call's canonical request envelope matches the measured envelope and its total is no lower than that call's full route-priced anchor; otherwise the complete current envelope and surface are estimated. Surface changes stay signed relative to a matching anchor repriced under the same route, including negative deltas after shrinking replacements.
+各計測は、有効なエンベロープのプロバイダー/モデルをオプションの `llm` サービスを通じて解決する。画像オカレンスは、アダプターが価格を宣言している場合、ルーティングされたリクエストのビジュアルトークン価格とモデル可視テキストを使い、`image/offload` イベントで選択されたオカレンスは、サーフェスが送信するままのルートのプレースホルダーテキストとして価格付けされる。他のルートは固定ヒューリスティックを保つ。ファイルオカレンスは、同じ `llm` サービスがアダプターディスパッチのために解決する正確なルート非依存のハンドルテキストを使う。これには現在の実行ワールドのパスまたは明示的なパスなしメッセージが含まれる。各ノードは置換のシャドウ価格のためのルート非依存の `heuristicTokens` も運ぶ。プロバイダー使用量は、最後の成功した呼び出しの正規リクエストエンベロープが計測されたエンベロープと一致し、その合計がその呼び出しの完全なルート価格付きアンカー以上である場合にのみ再利用される。そうでなければ、完全な現在のエンベロープとサーフェスが推定される。サーフェスの変化は、同じルートの下で再価格付けされた一致アンカーに対して符号付きのままで、縮小置換後の負のデルタも含む。
 
-The measurement anchor includes the priced surface immediately before the successful `assistant/message`, including system and user messages admitted after `step/start` and replacements made before a retry. With unchanged durable output, the completed call has zero surface delta: its prompt is already included in provider usage. Later surface changes remain signed deltas against that anchor.
+計測アンカーは、成功した `assistant/message` の直前の価格付きサーフェスを含む。これには `step/start` の後に受け入れられたシステムメッセージとユーザーメッセージ、および再試行の前に行われた置換が含まれる。永続出力が変わらなければ、完了した呼び出しのサーフェスデルタはゼロである: そのプロンプトはすでにプロバイダー使用量に含まれている。以降のサーフェス変更はそのアンカーに対する符号付きデルタのままである。
 
-### Session projections
+### セッションプロジェクション
 
-When the composition provides `ctx.sessionProjections`, token-meter registers three projection units. `tokenUsage` carries the complete durable log's `uncachedInputTokens`, `outputTokens`, `cacheReadTokens`, and `cacheWriteTokens`. A final assistant-message sample replaces streaming usage from the same attempt; `llm/retry-started` ends that replacement scope, so a retry in the same step contributes another billed attempt. `contextPressure` carries optional `pressureTokens` (the newest provider-reported prompt size), optional `projectedTokens` (what the next request's prompt would cost), and optional `contextWindow` from the newest `request/context` record. `contextBreakdown` carries heuristic `systemTokens`, `toolsTokens`, and `messageTokens` — the context's composition, not its provider-billed size. Unloading the plugin removes all three keys.
+コンポジションが `ctx.sessionProjections` を提供する場合、token-meter は 3 つのプロジェクションユニットを登録する。`tokenUsage` は完全な永続ログの `uncachedInputTokens`、`outputTokens`、`cacheReadTokens`、`cacheWriteTokens` を運ぶ。最後の assistant メッセージのサンプルが同じ試行のストリーミング使用量を置き換える。`llm/retry-started` がその置換スコープを終わらせるため、同じステップの再試行はもう 1 つの課金対象試行として寄与する。`contextPressure` は、任意の `pressureTokens` (最新のプロバイダー報告プロンプトサイズ)、任意の `projectedTokens` (次のリクエストのプロンプトのコスト)、および最新の `request/context` レコードからの任意の `contextWindow` を運ぶ。`contextBreakdown` はヒューリスティックな `systemTokens`、`toolsTokens`、`messageTokens` を運ぶ — コンテキストの構成であり、プロバイダーが請求するサイズではない。プラグインをアンロードすると 3 つのキーすべてが取り除かれる。
 
-Image offload reprices existing node identities while preserving prior usage anchors. The fixed reference heuristic excludes `offloaded` metadata, so an offload decision does not change `contextBreakdown` or the scalar heuristic total; route-aware measurement replaces the selected visual prices with placeholder text.
+画像オフロードは以前の使用量アンカーを保ったまま既存のノードアイデンティティを再価格付けする。固定参照ヒューリスティックは `offloaded` メタデータを除外するため、オフロードの決定は `contextBreakdown` やスカラーのヒューリスティック合計を変えない。ルート対応の計測は選択されたビジュアル価格をプレースホルダーテキストに置き換える。
 
-`contextBreakdown` classifies the last nonempty surviving `system/message` in surface order as `systemTokens`; empty dormant nodes contribute nothing, and no nonempty system means zero. `messageTokens` includes every other visible node, including superseded prompts. Their sum equals `measure().nodes[].heuristicTokens` after appends, metered compaction and pruning, and system-prompt rewrites or clearing; an unmetered replacement of a non-system range folds at zero delta, like `contextPressure`. `toolsTokens` follows the latest `request/header`. All three use the fixed heuristic, not route image pricing or file-handle projection; they are approximate composition, not billing or `projectedTokens`.
+`contextBreakdown` は、サーフェス順で最後の空でない生存 `system/message` を `systemTokens` として分類する。空の休眠ノードは何も寄与せず、空でないシステムがなければゼロである。`messageTokens` は置き換えられたプロンプトを含む他のすべての可視ノードを含む。それらの合計は、追記、メータリングされたコンパクションとプルーニング、および system-prompt の書き換えまたはクリアの後で `measure().nodes[].heuristicTokens` に等しい。非システム範囲のメータリングされていない置換は `contextPressure` と同様ゼロデルタで畳み込まれる。`toolsTokens` は最新の `request/header` に従う。3 つすべてが固定ヒューリスティックを使い、ルートの画像価格やファイルハンドル投影は使わない。それらは課金や `projectedTokens` ではなく近似の構成である。
 
-`deriveTurnTokenUsage(events)` folds one complete turn into exact per-attempt and whole-turn usage for browser consumers. It returns no result when lifecycle evidence is missing, counts are unsafe, or exact totals conflict; each corresponding aggregate appears only when every participating attempt reports its optional cache, reasoning, or route value.
+`deriveTurnTokenUsage(events)` は 1 つの完全なターンを、ブラウザーコンシューマー向けの正確な試行ごとおよびターン全体の使用量に畳み込む。ライフサイクルの証拠が欠けている場合、カウントが安全でない場合、または正確な合計が矛盾する場合は結果を返さない。対応する各集計は、参加するすべての試行が任意のキャッシュ、推論、またはルート値を報告する場合にのみ現れる。
 
-### Composition
+### コンポジション
 
 ```yaml
 - name: '@deepseek-ai/dsh-token-meter'
 - name: '@deepseek-ai/dsh-compaction-basic'
 ```
 
-Both plugins have usable defaults. The meter consumes only the optional `llm` service, and only to resolve route-declared request-image pricing; compaction remains optional. A deployment configures capacity and image pricing on its LLM adapter and compaction policy on `dsh-compaction-basic`.
+両方のプラグインに使用可能なデフォルトがある。メーターはオプションの `llm` サービスのみを消費し、それもルート宣言されたリクエスト画像価格を解決するためだけである。コンパクションもオプションのままである。デプロイメントは容量と画像価格を LLM アダプターで設定し、コンパクションポリシーを `dsh-compaction-basic` で設定する。
 
-### Reading the numbers
+### 数値の読み方
 
-Occupancy is a reference figure, not a billing record: nothing in the harness makes decisions from it, and compaction reads `measure()` instead. A UI computes occupancy by dividing measured pressure by the separately resolved capacity for the selected model. The `contextBreakdown` figures are estimates that will not sum to `projectedTokens`, whose provider anchor carries exactly the heuristic error — CJK text and JSON schemas underprice badly at four characters per token.
+占有量は参考値であり、請求記録ではない: harness 内の何もそれから決定を下さず、コンパクションは代わりに `measure()` を読む。UI は、計測された圧力を選択されたモデルについて別途解決された容量で割って占有量を計算する。`contextBreakdown` の数値は推定値であり、`projectedTokens` には合計されない。そのプロバイダーアンカーはまさにヒューリスティックの誤差を運ぶ — CJK テキストと JSON schema は 1 トークン 4 文字では大幅に過小価格付けされる。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design behind the service; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節はサービス背後の設計を説明する。観測可能な振る舞いは[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計方針
 
-The service is built on one fold and one anchor. Each session gets an isolated replay state — consumed-event cursor, canonical request header, priced surface, step boundary, and measurement anchor — advanced by folding the durable log. Provider usage anchors a measurement only when its canonical envelope matches and its total is no lower than the full route-priced cost of the same call; otherwise the complete envelope and surface are estimated. The route-independent `heuristicTokens` field keeps replacement shadow-price projections deterministic. The fold is total and allocation-fresh: a malformed event throws before any mutation, so the same log fails identically on every retry.
+このサービスは 1 つの fold と 1 つのアンカーの上に成り立つ。各セッションは分離されたリプレイ状態 (消費済みイベントカーソル、正規リクエストヘッダー、価格付きサーフェス、ステップ境界、計測アンカー) を持ち、永続ログを畳み込むことで進められる。プロバイダー使用量が計測をアンカーするのは、その正規エンベロープが一致し、合計が同じ呼び出しの完全なルート価格付きコスト以上である場合だけである。そうでなければ、完全なエンベロープとサーフェスが推定される。ルート非依存の `heuristicTokens` フィールドが、置換のシャドウ価格投影を決定的に保つ。fold は全域的で割り当ての新規性を保つ: 不正なイベントはあらゆる変更の前にスローするため、同じログは再試行のたびに同一に失敗する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | The `TokenMeter` service: replay state, fold, `measure()` and `estimateMessage()` |
-| [`src/estimate.ts`](src/estimate.ts) | The fixed heuristic: four characters per token plus block and role overhead |
-| [`src/surface-fold.ts`](src/surface-fold.ts) | The positional surface fold shared with `measure()` |
-| [`src/surface-projection.ts`](src/surface-projection.ts) | Shadow-price protocol for the O(1) projection units |
-| [`src/usage-projection.ts`](src/usage-projection.ts) | `tokenUsage` and `contextPressure` projection definitions |
-| [`src/breakdown-projection.ts`](src/breakdown-projection.ts) | `contextBreakdown` projection definition |
-| [`src/client.ts`](src/client.ts) | Browser-safe client surface for projection consumers |
-| [`src/turn-usage.ts`](src/turn-usage.ts) | Pure fold for exact per-attempt and per-Turn usage |
+| [`src/index.ts`](src/index.ts) | `TokenMeter` サービス: リプレイ状態、fold、`measure()` と `estimateMessage()` |
+| [`src/estimate.ts`](src/estimate.ts) | 固定ヒューリスティック: 1 トークン 4 文字とブロック/ロールのオーバーヘッド |
+| [`src/surface-fold.ts`](src/surface-fold.ts) | `measure()` と共有される位置サーフェス fold |
+| [`src/surface-projection.ts`](src/surface-projection.ts) | O(1) プロジェクションユニットのためのシャドウ価格プロトコル |
+| [`src/usage-projection.ts`](src/usage-projection.ts) | `tokenUsage` と `contextPressure` のプロジェクション定義 |
+| [`src/breakdown-projection.ts`](src/breakdown-projection.ts) | `contextBreakdown` のプロジェクション定義 |
+| [`src/client.ts`](src/client.ts) | プロジェクションコンシューマー向けのブラウザーセーフなクライアントサーフェス |
+| [`src/turn-usage.ts`](src/turn-usage.ts) | 正確な試行ごとおよびターンごとの使用量のための純粋な fold |
 
-### Fold flow
+### fold フロー
 
-Each `measure()` call synchronizes the fold to the current durable tail, then reads one coherent snapshot. The fold tracks full request-header snapshots, step boundaries, surface appends and replacements, successful assistant messages, and provider usage. Provider output for a usage anchor is reassembled from the assistant message's exact embedded stream, independently of listener rewrites to durable content; empty assembled content costs zero.
+各 `measure()` 呼び出しは fold を現在の永続テールに同期させてから、1 つの一貫したスナップショットを読む。fold は完全なリクエストヘッダースナップショット、ステップ境界、サーフェスの追記と置換、成功した assistant メッセージ、プロバイダー使用量を追跡する。使用量アンカーのプロバイダー出力は、永続コンテンツへのリスナー書き換えとは独立に、assistant メッセージの正確な埋め込みストリームから再アセンブルされる。空のアセンブル済みコンテンツのコストはゼロである。
 
-### Projection semantics
+### プロジェクションの意味論
 
-`contextBreakdown` retains only the surviving `system/message` nodes with their heuristic prices, one running surface total, and at most one armed shadow-price claim; a replacement subtracts the adjacent claim, whose `shadowedSeqs` also name the system prompts it removes, or the retained price of the one system prompt it rewrites ([decision](../../../.agents/notes/implemented/architecture/2026-10-13-context-breakdown-system-prompt-state.md)). Its state follows the number of surviving system prompts, not the message count; state version 6 invalidates positional checkpoints. `contextPressure` is the other scalar shadow-price consumer: replacements without adjacent claims contribute zero delta. The usage fold retains one last-sample slot because legal logs never report usage for an earlier step after a later step reports usage.
+`contextBreakdown` は、生存する `system/message` ノードをそのヒューリスティック価格とともに保持し、ランニングのサーフェス合計を 1 つ持ち、アームされたシャドウ価格クレームを最大 1 つ持つ。置換は隣接するクレーム (その `shadowedSeqs` は除去されるシステムプロンプトも名指す) または書き換える 1 つのシステムプロンプトの保持価格を差し引く ([決定](../../../.agents/notes/implemented/architecture/2026-10-13-context-breakdown-system-prompt-state.md))。その状態はメッセージ数ではなく生存するシステムプロンプトの数に従う。状態バージョン 6 は位置チェックポイントを無効にする。`contextPressure` はもう 1 つのスカラーシャドウ価格コンシューマーである: 隣接クレームのない置換はゼロデルタを寄与する。使用量 fold が最後のサンプルスロットを 1 つ保持するのは、正規のログが後続ステップの使用量を報告した後に先行ステップの使用量を報告することが決してないためである。
 
-`./estimate` exports the stateless text/content estimators used by tool-result retention. Model adapters supply request-image costs through `imageRequestPricing`.
+`./estimate` は、ツール結果の保持に使われるステートレスなテキスト/コンテンツ推定器をエクスポートする。モデルアダプターは `imageRequestPricing` を通じてリクエスト画像コストを供給する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the measurement service to the compaction consumer and the shared types.
+パッケージレベルの契約では足りないときにこれらのページを読む。計測サービスからコンパクションコンシューマーと共有型へと進む。
 
-- [Token meter subsystem](../../../docs/subsystems/token-meter.md) — the measurement semantics behind `ctx.tokenMeter`.
-- [dsh-llm service](../llm/README.md) — the model-call service whose capacity metadata `resolveModelInfo()` serves.
-- [Compaction capability](../../../docs/subsystems/compaction.md) — the pressure-sensitive consumer that reads `measure()`.
-- [Projected token usage](../../../.agents/notes/implemented/architecture/2026-07-29-projected-token-usage-and-request-context.md) — the design behind `projectedTokens` and the rejected atomic-pair comparison.
-- [LLM streaming subsystem](../../../docs/subsystems/llm-streaming.md) — the message and block types this service prices.
+- [Token meter サブシステム](../../../docs/subsystems/token-meter.md) — `ctx.tokenMeter` 背後の計測意味論。
+- [dsh-llm サービス](../llm/README.md) — `resolveModelInfo()` が容量メタデータを提供するモデル呼び出しサービス。
+- [コンパクションケイパビリティ](../../../docs/subsystems/compaction.md) — `measure()` を読む圧力感知コンシューマー。
+- [投影トークン使用量](../../../.agents/notes/implemented/architecture/2026-07-29-projected-token-usage-and-request-context.md) — `projectedTokens` 背後の設計と却下されたアトミックペア比較。
+- [LLM ストリーミングサブシステム](../../../docs/subsystems/llm-streaming.md) — このサービスが価格付けするメッセージとブロックの型。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through consumers such as `dsh-compaction-basic`; the service itself adds no prompt, message, schema, tool, or model call.
+間接的に、`dsh-compaction-basic` などのコンシューマーを通じて。サービス自体はプロンプト、メッセージ、スキーマ、ツール、モデル呼び出しを追加しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+直接の無効化はない。名指されたコンシューマーがリクエストプレフィックスの変更を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the measurement stops and future work begins. They are current package constraints, not a general token-accounting comparison or a task backlog.
+これらの制限は計測がどこで止まり、将来の作業がどこから始まるかを定義する。現在のパッケージ制約であり、一般的なトークン会計の比較やタスクバックログではない。
 
-- **The fixed heuristic is approximate** — text without reusable provider usage is priced by character count plus structural overhead, not an exact provider tokenizer or request serializer; only image occurrences on routes with declared pricing carry provider-exact visual tokens.
-- **Every measurement clones the current surface** — coherent immutable snapshots make reads O(surface), including below-threshold pressure checks.
-- **Provider usage is only reusable for an identical canonical envelope** — tools, provider, model, or call-config changes deliberately fall back to full heuristic estimation; system-prompt changes are signed surface deltas until the next successful call.
-- **A system-prompt rewrite carries no shadow price** — the loop replaces a system node without an adjacent metering event, so `contextPressure.projectedTokens` folds that replacement at zero delta until the next usage sample; `contextBreakdown.systemTokens` and `measure()` reprice the new prompt immediately.
-- **Composition checkpoints retain the current surface** — exact system/message classification needs positional entries; checkpoint size and surface-event folding are O(current retained surface).
+- **固定ヒューリスティックは近似である** — 再利用可能なプロバイダー使用量のないテキストは、文字数と構造オーバーヘッドで価格付けされ、正確なプロバイダートークナイザーやリクエストシリアライザーではない。宣言された価格を持つルート上の画像オカレンスだけがプロバイダー正確のビジュアルトークンを運ぶ。
+- **すべての計測が現在のサーフェスをクローンする** — 一貫した不変スナップショットにより読み取りは O(surface) になる。しきい値未満の圧力チェックも含む。
+- **プロバイダー使用量は同一の正規エンベロープに対してのみ再利用できる** — ツール、プロバイダー、モデル、または呼び出し設定の変更は意図的に完全なヒューリスティック推定へフォールバックする。system-prompt の変更は次の成功した呼び出しまでの符号付きサーフェスデルタである。
+- **system-prompt の書き換えはシャドウ価格を運ばない** — ループは隣接するメータリングイベントなしにシステムノードを置き換えるため、`contextPressure.projectedTokens` は次の使用量サンプルまでその置換をゼロデルタで畳み込む。`contextBreakdown.systemTokens` と `measure()` は新しいプロンプトを即座に再価格付けする。
+- **コンポジションチェックポイントは現在のサーフェスを保持する** — 正確な system/message 分類には位置エントリーが必要である。チェックポイントサイズとサーフェスイベントの畳み込みは O(現在保持されているサーフェス) である。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is non-authoritative working context: notes for maintainers and open questions. Shipped behavior and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発者ノートは権威を持たない作業コンテキストである: メンテナー向けのメモと未解決の問いである。出荷済みの振る舞いと受け入れられた根拠は、上記の節、パッケージコード、およびリンクされた Agent Note にある。
 
-- The fixed four-characters-per-token heuristic underprices CJK text and JSON schemas; the provider anchor carries exactly that error when usage is reused. Present the composition rows as an approximate composition, never as a total.
-- A per-provider exact tokenizer is not decided; keeping one deterministic heuristic is what makes every consumer's measurement agree and replay-stable.
+- 固定の 1 トークン 4 文字ヒューリスティックは CJK テキストと JSON schema を過小価格付けする。使用量が再利用されるとき、プロバイダーアンカーはまさにその誤差を運ぶ。構成の行は近似の構成として提示し、決して合計として提示しない。
+- プロバイダーごとの正確なトークナイザーは決定されていない。単一の決定的なヒューリスティックを保つことが、すべてのコンシューマーの計測を一致させ、リプレイ安定にする。
 
 </details>
 
-Usage folds replace samples within each attempt; totals need not be monotone. Composition and measurement share the positional replacement planner and fixed estimator, so their heuristic surface totals agree by construction. Route-priced totals deliberately differ.
+使用量 fold は各試行内でサンプルを置き換える。合計は単調である必要はない。コンポジションと計測は位置置換プランナーと固定推定器を共有するため、それらのヒューリスティックサーフェス合計は構造上一致する。ルート価格付きの合計は意図的に異なる。

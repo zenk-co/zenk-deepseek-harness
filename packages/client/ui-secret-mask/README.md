@@ -1,99 +1,99 @@
 ---
-description: "Web display masking for recognized credentials in sent user text, with a per-value reveal control in interactive messages."
+description: "送信済みユーザー文中の認識済み資格情報の Web 表示マスク。対話メッセージ内の値ごとの表示制御付き。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-secret-mask
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-client-ui-secret-mask` when Web users paste API keys, tokens, or passwords into messages that others may see on a shared screen or in a screenshot. Sent user text draws each recognized credential masked: a key or token keeps its first eight characters, and each remaining character is drawn as `*`. Masking changes only what is drawn; the message text, the copy action, and the model input keep the original characters.
+共有画面やスクリーンショットで他人に見られ得るメッセージに Web ユーザーが API キー・トークン・パスワードを貼り付ける場合に `dsh-client-ui-secret-mask` を使う。送信済みユーザー文は認識済み資格値をマスクして描く。キーやトークンは先頭 8 文字を保持し、残りの各文字を `*` で描く。マスクは描画のみを変える。メッセージ文、コピー操作、モデル入力は元の文字を保つ。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the package beside `dsh-client-ui-conversation`. The Web app bundle mounts it by default; removing its row draws credentials as written. Every caller of the [UserText Factory](../ui-conversation/README.md#sent-user-text) masks: message bubbles, steering messages, pending echoes, queued messages, and `/goal` input bubbles.
+`dsh-client-ui-conversation` のそばにパッケージをマウントする。Web アプリバンドルは既定でそれをマウントし、その行の除去は資格情報を書かれたとおりに描く。[UserText ファクトリー](../ui-conversation/README.md#sent-user-text)のすべての呼び出し側がマスクする。メッセージバブル、操舵メッセージ、保留エコー、キュー済みメッセージ、`/goal` 入力バブルである。
 
-Each masked value is drawn in a monospace font, so revealing it does not move the surrounding text. Interactive text, which is a sent message or an admitted steering message, adds an eye control at the end of each run. The control reveals or hides that one value, and every mount starts masked. Other callers draw the masked value without a control.
+各マスク値は等幅フォントで描かれるため、表示しても周囲の文は動かない。送信済みメッセージや許容操舵メッセージである対話文は各走査の末尾に目制御を加える。その制御はその 1 値を表示または隠し、すべてのマウントはマスクで開始する。他の呼び出し側は制御なしでマスク値を描く。
 
 <a id="what-is-masked"></a>
-### What is masked
+### マスク対象
 
-| Value | Examples | Display |
+| 値 | 例 | 表示 |
 | --- | --- | --- |
-| Model-service and Google API keys | `sk-…` with at least one digit, `AIza…` | First eight characters kept |
-| Code-hosting and package-registry tokens | `ghp_…`, `github_pat_…`, `glpat-…`, `npm_…`, `hf_…` | First eight characters kept |
-| Cloud access key IDs | `AKIA…`, `ASIA…`, `LTAI…`, `AKID…` | First eight characters kept |
-| Collaboration and payment tokens | `xoxb-…`, `sk_live_…`, `rk_test_…`, `whsec_…` | First eight characters kept |
-| JSON Web Tokens | `eyJ….eyJ….…` | First eight characters kept |
-| Private key blocks | `-----BEGIN … PRIVATE KEY-----` through its `END` line | `BEGIN` and `END` lines and line breaks kept |
-| Address passwords | `postgres://user:password@host/db` | Password masked completely, including a token used as one |
+| モデルサービスと Google API キー | 少なくとも 1 桁を含む `sk-…`、`AIza…` | 先頭 8 文字を保持 |
+| コード hosting とパッケージレジストリトークン | `ghp_…`、`github_pat_…`、`glpat-…`、`npm_…`、`hf_…` | 先頭 8 文字を保持 |
+| クラウドアクセスキー ID | `AKIA…`、`ASIA…`、`LTAI…`、`AKID…` | 先頭 8 文字を保持 |
+| 協業と決済トークン | `xoxb-…`、`sk_live_…`、`rk_test_…`、`whsec_…` | 先頭 8 文字を保持 |
+| JSON Web トークン | `eyJ….eyJ….…` | 先頭 8 文字を保持 |
+| 秘密鍵ブロック | `-----BEGIN … PRIVATE KEY-----` からその `END` 行まで | `BEGIN` 行と `END` 行および改行を保持 |
+| アドレスパスワード | `postgres://user:password@host/db` | トークンを含めパスワードを完全マスク |
 
-Named assignments such as `password=…` or `API_KEY=…`, passwords written in a sentence, verification codes, and personal data have no published format and stay as written.
+`password=…` や `API_KEY=…` のような名前付き代入、文中に書かれたパスワード、検証コード、個人データは公開形式がなく、書かれたとおりのままである。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The plugin registers one UserText matcher, `secret`, and its keyed `conversation.user.text.node` renderer; the `/client` export is the plugin body (`apply`/`inject`) only. The matcher reads no Facts, so Facts updates never query it again. Each query returns the nearest credential at or after the requested offset and allocates nothing before it returns a node. A literal-only alternation finds where a format can begin; where a literal's suffix can begin another literal, the scan resumes at that suffix. Format checks are bounded character comparisons and sticky `[class]*` patterns, which stop at the first character outside the class and leave nothing to backtrack into. The matcher instance that `apply` creates memoizes run ends, the next digit, and the next private-key `END` line per text across queries, so all queries of one text cost linear time together; the instance keeps the last queried text until a query for another text. At an equal start, the private-key, address-password, and prefix formats win in that order, and every overlapping candidate joins the earliest under its mask. When an address's `://` precedes the requested offset, the matcher walks back over the user name only if `:`, a password, and `@` follow the offset, so a query from anywhere inside an address finds the same password. The [user-text benchmark](../../../benchmarks/user-text/user-text.bench.client.ts) bounds evaluation time for text with and without credentials, linear scaling, and the matcher's allocation ([rationale](../../../.agents/notes/implemented/testing/2026-10-11-user-text-credential-matching.md)).
+このプラグインは UserText 照合器 `secret` 1 件とそのキー付き `conversation.user.text.node` 描画器を登録する。`/client` エクスポートはプラグイン本体（`apply`/`inject`）のみである。照合器は Facts を読まないため、Facts 更新がそれを再照会することはない。各照会は要求 offset 以降の最近傍資格値を返し、それより前には何も割り当てない。リテラルのみ alternation が形式開始位置を見つけ、リテラル接尾辞が他リテラルを開始できる場所では走査はその接尾辞から再開する。形式検査は有界文字比較と sticky `[class]*` パターンであり、種別外の最初の文字で停止し、遡及する余地を残さない。`apply` が作成する照合器実体は走査末尾・次桁・次秘密鍵 `END` 行を文ごとに照会間で memo 化するため、1 文の全照会は合わせて線形時間であり、実体は他文への照会まで最終照会文を保持する。等しい開始では秘密鍵・アドレスパスワード・接頭辞形式がその順に勝ち、重なるすべての候補はそのマスク下の最初に加わる。アドレスの `://` が要求 offset より前にある場合、照合器は offset 後に `:`・パスワード・`@` が続く場合に限りユーザー名上を戻るため、アドレス内の任意位置からの照会は同一パスワードを見つける。[ユーザー文 benchmark](../../../benchmarks/user-text/user-text.bench.client.ts) は資格値ありなし文、線形 scaling、照合器割り当ての評価時間を抑える（[根拠](../../../.agents/notes/implemented/testing/2026-10-11-user-text-credential-matching.md)）。
 
-The node payload carries only the masked display text. The renderer draws each run of `*` as centered marks while keeping the characters for copying and assistive technology, because a font's own asterisk sits near the cap height. It switches between that text and the node's original text, and it remembers the revealed original value instead of a flag, so a different credential at the same position starts masked.
+ノード payload はマスク表示文のみを運ぶ。描画器は `*` の各走査を中央印として描きながら、複写と支援技術のために文字を保持する。フォント自体のアスタリスクが cap 高さ付近にあるためである。元のノード文とその文を切り替え、旗ではなく表示済み元の値を覚えるため、同一位置の異なる資格値はマスクで開始する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [ui-conversation sent user text](../ui-conversation/README.md#sent-user-text) — the matcher registry, the scheduler, and the node renderer Slot.
-- [User text candidate scheduling](../../../.agents/notes/implemented/architecture/2026-10-10-user-text-json-nodes.md) — the forward-query and cache rules this matcher follows.
-- [Credential matching performance](../../../.agents/notes/implemented/testing/2026-10-11-user-text-credential-matching.md) — the linear matcher, its per-part complexity and trade-offs, and the time and allocation gates.
+- [ui-conversation 送信済みユーザー文](../ui-conversation/README.md#sent-user-text) — 照合器レジストリ、scheduler、ノード描画器スロット。
+- [ユーザー文候補 scheduling](../../../.agents/notes/implemented/architecture/2026-10-10-user-text-json-nodes.md) — この照合器が従う前方照会とキャッシュ規則。
+- [資格値照合性能](../../../.agents/notes/implemented/testing/2026-10-11-user-text-credential-matching.md) — 線形照合器、その部分ごとの計算量と tradeoff、時間と割り当て gate。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as masking changes only what the browser draws; the message text and the model input keep the original characters.
+なし。マスクはブラウザー描画のみを変え、メッセージ文とモデル入力は元の文字を保つためである。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てず送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits define when a credential is drawn as written; they are current package constraints.
+資格値が書かれたとおりに描かれる場合をこれらの制限が定義する。これらは現行パッケージ制約である。
 
-- **Recognition requires a published format** — a credential without one of the [recognized formats](#what-is-masked) is drawn as written. Named assignments stay plain because the same names also label ordinary values, such as token usage.
-- **Only UserText callers mask** — session titles, turn previews, search excerpts, the goal bar, tool cards, assistant replies, and the unsent composer draw credentials as written.
-- **An earlier reference draws its own text** — a credential inside a reference that starts before it, such as the file mention `@config/<key>.txt`, is drawn by that reference.
+- **認識には公開形式が必要** — [認識形式](#what-is-masked)のいずれも持たない資格値は書かれたとおりに描かれる。名前付き代入は通常値にも同じ名前が付くため平文のままである。たとえばトークン使用量などである。
+- **UserText 呼び出し側のみがマスクする** — セッション題名、ターン preview、検索抜粋、ゴールバー、ツールカード、アシスタント応答、未送信コンポーザーは資格値を書かれたとおりに描く。
+- **以前の参照は自文を描く** — `@config/<key>.txt` のようなファイル言及など、その前に始まる参照内の資格値はその参照が描く。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

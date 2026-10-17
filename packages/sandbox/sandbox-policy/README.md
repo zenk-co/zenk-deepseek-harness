@@ -1,39 +1,39 @@
 ---
-description: "The shared per-call sandbox policy resolver and current model context for users and maintainers composing, configuring, or debugging file-effect policy across enforcing capabilities."
+description: "強制するケイパビリティをまたいでファイル影響ポリシーをコンポーズ・設定・デバッグするユーザーとメンテナー向けの、共有の呼び出しごとサンドボックスポリシーリゾルバーと現在のモデルコンテキスト。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-sandbox-policy
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to apply one file-effect policy to every confined bash, filesystem, and terminal call. Deployments choose a default mode and fallback workspace root, while each session can switch modes independently. Session choices survive restart, and all enforcing capabilities use the same mode and workspace for a call. Before each model request, the model receives the effective policy and workspace without an inventory of mounted capabilities.
+このパッケージは、制限付きの bash、ファイルシステム、ターミナルのすべての呼び出しに 1 つのファイル影響ポリシーを適用するために使います。デプロイメントはデフォルトモードとフォールバックのワークスペースルートを選び、各セッションは独立にモードを切り替えられます。セッションの選択は再起動を生き延び、すべての強制ケイパビリティが呼び出しに対して同じモードとワークスペースを使います。各モデルリクエストの前に、モデルはマウントされたケイパビリティの一覧なしで、有効なポリシーとワークスペースを受け取ります。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と保留作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this package in any composition where sandbox-enforcing capabilities run: it owns the deployment default and the per-session overrides those capabilities consume, and it contributes the current policy to the model's runtime-context snapshot.
+サンドボックスを強制するケイパビリティが動作するあらゆるコンポジションでこのパッケージをマウントします: これはデプロイメントのデフォルトと、それらのケイパビリティが消費するセッションごとのオーバーライドを所有し、現在のポリシーをモデルのランタイムコンテキストスナップショットへ寄与します。
 
-### When to choose it
+### 選ぶべきとき
 
-Choose it for every composition with confined capabilities (bash, filesystem, terminal) so one policy home keeps them from drifting into different modes or workspace roots. Skip it only when nothing enforces sandbox policy — with no consumers, the resolved policy has no effect.
+制限付きケイパビリティ (bash、ファイルシステム、ターミナル) を持つすべてのコンポジションにこれを選び、1 つのポリシーホームがそれらを異なるモードやワークスペースルートへドリフトさせないようにします。サンドボックスポリシーを強制するものが何もない場合にのみ省略してください — コンシューマーがなければ、解決されたポリシーは何の効果も持ちません。
 
-### Minimal configuration
+### 最小構成
 
-Load the package with a default mode; the fail-safe default is `read-only`, and a deployment that wants a workspace-writable agent opts into `workspace-write` explicitly.
+デフォルトモードを伴ってパッケージをロードします。フェイルセーフのデフォルトは `read-only` で、エージェントにワークスペースへの書き込みを許すデプロイメントは `workspace-write` を明示的にオプトインします。
 
 ```yaml
 - name: '@deepseek-ai/dsh-sandbox-policy'
@@ -42,73 +42,73 @@ Load the package with a default mode; the fail-safe default is `read-only`, and 
     workspaceRoot: /absolute/path/to/workspace
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `mode` | `read-only` | The deployment default mode a session starts from, validated at load |
-| `workspaceRoot` | `process.cwd()` | Absolute fallback root for agentless calls or sessions without a cwd; relative values fail at load. Normal agent calls use the session's immutable cwd |
+| `mode` | `read-only` | セッションが開始するデプロイメントのデフォルトモード。ロード時に検証される |
+| `workspaceRoot` | `process.cwd()` | エージェントレス呼び出しまたは cwd を持たないセッションの絶対フォールバックルート。相対値はロード時に失敗する。通常のエージェント呼び出しはセッションの不変の cwd を使う |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-sandbox-policy) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-sandbox-policy)が、受理されるすべてのフィールドとその JSDoc の網羅的な情報源です。
 
-### Switching a session's mode
+### セッションのモード切り替え
 
-A session's mode can be switched at runtime through a UI policy control or an explicit switch; the switch is recorded in the session log and takes effect on the session's next confined call. The switch survives restart through replay, and each session keeps its own mode — two sessions never see each other's state. A switched session keeps its immutable workspace cwd as the writable boundary.
+セッションのモードは、UI のポリシーコントロールまたは明示的な切り替えを通じて実行時に変更できます。切り替えはセッションログに記録され、そのセッションの次の制限付き呼び出しで有効になります。切り替えはリプレイを通じて再起動を生き延び、各セッションは独自のモードを保ちます — 2 つのセッションが互いの状態を見ることは決してありません。切り替えられたセッションは、書き込み可能な境界としてその不変のワークスペース cwd を保ちます。
 
-### Failures and recovery
+### 失敗と回復
 
-An invalid configured mode is rejected when the plugin loads, so a typo fails loud instead of silently changing policy. A session without a cwd, and agentless calls, fall back to the configured workspace root; a call with an approved explicit mode uses that mode for exactly that call.
+不正な設定モードはプラグインのロード時に拒否されるため、タイポはポリシーを暗黙に変えるのではなく大きな音を立てて失敗します。cwd のないセッションとエージェントレス呼び出しは、設定されたワークスペースルートにフォールバックします。承認された明示的モードを伴う呼び出しは、まさにその呼び出しにそのモードを使います。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains policy resolution, the per-session store, and the model-visible contribution; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではポリシーの解決、セッションごとのストア、モデル可視の寄与を説明します。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱います。
 
-### Resolution precedence
+### 解決の優先順位
 
-`resolve({ session, mode })` returns one complete per-call policy: an approved explicit mode outranks the session's last `sandbox/mode` event, which outranks the deployment default. The session's immutable `cwd` supplies the workspace root; otherwise the configured fallback applies. Absolute execution-world spelling is preserved. Enforcing providers canonicalize the root on their own filesystem, so remote `symlink/..` paths are never resolved on the Harness host.
+`resolve({ session, mode })` は 1 つの完全な呼び出しごとポリシーを返します: 承認された明示的モードがセッションの最後の `sandbox/mode` イベントより優先され、それがデプロイメントのデフォルトより優先されます。セッションの不変の `cwd` がワークスペースルートを提供し、なければ設定されたフォールバックが適用されます。実行世界の絶対的な綴りが保たれます。強制プロバイダーは自らのファイルシステム上でルートを正規化するため、リモートの `symlink/..` パスが Harness ホスト上で解決されることは決してありません。
 
-### The per-session store
+### セッションごとのストア
 
-A runtime switch is one log-only `sandbox/mode` event on the session it applies to — the switch IS its event, and nothing mutates mode state out of band. `effective = explicit grant ?? fold(events) ?? deployment default`, so an override survives restart by replay and two sessions never see each other's state. Workspace identity needs no event: the immutable `SessionHeader.cwd` recorded at creation is the root for every call in that session. The event stays log-only; before each request, the owner contributes the current fact to the full runtime-context snapshot, and the agent loop logs that snapshot as a sourced `user/message`.
+実行時の切り替えは、それが適用されるセッション上の 1 つのログ専用 `sandbox/mode` イベントです — 切り替えがそのイベントそのもので、バンド外でモード状態を変更するものは何もありません。`effective = explicit grant ?? fold(events) ?? deployment default` であるため、オーバーライドはリプレイによって再起動を生き延び、2 つのセッションが互いの状態を見ることは決してありません。ワークスペースのアイデンティティにイベントは不要です: 作成時に記録された不変の `SessionHeader.cwd` が、そのセッションのすべての呼び出しのルートです。イベントはログ専用のままです。各リクエストの前に、オーナーが現在の事実を完全なランタイムコンテキストスナップショットへ寄与し、エージェントループがそのスナップショットを出所付きの `user/message` としてログに記録します。
 
-### Model-visible text
+### モデル可視テキスト
 
-The `sandbox:policy` contribution states the mode's capability-neutral file-effect contract and the recorded session workspace under `workspace-write`. It does not enumerate mounted capabilities; tool plugins retain operation-specific denial and escalation guidance, approval policy contributes separately to the same snapshot, and plan guidance remains `dsh-plan-mode`'s system section.
+`sandbox:policy` の寄与は、モードのケイパビリティ中立なファイル影響契約と、`workspace-write` の下での記録されたセッションワークスペースを述べます。マウントされたケイパビリティを列挙することはありません。ツールプラグインは操作固有の拒否とエスカレーションのガイダンスを保ち、承認ポリシーは同じスナップショットへ別途寄与し、plan のガイダンスは `dsh-plan-mode` のシステムセクションのままです。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `SandboxPolicyService`, `Config` schema, policy resolution and context contribution |
-| [`src/session-mode.ts`](src/session-mode.ts) | The `sandbox/mode` event, its fold, and the write path |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `SandboxPolicyService`、`Config` スキーマ、ポリシー解決とコンテキストへの寄与 |
+| [`src/session-mode.ts`](src/session-mode.ts) | `sandbox/mode` イベント、そのフォールド、書き込みパス |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Start with the subsystem reference for the shared vocabulary, then the seam contract and the cross-family decision.
+共有語彙についてはサブシステムリファレンスから始め、次にシーム契約とファミリー横断の決定へ進みます。
 
-- [Process sandbox subsystem](../../../docs/subsystems/sandbox.md) — modes, per-call policy, and enforcement semantics.
-- [Sandbox seam package](../sandbox/README.md) — the confinement contract every enforcing capability implements.
-- [historical Cross-family file sandbox decision](../../../.agents/notes/archived/feature/2026-07-14-cross-family-fs-sandbox.md) — why one shared policy home exists.
+- [プロセスサンドボックスサブシステム](../../../docs/subsystems/sandbox.md) — モード、呼び出しごとポリシー、強制のセマンティクス。
+- [サンドボックスシームパッケージ](../sandbox/README.md) — すべての強制ケイパビリティが実装する制限契約。
+- [過去のファミリー横断ファイルサンドボックスの決定](../../../.agents/notes/archived/feature/2026-07-14-cross-family-fs-sandbox.md) — 共有ポリシーホームが存在する理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Current file sandbox policy
+### 現在のファイルサンドボックスポリシー
 
-#### What the model sees
+#### モデルが見るもの
 
-One `sandbox:policy` contribution in the current runtime-context snapshot for every agent session. It does not enumerate mounted capabilities. Tool plugins retain operation and escalation guidance, approval policy contributes separately to the same snapshot, and plan guidance remains `dsh-plan-mode`'s system section.
+エージェントセッションごとの現在のランタイムコンテキストスナップショットに、1 つの `sandbox:policy` の寄与。マウントされたケイパビリティを列挙することはありません。ツールプラグインは操作とエスカレーションのガイダンスを保ち、承認ポリシーは同じスナップショットへ別途寄与し、plan のガイダンスは `dsh-plan-mode` のシステムセクションのままです。
 
 ##### Read-only
 
@@ -128,33 +128,33 @@ Current DSH file policy: workspace-write. Any available operation enforced by th
 Current DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.
 ```
 
-#### Token effect
+#### トークン効果
 
-One concise durable context message on the first request and each effective policy change; unchanged requests add nothing. `workspace-write` carries only the recorded session workspace path; platform-specific temporary paths are summarized without adding host-dependent bytes.
+最初のリクエストと各実効ポリシーの変更のときに、1 つの簡潔で永続的なコンテキストメッセージ。変更のないリクエストは何も追加しません。`workspace-write` は記録されたセッションワークスペースのパスのみを運び、プラットフォーム固有の一時パスはホスト依存のバイトを追加せずに要約されます。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-The stable system prompt remains byte-identical across mode changes. A changed full context snapshot is appended after retained history, preserving the prior cached prefix; subsequent unchanged requests reuse that retained snapshot.
+安定したシステムプロンプトはモード変更をまたいでバイト単位で同一のままです。変更された完全なコンテキストスナップショットは保持された履歴の後に追記され、以前のキャッシュ済みプレフィックスを保ちます。後続の変更のないリクエストはその保持されたスナップショットを再利用します。
 
-## Known Limitations and Deferred Work
+## 既知の制限と保留作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the policy surface this package provides. They are current package constraints, not a general sandbox comparison or a task backlog.
+これらの制限は、このパッケージが提供するポリシーサーフェスを定義します。これらは現在のパッケージ制約であり、一般的なサンドボックスの比較やタスクバックログではありません。
 
-- **One primary workspace root per session** — policy resolves `SessionHeader.cwd`; extra writable roots are not part of `SandboxExecutionPolicy`.
-- **File-effect modes only** — `SandboxMode` governs file effects; network and process policy are outside its vocabulary, so no knob here restricts them.
-- **Temporary areas are deliberately summarized** — enforcing backends grant different platform temporary areas, which are selected after policy resolution and therefore cannot be enumerated truthfully in the current context.
+- **セッションごとに 1 つのプライマリワークスペースルート** — ポリシーは `SessionHeader.cwd` を解決します。追加の書き込み可能ルートは `SandboxExecutionPolicy` の一部ではありません。
+- **ファイル影響モードのみ** — `SandboxMode` はファイル影響を統べます。ネットワークとプロセスのポリシーはその語彙の外にあり、ここにあるノブでそれらを制限することはできません。
+- **一時エリアは意図的に要約される** — 強制バックエンドは異なるプラットフォームの一時エリアを付与し、それらはポリシー解決後に選択されるため、現在のコンテキストに真実に列挙することはできません。
 
-Policy-context replacements must be counter-tested on denied-then-escalatable tasks to verify that the model still attempts the initial tool call. The [historical five-of-twelve zero-tool-call measurement](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md) records the failure this check prevents.
+ポリシーコンテキストの置き換えは、拒否されてからエスカレーション可能なタスクで対照試験し、モデルが依然として最初のツール呼び出しを試みることを検証しなければなりません。[過去の 12 件中 5 件のゼロツール呼び出し測定](../../../.agents/notes/archived/feature/2026-07-06-sandbox.md)が、このチェックが防ぐ失敗を記録しています。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,35 +1,35 @@
 ---
-description: "The deployment default model selection for users and maintainers choosing, configuring, or debugging which model freshly created agents start on."
+description: "どのモデルで新規作成エージェントが開始するかを選択、設定、デバッグするユーザーとメンテナーのための、デプロイ既定モデル選択。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-agent-default-model
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Give newly created agents a shared default provider and model when their sessions do not specify one. Provider, model, and reasoning effort are live Config fields. Saved selections update the active profile patch and apply to subsequent reads; per-session selection remains owned by the entry point.
+セッションが指定しない場合に新規作成エージェントへ共有既定プロバイダーとモデルを与える。プロバイダー、モデル、reasoning effort はライブ設定フィールドである。保存された選択は有効プロファイルパッチを更新し、後の読み取りに適用される。セッションごとの選択はエントリーポイントが所有したままである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this package wherever agents are created without an explicit model route. The service answers one question — which model should a fresh agent use? — so entry points that create agents consult it instead of re-implementing a default.
+明示的なモデル経路なしにエージェントが作成される場所にはどこでもこのパッケージをマウントする。サービスは 1 つの問いに答える。新規エージェントはどのモデルを使うべきか。エージェントを作成するエントリーポイントは既定値を再実装せずにそれを参照する。
 
-### Configure the default
+### 既定値の設定
 
-The composition requires a provider and model. Consumers read the live references even when no configuration editor is mounted.
+構成はプロバイダーとモデルを必須とする。コンシューマーは設定エディターがマウントされていない場合でもライブ参照を読む。
 
 ```yaml
 - name: '@deepseek-ai/dsh-agent-default-model'
@@ -38,89 +38,89 @@ The composition requires a provider and model. Consumers read the live reference
     model: deepseek-chat
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `provider` | required | Registered provider route for fresh agents |
-| `model` | required | Provider-owned model id for fresh agents |
+| `provider` | 必須 | 新規エージェント用の登録済みプロバイダー経路 |
+| `model` | 必須 | 新規エージェント用のプロバイダー所有モデル id |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-agent-default-model) lists every accepted field. `reasoningEffort` is optional; saving a selection without it removes that field from the profile’s complete config override.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-agent-default-model)は受け付けるすべてのフィールドを列挙する。`reasoningEffort` は任意である。それなしに選択を保存するとプロファイルの完全設定上書きからそのフィールドが除去される。
 
-### Read and change the default
+### 既定値の読み取りと変更
 
-`currentSelection()` returns a detached `{ provider, model, reasoningEffort? }` for a newly created agent; `saveSelection()` stores the complete selection for later agents.
+`currentSelection()` は新規作成エージェントのための切り離された `{ provider, model, reasoningEffort? }` を返す。`saveSelection()` は後のエージェントのために完全な選択を格納する。
 
 ```text
 const selection = ctx.agentDefaultModel.currentSelection()
 await ctx.agentDefaultModel.saveSelection({ provider, model, reasoningEffort: 'high' })
 ```
 
-Without a configuration editor, `saveSelection()` is a no-op. The service does not validate catalog membership; the consumer opening a model request owns availability diagnostics.
+設定エディターがなければ `saveSelection()` は何もしない。サービスはカタログ所属を検証しない。モデル要求を開くコンシューマーが利用可能性診断を所有する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains how the service realizes the behavior above; the observable contract is covered in [Use this package](#use-this-package).
+この節はサービスが上記の動作を実現する仕組みを説明する。観察可能な契約は[このパッケージを使う](#use-this-package)でカバーする。
 
-### Design concept
+### 設計概念
 
-The service retains its validated Config references and samples them in `currentSelection()`. `saveSelection()` captures the submitted values and serializes profile writes in submission order, including overlapping callers. Each caller observes its own write failure; a rejected write does not prevent later saves. Session-specific selection takes precedence in the consumer.
+サービスは検証済み設定参照を保持し、`currentSelection()` でそれらを標本化する。`saveSelection()` は提出値を捕捉し、重なる呼び出し元を含めて提出順にプロファイル書き込みを直列化する。各呼び出し元は自身の書き込み失敗を観察する。拒否された書き込みは後の保存を妨げない。セッション固有の選択はコンシューマー側で優先される。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Live default selection and profile-backed writes |
+| [`src/index.ts`](src/index.ts) | ライブ既定選択とプロファイルに支えられた書き込み |
 
-### Behavior notes
+### 動作注記
 
-`currentSelection()` returns a detached selection. A captured selection stays stable while later operations read updated Config references.
+`currentSelection()` は切り離された選択を返す。捕捉された選択は、後の操作が更新された設定参照を読む間も安定したままである。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-The package-level contract is enough for most consumers; read these when you need the surrounding domain.
+ほとんどのコンシューマーにはパッケージレベルの契約で十分である。周囲の領域が必要な場合に以下を読む。
 
-- [Core subsystem](../../../docs/subsystems/core.md) — the `Agent` handle and `AgentOptions` route selection.
-- [agent-loop package](../agent-loop/README.md) — how agents resolve provider and model at request time.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-agent-default-model) — every accepted config field and its source declaration.
-- [Core group map](../README.md) — how the core packages compose.
+- [Core サブシステム](../../../docs/subsystems/core.md) — `Agent` ハンドルと `AgentOptions` 経路選択。
+- [agent-loop パッケージ](../agent-loop/README.md) — エージェントが要求時にプロバイダーとモデルを解決する仕組み。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-agent-default-model) — 受け付けるすべての設定フィールドとそのソース宣言。
+- [Core グループマップ](../README.md) — core パッケージ群の構成方法。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the `ModelSelection` the service supplies to an entry point; request assembly and the provider adapters own the model-visible request.
+エントリーポイントにサービスが供給する `ModelSelection` を通じた間接的なもの。要求組み立てとプロバイダーアダプターはモデル可視要求を所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Changing the default affects only agents that subsequently resolve from it. An existing session whose request log already names a selection keeps that selection, so this service does not invalidate its established prefix.
+既定値変更はそこから後に解決するエージェントにのみ影響する。要求ログがすでに選択を指名している既存セッションはその選択を保持するため、このサービスは確立済みプレフィックスを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the service's scope. They are current package constraints, not a task backlog.
+これらの制限はサービスの範囲を定義する。これらは現在のパッケージの制約であり、タスクバックログではない。
 
-- **One process-wide default** — the service owns a single default; per-session model selection remains the entry point's responsibility.
-- **Persistence requires a profile configuration editor** — without it, saving a default does not retain the selection.
+- **プロセス全体で 1 つの既定値** — サービスは単一の既定値を所有する。セッションごとのモデル選択はエントリーポイントの責務のままである。
+- **永続化にはプロファイル設定エディターが必要** — それがなければ、既定値の保存は選択を保持しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

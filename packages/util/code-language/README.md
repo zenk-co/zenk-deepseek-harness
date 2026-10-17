@@ -1,48 +1,48 @@
 ---
-description: "Single file-extension to syntax-highlighting language table shared by the Client code surfaces and the Host read card."
+description: "Client 符号面と Host 読み札が共有する、単一のファイル拡張子から構文強調言語への表。"
 kind: "package-library"
 ---
 
 # dsh-util-code-language
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The repository's one file-extension to syntax-highlighting language table, shared by the Client's document Code preview and diff review, and by the Host read tool's persisted `lang` hint. `languageForPath` maps a path to a canonical grammar id case-insensitively; `CODE_HIGHLIGHT_EXTENSIONS` lists every suffix a preview registry can claim. `readLangHintForPath` projects the read card's short ids over the same table, so a suffix a recorded session already holds keeps its persisted value and every other suffix takes its language's short name. The package is browser-safe, stateless, and leaves tokenization to the Client highlighter.
+Client の文書符号 preview と差分査読、および Host 読み取りツールの持続 `lang` 暗示が共有する、リポジトリ唯一のファイル拡張子から構文強調言語への表。`languageForPath` は経路を大文字小文字を区別せず正準文法 id に写像し、`CODE_HIGHLIGHT_EXTENSIONS` は preview 登録が主張できる全接尾辞を列挙する。`readLangHintForPath` は読み札の短 id 群を同表上に投影するため、記録済みセッションが既に持つ接尾辞は持続値を保ち、その他の接尾辞は言語の短名を取る。パッケージはブラウザー安全で無状態であり、字句解析は Client 強調器に任せる。
 
-## Table of Contents
+## 目次
 
-- [Language selection](#language-selection)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [言語選択](#language-selection)
+- [既知の制限と後回しの作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="language-selection"></a>
-## Language selection
+## 言語選択
 
-The table lives in [`src/index.ts`](src/index.ts). Each key is a canonical language id — the grammar id the Client highlighter resolves — and each value is the lowercase extensions without the dot that select it. `languageForPath(path)` takes the text after the last dot of the final path segment, lowercases it, and looks it up in a `Map`; a `Map` keeps a filename such as `foo.constructor` from resolving an `Object.prototype` member. An unlisted dotfile (`.gitignore`), an absent extension, a trailing dot, and an unknown suffix all return `undefined`, which every consumer renders as plain text; a leading dot is still the separator, so `.env` resolves to `dotenv`. Both `/` and `\` separate path segments, so a Windows path resolves like a POSIX one.
+表は [`src/index.ts`](src/index.ts) にある。各鍵は正準言語 id — Client 強調器が解決する文法 id — であり、各値はそれを選択する点なし小文字拡張子である。`languageForPath(path)` は最終経路段片の最後の点より後の文を取り、小文字化して `Map` で引く。`Map` により `foo.constructor` のようなファイル名が `Object.prototype` 員に解決しない。挙げられない点文件 (`.gitignore`)、欠落拡張子、末尾点、未知接尾辞はすべて `undefined` を返し、各利用者は平文として描く。先頭点も区切りであるため `.env` は `dotenv` に解決する。`/` と `\` のどちらも経路段片を分けるため、Windows 経路は POSIX 経路と同様に解決する。
 
-The set is curated for common source, config, script, data, and markup extensions rather than mirroring a full language registry. Extensions with no matching grammar map to the nearest one (`properties` to `ini`, whose registration carries the `properties` alias); certificate and lock extensions (`pem`, `crt`, `key`, `cer`, `lock`) stay unlisted. CSV maps to `csv`; preview registries place specialized viewers before Code so Spreadsheet remains its default preview. `readLangHintForPath` is a projection over this table: a suffix whose value a recorded session already holds returns that persisted short id, any other suffix returns its language's short name (`powershell` to `ps1`), and an unrecognized suffix returns `undefined` — so the persisted field holds one style, a short name; for `kotlin`, `swift`, `yaml`, `json`, and similar that name is also the grammar id, and the suffixes whose own name is the better label (`tsx`, `tf`, `tfvars`, `gradle`) keep it. A consumer that needs the Client highlighter to actually tokenize a language still depends on that grammar being registered there — an id without a loaded grammar renders as plain text rather than failing.
+集合は完全な言語登録を写すのではなく、ありふれた原材料、設定、写本、資料、印付けの拡張子向けに選別されている。合う文法のない拡張子は最寄りに写像し (`properties` は `ini` へ。その登録が `properties` 別名を運ぶ)、証書と錠の拡張子 (`pem`、`crt`、`key`、`cer`、`lock`) は挙げないままである。CSV は `csv` に写像し、preview 登録は専覧者を符号より前に置くため表計算が既定 preview のままである。`readLangHintForPath` はこの表上の投影である。記録済みセッションが既に値を持つ接尾辞はその持続短 id を返し、それ以外の接尾辞は言語の短名を返し (`powershell` は `ps1` へ)、未認識接尾辞は `undefined` を返す — よって持続項目は短名という 1 様式を持ち、`kotlin`、`swift`、`yaml`、`json` などではその名が文法 id でもあり、自身名がより良い表示である接尾辞 (`tsx`、`tf`、`tfvars`、`gradle`) はそれを保つ。Client 強調器に実際に言語を字句解析させる必要のある利用者は、その文法がそこで登録されていることに依然依存する — 読み込まれた文法のない id は失敗ではなく平文として描かれる。
 
 -----
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しの作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Extension-only matching** — `languageForPath` reads a suffix, so names recognized without one (`Dockerfile`, `Makefile`, `.gitignore`, `.editorconfig`) stay unlisted. Filename rules are deferred.
-- **No content sniffing** — a file with an absent or unknown extension stays plain text even when its bytes are unambiguous; the table never inspects content.
-- **Curated, not exhaustive** — the table is smaller than Shiki's grammar catalog and GitHub linguist; adding a language means adding both the extension entry and the Client grammar registration.
+- **拡張子のみ照合** — `languageForPath` は接尾辞を読むため、接尾辞なしで認識される名 (`Dockerfile`、`Makefile`、`.gitignore`、`.editorconfig`) は挙げないままである。ファイル名規則は後回しである。
+- **内容物色なし** — 拡張子の欠落や未知のファイルは字句が明白でも平文のままである。表は内容を検査しない。
+- **選別的であり網羅的でない** — 表は Shiki 文法目録や GitHub linguist より小さく、言語の追加は拡張子項目と Client 文法登録の両追加を意味する。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業背景 — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

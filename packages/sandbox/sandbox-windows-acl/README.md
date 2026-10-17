@@ -1,39 +1,39 @@
 ---
-description: "The Windows write-restriction sandbox backend for users and maintainers choosing, configuring, or debugging restricted-token process confinement on Windows."
+description: "Windows で制限付きトークンのプロセス閉じ込めを選択、設定、またはデバッグするユーザーとメンテナー向けの、Windows 書き込み制限サンドボックスバックエンド。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-sandbox-windows-acl
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-On Windows, this package confines child-process writes and deletes to the workspace and a private temporary directory: `workspace-write` grants both, `read-only` grants neither. Mounting `dsh-sandbox-local` selects this for confined bash and PowerShell commands, or callers use the public `AclSandbox` API directly; any failed Win32 operation prevents an unrestricted spawn. Each grant combines a capability-SID allow ACE, a deny of the ambient parent-directory delete right, and a Low integrity label the lowered token must match, so one granted root cannot reach another. The guarantee stays partial: hard links alias file objects and files ACL'd by another AppContainer tool stay unreadable.
+Windows では、このパッケージは子プロセスの書き込みと削除をワークスペースとプライベート一時ディレクトリに閉じ込める。`workspace-write` は両方を許可し、`read-only` はどちらも許可しない。`dsh-sandbox-local` をマウントすると、閉じ込められた bash と PowerShell コマンドに対してこのバックエンドが選択され、または呼び出し元は公開 `AclSandbox` API を直接使う。Win32 操作が失敗すれば無制限の spawn が防止される。各許可は、ケイパビリティ SID の許可 ACE、親ディレクトリのアンビエント削除権の拒否、および降格したトークンが一致しなければならない Low 整合性ラベルを組み合わせるので、許可された 1 つのルートが別のルートに到達することはできない。保証は部分的にとどまる。ハードリンクはファイルオブジェクトを別名参照し、別の AppContainer ツールによって ACL 付けされたファイルは読み取れないままである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-On Windows, mounting the local sandbox provider makes this backend the runner behind `ctx.sandbox` — no extra configuration. Embed the `AclSandbox` API directly when you spawn confined children outside the harness.
+Windows では、ローカルサンドボックスプロバイダーをマウントすると、このバックエンドが `ctx.sandbox` の背後にあるランナーになる — 追加設定は不要である。ハーネスの外で閉じ込められた子プロセスを spawn する場合は、`AclSandbox` API を直接埋め込む。
 
-### When to choose it
+### いつ選ぶか
 
-Choose it for Windows compositions that confine subprocess file effects under `read-only` or `workspace-write`. Choose a different mechanism when the child must also be read-confined or network-restricted: `WRITE_RESTRICTED` intersects write accesses only, so pair this backend with a read-side policy or an AppContainer capability token for stronger confinement.
+サブプロセスのファイル効果を `read-only` または `workspace-write` の下に閉じ込める Windows 構成にはこれを選ぶ。子プロセスを読み取りも閉じ込めたり、ネットワークを制限したりする必要がある場合は別のメカニズムを選ぶ。`WRITE_RESTRICTED` は書き込みアクセスのみを交差するので、より強力な閉じ込めには、このバックエンドを読み取り側ポリシーまたは AppContainer ケイパビリティトークンと組み合わせる。
 
-### Direct API
+### 直接 API
 
-`AclSandbox` spawns a confined child with captured stdio (or inherited stdio for runner-style use). It requires an explicit private temp directory, or `tempDir: null` to disable temp writes — the ambient temp root is never an implicit grant.
+`AclSandbox` は stdio をキャプチャーして (またはランナー形式の用途では stdio を継承して) 閉じ込められた子プロセスを spawn する。明示的なプライベート一時ディレクトリ、または一時書き込みを無効にする `tempDir: null` を必要とする — アンビエントな一時ルートが暗黙に許可されることは決してない。
 
 ```ts
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -63,144 +63,144 @@ sandbox.dispose() // revokes the revocable (temp) grant and label, keeps the sta
 rmSync(tempDir, { recursive: true, force: true })
 ```
 
-The workspace security descriptor edits are granted standing — `dispose()` leaves them, because they are the cross-instance reuse cache — while the distinct temp SID is granted revocably. Each grant is one call carrying the capability-SID allow ACE, the ambient-delete deny, and the Low no-write-up label. The server-side counterpart is the `AclWriteGrant` class: `add(path, standing)` per directory, and `dispose()` revokes the revocable paths and frees the SIDs.
+ワークスペースのセキュリティ記述子の編集は常設で許可される — `dispose()` はそれらを残す。それらがインスタンス間の再利用キャッシュだからである — 一方、別個の一時 SID は取り消し可能に許可される。各許可は、ケイパビリティ SID の許可 ACE、アンビエント削除の拒否、および Low の no-write-up ラベルを運ぶ 1 回の呼び出しである。サーバー側の対応物は `AclWriteGrant` クラスである。ディレクトリごとに `add(path, standing)` を呼び、`dispose()` が取り消し可能なパスを取り消して SID を解放する。
 
-### What confinement gives you
+### 閉じ込めが与えるもの
 
-Under `workspace-write`, the child may write into the workspace and its private temp directory; other ACL-addressable writes and deletes are denied except the documented hard-link and AppContainer-ACL boundaries. Under `read-only`, no explicit write grants exist, so writes and deletes are denied with the same documented boundaries.
+`workspace-write` の下では、子プロセスはワークスペースとそのプライベート一時ディレクトリに書き込める。他の ACL でアドレス指定可能な書き込みと削除は、文書化されたハードリンクと AppContainer ACL の境界を除いて拒否される。`read-only` の下では明示的な書き込み許可が存在しないので、書き込みと削除は同じく文書化された境界とともに拒否される。
 
-Temp isolation is per live session/workspace pair: sessions sharing a workspace share its write authority but cannot write one another's temp directories. A fresh provider always chooses a new temp path and SID, so crash residue cannot block or authorize a resumed session.
+一時分離は生きたセッション/ワークスペースのペアごとである。ワークスペースを共有するセッションはその書き込み権限を共有するが、互いの一時ディレクトリには書き込めない。新しいプロバイダーは常に新しい一時パスと SID を選ぶので、クラッシュの残骸がレジュームされたセッションをブロックしたり認可したりすることはできない。
 
-### Failures and recovery
+### 失敗と回復
 
-`init()` throws on any Win32 failure — the child is never spawned unrestricted. A runner that fails before executing the command prints `windows-acl-run: <detail>` to stderr and exits 127, which the seam's runner-failure rules classify as a broken sandbox rather than a denial. Cleanup is best-effort by design: `dispose()` attempts every temp revocation and aggregates failures into an `AggregateError`.
+`init()` はあらゆる Win32 失敗でスローする — 子プロセスが無制限に spawn されることは決してない。コマンドを実行する前に失敗したランナーは `windows-acl-run: <detail>` を stderr に出力して 127 で終了し、シームのランナー失敗ルールはそれを拒否ではなく壊れたサンドボックスとして分類する。クリーンアップは設計上ベストエフォートである。`dispose()` はすべての一時取り消しを試み、失敗を `AggregateError` に集約する。
 
-A denial this backend cannot explain is diagnosed by the `diagnose-windows-sandbox-acl` skill bundled in `assets/`. `registerAclDiagnosisSkill` contributes it when `dsh-sandbox-local` uses its built-in Windows runner and a skill registry is available. Registration extracts resources for external PowerShell, including in ASAR and SEA deployments; fiber disposal unregisters the provider and removes its copy. Missing assets fail registration.
+このバックエンドが説明できない拒否は、`assets/` にバンドルされた `diagnose-windows-sandbox-acl` スキルによって診断される。`registerAclDiagnosisSkill` は、`dsh-sandbox-local` が組み込み Windows ランナーを使い、スキルレジストリが利用可能なときにそれをコントリビュートする。登録は、ASAR および SEA デプロイを含め、外部 PowerShell 用のリソースを抽出する。ファイバーの破棄でプロバイダーを登録解除し、そのコピーを削除する。アセットが欠落していると登録は失敗する。
 
-One run diagnoses and repairs. The script has no modes: it reads the requested path and every ancestor, adds the signed-in user's full-control allow ACE to chain directories that lack effective `WRITE_DAC` or `WRITE_OWNER`, and removes explicit package allow ACEs at their sources, ancestor first, verifying each change by re-reading it. Repairs preserve denies, owner, inheritance and SACL, and back up each changed DACL. An object is modified only when it is `-AllowRoot` or strictly inside it, so a workspace root can repair itself; reparse paths and managed application trees are refused, and a repair needs effective `WRITE_DAC`. Failed repairs restore attempted changes in reverse order and exit nonzero. Follow the [bundled skill](assets/diagnose-windows-sandbox-acl/SKILL.md) for the single command, original-operation verification and recovery.
+1 回の実行で診断と修復を行う。スクリプトにモードはない。要求されたパスとすべての祖先を読み取り、効果的な `WRITE_DAC` または `WRITE_OWNER` を欠くチェーン上のディレクトリにサインイン済みユーザーのフルコントロール許可 ACE を追加し、明示的なパッケージ許可 ACE を祖先から順にそのソースで削除し、各変更を再読み取りで検証する。修復は拒否、所有者、継承、SACL を保持し、変更された各 DACL をバックアップする。オブジェクトは `-AllowRoot` であるかその厳密な内部にある場合にのみ変更されるので、ワークスペースルートは自身を修復できる。再解析パスと管理アプリケーションツリーは拒否され、修復には効果的な `WRITE_DAC` が必要である。失敗した修復は試みた変更を逆順で復元し、非ゼロで終了する。単一のコマンド、元の操作の検証、回復については[バンドルされたスキル](assets/diagnose-windows-sandbox-acl/SKILL.md)に従う。
 
-Every run prints `REPORT` JSON records of observations, actions, reasons and verification, then a final `RECAP` line carrying the verdicts, changes, verifications, refusals and scans, and a summary with the counts, recovery commands and `nextAction`; unknown observations remain unknown. The same run writes every record to `-Out\acl-report-*.jsonl`, because tool output keeps only its tail. `-Out` also receives two recovery files per change: the DACL the object owned before that change and the independent script that restores it. Action completion records API execution; verification records the observed result. The [recovery decisions](../../../.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md#acl-diagnosis-and-recovery) explain resource ownership and rollback limits.
+各実行は、観測、アクション、理由、検証の `REPORT` JSON レコードを出力し、最後に評決、変更、検証、拒否、スキャンを運ぶ最終 `RECAP` 行と、カウント、回復コマンド、`nextAction` を含むサマリーを出力する。未知の観測は未知のままである。同じ実行はすべてのレコードを `-Out\acl-report-*.jsonl` に書き込む。ツール出力は末尾のみを保持するからである。`-Out` は変更ごとに 2 つの回復ファイルも受け取る。その変更前にオブジェクトが所有していた DACL と、それを復元する独立したスクリプトである。アクション完了は API 実行を記録し、検証は観測された結果を記録する。[回復の決定](../../../.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md#acl-diagnosis-and-recovery)がリソースの所有権とロールバックの制限を説明する。
 
-Inspection visits the requested object and each ancestor through the filesystem root. Each ACL observation's `path` identifies the inspected object; the classification's `details.packageObjects` lists objects carrying package allow ACEs without establishing the cause of the original failure. Each package removal is verified per object by comparing the recorded own ACEs with the re-read DACL, so a deny that shares the removed allow's SID remains visible in the verification details.
+検査は要求されたオブジェクトと、ファイルシステムルートまでの各祖先を訪問する。各 ACL 観測の `path` は検査されたオブジェクトを識別する。分類の `details.packageObjects` は、元の失敗の原因を確定することなく、パッケージ許可 ACE を持つオブジェクトを列挙する。各パッケージ削除は、記録された自身の ACE と再読み取りした DACL を比較することによってオブジェクトごとに検証されるので、削除された許可と同じ SID を共有する拒否は検証詳細に可視のまま残る。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the restricted-token mechanism, the token lists, the runner contract, and the verified boundaries; the observable behavior is fully covered in [Use this package](#use-this-package).
+ここでは、制限付きトークン機構、トークンリスト、ランナーのコントラクト、検証済みの境界を説明する。観測可能な挙動は[このパッケージを使う](#use-this-package)で完全に網羅されている。
 
-### Mechanism
+### 機構
 
-The caller's token is duplicated into a `WRITE_RESTRICTED` token whose restricting SIDs carry separate workspace and private-temp capabilities, and that token is lowered to Low integrity. Windows performs the access check twice — once against the normal SIDs, once against the restricting SIDs — and grants write-class access only where both checks pass; separately, the kernel's mandatory-integrity check denies write-class access to every object that is not labeled Low. The write-SID intersection covers only the object's OWN access check: Windows can also authorize a write or a delete from the parent directory's `FILE_DELETE_CHILD` right, which no restricting SID has to co-sign, so a token holding only the intersection could still delete anything its ambient user SIDs control — including files inside ANOTHER granted root, whose Low label clears the integrity check. Each grant therefore also denies `FILE_DELETE_CHILD` to the world SID, leaving the capability ACE's DELETE bit as the only delete authority inside the granted roots, and labels the same directory Low in the one `SetNamedSecurityInfoW` call that applies all three edits. The workspace SID is derived deterministically from the canonical workspace path (`workspaceWriteSid`), so the workspace-root security descriptor edit materializes once per workspace per machine and every later session, call, or restart hits the exact-ACE/exact-deny/exact-label skip. Each live session/workspace pair instead receives a random private temp directory and a SID derived from that path (`tempWriteSid`), so sessions share the intended workspace authority without inheriting one another's temp authority. Every policy-specific Win32 call and every process primitive from [`dsh-win32-process`](../../subprocess/win32-process/README.md) is checked; failures throw `Win32Error` carrying the API name, exact code, system text, and failing context — fail-closed by construction.
+呼び出し元のトークンは `WRITE_RESTRICTED` トークンに複製され、その制限 SID は別々のワークスペースとプライベート一時のケイパビリティを持つ。そのトークンは Low 整合性に降格される。Windows はアクセスチェックを 2 回実行する — 1 回は通常の SID に対して、1 回は制限 SID に対して — そして両方のチェックが通った場所にのみ書き込みクラスのアクセスを許可する。別途、カーネルの必須整合性チェックは、Low とラベル付けされていないすべてのオブジェクトへの書き込みクラスのアクセスを拒否する。書き込み SID の交差はオブジェクト自身のアクセスチェックのみをカバーする。Windows は親ディレクトリの `FILE_DELETE_CHILD` 権からも書き込みや削除を認可できるが、この権にどの制限 SID も連署する必要はない。したがって交差のみを保持するトークンは、そのアンビエントなユーザー SID が制御するものを依然として削除できてしまう — 別の許可されたルート内のファイルも含む。その Low ラベルは整合性チェックを通過させるからである。そこで各許可は、world SID への `FILE_DELETE_CHILD` も拒否し、許可されたルート内の唯一の削除権限としてケイパビリティ ACE の DELETE ビットを残し、3 つの編集すべてを適用する 1 回の `SetNamedSecurityInfoW` 呼び出しで同じディレクトリに Low ラベルを付ける。ワークスペース SID は正規のワークスペースパスから決定論的に導出される (`workspaceWriteSid`) ので、ワークスペースルートのセキュリティ記述子編集はマシンごと・ワークスペースごとに 1 回だけ実体化し、以降のすべてのセッション、呼び出し、再起動は exact-ACE/exact-deny/exact-label スキップに当たる。代わりに各ライブのセッション/ワークスペースペアは、ランダムなプライベート一時ディレクトリとそのパスから導出された SID (`tempWriteSid`) を受け取るので、セッションは意図されたワークスペース権限を共有しつつ、互いの一時権限を継承しない。ポリシー固有のすべての Win32 呼び出しと、[`dsh-win32-process`](../../subprocess/win32-process/README.md) のすべてのプロセスプリミティブは検査される。失敗は API 名、正確なコード、システムテキスト、失敗コンテキストを運ぶ `Win32Error` をスローする — 構造上フェイルクローズドである。
 
-### Modes and token lists
+### モードとトークンリスト
 
-`workspace-write` (logon SID, Everyone, workspace SID, temp SID) grants the workspace and the session's private temp subdirectory separate Write grants; `read-only` (logon SID, Everyone — no write SID) grants none. Both modes spawn a Low-integrity token, and only labeled directories stay writable for it. The keep-alive group (logon SID + Everyone) is present in both modes: without it, early DLL initialization dies with `0xC0000142` and CNG crashes pwsh with `0xE0434352`. The write SID stays out of the read-only list on purpose: the standing workspace grant from an earlier workspace-write period remains inert because the write-restricted pass-2 check grants only what the restricting list carries, while the standing security descriptor edit keeps a re-upgrade free of re-propagation.
+`workspace-write` (ログオン SID、Everyone、ワークスペース SID、一時 SID) は、ワークスペースとセッションのプライベート一時サブディレクトリに別々の書き込み許可を与える。`read-only` (ログオン SID、Everyone — 書き込み SID なし) は何も許可しない。どちらのモードも Low 整合性トークンを spawn し、ラベル付けされたディレクトリだけがそれにとって書き込み可能なまま残る。キープアライブグループ (ログオン SID + Everyone) は両モードに存在する。これがないと、初期の DLL 初期化が `0xC0000142` で死に、CNG が pwsh を `0xE0434352` でクラッシュさせる。書き込み SID が意図的に read-only リストに含まれないのは、以前の workspace-write 期間からの常設ワークスペース許可が不活性のまま残るからである。write-restricted の 2 パス目チェックは制限リストが運ぶものだけを許可し、常設のセキュリティ記述子編集は再昇格を再伝播なしに保つ。
 
-NUL writes are ambient, not granted: the device DACL grants Everyone read+write+execute (`0x1201BF`), so openers whose mask fits it (cmd `> NUL`, node `\\.\NUL`) can write it in both modes. `Set-Content NUL` fails in both modes (a PowerShell/.NET-layer effect, not the device DACL), while PowerShell's `> $null` redirection keeps working.
+NUL への書き込みは許可ではなくアンビエントである。デバイス DACL が Everyone に read+write+execute (`0x1201BF`) を許可するので、マスクがそれに適合するオープナー (cmd `> NUL`、node `\\.\NUL`) は両モードで書き込める。`Set-Content NUL` は両モードで失敗する (PowerShell/.NET 層の効果であり、デバイス DACL ではない)。一方、PowerShell の `> $null` リダイレクトは動作し続ける。
 
-Authenticated Users is absent from both lists — the WMI namespace security check fails (`0x80041003`), so CIM cmdlets and `Get-ComputerInfo` are unavailable in every confined mode, and the C:\-root tree-creation escape is closed. INTERACTIVE/LOCAL are absent too: the host's Public tree grants write to INTERACTIVE, so Public writes are denied.
+Authenticated Users は両リストに存在しない — WMI 名前空間のセキュリティチェックが失敗する (`0x80041003`) ので、CIM コマンドレットと `Get-ComputerInfo` はすべての閉じ込めモードで利用できず、C:\ ルートのツリー作成エスケープは閉じられる。INTERACTIVE/LOCAL も存在しない。ホストの Public ツリーは INTERACTIVE に書き込みを許可するので、Public への書き込みは拒否される。
 
-### The confinement runner
+### 閉じ込めランナー
 
-The seam-facing shape is the runner entry (`./runner`): an argv-prefix wrapper `dsh-sandbox-local` spawns in place of the caller's command, with the same architecture as bwrap/landlock-run/sandbox-exec. The runner creates the restricted token, spawns the wrapped argv under it with the caller's stdio passed straight through, wraps the child in a `KILL_ON_JOB_CLOSE` job, mirrors the child's exit code, and revokes its self-managed temp grant on exit. Every runner-side failure prints `windows-acl-run: <detail>` to stderr and exits 127 — the seam's runner-failure rules match that signature.
+シームに面する形はランナーエントリ (`./runner`) である。呼び出し元のコマンドの代わりに `dsh-sandbox-local` が spawn する argv プレフィックスラッパーであり、bwrap/landlock-run/sandbox-exec と同じアーキテクチャを持つ。ランナーは制限付きトークンを作成し、呼び出し元の stdio をそのまま通してラップされた argv をその下で spawn し、子プロセスを `KILL_ON_JOB_CLOSE` ジョブでラップし、子プロセスの終了コードをミラーし、終了時に自己管理の一時許可を取り消す。ランナー側のあらゆる失敗は `windows-acl-run: <detail>` を stderr に出力して 127 で終了する — シームのランナー失敗ルールはそのシグネチャーに一致する。
 
 ```sh
 node runner.js --workspace <dir> --temp <dir> --mode <read-only|workspace-write> [--write-sid <S-1-4-…> --temp-write-sid <S-1-4-…>] -- <argv...>
 ```
 
-The seam materializes the deterministic workspace SID's ACE standing (once per workspace per server lifetime — the reuse cache), then creates a random private temp directory and a distinct revocable SID for each live session/workspace pair, passing both as the required `--write-sid`/`--temp-write-sid` pair; the runner verifies each against its owning path and neither grants nor revokes (`manageDacls: false`). A fork receives a different temp capability, and a fresh provider gives even the same resumed session a new path and SID, so crash residue is inert litter. Without the pair, `--temp` names a root: an agentless workspace-write runner creates a random private child, self-manages its temp SID, rewrites TMP/TEMP, and removes the child on exit. Re-granting the standing workspace ACE after a restart is idempotent: `grantWrite` reads the current DACL and skips the re-propagation when the exact ACE already stands. A workspace equal to or containing the temp root is rejected before any grant.
+シームは決定論的なワークスペース SID の ACE を常設で実体化し (サーバー生存期間ごと・ワークスペースごとに 1 回 — 再利用キャッシュ)、次にライブの各セッション/ワークスペースペアにランダムなプライベート一時ディレクトリと別個の取り消し可能 SID を作成し、両方を必須の `--write-sid`/`--temp-write-sid` ペアとして渡す。ランナーはそれぞれを所有パスに対して検証し、許可も取り消しもしない (`manageDacls: false`)。Fork は異なる一時ケイパビリティを受け取り、新しいプロバイダーは同じレジュームされたセッションにさえ新しいパスと SID を与えるので、クラッシュの残骸は不活性な残りかすである。ペアがない場合、`--temp` はルートを名指す。Agent レスの workspace-write ランナーはランダムなプライベート子を作成し、その一時 SID を自己管理し、TMP/TEMP を書き換え、終了時に子を削除する。再起動後に常設ワークスペース ACE を再付与するのは冪等である。`grantWrite` は現在の DACL を読み、正確な ACE がすでに存在する場合は再伝播をスキップする。一時ルートと等しい、またはそれを含むワークスペースは、いかなる許可の前にも拒否される。
 
-When launched with the subprocess control marker, the runner forwards fd 7 through the restricted child's CRT startup table and closes its own copy immediately after spawn. The optional `controlFileDescriptor: 7` input requires `stdio: 'inherit'`; requesting it with piped stdio fails before process creation.
+サブプロセス制御マーカー付きで起動された場合、ランナーは fd 7 を制限付き子の CRT スタートアップテーブルを通じて転送し、spawn 直後に自身のコピーを閉じる。任意の `controlFileDescriptor: 7` 入力は `stdio: 'inherit'` を必要とする。パイプ stdio で要求すると、プロセス作成前に失敗する。
 
-### Verified boundaries
+### 検証済みの境界
 
-- **Everyone stays in both restricting lists, but no longer confers write authority** — the keep-alive group is required for early DLL initialization and CNG; the Low label now denies an Everyone-granted write outside the labeled roots, so that former gap is closed.
-- **Inside a granted root, the capability ACE's DELETE bit is the only delete authority** — the grant denies `FILE_DELETE_CHILD` to the world SID, which also removes the ambient default: a file whose own DACL grants no DELETE is no longer deletable through its parent's rights, by the confined child or by the user's own processes. The user's ordinary deletes keep working because the workspace DACL grants them DELETE directly.
-- **The deny inherits to subdirectories only, and a FullControl open of one is denied** — `FILE_DELETE_CHILD` is evaluated on directories, so the deny carries `CONTAINER_INHERIT_ACE` and never reaches files (its bit, `0x40`, is part of `FILE_ALL_ACCESS`, so a file-level copy would refuse every `GENERIC_ALL`/`FullControl` open by the user, Administrators, SYSTEM, or the DSH host). Directories inside a granted root keep the deny and therefore refuse those opens; `DELETE`-based deletes, `MAXIMUM_ALLOWED`, and ordinary read/write opens are unaffected, and both outcomes are pinned by the runner suite.
-- **Writes and deletes are restricted; reads, network, and process visibility are not** — neither layer intersects reads, so a confined child can read any caller-readable file (including files in another workspace) and open sockets; `read-only` therefore needs a read-side policy to be expressed.
-- **Hard links are file-object aliases, not path aliases** — an inheritable workspace grant propagated onto an existing hard link labels and grants the one underlying file security descriptor, so the same object is writable through an external alias; rejecting multiply-linked files is not viable for ordinary pnpm installations.
-- **Console isolation is unavailable** — children created with `CREATE_NO_WINDOW` / `CREATE_NEW_CONSOLE` die during DLL initialization with `STATUS_DLL_INIT_FAILED` (`0xC0000142`); children share the host console, and pipe-based stdio redirection is unaffected.
-- **Security descriptor edits are standing directory mutations** — workspace ACEs, denies, and labels stand by design (the reuse cache, never revoked); temp edits are revoked by `dispose()`, except that a revoke keeps the shared label while another capability grant remains on the directory, and the deny it leaves behind disappears with the temp directory itself; manual `icacls` cleanup cannot revoke them on this platform (`ERROR_NONE_MAPPED`, 1332), so revoke through this module.
-- **A standing Low label outlives DSH and widens the tree for other Low-integrity processes** — the workspace's inheritable label survives the session (and same-volume moves), so any other process running at Low integrity as the same user — another product's Low-IL sandbox, a Protected Mode reader — can write and delete inside the workspace, where a Medium label would have denied it. The label is the price of the write boundary: without it the confined child cannot write at all, and revoking it per session would re-propagate the whole tree on every provision.
-- **Granted directories must be caller-owned and grant `WRITE_OWNER`** — the owner's implicit rights cover only `READ_CONTROL` and `WRITE_DAC`; the label lives in the SACL, so the combined apply additionally needs `WRITE_OWNER` (a Full-control directory, the normal workspace case, has it). A directory whose DACL grants only Modify now fails the grant loudly instead of silently skipping the confinement.
-- **The ambient temp root is never granted implicitly** — direct callers must supply an existing private `tempDir` plus its distinct `tempWriteSid`, or disable temp writes with `tempDir: null`; the actual temp directory must be disjoint from every writable root.
-- **The confined child's temp capability is private per live session/workspace pair** — the runner rewrites TMP/TEMP to that private directory before the spawn; two tokens sharing the same workspace SID cannot write one another's temp directories.
-- **`whoami` and token-inspection cmdlets may fail under the restricted token** — `GetTokenInformation` on the duplicate is partially unavailable to the child, so whether a reporting cmdlet works is host-dependent; it is diagnostic noise rather than an operational failure.
+- **Everyone は両方の制限リストに残るが、もはや書き込み権限を付与しない** — キープアライブグループは初期の DLL 初期化と CNG に必要である。Low ラベルはラベル付けされたルート外での Everyone 付与の書き込みを拒否するようになり、以前のギャップは閉じられた。
+- **許可されたルート内では、ケイパビリティ ACE の DELETE ビットが唯一の削除権限である** — 許可は world SID への `FILE_DELETE_CHILD` を拒否し、これはアンビエントのデフォルトも除去する。自身の DACL が DELETE を許可しないファイルは、閉じ込められた子プロセスからもユーザー自身のプロセスからも、親の権利を通じて削除できなくなる。ユーザーの通常の削除は動作し続ける。ワークスペース DACL がそれらに DELETE を直接許可するからである。
+- **拒否はサブディレクトリにのみ継承され、サブディレクトリの FullControl オープンは拒否される** — `FILE_DELETE_CHILD` はディレクトリ上で評価されるので、拒否は `CONTAINER_INHERIT_ACE` を運び、ファイルには決して到達しない (そのビット `0x40` は `FILE_ALL_ACCESS` の一部であるため、ファイルレベルのコピーはユーザー、Administrators、SYSTEM、DSH ホストによるすべての `GENERIC_ALL`/`FullControl` オープンを拒否してしまう)。許可されたルート内のディレクトリは拒否を保ち、したがってそれらのオープンを拒否する。`DELETE` ベースの削除、`MAXIMUM_ALLOWED`、通常の読み書きオープンは影響を受けず、両方の結果はランナースイートによって固定されている。
+- **書き込みと削除は制限されるが、読み取り、ネットワーク、プロセスの可視性は制限されない** — どちらの層も読み取りを交差しないので、閉じ込められた子プロセスは呼び出し元が読める任意のファイル (別のワークスペース内のファイルを含む) を読めて、ソケットを開ける。したがって `read-only` を表現するには読み取り側ポリシーが必要である。
+- **ハードリンクはパスの別名ではなくファイルオブジェクトの別名である** — 既存のハードリンクに伝播した継承可能なワークスペース許可は、1 つの基盤となるファイルセキュリティ記述子にラベルを付け許可するので、同じオブジェクトが外部の別名を通じて書き込み可能になる。多重リンクされたファイルを拒否することは通常の pnpm インストールでは実行可能でない。
+- **コンソール分離は利用できない** — `CREATE_NO_WINDOW` / `CREATE_NEW_CONSOLE` で作成された子は DLL 初期化中に `STATUS_DLL_INIT_FAILED` (`0xC0000142`) で死ぬ。子はホストコンソールを共有し、パイプベースの stdio リダイレクトは影響を受けない。
+- **セキュリティ記述子の編集は常設のディレクトリ変更である** — ワークスペースの ACE、拒否、ラベルは設計上常設である (再利用キャッシュであり、決して取り消されない)。一時の編集は `dispose()` で取り消されるが、取り消しはディレクトリに別のケイパビリティ許可が残っている間は共有ラベルを保持し、取り消しが残す拒否は一時ディレクトリ自体とともに消える。手動の `icacls` クリーンアップはこのプラットフォームではそれらを取り消せない (`ERROR_NONE_MAPPED`、1332) ので、このモジュールを通じて取り消すこと。
+- **常設の Low ラベルは DSH より長生きし、他の Low 整合性プロセスのためにツリーを広げる** — ワークスペースの継承可能なラベルはセッション (および同一ボリューム内の移動) を生き延びるので、同じユーザーとして Low 整合性で実行される他のあらゆるプロセス — 別製品の Low-IL サンドボックス、Protected Mode リーダー — がワークスペース内で書き込みと削除を行える。Medium ラベルならそれを拒否したはずである。ラベルは書き込み境界の代償である。それがなければ閉じ込められた子はまったく書き込めず、セッションごとにラベルを取り消すとプロビジョンのたびにツリー全体を再伝播することになる。
+- **許可されるディレクトリは呼び出し元が所有し、`WRITE_OWNER` を許可している必要がある** — 所有者の暗黙の権利は `READ_CONTROL` と `WRITE_DAC` のみをカバーする。ラベルは SACL にあるので、合成適用にはさらに `WRITE_OWNER` が必要である (通常のワークスペースの場合であるフルコントロールのディレクトリはそれを持つ)。DACL が Modify のみを許可するディレクトリは、閉じ込めを黙ってスキップする代わりに、明確に許可に失敗するようになった。
+- **アンビエントな一時ルートは暗黙に許可されることは決してない** — 直接の呼び出し元は、既存のプライベート `tempDir` とその別個の `tempWriteSid` を供給するか、`tempDir: null` で一時書き込みを無効にする必要がある。実際の一時ディレクトリはすべての書き込み可能ルートと素でなければならない。
+- **閉じ込められた子の一時ケイパビリティはライブのセッション/ワークスペースペアごとにプライベートである** — ランナーは spawn 前に TMP/TEMP をそのプライベートディレクトリに書き換える。同じワークスペース SID を共有する 2 つのトークンは互いの一時ディレクトリに書き込めない。
+- **`whoami` とトークン検査コマンドレットは制限付きトークンの下で失敗し得る** — 複製上の `GetTokenInformation` は子にとって部分的に利用不能なので、レポート系コマンドレットが動作するかどうかはホスト依存である。これは運用上の失敗ではなく診断ノイズである。
 
-### Header verification and source map
+### ヘッダー検証とソースマップ
 
-The sandbox-owned SID, ACL, token, file, and lock declarations are checked against Windows headers by [`verify/abi-probe.cpp`](verify/abi-probe.cpp). The shared process, stdio, and Job ABI is owned and verified by [`@deepseek-ai/dsh-win32-process`](../../subprocess/win32-process/README.md#header-verification).
+サンドボックス所有の SID、ACL、トークン、ファイル、ロックの宣言は、[`verify/abi-probe.cpp`](verify/abi-probe.cpp) によって Windows ヘッダーと照合される。共有のプロセス、stdio、Job ABI は [`@deepseek-ai/dsh-win32-process`](../../subprocess/win32-process/README.md#header-verification) が所有および検証する。
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `AclSandbox`: restricted-token policy, DACL and label grants, fail-closed spawn and dispose |
-| [`src/runner.ts`](src/runner.ts) | The runner entry over shared Win32 process primitives |
-| [`src/grant.ts`](src/grant.ts) | `AclWriteGrant`: server-side grant materialization and revocation |
-| [`src/token.ts`](src/token.ts) + [`src/acl.ts`](src/acl.ts) | Win32 token, DACL, and mandatory-label primitives behind the sandbox |
+| [`src/index.ts`](src/index.ts) | `AclSandbox`: 制限付きトークンポリシー、DACL とラベルの許可、フェイルクローズドな spawn と dispose |
+| [`src/runner.ts`](src/runner.ts) | 共有 Win32 プロセスプリミティブ上のランナーエントリ |
+| [`src/grant.ts`](src/grant.ts) | `AclWriteGrant`: サーバー側の許可実体化と取り消し |
+| [`src/token.ts`](src/token.ts) + [`src/acl.ts`](src/acl.ts) | サンドボックスの背後にある Win32 のトークン、DACL、必須ラベルプリミティブ |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Start with the subsystem reference for the shared vocabulary, then the provider that mounts this rung, its consumers, and the design decision.
+共有語彙についてはサブシステムリファレンスから始め、次にこの段をマウントするプロバイダー、そのコンシューマー、設計上の決定へ進む。
 
-- [Process sandbox subsystem](../../../docs/subsystems/sandbox.md) — modes, per-call policy, and enforcement semantics.
-- [Local sandbox backends](../sandbox-local/README.md) — the provider that mounts this backend as the win32 rung.
-- [Sandbox seam package](../sandbox/README.md) — the service contract this backend implements.
-- [Win32 process library](../../subprocess/win32-process/README.md) — shared restricted-process, stdio, Job, wait, and handle-cleanup primitives.
-- [Bash sandbox executor](../../shell/bash-sandbox/README.md) and [pwsh sandbox executor](../../shell/pwsh-sandbox/README.md) — the confined executors that consume it.
-- [Windows ACL restricted-token sandbox decision](../../../.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md) — why raw ACL restricted tokens over mxc and AppContainer.
+- [プロセスサンドボックスサブシステム](../../../docs/subsystems/sandbox.md) — モード、呼び出しごとのポリシー、強制のセマンティクス。
+- [ローカルサンドボックスバックエンド](../sandbox-local/README.md) — このバックエンドを win32 段としてマウントするプロバイダー。
+- [サンドボックスシームパッケージ](../sandbox/README.md) — このバックエンドが実装するサービスコントラクト。
+- [Win32 プロセスライブラリ](../../subprocess/win32-process/README.md) — 共有の制限付きプロセス、stdio、Job、待機、ハンドルクリーンアップのプリミティブ。
+- [Bash サンドボックスエグゼキューター](../../shell/bash-sandbox/README.md) と [pwsh サンドボックスエグゼキューター](../../shell/pwsh-sandbox/README.md) — それを消費する閉じ込められたエグゼキューター。
+- [Windows ACL 制限付きトークンサンドボックスの決定](../../../.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md) — なぜ mxc や AppContainer よりも生の ACL 制限付きトークンなのか。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.md), [`dsh-pwsh-sandbox`](../../shell/pwsh-sandbox/README.md), and their tools, which render this backend's partial-enforcement and denial facts (the confined stderr the tool layer classifies through `denialSignatures`) while the [`dsh-sandbox`](../sandbox/README.md) seam owns the `SANDBOX_UNAVAILABLE` text and `sandbox-local` owns runner selection. On Windows this package also contributes one catalog entry, the bundled `diagnose-windows-sandbox-acl` skill, which is where the model learns to diagnose a denial the tool layer can only report.
+間接的に、[`dsh-bash-sandbox`](../../shell/bash-sandbox/README.md)、[`dsh-pwsh-sandbox`](../../shell/pwsh-sandbox/README.md)、およびそれらのツールを通じて。ツールはこのバックエンドの部分的な強制と拒否の事実を描画し (ツール層が `denialSignatures` を通じて分類する閉じ込められた stderr)、[`dsh-sandbox`](../sandbox/README.md) シームが `SANDBOX_UNAVAILABLE` テキストを所有し、`sandbox-local` がランナー選択を所有する。Windows では、このパッケージはさらに 1 つのカタログエントリ、バンドルされた `diagnose-windows-sandbox-acl` スキルをコントリビュートする。モデルはそこで、ツール層が報告しかできない拒否を診断することを学ぶ。
 
-#### KV Cache effect
+#### KV Cache の影響
 
-One extra catalog entry on Windows: the skill's description enters context with the catalog, and the body enters only when invoked. Resource extraction happens at registration and does not add script contents to model context. The denial surface itself stays in the tool layer.
+Windows ではカタログエントリが 1 つ増える。スキルの説明はカタログとともにコンテキストに入り、本体は呼び出されたときにのみ入る。リソース抽出は登録時に行われ、スクリプト内容をモデルコンテキストに追加しない。拒否サーフェス自体はツール層にとどまる。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
-- **Diagnosis preserves integrity labels** — it cannot fix Low-labeled executables affecting programs launched outside DSH. It also cannot repair a caller's missing `WRITE_DAC`; extracted and recovery scripts are user-writable and are not supported elevated entrypoints. Resource directories can remain after an unclean shutdown.
+- **診断は整合性ラベルを保持する** — DSH の外で起動されたプログラムに影響する Low ラベル付き実行可能ファイルを修正することはできない。呼び出し元の `WRITE_DAC` の欠落も修復できない。抽出スクリプトと回復スクリプトはユーザー書き込み可能であり、サポートされる昇格エントリポイントではない。クリーンでないシャットダウン後はリソースディレクトリが残り得る。
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the backend is a poor fit or needs special operational care. They are current package constraints, not a general Windows comparison or a task backlog.
+これらの制限は、このバックエンドが不適切であるか、特別な運用上の注意が必要なのはいつかを定義する。それらは現在のパッケージの制約であり、一般的な Windows の比較でもタスクバックログでもない。
 
-- **One write allowlist per workspace** — the write SID is the unit of the allowlist and IS the workspace identity; reusing one sandbox instance across two workspaces widens both grants to both roots. Create one instance per workspace root — the seam does exactly this, keyed by the workspace path.
-- **Cleanup is best-effort by design** — `dispose()` attempts every temp revocation and aggregates failures into an `AggregateError`; a cleanup failure can leave the random directory and its temp-SID-only ACE behind. Once the process exits no future token carries that SID, so the residue is inert until OS temp hygiene or manual removal reclaims it.
-- **Standing workspace ACEs are invisible residue** — renaming a workspace derives a new SID; the old ACEs on the old path stay (inert, write-SID-only), and a future cleanup command may reap them.
-- **NULL-DACL directories are not identity-preserving under grant+revoke** — a directory with a NULL DACL means "everyone full control"; `grantWrite` builds the new ACL from that null, and the revoke round-trip leaves an empty (deny-all) DACL rather than the original NULL DACL. Real workspace and temp directories carry real DACLs, so this stays a documented edge.
-- **Piped stdio capture is impossible for confined grandchildren** — libuv's pipe stdio uses named pipes, whose client-end open requests write access no restricting SID is granted (the Win32 layer's default SD template, not the token default DACL), so `spawn(..., { stdio: 'pipe' })` inside a confined process fails with EPERM; inherited and ignored stdio spawns work, and anonymous pipes (PowerShell pipelines) work because the restricted token's default DACL carries a full-access restricting-SID ACE.
-- **Grant materialization is an eager full-tree propagation** — `SetNamedSecurityInfoW` on a directory with inheritable ACEs walks every descendant immediately (tens of seconds on large workspace trees); the per-workspace identity pays it once per workspace per machine, and the exact-ACE skip makes every later provision cheap.
-- **Read-side confinement and network policy are out of scope** — `WRITE_RESTRICTED` intersects write accesses only; pair this backend with a read-side policy for stronger confinement.
-- **Reads stop at objects another AppContainer-based tool has ACL'd with a package SID** — a file whose DACL carries an ACE for a package SID (`S-1-15-2-…`) is inaccessible to a Low-integrity token on this host, even when the same DACL grants the user full control and Everyone read (observed: adding that single ACE to a fresh file reproduces the denial, granting Everyone read does not lift it, and the same bytes copied elsewhere stay readable). The kernel rule behind it is unconfirmed and not this package's to change; tools that sandbox themselves with AppContainers stamp such ACEs, so a tree they touched becomes unreadable to this backend's child. Removing the foreign ACE (or re-installing the affected tree) restores access.
-- **Wide-directory and FAT-volume warnings are deferred; the FAT-class residue is unverified** — the UI-side warnings are not implemented, a FAT volume as a grant root fails loudly, and a FAT-class target outside the granted roots stores no security descriptor; its effective integrity label is assigned by the system rather than recorded on the object, so the label layer's behavior there is untested. FAT stays legacy residue.
-- **The bundled diagnosis skill needs an unconfined caller** — both the classification and the repairs read or write security descriptors a confined child cannot reach, so the session must escalate that one call; with no approval channel the escalation fails closed and the path stays undiagnosed.
-- **PowerShell language mode differs by confined mode** — under `read-only`, PowerShell cannot create its AppLocker probe files in temp and conservatively starts in ConstrainedLanguage (`Add-Type`, non-core .NET static calls, COM, and reflection fail); the shipped `workspace-write` path lets the probe complete, so pwsh stays in FullLanguage unless host-wide WDAC/AppLocker policy says otherwise, while a direct `AclSandbox` with `tempDir: null` has no such guarantee. This split is PowerShell startup behavior, not part of the ACL write boundary.
+- **ワークスペースごとに 1 つの書き込み許可リスト** — 書き込み SID が許可リストの単位であり、ワークスペースのアイデンティティそのものである。1 つのサンドボックスインスタンスを 2 つのワークスペースで再利用すると、両方の許可が両方のルートに広がる。ワークスペースルートごとに 1 つのインスタンスを作成すること — シームはまさにこれを、ワークスペースパスをキーとして行う。
+- **クリーンアップは設計上ベストエフォートである** — `dispose()` はすべての一時取り消しを試み、失敗を `AggregateError` に集約する。クリーンアップ失敗はランダムなディレクトリとその一時 SID のみの ACE を残し得る。プロセスが終了すれば、その SID を運ぶ将来のトークンは存在しないので、OS の一時ファイル衛生または手動削除が回収するまで残骸は不活性である。
+- **常設のワークスペース ACE は目に見えない残骸である** — ワークスペースの名前を変更すると新しい SID が導出される。古いパス上の古い ACE は残り (不活性、書き込み SID のみ)、将来のクリーンアップコマンドがそれらを回収し得る。
+- **NULL DACL のディレクトリは許可+取り消しでアイデンティティを保持しない** — NULL DACL のディレクトリは「全員フルコントロール」を意味する。`grantWrite` はその null から新しい ACL を構築し、取り消しの往復は元の NULL DACL ではなく空の (全拒否の) DACL を残す。実際のワークスペースディレクトリと一時ディレクトリは実 DACL を持つので、これは文書化されたエッジケースにとどまる。
+- **閉じ込められた孫プロセスではパイプ stdio キャプチャーは不可能である** — libuv のパイプ stdio は名前付きパイプを使い、そのクライアント側の open リクエストはどの制限 SID にも許可されていない書き込みアクセスを要求する (トークンのデフォルト DACL ではなく、Win32 層のデフォルト SD テンプレート)。したがって閉じ込められたプロセス内の `spawn(..., { stdio: 'pipe' })` は EPERM で失敗する。継承・無視の stdio spawn は動作し、匿名パイプ (PowerShell パイプライン) は制限付きトークンのデフォルト DACL がフルアクセスの制限 SID ACE を運ぶので動作する。
+- **許可の実体化は先行型のツリー全体伝播である** — 継承可能な ACE を持つディレクトリへの `SetNamedSecurityInfoW` はすべての子孫を即座に走査する (大きなワークスペースツリーでは数十秒)。ワークスペースごとのアイデンティティはこれをマシンごと・ワークスペースごとに 1 回支払い、exact-ACE スキップが以降のすべてのプロビジョンを安価にする。
+- **読み取り側の閉じ込めとネットワークポリシーは対象外である** — `WRITE_RESTRICTED` は書き込みアクセスのみを交差する。より強力な閉じ込めには、このバックエンドを読み取り側ポリシーと組み合わせる。
+- **読み取りは、別の AppContainer ベースのツールがパッケージ SID で ACL 付けしたオブジェクトで止まる** — DACL がパッケージ SID (`S-1-15-2-…`) の ACE を運ぶファイルは、同じ DACL がユーザーにフルコントロールを、Everyone に読み取りを許可していても、このホストでは Low 整合性トークンからアクセスできない (観測: その単一 ACE を新しいファイルに追加すると拒否が再現し、Everyone への読み取り許可はそれを解除せず、同じバイトを別の場所にコピーすると読めるままである)。背後にあるカーネルルールは未確認であり、このパッケージが変更するものではない。AppContainer で自身をサンドボックス化するツールはそのような ACE を押すので、それらが触れたツリーはこのバックエンドの子にとって読めなくなる。外部の ACE を削除する (または影響を受けたツリーを再インストールする) とアクセスが回復する。
+- **広いディレクトリと FAT ボリュームの警告は延期されている。FAT クラスの残骸は未検証である** — UI 側の警告は実装されておらず、許可ルートとしての FAT ボリュームは明確に失敗し、許可されたルート外の FAT クラスのターゲットはセキュリティ記述子を保存しない。その実効整合性ラベルはオブジェクトに記録されるのではなくシステムによって割り当てられるので、そこでのラベル層の挙動は未テストである。FAT はレガシー残骸のままである。
+- **バンドルされた診断スキルには閉じ込められていない呼び出し元が必要である** — 分類と修復の両方が、閉じ込められた子が到達できないセキュリティ記述子を読み書きするので、セッションはその 1 回の呼び出しをエスカレーションする必要がある。承認チャネルがない場合、エスカレーションはフェイルクローズドに失敗し、パスは未診断のままになる。
+- **PowerShell の言語モードは閉じ込めモードによって異なる** — `read-only` の下では、PowerShell は一時に AppLocker プローブファイルを作成できず、保守的に ConstrainedLanguage で開始する (`Add-Type`、非コア .NET 静的呼び出し、COM、リフレクションが失敗する)。出荷される `workspace-write` パスはプローブを完了させられるので、ホスト全体の WDAC/AppLocker ポリシーが別段の定めをしない限り pwsh は FullLanguage にとどまるが、`tempDir: null` の直接 `AclSandbox` にはそのような保証がない。この分岐は PowerShell のスタートアップ挙動であり、ACL 書き込み境界の一部ではない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: undecided directions and open questions. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+この開発メモはメンテナー向けの作業コンテキストである。未決定の方向性と未解決の問いである。明示的に非権威であり、出荷された挙動、制限、受け入れられた根拠は、上のセクション、パッケージコード、リンクされた Agent Notes にある。
 
-#### Future: warnings and cleanup surfaces
+#### 将来: 警告とクリーンアップサーフェス
 
-The warn-only posture for unusually wide directories and FAT-class volumes is documented in the limitations above but not implemented, and a cleanup command that reaps standing workspace ACEs from renamed workspaces is undecided. Both are open directions, not shipped behavior.
+異常に広いディレクトリと FAT クラスのボリュームに対する警告のみの姿勢は、上の制限に文書化されているが実装されていない。名前を変更したワークスペースから常設のワークスペース ACE を回収するクリーンアップコマンドも未決定である。どちらも未出荷の方向性であり、出荷された挙動ではない。
 
 </details>

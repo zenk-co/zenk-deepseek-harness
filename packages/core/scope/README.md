@@ -5,30 +5,30 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-scope
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-scope` lets plugin authors give each agent or group an isolated contribution set with a shared lifetime. Child scopes inherit ancestor contributions, with the nearest definition taking precedence, while ancestor scopes can observe descendant activity; neither relationship works in reverse. Disposing a scope removes everything owned by it. Use this dependency-free library when per-agent or per-group isolation must work without depending on the agent loop or presets.
+`dsh-scope` によりプラグイン作者は各エージェントやグループに共有存続期間を持つ分離コントリビューション集合を与えられます。子スコープは祖先コントリビューションを継承し、最も近い定義が優先され、祖先スコープは子孫活動を観測できます。いずれの関係も逆向きには働きません。スコープ破棄はそれが所有するすべてを除去します。エージェントループやプリセットに依存せずエージェント毎・グループ毎の分離を働かせる場合、この依存フリーライブラリーを使います。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-Plugin authors use `dsh-scope` to give one agent (or one group) its own registration world. The registries in the core group build on it — a tool registered through `agent.ctx` is visible only to that agent — and the same primitive serves any custom registry or scope-filtered event.
+プラグイン作者は `dsh-scope` を使って 1 エージェント (または 1 グループ) に独自の登録世界を与えます。コアグループのレジストリーはその上に構築されます。`agent.ctx` 経由で登録されたツールはそのエージェントにのみ可視です。同じプリミティブは任意のカスタムレジストリーやスコープフィルタードイベントに役立ちます。
 
-### Mint a scope
+### スコープの発行
 
-`createScope(ctx, key)` creates a scope under `ctx`'s fiber: its `ctx` carries the scope tag, and everything registered through it is both scope-visible and scope-lifetime. `dispose()` unwinds every registration through the scope; `rawDispose` is the exact Cordis disposer for nesting the teardown in an ordered composite effect.
+`createScope(ctx, key)` は `ctx` のファイバー配下にスコープを作成します。その `ctx` はスコープタグを運び、それ経由で登録されたすべてはスコープ可視かつスコープ存続期間です。`dispose()` はスコープ経由のすべての登録を巻き戻します。`rawDispose` はティアダウンを順序付き複合 effect に組み込むための正確な Cordis disposer です。
 
 ```text
 const scope = createScope(ctx, agent)
@@ -37,42 +37,42 @@ scope.ctx.on('agent/status', ({ agent, status }) => track(agent, status))
 await scope.dispose()   // unwinds every registration made through scope.ctx
 ```
 
-### Route scoped events
+### スコープ付きイベントのルーティング
 
-`scopeTarget(base, key)` builds the opaque carrier a scope-filtered event dispatches with. Untagged listeners stay global; a listener tagged with `key` receives events for that key and its descendants. The carrier carries routing state only — the real subject travels in the event arguments.
+`scopeTarget(base, key)` はスコープフィルタードイベントが発送する不透明キャリアを構築します。タグなしリスナーはグローバルのままです。`key` でタグ付けされたリスナーはそのキーと子孫向けイベントを受け取ります。キャリアはルーティング状態のみ運び、実対象はイベント引数で運ばれます。
 
-### Build a scoped registry layer
+### スコープ付きレジストリー層の構築
 
-Registry authors use `ScopedLayers`, `NamedEntries`, and `AnonymousEntries` to hold one eager global layer plus lazily created exact-scope layers: reads never create layers, `merge()` materializes insertion-ordered named shadows along the scope chain, and `effect()` derives visibility and ownership from the same context. A scoped layer is reclaimed only when its whole aggregate is empty.
+レジストリー作者は `ScopedLayers`、`NamedEntries`、`AnonymousEntries` を使って 1 つの eager グローバル層と遅延作成の正確スコープ層を保持します。読取は層を作成せず、`merge()` はスコープチェーン沿いに挿入順の名前付きシャドウを実体化し、`effect()` は同じコンテキストから可視性と所有権を導出します。スコープ層は集約全体が空になった場合のみ回収されます。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-This section explains how the package realizes the behavior above; the observable contract is covered in [Use this package](#use-this-package).
+この節では上記動作の実現方法を説明します。観測可能な契約は [Use this package](#use-this-package) で扱っています。
 
-### Design concept
+### 設計概念
 
-The registration context determines both visibility and ownership: a registration made through a scoped context is visible in that scope and disposed with it, preventing a contribution from being visible in one scope but torn down with another. The primitive routes trusted same-process plugins; it is not a sandbox or an authority boundary. Handing out a scoped context also hands out the minting plugin's service-resolution API (resolution walks the minting fiber's dependency chain), so a scope is minted from the plugin whose dependencies the scoped registrations need.
+登録コンテキストが可視性と所有権の両方を決定します。スコープ付きコンテキスト経由の登録はそのスコープで可視であり、それと共に破棄されるため、あるスコープで可視なのに別スコープで破棄されるコントリビューションを防ぎます。プリミティブは信頼済み同プロセスプラグインをルーティングします。サンドボックスでも権限境界でもありません。スコープ付きコンテキストの配布は発行プラグインのサービス解決 API も配布します (解決は発行ファイバーの依存チェーンをたどります)。そのためスコープは、スコープ付き登録が必要とする依存を持つプラグインから発行します。
 
-### Source map
+### ソースマップ
 
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | `createScope`, `scopeOf`, `scopeTarget`, `bindScopeParent`/`scopeParentOf`/`scopeChainOf`, carrier marks |
 | [`src/store.ts`](src/store.ts) | `ScopedLayers`, `NamedEntries`, `AnonymousEntries`, `ScopeLayer` |
 
-### The parent chain
+### 親チェーン
 
-One relation powers both directions: registration views inherit DOWN the chain (a child scope sees its ancestors' layers), while event admission extends UP it (a listener tagged with an ancestor receives events dispatched to a descendant key). Binding is once — a key that already has a parent throws, and only the returned binding may re-link it — and every link rejects a cycle. `scopeChainOf` returns `[key, parent, …]` nearest-first.
+1 つの関係が両方向を動かします。登録ビューはチェーンを下向きに継承します (子スコープは祖先層を見ます)。一方イベント許容は上向きに広がります (祖先でタグ付けされたリスナーは子孫キー宛て発送イベントを受け取ります)。バインドは一度きりです。既に親を持つキーはスローし、返却バインディングのみ再リンクできます。すべてのリンクは循環を拒否します。`scopeChainOf` は `[key, parent, …]` を近い順で返します。
 
-### Event filtering
+### イベントフィルタリング
 
-`scopeTarget` composes the base's existing `Context.filter` with the scope predicate: an untagged listener is admitted; a tagged listener is admitted iff its tag is the dispatch key or an ancestor of it; `key === undefined` admits untagged listeners only. `{ global: true }` listeners bypass filtering. The `Scoped<T>` brand demands the carrier as the `this` type of a scope-filtered event, so dispatching with a bare subject is a compile error.
+`scopeTarget` はベースの既存 `Context.filter` とスコープ述語を合成します。タグなしリスナーは許容されます。タグ付きリスナーはそのタグが発送キーまたはその祖先の場合のみ許容されます。`key === undefined` はタグなしリスナーのみ許容します。`{ global: true }` リスナーはフィルタリングを回避します。`Scoped<T>` ブランドはキャリアをスコープフィルタードイベントの `this` 型として要求するため、素サブジェクトでの発送はコンパイルエラーです。
 
 </details>
 
@@ -81,7 +81,7 @@ One relation powers both directions: registration views inherit DOWN the chain (
 <a id="further-exploration"></a>
 ## Further Exploration
 
-The package-level contract is enough for most consumers; read these when you need the surrounding domain and the design rationale.
+パッケージレベルの契約は多くのコンシューマーに十分です。周辺ドメインと設計根拠が必要な場合に読みます。
 
 - [Scoped registration subsystem](../../../docs/subsystems/scope.md) — the identity, carrier, and layer types.
 - [Agent-scope runtime design reference](../agent-loop/README.md) — how the loop builds per-agent scopes.
@@ -89,18 +89,18 @@ The package-level contract is enough for most consumers; read these when you nee
 
 -----
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits define when the primitive needs special care. They are current package constraints, not a task backlog.
+これらの制限は、プリミティブに特別な注意が必要になる条件を定めます。これらは現行パッケージの制約であり、タスクバックログではありません。
 
-- **Only scope-aware APIs isolate state** — registries must file by `scopeOf()` and events must dispatch through `scopeTarget()`; an arbitrary Cordis service remains context-global merely because it is called through a scoped context.
-- **A context carries one nearest scope key** — the hierarchy lives in the key-level parent relation, not in context tags; nested scope contexts still shadow to a single tag, and multi-membership policy sets remain unsupported.
-- **Service reachability comes from the scope minter** — handing out `Scope.ctx` also hands out the minting plugin's injected services, so a broader minter cannot later be narrowed by the holder.
+- **Only scope-aware APIs isolate state** — レジストリーは `scopeOf()` で整理し、イベントは `scopeTarget()` 経由で発送しなければなりません。任意 Cordis サービスはスコープ付きコンテキスト経由で呼ばれただけではコンテキストグローバルのままです。
+- **A context carries one nearest scope key** — 階層はコンテキストタグではなくキーレベルの親関係に存在します。入れ子スコープコンテキストも単一タグにシャドウし、複数所属ポリシー集合は未対応です。
+- **Service reachability comes from the scope minter** — `Scope.ctx` の配布は発行プラグインの注入サービスも配布するため、広い発行者を保持者が後から狭めることはできません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

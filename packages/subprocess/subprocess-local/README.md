@@ -1,168 +1,168 @@
 ---
-description: "The local host provider for the subprocess service: run OS-owned managed ranges and real terminal sessions on the host machine, with explicit weaker fallbacks."
+description: "サブプロセスサービスのローカルホストプロバイダー: ホストマシン上で OS 所有の管理レンジと実ターミナルセッションを実行し、明示的なより弱いフォールバックを伴う。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-subprocess-local
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Mount `dsh-subprocess-local` in any composition that runs child processes on the host. It resolves local executables, gives ordinary Linux and Windows commands plus supported Linux terminal sessions an OS-owned managed range, and provides real terminal sessions through `node-pty`; unsupported hosts use an explicit weaker fallback. It has no configuration, so every disposition, limit, terminal size, and grace arrives on the spawn request from the calling capability seam. Output collection keeps a bounded in-memory tail with optional spill files for full-stream recovery, children start from a scrubbed environment, and disposal terminates and joins every selected range or session.
+`dsh-subprocess-local` は、ホスト上で子プロセスを実行するあらゆるコンポジションにマウントする。ローカルの実行ファイルを解決し、通常の Linux および Windows コマンドと、サポート対象の Linux ターミナルセッションに OS 所有の管理レンジを与え、`node-pty` を通じて実ターミナルセッションを提供する。サポート外のホストは、明示的なより弱いフォールバックを使う。設定がないため、あらゆる配置、制限、ターミナルサイズ、グレースは、呼び出し元のケイパビリティシームからの spawn リクエストとして届く。出力収集は、全ストリーム復旧のための任意のスピルファイルを伴う有界のインメモリテールを保ち、子はスクラブ済み環境から開始し、破棄は選択されたすべてのレンジまたはセッションを終了させて join する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the provider beside its consumers and start processes exactly as the subprocess service specifies; this package decides only how those processes run on the host. On Windows, non-terminal children and `taskkill` helpers start with their windows hidden so background operations do not take focus. This also hides GUI windows that honor the process startup visibility setting.
+プロバイダーをそのコンシューマーの隣にマウントし、subprocess サービスが指定する通りにプロセスを起動する。このパッケージが決めるのは、それらのプロセスがホスト上でどう実行されるかだけである。Windows では、ターミナル以外の子と `taskkill` ヘルパーはウィンドウを非表示にして起動するため、バックグラウンド操作がフォーカスを奪うことはない。これは、プロセスの起動可視性設定に従う GUI ウィンドウも同様に隠す。
 
-### Mounting the provider
+### プロバイダーのマウント
 
-Load the provider in the same composition as its consumers. It has no config fields: every choice arrives on the spawn request, so deployment-varying decisions stay with the caller's configuration. `terminalEnvironment()` reads a nonempty `SHELL` on POSIX, falling back to the account login shell, or a nonempty `ComSpec` on Windows. Empty values are omitted so the consumer can choose its platform fallback.
+プロバイダーは、そのコンシューマーと同じコンポジションでロードする。設定フィールドはない: あらゆる選択は spawn リクエストで届くので、デプロイごとに変わる決定は呼び出し元の設定に残る。`terminalEnvironment()` は POSIX では空でない `SHELL` を読み、なければアカウントのログインシェルにフォールバックし、Windows では空でない `ComSpec` を読む。空の値は省略されるため、コンシューマーはプラットフォームごとのフォールバックを選べる。
 
 ```yaml
 - name: '@deepseek-ai/dsh-subprocess-local'
 - name: '@deepseek-ai/dsh-bash-local'
 ```
 
-### Resolving executables
+### 実行ファイルの解決
 
-Absolute executable paths are verified; bare names resolve against the scrubbed PATH with platform-aware executable extensions (`.COM`/`.EXE`/`.BAT`/`.CMD` on Windows). Relative paths containing separators are rejected — provide an absolute path or a bare PATH name — and relative PATH entries resolve from the host process cwd.
+絶対実行ファイルパスは検証され、ベア名はスクラブ済み PATH に対して、プラットフォーム対応の実行可能拡張子 (Windows では `.COM`/`.EXE`/`.BAT`/`.CMD`) で解決される。区切り文字を含む相対パスは拒否される — 絶対パスかベア PATH 名を渡すこと — そして相対 PATH エントリはホストプロセスの cwd から解決される。
 
-Windows ordinary subprocesses start the private Job runner with `windowsHide` and request hidden initial windows for native targets. Standard streams and Job ownership remain independent of window visibility; commands that explicitly create their own windows are outside this guarantee.
+Windows の通常サブプロセスは、`windowsHide` 付きでプライベート Job ランナーを起動し、ネイティブターゲットには非表示の初期ウィンドウを要求する。標準ストリームと Job の所有権はウィンドウの可視性から独立したままである。明示的に自前のウィンドウを作るコマンドはこの保証の外にある。
 
-### Collecting output
+### 出力の収集
 
-Collect mode keeps the last `maxBytes` of a stream in memory — errors and final results cluster at the end — and, when a `spill` cap is configured, appends the complete stream to a private file under a per-process directory in the OS temp dir (a `0700` directory, `0600` random-named files). A stream larger than the spill cap discards its incomplete spill and returns only the marked truncated tail. Spilling is best-effort: when the spill file cannot be opened or appended (the per-process directory removed by a temporary-file cleaner, `EACCES`, `EMFILE`, `ENOSPC`), the collector discards the spill, logs one `error` through the plugin logger, and keeps collecting the in-memory tail, so the result is truncated with no spill path. Reads are offset-based and non-consuming, so background and batch readers coexist before and after exit.
+collect モードはストリームの最後の `maxBytes` をメモリに保ち — エラーと最終結果は末尾に集まる — そして `spill` 上限が設定されている場合、完全なストリームを OS 一時ディレクトリ内のプロセスごとのディレクトリにあるプライベートファイル (`0700` のディレクトリ、`0600` のランダム名ファイル) へ追記する。スピル上限を超えるストリームは不完全なスピルを破棄し、切り詰め済みとマークされたテールのみを返す。スピルはベストエフォートである: スピルファイルを開けない、または追記できない場合 (一時ファイルクリーナーによるプロセスごとのディレクトリの削除、`EACCES`、`EMFILE`、`ENOSPC`)、コレクターはスピルを破棄し、プラグインロガーを通じて `error` を 1 回ログし、インメモリテールの収集を続けるので、結果はスピルパスなしの切り詰めとなる。読み取りはオフセットベースで消費しないため、バックグラウンドリーダーとバッチリーダーは終了の前後で共存する。
 
-The `./output` export shares this collector and retained-spill storage with process adapters. `snapshot()` returns the retained raw bytes and total byte count, allowing remote adapters to preserve offsets without forwarding the complete stream.
+`./output` エクスポートはこのコレクターと保持スピルストレージをプロセスアダプターと共有する。`snapshot()` は保持された生バイトと総バイト数を返し、リモートアダプターが完全なストリームを転送せずにオフセットを保存できるようにする。
 
-### Control transport
+### 制御トランスポート
 
-An ordinary spawn can request the [subprocess control pipe](../subprocess/README.md#using-a-control-pipe). A Node target receives fd 7 on every supported host; Windows descriptor numbering requires CRT initialization. POSIX runners preserve that descriptor across `execve`; Windows Job and ACL runners establish it in the child's CRT startup table before Node initializes and close their own carrier copies after spawning. Standard streams and the runner's private management channel remain independent.
+通常の spawn は [subprocess 制御パイプ](../subprocess/README.md#using-a-control-pipe)を要求できる。Node ターゲットは、サポートされるすべてのホストで fd 7 を受け取る。Windows ではディスクリプターの番号付けに CRT の初期化が必要である。POSIX ランナーは `execve` をまたいでそのディスクリプターを保持し、Windows の Job と ACL ランナーは、Node が初期化する前に子の CRT 起動テーブルにそれを確立し、起動後に自身のキャリアコピーを閉じる。標準ストリームとランナーのプライベート管理チャネルは独立したままである。
 
 <a id="running-terminal-sessions"></a>
-### Running terminal sessions
+### ターミナルセッションの実行
 
-`spawnTerminal` allocates a real PTY and bridges UTF-8 text; you can inspect and signal the current foreground process group and await one `terminate()` operation. On supported Linux hosts, the original terminal argv runs directly inside a user-systemd scope, preserving the node-pty PID, session leader, controlling terminal, foreground `inputWaiting`, and readiness while the scope owns reparented or `setsid` descendants. On fallback hosts, cleanup retains exact identities from the rooted tree and observable session but cannot recover every escaped descendant. An exact Linux input wait requires a foreground thread whose fd 0 identifies the shell's controlling terminal and whose current syscall waits on that fd; if the kernel denies the syscall probe, the higher PTY backend uses its idle inference instead. On Windows, SIGINT is delivered as a Ctrl-C input write, SIGTSTP and SIGHUP are unsupported, and teardown verifies the shell's termination through the process table because an externally killed shell may never fire the PTY exit notification.
+`spawnTerminal` は実 PTY を割り当てて UTF-8 テキストをブリッジする。現在のフォアグラウンドプロセスグループを検査してシグナルを送り、1 回の `terminate()` 操作を await できる。サポートされる Linux ホストでは、元のターミナル argv が user-systemd スコープ内で直接実行され、node-pty の PID、セッションリーダー、制御端末、フォアグラウンド `inputWaiting`、およびレディネスを保ちつつ、スコープが親を付け替えられた子孫や `setsid` した子孫を所有する。フォールバックホストでは、クリーンアップはルート付きツリーと観測可能なセッションから正確な同一性を保持するが、すべてのエスケープした子孫を回収することはできない。正確な Linux 入力待機には、fd 0 がシェルの制御端末を指し、現在のシステムコールがその fd を待つフォアグラウンドスレッドが必要である。カーネルがシステムコールプローブを拒否した場合、上位の PTY バックエンドは代わりにアイドル推論を使う。Windows では、SIGINT は Ctrl-C 入力書き込みとして配信され、SIGTSTP と SIGHUP は未サポートであり、外部から kill されたシェルは PTY 終了通知を発火しないことがあるため、ティアダウンはプロセステーブルを通じてシェルの終了を検証する。
 
-With `shellActivity: true`, plain non-login `bash -i` and `zsh -i` launches install private lifecycle records while retaining user startup files and prompt configuration. Bash requires version 4.4 or later and writable prompt hooks; Zsh observes an empty top-level ZLE prompt, excluding `vared`, selection and continuation prompts. Input, shell transitions and changed process observations advance activity revisions. Foreground, background and stopped descendants block idle; native Linux also requires exactly one task in the systemd scope, including ownership beyond the process tree; incomplete process-table scans, custom traps and Zsh asynchronous descriptor handlers yield unknown. A failure to enumerate the process table rejects the observation; activity remains unknown and cleanup retains ownership until a readable table permits verification. Private files are removed after successful process cleanup. Other shells, Windows, custom arguments and sandbox-wrapped executables remain usable with unknown activity.
+`shellActivity: true` の場合、プレーンの非ログイン `bash -i` と `zsh -i` の起動がプライベートなライフサイクル記録を設置しつつ、ユーザーのスタートアップファイルとプロンプト設定を保持する。Bash はバージョン 4.4 以降と書き込み可能なプロンプトフックを必要とする。Zsh は空のトップレベル ZLE プロンプトを観測し、`vared`、選択プロンプト、継続プロンプトは除外する。入力、シェル遷移、変化したプロセス観測はアクティビティリビジョンを進める。フォアグラウンド、バックグラウンド、停止した子孫はアイドルを妨げる。ネイティブ Linux はさらに、プロセスツリーを超えた所有権を含め、systemd スコープ内にちょうど 1 つのタスクがあることを要求する。不完全なプロセステーブルスキャン、カスタムトラップ、Zsh の非同期ディスクリプターハンドラーは unknown を生む。プロセステーブルの列挙失敗は観測を拒否し、アクティビティは unknown のままで、クリーンアップは読み取り可能なテーブルが検証を可能にするまで所有権を保持する。プライベートファイルはプロセスクリーンアップの成功後に削除される。その他のシェル、Windows、カスタム引数、サンドボックスでラップされた実行ファイルは、アクティビティ unknown のまま利用可能である。
 
-Opted-in root exit does not terminate surviving descendants. A confirmed empty Linux managed range or complete empty Linux session can authorize reclamation of its retained record; macOS cannot confirm an unobserved process range after root exit and keeps that record unknown. The existing fallback visibility limits still apply: shell lifecycle records do not make escaped, unobserved descendants discoverable. Lifecycle records coordinate ordinary shell behavior, not hostile same-user processes.
+オプトインのルート終了は、生き残った子孫を終了させない。確認済みの空の Linux 管理レンジ、または完全に空の Linux セッションは、その保持記録の回収を許可できる。macOS は、ルート終了後に未観測のプロセスレンジを確認できないため、その記録を unknown のまま保つ。既存のフォールバック可視性の制限は依然として適用される: シェルライフサイクル記録は、エスケープした未観測の子孫を発見可能にはしない。ライフサイクル記録が調整するのは通常のシェル動作であり、敵対的な同一ユーザープロセスではない。
 
-### Shutdown behavior
+### シャットダウン動作
 
-Normal disposal terminates every running managed range and terminal session and awaits quiescence. During a JavaScript-observable host exit — direct `process.exit()`, default uncaught exceptions, default unhandled rejections — synchronous finalization asks a Linux scope to kill its members, kills each Windows runner so its sole Job handle closes, and uses the existing PGID, `taskkill`, or captured-identity operation for fallbacks. It creates no promises or timers and does not claim quiescence. The same exit removes the private per-process spill directory when it holds no completed spill file; completed spill files remain as full-output recovery artifacts until an external cleanup. Unhandled `SIGTERM`/`SIGINT`/`SIGHUP`, `SIGKILL`, fatal OOM, native crashes, and power loss need an external supervisor.
+通常の破棄は、実行中のすべての管理レンジとターミナルセッションを終了させ、静止を await する。JavaScript から観測可能なホスト終了 — 直接の `process.exit()`、デフォルトの未捕捉例外、デフォルトの未処理 reject — の間、同期ファイナライゼーションは Linux スコープにメンバーの kill を求め、各 Windows ランナーを kill してその唯一の Job ハンドルを閉じさせ、フォールバックには既存の PGID、`taskkill`、またはキャプチャ済み同一性の操作を使う。これは promise もタイマーも作らず、静止を主張しない。同じ終了は、完了済みスピルファイルを保持していない場合にプライベートなプロセスごとのスピルディレクトリを削除する。完了済みスピルファイルは、外部クリーンアップまでの全出力復旧アーティファクトとして残る。未処理の `SIGTERM`/`SIGINT`/`SIGHUP`、`SIGKILL`、致命的 OOM、ネイティブクラッシュ、電源断は外部スーパーバイザーを必要とする。
 
-Linux ordinary and terminal cancellation preserves the observed termination signal even before the bootstrap consumes its launch request. An unconsumed request still reports startup failure when no matching termination was requested; a recorded pre-exec error always takes precedence. `waitForExit()` independently proves the scope empty, including a scope the manager leaves active with no processes after a payload dies before it enters that scope's cgroup. State queries interrupted by a termination signal are repeated before deciding whether cleanup succeeded. After termination, a consumed launch request and zero scope processes prove quiescence even before the direct-process exit notification. If the final scope signal fails, an accepted direct `SIGKILL` or verified direct-process absence permits one wait for the pending direct-process settlement before rechecking an active range not yet proven empty. This wait is independent of output draining and whole-range settlement. The fresh scope observation must prove the range empty; surviving processes or an unknown process count retain the signal failure.
+Linux の通常およびターミナルキャンセルは、ブートストラップが起動リクエストを消費する前でも、観測された終了シグナルを保持する。未消費のリクエストは、一致する終了が要求されていなければ依然として起動失敗を報告する。記録された exec 前エラーが常に優先される。`waitForExit()` は、スコープが空であることを独立に証明する。ペイロードがそのスコープの cgroup に入る前に死んだ後、マネージャーがプロセスなしでアクティブのまま残したスコープも含む。終了シグナルで中断された状態クエリは、クリーンアップが成功したかを判断する前に繰り返される。終了後は、消費済みの起動リクエストとゼロのスコーププロセスが、直接プロセスの終了通知より前でも静止を証明する。最終スコープシグナルが失敗した場合、受け入れ済みの直接 `SIGKILL` または検証済みの直接プロセス不在は、まだ空と証明されていないアクティブレンジの再チェックの前に、保留中の直接プロセスの決着を 1 回待つことを許可する。この待機は出力ドレインとレンジ全体の決着から独立している。新しいスコープ観測はレンジが空であることを証明しなければならない。生き残ったプロセスまたは不明なプロセス数はシグナル失敗を保持する。
 
-### What can go wrong
+### 何がうまくいかなくなりうるか
 
-An executable that cannot be resolved fails loud with a stable error. `done` rejects when spawn or provider failure prevents a direct outcome, and that rejection does not prove whether target execution began. `waitForExit()` rejects if the selected owner can no longer prove its range empty, and cleanup still attempts termination. A read past the retained tail is `lossy` and points at the spill file when one exists. A fallback process group or observed terminal session can miss a descendant that escapes before observation — see the limitations below.
+解決できない実行ファイルは、安定したエラーで明示的に失敗する。spawn またはプロバイダーの失敗が直接の結果を妨げる場合、`done` は reject し、その reject はターゲットの実行が始まったかどうかを証明しない。選択されたオーナーがレンジが空であることをもはや証明できない場合、`waitForExit()` は reject し、クリーンアップは依然として終了を試みる。保持されたテールを越えた読み取りは `lossy` であり、スピルファイルが存在する場合はそれを指す。フォールバックプロセスグループまたは観測済みターミナルセッションは、観測前にエスケープした子孫を見逃しうる — 下記の制限を参照。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the provider and points at the code that realizes them; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションでは、プロバイダーの背後にある設計判断と、それを実現するコードを説明する。観測可能な動作は[このパッケージを使う](#use-this-package)で扱う。
 
-### Design concept
+### 設計概念
 
-Each spawn selects one owner for both signalling and quiescence. Supported Linux ordinary and terminal launches use transient user-systemd scopes, while supported Windows ordinary launches use a helper-owned kill-on-close Job. macOS, unavailable user-systemd, and unavailable Windows native support use the existing detached process-group, `taskkill`, or terminal-session observations with one warning. The provider never replays a command through fallback after a native path may have started it.
+各 spawn は、シグナル送信と静止の両方のために 1 つのオーナーを選ぶ。サポートされる Linux の通常起動とターミナル起動は一時的な user-systemd スコープを使い、サポートされる Windows の通常起動はヘルパー所有の kill-on-close Job を使う。macOS、利用不能な user-systemd、利用不能な Windows ネイティブサポートは、既存のデタッチドプロセスグループ、`taskkill`、またはターミナルセッション観測を 1 回の警告付きで使う。プロバイダーは、ネイティブパスがコマンドを起動した可能性がある後に、フォールバックを通じてそのコマンドをリプレイすることはない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service wiring: live-handle sets, disposal, host-exit finalization, executable lookup |
-| [`src/spawn.ts`](src/spawn.ts) | Shared process plumbing: direct outcomes, tail-keep collection, spill files, and fallback spawning |
-| [`src/managed-owner.ts`](src/managed-owner.ts) | Private signal-and-wait owner used by each ordinary handle |
-| [`src/linux-scope.ts`](src/linux-scope.ts) | Linux user-systemd capability checks, scope launch, signalling, and quiescence |
-| [`src/linux-execve.ts`](src/linux-execve.ts) | Linux libc image replacement and inherited-standard-descriptor preservation |
-| [`src/windows-job.ts`](src/windows-job.ts) | Windows Job capability checks and helper launch |
-| [`src/runner-launch.ts`](src/runner-launch.ts) | Source, built, and packaged private-runner selection |
-| [`src/spawn-runner.ts`](src/spawn-runner.ts) | Linux one-shot exec bootstrap and Windows Job runner |
-| [`src/runner-protocol.ts`](src/runner-protocol.ts) | Strict Linux launch/startup files and Windows IPC messages |
-| [`src/terminal.ts`](src/terminal.ts) | `node-pty` handle: Linux scope attachment, foreground inspection, and fallback cleanup |
-| [`src/process-inspector.ts`](src/process-inspector.ts) | POSIX process-tree and session inspection |
-| [`src/windows-inspector.ts`](src/windows-inspector.ts) | Windows Toolhelp32 process-table inspection via koffi |
+| [`src/index.ts`](src/index.ts) | サービスの配線: ライブハンドル集合、破棄、ホスト終了ファイナライゼーション、実行ファイル検索 |
+| [`src/spawn.ts`](src/spawn.ts) | 共有プロセス機構: 直接の結果、テール保持コレクション、スピルファイル、フォールバック spawn |
+| [`src/managed-owner.ts`](src/managed-owner.ts) | 各通常ハンドルが使う、シグナル送信と待機を行うプライベートオーナー |
+| [`src/linux-scope.ts`](src/linux-scope.ts) | Linux user-systemd ケイパビリティ検査、スコープ起動、シグナル送信、静止 |
+| [`src/linux-execve.ts`](src/linux-execve.ts) | Linux の libc イメージ置換と継承標準ディスクリプターの保持 |
+| [`src/windows-job.ts`](src/windows-job.ts) | Windows Job ケイパビリティ検査とヘルパー起動 |
+| [`src/runner-launch.ts`](src/runner-launch.ts) | ソース、ビルド済み、パッケージ済みのプライベートランナー選択 |
+| [`src/spawn-runner.ts`](src/spawn-runner.ts) | Linux のワンショット exec ブートストラップと Windows Job ランナー |
+| [`src/runner-protocol.ts`](src/runner-protocol.ts) | 厳密な Linux 起動/スタートアップファイルと Windows IPC メッセージ |
+| [`src/terminal.ts`](src/terminal.ts) | `node-pty` ハンドル: Linux スコープのアタッチ、フォアグラウンド検査、フォールバッククリーンアップ |
+| [`src/process-inspector.ts`](src/process-inspector.ts) | POSIX プロセスツリーとセッションの検査 |
+| [`src/windows-inspector.ts`](src/windows-inspector.ts) | koffi 経由の Windows Toolhelp32 プロセステーブル検査 |
 
-### Main flow
+### メインフロー
 
-A spawn synchronously validates the final argv, cwd, and environment, selects containment before the user command can run, and returns a handle while target identity remains private. Linux ordinary and terminal launches use a private one-shot request whose scoped bootstrap restores the target cwd and environment, resolves the executable, clears close-on-exec on fd 0 through fd 2 and optional control fd 7, and enters libc `execve()` with the original argv. Windows ordinary launches isolate runner fd 0 through fd 2, reserve fd 3 for IPC, and carry target stdio on fd 4 through fd 6 plus fd 7 when control is requested; the runner resolves those CRT descriptors to OS handles, creates the target suspended, assigns it to the Job, resumes it, and closes its standard-stream carriers and optional fd-7 carrier. `done` settles the direct command after its stdio barrier, while `waitForExit()` separately waits for the selected scope, Job, process group, or observed session to become empty.
+spawn は最終的な argv、cwd、環境を同期的に検証し、ユーザーコマンドが実行されうる前に封じ込めを選び、ターゲットの同一性が非公開のままハンドルを返す。Linux の通常起動とターミナル起動は、プライベートなワンショットリクエストを使い、そのスコープ付きブートストラップがターゲットの cwd と環境を復元し、実行ファイルを解決し、fd 0 から fd 2 および任意の制御 fd 7 の close-on-exec をクリアし、元の argv で libc `execve()` に入る。Windows の通常起動は、ランナーの fd 0 から fd 2 を分離し、fd 3 を IPC 用に予約し、ターゲットの stdio を fd 4 から fd 6、制御が要求された場合は fd 7 に載せる。ランナーはそれらの CRT ディスクリプターを OS ハンドルに解決し、ターゲットをサスペンド状態で作成して Job に割り当て、再開させ、その標準ストリームキャリアと任意の fd-7 キャリアを閉じる。`done` は stdio バリアの後に直接コマンドを決着させ、`waitForExit()` は選択されたスコープ、Job、プロセスグループ、または観測済みセッションが空になることを別途待つ。
 
-### Safety invariants
+### 安全不変条件
 
-Spill files are opened `0600` with `O_EXCL` and random names under a `0700` per-process directory, defeating symlink planting in shared temp dirs; a failed open, append, or final close withholds the spill path and never interrupts collection, because collection runs inside the stream's `'data'` listener where a thrown error would kill the host process. Fallback process identities carry start times, so cleanup never follows PID reuse. A selected native failure is reported instead of replaying argv through fallback, and a range is removed from the live set only after cleanup completes or the failure remains observable. Host-exit finalization creates no promises or timers, preserves the host exit code and diagnostic, contains each target's failure, and does not claim quiescence.
+スピルファイルは `0600` と `O_EXCL` で、`0700` のプロセスごとのディレクトリ下のランダム名で開かれ、共有一時ディレクトリでのシンボリックリンク植え付けを封じる。開く、追記、最終クローズの失敗はスピルパスを伏せ、収集を決して中断しない。収集はストリームの `'data'` リスナー内で実行されるため、そこで投げられたエラーはホストプロセスを kill するからである。フォールバックのプロセス同一性は開始時刻を運ぶので、クリーンアップが PID 再利用を追うことはない。選択されたネイティブの失敗は、フォールバックを通じて argv をリプレイする代わりに報告され、レンジがライブ集合から削除されるのは、クリーンアップが完了したか、失敗が観測可能なまま残った後だけである。ホスト終了ファイナライゼーションは promise もタイマーも作らず、ホストの終了コードと診断を保持し、各ターゲットの失敗を封じ込め、静止を主張しない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the provider-level contract is not enough. They move from the exhaustive type reference to the abstract contract and the decisions behind the host mechanics.
+プロバイダーレベルの契約では足りないときに、これらのページを読む。網羅的な型リファレンスから、抽象契約とホストの仕組みの背後にある判断へ進む。
 
-- [Subprocess subsystem](../../../docs/subsystems/subprocess.md) — spawn specs, output readers, outcomes, and the `DSH_*` environment in full.
-- [dsh-subprocess](../subprocess/README.md) — the abstract contract this provider implements.
-- [dsh-bash-local](../../shell/bash-local/README.md) — the largest consumer and the concrete stdio shapes it asks for.
-- [Subprocess seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-subprocess-seam.md) — why the process half became its own seam.
-- [Synchronous subprocess exit cleanup](../../../.agents/notes/archived/bug-fix/2026-08-11-synchronous-subprocess-exit-cleanup.md) — the host-exit finalization decision and its failure modes.
+- [Subprocess subsystem](../../../docs/subsystems/subprocess.md) — spawn スペック、出力リーダー、結果、および `DSH_*` 環境の全体像。
+- [dsh-subprocess](../subprocess/README.md) — このプロバイダーが実装する抽象契約。
+- [dsh-bash-local](../../shell/bash-local/README.md) — 最大のコンシューマーと、それが要求する具体的な stdio の形。
+- [Subprocess seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-subprocess-seam.md) — プロセス側がなぜ独自のシームになったか。
+- [Synchronous subprocess exit cleanup](../../../.agents/notes/archived/bug-fix/2026-08-11-synchronous-subprocess-exit-cleanup.md) — ホスト終了ファイナライゼーションの決定とその失敗モード。
 
 -----
 
-Terminal allocation advertises the caller-provided `terminalType` through TERM and node-pty. Dynamic resize updates the existing PTY. Output backpressure pauses native reads until the consumer drains; explicit termination resumes a paused reader to receive the exit notification.
+ターミナル割り当ては、呼び出し元提供の `terminalType` を TERM と node-pty を通じて広告する。動的リサイズは既存の PTY を更新する。出力バックプレッシャーは、コンシューマーがドレインするまでネイティブ読み取りを一時停止させる。明示的な終了は、一時停止したリーダーを再開させて終了通知を受け取らせる。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through consumer seams such as the bash executor family, which own all model-facing rendering of spawned process output and lifecycle.
+間接的に、bash 実行器ファミリーのようなコンシューマーシームを通じて。それらが spawn されたプロセス出力とそのライフサイクルのすべてのモデル向けレンダリングを所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct invalidation; the named consumers own any request-prefix changes.
+直接の無効化はない。リクエストプレフィックスの変更は、名前を挙げたコンシューマーが所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the provider is a poor fit or needs special operational care. They are current package constraints, not a general platform comparison or a task backlog.
+これらの制限は、プロバイダーが不向きになる条件や、特別な運用上の注意が必要になる条件を定める。これらは現在のパッケージの制約であり、一般的なプラットフォーム比較でもタスクのバックログでもない。
 
-- **Linux direct exit has no independent deadline** — after direct `SIGKILL` is acknowledged, uninterruptible kernel I/O can keep disposal pending indefinitely; `graceMs` and scope-query polling budgets do not bound this wait.
-- **Native ownership has explicit host requirements** — Linux needs a readable user manager whose `systemd-run` supports `--collect` (systemd 236 and later) and keeps scope arguments literal: version 254 and later receive `--expand-environment=no`, and earlier versions, whose scope mode never expands arguments, run without it. Hosts without a usable user manager use the warned PGID fallback. macOS always uses that fallback because no supported public persistent owner exists.
-- **Native selection has bounded per-spawn costs** — Linux checks the bootstrap entry, libc `execve`/`fcntl` bindings, reachable user manager, and literal-argv scope probe on the first eligible ordinary or terminal spawn and keeps that verdict, including a failed or timed-out probe. The user manager is identified by the process listening on `$XDG_RUNTIME_DIR/systemd/private`, the socket `systemd-run --user` connects through, as listed in the kernel's unix socket table (`/proc/net/unix`) for the same network namespace; reading the table costs time proportional to its size. After a positive verdict, each eligible spawn probes again when the `systemd-run` found through `PATH` has a different device, inode, size, or modification time, and otherwise confirms the manager: a listener confirms it without a child process; otherwise one `systemctl --user show` query decides, and that spawn uses the fallback when the query fails. A scope launch whose bootstrap never consumed its launch request, such as one sent to a hung manager that still listens, fails that command, as do scope launches issued before that failure arrives, and the next eligible spawn probes again. After a negative verdict, the provider probes again only when a different listener appears, so a manager that starts later is used without a restart. Windows rechecks the runner entry, bindings, and current Job support before every ordinary spawn. Fallback-warning de-duplication also persists for the provider lifetime. All probes finish before the user command can run; each child-process probe has a 5-second timeout, and a `systemd-run` that rejects `--expand-environment=no` is probed once more without it. Each Linux launch creates a private request directory, checks unresolved scope establishment every 50 milliseconds, then exponentially backs off an established active scope to at most 5 seconds between queries; a Windows ordinary launch keeps one runner and IPC channel until the Job reports zero active processes. Target standard handles are inherited directly, with no named-pipe stdio or result files.
-- **Windows Job inheritance has defined exclusions** — ordinary descendants inherit the Job by default, but breakaway processes are outside the guarantee. The target starts only after Job assignment; external termination of the runner in the narrow create-to-assignment interval can leave a suspended target behind.
-- **Windows terminal signalling is console-wide** — SIGINT is delivered as a `\x03` Ctrl-C input write that the console host turns into a console-wide CTRL_C event (on Windows that host is node-pty's bundled OpenConsole); SIGTSTP and SIGHUP are rejected as unavailable; a `taskkill` without `/F` does not terminate console processes, so the teardown TERM tier is a grace wait before the `/F` escalation. Windows readiness has no exact stdin-wait tier: the prompt-marker fast path compares the shell pid as the pseudo foreground group, and silence/timing tiers cover the rest.
-- **Windows terminal allocation requires node-pty's bundled console host assets** — every Windows terminal is spawned with `useConptyDll: true`, so allocation resolves `conpty/conpty.dll` and `OpenConsole.exe` relative to node-pty's own addon; an asset that is missing or unpacked wrong makes `spawnTerminal` throw instead of falling back to the operating system console host. node-pty marks the option experimental, so a node-pty upgrade can change this behaviour. See the [bundled console host note](../../../.agents/notes/implemented/bug-fix/2026-09-28-pty-bundled-console-host.md).
-- **Fallback terminal ownership remains observational** — on macOS or Linux without usable user-systemd, a child that reparents before any foreground-inspection snapshot or leaves the owned terminal session can escape the process-table scan. The local provider does not add a continuous process-table monitor; supported Linux native mode instead retains these descendants through scope membership.
-- **In-process cleanup requires a JavaScript-observable exit** — direct `process.exit()`, default uncaught exceptions, and default unhandled rejections emit Node's synchronous `exit` event. The default OS disposition for an unhandled `SIGTERM`, `SIGINT`, or `SIGHUP` bypasses that event; an application covers those signals only by installing a handler that performs normal disposal or calls `process.exit()`. `SIGKILL`, fatal OOM, `process.abort()`, native crashes, power loss, and any failure that cannot run JavaScript require an external supervisor, container init, or equivalent OS owner.
-- **The credential scrub is a name heuristic** — `*KEY*`/`*PASSWORD*`/`*SECRET*`/`*TOKEN*` only; differently named secrets (for example `*PASSPHRASE*`) pass through, and a whitelist for over-scrubbed variables is noted future work.
-- **Completed spill files are not deleted** — bounded full-output recovery files accumulate under the OS tmpdir until something external cleans them; the private per-process spill directory is removed at a JavaScript-observable exit only when it holds no completed spill file.
-- **A removed spill directory is not recreated** — the private per-process directory is created once; after an external cleaner removes it, every later spill in that process degrades to the in-memory tail with an `error` log until the host restarts. Recreating a fresh random directory on `ENOENT` is deferred work.
+- **Linux の直接終了には独立した期限がない** — 直接 `SIGKILL` が確認された後も、割り込み不能なカーネル I/O が破棄を無期限に保留させうる。`graceMs` とスコープクエリのポーリング予算はこの待機を制限しない。
+- **ネイティブ所有権には明示的なホスト要件がある** — Linux には、`systemd-run` が `--collect` をサポートし (systemd 236 以降) スコープ引数をリテラルのまま保つ、読み取り可能なユーザーマネージャーが必要である: バージョン 254 以降は `--expand-environment=no` を受け取り、スコープモードが引数を決して展開しないそれ以前のバージョンはそれなしで実行する。使用可能なユーザーマネージャーのないホストは、警告付きの PGID フォールバックを使う。macOS は、サポートされた公開の永続オーナーが存在しないため、常にそのフォールバックを使う。
+- **ネイティブ選択には有界の spawn ごとのコストがある** — Linux は、最初の対象となる通常またはターミナル spawn で、ブートストラップエントリ、libc `execve`/`fcntl` バインディング、到達可能なユーザーマネージャー、literal-argv スコーププローブを検査し、失敗またはタイムアウトしたプローブを含めてその判定を保持する。ユーザーマネージャーは、`$XDG_RUNTIME_DIR/systemd/private` をリッスンするプロセス — カーネルの unix ソケットテーブル (`/proc/net/unix`) に同一ネットワーク名前空間について列挙される、`systemd-run --user` が接続するソケット — によって識別され、テーブルの読み取りにはそのサイズに比例する時間がかかる。肯定判定の後、`PATH` を通じて見つかった `systemd-run` のデバイス、inode、サイズ、または変更時刻が異なる場合、対象となる各 spawn は再びプローブし、そうでなければマネージャーを確認する: リスナーがあれば子プロセスなしで確認し、なければ 1 回の `systemctl --user show` クエリが判定し、クエリが失敗した場合その spawn はフォールバックを使う。ブートストラップが起動リクエストを決して消費しなかったスコープ起動 — たとえば、まだリッスンしているハングしたマネージャーに送られたもの — はそのコマンドを失敗させ、その失敗が到着する前に発行されたスコープ起動も同様であり、次の対象となる spawn が再びプローブする。否定判定の後、プロバイダーは異なるリスナーが現れた場合にのみ再びプローブするので、後から起動したマネージャーは再起動なしで使われる。Windows は、通常 spawn のたびにランナーエントリ、バインディング、現在の Job サポートを再チェックする。フォールバック警告の重複排除もプロバイダーのライフタイム中持続する。すべてのプローブはユーザーコマンドが実行されうる前に完了する。各子プロセスプローブのタイムアウトは 5 秒で、`--expand-environment=no` を拒否する `systemd-run` はそれなしでもう一度プローブされる。各 Linux 起動はプライベートなリクエストディレクトリを作成し、未解決のスコープ確立を 50 ミリ秒ごとにチェックし、確立されたアクティブなスコープではクエリ間隔を指数関数的に広げて最大 5 秒にする。Windows の通常起動は、Job がアクティブプロセスゼロを報告するまで 1 つのランナーと IPC チャネルを保つ。ターゲットの標準ハンドルは直接継承され、named-pipe stdio や結果ファイルは使わない。
+- **Windows Job の継承には定義された除外がある** — 通常の子孫はデフォルトで Job を継承するが、ブレイクアウェイプロセスは保証の外にある。ターゲットは Job 割り当ての後に初めて起動する。作成から割り当てまでの狭い間隔でのランナーの外部終了は、サスペンドされたターゲットを残しうる。
+- **Windows ターミナルシグナルはコンソール全体に及ぶ** — SIGINT は `\x03` の Ctrl-C 入力書き込みとして配信され、コンソールホストがそれをコンソール全体の CTRL_C イベントに変換する (Windows ではそのホストは node-pty 同梱の OpenConsole)。SIGTSTP と SIGHUP は利用不可として拒否される。`/F` なしの `taskkill` はコンソールプロセスを終了させないため、ティアダウンの TERM 段階は `/F` へのエスカレーション前のグレース待機である。Windows のレディネスには正確な stdin 待機の段階がない: プロンプトマーカーの高速パスはシェル pid を擬似フォアグラウンドグループとして比較し、残りは沈黙/タイミングの段階がカバーする。
+- **Windows ターミナル割り当てには node-pty 同梱のコンソールホストアセットが必要である** — すべての Windows ターミナルは `useConptyDll: true` で spawn されるため、割り当ては node-pty 自身のアドオンを基準に `conpty/conpty.dll` と `OpenConsole.exe` を解決する。アセットが見つからないか誤って展開されていると、OS コンソールホストへのフォールバックではなく `spawnTerminal` が throw する。node-pty はこのオプションを実験的としているため、node-pty のアップグレードでこの動作が変わりうる。[同梱コンソールホストのノート](../../../.agents/notes/implemented/bug-fix/2026-09-28-pty-bundled-console-host.md)を参照。
+- **フォールバックのターミナル所有権は観測性に留まる** — 使用可能な user-systemd のない macOS または Linux では、フォアグラウンド検査スナップショットの前に親を付け替える子、または所有されたターミナルセッションから離脱する子は、プロセステーブルスキャンからエスケープしうる。ローカルプロバイダーは継続的なプロセステーブルモニターを追加しない。サポートされる Linux ネイティブモードは代わりに、スコープメンバーシップを通じてこれらの子孫を保持する。
+- **インプロセスクリーンアップには JavaScript から観測可能な終了が必要である** — 直接の `process.exit()`、デフォルトの未捕捉例外、デフォルトの未処理 reject は Node の同期 `exit` イベントを発行する。未処理の `SIGTERM`、`SIGINT`、`SIGHUP` に対する OS のデフォルト処置はそのイベントをバイパスする。アプリケーションがそれらのシグナルをカバーできるのは、通常の破棄を行うか `process.exit()` を呼ぶハンドラーを設置した場合だけである。`SIGKILL`、致命的 OOM、`process.abort()`、ネイティブクラッシュ、電源断、および JavaScript を実行できないあらゆる失敗は、外部スーパーバイザー、コンテナ init、または同等の OS オーナーを必要とする。
+- **資格情報スクラブは名前ヒューリスティックである** — `*KEY*`/`*PASSWORD*`/`*SECRET*`/`*TOKEN*` のみ。別名のシークレット (例えば `*PASSPHRASE*`) は通過し、過剰にスクラブされる変数のホワイトリストは将来の作業として記されている。
+- **完了済みスピルファイルは削除されない** — 有界の全出力復旧ファイルは、何か外部が掃除するまで OS 一時ディレクトリ下に蓄積する。プライベートなプロセスごとのスピルディレクトリは、完了済みスピルファイルを保持していない場合にのみ、JavaScript から観測可能な終了で削除される。
+- **削除されたスピルディレクトリは再作成されない** — プライベートなプロセスごとのディレクトリは 1 回だけ作成される。外部クリーナーがそれを削除した後、そのプロセス内の以降のすべてのスピルは、ホストが再起動するまで `error` ログ付きでインメモリテールに縮退する。`ENOENT` で新しいランダムディレクトリを再作成することは先送り作業である。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,39 +1,39 @@
 ---
-description: "The tool registry and execution pipeline for tool authors and maintainers registering, restricting, presenting, or debugging model-facing tools."
+description: "モデル向けツールを登録、制限、表示、デバッグするツール作者とメンテナーのための、ツールレジストリと実行パイプライン。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tools
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-tools` to expose typed capabilities to models, validate calls, enforce allow/deny/ask policy, and return finalized results without ending a turn on ordinary tool failures. Choose native Function Calling or [PTC mode](#ptc-mode) with `mode`; an agent can override the default through `presentAs`. Tool authors use `defineTool` to declare typed parameters and outputs, cooperative timeouts, parallel-safety, and optional UI presentation. Models see each permitted tool's declared name, description, and parameter schema; per-agent restrictions can narrow that visible set.
+`dsh-tools` を使うと、モデルに型付きケイパビリティを公開し、呼び出しを検証し、allow/deny/ask ポリシーを強制し、通常のツール失敗でターンを終了することなく最終化された結果を返せる。`mode` でネイティブな Function Calling または [PTC モード](#ptc-mode)を選ぶ。エージェントは `presentAs` でデフォルトを上書きできる。ツール作者は `defineTool` で型付きパラメーターと出力、協調的タイムアウト、並列安全性、オプションの UI 表示を宣言する。モデルは許可された各ツールの宣言された名前、説明、パラメータースキーマを見る。エージェントごとの制限はその可視セットを狭められる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Each `run_code` program captures the Session's current working directory when it starts. A nested directory change affects subsequent tool calls, while the running program keeps its initial directory.
+各 `run_code` プログラムは開始時に Session の現在の作業ディレクトリを取得する。ネストされたディレクトリ変更は以降のツール呼び出しに影響するが、実行中のプログラムは初期ディレクトリを保つ。
 
-Mount `dsh-tools` wherever agents call tools: it provides `ctx.tools`, the registry every tool plugin registers into and the loop dispatches through. Registering a tool is enough to make it visible — the registry feeds its schemas into the system-prompt assembly automatically.
+エージェントがツールを呼ぶ場所に `dsh-tools` をマウントする。これが提供する `ctx.tools` は、すべてのツールプラグインが登録し、ループがディスパッチするレジストリである。ツールを登録すれば可視になるだけで十分である。レジストリはそのスキーマをシステムプロンプトの組み立てに自動的に供給する。
 
-### Register a tool
+### ツールを登録する
 
-`defineTool` builds a typed tool definition: a model-facing name, description, and parameter schema, a canonical output declaration, and an `execute` body that returns only the declared JSON value. Model arguments are validated before execution; invalid input becomes a normal error result.
+`defineTool` は型付きツール定義を構築する。モデル向けの名前、説明、パラメータースキーマ、正規の出力宣言、および宣言された JSON 値のみを返す `execute` 本体である。モデルの引数は実行前に検証され、不正な入力は通常のエラー結果になる。
 
-Canonical values belong to execution; the Session records rendered content and optional presentation metadata instead. Replacing or redacting that content does not remove the canonical value available to a programmatic caller; a policy that must deny that access must block execution or replace the value.
+正規値は実行に属する。Session は代わりにレンダリングされたコンテンツとオプションのプレゼンテーションメタデータを記録する。そのコンテンツを置換または墨消ししても、プログラマティックな呼び出し元が利用できる正規値は取り除かれない。そのアクセスを拒否しなければならないポリシーは、実行をブロックするか値を置換する必要がある。
 
 ```ts
 import { readFile } from 'node:fs/promises'
@@ -61,11 +61,11 @@ ctx.tools.register(defineTool({
 }))
 ```
 
-The unified schema DSL supports `string`, `number`, `integer`, `boolean`, `null`, `array`, `object`, author-only `json`, and exact-one `oneOf`; `InferValue` preserves exact types through 16 container levels before widening to `JsonValue`. A raw JSON Schema (`JsonSchemaNode`) is the wire-level counterpart shared with subagents, workflows, and MCP.
+統一スキーマ DSL は `string`、`number`、`integer`、`boolean`、`null`、`array`、`object`、作者専用の `json`、およびちょうど 1 つを選ぶ `oneOf` をサポートする。`InferValue` は 16 段のコンテナーレベルまで正確な型を保ち、その後 `JsonValue` に広がる。生の JSON Schema（`JsonSchemaNode`）は、サブエージェント、ワークフロー、MCP と共有されるワイヤーレベルの対応物である。
 
-### Configure the presentation mode
+### プレゼンテーションモードを設定する
 
-The `mode` config decides what the model sees: `native` (every visible schema) or `ptc` (only `run_code` plus a generated SDK). The runtime supplies evaluation syntax, output syntax and state-retention guidance through `executionInstructions`; this package owns tool-call rules, SDK declarations and image-result attachment.
+`mode` 設定はモデルが見るものを決める。`native`（可視のすべてのスキーマ）または `ptc`（`run_code` と生成された SDK のみ）である。ランタイムは評価構文、出力構文、状態保持のガイダンスを `executionInstructions` を通じて供給し、このパッケージはツール呼び出しルール、SDK 宣言、画像結果の添付を担う。
 
 ```yaml
 - name: '@deepseek-ai/dsh-tools'
@@ -73,115 +73,115 @@ The `mode` config decides what the model sees: `native` (every visible schema) o
     mode: native
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `mode` | `native` | How visible tools are presented to the model: `native` or `ptc` |
-| `maxParallelSubCalls` | `10` | Concurrency cap for a `run_code` program's overlapping sub-calls; `1` restores strictly serial dispatch |
+| `mode` | `native` | 可視ツールがモデルにどのように提示されるか: `native` または `ptc` |
+| `maxParallelSubCalls` | `10` | `run_code` プログラムの重複するサブ呼び出しの並行上限。`1` で厳密に直列なディスパッチに戻る |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tools) is the exhaustive source for every accepted field. Non-native modes require a composed `ctx.ptcRuntime` whose language has a registered SDK renderer; an agent preset selects its own presentation with [`dsh-agent-tool-presentation`](../agent-tool-presentation/README.md), and one agent can shadow the default with `presentAs(mode)`.
+生成される[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-tools)が、受け付けられるすべてのフィールドの網羅的なソースである。非ネイティブモードには、その言語に登録された SDK レンダラーを持つ構成済みの `ctx.ptcRuntime` が必要である。エージェントプリセットは [`dsh-agent-tool-presentation`](../agent-tool-presentation/README.md) で自身のプレゼンテーションを選び、1 つのエージェントは `presentAs(mode)` でデフォルトを覆い隠せる。
 
-### Restrict tools per agent
+### エージェントごとにツールを制限する
 
-`ctx.tools.restrict(filter)` applies an allow or deny mask to the global tools one agent inherits; masks intersect, scoped registrations stay visible, and the restriction lifts when disposed. `ctx.tools.get(name, scope)` resolves a tool as one scope sees it. A Host-local presenter consumer passes the calling agent when it must match the definition that executed. `ctx.tools.schemas(scope)` returns the visible schemas without the `execute` functions.
+`ctx.tools.restrict(filter)` は、1 つのエージェントが継承するグローバルツールに allow または deny マスクを適用する。マスクは交差し、スコープ付き登録は可視のまま残り、制限は dispose されると解除される。`ctx.tools.get(name, scope)` は 1 つのスコープから見たツールを解決する。Host ローカルのプレゼンターコンシューマーは、実行された定義と一致する必要があるとき呼び出し元エージェントを渡す。`ctx.tools.schemas(scope)` は `execute` 関数なしで可視スキーマを返す。
 
-### Enforce policy on calls
+### 呼び出しにポリシーを強制する
 
-`ctx.tools.guard(guard)` registers a monotonic synchronous guard after the extensible `tools/pre-execute` waterfall: a returned reason denies the call, and no later listener can turn that denial back into permission. The pipeline's events give plugins more control — `tools/pre-execute` decides allow/deny/ask, `tools/execute` wraps dispatch for timeout or retry, `tools/post-execute` inspects or replaces the result, and `tools/result` observes the frozen final outcome.
+`ctx.tools.guard(guard)` は、拡張可能な `tools/pre-execute` waterfall の後に単調な同期ガードを登録する。返された理由は呼び出しを拒否し、後のどのリスナーもその拒否を許可に戻せない。パイプラインのイベントはプラグインにより多くの制御を与える。`tools/pre-execute` は allow/deny/ask を決め、`tools/execute` はタイムアウトや再試行のためにディスパッチを包み、`tools/post-execute` は結果を検査または置換し、`tools/result` は凍結された最終結果を観測する。
 
-A tool’s `projectContent` installs execution-prepared content before post-execute policies. Policies may still replace or block it; `finalizeContent` remains the final content transform after those policies.
+ツールの `projectContent` は post-execute ポリシーの前に実行準備済みのコンテンツを導入する。ポリシーは依然としてそれを置換またはブロックしてよい。`finalizeContent` はそれらのポリシーの後にある最終のコンテンツ変換のままである。
 
-### Host presentation descriptors
+### Host プレゼンテーション記述子
 
-A tool can retain pure `presentCall()` and `presentResult()` methods for Host-local consumers. The built-in Web Client does not consume those values. It selects a renderer through `tool.call.toolview` and derives card props from raw call arguments, result content, failure state, and persisted metadata. The [Client-derived presentation decision](../../../.agents/notes/implemented/architecture/2026-08-23-client-derived-tool-presentation.md) owns this transport split.
+ツールは Host ローカルのコンシューマーのために純粋な `presentCall()` と `presentResult()` メソッドを保持できる。組み込みの Web Client はそれらの値を消費しない。`tool.call.toolview` を通じてレンダラーを選び、生の呼び出し引数、結果コンテンツ、失敗状態、永続メタデータからカードの props を導出する。[クライアント導出プレゼンテーションの決定](../../../.agents/notes/implemented/architecture/2026-08-23-client-derived-tool-presentation.md)がこのトランスポート分割を所有する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-This section explains how the package realizes the behavior above; the observable contract is covered in [Use this package](#use-this-package).
+このセクションはパッケージが上記の動作をどのように実現するかを説明する。観測可能な契約は[このパッケージを使う](#use-this-package)で扱っている。
 
-### Design concept
+### 設計コンセプト
 
-The registry holds typed `ToolDefinition`s in scoped layers and projects them onto the model-facing `ToolSchema` set at request time — `output`, `execute`, `finalizeContent`, `timeoutMs`, and presentation callbacks never leak onto the wire. Every call runs a fixed pipeline: `tools/pre-execute` (extensible allow/deny/ask) → registered monotonic guards → `tools/execute` (around-dispatch wrappers) → `tools/post-execute` (inspect/replace, attach context) → definition-owned `finalizeContent` → the observe-only `tools/result` event. Only the `tools/execute` view may replace the required signal, and the registry re-fuses the caller signal before the body.
+レジストリは型付きの `ToolDefinition` をスコープ付きレイヤーに保持し、リクエスト時にモデル向けの `ToolSchema` セットに投影する。`output`、`execute`、`finalizeContent`、`timeoutMs`、プレゼンテーションコールバックは決してワイヤーに漏れない。すべての呼び出しは固定のパイプラインを実行する。`tools/pre-execute`（拡張可能な allow/deny/ask）→ 登録された単調ガード → `tools/execute`（around-dispatch ラッパー）→ `tools/post-execute`（検査/置換、コンテキストの添付）→ 定義所有の `finalizeContent` → 観測専用の `tools/result` イベント。必須シグナルを置換できるのは `tools/execute` ビューのみで、レジストリは本体の前に呼び出し元シグナルを再融合する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `ToolRuntime` service, config, registry, execution pipeline |
-| [`src/types.ts`](src/types.ts) | `ToolDefinition`, `ToolExecution`, `ToolExecutionResult`, guard and decision types |
-| [`src/schema.ts`](src/schema.ts) | The `defineTool` DSL: `ValueSchemaSpec`, `ParameterSchemaSpec`, `InferValue`, `InferArgs` |
-| [`src/json-schema.ts`](src/json-schema.ts) | The enforced raw JSON Schema subset and validation |
-| [`src/presentation.ts`](src/presentation.ts) | The `card`-tagged UI render intents |
-| [`src/ptc.ts`](src/ptc.ts) | PTC mode: SDK generation, `run_code` dispatch bridge, settlement |
-| [`src/ts-types.ts`](src/ts-types.ts) | TypeScript SDK type rendering |
-| [`src/py-types.ts`](src/py-types.ts) | Python SDK type rendering |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `ToolRuntime` サービス、設定、レジストリ、実行パイプライン |
+| [`src/types.ts`](src/types.ts) | `ToolDefinition`、`ToolExecution`、`ToolExecutionResult`、ガードと決定の型 |
+| [`src/schema.ts`](src/schema.ts) | `defineTool` DSL: `ValueSchemaSpec`、`ParameterSchemaSpec`、`InferValue`、`InferArgs` |
+| [`src/json-schema.ts`](src/json-schema.ts) | 強制される生の JSON Schema サブセットと検証 |
+| [`src/presentation.ts`](src/presentation.ts) | `card` タグ付き UI レンダリング intent |
+| [`src/ptc.ts`](src/ptc.ts) | PTC モード: SDK 生成、`run_code` ディスパッチブリッジ、決済 |
+| [`src/ts-types.ts`](src/ts-types.ts) | TypeScript SDK 型レンダリング |
+| [`src/py-types.ts`](src/py-types.ts) | Python SDK 型レンダリング |
 
-### Execution and cancellation
+### 実行とキャンセル
 
-Each typed invocation materializes and freezes parsed arguments, assigns an opaque correlation token, and runs policy and dispatch. A pre-execute denial may attach `ToolErrorInfo` beside its model-facing reason; the native and PTC durable projections preserve the structured name, code, and optional user-facing reason without adding that detail to model content. Cancellation is cooperative and quiescent: every tool body receives the caller-owned `exec.signal` and must observe it; cancellation before body invocation is `ABORTED_BEFORE_DISPATCH`, after invocation it replaces only a successful outcome with `ABORTED`. Denials, wrapper failures, tool failures, post-policy failures, and timeout-owned `TOOL_TIMEOUT` remain more specific. Unknown and throwing tools become structured errors (`UNKNOWN_TOOL`), so a call fails without ending the turn.
+各型付き呼び出しは解析済み引数を実体化して凍結し、不透明な相関トークンを割り当て、ポリシーとディスパッチを実行する。pre-execute の拒否は、モデル向けの理由のそばに `ToolErrorInfo` を添付してよい。ネイティブと PTC の永続投影は、その詳細をモデルコンテンツに加えることなく、構造化された名前、コード、オプションのユーザー向け理由を保持する。キャンセルは協調的かつ静止的である。すべてのツール本体は呼び出し元所有の `exec.signal` を受け取り、それを監視しなければならない。本体呼び出し前のキャンセルは `ABORTED_BEFORE_DISPATCH`、呼び出し後は成功した結果のみを `ABORTED` に置き換える。拒否、ラッパー失敗、ツール失敗、ポリシー後失敗、タイムアウト所有の `TOOL_TIMEOUT` はより特定的なままである。未知のツールと例外を投げるツールは構造化エラー（`UNKNOWN_TOOL`）になるため、呼び出しはターンを終了せずに失敗する。
 
-### PTC mode
+### PTC モード
 
-Under `ptc`, the registry exposes the reserved `run_code` transport plus a deterministic SDK generated in the loaded runtime's language. Each SDK binding captures a frozen ToolSchema and passes it through the scheduler to its execution context. Before policy, a started call records only pairing ids, name, and normalized arguments; its settle event preserves the rendered result, optional presentation metadata, and structured error. Metadata is projected from that call’s canonical value and frozen; it changes neither the program value nor model content. Description and parameters remain transient and never enter Session events or SDK output. Calls are scheduled through a per-run pool that reuses the native concurrency contract. Under `ptc` alone, a model-direct call naming any other visible tool resolves to `UNKNOWN_TOOL` before policy — the announced surface and the callable surface stay the same. Intermediate binding values are execution-local; only the outer `run_code` result has a hard size cap.
+`ptc` では、レジストリは予約された `run_code` トランスポートと、ロードされたランタイムの言語で生成された決定的な SDK を公開する。各 SDK バインディングは凍結された ToolSchema を取得し、スケジューラーを通じてその実行コンテキストへ渡す。ポリシーの前に、開始された呼び出しはペアリング id、名前、正規化された引数のみを記録し、その settle イベントはレンダリングされた結果、オプションのプレゼンテーションメタデータ、構造化エラーを保持する。メタデータはその呼び出しの正規値から投影されて凍結され、プログラム値もモデルコンテンツも変えない。説明とパラメーターは一時的なままで、Session イベントや SDK 出力に決して入らない。呼び出しは、ネイティブの並行性契約を再利用する実行ごとのプールを通じてスケジュールされる。`ptc` 単独では、他の可視ツールを名指しするモデル直接の呼び出しは、ポリシーの前に `UNKNOWN_TOOL` に解決される。告知されるサーフェスと呼び出せるサーフェスは同じままである。中間バインディング値は実行ローカルであり、外側の `run_code` 結果のみがハードサイズ上限を持つ。
 
-New sub-calls use `<parent>:ptc:<n>` ids. Consumers treat these ids as opaque and correlate events by exact equality; restored historical ids retain their original bytes. The [PTC mode decision](../../../.agents/notes/implemented/feature/2026-06-15-ptc.md) owns durable naming and restoration rules.
+新しいサブ呼び出しは `<parent>:ptc:<n>` id を使う。コンシューマーはこれらの id を不透明として扱い、正確な等価性でイベントを相関させる。復元された歴史的 id は元のバイトを保つ。[PTC モードの決定](../../../.agents/notes/implemented/feature/2026-06-15-ptc.md)が永続的な命名と復元のルールを所有する。
 
-Successful image-bearing subcall results become deferred user-message context with `source.kind` set to `ptc-mode`. Other additional contexts retain their producing tool's attribution.
+画像を含む成功したサブ呼び出し結果は、`source.kind` が `ptc-mode` に設定された遅延ユーザーメッセージコンテキストになる。他の追加コンテキストは生成元ツールの帰属を保つ。
 
-`run_code` accepts `timeoutMs` when the mounted runtime supports an override; its schema reports the configured default and maximum, and the runtime's usage instructions. The Node default is 120,000 ms with a 600,000 ms cap, including nested tool and approval waits. A wider `sandbox_permissions` mode requires a non-empty `justification` and approval before the program starts. The schema asks the model to write that reason in the current user's language. The grant applies to that complete execution; standing Session policy and nested tools retain their own authority. Programs are never replayed automatically: inspect earlier effects before explicitly retrying a denied program. Retained PTC environments follow the standing file policy. PTC observes committed Session mode changes and immediately cancels affected calls in both Node modes. Later PTC calls wait for their nested-tool cleanup before resolving the latest policy. The runtime owns process invalidation and cleanup; permission setters remain synchronous. One-time escalations omit the state owner and complete in a temporary environment; standing variables remain available to ordinary calls.
+`run_code` はマウントされたランタイムが上書きをサポートする場合 `timeoutMs` を受け付ける。そのスキーマは設定されたデフォルトと最大値、およびランタイムの使用手順を報告する。Node のデフォルトは 120,000 ms で上限は 600,000 ms、ネストされたツールと承認の待機を含む。より広い `sandbox_permissions` モードは、プログラム開始前に空でない `justification` と承認を要求する。スキーマはその理由を現在のユーザーの言語で書くようモデルに求める。付与はその実行全体に適用され、常設の Session ポリシーとネストされたツールは自身の権威を保つ。プログラムは自動的に再生されない。拒否されたプログラムを明示的に再試行する前に、以前の効果を検査する。保持された PTC 環境は常設のファイルポリシーに従う。PTC はコミットされた Session モード変更を観測し、両方の Node モードで影響を受ける呼び出しを直ちにキャンセルする。以降の PTC 呼び出しは、最新のポリシーを解決する前にネストされたツールのクリーンアップを待つ。ランタイムがプロセスの無効化とクリーンアップを所有し、パーミッションセッターは同期的なままである。1 回限りのエスカレーションは状態所有者を省き、一時的な環境で完了する。常設変数は通常の呼び出しに引き続き利用できる。
 
 <a id="extension-points"></a>
-### Extension points
+### 拡張ポイント
 
-Tool plugins call `ctx.tools.register()` and their schemas flow into prompt assembly automatically. `tools/pre-execute` is the reorderable allow/deny/ask gate; `ctx.tools.guard()` adds monotonic owner policy after it; `tools/execute` wraps normalized canonical dispatch for timeout, retry, or metrics; `tools/post-execute` may replace content or value, block with feedback, or attach ordered contexts; `tools/result` observes the immutable final outcome. MCP servers discover tools and register them with the server's schemas.
+ツールプラグインは `ctx.tools.register()` を呼び、そのスキーマは自動的にプロンプト組み立てへ流れ込む。`tools/pre-execute` は並べ替え可能な allow/deny/ask ゲートである。`ctx.tools.guard()` はその後に単調な所有者ポリシーを追加する。`tools/execute` はタイムアウト、再試行、メトリクスのために正規化された正規ディスパッチを包む。`tools/post-execute` はコンテンツや値を置換し、フィードバックでブロックし、または順序付きコンテキストを添付してよい。`tools/result` は不変の最終結果を観測する。MCP サーバーはツールを発見し、サーバーのスキーマでそれらを登録する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-The package-level contract is enough for most consumers; read these when you need the surrounding domain.
+パッケージレベルの契約はほとんどのコンシューマーに十分である。周辺ドメインが必要なときにこれらを読む。
 
-- [Tools subsystem](../../../docs/subsystems/tools.md) — the full pipeline types, schema DSL, and generated service API.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tools) — the shipped tools' schemas the model receives.
-- [Tool execution pipeline](../../../docs/tool-execution-pipeline.md) — the pipeline visualized.
-- [Adding a tool cookbook](../../../docs/cookbook/adding-a-tool.md) — step-by-step tool authoring.
-- [Cooperative cancellation Agent Note](../../../.agents/notes/implemented/architecture/2026-07-19-cooperative-tool-cancellation.md) — the full cancellation contract.
-- [Core group map](../README.md) — how the core packages compose.
+- [ツールサブシステム](../../../docs/subsystems/tools.md) — パイプラインの全型、スキーマ DSL、生成されるサービス API。
+- [生成されるツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tools) — モデルが受け取る出荷ツールのスキーマ。
+- [ツール実行パイプライン](../../../docs/tool-execution-pipeline.md) — 可視化されたパイプライン。
+- [ツール追加クックブック](../../../docs/cookbook/adding-a-tool.md) — ステップバイステップのツール作成。
+- [協調的キャンセルの Agent Note](../../../.agents/notes/implemented/architecture/2026-07-19-cooperative-tool-cancellation.md) — 完全なキャンセル契約。
+- [コアグループマップ](../README.md) — コアパッケージの構成方法。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Normal tool schemas
+### 通常のツールスキーマ
 
-#### What the model sees
+#### モデルが見るもの
 
-In normal mode the model sees each visible definition's exact name, description, and JSON Schema; the shipped definitions are recorded in the generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tools). Agent-scoped restrictions, shadows, and extension registrations change that agent's end-tool set.
+通常モードでは、モデルは各可視定義の正確な名前、説明、JSON Schema を見る。出荷される定義は生成される[ツールカタログ](../../../docs/tool-catalog.md#deepseek-aidsh-tools)に記録されている。エージェントスコープの制限、シャドウ、拡張登録はそのエージェントの最終ツールセットを変える。
 
-#### Token effect
+#### トークンへの影響
 
-Fixed per-request cost proportional to the visible definitions. Restrictions that hide tools remove their entire schema cost for that agent.
+可視定義に比例するリクエストごとの固定コスト。ツールを隠す制限は、そのエージェントにとってスキーマコスト全体を取り除く。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while visible definitions and their order are unchanged. Registration, disposal, or scoped restriction may invalidate reuse from the first changed schema token.
+可視定義とその順序が変わらない間はプレフィックス安定である。登録、dispose、スコープ付き制限は最初に変わったスキーマトークンから再利用を無効化しうる。
 
-### PTC mode schema and system prompt
+### PTC モードのスキーマとシステムプロンプト
 
-#### What the model sees
+#### モデルが見るもの
 
-PTC mode exposes the generated [`run_code` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tools), the SDK instructions below, and the generated exact SDK block for the loaded runtime's language. Both runtime languages list `code` before `description`; this is presentation order, not an enforced JSON member order. The TypeScript instructions use a return-value example for function-body runtimes and a printed-output example for REPL runtimes. They identify generated declarations as program-only bindings. When the current `bash` parameter schema accepts the example arguments, they also show a complete `run_code` call around `tools.bash(...)`. The `tools:sdk` section uses first-party order 5000 and disables prompt-variable interpolation, preserving literal `{{…}}` text in tool descriptions and schemas for both runtime languages. Under `ptc`, the prompt also carries the `tools:ptc-only` rule earlier in the first-party order, so the model reads which tools it may call before it reads what each one is for.
+PTC モードは、生成された [`run_code` スキーマ](../../../docs/tool-catalog.md#deepseek-aidsh-tools)、以下の SDK 指示、ロードされたランタイムの言語用に生成された正確な SDK ブロックを公開する。両方のランタイム言語で `code` が `description` より前に並ぶ。これはプレゼンテーション順であり、強制される JSON メンバー順ではない。TypeScript の指示は、関数本体ランタイムには戻り値の例を、REPL ランタイムには印字出力の例を使う。生成された宣言がプログラム専用バインディングであることを示す。現在の `bash` パラメータースキーマが例の引数を受け入れる場合、`tools.bash(...)` を囲む完全な `run_code` 呼び出しも示す。`tools:sdk` セクションはファーストパーティ順 5000 を使い、プロンプト変数の補間を無効にして、両方のランタイム言語でツールの説明とスキーマ内のリテラルな `{{…}}` テキストを保持する。`ptc` では、プロンプトはファーストパーティ順のより早い位置に `tools:ptc-only` ルールも運ぶため、モデルは各ツールが何のためかを読む前に、どのツールを呼んでよいかを読む。
 
-##### TypeScript PTC mode SDK instructions with bash
+##### bash を伴う TypeScript PTC モードの SDK 指示
 
 ```markdown
 ## Writing code for run_code
@@ -200,51 +200,51 @@ Inside the program:
 Program-only SDK bindings:
 ```
 
-#### Token effect
+#### トークンへの影響
 
-Fixed per-request cost proportional to the visible definitions. PTC mode trades end-tool schemas for generated SDK text plus one transport schema rather than promising a universal reduction.
+可視定義に比例するリクエストごとの固定コスト。PTC モードは普遍的な削減を約束するのではなく、最終ツールのスキーマを生成 SDK テキストと 1 つのトランスポートスキーマで置き換える。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Prefix-stable while the PTC mode selection, generated SDK, transport schema, and visible tool set are unchanged. Mode or filter changes may invalidate reuse from the first changed prompt or schema token.
+PTC モードの選択、生成 SDK、トランスポートスキーマ、可視ツールセットが変わらない間はプレフィックス安定である。モードやフィルターの変更は、最初に変わったプロンプトまたはスキーマトークンから再利用を無効化しうる。
 
-### Tool-call history and results
+### ツール呼び出し履歴と結果
 
-#### What the model sees
+#### モデルが見るもの
 
-The loop retains model-emitted arguments and the registry's final content. Any thrown or denied call becomes exactly `Error: <message>`; structured user-facing failure detail is not added to that message. PTC mode renders the outer program's printed lines and return value, `(run_code completed with no output)` when both are empty, or `Error: code run failed (<kind>): <message>` followed conditionally by `Captured output:` and the captured lines. Inner dispatch events stay log-only, while a successful image-bearing sub-result is appended after the outer result as source-attributed context.
+ループはモデルが出力した引数とレジストリの最終コンテンツを保持する。例外を投げた呼び出しや拒否された呼び出しは正確に `Error: <message>` になる。構造化されたユーザー向け失敗詳細はそのメッセージに加えられない。PTC モードは外側プログラムの印字行と戻り値をレンダリングし、両方が空の場合は `(run_code completed with no output)` を、または `Error: code run failed (<kind>): <message>` に続いて条件付きで `Captured output:` とキャプチャされた行をレンダリングする。内側のディスパッチイベントはログ専用のままである。画像を含む成功したサブ結果は、外側の結果の後にソース帰属コンテキストとして追加される。
 
-#### Token effect
+#### トークンへの影響
 
-Arguments, results, and additional context are data-dependent and resent until compaction. Restrictions that hide tools also remove their schemas before the model can call them.
+引数、結果、追加コンテキストはデータ依存で、コンパクションまで再送される。ツールを隠す制限は、モデルがそれらを呼べるようになる前にスキーマも取り除く。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
+追記のみ。新たに可視になったコンテンツは再利用可能なリクエストプレフィックスに続き、既存の KV キャッシュエントリーを無効化しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the registry needs special care. They are current package constraints, not a task backlog.
+これらの制限は、レジストリが特別な注意を要する場合を定義する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Concurrency policy is not an event gate** — `executionMode()` reads the resolved tool definition directly; plugins can only declare a classifier on definitions they own.
-- **`tools/pre-execute` deliberately cannot rewrite `exec.arguments`** — logged and rendered args would desync from what ran; the rewrite design is [a proposed Agent Note](../../../.agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.md).
-- **Caller-defined subagent and workflow structured outputs remain object-rooted** — this is a consumer-level guard; the shared schema vocabulary and tool outputs support every JSON root.
-- **`timeoutMs` on a definition is declarative only** — the registry never enforces deadlines; enforcement requires the `@deepseek-ai/dsh-tool-call-timeout-policy` wrapper.
-- **PTC mode's SDK language follows the one loaded runtime, and a presentation is per agent rather than per tool** — `mode: ptc` rejects prompt assembly unless `ctx.ptcRuntime.language` has a registered SDK renderer; within one agent no tool can be native-only while another is ptc-only.
-- **PTC mode intermediate values are execution-local and unbounded by bytes** — they cannot be reconstructed from session replay and may exhaust process or worker memory; only the outer `run_code` output has the worker's configurable hard cap.
-- **State depends on the runtime**: the default backend starts fresh; a REPL backend retains memory per live Agent. Agent disposal awaits release. Restart and execution failures can clear memory; model-visible guidance explains how to recreate missing variables. Programs and results remain in the Session log, without serializing live objects.
+- **並行性ポリシーはイベントゲートではない** — `executionMode()` は解決されたツール定義を直接読む。プラグインは自身が所有する定義に分類子を宣言できるだけである。
+- **`tools/pre-execute` は意図的に `exec.arguments` を書き換えられない** — ログに記録されレンダリングされる引数が実行されたものと同期しなくなる。書き換えの設計は[提案中の Agent Note](../../../.agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.md)である。
+- **呼び出し元定義のサブエージェントとワークフローの構造化出力はオブジェクト根のままである** — これはコンシューマーレベルのガードである。共有スキーマ語彙とツール出力はすべての JSON 根をサポートする。
+- **定義上の `timeoutMs` は宣言のみ** — レジストリは決して期限を強制しない。強制には `@deepseek-ai/dsh-tool-call-timeout-policy` ラッパーが必要である。
+- **PTC モードの SDK 言語はロードされた 1 つのランタイムに従い、プレゼンテーションはツールごとではなくエージェントごとである** — `mode: ptc` は `ctx.ptcRuntime.language` に登録された SDK レンダラーがない限りプロンプト組み立てを拒否する。1 つのエージェント内では、あるツールがネイティブ専用で別のツールが ptc 専用になることはできない。
+- **PTC モードの中間値は実行ローカルでバイト上限がない** — セッションリプレイから再構築できず、プロセスまたはワーカーのメモリを枯渇させうる。外側の `run_code` 出力のみがワーカーの設定可能なハード上限を持つ。
+- **状態はランタイムに依存する**: デフォルトバックエンドは新規に開始する。REPL バックエンドは存続中の Agent ごとにメモリを保持する。Agent の dispose は解放を待つ。再起動と実行失敗はメモリを消去しうる。モデルに見えるガイダンスが、欠落した変数を再作成する方法を説明する。プログラムと結果は生きたオブジェクトをシリアライズすることなく Session ログに残る。
 
-`defineTool()`, registry schema projection, and system-prompt assembly preserve `deferLoading: true`. The marker requests deferred definition loading and does not imply a `tool-addition` record; the [LLM package](../../../packages/llm/llm/README.md#known-limitations-and-deferred-work) documents provider enforcement limits.
+`defineTool()`、レジストリのスキーマ投影、システムプロンプトの組み立ては `deferLoading: true` を保つ。このマーカーは定義の遅延ロードを要求するもので、`tool-addition` レコードを意味しない。[LLM パッケージ](../../../packages/llm/llm/README.md#known-limitations-and-deferred-work)がプロバイダーの強制の限界を記録している。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

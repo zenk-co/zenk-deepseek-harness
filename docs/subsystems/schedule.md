@@ -1,12 +1,12 @@
-# Host-wide Schedule
+# ホスト全体の Schedule
 
-English | [中文](schedule.zh.md)
+日本語 | [English](schedule.en.md) | [中文](schedule.zh.md)
 
-Schedule stores reminders independently of Session activation and delivers them to their original Session. This page records the durable and model-facing types from [`types.ts`](../../packages/schedule/schedule/src/types.ts); the [package README](../../packages/schedule/schedule/README.md) owns composition and reminder framing.
+Schedule はリマインダーをセッションのアクティブ化とは独立に保存し、元のセッションへ配信します。このページは [`types.ts`](../../packages/schedule/schedule/src/types.ts) 由来の永続化向けおよびモデル向けの型を記録します。構成とリマインダーの枠付けは [パッケージ README](../../packages/schedule/schedule/README.md) が所有します。
 
-## Durable records
+## 永続化レコード
 
-`ScheduleId` is a globally unique [branded id](core.md#branded-ids). The version-1 `schedule` storage domain owns a `tasks` table whose entries bind a `ScheduleRecord` to its original `sessionId`, with stored `status: 'active' | 'inactive'` and optional `lastDelivery`. Records lacking status normalize to `active` without scanning or recreating historical Sessions. Creation canonicalizes the target into RFC 3339 UTC `scheduledAt`; `after` retains the submitted delay, `every` retains its fixed interval, `daily` and `weekly` retain normalized local `time` and their explicit `timeZone`, and `cron` retains its canonical five-field `expression` and explicit `timeZone`. Daily, weekly, and cron decoding preserve the committed instant and stored zone spelling. The stored task record declares a required `title`, the short name the task surfaces show; creation requires it and never derives it from the instruction. No stored record may omit its title: a record whose `title` is missing, blank after trimming, untrimmed, or longer than 120 characters fails durable decoding with `ScheduleLogError`, and the schedule domain declares no backup-and-skip policy, so one such stored task rejects the whole domain open instead of being dropped. Only explicit deletion removes a task; previously physically deleted tasks are not restored or fabricated.
+`ScheduleId` はグローバルに一意な [branded id](core.md#branded-ids) です。バージョン 1 の `schedule` ストレージドメインは `tasks` テーブルを所有し、各エントリは `ScheduleRecord` を元の `sessionId` に結び付け、保存される `status: 'active' | 'inactive'` と任意の `lastDelivery` を持ちます。status を欠くレコードは、履歴セッションの走査や再作成なしに `active` へ正規化されます。作成時は対象を RFC 3339 UTC の `scheduledAt` へ正規化します。`after` は送信された遅延を保持し、`every` は固定間隔を保持し、`daily` と `weekly` は正規化されたローカルの `time` と明示的な `timeZone` を保持し、`cron` は正規化された 5 フィールドの `expression` と明示的な `timeZone` を保持します。daily・weekly・cron のデコードは、確定した瞬間と保存されたゾーン表記を保持します。保存されるタスクレコードは必須の `title` を宣言します。これはタスク表示が示す短い名前です。作成時は `title` が必須であり、指示文から導出することはありません。保存レコードが `title` を省略することは許されません。`title` が欠落している、トリミング後に空白のみになる、トリミングされていない、または 120 文字を超えるレコードは、`ScheduleLogError` で永続化デコードに失敗します。schedule ドメインはバックアップ・アンド・スキップの方針を宣言しないため、このような保存タスクが 1 件あると、除外されるのではなくドメイン全体のオープンが拒否されます。タスクを削除するのは明示的な削除のみです。以前に物理削除されたタスクが復元または捏造されることはありません。
 
 ```ts type-equiv
 /** Durable one-shot reminder created from a positive delay. */
@@ -95,9 +95,9 @@ type RecurringScheduleRecord = EveryScheduleRecord | DailyScheduleRecord | Weekl
 type ScheduleRecord = OneShotScheduleRecord | RecurringScheduleRecord
 ```
 
-## Absolute-time input
+## 絶対時刻入力
 
-The `at` selector is either a strict offset-bearing RFC 3339 string or an exact local-calendar object. The local form keeps its interpretation explicit at the tool boundary:
+`at` セレクターは、オフセットを厳密に含む RFC 3339 文字列か、正確なローカルカレンダーオブジェクトのいずれかです。ローカル形式はツール境界で解釈を明示的に保ちます。
 
 ```ts type-equiv
 /** Structured local-calendar input accepted by creation and timing edits. */
@@ -116,14 +116,14 @@ interface LocalAtInput {
 type AtInput = string | LocalAtInput
 ```
 
-The shipped Web composition mounts the `schedule` service and the `ui-schedule` task page. The clock reading and the four reminder tools are preset-owned: `standard`, `cordis`, and `ptc` declare `time-context` and `@deepseek-ai/dsh-tool-schedule` together, and `minimal` declares neither. The `tool-subagent` and `tool-subagent-fork` rows in those three presets deny the four tools, and each tool refuses a delegated caller with `subagent_session`, so a delegated child neither sees the tools nor has a call accepted. Time-context tells the model to interpret otherwise-unqualified natural-language dates and times in that request-local zone when the open turn has one unambiguous browser zone; mixed or missing browser-zone records tell the model to ask. That guidance is not a durable Session default: the model must still pass an offset in the string form or `time_zone` in the local form, and Schedule never reads browser, Session, process, or model context.
+出荷される Web 構成は `schedule` サービスと `ui-schedule` タスクページをマウントします。時刻の読み取りと 4 つのリマインダーツールはプリセットが所有します。`standard`・`cordis`・`ptc` は `time-context` と `@deepseek-ai/dsh-tool-schedule` を一緒に宣言し、`minimal` はどちらも宣言しません。これら 3 プリセット内の `tool-subagent` 行と `tool-subagent-fork` 行は 4 ツールを拒否し、各ツールは委譲された呼び出し元を `subagent_session` で拒否するため、委譲された子はツールを見ることも呼び出しを受け付けられることもありません。time-context は、開いているターンに曖昧さのないブラウザーゾーンが 1 つある場合に、そのリクエストローカルなゾーンで修飾のない自然言語の日付・時刻を解釈するようモデルに指示します。ブラウザーゾーンの記録が混在または欠落している場合は、モデルに問い合わせるよう指示します。この指針は永続化されるセッションの既定値ではありません。モデルは文字列形式ではオフセットを、ローカル形式では `time_zone` を引き続き渡す必要があり、Schedule がブラウザー・セッション・プロセス・モデルのコンテキストを読むことはありません。
 
-Schedule rejects invalid offsets and zones, offset-free strings, non-future targets, and local times inside daylight-saving gaps. A daylight-saving overlap chooses its first, earlier instant. Successful creation stores only canonical UTC `scheduledAt`, so replay never depends on ambient time-zone state.
+Schedule は、不正なオフセットやゾーン、オフセットのない文字列、未来でない対象、夏時間の欠落期間内のローカル時刻を拒否します。夏時間の重複期間は最初の早い方の瞬間を選択します。作成成功時は正規化された UTC の `scheduledAt` のみを保存するため、リプレイが周囲のタイムゾーン状態に依存することはありません。
 
 <a id="daily-wall-clock-input"></a>
-## Daily wall-clock input
+## 日次ウォールクロック入力
 
-`daily` is one of the mutually exclusive creation selectors, alongside `after_seconds`, `at`, `every_seconds`, the weekly selector, and the cron selector. For example, `daily: { time: '23:00:00', time_zone: 'Asia/Shanghai' }` selects 23:00 in that zone on each eligible local date. The exact object has no date, offset, or interval field:
+`daily` は、`after_seconds`・`at`・`every_seconds`・weekly セレクター・cron セレクターと並ぶ、相互に排他的な作成セレクターの 1 つです。たとえば `daily: { time: '23:00:00', time_zone: 'Asia/Shanghai' }` は、該当する各ローカル日付でそのゾーンの 23:00 を選択します。exact オブジェクトには日付・オフセット・間隔のフィールドはありません。
 
 ```ts type-equiv
 /** Daily local-time selector accepted by creation and timing edits. */
@@ -135,44 +135,44 @@ interface DailyInput {
 }
 ```
 
-Creation requires `HH:mm:ss` with optional one-to-three fractional digits, rejects leap seconds and `24:00`, canonicalizes the explicit IANA zone, and stores `time` as `HH:mm:ss.SSS`. The first `scheduledAt` is strictly after creation time. A nonexistent local time or entire date is skipped; an overlap selects the earlier instant once per local date. If that earlier instant has passed, the later duplicate is not eligible. Only UTC target years 0001–9999 are constrained; local dates at the UTC range edges may fall in year 0 or 10000.
+作成時は 1〜3 桁の小数部を任意に伴う `HH:mm:ss` を要求し、うるう秒と `24:00` を拒否し、明示的な IANA ゾーンを正規化して、`time` を `HH:mm:ss.SSS` として保存します。最初の `scheduledAt` は作成時刻より厳密に後です。存在しないローカル時刻や日付全体はスキップされ、重複期間はローカル日付ごとに早い方の瞬間を 1 回選択します。その早い方の瞬間が過ぎている場合、遅い方の重複は対象になりません。制約されるのは UTC 対象年の 0001〜9999 のみであり、UTC 範囲の端にあるローカル日付は 0 年や 10000 年に入る場合があります。
 
-A saved next target is a committed UTC instant. The Host decoder and restart preserve that instant without resolving it against time-zone rules again, and valid stored zone aliases remain readable when canonical names change. Subsequent targets use the Host's current IANA data. The next target must be both after the delivery decision and on a local date later than the selected occurrence's date. Creation fails with `time_out_of_range` when no future UTC target is representable.
+保存された次の対象は確定した UTC の瞬間です。ホストのデコーダーと再起動は、その瞬間をタイムゾーン規則に対して再解決せずに保持し、有効な保存済みゾーンエイリアスは正規名が変わっても読み取り可能です。後続の対象はホストの現在の IANA データを使います。次の対象は、配信決定より後であり、かつ選択された出現の日付より後のローカル日付にある必要があります。将来の UTC 対象を表現できない場合、作成は `time_out_of_range` で失敗します。
 
-## Fixed-rate input and catch-up
+## 固定レート入力とキャッチアップ
 
-`every_seconds` is a safe-integer interval of at least 60 seconds, aligned to creation time. It measures elapsed time, not daily wall-clock time: `every_seconds: 86400` cannot substitute for `daily` across offset changes. The protocol provides no shared cooldown or cross-record admission rule; the cron selector described below is wall-clock timing, not a fixed-rate interval.
+`every_seconds` は 60 秒以上の safe-integer 間隔であり、作成時刻に合わせられます。日次のウォールクロック時刻ではなく経過時間を測ります。`every_seconds: 86400` はオフセット変更をまたいで `daily` の代用にはなりません。プロトコルは共有クールダウンやレコード横断の受け入れ規則を提供しません。後述の cron セレクターはウォールクロックのタイミングであり、固定レート間隔ではありません。
 
-When the Host starts with an overdue Every, Daily, Weekly, or Cron record, it sends only the latest due occurrence. Every advances to the first target aligned to its current interval anchor after the delivery decision; Daily, Weekly, and Cron follow the local-date rules above and below. Missed occurrences do not accumulate. If no next UTC target is representable, delivery retains the record as inactive with its latest receipt.
+ホストが期限切れの Every・Daily・Weekly・Cron レコードを抱えて起動した場合、期限到来分のうち最新の出現のみを送信します。Every は配信決定後の現在の間隔アンカーに合う最初の対象へ進み、Daily・Weekly・Cron は前後のローカル日付規則に従います。逃した出現が蓄積されることはありません。次の UTC 対象を表現できない場合、配信はレコードを最新の受領証とともに inactive として保持します。
 
-One-shots produce individual follow-ups. Recurring records due in the same scan for the same Session share one follow-up rendered by `renderRecurringReminderBatchFraming`, with one latest occurrence per record. The one-minute minimum applies only to fixed-rate intervals; delivery does not wait for the target Agent to become idle.
+ワンショットは個別のフォローアップを生成します。同じスキャンで同じセッション向けに期限到来した繰り返しレコードは、`renderRecurringReminderBatchFraming` で描画される 1 つのフォローアップを共有し、レコードごとに最新の出現を 1 件含みます。1 分の最小値は固定レート間隔にのみ適用されます。配信は対象エージェントがアイドルになるのを待ちません。
 
 <a id="cron-wall-clock-input"></a>
-## Cron wall-clock input
+## Cron ウォールクロック入力
 
-`cron` is one of the mutually exclusive creation selectors. Its exact object carries only the strict five-field Vixie expression `minute hour day-of-month month day-of-week` and an explicit IANA zone, for example `cron: { expression: '*/15 9-17 * * 1-5', time_zone: 'Asia/Shanghai' }`. The field bounds are:
+`cron` は相互に排他的な作成セレクターの 1 つです。その exact オブジェクトは、厳密な 5 フィールド Vixie 式 `minute hour day-of-month month day-of-week` と明示的な IANA ゾーンのみを持ちます。たとえば `cron: { expression: '*/15 9-17 * * 1-5', time_zone: 'Asia/Shanghai' }` です。フィールドの範囲は次のとおりです。
 
-| Field | Accepted range | Notes |
+| フィールド | 許容範囲 | 注記 |
 |---|---|---|
 | minute | 0-59 | |
 | hour | 0-23 | |
 | day-of-month | 1-31 | |
 | month | 1-12 | |
-| day-of-week | 0-7 | Both `0` and `7` mean Sunday. |
+| day-of-week | 0-7 | `0` と `7` はどちらも日曜日を意味します。 |
 
-Every field accepts `*`, a single value, an `a-b` range, a `*/n` or `a-b/n` step with `n >= 1`, and a comma-separated list of those forms. Everything else is rejected with `invalid_rule` and a message naming the offending field: `L`, `W`, and `#` operators, `JAN`/`MON` names, `@daily`-style macros, six-field expressions with a seconds field, out-of-range values, inverted ranges, zero steps, and empty fields. Because the dialect has five fields, the smallest interval is one minute; sub-minute scheduling stays unsupported.
+各フィールドは `*`・単一値・`a-b` 範囲・`n >= 1` の `*/n` または `a-b/n` ステップ、およびそれらの形式のコンマ区切りリストを受け付けます。それ以外はすべて、問題のフィールド名を示すメッセージとともに `invalid_rule` で拒否されます。`L`・`W`・`#` 演算子、`JAN`・`MON` 名、`@daily` 形式のマクロ、秒フィールド付きの 6 フィールド式、範囲外の値、反転した範囲、ゼロステップ、空フィールドが該当します。この方言は 5 フィールドのため最小間隔は 1 分であり、分未満のスケジューリングは引き続き未対応です。
 
-Creation canonicalizes the expression before storing it. Canonicalization expands each field into its matched value set and re-encodes that set deterministically: repeated values collapse, adjacent values and ranges merge, a uniform step is written as `a-b/n` or, for a field that started with `*`, as a star-step (`*` for every value, otherwise the widest star-step walk plus any remaining values), a step of `1` is dropped, and Sunday is written as `0`. A field that did not start with `*` never becomes a star-step. Preserving each field's star flag is what keeps the day-of-month/day-of-week rule below Vixie-faithful across the stored expression. The durable decoder rejects a stored expression that is not canonical.
+作成時は式を保存前に正規化します。正規化は各フィールドを一致する値集合へ展開し、その集合を決定的に再符号化します。重複値はつぶされ、隣接する値と範囲は統合され、一様なステップは `a-b/n` として、または `*` で始まったフィールドではスターステップとして（全値なら `*`、そうでなければ最も広いスターステップの歩みと残りの値）書かれ、ステップ `1` は落とされ、日曜日は `0` と書かれます。`*` で始まらなかったフィールドがスターステップになることはありません。各フィールドのスター標識を保持することこそが、後述の日・週ルールを保存式全体で Vixie に忠実に保ちます。永続化デコーダーは正規化されていない保存式を拒否します。
 
-The first target is the first strictly future instant whose local date and time in the zone match. It reuses the Daily and Weekly local-time resolution: a non-existent local time is skipped, and an ambiguous one takes the earlier occurrence once for that date. The committed UTC `scheduledAt` is never recomputed on restart.
+最初の対象は、そのゾーンでのローカル日付と時刻が一致する、厳密に未来の最初の瞬間です。Daily と Weekly のローカル時刻解決を再利用します。存在しないローカル時刻はスキップされ、曖昧な時刻はその日付について早い方の出現を 1 回取ります。確定した UTC の `scheduledAt` は再起動時に再計算されません。
 
-Day-of-month and day-of-week follow Vixie semantics. A field is a star when its text starts with `*`, independently of the values it matches, so `*/1` and `*/2` are stars while `1-31` and `0-7` are restricted. When either field is a star, a local date matches only when both fields match; when neither is a star, it matches when either field matches.
+日フィールドと曜日フィールドは Vixie の意味論に従います。一致する値とは無関係に、テキストが `*` で始まるフィールドがスターです。したがって `*/1` と `*/2` はスターであり、`1-31` と `0-7` は制限付きです。どちらかのフィールドがスターの場合、ローカル日付は両フィールドが一致したときのみ一致します。どちらもスターでない場合、どちらかのフィールドが一致したときに一致します。
 
-Cron decoding preserves the committed instant and the stored zone spelling, and rejects a non-canonical stored expression. Cron belongs only to the current Host `ScheduleRecord`; the frozen historical Session decoder does not admit it.
+cron のデコードは確定した瞬間と保存されたゾーン表記を保持し、正規化されていない保存式を拒否します。cron は現行ホストの `ScheduleRecord` にのみ属します。凍結された履歴セッションデコーダーはこれを受け付けません。
 
-## Historical Session changes
+## 履歴セッションの変更
 
-Version-1 `schedule/change` events remain decodable as historical Session data. Their create and fold types use `LegacyScheduleRecord`, which admits only After, At, and Every; Daily, Weekly, and Cron belong only to the current Host `ScheduleRecord`. The Host record decoder is separate from the frozen historical decoder. A create record written before titles existed carries no `title`, so the historical decoder admits that absent member while the Host decoder still requires it. Historical events do not populate the storage domain or schedule delivery. Existing reminders in these events require explicit recreation through `schedule_create`; no implicit Session migration or conversion of old `at` records occurs.
+バージョン 1 の `schedule/change` イベントは履歴セッションデータとして引き続きデコード可能です。その作成型とフォールド型は `LegacyScheduleRecord` を使い、After・At・Every のみを受け付けます。Daily・Weekly・Cron は現行ホストの `ScheduleRecord` にのみ属します。ホストレコードのデコーダーは凍結された履歴デコーダーとは別です。タイトルが存在する前に書かれた作成レコードは `title` を持たないため、履歴デコーダーはその欠落メンバーを許容する一方、ホストデコーダーは引き続きそれを要求します。履歴イベントはストレージドメインに格納されず、配信を予定しません。これらのイベント内の既存リマインダーは `schedule_create` による明示的な再作成が必要です。暗黙のセッション移行や古い `at` レコードの変換は行われません。
 
 ```ts type-equiv
 /**
@@ -236,11 +236,11 @@ type ScheduleDispatchChange = OneShotScheduleDispatchChange | EveryScheduleDispa
 type ScheduleChange = ScheduleCreateChange | ScheduleDeleteChange | ScheduleDispatchChange
 ```
 
-The historical decoder and fold reject unknown versions, extra fields, reused ids, and invalid transitions. The event remains indexed in the [persistence catalog](../persistence-catalog.md#schedulechange--log-only). Session history is not the authority for active tasks.
+履歴デコーダーとフォールドは、不明なバージョン・余分なフィールド・再利用された id・不正な遷移を拒否します。このイベントは [永続化カタログ](../persistence-catalog.md#schedulechange--log-only) に引き続き索引付けされます。セッション履歴は有効タスクの権威ではありません。
 
-## Active views and management
+## 有効ビューと管理
 
-Tool values combine the stored record with timing derived from the current wall clock. The Host restores the original Session when delivery requires it; listing and deleting tasks do not activate that Session.
+ツール値は、保存レコードと現在のウォールクロックから導出されたタイミングを組み合わせます。ホストは配信に必要な場合に元のセッションを復元します。タスクの一覧表示と削除はそのセッションをアクティブ化しません。
 
 ```ts type-equiv
 /** Current delivery timing derived from the durable record and wall clock. */
@@ -262,7 +262,7 @@ type ScheduleView = ScheduleRecord & {
 }
 ```
 
-The [tool catalog](../tool-catalog.md#deepseek-aidsh-tool-schedule) owns schemas for `schedule_create`, `schedule_list`, `schedule_delete`, and `schedule_update`, which [`@deepseek-ai/dsh-tool-schedule`](../../packages/schedule/tool-schedule/README.md) contributes to each preset that mounts it; the Host service owns storage and delivery. Create, delete, and update acknowledge the storage-domain write. A Host-wide queue serializes these mutations against due delivery; deleting a task does not remove an already queued message. Model tools address the current Session, while the shared Host create, list, update, and delete methods accept an explicit Session binding. `create` and `update` refuse a Session a delegated child owns with `subagent_session` when its delegation depth is above zero, and delivery cannot reach such a Session. The four model tools refuse a delegated caller in the tool layer, while `list`, `catalog`, `history`, and `delete` still serve that Session. Creation requires a `title` that must be non-empty after trimming and at most 120 characters; a missing, blank, or over-long title is rejected with `invalid_prompt`, and creation never derives one from the instruction. Create and list views carry the stored `title` alongside the instruction, and a stored record whose `title` is missing or invalid is rejected at decode.
+[ツールカタログ](../tool-catalog.md#deepseek-aidsh-tool-schedule) は `schedule_create`・`schedule_list`・`schedule_delete`・`schedule_update` のスキーマを所有し、[`@deepseek-ai/dsh-tool-schedule`](../../packages/schedule/tool-schedule/README.md) がそれをマウントする各プリセットへ提供します。ホストサービスは保存と配信を所有します。作成・削除・更新はストレージドメインへの書き込みを確認応答します。ホスト全体のキューは、これらの変更を期限到来の配信に対して直列化します。タスクの削除は既にキューに入ったメッセージを除去しません。モデルツールは現在のセッションを対象にし、共有ホストの create・list・update・delete メソッドは明示的なセッション束縛を受け付けます。`create` と `update` は、委譲深度が 0 を超える委譲子が所有するセッションを `subagent_session` で拒否し、そのようなセッションへ配信は到達できません。4 つのモデルツールはツール層で委譲された呼び出し元を拒否する一方、`list`・`catalog`・`history`・`delete` はそのセッションへの提供を続けます。作成時はトリミング後に空でなく 120 文字以内の `title` が必須です。欠落・空白・長過ぎるタイトルは `invalid_prompt` で拒否され、作成時に指示文から導出することはありません。作成ビューと一覧ビューは指示文とともに保存された `title` を運び、`title` が欠落または不正な保存レコードはデコード時に拒否されます。
 
 ```ts type-equiv
 /** Reminder creation selector, shared by the model consumer and Host service. */
@@ -309,9 +309,9 @@ type ScheduleDeleteResult =
   | { readonly id: ScheduleId; readonly deleted: false; readonly code: 'schedule_not_found' }
 ```
 
-## Web catalog
+## Web カタログ
 
-The Remote `schedule.catalog()` method returns active and inactive Host tasks with their original Session bindings, ordered by `scheduledAt` ascending and then lexicographically by `id`. It reads only the Schedule domain, without activating Sessions or reading their history. Browser consumers receive this browser-safe type:
+Remote の `schedule.catalog()` メソッドは、有効と無効のホストタスクを元のセッション束縛とともに、`scheduledAt` の昇順、次に `id` の辞書順で返します。セッションのアクティブ化や履歴読み取りなしに Schedule ドメインのみを読みます。ブラウザー利用者はこのブラウザーセーフな型を受け取ります。
 
 ```ts type-equiv
 /** Durable Session inbox delivery acknowledgment, not model execution completion. */
@@ -337,13 +337,13 @@ type ScheduleCatalogEntry = ScheduleRecord & {
 }
 ```
 
-The Remote `schedule.list({ sessionId })`, model `schedule_list`, and Session-header catalog return only active tasks. A model view's derived timing `state` remains distinct from stored lifecycle `status`. Deletion uses `schedule.delete({ sessionId, id })` with the entry's original binding; a mismatched binding returns not found. Model tools supply the current Agent's Session, whereas the global user interface supplies the selected task's binding. The binding check alone does not establish caller authorization. The payload-free `schedule/changed` event invalidates client lists; reconnecting clients fetch current state again.
+Remote の `schedule.list({ sessionId })`・モデルの `schedule_list`・セッションヘッダーのカタログは有効タスクのみを返します。モデルビューの導出タイミング `state` は、保存されたライフサイクル `status` とは区別されます。削除はエントリの元の束縛で `schedule.delete({ sessionId, id })` を使います。不一致の束縛は not found を返します。モデルツールは現在のエージェントのセッションを提供し、全体のユーザーインターフェースは選択されたタスクの束縛を提供します。束縛チェックだけでは呼び出し元の認可は確立しません。ペイロードのない `schedule/changed` イベントはクライアントの一覧を無効化し、再接続したクライアントは現在の状態を改めて取得します。
 
-The shipped Web composition mounts `ui-schedule` with the Host capability. The [client package](../../packages/client/ui-schedule/README.md) owns the catalog, empty state, and deletion controls. The page separately filters all, active, and inactive tasks, retains inactive details and an original-Session control in the detail tab strip, and requires explicit confirmed deletion. The Rules and Records tabs separate task settings from lazily paged saved receipts. Neither a receipt nor inactive status confirms model execution.
+出荷される Web 構成はホストケイパビリティとともに `ui-schedule` をマウントします。[クライアントパッケージ](../../packages/client/ui-schedule/README.md) はカタログ・空状態・削除コントロールを所有します。このページは全件・有効・無効のタスクを別々に絞り込み、無効の詳細と元セッションのコントロールを詳細タブストリップに保持し、明示的に確認された削除を要求します。Rules タブと Records タブは、タスク設定と遅延ページングされる保存済み受領証を分離します。受領証も inactive 状態もモデルの実行を裏付けません。
 
-## Timing edits
+## タイミング編集
 
-`schedule.update({ sessionId, id, expected, change })` edits an active task without activating its Session. `expected` is the complete observed `ScheduleRecord`, not a catalog entry with extra metadata. The Host compares it to the current record inside the same FIFO used by dispatch and deletion. Normal delivery can advance the target during editing; that stale snapshot returns `schedule_conflict` instead of overwriting the current rule. Missing or mismatched bindings return `schedule_not_found`, and inactive tasks return `schedule_ended`.
+`schedule.update({ sessionId, id, expected, change })` はセッションをアクティブ化せずに有効タスクを編集します。`expected` は余分なメタデータ付きのカタログエントリではなく、観測された完全な `ScheduleRecord` です。ホストはディスパッチや削除と同じ FIFO 内で現在のレコードと比較します。通常の配信が編集中に対象を進める場合があり、その古いスナップショットは現在の規則を上書きせず `schedule_conflict` を返します。欠落または不一致の束縛は `schedule_not_found` を返し、無効タスクは `schedule_ended` を返します。
 
 ```ts type-equiv
 /** Timing-only edit; it may select a different recurrence kind than the stored record, and one-shot targets use an absolute `at`. */
@@ -373,13 +373,13 @@ type ScheduleUpdateResult =
   | ScheduleToolError
 ```
 
-A changed Daily rule computes its first strictly future target using the saved local time and zone semantics. A changed Cron rule canonicalizes its expression and computes its first strictly future target under the same local-date, gap, and earlier-overlap rules. A changed Every interval starts a new anchor at accepted save time plus that interval. An After or At task can receive a different absolute target as an At record with the same id. These operations preserve the stored `title`, the prompt, original Session binding, lifecycle status, and all saved receipts. A change may also select a different recurrence kind, which recomputes the target from the new rule with the same id, title, prompt, Session binding, status, and saved receipts. An equivalent normalized rule returns `updated: false` with its unchanged record; it does not rewrite storage, reset the target, or emit a change event. A differently spelled but equivalent Cron expression is such a no-op, because the comparison uses the canonical expression and the canonical zone.
+変更された Daily 規則は、保存されたローカル時刻とゾーンの意味論で厳密に未来の最初の対象を計算します。変更された Cron 規則は式を正規化し、同じローカル日付・欠落・早い方の重複規則で厳密に未来の最初の対象を計算します。変更された Every 間隔は、受け付けられた保存時刻にその間隔を加えた新しいアンカーを開始します。After や At のタスクは、同じ id の At レコードとして異なる絶対対象を受け取れます。これらの操作は保存された `title`・プロンプト・元のセッション束縛・ライフサイクル状態・すべての保存済み受領証を保持します。変更は異なる繰り返し種別を選択することもでき、同じ id・title・プロンプト・セッション束縛・状態・保存済み受領証で新しい規則から対象を再計算します。同等に正規化される規則は `updated: false` と変更なしのレコードを返します。保存の書き換え・対象のリセット・変更イベントの発行は行いません。表記が異なるだけの同等な Cron 式はこのような no-op です。比較は正規化された式と正規化されたゾーンを使うためです。
 
-Input validation uses existing timing errors. A changed absolute target must still be future when its FIFO slot runs. The successful task put precedes the change notification and timer recomputation. Storage and lifecycle failures reject; cancellation is checked after queue and initialization waits but cannot roll back an in-flight write. One-shot records retain a UTC instant rather than the editing form's IANA zone. Timing edits append no historical Session event: the model reaches the same in-place update through `schedule_update`, which compares the record it read with the stored one instead of deleting and recreating the task.
+入力検証は既存のタイミングエラーを用います。変更された絶対対象は FIFO スロット実行時にも未来でなければなりません。成功したタスク put は変更通知とタイマー再計算に先行します。保存とライフサイクルの失敗は拒否されます。キャンセルはキューと初期化の待機後に確認されますが、実行中の書き込みを巻き戻せません。ワンショットレコードは編集形式の IANA ゾーンではなく UTC の瞬間を保持します。タイミング編集は履歴セッションイベントを追加しません。モデルは `schedule_update` により同じインプレース更新に到達します。これはタスクを削除して再作成するのではなく、読み取ったレコードと保存レコードを比較します。
 
-## Saved delivery records
+## 保存済み配信記録
 
-`schedule.history({ sessionId, id, limit })` reads saved receipts without activating a Session. The explicit limit is a safe integer from 1 through 100. Pages follow reverse append order, not wall-clock sorting; the optional message-id cursor excludes the oldest record from the preceding page. New arrivals do not shift that cursor. A missing task or wrong Session binding returns `schedule_not_found`; an unknown cursor returns `delivery_cursor_not_found`, not an empty successful page.
+`schedule.history({ sessionId, id, limit })` はセッションをアクティブ化せずに保存済み受領証を読み取ります。明示的な limit は 1〜100 の safe-integer です。ページはウォールクロック順ではなく逆追加順に従い、任意のメッセージ id カーソルは前ページの最古レコードを除外します。新しい到着がそのカーソルをずらすことはありません。欠落タスクや誤ったセッション束縛は `schedule_not_found` を返し、不明なカーソルは空の成功ページではなく `delivery_cursor_not_found` を返します。
 
 ```ts type-equiv
 /** Saved inbox delivery with its immutable sent prompt when recorded by this Host. */
@@ -427,15 +427,15 @@ type ScheduleDeliveryHistoryResult =
   | { readonly id: ScheduleId; readonly code: 'schedule_not_found' | 'delivery_cursor_not_found' }
 ```
 
-New tasks initialize an empty history. Older task rows without history expose only their existing latest receipt, mark earlier records unavailable, and are not rewritten by reads. Future acknowledgments preserve that receipt and append actual new receipts with instruction snapshots. Lost history and missing legacy instruction snapshots are never reconstructed. The same task-row write commits history, latest receipt, status, and next target; explicit task deletion stops future delivery, removes the task row together with its saved receipts, and takes it out of `list` and `catalog`; conversation messages are unaffected. Saved delivery records are pruned on append to the configured `deliveryHistoryDays` window, measured back from each receipt's `deliveredAt`, and to the `deliveryHistoryRecords` cap; the appended latest receipt always survives, and a pruned window marks earlier records unavailable. Pagination bounds returned record count rather than storage size or instruction bytes.
+新しいタスクは空の履歴で初期化されます。履歴のない古いタスク行は既存の最新受領証のみを公開し、以前の記録を利用不可と示し、読み取りで書き換えられることはありません。以後の確認応答はその受領証を保持し、指示スナップショット付きの実際の新しい受領証を追加します。失われた履歴や欠落したレガシーの指示スナップショットが再構築されることはありません。同一のタスク行書き込みが履歴・最新受領証・状態・次の対象を確定します。明示的なタスク削除は将来の配信を止め、タスク行を保存済み受領証とともに除去し、`list` と `catalog` から取り除きます。会話メッセージには影響しません。保存済み配信記録は、追加時に設定された `deliveryHistoryDays` ウィンドウ（各受領証の `deliveredAt` から遡って測定）と `deliveryHistoryRecords` 上限まで刈り込まれます。追加された最新受領証は必ず残り、刈り込まれたウィンドウは以前の記録を利用不可と示します。ページングは保存サイズや指示バイト数ではなく、返された記録数を区切ります。
 
-## Host delivery
+## ホスト配信
 
-The Host reads persisted tasks at startup and sets its timer to the earliest active target. Inactive tasks remain queryable but never schedule another delivery. At delivery it resolves the original Session through the Session controller, including cold Sessions. After restoration it samples the wall clock again and excludes members that are no longer due after a rollback; those tasks retain their timer obligation. Neither a Goal nor a separate Run completion record participates in dispatch.
+ホストは起動時に永続化タスクを読み取り、タイマーを最も早い有効対象に合わせます。無効タスクは照会可能ですが、以後配信を予定しません。配信時はコールドセッションを含め、セッションコントローラー経由で元のセッションを解決します。復元後にウォールクロックを再測定し、ロールバック後に期限到来でなくなったものを除外します。それらのタスクはタイマー義務を保持します。Goal も個別の Run 完了記録もディスパッチに参加しません。
 
-Plugin-sourced `followup()` synchronously appends the message to the Session inbox. After a successful Session flush, one task-record put appends a saved delivery with its instruction snapshot and stores the latest `ScheduleDeliveryReceipt` together with the one-shot's `inactive` status or the recurring task's next target and status. Recurring tasks in the same batch share the receipt's `messageId`; each receipt retains that task's delivered occurrence time. Delivery never steers or cancels the current turn and does not wait for model completion.
+プラグイン由来の `followup()` はメッセージをセッション受信箱へ同期的に追加します。セッションフラッシュ成功後、1 回のタスクレコード put が指示スナップショット付きの保存済み配信を追加し、最新の `ScheduleDeliveryReceipt` をワンショットの `inactive` 状態または繰り返しタスクの次の対象と状態とともに保存します。同じバッチ内の繰り返しタスクは受領証の `messageId` を共有し、各受領証はそのタスクの配信出現時刻を保持します。配信が現在のターンを誘導・中断することはなく、モデルの完了を待ちません。
 
-A failure to resolve the Session, enqueue the message, or confirm persistence leaves the task stored and reports a Host warning. A later management change or Host restart retries it. Session persistence and the task put are not atomic across stores. A crash after inbox persistence but before the task put can repeat delivery; the receipt does not close this gap. Schedule provides no model-result acknowledgement, execution cancellation, or external notification channel.
+セッションの解決・メッセージのキュー入れ・永続化の確認の失敗は、タスクを保存したままホスト警告を報告します。後の管理変更やホスト再起動が再試行します。セッション永続化とタスク put はストア間でアトミックではありません。受信箱永続化後・タスク put 前のクラッシュは配信を重複させ得ます。受領証はこの隙間を閉じません。Schedule はモデル結果の確認応答・実行中断・外部通知チャネルを提供しません。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -443,15 +443,15 @@ A failure to resolve the Session, enqueue the message, or confirm persistence le
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によりソースから生成されます（doc-sync 内の `pnpm run verify-cordis-catalog` で鮮度を検証、`pnpm run gen-cordis-catalog` で再生成）。言語面の差異はロケール固有の対訳文書パスのみです。署名ブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持します。ディスパッチモードは [primer](../cordis-primer.md#dispatch-modes) で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にあります。
 
 <a id="ctxschedule--scheduleservice"></a>
 
 ### `ctx.schedule` — `ScheduleService`
 
-Shared management service; reads, deletion, and timing edits never activate a Session.
+共有管理サービス。読み取り・削除・タイミング編集はセッションをアクティブ化しません。
 
-`sessionPersistence` is a load-order requirement rather than a directly called service: a delivery commits only when `ctx.sessions.flush()` reports that a `session/flush` listener participated, and the persistence backend providing this service is the plugin that registers that listener.
+`sessionPersistence` は直接呼ばれるサービスではなくロード順の要件です。配信は `ctx.sessions.flush()` が `session/flush` リスナーの参加を報告した場合にのみ確定し、このサービスを提供する永続化バックエンドはそのリスナーを登録するプラグインです。
 
 ```ts cordis-catalog
 /**
@@ -537,7 +537,7 @@ Source: [`packages/schedule/schedule/src/index.ts`](../../packages/schedule/sche
 
 #### `schedule/changed` — emit
 
-Durable task set changed; clients refetch global task and Session-active catalogs.
+永続化タスク集合が変更されました。クライアントは全体タスクとセッション有効カタログを再取得します。
 
 ```ts cordis-catalog
 /** Durable task set changed; clients refetch global task and Session-active catalogs.

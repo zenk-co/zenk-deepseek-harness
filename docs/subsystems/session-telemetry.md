@@ -1,12 +1,12 @@
 # SessionTelemetryBackend
 
-English | [中文](session-telemetry.zh.md)
+日本語 | [English](session-telemetry.en.md) | [中文](session-telemetry.zh.md)
 
-The [capture service](../../packages/session/session-telemetry/README.md) owns canonical-event capture, redaction, and handoff cursors. The [feedback backend](../../packages/session/session-telemetry-otel/README.md) authorizes Session prefixes and owns their independent queue, per-request scheduling, and 4,000,000-byte ceiling. No reporting data reaches model requests.
+[キャプチャサービス](../../packages/session/session-telemetry/README.md)が正規イベントのキャプチャ、レダクション、ハンドオフカーソルを所有する。[フィードバックバックエンド](../../packages/session/session-telemetry-otel/README.md)は Session プレフィックスを認可し、その独立したキュー、リクエストごとのスケジューリング、4,000,000 バイト上限を所有する。レポートデータがモデルリクエストに到達することはない。
 
-Source: [`packages/session/session-telemetry/src/index.ts`](../../packages/session/session-telemetry/src/index.ts)
+ソース: [`packages/session/session-telemetry/src/index.ts`](../../packages/session/session-telemetry/src/index.ts)
 
-## The logical record
+## 論理レコード
 
 ```ts type-equiv
 /**
@@ -57,11 +57,11 @@ interface SessionTelemetryRecord {
 }
 ```
 
-Every canonical [session event](session.md), including each `assistant/message` or `assistant/attempt` with its complete compact stream and every plugin-merged type the seam never heard of, passes through whole as one ordered ledger record. Process-local `agent/assistant-stream` frames do not enter this durable feed. A new fork starts at its child-owned suffix, including the inherited marker and fork closers; restored Sessions start after their stored prefix, including restored forks. The backend can select `includeHistory` to include the complete prefix; re-adopting the same object resumes after its handoff cursor. Delivery is best-effort: the cursor marks handed-off, not delivered, and records can be lost (crash, reload window) or duplicated (new-object replay, SDK retries), so receivers dedupe ledger records on `(session.id, session.format_version, event.seq)`; ops records deliberately omit that identity — they are signals to alert on, not entries to sum, and tolerate duplicates instead.
+すべての正規の[セッションイベント](session.md) — 完全なコンパクトストリームを持つ各 `assistant/message` または `assistant/attempt` と、シームが知らないあらゆるプラグイン統合型を含む — が、1 つの順序付きレジャーレコードとして丸ごと通過する。プロセスローカルの `agent/assistant-stream` フレームはこの永続フィードに入らない。新しいフォークは自身の子所有サフィックス — 継承マーカーとフォーククローザーを含む — から開始し、復元された Session は保存されたプレフィックスの後 — 復元されたフォークを含む — から開始する。バックエンドは `includeHistory` を選択して完全なプレフィックスを含めることができる。同じオブジェクトを再アドプトすると、そのハンドオフカーソルの後から再開する。配信はベストエフォートである: カーソルは配信済みではなくハンドオフ済みを印付け、レコードは失われ (クラッシュ、リロードウィンドウ) たり重複したりする (新しいオブジェクトのリプレイ、SDK リトライ) ことがあるので、レシーバーはレジャーレコードを `(session.id, session.format_version, event.seq)` で重複排除する。ops レコードは意図的にその同一性を省略する — それらは合計するエントリーではなくアラートを上げるシグナルであり、代わりに重複を許容する。
 
-## The sharing disclosure
+## 共有の開示
 
-Every backend exposes its deployment-selected mode through the required abstract `sharing` member on `ctx.sessionTelemetry` ([Service Definition README](../../packages/session/session-telemetry/README.md#the-sharing-disclosure)). This is neither a per-Session admission decision nor a delivery receipt. The `/feedback` acknowledgement does not consult it.
+すべてのバックエンドは、`ctx.sessionTelemetry` 上の必須の抽象 `sharing` メンバーを通して、デプロイメントが選択したモードを公開する ([Service Definition README](../../packages/session/session-telemetry/README.md#the-sharing-disclosure))。これは Session ごとのアドミッション決定でも配信受領書でもない。`/feedback` の確認応答はこれを参照しない。
 
 ```ts type-equiv
 /**
@@ -70,7 +70,7 @@ Every backend exposes its deployment-selected mode through the required abstract
 type SessionTelemetrySharingStatus = 'full' | 'feedback-only' | 'disabled'
 ```
 
-## Capture policy
+## キャプチャポリシー
 
 ```ts type-equiv
 /** Whether capture follows live events or reads the canonical log only when requested. */
@@ -87,9 +87,9 @@ interface SessionTelemetryCaptureOptions {
 }
 ```
 
-`includeHistory` permits stored and inherited records but does not itself authorize capture. The [OTel backend](../../packages/session/session-telemetry-otel/README.md) uses on-demand capture and requires new own explicit feedback; it releases only the complete prefix through that feedback, for every provider.
+`includeHistory` は保存済みおよび継承されたレコードを許可するが、それ自体がキャプチャを認可するわけではない。[OTel バックエンド](../../packages/session/session-telemetry-otel/README.md)はオンデマンドキャプチャを使用し、新たな自身の明示的フィードバックを要求する。すべてのプロバイダーについて、そのフィードバックを通して完全なプレフィックスのみを解放する。
 
-## The backend contract
+## バックエンド契約
 
 ```ts type-equiv
 /**
@@ -137,11 +137,11 @@ interface SessionTelemetrySink {
 }
 ```
 
-`SessionTelemetryBackend` (`ctx.sessionTelemetry`, [signatures](#ctxsessiontelemetry--sessiontelemetrybackend-abstract-seam)) is the contract's loadable form — one implementation per context, duplicate load throws — and a backend composes the seam's `SessionTelemetryCoordinator` in its constructor to install the capture side.
+`SessionTelemetryBackend` (`ctx.sessionTelemetry`、[シグネチャ](#ctxsessiontelemetry--sessiontelemetrybackend-abstract-seam)) は契約のロード可能な形である — コンテキストごとに 1 実装で、重複ロードは throw する — そしてバックエンドはコンストラクターでシームの `SessionTelemetryCoordinator` を構成してキャプチャ側をインストールする。
 
-## The redact waterfall: `session-telemetry/record`
+## レダクションウォーターフォール: `session-telemetry/record`
 
-Every record passes the `session-telemetry/record` [waterfall](../cordis-primer.md#cordis-waterfall-semantics) between the canonical-event copy and `emit()` ([event entry](#session-telemetryrecord--waterfall)). The seam ships NO rules of its own: with no listener mounted, records reach the backend exactly as captured, so exported data is precisely as clean as the rules a deployment mounts. Listeners stack by transforming `next()`'s return value; returning without `next()` replaces everything beneath; a throwing listener withholds that one record fail-closed inside the coordinator's containment. Redaction applies to the exported copy only — the canonical session log is never rewritten.
+すべてのレコードは、正規イベントのコピーと `emit()` の間で `session-telemetry/record` [ウォーターフォール](../cordis-primer.md#cordis-waterfall-semantics)を通過する ([イベントエントリー](#session-telemetryrecord--waterfall))。シームは独自のルールを一切同梱しない: リスナーがマウントされていなければ、レコードはキャプチャされたままバックエンドに到達するので、エクスポートされるデータはデプロイメントがマウントするルールと同じだけクリーンである。リスナーは `next()` の戻り値を変換することで積み重なる。`next()` なしで return するとその下のすべてを置き換える。throw するリスナーは、コーディネーターの封じ込めの中でその 1 レコードをフェイルクローズドで保留する。レダクションはエクスポートされたコピーのみに適用される — 正規セッションログが書き換えられることは決してない。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

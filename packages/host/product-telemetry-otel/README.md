@@ -5,27 +5,27 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-host-product-telemetry-otel
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Send selected product usage events to an OTLP/HTTP collector. Events carry a name, string summary, occurrence time, and scalar or one-level object attributes. Mounting the plugin collects nothing automatically; applications explicitly submit each event. Delivery is best effort and does not confirm warehouse ingestion.
+選択した製品利用イベントを OTLP/HTTP コレクターに送ります。イベントは名前、文字列要約、発生時刻、スカラーまたは 1 階層オブジェクト属性を運びます。プラグインのマウントは自動収集しません。アプリケーションは各イベントを明示提出します。配送はベストエフォートであり、ウェアハウス取込みを確認しません。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-Mount the plugin in a Cordis composition with the application identity; override the collector endpoint when needed. The Desktop composition mounts it when [product analytics](../../client/product-analytics/README.md) is enabled; ordinary Web does not. The standalone example below reads `DSH_APP_VERSION`; Desktop supplies `DSH_CLIENT_VERSION` through its native launcher. Both must name the running release; the schema rejects an absent version.
+アプリケーション同一性と共に Cordis 構成にプラグインをマウントし、必要に応じてコレクターエンドポイントを上書きします。Desktop 構成は [product analytics](../../client/product-analytics/README.md) 有効時にマウントします。通常 Web はしません。以下の単独例は `DSH_APP_VERSION` を読みます。Desktop はネイティブランチャー経由で `DSH_CLIENT_VERSION` を提供します。両者は実行リリースを名指さなければなりません。スキーマは欠落バージョンを拒否します。
 
 ```yaml
 - name: '@deepseek-ai/dsh-otel'
@@ -50,23 +50,23 @@ Mount the plugin in a Cordis composition with the application identity; override
 | `exportTimeoutMillis` | `20000` | Processor batch export deadline |
 | `shutdownTimeoutMillis` | `21000` | Drain deadline; expiry cancels pending exports and reports possible loss |
 
-The default endpoint routes explicitly submitted events to the production product collector. Test and custom deployments must override it. Only `x-channel` and SDK protocol headers reach the collector; ambient OTel headers and client certificates are not inherited.
+既定エンドポイントは明示提出イベントを製品コレクターにルーティングします。テストおよびカスタム配置は上書きしなければなりません。コレクターに届くのは `x-channel` と SDK プロトコルヘッダーのみです。環境 OTel ヘッダーやクライアント証明書は継承されません。
 
-The 30-second interval batches product events; the exporter has a 15-second retry window inside the processor’s 20-second batch deadline. The 21-second drain deadline covers SDK `forceFlush()` work that the processor deadline does not cover. Expiry cancels active HTTP requests and retry waits, then awaits transport cleanup before disposal completes. An unreachable collector can delay disposal for the full 21 seconds. A full 2,048-record queue requires four 512-record batches and may not drain before that deadline. Interactive compositions needing a shorter exit should override these budgets; neither configuration guarantees delivery.
+30 秒間隔は製品イベントをバッチ化します。エクスポーターはプロセッサーの 20 秒バッチ期限内に 15 秒の再試行枠を持ちます。21 秒の排出期限はプロセッサー期限が扱わない SDK `forceFlush()` 処理を覆います。期限切れは有効 HTTP 要求と再試行待機をキャンセルし、転送クリーンアップを待ってから破棄完了します。到達不能コレクターは最大 21 秒破棄を遅延させることがあります。2,048 件の満杯キューは 512 件バッチ 4 回を要し、期限前に排出できないことがあります。短い終了を求める対話構成はこれら予算を上書きします。いずれの設定も配送を保証しません。
 
-Consumers inject `productTelemetry` and call `emit()` with explicitly selected analytics fields. Event names and field semantics belong to their product and analytics owners. The plugin reads no Session, account, credential, or device identifier. Callers must exclude prompts, responses, file contents, credentials, and other unapproved values.
+コンシューマーは `productTelemetry` を注入し、明示選択の分析フィールドで `emit()` を呼びます。イベント名とフィールド意味はその製品および分析所有者に属します。プラグインはセッション、アカウント、認証情報、デバイス識別子を読みません。呼び出し側はプロンプト、応答、ファイル内容、認証情報、その他未承認値を除外しなければなりません。
 
-The collector expects a string body and attributes containing strings, numbers, booleans, or objects of those scalars. Callers supply occurrence time in milliseconds; the plugin assigns observation time and defaults severity to INFO. Invalid transport configuration fails at activation. Export failures produce local warnings without making event submission wait for the network.
+コレクターは文字列本体と文字列、数値、真偽値、またはそれらスカラーのオブジェクトを含む属性を期待します。呼び出し側は発生時刻をミリ秒で提供します。プラグインは観測時刻を割当て、重大度既定を INFO とします。無効転送設定は有効化時に失敗します。出力失敗はローカル警告を生成し、イベント提出をネットワーク待機させません。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The adapter injects `otel` and creates an independent ordinary-event channel through `ctx.otel.createEventReporter()`. The [shared OTel plugin](../../telemetry/otel/README.md) owns transport and SDK batching; this adapter owns analytics configuration and its shutdown cancellation deadline. No global OTel provider is installed.
+アダプターは `otel` を注入し、`ctx.otel.createEventReporter()` 経由で独立の通常イベントチャネルを作成します。[共有 OTel プラグイン](../../telemetry/otel/README.md)は転送と SDK バッチ化を所有します。このアダプターは分析設定とその終了キャンセル期限を所有します。グローバル OTel プロバイダーは導入しません。
 
 [`src/index.ts`](src/index.ts) owns configuration and submission.
 
@@ -84,26 +84,26 @@ The adapter injects `otel` and creates an independent ordinary-event channel thr
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
 None, as the plugin exports explicit analytics records without contributing model context.
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; event submission does not change model requests.
+なし。イベント提出はモデル要求を変更しません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
-Delivery and collection remain limited to the following capabilities.
+配送と収集は次のケイパビリティに限定されたままです。
 
-- Callers own event selection, renderer-to-host transport, and any permitted identity attributes.
-- The queue is memory-only; overflow, network failure, and process exit can lose events. There is no durable outbox or warehouse acknowledgement.
-- The SDK batches by record count, not encoded bytes. Callers must keep records within the collector's 4 MB limit and choose batch sizes appropriate to the receiver.
-- Caller-selected strings are not redacted automatically. This package does not decide product disclosure or consent policy.
+- 呼び出し側はイベント選択、レンダラーからホストへの転送、許可済み同一性属性を所有します。
+- キューはメモリー限定です。溢れ、ネットワーク失敗、プロセス終了でイベント喪失がありえます。durable outbox もウェアハウス確認もありません。
+- SDK は符号化バイトではなく件数でバッチ化します。呼び出し側は記録をコレクターの 4 MB 制限内に保ち、受信者に適したバッチサイズを選ばなければなりません。
+- 呼び出し側選択の文字列は自動編集されません。このパッケージは製品開示や同意ポリシーを決定しません。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 None.

@@ -1,9 +1,9 @@
 ---
-description: "Prebuilt system.node for macOS x64 POSIX locks."
+description: "macOS x64 POSIX ロック向けプリビルド system.node。"
 kind: "package-library"
 ---
 # @deepseek-ai/node-addon-system-darwin-x64
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-This platform package supplies `bin/system.node`, a stable Node-API v8 addon used by `@deepseek-ai/node-addon-system/flock`. It contains no Landlock executable, JavaScript loader, or installation build script. The native workflow builds it on macOS x64 and owns its installed-artifact validation.
+このプラットフォームパッケージは `@deepseek-ai/node-addon-system/flock` が使う安定した Node-API v8 アドオン `bin/system.node` を提供する。Landlock 実行ファイル、JavaScript ローダー、インストールビルドスクリプトは含まない。ネイティブワークフローは macOS x64 上でこれをビルドし、インストール成果物検証を所有する。

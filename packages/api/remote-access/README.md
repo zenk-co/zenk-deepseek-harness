@@ -1,97 +1,97 @@
 ---
-description: "Method-level Remote access control for non-owner Peers: role-based policy decisions, list filtering, and the per-Peer access snapshot."
+description: "非 owner の Peer に対するメソッド単位の Remote アクセス制御: ロールベースのポリシー判定、リストフィルタリング、および Peer ごとのアクセススナップショット。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-api-remote-access
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Decides which Remote methods a non-owner Peer may call and which forwarded events it may receive. Business packages define roles, each an action set over one resource kind, and register one policy per non-owner principal kind that binds roles to resources. The [API Gateway](../gateway/README.md) resolves the resources a call or event touches and asks this package before it resolves lookups or decodes arguments. List methods filter items through `allows()`, and each Peer follows its own access snapshot, so the Client can hide entries the Host would refuse. The [Peer principals Agent Note](../../../.agents/notes/implemented/architecture/2026-10-12-peer-principal-and-remote-access.md) owns the design.
+非 owner の Peer が呼び出せる Remote メソッドと、受信できる転送イベントを判定する。ビジネスパッケージはロール — それぞれ 1 つのリソース kind に対するアクション集合 — を定義し、非 owner のプリンシパル kind ごとに、ロールをリソースにバインドするポリシーを 1 つ登録する。[API Gateway](../gateway/README.md) は呼び出しまたはイベントが触れるリソースを解決し、ルックアップの解決や引数のデコードの前にこのパッケージへ問い合わせる。リストメソッドは `allows()` を通じて項目をフィルタリングし、各 Peer は自身のアクセススナップショットに従うため、Client は Host が拒否するエントリーを非表示にできる。設計は [Peer principals Agent Note](../../../.agents/notes/implemented/architecture/2026-10-12-peer-principal-and-remote-access.md) が所有する。
 
-## Table of Contents
+## 目次
 
-- [Host service: `RemoteAccessService` (ctx key: `remoteAccess`)](#host-service)
-- [Client face](#client-face)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [ホストサービス: `RemoteAccessService` (ctx key: `remoteAccess`)](#host-service)
+- [Client フェイス](#client-face)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="host-service"></a>
-## Host service: `RemoteAccessService` (ctx key: `remoteAccess`)
+## ホストサービス: `RemoteAccessService` (ctx key: `remoteAccess`)
 
-Every composition that mounts [API Gateway](../gateway/README.md) mounts this service: the Gateway injects `remoteAccess` and does not start without it. [`bundle/base`](../../bundle/base/cordis.patch.yml) loads it beside `typert-gateway`. The owner (`{ kind: 'owner' }`) is never checked; every method below concerns non-owner principals.
+[API Gateway](../gateway/README.md) をマウントするすべてのコンポジションはこのサービスをマウントする: Gateway は `remoteAccess` を注入し、これなしでは起動しない。[`bundle/base`](../../bundle/base/cordis.patch.yml) が `typert-gateway` の隣でこれをロードする。owner (`{ kind: 'owner' }`) は決してチェックされない; 以下のすべてのメソッドは非 owner のプリンシパルに関する。
 
-| Member | Contract |
+| メンバー | 契約 |
 |---|---|
-| `registerPolicy(kind, policy)` | Registers the `RemoteAccessPolicy` of one non-owner principal kind; its `bindings()` and `explain()` receive principals typed by that kind. A second policy for the same kind throws. The registration is a Cordis effect of the caller's fiber; registration and removal recompute open snapshots. |
-| `invalidate(principal?)` | Reports that bindings or condition answers for one principal, or for every principal, may have changed. A business package calls it on every grant, revocation, mode change, and expiry. |
-| `decide(request)` | Gateway-only. `request` is `{ principal, action, resources, args? }`: the caller or recipient, the endpoint `ns/method` or `event:<name>`, the valid resources the Gateway resolved, and a call's arguments validated against their Typert-compiled types, with lookup parameters as wire identities. Returns `{ kind: 'allow' }` or `{ kind: 'deny', reason }`; the Gateway throws `remote-access/denied` with details `{ action, reason }` for a denied call and drops a denied event without building an error. The owner and `remoteAccess/follow` are always allowed. |
-| `allows(resource)` | Reads the invocation of the Context that accessed the service, so a list method calls `this.ctx.remoteAccess.allows(resource)` for each item. Decides the call's endpoint action on that resource without arguments, reading the bindings again on every check. True for the owner and outside a Remote call. |
-| `snapshotFor(principal)` | The baseline a page opens with: `{ type: 'baseline', owner: true }` for the owner, otherwise the principal's current grants. |
-| `follow(signal)` | Remote stream `remoteAccess/follow`: one `baseline`, then `upsert` and `remove` frames. The owner receives only `{ type: 'baseline', owner: true }`. The stream ends when `signal` aborts or the service unloads, so a reloaded service starts every reader from a fresh baseline. |
+| `registerPolicy(kind, policy)` | 1 つの非 owner プリンシパル kind の `RemoteAccessPolicy` を登録する; その `bindings()` と `explain()` はその kind で型付けされたプリンシパルを受け取る。同じ kind に対する 2 つ目のポリシーは throw する。登録は呼び出し元の fiber の Cordis エフェクトである; 登録と解除は開いているスナップショットを再計算する。 |
+| `invalidate(principal?)` | 1 つのプリンシパル、またはすべてのプリンシパルのバインディングまたは条件の答えが変化した可能性があることを報告する。ビジネスパッケージは、すべてのグラント、取り消し、モード変更、期限切れでこれを呼ぶ。 |
+| `decide(request)` | Gateway 専用。`request` は `{ principal, action, resources, args? }` である: 呼び出し元または受信者、エンドポイント `ns/method` または `event:<name>`、Gateway が解決した有効なリソース、および Typert コンパイル済み型に対して検証された呼び出しの引数 (ルックアップパラメーターは wire の同一性として)。`{ kind: 'allow' }` または `{ kind: 'deny', reason }` を返す; Gateway は拒否された呼び出しに対して details `{ action, reason }` とともに `remote-access/denied` を throw し、拒否されたイベントはエラーを構築せずに破棄する。owner と `remoteAccess/follow` は常に許可される。 |
+| `allows(resource)` | サービスにアクセスした Context の呼び出しを読むため、リストメソッドは各項目について `this.ctx.remoteAccess.allows(resource)` を呼ぶ。そのリソースに対する呼び出しのエンドポイントアクションを引数なしで判定し、チェックごとにバインディングを再度読む。owner と Remote 呼び出しの外では true。 |
+| `snapshotFor(principal)` | ページが開くときのベースライン: owner には `{ type: 'baseline', owner: true }`、それ以外はプリンシパルの現在のグラント。 |
+| `follow(signal)` | Remote ストリーム `remoteAccess/follow`: 1 つの `baseline` に続いて `upsert` と `remove` フレーム。owner は `{ type: 'baseline', owner: true }` だけを受け取る。ストリームは `signal` が abort するかサービスがアンロードされると終了するため、再ロードされたサービスはすべてのリーダーを新しいベースラインから開始する。 |
 
-A role `{ name, resource, actions }` is a plain value naming an action set over one resource kind, `global` or a kind declared in `TypertResourceMap`. A binding `{ role, resource, condition? }` grants the role on one resource of the role's kind. A policy answers `bindings(principal)` and an optional `explain(request)` synchronously from state it holds in memory. A request is allowed only when, on every resolved resource, some binding names that resource, its role lists the action, and it has no condition or its condition allows. Resources are independent: a grant on `global` implies nothing on any other resource, and no resource implies another. A condition receives `{ action, resource, args? }` and runs only for a binding whose resource and role match; `args` is absent for events, snapshots, and list filtering. `bindings()` runs once per `decide()`, once per `allows()` check, and once per snapshot computation; it is never cached across decisions, so time-dependent state applies to the next call.
+ロール `{ name, resource, actions }` は、1 つのリソース kind — `global` または `TypertResourceMap` で宣言された kind — に対するアクション集合を名指すプレーンな値である。バインディング `{ role, resource, condition? }` は、ロールの kind の 1 つのリソースに対してそのロールを付与する。ポリシーは、メモリに保持する状態から `bindings(principal)` と省略可能な `explain(request)` に同期的に答える。リクエストは、解決されたすべてのリソースについて、そのリソースを名指すバインディングが存在し、そのロールがアクションを列挙しており、かつ条件がないか条件が許可する場合にのみ許可される。リソースは独立している: `global` 上のグラントは他のどのリソースに対しても何も意味せず、どのリソースも別のリソースを意味しない。条件は `{ action, resource, args? }` を受け取り、リソースとロールが一致するバインディングに対してのみ実行される; `args` はイベント、スナップショット、リストフィルタリングでは存在しない。`bindings()` は `decide()` ごとに 1 回、`allows()` チェックごとに 1 回、スナップショット計算ごとに 1 回実行される; 判定をまたいでキャッシュされることは決してないため、時間依存の状態は次の呼び出しに適用される。
 
-The Gateway resolves resources from `@Remote` and `@RemoteScope` `resources` readers, lookup and Host Context adapter `resource` declarations, and the default fields in `typert.resources`, and the [API Gateway](../gateway/README.md) owns that order; this package reads no argument field. A call that names no resource touches the `global` resource alone, so only a `global` role can allow it; putting an action in a `global` role lets the principal call it on any resource the call does not name. The Gateway refuses a call whose resources are invalid with `resource-invalid` without asking `decide()`.
+Gateway は `@Remote` および `@RemoteScope` の `resources` リーダー、ルックアップと Host Context アダプターの `resource` 宣言、および `typert.resources` のデフォルトフィールドからリソースを解決し、その順序は [API Gateway](../gateway/README.md) が所有する; このパッケージはどの引数フィールドも読まない。どのリソースも名指さない呼び出しは `global` リソースだけに触れるため、`global` ロールだけがそれを許可できる; アクションを `global` ロールに入れると、プリンシパルは呼び出しが名指さない任意のリソースでそれを呼び出せる。リソースが無効な呼び出しは、`decide()` に問い合わせることなく `resource-invalid` で Gateway が拒否する。
 
-When `bindings()`, a condition, or `explain()` throws, the decision is refused with `policy-failed`; in a snapshot, a throwing `bindings()` leaves the principal no grant and a throwing condition excludes its action. A faulty rule therefore never breaks the shared `$events` source, the snapshot stream, or page rendering. The service logger reports the first failure of each policy after each `invalidate()` and each policy registration or removal; later failures of that policy stay silent until then.
+`bindings()`、条件、または `explain()` が throw すると、判定は `policy-failed` で拒否される; スナップショットでは、throw する `bindings()` はプリンシパルにグラントを残さず、throw する条件はそのアクションを除外する。したがって、欠陥のあるルールが共有の `$events` ソース、スナップショットストリーム、ページレンダリングを壊すことは決してない。サービスロガーは、各 `invalidate()` と各ポリシーの登録または解除の後、各ポリシーの最初の失敗を報告する; それまでの間、そのポリシーの以降の失敗は沈黙したままである。
 
-A forwarded event is decided as the action `event:<name>` on the resources its forwarding entry's readers name, or on `global` when the entry declares none, and reaches a non-owner whole or not at all; its payload is never trimmed. An event carries every resource it declares, so a reader that returns `undefined` makes the event's resources invalid, and the Gateway delivers it to no non-owner without asking `decide()`. An event names at most one resource, so collection changes travel on follow streams (`session/follow`, `session/control`, `workspace/follow`), whose methods decide each item inline through `allows()`.
+転送イベントは、その転送エントリーのリーダーが名指すリソースに対して、またはエントリーが何も宣言しない場合は `global` に対して、アクション `event:<name>` として判定され、非 owner には丸ごと届くか全く届かないかのいずれかである; そのペイロードがトリムされることは決してない。イベントは自身が宣言するすべてのリソースを運ぶため、`undefined` を返すリーダーはイベントのリソースを無効にし、Gateway は `decide()` に問い合わせることなくそれを非 owner に届けない。イベントが名指すリソースは最大 1 つであるため、コレクションの変更はフォローストリーム (`session/follow`、`session/control`、`workspace/follow`) で伝わり、それらのメソッドは `allows()` を通じて各項目をインラインで判定する。
 
-The service adds a `global` row named `REMOTE_ACCESS_SNAPSHOT_KEY` (`__DSH_REMOTE_ACCESS__`) holding the owner baseline `{ type: 'baseline', owner: true }` to every index the webServer renders through `webserver/index-inject`. A business package that renders a non-owner page, such as a liveshare viewer page rendered on the owner Host, places an assignment of that global to `ctx.remoteAccess.snapshotFor(principal)` after every index injection row, for example a `global` row appended to the end of `ctx.webServer.collectIndexInjections()`. The later assignment replaces the owner baseline, and the Client entry reads the global when it mounts, so the page opens with the viewer's grants instead of the owner's.
+サービスは、webServer が `webserver/index-inject` を通じてレンダリングするすべてのインデックスに、owner ベースライン `{ type: 'baseline', owner: true }` を保持する `REMOTE_ACCESS_SNAPSHOT_KEY` (`__DSH_REMOTE_ACCESS__`) という名前の `global` 行を追加する。owner Host 上でレンダリングされる liveshare ビューアページなど、非 owner のページをレンダリングするビジネスパッケージは、すべてのインデックス注入行の後に、そのグローバルへの `ctx.remoteAccess.snapshotFor(principal)` の代入を配置する。たとえば `ctx.webServer.collectIndexInjections()` の末尾に追加される `global` 行である。後からの代入が owner ベースラインを置き換え、Client エントリーはマウント時にそのグローバルを読むため、ページは owner のグラントではなくビューアのグラントで開く。
 
-| `details.reason` of `remote-access/denied` | Cause |
+| `remote-access/denied` の `details.reason` | 原因 |
 |---|---|
-| `resource-invalid` | Given by the Gateway before `decide()`: a resource reader threw or returned an empty list, or a resource id, including a Context identity, is not a non-empty string. |
-| `no-allow` | The principal kind has no policy, or no binding allows the action on some resource and neither a condition nor `explain()` names a reason. |
-| `policy-failed` | `bindings()`, a condition, or `explain()` threw; the failure is logged as described above. |
-| condition or `explain()` reason | On the first resource no binding allows, the first refusing condition of a matching binding names the reason; without one, `explain(request)` does. |
+| `resource-invalid` | `decide()` の前に Gateway が与える: リソースリーダーが throw したか空リストを返した、またはリソース id (Context の同一性を含む) が空でない文字列でない。 |
+| `no-allow` | プリンシパル kind にポリシーがない、または一部のリソースでアクションを許可するバインディングがなく、条件も `explain()` も理由を名指さない。 |
+| `policy-failed` | `bindings()`、条件、または `explain()` が throw した; 失敗は上記のとおりログに記録される。 |
+| 条件または `explain()` の理由 | バインディングが許可しない最初のリソースについて、一致するバインディングの最初の拒否条件が理由を名指す; それがなければ `explain(request)` が名指す。 |
 
-Snapshot grants list, per resource the principal's bindings name, the sorted endpoint actions of those bindings' roles that `decide()` allows there without call arguments, so the snapshot agrees with `decide()` for the same principal, action, and resource; a resource with no such action gets no grant, and the stream pushes `remove` once its allowed set becomes empty. `event:` actions never enter the snapshot. Snapshots are recomputed only after `invalidate()` and policy registration or removal.
+スナップショットのグラントは、プリンシパルのバインディングが名指すリソースごとに、それらのバインディングのロールのエンドポイントアクションのうち `decide()` が呼び出し引数なしでそこで許可するものをソートして列挙する。したがってスナップショットは、同じプリンシパル、アクション、リソースに対して `decide()` と一致する; そのようなアクションがないリソースはグラントを得ず、許可集合が空になるとストリームが `remove` をプッシュする。`event:` アクションがスナップショットに入ることは決してない。スナップショットは `invalidate()` とポリシーの登録または解除の後にのみ再計算される。
 
 <a id="client-face"></a>
-## Client face
+## Client フェイス
 
-The Client entry reads the baseline the index injected under `REMOTE_ACCESS_SNAPSHOT_KEY` synchronously, mounts the generated `remoteAccess` contribution itself through `mountAccess(ctx, contribution, initial)`, follows the snapshot stream, and provides:
+Client エントリーは、インデックスが `REMOTE_ACCESS_SNAPSHOT_KEY` の下で注入したベースラインを同期的に読み、`mountAccess(ctx, contribution, initial)` を通じて生成された `remoteAccess` コントリビューション自体をマウントし、スナップショットストリームをフォローし、次を提供する:
 
-- the Client service `ctx.remoteAccess.source(kind, id, action)`, an identity-stable boolean source per `(kind, id, action)` for one resource of a declared kind;
-- the standard Hook `useRemoteAccess(action)`, which answers on the `global` resource.
+- Client サービス `ctx.remoteAccess.source(kind, id, action)` — 宣言された kind の 1 つのリソースに対する `(kind, id, action)` ごとの同一性安定のブール値ソース;
+- 標準 Hook `useRemoteAccess(action)` — `global` リソースについて答える。
 
-Domain UI packages publish their resource Hooks over `source()`: [ui-session](../../client/ui-session/README.md) provides `useSessionAccess(sessionId, action)` and the Session-scope `useAccess(action)` on Session resources, a different name from the `global` `useRemoteAccess`, and [ui-workspace](../../client/ui-workspace/README.md) provides `useWorkspaceAccess(workspaceId, action)` on Workspace resources. A Hook's `action` is a `RemoteEndpoint`, an endpoint some Client Remote namespace declares. A non-owner answer is whether that resource's grant lists the action and never falls back to the `global` answer, so a resource without a grant, or whose grant lists no action, answers false. Every answer is true for the owner; a non-owner page without an injected baseline, and a non-owner page whose stream fails terminally, answers false; the terminal failure is reported with its error, for a non-owner with the advice to reload the page and for the owner with the note that its answers are unaffected; a reconnect keeps the last snapshot. A malformed injected baseline fails the mount. Hooks never issue requests, and the Host still checks every call. [`dsh-client-test-runtime`](../../test-support/client-runtime/README.md) replaces this row with allow-all access in Client specs.
+ドメイン UI パッケージは `source()` を通じて自身のリソース Hook を公開する: [ui-session](../../client/ui-session/README.md) は Session リソース上の `useSessionAccess(sessionId, action)` と Session スコープの `useAccess(action)` — `global` の `useRemoteAccess` とは別の名前 — を提供し、[ui-workspace](../../client/ui-workspace/README.md) は Workspace リソース上の `useWorkspaceAccess(workspaceId, action)` を提供する。Hook の `action` は `RemoteEndpoint`、すなわちいずれかの Client Remote 名前空間が宣言するエンドポイントである。非 owner の答えは、そのリソースのグラントがアクションを列挙しているかどうかであり、`global` の答えにフォールバックすることは決してないため、グラントがないリソース、またはグラントがアクションを列挙していないリソースは false と答える。owner にはすべての答えが true である; 注入されたベースラインのない非 owner ページ、およびストリームが終端失敗した非 owner ページは false と答える; 終端失敗はそのエラーとともに報告され、非 owner にはページを再読み込みするよう助言し、owner には自身の答えが影響を受けない旨を注記する; 再接続は最後のスナップショットを保つ。不正な注入ベースラインはマウントを失敗させる。Hook はリクエストを発行することは決してなく、Host は依然としてすべての呼び出しをチェックする。Client スペックでは [`dsh-client-test-runtime`](../../test-support/client-runtime/README.md) がこの行を全許可アクセスに置き換える。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this package decides Remote access for Client callers and registers nothing model-facing.
+なし。本パッケージは Client 呼び出し元の Remote アクセスを判定し、モデル向けのものは何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-No direct effect.
+直接の影響はなし。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Snapshot and list-filtering decisions carry no call arguments, so a condition that refines its answer from `args` can refuse a call that the snapshot shows as allowed.
-- Resource readers and automatic resolution must cover every resource a method touches; a resource the call does not name is not checked, so a principal granted on the named resources reaches it.
-- Default resource resolution matches wire field names; adding a field with a registered kind's name to a method adds that kind's resource to the call.
-- Exact Connection Fetch routes do not pass through the Gateway; the shared Fetch handler refuses them to every non-owner Peer with 403 until each route declares its own access rule.
-- Interaction participation (answering forwarded waterfalls) is owner-only: non-owner `$events` streams receive only the broadcast frames whose `event:<name>` action the policy allows on the event's resources.
-- `api-session/added` carries the whole `SessionSummary`, so a non-owner allowed to receive it also learns its `parentSessionId`.
-- A granted Session's cwd and tool paths already contain the owner's absolute paths, so the `$events` ready frame gives a non-owner the full `host`, including `home`; the Gateway does not hide `home` separately.
-- `workspace/follow` notices a Workspace whose visibility a policy revoked only when that Workspace or the Workspace order next changes, and then replaces the non-owner's baseline; an access change alone sends no frame.
+- スナップショットとリストフィルタリングの判定は呼び出し引数を運ばないため、`args` から答えを精緻化する条件は、スナップショットが許可として示す呼び出しを拒否し得る。
+- リソースリーダーと自動解決は、メソッドが触れるすべてのリソースをカバーしなければならない; 呼び出しが名指さないリソースはチェックされないため、名指されたリソースにグラントされたプリンシパルはそれに到達する。
+- デフォルトのリソース解決は wire フィールド名に一致する; 登録された kind の名前を持つフィールドをメソッドに追加すると、その kind のリソースが呼び出しに追加される。
+- 正確な Connection Fetch ルートは Gateway を通らない; 共有 Fetch ハンドラーは、各ルートが独自のアクセスルールを宣言するまで、すべての非 owner Peer に対してそれらを 403 で拒否する。
+- インタラクションへの参加 (転送された waterfall への応答) は owner 専用である: 非 owner の `$events` ストリームは、ポリシーがイベントのリソース上で `event:<name>` アクションを許可するブロードキャストフレームだけを受け取る。
+- `api-session/added` は `SessionSummary` 全体を運ぶため、それを受信することを許可された非 owner はその `parentSessionId` も知る。
+- グラントされた Session の cwd とツールパスにはすでに owner の絶対パスが含まれるため、`$events` の ready フレームは非 owner に `home` を含む完全な `host` を与える; Gateway は `home` を別途隠すことはない。
+- `workspace/follow` は、ポリシーが可視性を取り消した Workspace を、その Workspace または Workspace 順序が次に変化したときにのみ認識し、そのとき非 owner のベースラインを置き換える; アクセス変更だけではフレームは送られない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

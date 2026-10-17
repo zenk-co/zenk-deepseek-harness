@@ -1,78 +1,78 @@
 ---
-description: "Let agents add a “powered by dsh” badge to documents, pull requests, and other outputs."
+description: "エージェントがドキュメント、プルリクエスト、その他の出力に「powered by dsh」バッジを付けられるようにする。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-experimental-badge-skill-bundle
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Let Agents whose presets load skills add a “powered by dsh” badge to documents, pull requests, and other outputs. The shared provider adds no model tool. It ships switched off in Web and Desktop. Select it in Plugins to enable it.
+プリセットが skill 読み込みを行うエージェントが、ドキュメント、プルリクエスト、その他の出力に「powered by dsh」バッジを付けられるようにする。共有プロバイダーはモデルツールを追加しない。Web と Desktop ではオフのまま出荷される。プラグインで選択すると有効になる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [関連情報](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と将来の課題](#known-limitations-and-deferred-work)
+- [開発ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-In Web or Desktop, open Plugins and enable **DSH badge skill** in Official. Switch it off to remove its profile layer.
+Web または Desktop でプラグインを開き、Official の **DSH badge skill** を有効にする。オフに切り替えるとプロファイル層が削除される。
 
-The switch adds or removes a Host-wide skill provider for existing and new Agents. Presets that expose skill loading can use the badge; minimal keeps its tool catalog unchanged.
+このスイッチは既存と新規のエージェント向けに Host 全体の skill プロバイダーを追加または削除する。skill 読み込みを公開するプリセットはバッジを使え、ミニマルはツールカタログを変更しない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation details — click to expand</summary>
+<summary>実装の詳細 — クリックして展開</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) contributes the `skill-badge` provider row on the Host. Later root patches can disable that row; an override alone does not select the bundle. The [profile composer](../../boot/app-boot/README.md) owns patch ordering and errors.
+[`cordis.patch.yml`](cordis.patch.yml) は Host 上に `skill-badge` プロバイダー行を提供する。後段のルートパッチはその行を無効化できる。オーバーライドだけではバンドルは選択されない。[プロファイルコンポーザー](../../boot/app-boot/README.md) がパッチ順序とエラーを所有する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 関連情報
 
-[Capability implementation](../skill-badge/README.md)
+[ケイパビリティ実装](../skill-badge/README.md)
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through the [capability implementation](../skill-badge/README.md), which owns model context and results.
+[ケイパビリティ実装](../skill-badge/README.md) 経由で間接的に関わる。同実装がモデルコンテキストと結果を所有する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The layer adds no request content directly; the capability implementation owns cache effects from tools, prompts, and results.
+この層はリクエスト内容を直接追加しない。ツール、プロンプト、結果に由来するキャッシュ効果はケイパビリティ実装が所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と将来の課題
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- A preset must include skill discovery and loading to use the badge. The minimal preset does not gain skill tools from this bundle.
+- バッジを使うにはプリセットに skill 検出と読み込みが必要である。ミニマルプリセットはこのバンドルで skill ツールを獲得しない。
 
 -----
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発ノート
 
 <details>
-<summary>Maintainer context — click to expand</summary>
+<summary>メンテナー向けコンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

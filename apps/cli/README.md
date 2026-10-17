@@ -1,27 +1,27 @@
 # `@deepseek-ai/dsh`
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-The `dsh` command is the sole supported Node application launcher: profiles are ordered stacks of plugin-bundle patch layers under the user's own overrides. SDK and ACP are profiles, not separate public bins. The Python runtime wheel packages this same command; the SDK defaults to `sdk`, and the minimal example selects `sdk-minimal`. [`src/args.ts`](src/args.ts) owns the command grammar, and [`src/bin.ts`](src/bin.ts) loads only the selected runner. Invalid commands, options from another mode, and fatal configuration or boot failures exit nonzero.
+`dsh` コマンドは唯一サポートされる Node アプリケーションランチャーである。プロファイルはユーザー自身の上書き配下のプラグインバンドルパッチ層の順序付きスタックである。SDK と ACP はプロファイルであり、別の公開 bin ではない。Python ランタイム wheel は同じコマンドをパッケージする。SDK は既定で `sdk` を使い、最小例は `sdk-minimal` を選ぶ。[`src/args.ts`](src/args.ts) がコマンド文法を所有し、[`src/bin.ts`](src/bin.ts) は選ばれたランナーのみ読み込む。無効コマンド、別モードのオプション、致命的な構成または起動失敗は非ゼロ終了する。
 
-## Entry modes
+## エントリーモード
 
-| Command | Purpose |
+| コマンド | 目的 |
 |---|---|
-| `dsh <name>` / `dsh --profile <name>` | Boot the named profile under `$DSH_HOME/profiles/<name>`. |
-| `dsh --profile <name> --from-default-profile <template>` | Replace a custom profile with a fresh copy of a shipped template, then boot it. |
-| `dsh --profile acp` | Serve automation clients over ACP stdio until disconnect. |
-| `dsh --profile headless "job"` | Run one fresh persisted session, print the final answer, and exit. |
-| `dsh --profile sdk` | Serve SDK clients over JSON-RPC stdio until shutdown or disconnect. |
-| `dsh --profile sdk-minimal` | Serve SDK clients with the standalone minimal agent tree. |
-| `dsh web` | Boot the Web profile. |
-| `dsh plugin --profile <name> <pnpm args>` | Manage a profile's plugins by forwarding to pnpm in the profile directory. |
+| `dsh <name>` / `dsh --profile <name>` | `$DSH_HOME/profiles/<name>` 配下の名前付きプロファイルを起動する。 |
+| `dsh --profile <name> --from-default-profile <template>` | カスタムプロファイルを出荷テンプレートの新しいコピーで置き換えてから起動する。 |
+| `dsh --profile acp` | 切断まで ACP stdio で自動化クライアントに提供する。 |
+| `dsh --profile headless "job"` | 新しい永続セッションを 1 件実行し、最終回答を印刷して終了する。 |
+| `dsh --profile sdk` | シャットダウンまたは切断まで JSON-RPC stdio で SDK クライアントに提供する。 |
+| `dsh --profile sdk-minimal` | 独立最小エージェントツリーで SDK クライアントに提供する。 |
+| `dsh web` | Web プロファイルを起動する。 |
+| `dsh plugin --profile <name> <pnpm args>` | プロファイルディレクトリで pnpm に転送してプロファイルのプラグインを管理する。 |
 
-The invoking directory is the default workspace root. The `web`, `headless`, `sdk`, `sdk-minimal`, and `acp` profiles auto-initialize on first use from shipped templates. Create or reset another profile at a non-shipped name with `--from-default-profile`, or initialize a base-backed profile through `dsh plugin`. The `desktop` name is reserved for the Electron-owned profile, so the CLI rejects boot and config-dump requests for it. The npm CLI also rejects its plugin-management requests; the [Desktop-installed command](../desktop/README.md#bundled-command-runtime) can manage the initialized Desktop profile using that installation’s runtime.
+起動ディレクトリは既定ワークスペースルートである。`web`、`headless`、`sdk`、`sdk-minimal`、`acp` プロファイルは初回使用時に出荷テンプレートから自動初期化される。出荷外の名前で別プロファイルを作成またはリセットするには `--from-default-profile` を使い、ベース支援プロファイルは `dsh plugin` 経由で初期化する。`desktop` 名は Electron 所有プロファイル用に予約されており、CLI はそれへの起動と設定ダンプ要求を拒否する。npm CLI はそのプラグイン管理要求も拒否する。[Desktop インストール済みコマンド](../desktop/README.md#bundled-command-runtime)はそのインストールのランタイムを使って初期化済み Desktop プロファイルを管理できる。
 
-## App arguments
+## アプリ引数
 
-The launcher parses only its own flags and hands everything after them to the booted profile, where any injected app plugin may parse the shared immutable snapshot ([`dsh-cmdline`](../../packages/boot/cmdline/README.md)). The first token the launcher does not recognize starts the app's arguments:
+ランチャーは自身のフラグのみ解析し、それ以降を起動プロファイルに渡す。そこでは注入された任意アプリプラグインが共有不変スナップショットを解析し得る ([`dsh-cmdline`](../../packages/boot/cmdline/README.md))。ランチャーが認識しない最初のトークンがアプリ引数の開始である。
 
 ```sh
 dsh --profile web --port 8080       # --port belongs to the web app
@@ -32,33 +32,33 @@ dsh --help                          # the launcher's own help
 ```
 
 <a id="profiles"></a>
-## Profiles
+## プロファイル
 
-A profile directory holds a `package.json` (out-of-tree plugin dependencies plus the profile manifest `dsh.profile` with its ordered `bundles` list) and a `cordis.patch.yml` (the user's own patch layer). `dsh-hmr`, when enabled in YAML, watches the profile manifest and both profile and home patch files, then recomposes all layers through one serialized reload. Without HMR, changes apply on restart. Edits arriving during watcher registration use the same nonfatal reload reporting as later edits. [Plugin Manager](../../packages/boot/plugin-manager/README.md) shares package operations and the profile write lock with `dsh plugin`; package updates retain disabled bundle selections. CLI package commands inherit authentication variables and terminal descriptors, including interactive build approval; service calls retain their scrubbed environment and captured diagnostics.
+プロファイルディレクトリは `package.json` (ツリー外プラグイン依存関係と順序付き `bundles` 一覧を持つプロファイルマニフェスト `dsh.profile`) と `cordis.patch.yml` (ユーザー自身のパッチ層) を保持する。YAML で有効化された `dsh-hmr` はプロファイルマニフェストとプロファイル・ホーム両パッチファイルを監視し、直列化再読み込み 1 回で全層を再構成する。HMR なしでは変更は再起動時に適用される。ウォッチャー登録中に届く編集は後の編集と同じ非致命再読み込み報告を使う。[プラグインマネージャー](../../packages/boot/plugin-manager/README.md)は `dsh plugin` とパッケージ操作とプロファイル書き込みロックを共有する。パッケージ更新は無効バンドル選択を保持する。CLI パッケージコマンドは対話ビルド承認を含む認証変数と端末記述子を継承する。サービス呼び出しはスクラブ済み環境と取得済み診断を保持する。
 
-Installation and profile startup enforce the declared `engines.dsh` range, or DSH peer ranges when it is absent, against the same runtime version shown by `dsh --version`. Incompatible plugins require an explicitly acknowledged exact-version exemption. The [plugin manager's compatibility reference](../../packages/boot/plugin-manager/README.md#version-compatibility-and-exemptions) documents `version-exemptions`, `allow-version`, `revoke-version`, persistence, and risks.
+インストールとプロファイル起動は宣言済み `engines.dsh` 範囲を、なければ DSH ピア範囲を、`dsh --version` が示す同じランタイムバージョンに対して強制する。互換性のないプラグインは明示的に承認された正確バージョン免除を要する。プラグインマネージャーの[互換性リファレンス](../../packages/boot/plugin-manager/README.md#version-compatibility-and-exemptions)は `version-exemptions`、`allow-version`、`revoke-version`、永続化、リスクを文書化する。
 
-The tree composes over an empty root:
-- each bundle's patch in `dsh.profile.bundles` order
-- then the profile's `cordis.patch.yml`, then the home-level `$DSH_HOME/cordis.patch.yml`
-- then `--patch` overlays
+ツリーは空ルート上に構成される。
+- `dsh.profile.bundles` 順の各バンドルのパッチ
+- 次にプロファイルの `cordis.patch.yml`、次にホームレベル `$DSH_HOME/cordis.patch.yml`
+- 次に `--patch` 上書き
 
-Bundles named in `dsh.profile.bundles` resolve from the dsh installation first (`@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app`, `@deepseek-ai/dsh-headless`, `@deepseek-ai/dsh-sdk-app`, `@deepseek-ai/dsh-sdk-minimal`, `@deepseek-ai/dsh-acp-app`), then from the profile's own `node_modules`, where pnpm installs out-of-tree plugins.
+`dsh.profile.bundles` に名指されたバンドルはまず dsh インストールから解決される (`@deepseek-ai/dsh-base`、`@deepseek-ai/dsh-web-app`、`@deepseek-ai/dsh-headless`、`@deepseek-ai/dsh-sdk-app`、`@deepseek-ai/dsh-sdk-minimal`、`@deepseek-ai/dsh-acp-app`)、次にプロファイル自身の `node_modules` から解決され、pnpm はそこにツリー外プラグインをインストールする。
 
-Use `--dump-default-config` and `--dump-config` to inspect the composed tree without booting it. `--dump-config-schema` imports the composed tree's declared plugin schemas and prints JSON Schema for entries and patches instead of configuration values; read the [schema-dump safety and scope](reference/README.md#config-schema-dump) before inspecting untrusted plugins.
+構成済みツリーを起動せずに検査するには `--dump-default-config` と `--dump-config` を使う。`--dump-config-schema` は構成済みツリーの宣言プラグインスキーマを import し、設定値の代わりにエントリーとパッチの JSON Schema を印刷する。信頼できないプラグインを検査する前に[スキーマダンプの安全と範囲](reference/README.md#config-schema-dump)を読むこと。
 
-The [CLI behavior reference](reference/README.md) owns exact layer precedence, flags, shutdown behavior, deployment defaults, and source execution. The [startup and reload failure table](../../packages/boot/app-boot/README.md#startup-and-reload-failures) compares optional and required plugin failures with configuration HMR.
+[CLI 動作リファレンス](reference/README.md)は正確な層優先順位、フラグ、シャットダウン動作、デプロイ既定、ソース実行を所有する。[起動と再読み込み失敗表](../../packages/boot/app-boot/README.md#startup-and-reload-failures)は任意と必須のプラグイン失敗を設定 HMR と比較する。
 
-## Optional overlays
+## 任意上書き
 
-`config/examples/` ships opt-in overlays for GitHub review webhooks, memory MCP servers, and runtime Cordis tools. They are never part of a default profile; the [user guides](../../docs/user/guide/index.md) and [developer practice guides](../../docs/user/develop/practice/index.md) own setup and safety instructions.
+`config/examples/` は GitHub レビュー Webhook、メモリー MCP サーバー、ランタイム Cordis ツール向けのオプトイン上書きを出荷する。これらは既定プロファイルの一部になることは決してない。[ユーザーガイド](../../docs/user/guide/index.md)と[開発者実践ガイド](../../docs/user/develop/practice/index.md)がセットアップと安全指示を所有する。
 
-## Development
+## 開発
 
-Production runs require built package and frontend artifacts. From the repository root, run `pnpm run build` separately, then use `pnpm dsh <args...>` to run the TypeScript entry and forward every argument; the [source-execution reference](reference/README.md#source-execution) owns the module-resolution contract.
+本番実行はビルド済みパッケージとフロントエンド成果物を要する。リポジトリルートから `pnpm run build` を別に実行し、次に `pnpm dsh <args...>` で TypeScript エントリーを実行して全引数を転送する。[ソース実行リファレンス](reference/README.md#source-execution)がモジュール解決契約を所有する。
 
-The `@deepseek-ai/dsh/profile-boot` export provides the shared profile lifecycle to the Desktop host. A resolved application profile supplies its own installation anchor for runtime package resolution while retaining the Harness home patch, proxy environment, telemetry switch, patch reload, and bounded shutdown.
+`@deepseek-ai/dsh/profile-boot` export は Desktop ホストに共有プロファイルライフサイクルを提供する。解決済みアプリケーションプロファイルは Harness ホームパッチ、プロキシ環境、テレメトリスイッチ、パッチ再読み込み、制限シャットダウンを保持しながら、ランタイムパッケージ解決向けに自身のインストールアンカーを提供する。
 
-Packaged installations call the same `runCli()` entry with their package-manager executable. The Desktop carrier also enables plugin operations for its initialized profile; npm launches omit these options. Installation-owned package environments apply only to plugin package operations; the invoking directory, ordinary profile selection, and agent-shell PATH retain their CLI meanings.
+パッケージ済みインストールは同じ `runCli()` エントリーをパッケージマネージャー実行ファイル付きで呼ぶ。Desktop キャリアーは初期化済みプロファイル向けにプラグイン操作も有効化する。npm 起動はこれらのオプションを省く。インストール所有パッケージ環境はプラグインパッケージ操作にのみ適用される。起動ディレクトリ、通常プロファイル選択、エージェントシェル PATH は CLI の意味を保つ。
 
-The [Web failure matrix](tests/profiles/web/tests/web-failure-matrix.expected.e2e.ts) runs the built CLI through startup failures and native configuration HMR with `awaitWriteFinish` enabled in `test:expected`. It verifies authenticated HTTP responses, diagnostics, recovery, process exits, and disposal without model API calls; the [startup acceptance](tests/profiles/web/tests/web-best-effort-startup.expected.e2e.ts) also covers the shipped required Web dependencies and port conflicts.
+[Web 失敗行列](tests/profiles/web/tests/web-failure-matrix.expected.e2e.ts)はビルド済み CLI を `test:expected` で `awaitWriteFinish` 有効の起動失敗とネイティブ設定 HMR 経由で実行する。モデル API 呼び出しなしに認証済み HTTP 応答、診断、回復、プロセス終了、破棄を検証する。[起動受け入れ](tests/profiles/web/tests/web-best-effort-startup.expected.e2e.ts)は出荷必須 Web 依存関係とポート競合もカバーする。

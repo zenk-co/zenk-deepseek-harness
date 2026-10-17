@@ -1,147 +1,146 @@
 ---
-description: "Cross-session snapshot references and durable untrusted model context, for users and maintainers enabling or debugging ctx.sessionReferenceResolver."
+description: "セッションをまたぐスナップショット参照と耐久性のある非信頼のモデルコンテキスト。ctx.sessionReferenceResolver を有効化またはデバッグするユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-reference
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-session-reference` lets a conversation reference other sessions: a host turns a `@label` mention into a canonical URI, and the service prepares a bounded, read-only snapshot of each referenced session as durable, untrusted background context for the model. Candidate discovery ranks other sessions by working-directory affinity and labels them with their latest titles. Snapshots are immutable after capture and carry a fixed warning that forbids following instructions, permission claims, or tool requests inside them. It is an opt-in service for hosts that support cross-session mentions; it consumes `ctx.sessionQuery` and needs no SQLite FTS.
+`dsh-session-reference` は、会話が他のセッションを参照できるようにする。ホストが `@label` メンションを正規の URI に変換し、サービスが参照された各セッションの有界で読み取り専用のスナップショットを、モデル向けの耐久性のある非信頼のバックグラウンドコンテキストとして準備する。候補の発見は他のセッションを作業ディレクトリとの親和性で順位付けし、最新のタイトルでラベル付けする。スナップショットは取得後に不変であり、その内部の指示、権限の主張、ツール要求に従うことを禁じる固定の警告を運ぶ。これはセッションをまたぐメンションをサポートするホスト向けのオプトインサービスであり、`ctx.sessionQuery` を消費し、SQLite FTS を必要としない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Enable this service when hosts should let a user mention another session and give the model its context. It works with any session-query backend because it consumes the backend-independent compact checkpoint marker.
+ホストがユーザーに他のセッションをメンションさせ、そのコンテキストをモデルに与えたい場合にこのサービスを有効化する。バックエンド非依存のコンパクトなチェックポイントマーカーを消費するため、どの session-query バックエンドでも動作する。
 
-### Mention syntax
+### メンション構文
 
-A canonical mention is `@[label](dsh-session:<base64url-encoded-id>)` in Markdown, or the bare `dsh-session:` URI; every JavaScript string session id round-trips exactly. The service rewrites mentions into readable `@label` text in the message and returns the structured references. Explicit Markdown mentions reject malformed URIs; empty or punctuation-only scheme mentions stay ordinary discussion text.
+正規のメンションは Markdown の `@[label](dsh-session:<base64url-encoded-id>)`、または素の `dsh-session:` URI である。すべての JavaScript 文字列の session id が正確に往復する。サービスはメンションをメッセージ内の読みやすい `@label` テキストに書き換え、構造化された参照を返す。明示的な Markdown メンションは不正な URI を拒否する。空の、または句読点のみのスキームメンションは通常の議論テキストのままである。
 
-### What the agent gets
+### エージェントが受け取るもの
 
-A message that cites other sessions is followed immediately by a `## Referenced sessions` snapshot as a second user-role message. The snapshot is untrusted background: the fixed warning tells the model not to follow instructions, permission claims, or tool requests inside it unless the current user explicitly repeats them. Each source preview is bounded independently — at most `maxReferences` distinct sessions per message and a configured or model-relative serialized JSON byte budget per source. Retention drops older non-checkpoint messages before shortening retained text; preparation fails only when the reference cannot fit even after retention.
+他のセッションを引用するメッセージの直後に、2 つ目の user ロールメッセージとして `## Referenced sessions` スナップショットが続く。スナップショットは非信頼のバックグラウンドである。固定の警告は、現在のユーザーが明示的に繰り返さない限り、その内部の指示、権限の主張、ツール要求に従わないようモデルに伝える。各ソースのプレビューは独立に有界である。メッセージごとに最大 `maxReferences` 個の異なるセッション、およびソースごとに構成された、またはモデル相対のシリアライズ済み JSON バイト予算である。保持は、保持されるテキストを短くする前に、古い非チェックポイントメッセージを落とす。準備は、保持後でも参照が収まらない場合にのみ失敗する。
 
-For a truncated reference, an optional spill backend saves the full captured text projection under the target session. A separate omission notice outside the bounded preview JSON gives exact `omittedMessages` and `omittedBytes`, then the saved locator and `retrievalHint`, or an unavailable outcome distinguishing missing storage from a failed save. The notice is part of the same durable context message. Full transcripts carry the same untrusted-background warning and capture metadata, including `capturedFormatVersion`. Each message uses JSON string fragments of at most 64 Unicode code points per line; decode and concatenate its fragments to recover exact text, including original newlines. This fixed storage format keeps even long single-line text readable through paged file reads.
+切り詰められた参照では、任意の spill バックエンドが完全な取得済みテキスト投影をターゲットセッションの下に保存する。有界のプレビュー JSON の外側にある別個の省略通知が、正確な `omittedMessages` と `omittedBytes`、続いて保存されたロケーターと `retrievalHint`、またはストレージの欠落と保存の失敗を区別する利用不可の結果を示す。通知は同じ耐久コンテキストメッセージの一部である。完全なトランスクリプトは同じ非信頼バックグラウンドの警告と取得メタデータ（`capturedFormatVersion` を含む）を運ぶ。各メッセージは 1 行あたり最大 64 Unicode コードポイントの JSON 文字列断片を使う。断片をデコードして連結すると、元の改行を含む正確なテキストを復元できる。この固定のストレージ形式は、長い単一行のテキストでもページ分割されたファイル読み取りを通じて読み取り可能にする。
 
-### Finding sessions to reference
+### 参照するセッションの見つけ方
 
-`listCandidates(agent, query?, limit?)` lists sessions other than the agent's own, filters case-insensitively by id, working directory, projected title, or display title, and ranks same-directory sessions first. Each candidate carries its latest title as `label`, falling back to the session id when the title is absent or unreadable. Its display title prefers a subagent's durable creation label over that title. The candidate also reports whether its working directory is the requesting agent's so a host can surface a location only when it distinguishes the row. Browser consumers call the same discovery as `ctx.remote.sessionReferenceResolver.candidates`, which labels the canonical mention with `displayTitle` when present.
+`listCandidates(agent, query?, limit?)` は、エージェント自身以外のセッションを一覧し、id、作業ディレクトリ、投影されたタイトル、または表示タイトルで大文字小文字を区別せずにフィルタリングし、同じディレクトリのセッションを先に順位付けする。各候補は最新のタイトルを `label` として運び、タイトルが存在しないか読み取れない場合は session id にフォールバックする。その表示タイトルは、サブエージェントの耐久性のある作成ラベルをそのタイトルより優先する。候補はまた、その作業ディレクトリが要求元エージェントのものかどうかを報告し、ホストが行を区別できる場合にのみ場所を表示できるようにする。ブラウザー側のコンシューマーは同じ発見を `ctx.remote.sessionReferenceResolver.candidates` として呼び出し、存在する場合は `displayTitle` で正規のメンションをラベル付けする。
 
-### Configuration
+### 構成
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `maxReferences` | `3` | Maximum distinct source sessions in one prepared message; must not exceed `3` |
-| `candidateLimit` | `50` | Default candidate count returned to a host |
-| `maxReferenceBytes` | automatic | Explicit maximum serialized JSON bytes per source; overrides the automatic budget exactly |
-| `referenceContextFraction` | `0.2` | Context-window fraction per source, from `0` to `1` |
+| `maxReferences` | `3` | 1 つの準備済みメッセージ内の異なるソースセッションの最大数。`3` を超えてはならない |
+| `candidateLimit` | `50` | ホストに返す既定の候補数 |
+| `maxReferenceBytes` | 自動 | ソースごとのシリアライズ済み JSON バイトの明示的な最大値。自動予算をそのまま上書きする |
+| `referenceContextFraction` | `0.2` | ソースごとのコンテキストウィンドウの割合（`0` から `1`） |
 
-The automatic budget is `max(65536, floor(contextWindow × 4 × referenceContextFraction))` bytes per source. Model context capacity is measured in tokens; four bytes per token is a sizing heuristic, not an exact token conversion. A missing route, LLM service, adapter, or capacity uses 64 KiB; other model metadata lookup errors and cancellation fail preparation.
+自動予算はソースごとに `max(65536, floor(contextWindow × 4 × referenceContextFraction))` バイトである。モデルのコンテキスト容量はトークンで測られる。1 トークンあたり 4 バイトはサイズ見積もりのヒューリスティックであり、正確なトークン換算ではない。ルート、LLM サービス、アダプター、または容量が見つからない場合は 64 KiB を使う。その他のモデルメタデータの照会エラーとキャンセルは準備を失敗させる。
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-session-reference) is the exhaustive source for every accepted field and its JSDoc.
+生成される[構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-session-reference)が、受け付けるすべてのフィールドとその JSDoc の網羅的な情報源である。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design of the service; the observable behavior is covered in [Use this package](#use-this-package).
+このセクションはサービスの設計を説明する。観測可能な挙動は[このパッケージを使う](#use-this-package)でカバーされている。
 
-### Design concept
+### 設計概念
 
-Preparation reads each referenced session's current surface exactly once, when the target message reaches `agent/pre-step`. Both preview and spill use that same captured projection: direct-user text, assistant text, and user checkpoints carrying the canonical compaction marker; tools, reasoning, and other injected context are excluded. This prevents recursive reference propagation and prevents a later source mutation from changing the saved transcript. Preview JSON escapes every `<` as `\u003c`, so source text cannot spell the `<referenced-sessions>` framing tag.
+準備は、ターゲットメッセージが `agent/pre-step` に到達したときに、参照された各セッションの現在のサーフェスを正確に一度だけ読む。プレビューと spill の両方がその同じ取得済み投影を使う。直接ユーザーテキスト、アシスタントテキスト、および正規のコンパクションマーカーを運ぶユーザーチェックポイントであり、ツール、reasoning、その他の注入されたコンテキストは除外される。これにより再帰的な参照の伝播を防ぎ、後からのソースの変更が保存済みトランスクリプトを変えることを防ぐ。プレビュー JSON はすべての `<` を `\u003c` にエスケープするため、ソーステキストが `<referenced-sessions>` フレーミングタグを綴ることはできない。
 
-The resolver discovers optional storage through `ctx.get("spillStore")` and saves only truncated references. Storage ownership is the target session; the source descriptor identifies the referenced session and label, without a fabricated tool call. Cancellation is checked after the asynchronous save and prevents publication even if an artifact was written. Artifact expiry remains the backend's existing policy.
+リゾルバーは `ctx.get("spillStore")` を通じて任意のストレージを発見し、切り詰められた参照のみを保存する。ストレージの所有権はターゲットセッションにある。ソース記述子は参照されたセッションとラベルを識別し、捏造されたツール呼び出しは伴わない。キャンセルは非同期保存の後に確認され、アーティファクトが書き込まれていても公開を妨げる。アーティファクトの期限はバックエンドの既存ポリシーのままである。
 
-The budget uses the provider and model captured after `system-prompt/assemble` completes for the target agent. Direct `prepare` calls before any assembly use agent options; session headers do not select the budget model. Diagnostic assemblies without an agent do not affect captured routes.
+予算は、ターゲットエージェントの `system-prompt/assemble` が完了した後に取得されたプロバイダーとモデルを使う。何らかの組み立てより前の直接の `prepare` 呼び出しはエージェントオプションを使い、セッションヘッダーが予算のモデルを選ぶことはない。エージェントのない診断用の組み立ては取得済みルートに影響しない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `SessionReferenceResolver`: pre-step listener, candidate discovery, preparation |
-| [`src/config.ts`](src/config.ts) | `Config` schema, `SessionReferenceError` taxonomy |
-| [`src/uri.ts`](src/uri.ts) | `dsh-session:` URI codec, mention formatting and parsing |
-| [`src/projection.ts`](src/projection.ts) | Current-surface projection and byte-budget retention |
-| [`src/serialization.ts`](src/serialization.ts) | Tag-safe JSON escaping for snapshot payloads |
-| [`src/spill.ts`](src/spill.ts) | Full transcript serialization and model-visible omission notices |
-| [`src/types.ts`](src/types.ts) | `SessionReferenceInput`/`Candidate` and source types |
+| [`src/index.ts`](src/index.ts) | `SessionReferenceResolver`: pre-step リスナー、候補の発見、準備 |
+| [`src/config.ts`](src/config.ts) | `Config` スキーマ、`SessionReferenceError` の分類 |
+| [`src/uri.ts`](src/uri.ts) | `dsh-session:` URI コーデック、メンションの整形と解析 |
+| [`src/projection.ts`](src/projection.ts) | 現在サーフェスの投影とバイト予算の保持 |
+| [`src/serialization.ts`](src/serialization.ts) | スナップショットペイロードのタグセーフな JSON エスケープ |
+| [`src/spill.ts`](src/spill.ts) | 完全トランスクリプトのシリアライズとモデル可視の省略通知 |
+| [`src/types.ts`](src/types.ts) | `SessionReferenceInput`/`Candidate` とソースの型 |
 
-### Main flow
+### メインフロー
 
-The outer `agent/pre-step` listener accepts the step, parses canonical mentions out of direct user messages, then calls `prepare`, which normalizes references (first-mention order, deduplication, self-reference and count rejection), reads every surface in parallel, retains each under its resolved byte budget, and renders the aggregated prompt. Each durable source record keeps the frozen `capturedThroughSeq` and records a nonzero `capturedFormatVersion`; absence denotes format v0. Each snapshot is inserted immediately after the message that cited it, and the target log records the readable direct message followed by its sourced context, so source mutation after capture cannot change target replay.
+外側の `agent/pre-step` リスナーはステップを受理し、直接ユーザーメッセージから正規のメンションを解析し、次に `prepare` を呼ぶ。`prepare` は参照を正規化し（初出順、重複排除、自己参照と件数の拒否）、すべてのサーフェスを並行して読み、それぞれを解決されたバイト予算の下に保持し、集約されたプロンプトをレンダリングする。各耐久ソースレコードは凍結された `capturedThroughSeq` を保ち、非ゼロの `capturedFormatVersion` を記録する。存在しない場合は形式 v0 を表す。各スナップショットはそれを引用したメッセージの直後に挿入され、ターゲットログは読みやすい直接メッセージとそれに続くソース付きコンテキストを記録するため、取得後のソースの変更がターゲットのリプレイを変えることはできない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared reference surface to the design decision and the read service behind it.
+パッケージレベルの契約で足りない場合はこれらのページを読む。共有の参照サーフェスから設計決定と背後の読み取りサービスへと進む。
 
-- [Session-reference subsystem](../../../docs/subsystems/session-reference.md) — canonical URIs, projection rules, and the stable error taxonomy.
-- [historical Session-reference spill reuse](../../../.agents/notes/archived/bug-fix/2026-09-05-session-reference-spill-reuse.md) — snapshot identity, omission notices, storage ownership, and alternatives.
-- [Session-query subsystem](../../../docs/subsystems/session-query.md) — the read service that supplies session surfaces.
-- [Context group map](../README.md) — sibling request-context packages.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-session-reference) — every accepted config field and its source declaration.
+- [Session-reference サブシステム](../../../docs/subsystems/session-reference.md) — 正規 URIs、投影の規則、安定したエラーの分類。
+- [歴史的な Session-reference spill の再利用](../../../.agents/notes/archived/bug-fix/2026-09-05-session-reference-spill-reuse.md) — スナップショットのアイデンティティ、省略通知、ストレージの所有権、代替案。
+- [Session-query サブシステム](../../../docs/subsystems/session-query.md) — セッションのサーフェスを供給する読み取りサービス。
+- [Context グループマップ](../README.md) — 隣接するリクエストコンテキストパッケージ。
+- [生成される構成カタログ](../../../docs/config-catalog.md#deepseek-aidsh-session-reference) — 受け付けるすべての構成フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Referenced session background
+### 参照されたセッションのバックグラウンド
 
-#### What the model sees
+#### モデルが見るもの
 
-The model sees two consecutive user-role messages: the current message with its readable `@label`, then the `## Referenced sessions` untrusted snapshot. The warning forbids following instructions, permission claims, or tool requests from the snapshot unless the current user explicitly repeats them. Labels, cwd values, ids, and conversation text are serialized as JSON inside `<referenced-sessions>` tags; every data `<` is emitted as the lossless JSON escape `\u003c`, so source text cannot spell a framing tag.
+モデルは 2 つの連続する user ロールメッセージを見る。読みやすい `@label` を伴う現在のメッセージ、次に `## Referenced sessions` の非信頼スナップショットである。警告は、現在のユーザーが明示的に繰り返さない限り、スナップショットからの指示、権限の主張、ツール要求に従うことを禁じる。ラベル、cwd 値、id、会話テキストは `<referenced-sessions>` タグ内で JSON としてシリアライズされる。データのすべての `<` はロスレスな JSON エスケープ `\u003c` として出力されるため、ソーステキストがフレーミングタグを綴ることはできない。
 
-#### Token effect
+#### トークンへの影響
 
-Each referenced message adds the fixed warning plus up to three serialized previews, each independently bounded by the configured or model-relative byte budget. Truncated references add separate omission notices outside that budget; a saved full transcript adds tokens only when retrieved. The exact context remains in target history until target compaction shadows or summarizes it; source-session changes add no further tokens.
+参照された各メッセージは、固定の警告と最大 3 つのシリアライズ済みプレビューを追加し、それぞれが構成された、またはモデル相対のバイト予算によって独立に制限される。切り詰められた参照はその予算の外側に別個の省略通知を追加し、保存された完全トランスクリプトは取得されたときにのみトークンを追加する。正確なコンテキストは、ターゲットのコンパクションがそれをシャドウまたは要約するまでターゲット履歴に残る。ソースセッションの変更がさらにトークンを追加することはない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The request and snapshot are consecutive append-only target messages and preserve earlier cacheable history. Different references or source capture contents change the new suffix only; later target compaction may invalidate reuse from its replacement boundary.
+リクエストとスナップショットは連続する追記専用のターゲットメッセージであり、それ以前のキャッシュ可能な履歴を保つ。異なる参照やソースの取得内容は新しいサフィックスのみを変える。後のターゲットのコンパクションはその置換境界から再利用を無効化することがある。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
+これらの制限は、セッションをまたぐ参照が不向きになる状況を定義する。現在のパッケージの制約である。
 
-These limits define when cross-session references are a poor fit. They are current package constraints.
-
-- **No body discovery** — candidate queries inspect titles but do not search message bodies.
-- **Labels come from projections alone** — an attached session is labeled from its live projection cut, a cold one from its durable checkpoint, and a session neither answers for is labeled by its id and cannot be found by its title. Discovery never reads a log: folding one title costs a whole log, and this runs under every completion keystroke. A session persisted before the projection cache was composed regains its title the first time it is opened, which checkpoints it.
-- **Trusted caller boundary** — the service assumes its host is authorized to read every session exposed by `ctx.sessionQuery`; it is not a model-facing search tool.
-- **Text projection only** — non-text user and assistant blocks are not propagated across sessions.
-- **No live link** — references are snapshots, not forks, resumes, subscriptions, or source-session mutations.
-- **Transcript search is line-based** — a literal phrase can straddle JSON-fragment lines or include escaped characters; decode and concatenate a message's fragments for exact text matching. Saved artifacts may expire under the backend's policy.
+- **本文の発見はない** — 候補クエリはタイトルを調べるが、メッセージ本文を検索しない。
+- **ラベルは投影のみから来る** — 接続されたセッションはそのライブ投影のカットから、コールドなセッションはその耐久チェックポイントからラベル付けされ、どちらも答えないセッションはその id でラベル付けられ、タイトルで見つけることはできない。発見がログを読むことは決してない。タイトルを 1 つ折り畳むにはログ全体のコストがかかり、これは完了のたびのキーストロークの下で実行される。投影キャッシュがコンポーズされる前に永続化されたセッションは、最初に開かれたときにタイトルを取り戻し、それによりチェックポイントされる。
+- **信頼された呼び出し元の境界** — サービスは、そのホストが `ctx.sessionQuery` が公開するすべてのセッションを読むことを認可されていると仮定する。モデル向けの検索ツールではない。
+- **テキスト投影のみ** — テキスト以外のユーザーおよびアシスタントのブロックはセッションをまたいで伝播されない。
+- **ライブリンクはない** — 参照はスナップショットであり、フォーク、レジューム、購読、ソースセッションの変更ではない。
+- **トランスクリプト検索は行ベース** — リテラルフレーズが JSON 断片の行をまたいだり、エスケープされた文字を含んだりすることがある。正確なテキスト照合にはメッセージの断片をデコードして連結する。保存されたアーティファクトはバックエンドのポリシーの下で期限切れになることがある。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,128 +1,128 @@
 ---
-description: "Subagent conversation catalog, continuation routing UI, and '@' reference source for the dsh web client."
+description: "dsh web クライアントの subagent conversation カタログ、継続ルーティング UI、'@' 参照ソース。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-subagent
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Browse local subagent conversations and external tasks from the parent header. Local conversations show activity, token usage, and duration; continuable children accept follow-up prompts and support Stop. External tasks appear as non-navigable leaves without an execution status. Historical one-shot conversations open as read-only records. The ordinary sidebar omits subagent conversations, and the separate `@` source inserts a running child's label without granting continuation authority.
+親ヘッダーからローカルの subagent conversation と外部タスクを閲覧できる。ローカルの conversation はアクティビティ、トークン使用量、期間を表示し、継続可能な子はフォローアッププロンプトを受け付けて Stop をサポートする。外部タスクは実行ステータスのないナビゲート不可のリーフとして現れる。履歴上の one-shot conversation は読み取り専用レコードとして開く。通常のサイドバーは subagent conversation を省略し、別個の `@` ソースは継続権限を与えずに実行中の子のラベルを挿入する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-The session header keeps the current session title as the lineage breadcrumb; when the session's direct catalog has entries or a read has failed, the descendant-count trigger renders after the preset label in the header actions band, with no breadcrumb separator. An absent catalog, an empty loading catalog, or a successfully loaded empty catalog hides the count trigger. The trigger opens that direct catalog, reports its total and running counts, and loads nested catalogs only when their rows expand. Select a local child at any depth to open that child's conversation with its exact `{parentSessionId, childSessionId, mode}` address, or use the row's trailing arrow to open the same address in the right Sidebar, preferring a separate pane when room permits.
+セッションヘッダーは現在のセッションタイトルを系統のブレッドクラムとして保つ。セッションの直接カタログにエントリーがあるか読み取りが失敗したとき、子孫数トリガーがヘッダーアクションバンドのプリセットラベルの後にレンダリングされ、ブレッドクラム区切りはない。カタログの不在、読み込み中の空のカタログ、または正常にロードされた空のカタログはカウントトリガーを隠す。トリガーはその直接カタログを開き、合計と実行中の数を報告し、ネストされたカタログはその行が展開されたときにのみロードする。任意の深さのローカルの子を選択すると、その正確な `{parentSessionId, childSessionId, mode}` アドレスでその子の conversation を開く。または行の末尾の矢印を使うと同じアドレスが右 Sidebar で開き、余地があれば別ペインが優先される。
 
-This package registers the `dsh-resource://subagentchat/session/<child>?parent=<parent>&mode=<mode>` resource and builtin Sidebar tab type. The resource retains the child `SessionReference` directly from its address without refreshing the parent catalog, and releases the reference when the tab record closes. The tab renders the shared `conversation.content` Factory through `sidebar.chat.conversation`, fixes the local View to Chat, and omits the main Conversation header and width controls.
+このパッケージは `dsh-resource://subagentchat/session/<child>?parent=<parent>&mode=<mode>` リソースとビルトインの Sidebar タブ種別を登録する。このリソースは親カタログをリフレッシュせずにアドレスから直接子の `SessionReference` を保持し、タブレコードが閉じると参照を解放する。タブは `sidebar.chat.conversation` を通じて共有の `conversation.content` Factory をレンダリングし、ローカルの View を Chat に固定し、メインの Conversation ヘッダーと幅コントロールを省略する。
 
-### Browsing the tree
+### ツリーの閲覧
 
-Hovering a trigger opens its catalog after 150ms; leaving both trigger and catalog closes it after 120ms. Clicking the descendant-count trigger pins its catalog until outside click or Escape from the trigger or tree. Breadcrumb-title clicks navigate to the corresponding conversation.
+トリガーにホバーすると 150ms 後にそのカタログが開き、トリガーとカタログの両方から離れると 120ms 後に閉じる。子孫数トリガーをクリックすると、トリガーまたはツリーから外側クリックまたは Escape するまでそのカタログがピン留めされる。ブレッドクラムタイトルのクリックは対応する conversation へナビゲートする。
 
-Rows display mode plus activity and an optional log-backed title; running uses the shared ongoing loader, an inactive child whose latest closed turn completed normally uses the shared success dot, and other inactive children use the shared idle dot. Every row reserves the same 14px status column, centering smaller dots so titles align with the loader state. The compact header trigger vertically centers its activity glyph and count with a 4px gap. The trailing column stacks total durable provider usage above active-turn duration. Keyboard navigation works with ArrowRight/ArrowLeft to expand and collapse branches and ArrowUp/ArrowDown, Home, End, and Escape to navigate or close the tree. An unlabeled one-shot row falls back to its session id. A row is a known leaf only after its own catalog loads empty.
+行はモードとアクティビティ、およびオプションのログに裏付けられたタイトルを表示する。実行中は共有の ongoing ローダーを使い、最新の閉じたターンが正常に完了した非アクティブな子は共有の成功ドットを使い、その他の非アクティブな子は共有のアイドルドットを使う。すべての行は同じ 14px のステータス列を確保し、小さいドットを中央揃えにしてタイトルがローダー状態と整列するようにする。コンパクトヘッダーのトリガーはアクティビティグリフとカウントを 4px の間隔で垂直中央揃えする。末尾の列はアクティブターンの期間の上に合計耐久プロバイダー使用量を積む。キーボードナビゲーションは ArrowRight/ArrowLeft でブランチを展開・折りたたみ、ArrowUp/ArrowDown、Home、End、Escape でツリーを移動または閉じる。ラベルのない one-shot の行はその session id にフォールバックする。行が既知のリーフになるのは、自身のカタログが空でロードされた後だけである。
 
-### Continuing a conversation
+### conversation の継続
 
-A continuable child with a live parent keeps the ordinary input chrome: typing and Send stay available while the child runs because every follow-up joins the child's FIFO inbox, and an independent Stop routes through `subagents/interruptByParent`. A continuable child whose exact parent is unavailable and which is not running elects a read-only composer explaining the recovery path; while such a child still runs, the selector yields to the ordinary composer with input and Send disabled but its independent Stop usable.
+生きた親を持つ継続可能な子は通常の入力クロームを保つ: 子の実行中も入力と Send が利用できるのは、すべてのフォローアップが子の FIFO 受信箱に参加するためであり、独立した Stop は `subagents/interruptByParent` を通る。正確な親が利用不可能で実行中でもない継続可能な子は、復旧経路を説明する読み取り専用コンポーザーを選択する。そのような子がまだ実行中の間は、セレクターが通常のコンポーザーに譲り、入力と Send は無効になるが独立した Stop は使用できる。
 
-### The `@` reference source
+### @ 参照ソース
 
-The `@` source remains deliberately separate and inert: candidates are zero-RPC running children from `ctx.sessions.list`, picking one inserts literal `@label ` text, and the codec projects `@label`. It has no command-adjudication hooks and does not resolve labels into continuation addresses.
+`@` ソースは意図的に分離された不活性なままである: 候補は `ctx.sessions.list` からの zero-RPC の実行中の子であり、1 つ選ぶとリテラル `@label ` テキストが挿入され、コーデックは `@label` を投影する。コマンド裁定フックを持たず、ラベルを継続アドレスに解決しない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The [subagent runtime](../../subagent/subagent/README.md) owns continuation and interruption; the [conversation reference](../ui-conversation/README.md) documents composer behavior.
+[subagent ランタイム](../../subagent/subagent/README.md)が継続と中断を所有し、[conversation リファレンス](../ui-conversation/README.md)がコンポーザーの挙動を説明する。
 
-### Catalog derivation
+### カタログの導出
 
-The header lineage renderer reads `projectionsBySession` through the standard `useSessions` hook. The renderer selects `subagentCatalog` from each Session’s shared values for membership, disclosure, and counts; Activity prefers the unified UI status and falls back to Session summaries; summaries supply titles and usage. Expanding a row reads its target's projections, including ordinary cold history. A list row with `formatStatus: migration-required` displays “Migration required” before expansion and keeps its history-opening actions without descendant expansion or changing its subagent mode; a projection read requiring migration without a catalog supplies the same notice. Opening the Session supplies its catalog through history and control projections. Otherwise, an available catalog remains usable, including an explicit empty catalog. Live projection frames update every loaded level without menu subscriptions or repeated membership queries. Other rows remain expandable while their catalogs are absent, loading, or failed, and become known leaves after ready empty catalogs. External rows are always leaves and do not load child Sessions.
+ヘッダーの系統レンダラーは標準の `useSessions` フックを通じて `projectionsBySession` を読む。レンダラーは各 Session の共有値からメンバーシップ、開示、カウントのために `subagentCatalog` を選択する。Activity は統合 UI ステータスを優先し、Session サマリーにフォールバックし、サマリーがタイトルと使用量を供給する。行を展開すると、そのターゲットのプロジェクション（通常のコールド履歴を含む）を読む。`formatStatus: migration-required` のリスト行は展開前に「Migration required」を表示し、子孫の展開や subagent モードの変更なしに履歴を開くアクションを保つ。カタログなしでマイグレーションを要求するプロジェクション読み取りも同じ通知を供給する。Session を開くと、履歴と制御のプロジェクションを通じてそのカタログが供給される。それ以外の場合、利用可能なカタログ（明示的な空のカタログを含む）は使用可能なままである。ライブプロジェクションフレームは、メニュー購読や繰り返しのメンバーシップクエリなしに、ロード済みのすべてのレベルを更新する。他の行は、そのカタログが不在、読み込み中、失敗の間も展開可能なままであり、ready で空のカタログの後に既知のリーフになる。外部の行は常にリーフであり、子 Session をロードしない。
 
-Opening a catalog dropdown does not request its root catalog. Child-catalog expansion and failed-read retries call `refreshProjection`; shared projection-value changes update the display automatically.
+カタログドロップダウンを開いてもそのルートカタログは要求されない。子カタログの展開と失敗した読み取りのリトライは `refreshProjection` を呼ぶ。共有プロジェクション値の変更は表示を自動的に更新する。
 
-Breadcrumb addresses derive from the Provider-bound Session address, loaded parent catalogs, or already-listed subagent lineage, including never-selected ancestors.
+ブレッドクラムアドレスは Provider にバインドされた Session アドレス、ロード済みの親カタログ、またはすでに一覧された subagent 系統（一度も選択されていない祖先を含む）から導出される。
 
-### Duration, completion, and tokens
+### 期間、完了、トークン
 
-Each visible catalog level advances its own clock while it contains a running child; collapsing the level or closing the menu releases that clock. Token totals sum the four disjoint `tokenUsage` buckets. The `subagentTiming` projection sums completed-turn duration and records whether the latest closed turn ended with `completed`; opening another turn clears that completion until its own `turn/end`. Duration advances once per second only for an open turn on a running child and freezes after the child becomes inactive; an interrupted open turn is bounded by its same-cut `active.through`, never by newer session metadata.
+可視の各カタログレベルは、実行中の子を含む間、自身のクロックを進める。レベルを折りたたむかメニューを閉じるとそのクロックは解放される。トークン合計は 4 つの互いに素な `tokenUsage` バケットを合算する。`subagentTiming` プロジェクションは完了したターンの期間を合算し、最新の閉じたターンが `completed` で終わったかどうかを記録する。別のターンを開くと、その自身の `turn/end` までその完了状態はクリアされる。期間は実行中の子の開いているターンについてのみ 1 秒に 1 回進み、子が非アクティブになった後は凍結する。中断された開いているターンは同じカットの `active.through` で境界付けられ、より新しいセッションメタデータでは決して境界付けられない。
 
-### Composer election
+### コンポーザーの選択
 
-One-shot children always elect a read-only composer. A continuable child elects one only when its exact parent is unavailable and the child is not running; otherwise the ordinary composer's Session routes prompts through `subagents/prompt`. This package never receives host context or calls a model-facing tool.
+one-shot の子は常に読み取り専用コンポーザーを選択する。継続可能な子がそれを選択するのは、正確な親が利用不可能で子が実行中でない場合のみである。それ以外では通常のコンポーザーの Session が `subagents/prompt` を通じてプロンプトをルーティングする。このパッケージはホストコンテキストを受け取らず、モデル向けツールを呼ぶことも決してない。
 
-Unknown-mode catalog rows remain visible and clickable, using the child id when no label is available. Their composer is read-only until child history establishes a supported mode; a read failure is reported in the child conversation.
+未知モードのカタログ行は可視でクリック可能なままで、ラベルが利用できない場合は子 id を使う。それらのコンポーザーは、子の履歴がサポートされたモードを確定するまで読み取り専用である。読み取り失敗は子の conversation で報告される。
 
-Lineage-menu highlights follow the [standard menu edge geometry](../../../docs/ui-radius.md#nested-hover); tree disclosure controls retain their separate left gutter.
+系統メニューのハイライトは[標準のメニューエッジジオメトリ](../../../docs/ui-radius.md#nested-hover)に従い、ツリーの開示コントロールは独自の左ガターを保持する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-These pages cover the conversation surface, the host seam, and the design notes.
+これらのページは conversation サーフェス、ホストシーム、設計ノートを扱う。
 
-- [ui-conversation](../ui-conversation/README.md) — the chat surface hosting the header action and composer chain.
-- [ui-input-trigger](../ui-input-trigger/README.md) — the suggestion machinery hosting the `@` source.
-- [subagent](../../subagent/subagent/README.md) — the host-side capability seam behind continuable children.
-- [historical Web subagent conversations](../../../.agents/notes/archived/feature/2026-07-27-web-subagent-conversations.md) — the catalog and composer specification.
-- [Current-turn interrupt](../../subagent/subagent/README.md) — the independent Stop semantics.
+- [ui-conversation](../ui-conversation/README.md) — ヘッダーアクションとコンポーザーチェーンをホストするチャットサーフェス。
+- [ui-input-trigger](../ui-input-trigger/README.md) — `@` ソースをホストするサジェスチョン機構。
+- [subagent](../../subagent/subagent/README.md) — 継続可能な子の背後のホスト側ケイパビリティシーム。
+- [歴史的な Web subagent conversation](../../../.agents/notes/archived/feature/2026-07-27-web-subagent-conversations.md) — カタログとコンポーザーの仕様。
+- [現在ターンの中断](../../subagent/subagent/README.md) — 独立した Stop のセマンティクス。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Subagent label text in the user prompt
+### ユーザープロンプト内の subagent ラベルテキスト
 
-#### What the model sees
+#### モデルが見るもの
 
-Only the `@` reference source affects model input: a picked candidate reaches the ordinary user message as literal `@label`, without a dedicated block or host-side resolution. Catalog browsing, child navigation, and persisted transcript viewing add no prompt section; accepted continuation content becomes a normal FIFO user message through the host subagent adapter.
+モデル入力に影響するのは `@` 参照ソースだけである: 選択された候補は専用ブロックやホスト側の解決なしにリテラル `@label` として通常のユーザーメッセージに到達する。カタログの閲覧、子へのナビゲーション、永続化トランスクリプトの表示はプロンプトセクションを追加しない。受理された継続コンテンツはホストの subagent アダプターを通じて通常の FIFO ユーザーメッセージになる。
 
-#### Token effect
+#### トークン効果
 
-Conditional and append-only: the literal `@label` or a human follow-up adds tokens only to its new user message. Catalog and transcript operations add zero model tokens.
+条件的かつ追記のみ: リテラル `@label` または人間のフォローアップはその新しいユーザーメッセージにのみトークンを追加する。カタログとトランスクリプトの操作はモデルトークンをゼロ追加する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Append-only. This package never edits earlier request tokens.
+追記のみ。このパッケージは以前のリクエストトークンを決して編集しない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the catalog can show and what `@` references mean; they are current package constraints.
+これらの制限はカタログが表示できるものと `@` 参照が意味するものを定義する。これらは現在のパッケージ制約である。
 
-- **Non-completed inactive outcomes remain grouped** — the catalog distinguishes a latest normal completion from other inactive states, but does not distinguish failure, cancellation, refusal, token exhaustion, or a child with no closed turn; the UI exposes no Activation identity, and stopping is limited to the composer's current-turn Stop for a running continuable child.
-- **`@` references remain display-title text** — duplicate or renamed labels are ambiguous, so they intentionally do not acquire continuation semantics.
+- **未完了の非アクティブな結果はグループ化されたまま** — カタログは最新の正常完了とその他の非アクティブ状態を区別するが、失敗、キャンセル、拒否、トークン枯渇、閉じたターンを持たない子は区別しない。UI は Activation アイデンティティを公開せず、停止は実行中の継続可能な子に対するコンポーザーの現在ターンの Stop に限られる。
+- **`@` 参照は表示タイトルのテキストのまま** — 重複または改名されたラベルは曖昧なので、意図的に継続セマンティクスを獲得しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,138 +1,138 @@
 ---
-description: "Anonymous per-harness-home identity for users and maintainers tracing how telemetry, feedback acknowledgement, and DeepSeek provider requests correlate records."
+description: "ハーネスホーム単位の匿名アイデンティティ。テレメトリー・フィードバック受理・DeepSeek プロバイダーリクエストが記録をどう相関させるか追うユーザーとメンテナ向け。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-anonymous-user-id
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-DeepSeek Harness uses one anonymous identifier per harness home to correlate telemetry, feedback, and DeepSeek requests from the same installation without identifying the user. The random UUID is stored in `$DSH_HOME/.anonymous-user-id` (`$DSH_HOME` defaults to `~/.dsh`), persists across restarts, and is regenerated after you delete the file. Different harness homes use different identifiers, and the value contains no machine or account data. Built-in features create and attach it automatically; package consumers can reuse the same value for installation-scoped correlation, but cannot join records across homes.
+DeepSeek Harness はハーネスホーム単位に 1 つの匿名識別子を使い、ユーザーを識別せずに同じインストール由来のテレメトリー・フィードバック・DeepSeek リクエストを相関させる。ランダム UUID は `$DSH_HOME/.anonymous-user-id` (`$DSH_HOME` 既定は `~/.dsh`) に格納され、再起動をまたいで永続し、ファイル削除後に再生成される。異なるハーネスホームは異なる識別子を使い、値にマシンやアカウントデータは含まれない。組み込み機能は自動作成・付加する。パッケージコンシューマーはインストールスコープ相関に同じ値を再利用できるが、ホーム横断で記録を結合できない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [このパッケージの使い方](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの使い方
 
-When you want the records your installation sends out to be recognizable as coming from the same harness home — telemetry, feedback, and DeepSeek requests all carry one shared id — this package is what provides it. There is nothing to install or configure: the id appears automatically, and the shipped feedback, telemetry, and DeepSeek features already use it. Do not use it to identify a user or to join records across different homes; it is anonymous and home-scoped.
+自インストールが送出する記録 — テレメトリー、フィードバック、DeepSeek リクエストはすべて 1 つの共有 id を運ぶ — を同じハーネスホーム由来と認識できるようにしたい場合、このパッケージがそれを提供する。インストールも設定も不要である。id は自動出現し、出荷フィードバック・テレメトリー・DeepSeek 機能は既にそれを使う。ユーザーの識別や異なるホーム横断の記録結合に使ってはならない。匿名かつホームスコープである。
 
-### What the id does for you
+### id がしてくれること
 
-Three things your installation sends out carry the same id, so records line up across all of them:
+自インストールが送出する 3 種が同じ id を運ぶため、すべて横断で記録が整列する:
 
-- **Session telemetry** — your telemetry exports carry the id as the `user.id` resource attribute, so a collector can group an installation's records.
-- **Feedback** — each feedback acknowledgement names the anonymous installation that recorded it.
-- **DeepSeek requests** — every provider request carries the `x-deepseek-harness-user-id` header, so usage can be attributed per installation.
+- **セッションテレメトリー** — テレメトリーエクスポートは id を `user.id` リソース属性として運ぶため、コレクターはインストール単位記録を束ねられる。
+- **フィードバック** — 各フィードバック受理はそれを記録した匿名インストールを名指しする。
+- **DeepSeek リクエスト** — 各プロバイダーリクエストは `x-deepseek-harness-user-id` ヘッダーを運ぶため、利用をインストール単位に帰属できる。
 
-### Observing and resetting the id
+### id の確認とリセット
 
-The id lives in `$DSH_HOME/.anonymous-user-id` (`$DSH_HOME` defaults to `~/.dsh`) as a plain UUID text file. Delete that file to get a fresh id at the next launch; the running process keeps its current id until it exits. Separate harness homes keep separate ids, and no machine or account detail ever goes into the value.
+id は素の UUID テキストファイルとして `$DSH_HOME/.anonymous-user-id` (`$DSH_HOME` 既定は `~/.dsh`) にある。そのファイルを削除すると次回起動で新しい id を得る。実行中プロセスは終了まで現行 id を保持する。別ハーネスホームは別 id を保持し、値にマシンやアカウント詳細が入ることは決してない。
 
-### Using it in your own package
+### 自分のパッケージで使う
 
-When you build a feature that should share the installation's anonymous id, import the value once and reuse it — telemetry, feedback, and DeepSeek already use the same id, so your records line up with theirs:
+インストールの匿名 id を共有すべき機能を作る場合、値を 1 回インポートして再利用する — テレメトリー、フィードバック、DeepSeek は既に同じ id を使うため、自記録はそれらと整列する:
 
 ```ts
 import { getOrCreateAnonymousUserId } from '@deepseek-ai/dsh-anonymous-user-id'
 
-const userId = getOrCreateAnonymousUserId() // stable for the process lifetime
+const userId = getOrCreateAnonymousUserId() // プロセス生存期間は安定
 ```
 
-The value is stable for the process and matches what the built-in features use; it changes only when the file is deleted and a later launch mints a replacement. Even when the home directory cannot be written, the value still works for the current run, so records keep flowing.
+値はプロセスに安定し、組み込み機能が使うものと一致する。ファイル削除後に後の起動が置換を発行した場合のみ変わる。ホームディレクトリに書き込めない場合も値は現行実行で有効のままであるため、記録は流れ続ける。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the package and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではパッケージの背後にある設計上の決定と、それを実現するコード箇所を説明する。観測可能な動作はすべて[このパッケージの使い方](#use-this-package)で扱っている。
 
-### Design philosophy
+### 設計思想
 
-- **Random, never derived.** The id comes from `crypto.randomUUID()`; it is never derived from the hostname, network address, git remote, or any other identifying source, so anonymity is a property of the mint.
-- **Synchronous and memoized.** One process touches each resolved file path once: reads and writes are synchronous, and the result is memoized per resolved file path.
-- **Best-effort persistence.** A write failure still returns a usable id for the run, so telemetry and feedback never block on an unwritable home.
-- **Library, not plugin.** There is no Cordis plugin entry or config.
+- **ランダムであり、導出ではない。**id は `crypto.randomUUID()` 由来であり、ホスト名・ネットワークアドレス・git リモートその他識別情報源から決して導出されないため、匿名性は発行の性質である。
+- **同期的かつメモ化。**1 プロセスは各解決ファイルパスに 1 回だけ触れる。読み書きは同期的であり、結果は解決ファイルパス単位にメモ化される。
+- **最善努力の永続化。**書き込み失敗でも実行用に使える id を返すため、テレメトリーとフィードバックは書き込み不可ホームで止まらない。
+- **プラグインではなくライブラリ。**Cordis プラグイン入口も設定もない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Library entry: `getOrCreateAnonymousUserId`, file persistence, per-path memoization |
-| [`tests/anonymous-user-id.spec.ts`](tests/anonymous-user-id.spec.ts) | Exercised behavior: mint, persistence, corruption, concurrency, memoization |
+| [`src/index.ts`](src/index.ts) | ライブラリ入口。`getOrCreateAnonymousUserId`、ファイル永続化、パス単位メモ化 |
+| [`tests/anonymous-user-id.spec.ts`](tests/anonymous-user-id.spec.ts) | 検証済み動作。発行、永続化、破損、同時実行、メモ化 |
 
-### The API
+### API
 
-The package exposes one function that returns the installation's anonymous id, minting and persisting it on first use; the exact signature, options, and defaults live in `src/index.ts`.
+パッケージはインストールの匿名 id を返す関数を 1 つ公開し、初回使用で発行・永続化する。正確なシグネチャ・オプション・既定値は `src/index.ts` にある。
 
-### Storage contract
+### 記憶域契約
 
-The file is a bare UUID line named by `ANONYMOUS_USER_ID_FILE_NAME`, validated against a UUID pattern on read. A first writer uses exclusive creation (`wx`); a concurrent loser rereads and adopts the winner's value. A corrupt or unreadable file falls through to mint-and-overwrite. Memoization is keyed by resolved file path, so distinct homes never share an id.
+ファイルは `ANONYMOUS_USER_ID_FILE_NAME` 名の素 UUID 行であり、読み取りで UUID パターン検証される。最初の書き手は排他作成 (`wx`) を使い、同時敗者は勝者値を読み直して採用する。破損や読み取り不可ファイルは発行・上書きにフォールスルーする。メモ化は解決ファイルパス鍵のため、異なるホームは決して id を共有しない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the identity group map to the home-path resolution this package builds on and the features that use the id.
+パッケージレベルの契約では足りない場合にこれらのページを読むとよい。アイデンティティグループマップから、このパッケージが土台にするホームパス解決、それを使う機能へと進む。
 
-- [identity group map](../README.md) — the sibling packages and group scope.
-- [dsh-home-paths](../../util/home-paths/README.md) — owns `$DSH_HOME` and `~/.dsh` resolution.
-- [dsh-session-telemetry-otel](../../session/session-telemetry-otel/README.md) — reports the id as the OTel Resource `user.id`.
-- [dsh-command-feedback](../../feedback/command-feedback/README.md) — embeds the id in the feedback acknowledgement.
-- [dsh-llm-deepseek](../../llm/llm-deepseek/README.md) — sends `x-deepseek-harness-user-id` on provider requests.
-- [Session telemetry subsystem](../../../docs/subsystems/session-telemetry.md) — the telemetry seam and its backend contract.
+- [identity グループマップ](../README.md) — 兄弟パッケージとグループ範囲。
+- [dsh-home-paths](../../util/home-paths/README.md) — `$DSH_HOME` と `~/.dsh` 解決を所有する。
+- [dsh-session-telemetry-otel](../../session/session-telemetry-otel/README.md) — OTel Resource `user.id` として id を報告する。
+- [dsh-command-feedback](../../feedback/command-feedback/README.md) — フィードバック受理に id を埋め込む。
+- [dsh-llm-deepseek](../../llm/llm-deepseek/README.md) — プロバイダーリクエストに `x-deepseek-harness-user-id` を送る。
+- [Session telemetry サブシステム](../../../docs/subsystems/session-telemetry.md) — テレメトリーシームとそのバックエンド契約。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the shared identifier reaches DeepSeek only as model-hidden HTTP metadata and registers nothing model-facing.
+なし。共有識別子はモデル隠し HTTP メタデータとしてのみ DeepSeek に届き、モデルに面した登録は一切ない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; the transport header changes neither tokens nor the model-visible prefix.
+なし。転送ヘッダーはトークンもモデル可視接頭辞も変えない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits describe when the id is a poor fit or needs special attention. They are current package constraints, not a general comparison of anonymity approaches or a task backlog.
+これらの制限は id が不向きな場合や特別な注意を要する場合を記述する。これらは現在のパッケージ制約であり、匿名手法の一般比較やタスクバックログではない。
 
-- **No recovery after deletion** — losing the file mints a new anonymous identity by design; recovery would require stable derivation material that weakens anonymity.
-- **Best-effort concurrency** — a reader landing in the narrow interval between a concurrent process's exclusive create and completed write can use a different in-memory UUID for that run; later launches converge on the persisted value.
-- **No cross-home identity** — different `$DSH_HOME` values cannot be correlated.
-- **Configured DeepSeek gateways receive the id** — `dsh-llm-deepseek` sends the stable header to its resolved `baseURL`, including deployment overrides, independently of telemetry sharing mode.
-- **Deleting the file does not reset the current process** — memoization keeps the run's id until the next launch.
+- **削除後の回復なし** — ファイル喪失は設計上新規匿名アイデンティティを発行する。回復は匿名性を弱める安定導出材料を要する。
+- **最善努力の同時実行** — 同時プロセスの排他作成と書き込み完了の狭い間隙に着地した読み手は、その実行で異なるインメモリ UUID を使いうる。後の起動は永続値に収束する。
+- **ホーム横断アイデンティティなし** — 異なる `$DSH_HOME` 値は相関できない。
+- **設定 DeepSeek ゲートウェイは id を受け取る** — `dsh-llm-deepseek` は解決 `baseURL` に安定ヘッダーを送り、デプロイ上書きを含め、テレメトリー共有モードとは独立である。
+- **ファイル削除は現行プロセスをリセットしない** — メモ化は次回起動まで実行 id を保持する。
 
 <a id="dev-note"></a>
 ### Dev Note
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナ向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers: open questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above and the package code, and conclusions migrate there once they stabilize.
+この Dev Note はメンテナ向け作業コンテキストである。未決定の開かれた問いと方向性であり、明示的に非権威である — 出荷動作・制限・受理根拠は上記セクションとパッケージコードにあり、結論は安定後にそこへ移る。
 
-#### Open: file-format evolution
+#### 未決: ファイル形式進化
 
-The persistence contract is a bare UUID line with no version marker. Adding a second value beside the id, or wrapping the line in a container, has no migration story for existing files; a versioned line format is one way to make such a change safe.
+永続契約はバージョン印なし素 UUID 行である。id 脇に 2 件目の値を追加する、行をコンテナーで包むなどの変更に移行筋書きはない。バージョン付き行形式はそのような変更を安全にする一法である。
 
 </details>

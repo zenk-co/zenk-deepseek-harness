@@ -1,172 +1,172 @@
 ---
-description: "Enable profile plugins and install, remove or select bundles from the Web sidebar or an agent."
+description: "プロファイルのプラグインを有効化し、Web サイドバーまたはエージェントからバンドルをインストール、削除、選択する。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-plugin-manager
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-Application-owned profiles supply their bundled package-manager invocation through launcher facts. It takes precedence over `pnpmCommand` for package operations and registry inspection; its environment applies only to those subprocesses.
+アプリケーション所有のプロファイルは、ランチャー情報を通じて、組み込みのパッケージマネージャー呼び出しを提供する。これはパッケージ操作とレジストリ検査において `pnpmCommand` より優先される。その環境はそれらのサブプロセスにのみ適用される。
 
-## Summary
+## 概要
 
-Manage the current profile's plugins without editing configuration by hand. Enable or disable individual plugin entries, select installed bundles, and install or remove external bundles. With HMR enabled in YAML, configuration changes apply immediately; without HMR, the running composition remains until restart. Changes affect every session using the profile.
+現在のプロファイルのプラグインを、手作業で設定を編集することなく管理する。個々のプラグインエントリを有効化または無効化し、インストール済みバンドルを選択し、外部バンドルをインストールまたは削除する。YAML で HMR を有効にすると設定変更は即座に適用され、HMR がなければ実行中の構成は再起動まで残る。変更はそのプロファイルを使うすべてのセッションに影響する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Failure behavior](#failure-behavior)
-- [Dev Note](#dev-note)
+- [本パッケージの使用方法](#use-this-package)
+- [実装の理解](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [失敗時の動作](#failure-behavior)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 本パッケージの使用方法
 
-Base-backed profiles provide the manager. In Web, the sidebar's **Plugins** page ([ui-plugin-manager](../../client/ui-plugin-manager/README.md)) manages the profile's bundles and their uniquely addressable rows; the Settings Plugin list stays read-only. Agent-preset rows remain read-only. The `plugin_manager` tool exposes the same operations and is enabled in Creator mode. Other presets keep it disabled by default. Every tool action requires `danger-full-access` or approval for that call. Under lower sandbox modes, `ask` requests approval; `never`, rejection, cancellation, or an unavailable approval channel prevents execution. An approval leaves the session permission mode unchanged. Profile changes persist across sessions, and installed Host code executes in-process outside the workspace sandbox. Dependency build-script approval remains separate.
+Base に基づくプロファイルがこのマネージャーを提供する。Web では、サイドバーの**プラグイン**ページ（[ui-plugin-manager](../../client/ui-plugin-manager/README.md)）が、プロファイルのバンドルとその一意にアドレス指定できる行を管理する。設定のプラグインリストは読み取り専用のままである。エージェントプリセットの行も読み取り専用のままである。`plugin_manager` ツールは同じ操作を公開し、Creator モードで有効になる。他のプリセットではデフォルトで無効のままである。すべてのツールアクションには `danger-full-access` か、その呼び出しへの承認が必要である。より低いサンドボックスモードでは、`ask` が承認を要求する。`never`、拒否、キャンセル、または承認チャネルが利用できない場合は実行されない。承認はセッションの許可モードを変更しない。プロファイルの変更はセッションをまたいで永続化され、インストールされた Host コードはワークスペースサンドボックスの外のプロセス内で実行される。依存関係のビルドスクリプトの承認は別個のままである。
 
-For a deployment without agent presets, enable the tool in the profile patch. Preset-backed sessions use their preset’s `tool-plugin-manager` entry.
+エージェントプリセットのないデプロイでは、プロファイルパッチでツールを有効にする。プリセットに基づくセッションは、そのプリセットの `tool-plugin-manager` エントリを使う。
 
 ```yaml
 - id: tool-plugin-manager
   disabled: false
 ```
 
-A plugin toggle updates only `disabled` in the last matching override in the profile's `cordis.patch.yml`, or appends an override when none matches. Matching uses the entry id and any module-name assertion. An override holding only `id` and `disabled` is removed, and none is appended, when the bundle layers and the remaining profile patches already give the entry the requested state, so the profile patch records only departures from the bundles. Home and invocation patches are left out of that comparison; they apply after the profile patch and do not decide what it records. A bundle toggle changes `package.json`'s ordered `dsh.profile.bundles` list. Disabling retains the dependency; enabling appends the bundle at the end, which can change configuration precedence. Installation enables a new bundle by default. Home and invocation patches retain their higher priority.
+プラグイントグルは、プロファイルの `cordis.patch.yml` 内の最後の一致するオーバーライドの `disabled` のみを更新し、一致がなければオーバーライドを追加する。マッチングにはエントリ id と、あればモジュール名のアサーションを使う。バンドルレイヤーと残りのプロファイルパッチがすでにそのエントリに要求された状態を与えている場合、`id` と `disabled` のみを持つオーバーライドは削除され、オーバーライドは追加されない。そのためプロファイルパッチはバンドルからの逸脱のみを記録する。ホームパッチと起動パッチはこの比較から除外される。これらはプロファイルパッチの後に適用され、プロファイルパッチが何を記録するかを決めない。バンドルトグルは `package.json` の順序付き `dsh.profile.bundles` リストを変更する。無効化は依存関係を保持し、有効化はバンドルを末尾に追加するため、設定の優先順位が変わることがある。インストールは新しいバンドルをデフォルトで有効にする。ホームパッチと起動パッチは、より高い優先順位を保つ。
 
-A selected bundle that cannot load remains in `listBundles` with an `error`; `enabled` records the saved selection, not successful loading. The plugin page shows the error and allows deselection. A broken bundle cannot be enabled. Management bundles remain protected if their files become unreadable.
+読み込めない選択済みバンドルは、`error` 付きで `listBundles` に残る。`enabled` は保存された選択を記録するものであり、読み込みの成功ではない。プラグインページはそのエラーを表示し、選択解除を許可する。壊れたバンドルは有効化できない。管理バンドルは、そのファイルが読めなくなっても保護されたままである。
 
-`listBundles` includes optional display `meta` for each bundle and its declared plugin rows, including disabled bundles. The Client selects a language from these values. The separate `description` field is the bundle's raw `package.json.description`; a metadata diagnostic does not block management. `source` gives a profile dependency as a spec `pnpm add` accepts: a git address or URL as recorded without the user information of an http(s) URL (a query string stays as recorded), a `file:` or `link:` path made absolute against the profile or the home directory for `~`, and a registry range, tag, or alias after the package name, as is any spec of a package installed under another name; a bundle the installation supplies has none, even when the profile also depends on it, because the installation's copy is the one that loads. The `plugin_manager` tool omits UI display metadata from list results.
+`listBundles` には、各バンドルとその宣言されたプラグイン行のオプションの表示用 `meta`（無効なバンドルも含む）が含まれる。Client はこれらの値から言語を選択する。別個の `description` フィールドはバンドルの生の `package.json.description` である。メタデータの診断は管理を妨げない。`source` は、`pnpm add` が受け付ける spec としてプロファイル依存関係を与える。すなわち、http(s) URL のユーザー情報を除いて記録どおりの git アドレスまたは URL（クエリ文字列は記録どおりに残る）、プロファイルまたは `~` ではホームディレクトリを基準に絶対化される `file:` または `link:` パス、パッケージ名の後ろのレジストリレンジ、タグ、またはエイリアスであり、別名でインストールされたパッケージの spec も同様である。インストールが供給するバンドルは、プロファイルも依存している場合でも `source` を持たない。読み込まれるのはインストール側のコピーだからである。`plugin_manager` ツールはリスト結果から UI 表示メタデータを省略する。
 
-`listBundles` marks shipped optional bundles and on-demand catalog entries as `official`, independently of package installation. `availability` identifies a readable installation-provided or profile package, or `missing`; on-demand catalog entries exclude undeclared transitive copies. `installed` only records whether the profile declares the dependency. An absent on-demand entry carries embedded localized metadata and a host-derived `installTarget` containing the running DSH version and install spec, without registry access. Profile-declared packages with unreadable files retain their declaration and expose the normal error.
+`listBundles` は、出荷済みのオプションバンドルとオンデマンドカタログエントリを、パッケージのインストールとは独立に `official` とマークする。`availability` は、読み取り可能なインストール提供パッケージまたはプロファイルパッケージを識別するか、`missing` を示す。オンデマンドカタログエントリは、宣言されていない推移的コピーを除外する。`installed` はプロファイルが依存関係を宣言しているかどうかのみを記録する。存在しないオンデマンドエントリは、埋め込みのローカライズ済みメタデータと、実行中の DSH バージョンおよびインストール spec を含むホスト由来の `installTarget` を持ち、レジストリアクセスを伴わない。ファイルが読めないプロファイル宣言済みパッケージは宣言を保持し、通常のエラーを公開する。
 
-`inspect(spec, options)` reads what a spec names before anything installs: a registry name is asked of the registry through `pnpm view`, run in the profile directory so the same proxy and authentication settings apply as to the install; an absolute path has its `package.json` read; a git address or tarball answers only its form and the `host` it is fetched from. The answer carries the name, version, description, whether the package declares a bundle, and the `registry` that answered, or a `problem`: `invalid-spec`, `already-installed`, `not-found`, `not-a-package`, `not-a-bundle`, `network`, or `unknown`, with the `registries` asked. A caller's `signal` or `inspectTimeoutMs` ends the lookup.
+`inspect(spec, options)` は、何かがインストールされる前に、spec が名指しするものを読み取る。レジストリ名は `pnpm view` を通じてレジストリに問い合わせる。これはプロファイルディレクトリで実行されるため、インストールと同じプロキシと認証の設定が適用される。絶対パスはその `package.json` を読む。git アドレスまたは tarball はその形式と、取得元の `host` のみを答える。回答は、名前、バージョン、説明、パッケージがバンドルを宣言しているかどうか、回答した `registry` を運ぶか、`problem`（`invalid-spec`、`already-installed`、`not-found`、`not-a-package`、`not-a-bundle`、`network`、`unknown` のいずれか）を運び、問い合わせた `registries` を伴う。呼び出し元の `signal` または `inspectTimeoutMs` が検索を終了させる。
 
-Published installations offer `package@<running DSH version>`. Source Web and development Desktop offer `link:<absolute workspace package directory>` from the running CLI installation, including its development symlink. Package names resolve through workspace manifests; current working directory and prerelease suffixes do not select a checkout. Missing packages, bundle patches, or built entry points produce a diagnostic without registry fallback. Prepare the checkout with `pnpm install` and `pnpm run build`. Linked packages use that checkout’s dependencies and peers; rebuilding and restarting remain necessary after code changes. A registry copy or another checkout’s link can need replacement even when its version matches.
+公開済みインストールは `package@<running DSH version>` を提供する。ソース Web と開発用 Desktop は、実行中の CLI インストールから `link:<absolute workspace package directory>` を提供し、その開発用シンボリックリンクを含む。パッケージ名はワークスペースマニフェストを通じて解決される。現在の作業ディレクトリとプレリリースサフィックスはチェックアウトを選択しない。パッケージ、バンドルパッチ、またはビルド済みエントリポイントの欠落は、レジストリフォールバックなしの診断を生成する。チェックアウトは `pnpm install` と `pnpm run build` で準備する。リンクされたパッケージはそのチェックアウトの依存関係と peer を使う。コード変更後は再ビルドと再起動が必要なままである。レジストリのコピーまたは別のチェックアウトのリンクは、バージョンが一致していても置き換えが必要になることがある。
 
-Official on-demand installs call the same `installBundle` operation as other bundles. Registry targets use `saveExact: true`; development targets retain the ordinary `link:` dependency. An explicit update removes the installed package and installs the target with the current `enabled` selection; without HMR, a bundle that runs since startup cannot be removed, so the installation goes over it and reports `restart-required`. A failed or cancelled installation after the removal leaves the package uninstalled, and the reinstalled bundle joins the end of the selection. Turning Off only deselects the layer, and Remove uses the existing removal checks. Installation failure restores the profile manifest and lockfile; activation failure after installation can retain the saved dependency and selection. The existing peer-compatibility check still applies, without an additional Official-only version admission rule.
+公式のオンデマンドインストールは、他のバンドルと同じ `installBundle` 操作を呼び出す。レジストリターゲットは `saveExact: true` を使い、開発ターゲットは通常の `link:` 依存関係を保つ。明示的な更新はインストール済みパッケージを削除し、現在の `enabled` 選択でターゲットをインストールする。HMR がない場合、起動以来実行されているバンドルは削除できないため、インストールはその上に重なり、`restart-required` を報告する。削除後のインストールが失敗またはキャンセルされると、パッケージは未インストールのまま残り、再インストールされたバンドルは選択の末尾に加わる。オフにする操作はレイヤーを非選択にするだけで、削除は既存の削除チェックを使う。インストール失敗はプロファイルマニフェストとロックファイルを復元する。インストール後のアクティベーション失敗は、保存された依存関係と選択を保持しうる。既存の peer 互換性チェックは引き続き適用され、追加の公式専用バージョン受け入れルールはない。
 
-`installBundle` checks GitHub repositories with `git ls-remote` before starting pnpm, using the profile directory and the installer's Git and proxy configuration. `githubConnectionTimeoutMs` defaults to 5000 ms and limits only this check, not package download or builds. The check disables credential helpers and prompts; only network failures and timeouts stop installation, reporting `failedAt: 'spec-host'` with the existing failure kind and diagnostic log. Authentication, repository lookup and other failures are left to pnpm, including its HTTPS-to-SSH fallback. Cancellation and manager disposal stop the check and its descendants. Registry packages, paths, tarballs and other Git hosts skip this check. A reachable repository can still fail during download or bundle validation.
+`installBundle` は pnpm を開始する前に、`git ls-remote` で GitHub リポジトリを検査する。プロファイルディレクトリと、インストーラーの Git 設定およびプロキシ設定を使う。`githubConnectionTimeoutMs` はデフォルト 5000 ms で、この検査のみを制限し、パッケージのダウンロードやビルドは制限しない。この検査は資格情報ヘルパーとプロンプトを無効にする。インストールを止めるのはネットワーク障害とタイムアウトのみで、既存の失敗種別と診断ログを伴って `failedAt: 'spec-host'` を報告する。認証、リポジトリ検索、その他の失敗は pnpm に委ねられ、HTTPS から SSH へのフォールバックも含む。キャンセルとマネージャーの破棄は検査とその子孫を停止する。レジストリのパッケージ、パス、tarball、その他の Git ホストはこの検査をスキップする。到達可能なリポジトリでも、ダウンロード中またはバンドル検証中に失敗することがある。
 
-Registries are asked in turn. The plan starts at `options.registry`, else the configured `registry` (`null` is the one pnpm's own configuration names), and continues through `fallbackRegistries` while a registry is unreachable, times out, or answers that it has no such package or version, which a mirror not yet synced does. A registry outside the configured set is asked alone, so a private registry never falls through to a public one; pnpm's own registry counts as part of the set only while what it names, read through `pnpm config get registry` before each plan, is npm's own registry or one of the fallbacks, and is otherwise asked alone as a private one. A registry pnpm's own configuration already names is asked once. The lookup runs `pnpm view` with `--registry` and without pnpm's own retries, so a dead registry is reported within `inspectTimeoutMs` and the next one is asked; pnpm prints its refusal as JSON on stdout, which is read like stderr. The install keeps pnpm's retry settings. `registries()` answers the configured set and what pnpm names, for a picker. The [registry Agent Note](../../../.agents/notes/implemented/architecture/2026-09-18-plugin-install-registries.md) owns the rationale.
+レジストリは順に問い合わせられる。プランは `options.registry` から、なければ設定された `registry`（`null` は pnpm 自身の設定が名指しするもの）から始まり、レジストリに到達できない、タイムアウトする、またはそのようなパッケージやバージョンを持たないと答える間（未同期のミラーがそうする）、`fallbackRegistries` へと続く。設定された集合の外にあるレジストリは単独で問い合わせられるため、プライベートレジストリがパブリックなものへ流れることは決してない。pnpm 自身のレジストリが集合の一部として数えられるのは、各プランの前に `pnpm config get registry` を通じて読み取られるそれが名指しするものが npm 自身のレジストリまたはフォールバックの 1 つである間だけで、それ以外はプライベートなものとして単独で問い合わせられる。pnpm 自身の設定がすでに名指ししているレジストリは 1 回だけ問い合わせられる。検索は `--registry` 付きで、pnpm 自身の再試行なしに `pnpm view` を実行するため、死んだレジストリは `inspectTimeoutMs` 以内に報告され、次のものが問い合わせられる。pnpm は拒否を stdout に JSON として出力し、それは stderr と同様に読まれる。インストールは pnpm の再試行設定を維持する。`registries()` はピッカー用に、設定された集合と pnpm が名指しするものを答える。根拠は [レジストリの Agent Note](../../../.agents/notes/implemented/architecture/2026-09-18-plugin-install-registries.md) が所有する。
 
-The browser-safe `@deepseek-ai/dsh-plugin-manager/registry` entry exports `OFFICIAL_NPM_REGISTRY` and `NPMMIRROR_REGISTRY` for consumers that identify those public registries.
+ブラウザーセーフな `@deepseek-ai/dsh-plugin-manager/registry` エントリは、それらのパブリックレジストリを識別する消費者向けに `OFFICIAL_NPM_REGISTRY` と `NPMMIRROR_REGISTRY` をエクスポートする。
 
-`installBundle` accepts a caller-generated `requestId`, under which `plugin-manager/install-log` streams each pnpm run's output and `plugin-manager/install-state` announces `installing`, `cancelling`, and `applying`; `installing` is announced once per registry asked, with the `attempt`'s registry, position, and the plan's length. The install asks the same plan as the lookup, from `options.registry`, running `pnpm add` with `--registry` and restoring the profile files between attempts; it moves on for the failures another registry can change and stops at any other, and at a failure whose error line names the host a git or tarball spec is fetched from, which no registry stands in for; `failedAt` says which of the two the last failed run could not reach. `cancelInstall(requestId)` stops the run and answers `cancelled` only after the Git check or pnpm exited and the files are back, `too-late` once the bundle is being applied, and `not-running` for any other id; the install call then reports `application: 'cancelled'`. A run that fails, is cancelled, or adds a package without a bundle patch restores `package.json` and `pnpm-lock.yaml` as they were; `packageResult.kind` classifies the last run from its exit and output, `registries` names every registry asked, `bundle` names the package a finished run added, and `version` its manifest version, which can differ from the version `inspect` read, for example when pnpm's `minimumReleaseAge` holds back a recent release. `listBundles` carries each bundle's one-liner (the package `description`), the rows its patch declares with their live entries, and the built-in rows it overrides; it lists the profile's own bundles, the bundles the installation supplies, and a selected name without a bundle patch as a `not-bundle` problem, while an unselected plain dependency is left out. A bundle the launcher's `OPTIONAL_BUNDLES` names is `optional`: shipped switched off for the person to turn on, never removable, and selected by no shipped template ([rationale](../../../.agents/notes/implemented/process/2026-09-15-shipped-optional-bundles.md)). Every completed operation emits `plugin-manager/changed`; a patch generation applied outside the manager, by HMR's watcher after a CLI or hand edit, announces nothing, so the page learns of it on its next read.
+`installBundle` は呼び出し元が生成した `requestId` を受け付ける。そのもとで `plugin-manager/install-log` が各 pnpm 実行の出力をストリームし、`plugin-manager/install-state` が `installing`、`cancelling`、`applying` を告知する。`installing` は、問い合わせたレジストリごとに 1 回、`attempt` のレジストリ、位置、プランの長さとともに告知される。インストールは検索と同じプランを `options.registry` から問い合わせ、`--registry` 付きで `pnpm add` を実行し、試行間でプロファイルのファイルを復元する。別のレジストリが変えられる失敗では次へ進み、それ以外の失敗では停止する。また、git または tarball の spec の取得元ホストをエラー行が名指しする失敗（どのレジストリもそれを代行できない）でも停止する。`failedAt` は、最後に失敗した実行がこの 2 つのうちどちらに到達できなかったかを示す。`cancelInstall(requestId)` は実行を停止し、Git 検査または pnpm が終了してファイルが戻った後にのみ `cancelled` を、バンドルが適用され始めた後は `too-late` を、その他の id には `not-running` を答える。その場合インストール呼び出しは `application: 'cancelled'` を報告する。失敗した、キャンセルされた、またはバンドルパッチなしでパッケージを追加した実行は `package.json` と `pnpm-lock.yaml` を元の状態に復元する。`packageResult.kind` は最後の実行をその終了状態と出力から分類し、`registries` は問い合わせたすべてのレジストリを名指しし、`bundle` は完了した実行が追加したパッケージを名指しし、`version` はそのマニフェストバージョンであり、`inspect` が読んだバージョンと異なることがある（たとえば pnpm の `minimumReleaseAge` が最近のリリースを保留する場合）。`listBundles` は、各バンドルの一行説明（パッケージの `description`）、そのパッチが宣言する行とそれらのライブエントリ、およびそれがオーバーライドする組み込み行を運ぶ。プロファイル自身のバンドル、インストールが供給するバンドル、およびバンドルパッチのない選択済みの名前を `not-bundle` 問題としてリストし、選択されていない単なる依存関係は除外される。ランチャーの `OPTIONAL_BUNDLES` が名指しするバンドルは `optional` である。すなわち、ユーザーがオンにできるようオフで出荷され、決して削除できず、どの出荷済みテンプレートにも選択されない（[根拠](../../../.agents/notes/implemented/process/2026-09-15-shipped-optional-bundles.md)）。完了したすべての操作は `plugin-manager/changed` を発行する。マネージャーの外で、CLI または手編集の後に HMR のウォッチャーによって適用されたパッチ生成は何も告知しないため、ページは次の読み取りでそれを知る。
 
-`waitForInstall(requestId)` lets a client recover a lost response by waiting for the active installation, including its non-cancellable application phase. It returns the same outcome as the original call, or `null` if the request is not active. Completed results are not retained; `null` establishes neither success nor cancellation.
+`waitForInstall(requestId)` は、キャンセル不可能な適用フェーズも含め、アクティブなインストールを待つことで、クライアントが失われた応答を回復できるようにする。元の呼び出しと同じ結果を返すか、リクエストがアクティブでなければ `null` を返す。完了した結果は保持されない。`null` は成功もキャンセルも確定しない。
 
-When pnpm 11 blocks dependency scripts, the failed installation reports every pending package name in the profile under `pendingBuilds`, including names left by earlier attempts and names the run reported as ignored. pnpm writes those entries into `pnpm-workspace.yaml` only when it can prompt, so the manager records the reported names itself; a failed run restores `package.json` and `pnpm-lock.yaml` but deliberately not `pnpm-workspace.yaml`. The Web plugin page offers **Allow these scripts and retry**; the tool can grant permission on the user's behalf through `approvedBuilds` on `install_bundle`, after the user approves those scripts in the conversation. The service validates pending names; it does not verify conversation approval. Approval persists by package name in this profile, permits commands with the host user's permissions, and survives another installation failure. Only currently undecided names can be approved; existing denials and wildcard rules cannot be overridden through this action. Approval rejects YAML anchors or aliases inside `allowBuilds`. Retry preserves the original activation choice.
+pnpm 11 が依存関係スクリプトをブロックすると、失敗したインストールはプロファイル内のすべての保留中パッケージ名を `pendingBuilds` の下に報告する。以前の試行が残した名前や、実行が無視されたと報告した名前も含まれる。pnpm はプロンプトを出せるときにのみそれらのエントリを `pnpm-workspace.yaml` に書き込むため、マネージャーが報告された名前を自身で記録する。失敗した実行は `package.json` と `pnpm-lock.yaml` を復元するが、`pnpm-workspace.yaml` は意図的に復元しない。Web のプラグインページは**これらのスクリプトを許可して再試行**を提供する。ツールは、ユーザーが会話内でそれらのスクリプトを承認した後、`install_bundle` の `approvedBuilds` を通じてユーザーに代わって許可を与えられる。サービスは保留中の名前を検証するが、会話での承認は検証しない。承認はこのプロファイル内でパッケージ名ごとに永続化し、ホストユーザーの権限でコマンドを許可し、別のインストール失敗を経ても存続する。承認できるのは現在未決定の名前のみである。既存の拒否とワイルドカードルールは、このアクションを通じてオーバーライドできない。承認は `allowBuilds` 内の YAML アンカーまたはエイリアスを拒否する。再試行は元のアクティベーション選択を保つ。
 
 <a id="version-compatibility-and-exemptions"></a>
-### Version compatibility and exemptions
+### バージョン互換性と適用除外
 
-An install command that names packages (`add`, or `install` with specs) is checked before pnpm runs: a local path is read from its own `package.json`, and a registry spec is resolved through pnpm's registry lookup for the version its range selects and the `engines` and `peerDependencies` that version declares. An unmet DSH requirement rejects the operation before pnpm runs, so nothing is downloaded and no build script runs; a build approval the caller supplied with the request is recorded before this check and remains. A git or tarball spec needs the fetch itself, so it is judged after installation: the operation then restores the profile manifest and lockfile, reinstalls the restored lockfile (or, when the profile had none, reinstalls from the restored manifest without creating one), and reports whether that recovery succeeded; already permitted build-script effects may remain. A dependency the run did not change never blocks an unrelated operation: it stays installed, the run reports a warning naming it, and profile startup denies it. Installation requests with `enabled: false` are checked the same way. Startup checks run independently; see [App boot](../app-boot/README.md#profiles) for range semantics. Version exemptions do not authorize dependency scripts.
+パッケージを名指しするインストールコマンド（`add`、または spec 付きの `install`）は、pnpm が実行される前に検査される。ローカルパスは自身の `package.json` から読まれ、レジストリ spec は pnpm のレジストリ検索を通じて、そのレンジが選択するバージョンと、そのバージョンが宣言する `engines` および `peerDependencies` について解決される。満たされない DSH 要件は pnpm の実行前に操作を拒否するため、何もダウンロードされず、ビルドスクリプトも実行されない。呼び出し元がリクエストとともに渡したビルド承認は、この検査の前に記録され、残る。git または tarball の spec は取得自体を必要とするため、インストール後に判定される。その場合、操作はプロファイルマニフェストとロックファイルを復元し、復元されたロックファイルを再インストールし（プロファイルにロックファイルがなかった場合は、新規作成せずに復元されたマニフェストから再インストールし）、その回復が成功したかどうかを報告する。すでに許可されたビルドスクリプトの効果は残ることがある。実行が変更しなかった依存関係は、無関係な操作を決して妨げない。それはインストールされたままになり、実行はそれを名指しする警告を報告し、プロファイル起動がそれを拒否する。`enabled: false` のインストールリクエストも同じように検査される。起動時の検査は独立に実行される。レンジの意味論は [アプリ起動](../app-boot/README.md#profiles) を参照。バージョンの適用除外は依存関係スクリプトを許可しない。
 
-An exemption is an exact `package-name@version` mapped to a list of exact DSH runtime versions in the profile's own `compatibility.json`, beside `package.json` and `cordis.patch.yml`. Writing it changes no dependency, no bundle selection, and no patch layer. Neither plugin upgrades nor DSH upgrades inherit permission. Use `plugin_manager` with `list_version_exemptions` to obtain the runtime version and saved grants, then `set_version_exemption` with `target`, `runtimeVersion`, and `enabled`. Granting also requires `acceptRisk: true`, only after warning the user that incompatible plugins may cause crashes or data loss and receiving explicit permission for that pair. The service checks the acknowledgement and versions, not conversation history. Revocation can remove historical runtime grants.
+適用除外は、`package.json` と `cordis.patch.yml` の隣にあるプロファイル自身の `compatibility.json` の中で、正確な `package-name@version` を正確な DSH ランタイムバージョンのリストにマップしたものである。それを書き込んでも、依存関係、バンドル選択、パッチレイヤーのいずれも変わらない。プラグインのアップグレードも DSH のアップグレードも許可を継承しない。`plugin_manager` の `list_version_exemptions` でランタイムバージョンと保存済みの付与を取得し、次に `set_version_exemption` を `target`、`runtimeVersion`、`enabled` とともに使う。付与には `acceptRisk: true` も必要であり、これは互換性のないプラグインがクラッシュやデータ損失を引き起こしうることをユーザーに警告し、そのペアについて明示的な許可を得た後にのみ行う。サービスが検査するのは確認応答とバージョンであり、会話履歴ではない。取り消しは過去のランタイム付与を削除できる。
 
-A grant takes effect on the next composition. A live profile recomposes, so the granted plugin mounts in the running session and the result reports `applied`; a startup-only profile keeps its current entries until restart and reports `restart-required`.
+付与は次の構成で有効になる。ライブプロファイルは再構成されるため、付与されたプラグインは実行中のセッションにマウントされ、結果は `applied` を報告する。起動専用プロファイルは再起動まで現在のエントリを保ち、`restart-required` を報告する。
 
-The CLI exposes `dsh plugin --profile <profile> version-exemptions`, `allow-version <package@version> --dsh-version <runtime> --accept-risk`, and `revoke-version <package@version> --dsh-version <runtime>`. A grant prints a risk warning before saving. A compatibility refusal carries the `incompatible-version` code with each refused package's `name`, `version`, `runtimeVersion`, and unmet `requirements`, keyed `engines.dsh` or by DSH peer package name; each surface renders that record itself. The Web page words it through its locale dictionary, and a CLI refusal prints the exact `allow-version` command. Use the tool or CLI to grant an exemption and retry the original operation.
+CLI は `dsh plugin --profile <profile> version-exemptions`、`allow-version <package@version> --dsh-version <runtime> --accept-risk`、`revoke-version <package@version> --dsh-version <runtime>` を公開する。付与は保存前にリスク警告を表示する。互換性の拒否は `incompatible-version` コードを、拒否された各パッケージの `name`、`version`、`runtimeVersion`、および満たされていない `requirements`（`engines.dsh` または DSH peer パッケージ名をキーとする）とともに運ぶ。各サーフェスはそのレコードを自身でレンダリングする。Web ページは自身のロケール辞書を通じて文言化し、CLI の拒否は正確な `allow-version` コマンドを表示する。適用除外を付与して元の操作を再試行するには、ツールまたは CLI を使う。
 
-### Configuration
+### 設定
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `pnpmCommand` | `pnpm` | The pnpm executable name or path, resolved through `PATH` like the `dsh plugin` command. |
-| `inspectTimeoutMs` | `20000` | Bound on one registry lookup an inspection runs, in milliseconds. |
-| `githubConnectionTimeoutMs` | `5000` | Deadline for the GitHub repository check before installation, in milliseconds. |
-| `registry` | pnpm's own | The registry lookups and installations ask first, as an http(s) URL; absent, the one pnpm's own configuration names. |
-| `fallbackRegistries` | `['https://registry.npmmirror.com/']` | Registries asked in turn, as http(s) URLs, while the one before is unreachable or holds no copy of the package; pnpm's own registry joins the order only while it names npm's own registry or one of these. |
-| `outputBytes` | `16384` | Maximum pnpm diagnostic bytes returned per operation; the full output remains in the returned log path. |
-| `lockWaitMs` | `120000` | Maximum time in milliseconds to acquire the profile write lock. |
-| `idleTimeoutMs` | `600000` | Maximum time in milliseconds a service package run may capture no output before the manager terminates it; a run with inherited descriptors (`dsh plugin`) is never bound. |
+| `pnpmCommand` | `pnpm` | `dsh plugin` コマンドと同様に `PATH` を通じて解決される、pnpm 実行ファイルの名前またはパス。 |
+| `inspectTimeoutMs` | `20000` | 1 回の検査が実行する 1 つのレジストリ検索の上限（ミリ秒）。 |
+| `githubConnectionTimeoutMs` | `5000` | インストール前の GitHub リポジトリ検査の期限（ミリ秒）。 |
+| `registry` | pnpm 自身 | 検索とインストールが最初に問い合わせるレジストリ（http(s) URL）。省略時は pnpm 自身の設定が名指しするもの。 |
+| `fallbackRegistries` | `['https://registry.npmmirror.com/']` | 直前の 1 つに到達できない、またはパッケージのコピーを持たない間、http(s) URL として順に問い合わせられるレジストリ。pnpm 自身のレジストリは、npm 自身のレジストリまたはこれらの 1 つを名指ししている間のみこの順序に加わる。 |
+| `outputBytes` | `16384` | 操作ごとに返される pnpm 診断バイトの最大値。完全な出力は返されるログパスに残る。 |
+| `lockWaitMs` | `120000` | プロファイル書き込みロックを取得する最大時間（ミリ秒）。 |
+| `idleTimeoutMs` | `600000` | マネージャーが終了させるまでに、サービスのパッケージ実行が出力を捕捉しないままでいられる最大時間（ミリ秒）。記述子を継承した実行（`dsh plugin`）は決して制限されない。 |
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックで展開</summary>
 
-The service and `dsh plugin` share the package operations in [operations.ts](src/operations.ts). The launcher supplies the current profile; [DSH HMR](../hmr/README.md) serializes module reloads, file watching and management writes. Each configuration refresh re-reads bundle selection and patch layers, updates the original root Include, and awaits removed plugin resources as well as the remaining Loader tree. CLI and service operations share the profile manifest writer lock to prevent concurrent package and manifest writes. HMR does not acquire that lock. Pnpm runs outside the HMR queue; installation selects the bundle after pnpm succeeds, while removal deselects and unloads the bundle before pnpm runs.
+サービスと `dsh plugin` は [operations.ts](src/operations.ts) のパッケージ操作を共有する。ランチャーが現在のプロファイルを供給し、[DSH HMR](../hmr/README.md) がモジュール再読み込み、ファイル監視、管理の書き込みを直列化する。設定の更新ごとにバンドル選択とパッチレイヤーを読み直し、元のルート Include を更新し、削除されたプラグインリソースと残りの Loader ツリーの両方を待つ。CLI とサービスの操作は、パッケージとマニフェストの同時書き込みを防ぐためにプロファイルマニフェストの書き込みロックを共有する。HMR はそのロックを取得しない。pnpm は HMR キューとは別に実行される。インストールは pnpm の成功後にバンドルを選択し、削除は pnpm の実行前にバンドルの選択を解除してアンロードする。
 
-Without HMR, installing a new package, enabling a bundle and a successful removal publish the profile's runtime resolution; with HMR, every operation leaves publication to [HMR](../hmr/README.md)'s recomposition, which removes dropped mappings after their plugins stop. Shared dependencies may pass to another bundle's declaration when their normalized directory and scope stay unchanged. Without HMR, a deselected startup bundle still runs: while any such bundle is absent from the saved selection, subsequent package operations retain the entire current table and report `restart-required`. Other new installations and removals of non-running bundles can still publish without HMR; activation waits for restart. With HMR, `installBundle()` refuses a package that is already installed with `already-installed`, before pnpm runs, when the spec names it: a registry name, a local directory, or the git or tarball spec its dependency was saved with. A package that cannot be removed, such as a bundle carrying plugin management, therefore cannot be installed over with HMR. Installing another version is a removal and an installation, so the previous version's plugins stop, its modules are evicted and its mappings removed before the new one is installed; the Web page's Update for an Official plugin does both. A git or tarball spec whose package is known only after pnpm ran can still install over an installed package: without HMR it reports `restart-required`, and with HMR the recomposition replaces the running plugins whose loaded files changed. A replacement that fails to import or start reports `failed` with the activation diagnostic, which names the import error; the previous version no longer runs, and every later operation imports it again, so it starts once its files or dependencies are corrected. An unchanged import failure is a warning of later operations; a changed one fails them. A publication the runtime resolution rejects, because an installed package now resolves to another directory or a mapping of the DSH installation changed, leaves the composition as it was, after stopping and starting again the rows it would drop, and reports `restart-required` with `package-moved`. Disabling or removing a bundle evicts the modules of the packages whose mappings it drops. Every `restart-required` result carries `restartReason`: `no-hmr`, `package-moved`, or the [HMR pending reason](../hmr/README.md) of a changed module that loads only after a restart, unless the operation reports `overridden` ([decision](../../../.agents/notes/implemented/architecture/2026-09-30-profile-package-refresh-and-manifest-invalidation.md)).
+HMR がない場合、新しいパッケージのインストール、バンドルの有効化、成功した削除がプロファイルのランタイム解決を公開する。HMR がある場合、すべての操作は公開を [HMR](../hmr/README.md) の再構成に委ね、再構成はプラグインの停止後に落とされたマッピングを除去する。共有依存関係は、正規化されたディレクトリとスコープが変わらない場合、別のバンドルの宣言に移ることがある。HMR がない場合、非選択の起動バンドルはそれでも実行される。そのようなバンドルが保存された選択にない間、後続のパッケージ操作は現在のテーブル全体を保持し、`restart-required` を報告する。実行されていないバンドルの他の新規インストールと削除は、HMR なしでも公開できる。アクティベーションは再起動を待つ。HMR がある場合、`installBundle()` は、spec がすでにインストールされているパッケージを名指しするとき（レジストリ名、ローカルディレクトリ、またはその依存関係が保存された git もしくは tarball の spec）は、pnpm が実行される前に `already-installed` で拒否する。したがって、プラグイン管理を担うバンドルのように削除できないパッケージには、HMR で上書きインストールできない。別のバージョンのインストールは削除とインストールであるため、前のバージョンのプラグインが停止し、そのモジュールが追い出され、新しいものがインストールされる前にそのマッピングが削除される。Web ページの公式プラグインの更新はその両方を行う。pnpm が実行された後にのみパッケージが判明する git または tarball の spec は、インストール済みパッケージに上書きインストールできる。HMR なしでは `restart-required` を報告し、HMR ありでは再構成が、読み込まれたファイルが変わった実行中プラグインを置き換える。インポートまたは起動に失敗した置き換えは、インポートエラーを名指しするアクティベーション診断とともに `failed` を報告する。前のバージョンはもはや実行されず、以降のすべての操作がそれを再度インポートするため、そのファイルまたは依存関係が修正されれば起動する。変わらないインポート失敗は後続操作の警告であり、変わったものはそれらを失敗させる。インストール済みパッケージが別のディレクトリに解決されるようになった、または DSH インストールのマッピングが変わったためにランタイム解決が公開を拒否する場合、落とされるはずの行を停止して再度起動した後、構成を元のままにし、`package-moved` を伴って `restart-required` を報告する。バンドルの無効化または削除は、そのマッピングが落とすパッケージのモジュールを追い出す。すべての `restart-required` 結果は `restartReason` を運ぶ。すなわち `no-hmr`、`package-moved`、または再起動後にのみ読み込まれる変更済みモジュールの [HMR 保留理由](../hmr/README.md) であり、操作が `overridden` を報告する場合を除く（[決定](../../../.agents/notes/implemented/architecture/2026-09-30-profile-package-refresh-and-manifest-invalidation.md)）。
 
-A service run whose captured output stays silent for `idleTimeoutMs` is terminated, reports `timedOut` alongside its exit status, is classified `timeout` whatever status the signal left behind, and is not retried on the next registry, which bounds how long one operation can hold the profile lock; the CLI inherits the terminal, captures no output, and stays unbounded for its operator to interrupt. A run completes when its process exits, and the pipes then drain under a bounded grace period, so a descendant that inherited them cannot hold the operation open. The diagnostic file is closed before the call settles, including preparation or spawn failures. A terminated run stops its whole process tree and waits for it, because a lifecycle script outlives the pnpm process that started it (issue #4981). Each operation records the pnpm run it starts in `.plugin-manager/run.json` and removes the record when the run ends. A lock whose holder process exited is taken over by the next writer, but that process's pnpm tree can still be running, so an operation that finds a record waits up to five seconds for the recorded run to stop and otherwise fails with a diagnostic that names the process and the record, without running pnpm. Dependency-only changes do not trigger configuration reloads.
+捕捉した出力が `idleTimeoutMs` の間沈黙したままのサービス実行は終了させられ、終了ステータスとともに `timedOut` を報告し、シグナルが残したステータスが何であれ `timeout` に分類され、次のレジストリで再試行されない。これにより、1 つの操作がプロファイルロックを保持できる時間が制限される。CLI は端末を継承し、出力を捕捉せず、オペレーターが中断できるよう無制限のままである。実行はプロセスが終了すると完了し、その後パイプは有界の猶予期間内にドレインされるため、パイプを継承した子孫が操作を開いたままにすることはできない。診断ファイルは、準備または spawn の失敗を含め、呼び出しが確定する前に閉じられる。終了させられた実行はプロセスツリー全体を停止してそれを待つ。ライフサイクルスクリプトが、それを開始した pnpm プロセスより長生きするからである（issue #4981）。各操作は開始した pnpm 実行を `.plugin-manager/run.json` に記録し、実行が終わるとそのレコードを削除する。保持プロセスが終了したロックは次の書き込み者が引き継ぐが、そのプロセスの pnpm ツリーはまだ実行中かもしれない。そのため、レコードを見つけた操作は記録された実行が停止するのを最大 5 秒待ち、そうでなければ pnpm を実行せずに、プロセスとレコードを名指しする診断で失敗する。依存関係のみの変更は設定の再読み込みをトリガーしない。
 
-Results contain the last attempted stage, target, saved-state change, application status and error codes. Web dictionaries render management text; pnpm and Loader diagnostics remain unmodified. Unrelated pre-existing inactive entries return warnings; new or changed failures and inactive explicit enablement targets fail the operation. A failed or cancelled package run, or failed bundle validation, restores the manifest and lockfile snapshotted before pnpm ran ([rationale](../../../.agents/notes/implemented/architecture/2026-09-15-guided-plugin-installation.md)); later failures retain saved changes as described in [Failure behavior](#failure-behavior). Installations are tracked by request id until their call settles, so a cancellation names one run and joins its settlement without taking the profile lock. The CLI inherits authentication variables and terminal descriptors; service operations use a scrubbed environment and captured output.
+結果には、最後に試みた段階、ターゲット、保存状態の変更、適用ステータス、エラーコードが含まれる。Web の辞書が管理テキストをレンダリングし、pnpm と Loader の診断は変更されないままである。無関係な既存の非アクティブエントリは警告を返す。新規または変更された失敗と、非アクティブな明示的有効化ターゲットは操作を失敗させる。失敗またはキャンセルされたパッケージ実行、またはバンドル検証の失敗は、pnpm 実行前にスナップショットされたマニフェストとロックファイルを復元する（[根拠](../../../.agents/notes/implemented/architecture/2026-09-15-guided-plugin-installation.md)）。その後の失敗は[失敗時の動作](#failure-behavior)で説明するとおり、保存された変更を保持する。インストールは呼び出しが確定するまでリクエスト id で追跡されるため、キャンセルは 1 つの実行を名指しし、プロファイルロックを取らずにその確定に合流する。CLI は認証変数と端末記述子を継承する。サービスの操作はスクラブされた環境と捕捉された出力を使う。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-- [App boot](../app-boot/README.md) — profile layers and startup policy.
-- [Plugin inventory](../../host/plugin-inventory/README.md) — current Loader and preset observations.
-- [Plugin manager page](../../client/ui-plugin-manager/README.md) — the Web sidebar page over this service.
-- [Plugin settings](../../client/ui-settings-plugin-inventory/README.md) — the read-only Web inventory.
+- [アプリ起動](../app-boot/README.md) — プロファイルレイヤーと起動ポリシー。
+- [プラグインインベントリ](../../host/plugin-inventory/README.md) — 現在の Loader とプリセットの観測。
+- [プラグインマネージャーページ](../../client/ui-plugin-manager/README.md) — このサービスの上にある Web サイドバーページ。
+- [プラグイン設定](../../client/ui-settings-plugin-inventory/README.md) — 読み取り専用の Web インベントリ。
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Management tool
+### 管理ツール
 
-#### What the model sees
+#### モデルが見るもの
 
-The [`plugin_manager` tool](../../../docs/tool-catalog.md#deepseek-aidsh-plugin-manager) lists plugin entries and bundles and performs profile-wide changes. Its results include saved-state changes, application status and package diagnostics. A change result that is not plainly applied adds `nextStep`, a sentence derived from its application status, refusal code, package-manager failure kind or restart reason that says what the model does next or tells the user. Management operations do not inject messages into Agents.
+[`plugin_manager` ツール](../../../docs/tool-catalog.md#deepseek-aidsh-plugin-manager) はプラグインエントリとバンドルをリストし、プロファイル全体の変更を実行する。その結果には保存状態の変更、適用ステータス、パッケージ診断が含まれる。明白に適用されていない変更結果は `nextStep` を追加する。これは、その適用ステータス、拒否コード、パッケージマネージャーの失敗種別、または再起動理由から導かれる文で、モデルが次に何をするか、またはユーザーに何を伝えるかを示す。管理操作はエージェントにメッセージを注入しない。
 
-#### Token effect
+#### トークン効果
 
-The tool declaration is present when its consumer is mounted; each invocation adds its returned inventory or change result.
+ツール宣言はその消費者がマウントされているときに存在する。各呼び出しは返されたインベントリまたは変更結果を追加する。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Tool results append to the transcript. Enabling or disabling other tools can change subsequent tool declarations and their cache reuse.
+ツール結果はトランスクリプトに追加される。他のツールの有効化または無効化は、後続のツール宣言とそのキャッシュ再利用を変えることがある。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Web approves the entire displayed pending group; it has no per-package selection.
-- pnpm verifies every lockfile tarball URL against its default registry when a command changes the lockfile. After a package was installed from another registry, installing a different package with the default registry, or removing that package after a restart, can fail with `ERR_PNPM_TARBALL_URL_MISMATCH`.
-- Package replacements require restarting the process without HMR. A package relinked outside Plugin Manager while it is still installed waits for a restart.
-- Startup-only profiles cannot remove packages used to start the current process; stop it and use `dsh plugin`.
-- The manager cannot disable its own management components, change another profile, or edit an agent preset's composition.
-- A failed removal may leave dependencies partially changed, and a failed or cancelled installation can leave downloaded files under `node_modules` or the pnpm store. Inactive dependencies with missing files remain removable. Diagnostic logs remain under the profile's `.plugin-manager/logs` directory.
-- Management results describe Host activation. Browser synchronization failures appear separately in the Settings plugin list.
-- Desktop package operations remain owned by the Desktop shell.
+- Web は表示された保留グループ全体を承認する。パッケージ単位の選択はない。
+- pnpm はコマンドがロックファイルを変更するとき、そのデフォルトレジストリに対してすべてのロックファイル tarball URL を検証する。別のレジストリからパッケージをインストールした後に、デフォルトレジストリで別のパッケージをインストールするか、再起動後にそのパッケージを削除すると、`ERR_PNPM_TARBALL_URL_MISMATCH` で失敗することがある。
+- パッケージの置き換えは、HMR なしではプロセスの再起動を必要とする。まだインストールされている間に Plugin Manager の外で再リンクされたパッケージは、再起動を待つ。
+- 起動専用プロファイルは、現在のプロセスの起動に使われたパッケージを削除できない。プロセスを停止して `dsh plugin` を使う。
+- マネージャーは自身の管理コンポーネントを無効化したり、別のプロファイルを変更したり、エージェントプリセットの構成を編集したりできない。
+- 失敗した削除は依存関係を部分的に変更したまま残すことがあり、失敗またはキャンセルされたインストールは `node_modules` または pnpm ストアの下にダウンロード済みファイルを残すことがある。ファイルが欠落した非アクティブな依存関係は削除可能なままである。診断ログはプロファイルの `.plugin-manager/logs` ディレクトリに残る。
+- 管理結果は Host のアクティベーションを記述する。ブラウザー同期の失敗は設定のプラグインリストに別途現れる。
+- Desktop のパッケージ操作は Desktop シェルが所有したままである。
 
 <a id="failure-behavior"></a>
-### Failure behavior
+### 失敗時の動作
 
-Failures preserve completed steps and report the actual remaining state. Profile dependencies without valid bundle metadata remain visible and removable, with enablement unavailable.
+失敗は完了したステップを保持し、実際に残った状態を報告する。有効なバンドルメタデータのないプロファイル依存関係は、表示されたままで削除可能であり、有効化は利用できない。
 
-| Failed operation | Handling |
+| 失敗した操作 | 対応 |
 |---|---|
-| Install: pnpm or bundle validation fails | Restore `package.json` and `pnpm-lock.yaml` as snapshotted before pnpm ran; files pnpm downloaded may remain. Report installation failure. |
-| Enable: saving selection or loading fails | Keep the installed dependency and any saved selection. Report enablement failure; allow repair, disablement or removal. |
-| Resolution publication after a successful package operation fails | Keep completed disk changes and the previous runtime table. Report `application: 'failed'` with the publication diagnostic; pnpm's zero exit code does not mean publication succeeded. |
-| Remove: any step fails | Stop at the failed step. Preserve completed changes, retain remaining dependencies for retry, and report removal failure. Do not re-enable the bundle. |
+| インストール: pnpm またはバンドル検証が失敗 | pnpm 実行前にスナップショットしたとおりに `package.json` と `pnpm-lock.yaml` を復元する。pnpm がダウンロードしたファイルは残ることがある。インストール失敗を報告する。 |
+| 有効化: 選択の保存または読み込みが失敗 | インストール済みの依存関係と保存された選択を保持する。有効化失敗を報告し、修復、無効化、または削除を許可する。 |
+| 成功したパッケージ操作後の解決の公開が失敗 | 完了したディスク変更と以前のランタイムテーブルを保持する。公開の診断とともに `application: 'failed'` を報告する。pnpm の終了コード 0 は公開の成功を意味しない。 |
+| 削除: いずれかのステップが失敗 | 失敗したステップで停止する。完了した変更を保持し、残りの依存関係を再試行のために残し、削除失敗を報告する。バンドルを再有効化しない。 |
 
-Installation finishes after pnpm and bundle validation succeed; subsequent publication or enablement failure does not undo installation. Removal proceeds in order: remove the bundle from `dsh.profile.bundles`, unload its runtime contributions, run `pnpm remove`, then publish runtime resolution unless a deselected startup bundle still runs without HMR. `pnpm remove` runs with the registry this manager last installed the package from in the running process, because pnpm verifies lockfile tarball URLs against its default registry; a package installed before the process started is removed with the registry an installation asks first. A failed step prevents subsequent steps; publication failure after removal does not restore deleted packages. A selected name that neither the profile's dependencies nor the installation holds, such as a retired bundle, is also removable; its removal stops after deselection and runs no pnpm.
+インストールは pnpm とバンドル検証が成功した後に完了する。その後の公開または有効化の失敗はインストールを取り消さない。削除は順に進む。`dsh.profile.bundles` からバンドルを削除し、そのランタイム寄与をアンロードし、`pnpm remove` を実行し、次に、非選択の起動バンドルが HMR なしでまだ実行中でない限り、ランタイム解決を公開する。`pnpm remove` は、このマネージャーが実行中プロセスでそのパッケージを最後にインストールしたレジストリで実行される。pnpm がロックファイルの tarball URL をそのデフォルトレジストリに対して検証するからである。プロセス開始前にインストールされたパッケージは、インストールが最初に問い合わせるレジストリで削除される。失敗したステップは後続のステップを妨げる。削除後の公開失敗は削除されたパッケージを復元しない。プロファイルの依存関係にもインストールにもない選択済み名（たとえば廃止されたバンドル）も削除可能である。その削除は選択解除の後に停止し、pnpm を実行しない。
 
-Restoration rewrites only the two snapshotted files; user-authored patch configuration, application data, diagnostic logs and files pnpm downloaded remain untouched, and the next package operation prunes packages no manifest references.
+復元はスナップショットされた 2 つのファイルのみを書き換える。ユーザーが作成したパッチ設定、アプリケーションデータ、診断ログ、pnpm がダウンロードしたファイルは手つかずのままであり、次のパッケージ操作がマニフェストから参照されていないパッケージを刈り込む。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

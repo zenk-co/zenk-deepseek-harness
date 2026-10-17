@@ -1,25 +1,25 @@
 ---
-description: "Records a persistence type transition and its compatibility acknowledgement."
+description: "永続化型の移行とその互換性の承認を記録する。"
 kind: persistence-change
 ---
 
 # 2026-09-13-working-directory
 
-English | [中文](2026-09-13-working-directory.zh.md)
+日本語 | [English](2026-09-13-working-directory.en.md) | [中文](2026-09-13-working-directory.zh.md)
 
-## Summary
+## 概要
 
-Adds durable per-Session working-directory changes.
+セッション単位の作業ディレクトリー変更を durable に追加する。
 
-## Table of Contents
+## 目次
 
-- [Declaration](#declaration)
-- [Compatibility](#compatibility)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [宣言](#declaration)
+- [互換性](#compatibility)
+- [検証](#verification)
+- [開発者ノート](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -33,16 +33,16 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-Existing Session headers and events remain valid. The new event is required on read: older builds that do not know working-directory/change refuse logs containing it. The event vocabulary grows without changing the structural Session format.
+既存のセッションヘッダーとイベントは引き続き有効である。新しいイベントは読み取り時に必須である: working-directory/change を知らない古いビルドはそれを含むログを拒否する。イベント語彙は構造的な Session 形式を変えずに拡張される。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Focused working-directory and system-prompt suites pass 113 tests with per-file 100% coverage. Keyless headless replay verifies changes, recovery, user-context notices, and a stable system prompt.
+working-directory と system-prompt の focused スイートが 113 テストに合格し、ファイル単位 100% カバレッジである。キーレス headless リプレイが変更、回復、ユーザーコンテキスト通知、安定したシステムプロンプトを検証する。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
 None.

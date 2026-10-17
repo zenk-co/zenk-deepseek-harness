@@ -1,18 +1,18 @@
-# Working Directory
+# 作業ディレクトリ
 
-English | [中文](working-directory.zh.md)
+日本語 | [English](working-directory.en.md) | [中文](working-directory.zh.md)
 
-A Session's active directory is owned by [`dsh-working-directory`](../../packages/session/working-directory/README.md). The immutable header identifies the original project; `working-directory/change` records the effective directory used by later directory-based operations. The generated [persistence catalog](../persistence-catalog.md) owns the event declaration.
+セッションの有効ディレクトリは [`dsh-working-directory`](../../packages/session/working-directory/README.md) が所有する。不変ヘッダーが元のプロジェクトを識別し、`working-directory/change` が後続のディレクトリ基準操作で使う実効ディレクトリを記録する。生成済み[永続化カタログ](../persistence-catalog.md)がイベント宣言を所有する。
 
-## Directory selection
+## ディレクトリ選択
 
-`ctx.workingDirectory.get(session)` reads the logged value. `ensure(agent)` validates it and restores the original project when the directory disappeared. `set(agent, path)` validates and records a requested change. Sessions without a header directory use the configured runtime fallback; an unavailable fallback produces an error.
+`ctx.workingDirectory.get(session)` は記録値を読む。`ensure(agent)` はそれを検証し、ディレクトリが消えていれば元のプロジェクトに復元する。`set(agent, path)` は要求された変更を検証して記録する。ヘッダーディレクトリのないセッションは設定済みランタイムフォールバックを使い、フォールバックが利用できなければエラーになる。
 
-Changes are local to one Session. Relative filesystem operations, newly started processes, instruction discovery, skills, and file completion use the active directory. Existing terminals and persistent shells retain their own directories. Sandbox writable roots and project membership remain anchored to the original project.
+変更は 1 つのセッションに局所的である。相対ファイルシステム操作、新規起動プロセス、指示探索、スキル、ファイル補完は有効ディレクトリを使う。既存ターミナルと持続シェルは各自のディレクトリを保つ。サンドボックス書き込みルートとプロジェクト所属は元のプロジェクトに錨止めされたままである。
 
-## Model context
+## モデル文脈
 
-The initial value and subsequent current values reach the model as required user-context snapshots, even when optional runtime context is disabled. Each committed change attempts to queue a notice through the ordinary Agent inbox; cancellation or disposal can discard notices before request admission. The directory event survives, and the next admitted request receives the current value. Directory context never enters the system prompt. [`working_directory`](../../packages/session/tool-working-directory/README.md) exposes one optional `cd` argument.
+初期値と後続の現在値は、任意ランタイム文脈が無効でも、必須のユーザー文脈スナップショットとしてモデルに届く。確定した各変更は通常の Agent 受信箱経由で通知の待ち行列化を試みるが、取消や破棄により受付け前に通知が捨てられうる。ディレクトリイベントは残存し、次に受け付けられたリクエストが現在値を受ける。ディレクトリ文脈はシステムプロンプトに入らない。[`working_directory`](../../packages/session/tool-working-directory/README.md) は任意の `cd` 引数 1 つを表す。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -20,13 +20,13 @@ The initial value and subsequent current values reach the model as required user
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によりソースから生成 (doc-sync 内の `pnpm run verify-cordis-catalog` で鮮度を検証。`pnpm run gen-cordis-catalog` で再生成) — 言語面は地域固有の対訳文書経路のみが異なる。署名ブロックは `ts cordis-catalog` フェンスを使い元のソース JSDoc を保つ。送出様式は[入門](../cordis-primer.md#dispatch-modes)で定義し、継承 `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxworkingdirectory--workingdirectoryservice"></a>
 
 ### `ctx.workingDirectory` — `WorkingDirectoryService`
 
-One owner for each Session's effective directory and its model-visible changes.
+各セッションの実効ディレクトリとそのモデル可視な変更の単一所有者。
 
 ```ts cordis-catalog
 /**
@@ -58,7 +58,7 @@ ensure(agent: Agent, signal?: AbortSignal): Promise<string>
 set(agent: Agent, path: string, signal?: AbortSignal): Promise<string>
 ```
 
-Types: [Agent](core.md) · [Session](session.md)
+型: [Agent](core.md) · [Session](session.md)
 
-Source: [`packages/session/working-directory/src/index.ts`](../../packages/session/working-directory/src/index.ts)
+ソース: [`packages/session/working-directory/src/index.ts`](../../packages/session/working-directory/src/index.ts)
 <!-- END GENERATED cordis-surface -->

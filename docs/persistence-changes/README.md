@@ -1,90 +1,90 @@
 ---
-description: "Review and maintain recorded Session persistence-type changes, their schema snapshots, and compatibility decisions."
+description: "記録された Session 永続化型の変更、そのスキーマスナップショット、および互換性の決定を確認・維持する。"
 ---
 
-# Persistence-type change records
+# 永続化型変更レコード
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this reference to inspect an acknowledged Session persistence-type change and its predecessor. Each record binds a compatibility decision to exact generated schemas. Local checks compare the current source with the recorded history using only files in the checkout. Start with the [review cookbook](../cookbook/reviewing-persistence-type-changes.md) when changing a persisted type.
+このリファレンスは、承認された Session 永続化型の変更とその前任者を検査するために使う。各レコードは互換性の決定を正確な生成スキーマに結び付ける。ローカルチェックは、チェックアウト内のファイルだけを使って現在のソースと記録された履歴を比較する。永続化型を変更するときは[レビュー Cookbook](../cookbook/reviewing-persistence-type-changes.md) から始める。
 
-For older tagged versions, use the [prerelease archive](releases/README.md). It reconstructs alpha/RC type differences for historical reading and format validation; its observations do not serve as current compatibility acknowledgements.
+古いタグ付きバージョンには[プレリリースアーカイブ](releases/README.md)を使う。これは履歴の閲覧とフォーマット検証のために alpha/RC の型の差分を再構成する; その観察は現在の互換性承認として機能しない。
 
-For complete schemas grouped by Session format, use the [format references](historical-formats/README.md). Their coverage follows the writer constant, including intermediate formats without a release tag.
+Session フォーマット別にグループ化された完全なスキーマには[フォーマット参照](historical-formats/README.md)を使う。そのカバレッジは writer 定数に従い、リリースタグのない中間フォーマットも含む。
 
-## Table of Contents
+## 目次
 
-- [Files and ownership](#files-and-ownership)
-- [Compatibility rules](#compatibility-rules)
-- [History and limitations](#history-and-limitations)
-- [Dev Note](#dev-note)
+- [ファイルと所有権](#files-and-ownership)
+- [互換性規則](#compatibility-rules)
+- [履歴と制限](#history-and-limitations)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="files-and-ownership"></a>
-## Files and ownership
+## ファイルと所有権
 
-The generated [catalog](../persistence-catalog.md) provides readable declarations and digests; the [schema inventory](../persistence-schema.json) contains the normalized types. Roots cover the logical Session header, the physical JSONL header line, the event envelope, and every repository-declared event. Referenced types contribute transitively to each affected root's digest.
+生成された[カタログ](../persistence-catalog.md)は読みやすい宣言とダイジェストを提供する; [スキーマインベントリ](../persistence-schema.json)は正規化された型を含む。ルートは論理 Session ヘッダー、物理 JSONL ヘッダー行、イベントエンベロープ、およびリポジトリが宣言するすべてのイベントをカバーする。参照される型は影響を受ける各ルートのダイジェストに推移的に寄与する。
 
-Each dated record has four sibling files:
+日付付きの各レコードは 4 つの兄弟ファイルを持つ:
 
-| File | Owner |
+| ファイル | 所有者 |
 |---|---|
-| `YYYY-MM-DD-slug.md` | English acknowledgement with `kind: persistence-change`, one machine declaration, compatibility reasoning, and verification evidence |
-| `YYYY-MM-DD-slug.zh.md` | Chinese counterpart with the identical machine declaration |
-| `YYYY-MM-DD-slug.i18n.yaml` | Generated bilingual consistency record |
-| `YYYY-MM-DD-slug.schema.json` | Generated complete after schemas for the affected roots that remain present |
+| `YYYY-MM-DD-slug.md` | 英語の承認。`kind: persistence-change`、1 つの機械宣言、互換性の理由付け、および検証証拠を含む |
+| `YYYY-MM-DD-slug.zh.md` | 同一の機械宣言を持つ中国語の対側 |
+| `YYYY-MM-DD-slug.i18n.yaml` | 生成されたバイリンガル一貫性レコード |
+| `YYYY-MM-DD-slug.schema.json` | 生成された、影響を受けるルートのうち現存するものの完全な after スキーマ |
 
-`finalized/vN.json` records the complete root classifications/digests of an accepted compatibility baseline and semantic hashes of its accepted records. The [finalization record](../session-format-status.md#finalization-record) requires its checkpoint. Current V4 schemas may evolve compatibly; the checkpoint protects accepted machine declarations and after schemas even after the writer advances, while excluding prose, aliases, and source locations from record hashes.
+`finalized/vN.json` は、承認された互換性ベースラインの完全なルート分類/ダイジェストと、その承認済みレコードのセマンティックハッシュを記録する。[ファイナライゼーションレコード](../session-format-status.md#finalization-record)はそのチェックポイントを必要とする。現在の V4 スキーマは互換的に進化してよい; チェックポイントは、writer が進んだ後でも承認された機械宣言と after スキーマを保護し、散文、エイリアス、ソース位置はレコードハッシュから除外する。
 
-A maintainer captures an agreed format with [`createPersistenceFinalizationCheckpoint`](../../scripts/persistence-finalization.ts), writes a new version-named checkpoint without replacing an earlier one, and advances the paired `latestFinalizedVersion`. The helper requires current schemas to match complete acknowledged history. Run the ordinary verifier before committing.
+メンテナーは合意されたフォーマットを [`createPersistenceFinalizationCheckpoint`](../../scripts/persistence-finalization.ts) でキャプチャし、以前のものを置き換えずに新しいバージョン名のチェックポイントを書き、対になる `latestFinalizedVersion` を進める。ヘルパーは現在のスキーマが完全な承認済み履歴と一致することを要求する。コミット前に通常の検証ツールを実行する。
 
-The [record template](../../.agents/skills/dsh-doc/templates/persistence-change.md) defines the authored format. Record creation accepts a bilingual prose input and generates the machine declaration, snapshots, catalog pair, and consistency records. The verifier reads the machine declaration once from the English file and checks the Chinese declaration for equality. A declaration names each affected root, its predecessor record, its after digest, and its compatibility decision. A new root has no predecessor; a deletion has no after schema and retains an explicit tombstone.
+[レコードテンプレート](../../.agents/skills/dsh-doc/templates/persistence-change.md)が作成フォーマットを定義する。レコード作成はバイリンガルの散文入力を受け取り、機械宣言、スナップショット、カタログペア、一貫性レコードを生成する。検証ツールは機械宣言を英語ファイルから一度読み、中国語宣言の等価性をチェックする。宣言は影響を受ける各ルート、その前任レコード、その after ダイジェスト、および互換性の決定を名指す。新しいルートは前任者を持たない; 削除は after スキーマを持たず、明示的なトゥームストーンを保持する。
 
 <a id="compatibility-rules"></a>
-## Compatibility rules
+## 互換性規則
 
-Every detected structural change requires an acknowledgement. Keep the Session version when older readers preserve the required meaning of accepted data, safely ignore optional features while retaining opaque records, or refuse unsupported required data before execution, mutation, or recovery truncation. New readers must preserve historical meaning and readability. Bump only when unsafe interpretation cannot be prevented by an effective discriminator. Unknown fields or values count only when existing readers actually handle them safely; type differences alone cannot establish that behavior. See the [reader-compatibility decision](../../.agents/notes/implemented/process/2026-10-08-session-reader-compatibility-review.md).
+検出されたすべての構造変更は承認を必要とする。古いリーダーが承認済みデータの必要な意味を保つ場合、不透明なレコードを保持しつつ省略可能な機能を安全に無視する場合、または実行、ミューテーション、復旧トランケーションの前にサポートされない必須データを拒否する場合は、Session バージョンを保つ。新しいリーダーは履歴の意味と可読性を保たなければならない。効果的なディスクリミネーターで安全でない解釈を防げない場合にのみバンプする。未知のフィールドまたは値は、既存のリーダーが実際にそれらを安全に処理する場合にのみ数える; 型の差分だけではその挙動を確立できない。[reader-compatibility の決定](../../.agents/notes/implemented/process/2026-10-08-session-reader-compatibility-review.md)を参照。
 
-| Detected change | Recording requirement |
+| 検出された変更 | 記録要件 |
 |---|---|
-| Add an optional event-body property, including its complete subtree | `same-version` |
-| Make a required event-body property optional | `same-version` |
-| Add an ordinary event type | `same-version` |
-| Add a higher numeric `data.version` to an ordinary event while retaining every old payload alternative under the existing compatibility rules | `same-version` |
-| Add an explicitly qualified attribution kind to a user/developer source slot whose before and after schemas carry the same supported policy | `same-version` |
-| Make an optional property required, add a required property, change an existing type, or remove/rename a property or event | Compatibility review for `same-version`, or explicit `version-bump` |
-| Change the Session header or event envelope | Compatibility review for `same-version`; a header version change requires `version-bump` |
+| 省略可能なイベントボディプロパティの追加 (完全なサブツリーを含む) | `same-version` |
+| 必須のイベントボディプロパティを省略可能にする | `same-version` |
+| 通常のイベント型の追加 | `same-version` |
+| 通常のイベントに、既存の互換性規則の下で古いすべてのペイロード代替を保ちつつ、より高い数値の `data.version` を追加する | `same-version` |
+| before と after のスキーマが同じサポートポリシーを持つ user/developer ソーススロットに、明示的に修飾されたアトリビューション kind を追加する | `same-version` |
+| 省略可能なプロパティを必須にする、必須プロパティを追加する、既存の型を変更する、またはプロパティやイベントを削除/改名する | `same-version` の互換性レビュー、または明示的な `version-bump` |
+| Session ヘッダーまたはイベントエンベロープを変更する | `same-version` の互換性レビュー; ヘッダーバージョンの変更には `version-bump` が必要 |
 
-The classifier identifies established same-version cases and changes requiring compatibility review; it cannot decide semantic safety. The latter require an explicit `--decision same-version` when recording or updating without a version increase. The acknowledgement’s Compatibility section explains actual reader behavior in both directions, and Verification records the executed checks. Review the complete transition, including simultaneous changes. An explicit `version-bump` instead requires its own increasing `SessionHeader.version` transition; a same-version decision cannot waive a header version change. Finalized records remain immutable, so a later record cannot reuse the accepted 3→4 transition.
+分類器は確立された same-version ケースと互換性レビューを要する変更を識別する; 意味的な安全性を決定することはできない。後者は、バージョンを上げずに記録または更新する際に明示的な `--decision same-version` を必要とする。承認の Compatibility セクションは双方向の実際のリーダー挙動を説明し、Verification は実行されたチェックを記録する。同時変更を含め、完全な遷移をレビューする。明示的な `version-bump` は代わりに、独自の増加する `SessionHeader.version` 遷移を必要とする; same-version の決定がヘッダーバージョン変更を免除することはできない。ファイナライズされたレコードは不変のままであるため、後のレコードが承認済みの 3→4 遷移を再利用することはできない。
 
-The CLI requires that explicit choice before generating a flagged same-version record. CI reads the recorded `decision: same-version` and accepts it when the ordinary history, schema, and header-version constraints hold, whether the record was generated or edited manually. Verification cannot establish how the record was authored or whether a human reviewed it. Reviewers compare base and head inventories with [`persistence-review`](../cookbook/reviewing-persistence-type-changes.md#generate); `--check` validates current-tree consistency and cannot reveal a transition already covered by an acknowledgement.
+CLI は、フラグ付きの same-version レコードを生成する前にその明示的な選択を要求する。CI は記録された `decision: same-version` を読み、通常の履歴、スキーマ、ヘッダーバージョンの制約が成り立つ場合にそれを受け入れる。レコードが生成されたか手動で編集されたかは問わない。検証は、レコードがどのように作成されたか、または人間がレビューしたかを確立できない。レビュアーは [`persistence-review`](../cookbook/reviewing-persistence-type-changes.md#generate) でベースとヘッドのインベントリを比較する; `--check` は現在のツリーの一貫性を検証し、承認ですでにカバーされた遷移を明らかにすることはできない。
 
-An ordinary event may add payload alternatives with a required, nonnegative integer `data.version` greater than every existing payload version, provided every existing alternative remains readable under the established same-version rules above. Optional property additions and required-to-optional changes may accompany the new version; each retained alternative is compared separately. Other payload changes require compatibility review. Older readers may reject the new payload version. The [catalog acknowledgement](2026-09-20-unknown-child-catalog.md) records one such transition.
+通常のイベントは、すべての既存ペイロードバージョンより大きい、必須の非負整数 `data.version` を持つペイロード代替を追加してよい。ただし、既存のすべての代替が上記の確立された same-version 規則の下で読める場合に限る。省略可能プロパティの追加と必須から省略可能への変更は新しいバージョンに伴ってよい; 保持された各代替は別々に比較される。その他のペイロード変更は互換性レビューを必要とする。古いリーダーは新しいペイロードバージョンを拒否し得る。[カタログ承認](2026-09-20-unknown-child-catalog.md)がそのような遷移の 1 つを記録している。
 
-The extractor accepts an explicit `@persistenceSource` binding for a core-owned source property on a literal user or developer role; it does not infer a binding from an unannotated type. A producer qualifies its `MessageSourceMap` entry with `@persistenceAttribution`. Qualification promises that an unknown kind and its JSON metadata survive reading without the producer, and that the kind imposes no validation, replay, or authority requirement. A producer may inspect its own kind to resume duplicate suppression; other readers must preserve and derive the recorded messages without that projection. The recorded schema retains the binding, policy version, literal `kind` discriminator, preservation promise, and qualified kind set. Inventory format 2 stores those promises; extraction without a bound policy retains format 1. Session format versions are independent. Both compared snapshots must carry compatible policy state. Existing kind groups still receive ordinary structural comparison; removals, unmarked additions, policy changes, and unrelated structural changes require compatibility review. Multiple context-form alternatives with the same wire kind form one group.
+エクストラクターは、リテラルの user または developer ロール上の core 所有ソースプロパティに対する明示的な `@persistenceSource` バインディングを受け入れる; 注釈のない型からバインディングを推論することはない。プロデューサーは `MessageSourceMap` エントリーを `@persistenceAttribution` で修飾する。修飾は、未知の kind とその JSON メタデータがプロデューサーなしで読み取りを生き延びること、およびその kind が検証、リプレイ、権限の要件を課さないことを約束する。プロデューサーは重複抑制を再開するために自身の kind を検査してよい; 他のリーダーはその投影なしで記録されたメッセージを保存し導出しなければならない。記録されたスキーマはバインディング、ポリシーバージョン、リテラルの `kind` ディスクリミネーター、保存の約束、および修飾された kind 集合を保持する。インベントリフォーマット 2 はそれらの約束を保存する; バインドされたポリシーなしの抽出はフォーマット 1 を保持する。Session フォーマットのバージョンは独立している。比較される両方のスナップショットは互換のポリシー状態を運ばなければならない。既存の kind グループは依然として通常の構造比較を受ける; 削除、マークされていない追加、ポリシー変更、および無関係な構造変更は互換性レビューを必要とする。同じ wire kind を持つ複数の context-form 代替は 1 つのグループを形成する。
 
-Every same-version explanation states how old records remain readable and how older readers handle new records, including established cases that need no explicit CLI decision. A feature absent from a log must retain the old behavior; dispensable features must be safe to ignore; required features need an effective refusal signal. Unsupported-feature refusal must not become corruption recovery or tail truncation. For required-to-optional changes, explain how readers handle an absent value. Reviewers assess behavior and evidence; the checker validates the declaration and type classification. A version-bump record follows the [Session-format procedure](../cookbook/adding-a-session-format-version.md).
+すべての same-version 説明は、古いレコードがどのように読めるままでいるか、および古いリーダーが新しいレコードをどのように処理するかを述べる。明示的な CLI 決定を必要としない確立済みケースも含む。ログに存在しない機能は古い挙動を保たなければならない; 不要な機能は無視しても安全でなければならない; 必須の機能は効果的な拒否シグナルを必要とする。サポートされない機能の拒否が破損復旧やテールトランケーションになってはならない。必須から省略可能への変更では、リーダーが存在しない値をどう処理するかを説明する。レビュアーは挙動と証拠を評価する; チェッカーは宣言と型分類を検証する。version-bump レコードは [Session フォーマットの手順](../cookbook/adding-a-session-format-version.md)に従う。
 
-When a reader rejects a JSON property by name, declare the property as optional `never` and mark it with argument-free `@persistenceReserved`. The extractor retains the forbidden field, so allowing a JSON value later requires an existing-field type change. Required or JSON-valued properties cannot carry this marker. Unmarked optional `never` and `undefined` properties retain their existing omission behavior.
+リーダーが JSON プロパティを名前で拒否する場合、そのプロパティを省略可能な `never` として宣言し、引数なしの `@persistenceReserved` でマークする。エクストラクターは禁止されたフィールドを保持するため、後で JSON 値を許可するには既存フィールドの型変更が必要になる。必須または JSON 値のプロパティはこのマーカーを付けられない。マークされていない省略可能な `never` と `undefined` のプロパティは、既存の省略挙動を保つ。
 
 <a id="history-and-limitations"></a>
-## History and limitations
+## 履歴と制限
 
-One baseline records the complete initial inventory. Later records use their predecessor's after schema as the before schema. The verifier rejects missing predecessors, cycles, duplicate successors for one root, digest mismatches, and current roots that disagree with their latest records. Independent roots can advance independently. Two changes to the same predecessor require a single ordered history after integration.
+1 つのベースラインが完全な初期インベントリを記録する。以降のレコードは前任者の after スキーマを before スキーマとして使う。検証ツールは、欠落した前任者、循環、1 つのルートに対する重複した後続、ダイジェスト不一致、および最新レコードと一致しない現在のルートを拒否する。独立したルートは独立に進んでよい。同じ前任者への 2 つの変更は、統合後に単一の順序付き履歴を必要とする。
 
-Accepted records describe historical transitions; preserve their machine declarations and schema snapshots when adding a successor. An unaccepted terminal record can be refreshed explicitly; the command rejects baselines, records with dependants, and checkpoint-locked records before producing artifacts. Verification checks retained checkpoint hashes; it does not prove that the checkpoints and their authority record were never edited together. No Git ref, remote service, or released checkout supplies the baseline.
+承認されたレコードは履歴の遷移を記述する; 後続を追加するときはそれらの機械宣言とスキーマスナップショットを保つ。未承認の終端レコードは明示的にリフレッシュできる; コマンドはアーティファクトを生成する前に、ベースライン、依存先を持つレコード、およびチェックポイントロックされたレコードを拒否する。検証は保持されたチェックポイントハッシュをチェックする; チェックポイントとその権威レコードが一緒に編集されたことがないことを証明するものではない。Git ref、リモートサービス、リリース済みチェックアウトのいずれもベースラインを供給しない。
 
-Digests describe declared persistence types, not runtime validation or behavior. Ordinary comments, source locations, alias names, and harmless declaration reordering do not affect them. Compatibility annotations are recorded policy data and do affect digests. Unannotated version-1 snapshots retain their original normalization and fingerprints; policy-bearing graphs use a separate fingerprint domain. Object fields, union alternatives, intersection operands, and index signatures can be reordered when their resolved types stay the same; tuple positions and numeric enum values remain significant. Catalog text and source locations may still change, so regenerate stale artifacts without adding an acknowledgement for an unchanged digest. Opaque types such as `unknown` expose no hidden structure to compare. Behavior-only changes and structures hidden inside opaque values are outside this mechanism's scope. The [decision](../../.agents/notes/implemented/process/2026-09-11-persistence-type-history.md) records these trade-offs.
+ダイジェストは宣言された永続化型を記述し、実行時の検証や挙動を記述するものではない。通常のコメント、ソース位置、エイリアス名、および無害な宣言の並べ替えはそれらに影響しない。互換性アノテーションは記録されたポリシーデータであり、ダイジェストに影響する。注釈のない version-1 スナップショットは元の正規化とフィンガープリントを保つ; ポリシーを持つグラフは別のフィンガープリントドメインを使う。オブジェクトフィールド、union 代替、intersection オペランド、およびインデックスシグネチャは、解決された型が同じままである場合に並べ替えられてよい; タプル位置と数値 enum 値は依然として重要である。カタログテキストとソース位置はまだ変化し得るため、変更のないダイジェストに対する承認を追加せずに古いアーティファクトを再生成する。`unknown` などの不透明型は比較できる隠れた構造を公開しない。挙動のみの変更と不透明値の内部に隠れた構造は、このメカニズムの対象外である。[決定](../../.agents/notes/implemented/process/2026-09-11-persistence-type-history.md)がこれらのトレードオフを記録している。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

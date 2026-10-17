@@ -3,54 +3,54 @@ description: "Package map for the human-collaboration capability family: slash c
 kind: "package-group"
 ---
 
-# interaction/ — the human-collaboration plane
+# interaction/ — 人間協調プレーン
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `interaction/` group covers the ways a person can guide a running agent. Use slash commands for immediate actions that do not require a model round trip, one-shot approvals for sensitive operations, permission presets to choose sandbox and approval behavior together, and questions when the agent needs information or a decision. Interactive applications expose these capabilities to people; automation handles its own approvals through ACP. The package map below distinguishes each capability and links to its full behavior and configuration.
+`interaction/` グループは、実行中のエージェントを人が導く方法を対象とする。モデル往復を要しない即時アクションにはスラッシュコマンド、機微操作にはワンショット承認、サンドボックスと承認動作をまとめて選択する権限プリセット、エージェントが情報や決定を必要とする場合の質問を使用する。対話型アプリケーションはこれらのケイパビリティを人に公開し、自動化は ACP 経由で自身の承認を処理する。以下のパッケージマップで各ケイパビリティを区別し、完全な動作と設定へリンクする。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-Each package README and its subsystem reference own the exhaustive contracts.
+各パッケージ README とそのサブシステムリファレンスが網羅的な契約を所有する。
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`commands/`](commands/README.md) | Lets users type slash commands that run directly against an agent without a model round trip | `ctx.commands` |
-| [`user-approval/`](user-approval/README.md) | Asks composed answerers for one-shot allow/reject decisions and fails closed without one | `ctx.approval` |
-| [`permission-presets/`](permission-presets/README.md) | Bundles sandbox mode with an approval policy into one user-facing Permissions selector | `ctx.permissionPresets` |
-| [`user-questions/`](user-questions/README.md) | Defines the validated question schema and scoped answerer waterfall an agent pauses on | `ctx.userQuestions` |
-| [`tool-ask-user/`](tool-ask-user/README.md) | Exposes the `ask_user_question` tool so the model can ask the human for a decision | registers on `ctx.tools` |
+| [`commands/`](commands/README.md) | モデル往復なしにエージェントへ直接実行するスラッシュコマンドをユーザーが入力できる | `ctx.commands` |
+| [`user-approval/`](user-approval/README.md) | 構成済み回答者にワンショットの許可/拒否決定を求め、回答なしではフェイルクローズドする | `ctx.approval` |
+| [`permission-presets/`](permission-presets/README.md) | サンドボックスモードと承認ポリシーを束ねたユーザー向け Permissions セレクター | `ctx.permissionPresets` |
+| [`user-questions/`](user-questions/README.md) | エージェントが待機する検証済み質問スキーマとスコープ付き回答者ウォーターフォールを定義する | `ctx.userQuestions` |
+| [`tool-ask-user/`](tool-ask-user/README.md) | モデルが人間に決定を求められるよう `ask_user_question` ツールを公開する | `ctx.tools` に登録 |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Start with the subsystem references for the shared vocabularies, then the neighboring automation and composition surfaces.
+共有語彙のサブシステムリファレンスから始め、次に隣接する自動化と構成サーフェスを読む。
 
-- [Commands subsystem](../../docs/subsystems/commands.md) — command registry semantics and the `ctx.commands` Cordis surface.
-- [Approval subsystem](../../docs/subsystems/approval.md) — request/outcome vocabulary, the answerer waterfall, and per-session policy.
-- [Permission presets subsystem](../../docs/subsystems/permission-presets.md) — the preset table and the knob write-through.
-- [User interaction subsystem](../../docs/subsystems/user-questions.md) — question vocabulary, answerer waterfall, and pending-question lifecycle.
-- [ACP group](../acp/README.md) — the automation-only transport that answers approval requests for its own agents.
+- [コマンドサブシステム](../../docs/subsystems/commands.md) — コマンドレジストリーの意味と `ctx.commands` Cordis サーフェス。
+- [承認サブシステム](../../docs/subsystems/approval.md) — 要求/結果語彙、回答者ウォーターフォール、セッションごとのポリシー。
+- [権限プリセットサブシステム](../../docs/subsystems/permission-presets.md) — プリセット表とノブ書き戻し。
+- [ユーザー対話サブシステム](../../docs/subsystems/user-questions.md) — 質問語彙、回答者ウォーターフォール、保留質問ライフサイクル。
+- [ACP グループ](../acp/README.md) — 自身のエージェント用承認要求に応答する自動化専用トランスポート。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

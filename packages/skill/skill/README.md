@@ -1,150 +1,150 @@
 ---
-description: "The skill provider registry for users and maintainers choosing, configuring, or debugging how skills from any source are merged, resolved, and loaded."
+description: "任意のソースのスキルがどうマージ・解決・ロードされるかを選択・構成・デバッグするユーザーとメンテナー向けのスキルプロバイダーレジストリ。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-skill
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to give agents and users one catalog of reusable, task-specific instructions collected from local directories, embedded plugin data, or remote services. It resolves duplicate names predictably, validates entries, tolerates unavailable sources without discarding usable results, and loads the selected skill's full instructions on demand. Mount it when a composition needs skills from multiple or non-filesystem sources; pair it with `dsh-skill-filesystem` for local discovery and `dsh-tool-skill` for model access, because it includes no skill content itself.
+このパッケージは、ローカルディレクトリ、埋め込みプラグインデータ、またはリモートサービスから収集された再利用可能なタスク固有の指示の 1 つのカタログを、エージェントとユーザーに与える。重複名を予測可能に解決し、エントリーを検証し、利用不能なソースを許容して使える結果を捨てず、選択されたスキルの完全な指示をオンデマンドでロードする。構成が複数のまたはファイルシステム以外のソースからスキルを必要とするときにマウントする。ローカル探索には `dsh-skill-filesystem`、モデルアクセスには `dsh-tool-skill` と組み合わせる。このパッケージ自体はスキル内容を含まないためである。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the plugin to give a composition one skill registry. Skill sources (providers) and consumers (the model-facing catalog and loader, or your own code) all talk to `ctx.skills`; the registry merges everything any provider reports, so one lookup sees skills from every source.
+このプラグインをマウントして構成に 1 つのスキルレジストリを与える。スキルソース（プロバイダー）とコンシューマー（モデル向けカタログとローダー、または独自コード）はすべて `ctx.skills` と対話する。レジストリはプロバイダーが報告するすべてをマージするため、1 回のルックアップですべてのソースのスキルが見える。
 
-### When to choose it
+### いつ選ぶか
 
-Use `dsh-skill` when agents should load skills from more than one source through one interface, or when the source of skills is not the local filesystem. Avoid it when a composition needs no skill loading at all — the plugin adds a service and a per-lookup discovery cost. The shipped local provider (`dsh-skill-filesystem`) and the model-facing consumer (`dsh-tool-skill`) are separate packages; mount them alongside when the deployment wants local skills and model access.
+エージェントが 1 つのインターフェースを通じて複数のソースからスキルをロードすべき場合、またはスキルのソースがローカルファイルシステムでない場合に `dsh-skill` を使う。構成がスキルロードをまったく必要としない場合は避ける — プラグインはサービスとルックアップごとの探索コストを追加する。同梱のローカルプロバイダー (`dsh-skill-filesystem`) とモデル向けコンシューマー (`dsh-tool-skill`) は別パッケージである。デプロイがローカルスキルとモデルアクセスを求める場合はそれらを並べてマウントする。
 
-### Mount and configure
+### マウントと設定
 
-Load the plugin like any Cordis plugin. The only configuration limits how many completed provider catalogs are kept in memory; everything else is provider behavior.
+他の Cordis プラグインと同様にロードする。唯一の設定は完了したプロバイダーカタログをメモリにいくつ保持するかを制限する。それ以外はすべてプロバイダーの振る舞いである。
 
 ```yaml
 - name: '@deepseek-ai/dsh-skill'
 ```
 
-| Field | Default | Meaning |
+| フィールド | 既定値 | 意味 |
 |---|---|---|
-| `collectCacheMaxEntries` | `128` | Completed cwd/provider catalogs kept in memory |
+| `collectCacheMaxEntries` | `128` | メモリに保持される完了済み cwd/プロバイダーカタログ数 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-skill) is the exhaustive source for every accepted field.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-skill)が、受け入れられるすべてのフィールドの網羅的な情報源である。
 
-### What the registry gives you
+### レジストリが与えるもの
 
-- **One merged catalog.** A consumer asks for the current catalog of a workspace and receives every winning skill summary from every provider, sorted by name — no provider-specific ordering or deduplication to do.
-- **On-demand loading.** Asking for one skill by name returns the full instruction body from whichever provider owns the winning candidate; the registry re-validates the loaded definition and rejects a stale selection whose name changed between discovery and load.
-- **Embedded skills.** Plugins register an in-memory skill with `ctx.skills.register(...)`; the registry fills in a default invocation policy and the `runtime` provider label. Same-name runtime registrations in one layer are first-wins with a warning.
-- **Provider registration.** A provider contributes its catalog with `ctx.skills.registerProvider(...)`; registration is synchronous, and the returned disposer removes the provider. `runtime` is a reserved provider name.
+- **1 つのマージ済みカタログ。** コンシューマーはワークスペースの現在のカタログを要求し、すべてのプロバイダーからの勝者スキルサマリーを名前順に受け取る — プロバイダー固有の順序付けや重複排除は不要である。
+- **オンデマンドロード。** 名前で 1 つのスキルを要求すると、勝者候補を所有するプロバイダーから完全な指示本文が返る。レジストリはロードされた定義を再検証し、探索とロードの間で名前が変わった陳腐化した選択を拒否する。
+- **埋め込みスキル。** プラグインは `ctx.skills.register(...)` でインメモリスキルを登録する。レジストリは既定の起動ポリシーと `runtime` プロバイダーラベルを補う。1 つのレイヤー内の同名 runtime 登録は警告付きで先勝ちである。
+- **プロバイダー登録。** プロバイダーは `ctx.skills.registerProvider(...)` でそのカタログを提供する。登録は同期で、返されたディスポーザーがプロバイダーを除去する。`runtime` は予約されたプロバイダー名である。
 
-An invocation policy on every skill decides which surfaces may advertise and load it: `modelInvocable` for model-facing tools and catalogs, `userInvocable` for human-facing commands. The registry keeps all four combinations, so one discovery result can serve both surfaces without conflating their catalogs.
+すべてのスキルの起動ポリシーが、どのサーフェスがそれを広告およびロードできるかを決める: モデル向けツールとカタログには `modelInvocable`、人間向けコマンドには `userInvocable`。レジストリは 4 つの組み合わせすべてを保持するため、1 つの探索結果が両方のサーフェスに、それらのカタログを混同せずにサービスできる。
 
-| Policy | Model | User |
+| ポリシー | モデル | ユーザー |
 |---|---|---|
-| `{ modelInvocable: true, userInvocable: true }` | included | included |
-| `{ modelInvocable: true, userInvocable: false }` | included | excluded |
-| `{ modelInvocable: false, userInvocable: true }` | excluded | included |
-| `{ modelInvocable: false, userInvocable: false }` | excluded | excluded |
+| `{ modelInvocable: true, userInvocable: true }` | 含まれる | 含まれる |
+| `{ modelInvocable: true, userInvocable: false }` | 含まれる | 除外される |
+| `{ modelInvocable: false, userInvocable: true }` | 除外される | 含まれる |
+| `{ modelInvocable: false, userInvocable: false }` | 除外される | 除外される |
 
-### Observable success and failures
+### 観察可能な成功と失敗
 
-A skill that any provider reports appears in the merged catalog, and loading it by its exact kebab-case name returns the body; an invalid name returns no skill rather than throwing. A provider that fails discovery is logged and skipped, and the observation is reported incomplete so consumers keep their last-good catalog; an explicit incomplete observation still contributes its candidates. A malformed candidate fails fast — the registry validates names, descriptions, invocation booleans, and provider ownership before caching or returning anything.
+任意のプロバイダーが報告するスキルはマージ済みカタログに現れ、正確なケバブケース名でロードすると本文が返る。無効な名前は throw せずスキルなしを返す。探索に失敗したプロバイダーはログされスキップされ、その観察は不完全として報告されるためコンシューマーは最後に成功したカタログを保つ。明示的に不完全な観察はそれでもその候補を提供する。不正な候補は即座に失敗する — レジストリは何かをキャッシュまたは返す前に名前、説明、起動ブール、プロバイダー所有権を検証する。
 
-Skill summaries retain the winning provider’s optional instruction-file `path` for discovery consumers that offer file previews. Listing still reads no skill body, and model-facing catalogs continue to select only their owned routing fields.
+スキルサマリーはファイルプレビューを提供する探索コンシューマーのために、勝者プロバイダーのオプションの指示ファイル `path` を保持する。一覧表示は依然としてスキル本文を読まず、モデル向けカタログは引き続き自身が所有するルーティングフィールドのみを選択する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains how the registry merges, caches, and invalidates provider catalogs; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではレジストリがプロバイダーカタログをどうマージ、キャッシュ、無効化するかを説明する。観察可能な振る舞いは[このパッケージを使う](#use-this-package)で完全にカバーされている。
 
-### Design concept
+### 設計概念
 
-The package is built on one separation: the registry owns merging, winning resolution, and validation, while providers own where skills come from. A provider is a borrowed same-process object with a `list()` that returns candidates and a `get()` that loads a body; the registry never inspects skill content beyond validating its semantic fields.
+このパッケージは 1 つの分離の上に構築される: レジストリがマージ、勝者解決、検証を所有し、プロバイダーがスキルの出所を所有する。プロバイダーは候補を返す `list()` と本文をロードする `get()` を持つ借用された同一プロセスオブジェクトである。レジストリはスキル内容をその意味フィールドの検証以上に検査しない。
 
-The registry is host+per-scope layered, the shape the tools registry established: a registration is filed into the layer of its calling context's scope — host rows and repository plugins land in the global layer, a plugin mounted by an agent preset's standing composition lands in that preset's layer. A read merges the global layer with the viewing scope's chain; the nearest layer wins a duplicate name outright, and within one layer duplicates resolve by rank, provider registration order, then provider-local order.
+レジストリは host＋スコープごとのレイヤー構成で、tools レジストリが確立した形である: 登録は呼び出しコンテキストのスコープのレイヤーに収められる — host 行とリポジトリプラグインはグローバルレイヤーに、エージェントプリセットの常設構成によってマウントされたプラグインはそのプリセットのレイヤーに。読み取りはグローバルレイヤーと閲覧スコープのチェーンをマージする。最も近いレイヤーが重複名に無条件で勝ち、1 つのレイヤー内ではランク、プロバイダー登録順、プロバイダー内順で重複が解決される。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry, `SkillRegistry` service, candidate and definition validation, shared model-facing rendering |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー、`SkillRegistry` サービス、候補と定義の検証、共有のモデル向けレンダリング |
 
-### Catalog collection
+### カタログ収集
 
-A read (`list`/`snapshot`) collects each layer's candidates: runtime skills first, then each provider's `list()` result, awaiting providers sequentially and containing failures. Candidates are validated, deduplicated within the layer, and merged across layers; summaries sort by name. Completed collections are cached per cwd, scope chain, and revision up to `collectCacheMaxEntries`; an in-flight collection retries once when a provider or runtime mutation bumps the revision mid-read, and a second change returns the latest candidates as an incomplete, uncached observation.
+読み取り (`list`/`snapshot`) は各レイヤーの候補を収集する: まず runtime スキル、次に各プロバイダーの `list()` 結果。プロバイダーを順次待ち、失敗を封じ込める。候補は検証され、レイヤー内で重複排除され、レイヤー間でマージされる。サマリーは名前順に並ぶ。完了した収集は cwd、スコープチェーン、リビジョンごとに `collectCacheMaxEntries` までキャッシュされる。プロバイダーまたは runtime の変更が読み取り途中でリビジョンを上げると、進行中の収集は 1 度再試行し、2 度目の変更は最新の候補を不完全でキャッシュされない観察として返す。
 
-### Loading and staleness
+### ロードと陳腐化
 
-`get()` selects the winning candidate, races the provider's load against the lookup's abort signal, and rechecks cancellation after selection or a cache hit. The returned definition must match the selected candidate's name; a mismatch invalidates the cached catalogs so the next snapshot rediscovers the provider's skills. Definitions are never cached — every load asks the provider for the current body.
+`get()` は勝者候補を選択し、プロバイダーのロードをルックアップの abort シグナルと競わせ、選択またはキャッシュヒットの後にキャンセルを再確認する。返された定義は選択された候補の名前と一致しなければならない。不一致はキャッシュされたカタログを無効化し、次のスナップショットがプロバイダーのスキルを再探索する。定義は決してキャッシュされない — すべてのロードがプロバイダーに現在の本文を求める。
 
-### Invalidation
+### 無効化
 
-The registry has no TTL: only a provider calling its registration-scoped `invalidate()`, or a runtime registration or disposal, clears completed catalogs. Each invalidation bumps a revision, clears the cache, and emits the unfiltered `skills/change` event; consumers refetch with their own lookup options. `invalidate()` takes effect only while the exact registration that received it is still active, so a late callback cannot disturb a replacement provider with the same name.
+レジストリに TTL はない: プロバイダーがその登録スコープの `invalidate()` を呼ぶか、runtime 登録または破棄だけが完了済みカタログをクリアする。各無効化はリビジョンを上げ、キャッシュをクリアし、フィルターなしの `skills/change` イベントを emit する。コンシューマーは自身のルックアップオプションで再取得する。`invalidate()` はそれを受け取った正確な登録がまだアクティブな間のみ効くため、遅延コールバックが同名の置換プロバイダーを乱すことはない。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the shared skill vocabulary to the shipped provider, the model-facing consumer, and the design rationale.
+パッケージレベルの規約で足りないときにこれらのページを読む。共有スキル語彙から同梱プロバイダー、モデル向けコンシューマー、設計根拠へと進む。
 
-- [Skill subsystem reference](../../../docs/subsystems/skills.md) — the registry, provider contract, and local discovery priority.
-- [skill-filesystem package](../skill-filesystem/README.md) — the shipped local provider that discovers skills from disk.
-- [tool-skill package](../tool-skill/README.md) — the consumer that renders the session catalog and the `skill` tool.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-skill) — every config field and its source declaration.
-- [historical Skill invocation policy Agent Note](../../../.agents/notes/archived/feature/2026-07-28-skill-invocation-policy.md) — the rationale for the model and user invocation controls.
+- [スキルサブシステム参照](../../../docs/subsystems/skills.md) — レジストリ、プロバイダー規約、ローカル探索優先度。
+- [skill-filesystem パッケージ](../skill-filesystem/README.md) — ディスクからスキルを探索する同梱ローカルプロバイダー。
+- [tool-skill パッケージ](../tool-skill/README.md) — セッションカタログと `skill` ツールをレンダリングするコンシューマー。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-skill) — すべての config フィールドとそのソース宣言。
+- [歴史的な Skill 起動ポリシー Agent Note](../../../.agents/notes/archived/feature/2026-07-28-skill-invocation-policy.md) — モデルとユーザーの起動制御の根拠。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-Indirectly, through `dsh-tool-skill`, which renders provider summaries into durable initial or replacement catalog messages and loaded instruction bodies into retained tool results.
+間接的に、`dsh-tool-skill` を通じて。これはプロバイダーサマリーを永続的な初期または置換カタログメッセージに、ロードされた指示本文を保持されたツール結果にレンダリングする。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-No direct prompt effect. The named consumer owns the durable initial catalog and append-only replacements after invalidation.
+直接のプロンプト効果はない。指名されたコンシューマーが永続的な初期カタログと無効化後の追加専用置換を所有する。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the registry is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+これらの制限は、レジストリがいつ不適切か、または特別な運用上の注意を要するかを定義する。これらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Invalidation is provider-driven** — the registry has no TTL and cannot infer that an arbitrary remote source changed; each mutable provider must retain and call its registration-scoped `invalidate()` capability from its own observation mechanism.
-- **Providers are queried sequentially** — one slow provider delays every provider registered after it; cancellation stops the caller's wait but cannot terminate work an uncooperative provider keeps running.
-- **Incomplete observations are not retained** — rejected providers are omitted and explicitly supplied candidates remain available only to the current lookup; the registry owns neither a last-good catalog nor per-provider diagnostics.
-- **Duplicate resolution is first-wins** — later lower-priority candidates within a layer are logged and hidden, and a nearer layer shadows a farther one silently; there is no API to inspect all shadowed definitions.
+- **無効化はプロバイダー駆動** — レジストリに TTL はなく、任意のリモートソースが変わったことを推論できない。各可変プロバイダーは自身の観察メカニズムから登録スコープの `invalidate()` ケイパビリティを保持して呼ぶ必要がある。
+- **プロバイダーは順次問い合わされる** — 1 つの遅いプロバイダーはそれ以降に登録されたすべてのプロバイダーを遅らせる。キャンセルは呼び出し元の待機を止めるが、非協力的なプロバイダーが動かし続ける作業を終了させることはできない。
+- **不完全な観察は保持されない** — 拒否されたプロバイダーは省略され、明示的に供給された候補は現在のルックアップにのみ利用できる。レジストリは最後に成功したカタログもプロバイダーごとの診断も所有しない。
+- **重複解決は先勝ち** — 1 つのレイヤー内の後続の低優先候補はログされ隠され、近いレイヤーは遠いレイヤーを黙って影にする。影にされたすべての定義を検査する API はない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers and is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the code. An open question is whether the registry should retain a last-good catalog or per-provider diagnostics for failed providers, or whether consumers should own that state; the incomplete-observations limitation records the current answer.
+この開発者ノートはメンテナー向けの作業コンテキストであり、明示的に非権威である — 出荷された振る舞いと制限は上のセクションとコードにある。未解決の問いは、レジストリが失敗したプロバイダーの最後に成功したカタログやプロバイダーごとの診断を保持すべきか、それともコンシューマーがその状態を所有すべきかである。不完全な観察の制限が現在の答えを記録している。
 
 </details>

@@ -5,57 +5,57 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-renderer
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-client-ui-renderer` mounts the assembled dsh web client GUI: after the complete client plugin roster settles, the boot kernel calls `ctx.uiRenderer.mount(container)`, which hydrates the framework-free boot page and switches to the full React application before the next paint. Business plugins stay plain React components that receive session and workspace data through typed props and never wire subscriptions themselves — the renderer binds the runtime's bare observable sources into selector hooks at the slot outlets. The web shell and the boot kernel are its only direct consumers, so a composition needs it exactly when it wants a React-rendered GUI.
+`dsh-client-ui-renderer` は組み立て済み dsh Web クライアント GUI をマウントします。完全なクライアントプラグイン名簿が確定した後、ブートカーネルが `ctx.uiRenderer.mount(container)` を呼び出し、フレームワークフリーのブートページをハイドレートして次のペイント前に完全 React アプリケーションに切り替えます。業務プラグインは型付き props でセッションとワークスペースデータを受け取るプレーン React コンポーネントのままです。自前で購読を配線することはありません。レンダラーはランタイムの素の observable ソースをスロット出口のセレクターフックにバインドします。Web シェルとブートカーネルが唯一の直接コンシューマーであるため、構成が React レンダリング GUI を求める場合ちょうどそのときに必要です。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
+- [このパッケージの利用](#use-this-package)
+- [実装の理解](#understand-the-implementation)
 - [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージの利用
 
-This package is infrastructure: the web shell and the boot kernel are its only direct consumers. A composition needs it whenever it wants a React-rendered GUI — `dsh-client-web` loads the roster, waits for every entry to activate, then calls `ctx.uiRenderer.mount(container)`.
+このパッケージはインフラです。Web シェルとブートカーネルが唯一の直接コンシューマーです。React レンダリング GUI を求める場合に構成は必要です。`dsh-client-web` は名簿を読み込み、すべてのエントリー有効化を待ってから `ctx.uiRenderer.mount(container)` を呼びます。
 
-### What mounting does
+### マウントが行うこと
 
-`mount(container)` installs the slot renderer, hydrates the existing boot DOM when present, renders the assembled application into the container before the next paint, and returns a disposer that unmounts the React root. The renderer performs the sole context-level `renderSlot('root')` call; the registered root occupant owns product layout and document metadata.
+`mount(container)` はスロットレンダラーを導入し、存在すれば既存ブート DOM をハイドレートし、次のペイント前に組み立て済みアプリケーションをコンテナーにレンダリングし、React ルートをアンマウントする disposer を返します。レンダラーは唯一のコンテキストレベル `renderSlot('root')` 呼び出しを行います。登録済みルート占有者が製品レイアウトとドキュメントメタデータを所有します。
 
-### For business plugins
+### 業務プラグイン向け
 
-A business plugin registers an ordinary Slot entry or a reusable Component Factory; the renderer binds the runtime's session and workspace observable sources into selector hooks at the render position. The plugin receives standard scope props through its derived Component props — it never imports the renderer or touches React internals. Every renderer-created Component can render a Factory occurrence, and a Factory can expose caller-selected local Components without sharing implementation values between packages.
+業務プラグインは通常 Slot エントリーまたは再利用可能 Component Factory を登録します。レンダラーはランタイムのセッションおよびワークスペース observable ソースをレンダー位置のセレクターフックにバインドします。プラグインは導出 Component props 経由で標準スコープ props を受け取ります。レンダラーをインポートも React 内部に触れることもありません。レンダラー作成のすべての Component は Factory 出現をレンダリングでき、Factory はパッケージ間で実装値を共有せずに呼び出し側選択ローカル Component を公開できます。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装の理解
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The package realizes one boundary: the object layer (runtime, React-free) owns business state; this renderer is the only place ctx-to-React integration happens — slot renderer, `SessionProvider`, and the `useSyncExternalStore` adapter.
+このパッケージは 1 つの境界を実現します。オブジェクト層 (ランタイム、React フリー) が業務状態を所有します。このレンダラーは ctx-to-React 統合が行われる唯一の場所です。スロットレンダラー、`SessionProvider`、`useSyncExternalStore` アダプターです。
 
-### Activation and mount
+### 有効化とマウント
 
-The plugin activates after `slots`, `sessions`, and `layout`; it installs `createSlotRenderer()` and reflects the `uiRenderer` service. `mountApp` looks for the boot kernel's `[data-dsh-boot]` element: when present it hydrates through `BootHandoff` (a one-frame pass-through that preserves the loading DOM), otherwise it creates a fresh root and flushes the render synchronously.
+プラグインは `slots`、`sessions`、`layout` の後に有効化します。`createSlotRenderer()` を導入し、`uiRenderer` サービスを反映します。`mountApp` はブートカーネルの `[data-dsh-boot]` 要素を探します。存在すれば `BootHandoff` 経由でハイドレートし (読込中 DOM を保持する 1 フレームパススルー)、なければ新規ルートを作成してレンダーを同期フラッシュします。
 
-### Slot bindings
+### スロットバインディング
 
-`createSlotRenderer` connects the slot registry to React: ordinary entry lists and Factory definitions become reactive sources, and each outlet or occurrence renders through the installed renderer. Business plugins pass bare observable sources through typed `hooks`; the renderer binds them at the render position via the uSES adapter. A Factory Store factory stays lazy until an occurrence first materializes; its exclusive handle rejects persistence, render-time records stay weak, and an idempotent effect strongly retains only mounted occurrences while preserving identity across effect replay. Factory errors use the ordinary supervision channel without abdicating the shared definition: the definition and its fallback local Components report against the definition, caller-selected local Components report against the caller registration, and each boundary resets with its own scope incarnation.
+`createSlotRenderer` はスロットレジストリーを React に接続します。通常エントリーリストと Factory 定義がリアクティブソースになり、各出口または出現は導入済みレンダラー経由でレンダリングします。業務プラグインは素の observable ソースを型付き `hooks` 経由で渡します。レンダラーは uSES アダプター経由でレンダー位置にバインドします。Factory Store ファクトリーは出現が最初に実体化するまで遅延のままです。その排他ハンドルは永続化を拒否し、レンダー時記録は弱参照に留まり、べき等 effect はマウント済み出現のみ強保持し、effect 再送でも同一性を保持します。Factory エラーは共有定義を放棄せず通常監督チャネルを使います。定義とそのフォールバックローカル Component は定義に対して報告し、呼び出し側選択ローカル Component は呼び出し側登録に対して報告し、各境界は独自スコープ化身でリセットします。
 
-### Identity
+### 同一性
 
-React, React DOM, Cordis, ui-slots, and ui-primitives retain one browser identity through the web shell's static module table; this package arrives as a dynamic client bundle.
+React、React DOM、Cordis、ui-slots、ui-primitives は Web シェルの静的モジュールテーブル経由で 1 つのブラウザー同一性を保持します。このパッケージは動的クライアントバンドルとして到達します。
 
 </details>
 
@@ -64,38 +64,38 @@ React, React DOM, Cordis, ui-slots, and ui-primitives retain one browser identit
 <a id="further-exploration"></a>
 ## Further Exploration
 
-These pages cover the surrounding machinery and the composition model.
+周辺機構と構成モデルを扱うページです。
 
-- [ui-slots](../ui-slots/README.md) — the slot registry pure core this renderer binds to React.
-- [web](../web/README.md) — the shell that loads the roster and calls `mount`.
-- [ui-session](../ui-session/README.md) — the adapter that supplies the standard Session sources and hooks this renderer binds.
-- [Web client architecture](../../../docs/subsystems/web-client.md) — the loading chain, object layer, and layering red lines.
-- [Slot system standard](../../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) — the definitive composition model.
+- [ui-slots](../ui-slots/README.md) — このレンダラーが React にバインドするスロットレジストリー純粋コア。
+- [web](../web/README.md) — 名簿を読み込み `mount` を呼ぶシェル。
+- [ui-session](../ui-session/README.md) — 標準セッションソースとフックを提供し、このレンダラーがバインドするアダプター。
+- [Web client architecture](../../../docs/subsystems/web-client.md) — 読込チェーン、オブジェクト層、層化レッドライン。
+- [Slot system standard](../../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.md) — definitive composition model.
 - [Component Factories](../../../.agents/notes/implemented/architecture/2026-09-10-component-factories-and-local-slots.md) — reusable definitions, local Component selection, and occurrence lifetimes.
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
 None, as the package is a browser-side render assembly that registers nothing model-facing.
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てず送信もしません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the application frame appears and how far per-region readiness goes; they are current package constraints.
+これらの制限は、アプリケーションフレームが現れる条件と領域ごと準備が進む範囲を定めます。これらは現行パッケージの制約です。
 
-- **The first application frame waits for every client entry** — the boot kernel hands over the mount point only after the loader roster settles; per-region readiness remains deferred.
-- **Slot rendering has no Suspense integration or per-entry lazy loading** — the complete plugin roster settles before the renderer mounts the root.
+- **The first application frame waits for every client entry** — ブートカーネルはローダー名簿確定後にのみマウントポイントを引き渡します。領域ごと準備は deferred のままです。
+- **Slot rendering has no Suspense integration or per-entry lazy loading** — レンダラーは完全プラグイン名簿確定後にルートをマウントします。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

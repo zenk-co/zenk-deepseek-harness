@@ -1,52 +1,52 @@
 ---
-description: "Package map for the credential capability family: the credential-reference seam, the environment-and-file provider, the authorization flow registry, and how references keep secret values out of configuration."
+description: "資格情報ケイパビリティファミリーのパッケージマップ: 資格情報参照シーム、環境とファイルのプロバイダー、認可フローレジストリ、および参照がどのように秘密値を構成から締め出すか。"
 kind: "package-group"
 ---
 
-# credentials/ — credentials and authorization
+# credentials/ — 資格情報と認可
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The `credentials/` group lets configuration name secrets instead of embedding their values. Use `credentials/` to store, look up, and remove credentials, `credentials-local/` for private on-machine storage with environment fallbacks, and `authorization/` when obtaining a credential requires asking a human. Rotated stored values apply to the next model request, and a stored value takes precedence over `DEEPSEEK_API_KEY=… dsh`. Configuration files contain only credential names; local secret values remain readable only by the same OS user.
+`credentials/` グループは、構成が秘密の値を埋め込む代わりに名前を指定できるようにする。資格情報の保存、検索、削除には `credentials/`、環境フォールバック付きのマシン上のプライベートストレージには `credentials-local/`、資格情報の取得に人間への問い合わせが必要な場合は `authorization/` を使う。ローテートされた保存値は次のモデルリクエストに適用され、保存値は `DEEPSEEK_API_KEY=… dsh` より優先される。構成ファイルには資格情報の名前のみが含まれ、ローカルの秘密値は同じ OS ユーザーのみが読める状態を保つ。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連ドキュメント](#related-documentation)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-Three packages provide the credential feature: one stores, looks up, and removes secrets at runtime while configuration only names them; the second is the default on-machine store; the third lets plugins obtain credentials that have to be asked for. Their READMEs cover day-to-day use; the subsystem reference owns the exhaustive contracts.
+3 つのパッケージが資格情報機能を提供する: 1 つは実行時に秘密を保存、検索、削除し、構成はそれらを名指しするだけである。2 つ目はデフォルトのマシン上ストアである。3 つ目は、問い合わせる必要がある資格情報をプラグインが取得できるようにする。それぞれの README が日常的な使用を扱い、サブシステムリファレンスが網羅的な契約を所有する。
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`credentials/`](credentials/README.md) | Store, look up, and remove secrets at runtime while configuration only names them | `ctx.credentials` |
-| [`credentials-local/`](credentials-local/README.md) | The default on-machine store: a private YAML file that outranks environment fallbacks | registers `ctx.credentials` |
-| [`authorization/`](authorization/README.md) | Plugin-owned flows that obtain a credential by asking a human | `ctx.authorization` |
+| [`credentials/`](credentials/README.md) | 構成は名前を指定するだけにしつつ、実行時に秘密を保存、検索、削除する | `ctx.credentials` |
+| [`credentials-local/`](credentials-local/README.md) | デフォルトのマシン上ストア: 環境フォールバックより優先されるプライベート YAML ファイル | `ctx.credentials` を登録する |
+| [`authorization/`](authorization/README.md) | 人間に尋ねることで資格情報を取得する、プラグイン所有のフロー | `ctx.authorization` |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連ドキュメント
 
-Start with the subsystem reference for the shared vocabulary, then the capability-seam table and the configuration surface of the local store.
+共有語彙にはサブシステムリファレンスから始め、次にケイパビリティシームの表とローカルストアの構成サーフェスへ進む。
 
-- [Credentials subsystem reference](../../docs/subsystems/credentials.md) — `CredentialRef` and `CredentialKey`, per-operation resolution, UI-safe `CredentialInfo`, authorization flows, and the generated Cordis surface.
-- [Capability seams](../../docs/capability-seams.md) — the Service Definition / Service Provider / Consumer split this family follows.
-- [Generated configuration catalog](../../docs/config-catalog.md#deepseek-aidsh-credentials-local) — every accepted field of the local store.
+- [資格情報サブシステムリファレンス](../../docs/subsystems/credentials.md) — `CredentialRef` と `CredentialKey`、操作ごとの解決、UI 安全な `CredentialInfo`、認可フロー、および生成された Cordis サーフェス。
+- [ケイパビリティシーム](../../docs/capability-seams.md) — このファミリーが従う Service Definition / Service Provider / Consumer の分割。
+- [生成された構成カタログ](../../docs/config-catalog.md#deepseek-aidsh-credentials-local) — ローカルストアが受け付けるすべてのフィールド。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

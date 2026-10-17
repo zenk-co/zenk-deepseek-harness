@@ -1,39 +1,39 @@
 ---
-description: "Log-backed session titles for users and maintainers choosing a title source, configuring the service, or debugging title state."
+description: "タイトルソースの選択、サービスの設定、タイトル状態のデバッグを行うユーザーとメンテナー向けの、ログに基づくセッションタイトル。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-title
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-session-title` to give each session a client-visible title from the first eligible human message, an optional asynchronous generator, or an explicit user rename. Accepted titles persist through replay, resume, and paging but never enter model input. Automatic generation never delays the main agent response, and newer title requests supersede older work. Choose the package when clients need durable titles with configurable length limits and a deliberate `refresh()` path for regenerating them.
+`dsh-session-title` を使うと、最初の適格な人間メッセージ、任意の非同期ジェネレーター、または明示的なユーザーによる名前変更から、各セッションにクライアント可視のタイトルを付けられます。受理されたタイトルはリプレイ、レジューム、ページングを通じて永続化されますが、モデル入力に入ることは決してありません。自動生成がメインエージェントの応答を遅延させることはなく、新しいタイトルリクエストは古い作業を置き換えます。クライアントが、設定可能な長さ制限と、再生成のための意図的な `refresh()` パスを備えた永続タイトルを必要とする場合に、このパッケージを選んでください。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と保留作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount the service to give sessions titles that clients can display and that never reach the model. The common path is explicit: load the session store, mount the service with its required limits, and optionally mount one provider plugin.
+サービスをマウントして、クライアントが表示でき、モデルには決して届かないタイトルをセッションに付けます。一般的な経路は明示的です: セッションストアをロードし、必須の制限を伴ってサービスをマウントし、任意で 1 つのプロバイダープラグインをマウントします。
 
-### Choosing a title source
+### タイトルソースの選択
 
-Titles come from three sources, newest wins. The built-in fallback derives from the first eligible human message's leading words within the configured caps; a registered provider generates a title over eligible messages; an explicit `rename()` accepts a user-supplied title. Only text blocks from human `user/message` events are eligible, and empty or non-text prompts wait for later eligible input. A user-sourced latest title pins the session — later user messages schedule no automatic revision, and an explicit `refresh()` remains the deliberate unpin.
+タイトルは 3 つのソースから来て、最新が勝ちます。組み込みフォールバックは、設定された上限内で最初の適格な人間メッセージの先頭の単語から導出されます。登録されたプロバイダーは適格なメッセージに基づいてタイトルを生成します。明示的な `rename()` はユーザー提供のタイトルを受理します。適格なのは人間の `user/message` イベントのテキストブロックのみで、空または非テキストのプロンプトは後続の適格な入力まで待ちます。ユーザー由来の最新タイトルはセッションを固定します — 以降のユーザーメッセージは自動リビジョンをスケジュールせず、明示的な `refresh()` が意図的なピン解除のままです。
 
-### Minimal configuration
+### 最小構成
 
-All limits are required; the library supplies no defaults. Mount the service with the three bounds:
+すべての制限は必須で、ライブラリはデフォルトを提供しません。3 つの境界を伴ってサービスをマウントします:
 
 ```yaml
 - name: '@deepseek-ai/dsh-session'
@@ -44,106 +44,106 @@ All limits are required; the library supplies no defaults. Mount the service wit
     maxTitleBytes: 120
 ```
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `fallbackMaxWords` | required | Maximum whitespace-delimited words in the deterministic fallback |
-| `fallbackMaxBytes` | required | Maximum UTF-8 bytes in the fallback; must not exceed `maxTitleBytes` |
-| `maxTitleBytes` | required | Maximum UTF-8 bytes accepted from any source |
+| `fallbackMaxWords` | 必須 | 決定論的フォールバックにおける空白区切り単語の最大数 |
+| `fallbackMaxBytes` | 必須 | フォールバックの UTF-8 バイト上限。`maxTitleBytes` を超えてはならない |
+| `maxTitleBytes` | 必須 | 任意のソースから受理する UTF-8 バイト上限 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-session-title) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-session-title)が、受理されるすべてのフィールドとその JSDoc の網羅的な情報源です。
 
-### Adding a provider
+### プロバイダーの追加
 
-One optional asynchronous provider may be registered through `ctx.sessionTitle.register(provider)`; a second registration throws until the first provider's disposal starts, so a replacement can activate while the previous provider drains, and the previous provider's late results never commit. The shipped model-backed providers are [first-prompt](../session-title-first-prompt-llm/README.md) and [all-prompts](../../experimental/session-title-all-prompts-llm/README.md), both using the shared [LLM execution module](../session-title-llm/README.md). Immediately before each call the service captures the latest accepted title snapshot, including the fallback it just ensured, and passes it as `request.currentTitle`; the provider owns whether and how to use it. A provider starts only after a marked loop-built request's exact route matches the logged `request/header`, and a newer revision supersedes and aborts older work. For unchanged routes, an active marked request starts pending automatic generation without a new header event; accepted human messages may follow the current `step/start`.
+任意の非同期プロバイダーを 1 つ `ctx.sessionTitle.register(provider)` で登録できます。2 つ目の登録は、最初のプロバイダーの破棄が始まるまで例外を投げるため、置き換えは以前のプロバイダーのドレイン中にアクティベートでき、以前のプロバイダーの遅延結果は決してコミットされません。出荷済みのモデルベースプロバイダーは [first-prompt](../session-title-first-prompt-llm/README.md) と [all-prompts](../../experimental/session-title-all-prompts-llm/README.md) で、どちらも共有の [LLM 実行モジュール](../session-title-llm/README.md)を使います。各呼び出しの直前に、サービスはそれが確保したフォールバックを含む最新の受理済みタイトルスナップショットをキャプチャし、`request.currentTitle` として渡します。それを使うかどうかと使い方はプロバイダーが所有します。プロバイダーは、マーク付きの loop 構築リクエストの正確なルートがログの `request/header` と一致した後にのみ開始し、新しいリビジョンは古い作業を置き換えて中断します。ルートが変わらない場合、アクティブなマーク付きリクエストは新しいヘッダーイベントなしで保留中の自動生成を開始します。受理された人間メッセージは現在の `step/start` の後に続くことがあります。
 
-### Reading titles
+### タイトルの読み取り
 
-`get(session)` reads the latest folded title from one live or replayed session, and `foldSessionTitle(events)` is the pure fold over a log. The service requires `ctx.sessionProjections` and registers two units: the client-visible `title` unit (the accepted title string for client list rows) and the host-only `titleInput` unit, which folds the first and latest eligible messages plus their count so scheduling and fallback reads are O(1) through `stateOf()`; the full eligible prefix for one provider generation is scanned from the session log at execution time. An explicit `refresh(session)` materializes the fallback when needed, then explicitly runs the registered provider over the current eligible messages.
+`get(session)` はライブまたはリプレイされた 1 つのセッションから最新のフォールド済みタイトルを読み取り、`foldSessionTitle(events)` はログに対する純粋なフォールドです。サービスは `ctx.sessionProjections` を必要とし、2 つのユニットを登録します: クライアント可視の `title` ユニット (クライアントの一覧行向けの受理済みタイトル文字列) と、ホスト専用の `titleInput` ユニットです。後者は最初と最新の適格メッセージおよびそのカウントをフォールドし、スケジューリングとフォールバックの読み取りが `stateOf()` を通じて O(1) になるようにします。プロバイダー生成 1 回分の適格なプレフィックス全体は、実行時にセッションログからスキャンされます。明示的な `refresh(session)` は、必要に応じてフォールバックをマテリアライズし、次に現在の適格なメッセージに対して登録済みプロバイダーを明示的に実行します。
 
-### Failures and recovery
+### 失敗と回復
 
-Automatic failures warn and retain the latest title; explicit `refresh()` rejects on provider error or caller cancellation, and cancellation does not roll back an already accepted fallback event. Automatic work never delays the main agent response, its late completion appends a standalone log-only event without opening a turn, and a stale completion cannot append. Forks inherit title events in their seed unchanged.
+自動の失敗は警告を出し、最新のタイトルを保ちます。明示的な `refresh()` はプロバイダーエラーまたは呼び出し元のキャンセルで拒否され、キャンセルはすでに受理されたフォールバックイベントをロールバックしません。自動作業がメインエージェントの応答を遅延させることはなく、その遅延完了はターンを開かずに独立したログ専用イベントを追記し、古い完了は追記できません。フォークはシード内のタイトルイベントをそのまま継承します。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains the title design; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではタイトルの設計を説明します。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱います。
 
-### Design concept
+### 設計概念
 
-Titles are durable, log-only state: every accepted revision is a `session/title` event, and `foldSessionTitle()` selects the latest, so a title survives replay, resume, and paging exactly like any other session event. The service owns scheduling, supersession, and acceptance; providers own generation.
+タイトルは永続的なログ専用状態です。受理された各リビジョンは `session/title` イベントで、`foldSessionTitle()` が最新を選択するため、タイトルは他のあらゆるセッションイベントとまったく同様にリプレイ、レジューム、ページングを生き延びます。スケジューリング、置き換え、受理はサービスが所有し、生成はプロバイダーが所有します。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service: config, fold, fallback scheduling, provider registry, concurrency, `title` projection unit |
-| [`src/normalize.ts`](src/normalize.ts) | Title-text cleaning, UTF-8-safe truncation, and the deterministic fallback |
-| [`src/types.ts`](src/types.ts) | One home of the `title` projection-key declaration |
+| [`src/index.ts`](src/index.ts) | サービス: 設定、フォールド、フォールバックスケジューリング、プロバイダーレジストリ、並行性、`title` プロジェクションユニット |
+| [`src/normalize.ts`](src/normalize.ts) | タイトルテキストのクリーニング、UTF-8 安全な切り捨て、決定論的フォールバック |
+| [`src/types.ts`](src/types.ts) | `title` プロジェクションキー宣言の唯一のホーム |
 
-### Lifecycle and concurrency
+### ライフサイクルと並行性
 
-Per-session work state tracks a revision counter, an in-flight fallback, and pending and active provider work. A newer user message, provider disposal, session disposal, or explicit refresh aborts older work through an `AbortController`; a completion whose provider, revision, session, or signal is stale cannot append. Explicit refreshes reserve their revision before provider work; overlapping automatic and explicit fallback requests share one session-local in-flight append. Service teardown cancels queued work and drains calls that ignore cancellation before unloading completes.
+セッションごとの作業状態は、リビジョンカウンター、進行中のフォールバック、保留中とアクティブなプロバイダー作業を追跡します。新しいユーザーメッセージ、プロバイダーの破棄、セッションの破棄、または明示的なリフレッシュは `AbortController` を通じて古い作業を中断します。プロバイダー、リビジョン、セッション、またはシグナルが古い完了は追記できません。明示的なリフレッシュはプロバイダー作業の前にそのリビジョンを予約します。重なる自動と明示的なフォールバックのリクエストは、セッションローカルの 1 つの進行中の追記を共有します。サービスのティアダウンはキューイングされた作業をキャンセルし、アンロード完了前にキャンセルを無視する呼び出しをドレインします。
 
-### Normalization
+### 正規化
 
-Accepted titles are cleaned of terminal control sequences, directional and invisible controls, and non-whitespace C0/C1 controls; whitespace is normalized, and truncation to the byte caps never splits a Unicode code point. The deterministic fallback takes the first eligible message's leading words within `fallbackMaxWords` and `fallbackMaxBytes`.
+受理されたタイトルは、端末制御シーケンス、方向制御・不可視制御文字、空白以外の C0/C1 制御文字を取り除かれます。空白は正規化され、バイト上限への切り捨ても Unicode コードポイントを分割しません。決定論的フォールバックは、`fallbackMaxWords` と `fallbackMaxBytes` の範囲内で最初の適格メッセージの先頭の単語を取ります。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the service contract is not enough. They move from the subsystem reference to the model-backed providers that plug in here.
+サービス契約では足りないときに、これらのページを読んでください。サブシステムリファレンスから、ここに接続するモデルベースプロバイダーへと進みます。
 
-- [Session title subsystem](../../../docs/subsystems/session-title.md) — durable title state and the provider vocabulary types.
-- [Shared LLM execution module](../session-title-llm/README.md) — the model-backed execution module both shipped providers use.
-- [First-message title provider](../session-title-first-prompt-llm/README.md) — titles from the first eligible human message.
-- [All-messages title provider](../../experimental/session-title-all-prompts-llm/README.md) — titles from every eligible human message.
-- [Session package map](../README.md) — adjacent persistence, projection, title, and telemetry packages.
+- [セッションタイトルサブシステム](../../../docs/subsystems/session-title.md) — 永続タイトル状態とプロバイダー語彙の型。
+- [共有 LLM 実行モジュール](../session-title-llm/README.md) — 両方の出荷済みプロバイダーが使うモデルベース実行モジュール。
+- [最初のメッセージのタイトルプロバイダー](../session-title-first-prompt-llm/README.md) — 最初の適格な人間メッセージからのタイトル。
+- [全メッセージのタイトルプロバイダー](../../experimental/session-title-all-prompts-llm/README.md) — すべての適格な人間メッセージからのタイトル。
+- [session パッケージマップ](../README.md) — 隣接する永続化、プロジェクション、タイトル、テレメトリーのパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Session title state
+### セッションタイトル状態
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing. `session/title` is log-only and never enters the session surface, `deriveMessages()`, system prompt, tool schemas, or request prefix.
+何もありません。`session/title` はログ専用で、セッションサーフェス、`deriveMessages()`、システムプロンプト、ツールスキーマ、リクエストプレフィックスのいずれにも決して入りません。
 
-#### Token effect
+#### トークン効果
 
-The fallback and accepted provider revisions add zero tokens to the main agent request. An optional provider's separate auxiliary request is documented by that provider package.
+フォールバックと受理されたプロバイダーリビジョンは、メインエージェントのリクエストにトークンを追加しません。任意のプロバイダーの別個の補助リクエストは、そのプロバイダーパッケージが文書化しています。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None for the main request; title events do not change its reconstructed content or cache key.
+メインリクエストにはなし。タイトルイベントはその再構築されるコンテンツやキャッシュキーを変えません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と保留作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the title service does not provide. They are current package constraints.
+これらの制限は、タイトルサービスが提供しないものを定義します。これらは現在のパッケージ制約です。
 
-- **No title deletion, search, or list indexing** — unpinning back to automatic titles without an explicit `refresh`, search, and list indexing are outside this service.
-- **At most one provider** — the registry deliberately accepts a single implementation, so a deployment cannot compose competing title strategies without writing one provider that owns their precedence.
+- **タイトルの削除、検索、リストインデックスなし** — 明示的な `refresh` なしで自動タイトルにピン解除すること、検索、リストインデックスはこのサービスの範囲外です。
+- **プロバイダーは最大 1 つ** — レジストリは意図的に単一の実装のみを受理するため、デプロイメントが競合するタイトル戦略をコンポーズするには、それらの優先順位を所有するプロバイダーを 1 つ書く必要があります。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

@@ -1,39 +1,39 @@
 ---
-description: "Domain data form (ctx.storageDomain) for hosts and maintainers choosing, mounting, or debugging schema-validated, change-emitting KV domains over storage backends."
+description: "スキーマ検証済みで変更を発行する KV ドメインを storage バックエンド上に選択・マウント・デバッグするホストとメンテナー向けのドメインデータ形式 (ctx.storageDomain)。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-storage-domain
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use this package to declare schema-validated key-value domains and open them through `ctx.storageDomain` over a configured storage backend. Reads return synchronously from validated in-memory state, while each write becomes durable before it resolves and emits `domain/changed` in order. Product packages use domain handles instead of accessing storage backends directly. This host-side state does not add tools, prompts, or session events, so it remains invisible to the model and agent loop.
+このパッケージは、スキーマ検証済みのキー・バリュードメインを宣言し、設定された storage バックエンド上で `ctx.storageDomain` を通じてそれらを開くために使います。読み取りは検証済みのインメモリ状態から同期的に返り、各書き込みは解決する前に永続化され、`domain/changed` を順序どおりに発行します。プロダクトパッケージは storage バックエンドに直接アクセスする代わりにドメインハンドルを使います。このホスト側の状態はツール、プロンプト、セッションイベントを追加しないため、モデルとエージェントループからは見えません。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と保留作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use this package when a host package keeps durable, schema-validated records — workspace records, session sidecar metadata. The owning package declares the domain once; consumers open it and get synchronous reads and durable, change-emitting writes without ever touching a backend.
+ホストパッケージが永続的でスキーマ検証済みのレコード — ワークスペースレコード、セッションのサイドカーメタデータ — を保持する場合に、このパッケージを使います。所有するパッケージがドメインを 1 回宣言し、コンシューマーがそれを開くと、バックエンドに一切触れることなく、同期読み取りと永続的で変更を発行する書き込みが得られます。
 
-### When to use it
+### 使うべきとき
 
-Choose it for any host-side data that must survive restarts and stay valid against a schema: the domain form validates every stored record at open, and every write is durable before it resolves. Avoid it when the data belongs in a session event log — the session persistence seam owns that surface.
+再起動をまたいで存続し、スキーマに対して有効であり続ける必要があるあらゆるホスト側データにこれを選びます。ドメイン形式は開くときに保存済みの全レコードを検証し、各書き込みは解決する前に永続化されます。データがセッションイベントログに属する場合は避けてください — そのサーフェスはセッション永続化シームが所有します。
 
-### Declaring a domain
+### ドメインの宣言
 
-The owning package declares the domain once with `defineDomain` — name, version, and zod record schemas — and exports it. `defineDomain` fails loudly at module load on a bad name, a version that is not a non-negative integer, or a global schema that accepts `null`.
+所有するパッケージは `defineDomain` でドメインを 1 回宣言し — 名前、バージョン、zod レコードスキーマ — それをエクスポートします。`defineDomain` は、不正な名前、非負整数でないバージョン、または `null` を受理するグローバルスキーマに対して、モジュールロード時に大きな音を立てて失敗します。
 
 ```text
 // Owning package, once:
@@ -44,9 +44,9 @@ const workspaceSpec = defineDomain({
 })
 ```
 
-### Opening and using a domain
+### ドメインを開いて使う
 
-A consumer opens the declared domain through `ctx.storageDomain` and keeps the returned handle; reads are synchronous, writes are durable:
+コンシューマーは宣言されたドメインを `ctx.storageDomain` を通じて開き、返されたハンドルを保持します。読み取りは同期的で、書き込みは永続的です:
 
 ```text
 const domain = await ctx.storageDomain.open(workspaceSpec)
@@ -55,104 +55,104 @@ const record = domain.table('workspaces').get(id) // synchronous, from memory
 domain.table('workspaces').update(id, (r) => ({ ...r, path: newPath }))
 ```
 
-The caller owns the handle's lifecycle and releases it with `domain.close()` when the feature shuts down (typically its own `ctx.effect` disposer); domains still open when the plugin unmounts are closed by the facility.
+ハンドルのライフサイクルは呼び出し元が所有し、機能のシャットダウン時に `domain.close()` で解放します (通常は自らの `ctx.effect` デリポーザー)。プラグインのアンマウント時にまだ開いているドメインは、ファシリティが閉じます。
 
-### Routing domains to backends
+### ドメインをバックエンドへルーティングする
 
-The domain plugin's configuration decides which backend serves which domain — never the hub. `backend` names the default route; `routes` overrides it per domain name. A route naming an unregistered backend fails loudly at open with `backend-not-found`.
+どのバックエンドがどのドメインにサービスするかは、ハブではなくドメインプラグインの設定が決めます。`backend` はデフォルトのルートを名指し、`routes` はドメイン名ごとにそれを上書きします。未登録のバックエンドを名指すルートは、開くときに `backend-not-found` で大きな音を立てて失敗します。
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `backend` | required | Default backend name for every domain without an explicit route |
-| `routes` | `{}` | Per-domain overrides: domain name → backend name |
+| `backend` | 必須 | 明示的なルートを持たないすべてのドメインのデフォルトバックエンド名 |
+| `routes` | `{}` | ドメインごとの上書き: ドメイン名 → バックエンド名 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-storage-domain) is the exhaustive source for every accepted field and its JSDoc.
+生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-storage-domain)が、受理されるすべてのフィールドとその JSDoc の網羅的な情報源です。
 
-### Observable behavior and failures
+### 観察可能な動作と失敗
 
-Every write resolves only after the backend acknowledges durability, and each emits one `domain/changed` event in write order. Failures carry stable `DomainError` codes: `already-open` (the name is open or still closing), `facet-unsupported` (the routed backend serves no `kv` facet), `invalid-record` (a stored record or global fails its schema, naming the table and key), `missing-key` (an `update` on an absent record), and `closed` (any use after close). Backend failures such as `version-mismatch` pass through unchanged.
+すべての書き込みは、バックエンドが永続性を確認応答した後にのみ解決し、各書き込みは書き込み順に 1 つの `domain/changed` イベントを発行します。失敗は安定した `DomainError` コードを伴います: `already-open` (その名前が開いているか、まだ閉じている最中)、`facet-unsupported` (ルーティングされたバックエンドが `kv` ファセットを提供しない)、`invalid-record` (保存済みレコードまたはグローバルがスキーマに失敗する。テーブルとキーを名指す)、`missing-key` (存在しないレコードへの `update`)、`closed` (クローズ後のあらゆる使用)。`version-mismatch` のようなバックエンドの失敗はそのまま通過します。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The domain layer is a single implementation, not an abstracted seam: consumers depend on this package and never touch backends directly, which concentrates all domain logic — schema validation, write serialization, change events — in one place instead of doubling it per backend.
+ドメイン層は抽象化されたシームではなく単一の実装です。コンシューマーはこのパッケージに依存し、バックエンドに直接触れることはありません。これにより、スキーマ検証、書き込みの直列化、変更イベントというすべてのドメインロジックが、バックエンドごとに二重化されるのではなく 1 か所に集中します。
 
-### Design concept
+### 設計概念
 
-- **The spec object is the single source of truth.** `defineDomain` pins the spec's literal types and validates its fields at the owning package's module load, before any medium is touched. Record schemas are zod, so `z.infer` avoids duplicating consumer types; plugin `Config` stays schemastery.
-- **Memory is authoritative; the medium is the durable projection.** Reads are synchronous from validated in-memory state. Every write queues on one per-domain write chain: backend durability first, then memory mutation, then `domain/changed` — a rejected backend write leaves memory untouched, so reads never diverge from the medium.
-- **One write chain per domain.** `put`, `delete`, `update`, and `global.set` all queue on it; `update`'s transform runs at its chain slot, so concurrent updates never interleave. Records are plain immutable data — returned values are the stored objects themselves and must not be mutated in place.
-- **Writes emit after the commit point.** `domain/changed` is a notification, not a transaction participant: a throwing listener is contained with a logged warning rather than rejecting the already-durable write.
+- **spec オブジェクトが唯一の真実の源です。** `defineDomain` は spec のリテラル型を固定し、所有パッケージのモジュールロード時、あらゆる媒体に触れる前にそのフィールドを検証します。レコードスキーマは zod なので、`z.infer` によってコンシューマー側の型の重複を避けられます。プラグインの `Config` は schemastery のままです。
+- **メモリが権威であり、媒体は永続的なプロジェクションです。** 読み取りは検証済みのインメモリ状態から同期的に行われます。すべての書き込みはドメインごとに 1 つの書き込みチェーンにキューイングされます: まずバックエンドの永続化、次にメモリの変更、次に `domain/changed` — 拒否されたバックエンド書き込みはメモリを触らないままにするため、読み取りが媒体から乖離することはありません。
+- **ドメインごとに 1 つの書き込みチェーン。** `put`、`delete`、`update`、`global.set` はすべてそこにキューイングされます。`update` の変換はそのチェーンスロットで実行されるため、同時更新がインターリーブすることはありません。レコードはプレーンで不変なデータです — 返される値は保存されたオブジェクトそのものであり、その場で変更してはなりません。
+- **書き込みはコミットポイントの後に発行されます。** `domain/changed` は通知であり、トランザクションの参加者ではありません。例外を投げるリスナーは、すでに永続化された書き込みを拒否するのではなく、ログ付きの警告で封じ込められます。
 
-### Open sequence
+### オープンシーケンス
 
-`DomainFacility.open(spec)` runs a strict sequence, each step failing the whole call: reject a name already open or still closing (`already-open`); resolve the route (`backend-not-found`); require the `kv` facet (`facet-unsupported`); open the unit (backend `version-mismatch`/`malformed-medium` pass through); load and validate every stored record and the global against the spec's schemas (`invalid-record`); construct the domain. The caller owns the handle; the facility closes any domain left open when it unmounts, and a closed domain's name frees for reopening only after teardown completes.
+`DomainFacility.open(spec)` は厳密なシーケンスを実行し、各ステップの失敗が呼び出し全体を失敗させます: すでに開いているかまだ閉じている最中の名前を拒否 (`already-open`)。ルートを解決 (`backend-not-found`)。`kv` ファセットを要求 (`facet-unsupported`)。ユニットを開く (バックエンドの `version-mismatch`/`malformed-medium` は通過)。保存済みの全レコードとグローバルを spec のスキーマに対してロードして検証 (`invalid-record`)。ドメインを構築。ハンドルは呼び出し元が所有し、ファシリティはアンマウント時に開いたままのドメインを閉じ、閉じたドメインの名前はティアダウン完了後にのみ再オープンのために解放されます。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `DomainFacility`, routing, `Config`, form mounting |
-| [`src/spec.ts`](src/spec.ts) | Domain declarations: `defineDomain`, `domainTable`, descriptor projection |
-| [`src/domain.ts`](src/domain.ts) | Open-domain runtime: write chain, table and global handles, close |
-| [`src/events.ts`](src/events.ts) | The `domain/changed` event vocabulary |
-| [`src/error.ts`](src/error.ts) | `DomainError` codes |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `DomainFacility`、ルーティング、`Config`、形式のマウント |
+| [`src/spec.ts`](src/spec.ts) | ドメイン宣言: `defineDomain`、`domainTable`、記述子のプロジェクション |
+| [`src/domain.ts`](src/domain.ts) | オープン済みドメインのランタイム: 書き込みチェーン、テーブルとグローバルのハンドル、クローズ |
+| [`src/events.ts`](src/events.ts) | `domain/changed` イベント語彙 |
+| [`src/error.ts`](src/error.ts) | `DomainError` コード |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the domain layer's view is not enough: the subsystem reference is the authoritative contract, and the Agent Note records the design and deferred work.
+ドメイン層の見方では足りないときに、これらのページを読んでください。サブシステムリファレンスが権威ある契約で、Agent Note が設計と保留作業を記録しています。
 
-- [Storage subsystem](../../../docs/subsystems/storage.md) — the domain contract, backend contract, change events, and generated API.
-- [Storage package map](../README.md) — the family's packages and their repository position.
-- [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — why domains exist, the workspace consumer, and deferred work such as cross-process change push.
-- [Workspace subsystem](../../../docs/subsystems/workspace.md) — the first consumer of the domain data form.
+- [storage サブシステム](../../../docs/subsystems/storage.md) — ドメイン契約、バックエンド契約、変更イベント、生成された API。
+- [storage パッケージマップ](../README.md) — ファミリーのパッケージとリポジトリ上の位置。
+- [ドメイン KV storage の Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — ドメインが存在する理由、ワークスペースコンシューマー、プロセス間の変更プッシュなどの保留作業。
+- [workspace サブシステム](../../../docs/subsystems/workspace.md) — ドメインデータ形式の最初のコンシューマー。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Durable domain state
+### 永続ドメイン状態
 
-#### What the model sees
+#### モデルが見るもの
 
-Nothing. The package registers no tools, injects no prompts, and appends no session events; it stores non-session data behind `ctx.storageDomain` and emits only the in-process `domain/changed` event, which reaches a model only if a consumer renders it through its own documented surface.
+何もありません。このパッケージはツールを登録せず、プロンプトを注入せず、セッションイベントを追記しません。`ctx.storageDomain` の背後に非セッションデータを保存し、プロセス内の `domain/changed` イベントのみを発行します。それがモデルに届くのは、コンシューマーが自身の文書化されたサーフェスを通じてレンダリングした場合だけです。
 
-#### Token effect
+#### トークン効果
 
-Zero: no text from this package enters any model request.
+ゼロ: このパッケージからのテキストはどのモデルリクエストにも入りません。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Independent: domain reads and writes never touch request prefixes, so nothing here can invalidate provider cache reuse.
+独立: ドメインの読み取りと書き込みはリクエストプレフィックスに触れないため、ここにあるものがプロバイダーのキャッシュ再利用を無効化することはできません。
 
-## Known Limitations and Deferred Work
+## 既知の制限と保留作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the domain layer is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+これらの制限は、ドメイン層が不向きな場合、または特別な運用上の注意が必要な場合を定義します。これらは現在のパッケージ制約であり、タスクバックログではありません。
 
-- **Single-process change visibility** — `domain/changed` is an in-process event; a second host process or a reconnecting GUI observes no changes until the cross-process revision pattern lands ([Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md)).
-- **No cross-table transactions, secondary indexes, or multi-segment keys** — each write touches one record; these extensions are deferred in the Agent Note's out-of-scope list.
-- **No data migration** — a domain whose stored version differs from its spec rejects at open (`version-mismatch`); changing a schema requires migrating the stored data by hand.
+- **変更の可視性は単一プロセス** — `domain/changed` はプロセス内イベントです。2 つ目のホストプロセスや再接続中の GUI は、プロセス間リビジョンパターンが実現するまで変更を観察しません ([Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md))。
+- **テーブル間トランザクション、セカンダリインデックス、複数セグメントキーなし** — 各書き込みは 1 レコードに触れます。これらの拡張は Agent Note のスコープ外リストで保留されています。
+- **データ移行なし** — 保存されたバージョンが spec と異なるドメインは開くときに拒否されます (`version-mismatch`)。スキーマの変更には、保存データを手作業で移行する必要があります。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

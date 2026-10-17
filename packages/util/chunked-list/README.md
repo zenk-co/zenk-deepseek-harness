@@ -1,31 +1,31 @@
 ---
-description: "Immutable append-only lists for projection state, with bounded append copying, insertion-order iteration, and Zod checkpoint validation."
+description: "投影状態用の不変追加専用一覧。有界追加写し、挿入順反復、Zod 検査点検証付き。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-chunked-list
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-chunked-list` lets callers append values while retaining earlier list versions without copying the whole collection. Callers can iterate every value in insertion order and validate JSON checkpoints with their own value schema. The subagent catalog uses it for immutable projection state.
+`dsh-chunked-list` は呼出者が全収集を写さずに初期一覧版を保ちつつ値を追加できる。呼出者は挿入順に全値を反復し、自身値 schema で JSON 検査点を検証できる。副応答者目録は不変投影状態にそれを使う。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに探る](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と後回しの作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use this list when an append-only collection needs immutable versions and JSON-compatible storage. An empty list is `undefined`; appending returns a new head without modifying existing nodes. The list shares stored values by reference, so callers must treat them as immutable.
+不変版と JSON 適合貯蔵の要る追加専用収集にこの一覧を使う。空一覧は `undefined` であり、追加は既存節を変えずに新頭を返す。一覧は貯蔵値を参照で共有するため、呼出者はそれらを不変として扱わなければならない。
 
 ```ts
 import { appendChunkedList, iterateChunkedList } from '@deepseek-ai/dsh-chunked-list'
@@ -35,57 +35,57 @@ const second = appendChunkedList(first, 'second')
 console.log([...iterateChunkedList(second)])
 ```
 
-The example produces `['first', 'second']`; `first` still contains only its original value. `chunkedListSchema(valueSchema)` validates JSON checkpoints and rejects unknown fields, invalid values, and empty or oversized chunks. Use `.optional()` on the schema when the containing field also permits an empty list. See the [source contracts](src/index.ts) for the operations.
+例は `['first', 'second']` を生じ、`first` は依然元の値のみを含む。`chunkedListSchema(valueSchema)` は JSON 検査点を検証し、未知項目、不正値、空または過大塊を拒む。含む項目が空一覧も許す場合は schema に `.optional()` を使う。操作は[源契約](src/index.ts)を見ること。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-The newest chunk stores up to 64 values. Appends copy at most that chunk and share older nodes, taking bounded O(1) work. The capacity controls storage layout, not total list length. Iteration visits all N values in O(N) time and uses O(N / 64) scratch space to visit chunks from oldest to newest. A single capacity constant governs append rollover and recursive Zod validation.
+最新塊は最大 64 値を貯める。追加はその塊までを写し旧節を共有するため、有界 O(1) 作業である。容量は貯蔵配置を制御し、全一覧長ではない。反復は全 N 値を O(N) 時間で訪れ、古い方から新しい方へ塊を訪れるのに O(N / 64) 作業域を使う。単一容量定数が追加繰上と再帰 Zod 検証を統治する。
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Persistent list operations and checkpoint validation |
-| [`tests/chunked-list.spec.ts`](tests/chunked-list.spec.ts) | Version isolation, ordering, structural sharing, and checkpoint acceptance |
+| [`src/index.ts`](src/index.ts) | 持続一覧操作と検査点検証 |
+| [`tests/chunked-list.spec.ts`](tests/chunked-list.spec.ts) | 版隔離、順序、構造共有、検査点受容の適用範囲 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに探る
 
-- [Utility package map](../README.md) — shared primitives.
-- [Subagent catalog decision](../../../.agents/notes/implemented/architecture/2026-09-01-parent-owned-subagent-catalog.md) — why projection state uses chunks.
+- [実用包地図](../README.md) — 共有素材。
+- [副応答者目録決定](../../../.agents/notes/implemented/architecture/2026-09-01-parent-owned-subagent-catalog.md) — 投影状態が塊を使う理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this collection registers nothing model-facing.
+なし。この収集は模型対面の何も登録しない。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Nothing here enters a model request, so provider cache reuse is unaffected.
+ここからは模型要求に何も入らないため、提供子緩衝再利用は変わらない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と後回しの作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Append-only access** — callers needing removal or random access need another collection.
-- **Recursive checkpoints** — JSON serialization and schema validation remain subject to runtime nesting limits. Stored values must themselves support the caller's serialization format.
+- **追加専用到達** — 除去や無作為到達の要る呼出者は他収集が必要である。
+- **再帰検査点** — JSON 直列化と schema 検証は実行時入れ子限りに従うままである。貯蔵値は呼出者の直列化形式を支えなければならない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業背景 — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

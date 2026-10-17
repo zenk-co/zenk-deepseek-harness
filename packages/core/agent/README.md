@@ -1,35 +1,35 @@
 ---
-description: "The Agent handle, live registry, process-local initiator scope, and agent/* event vocabulary for plugins, UI, and orchestrators building or extending agents."
+description: "プラグイン、UI、オーケストレーターがエージェントを構築または拡張するための、Agent ハンドル、ライブレジストリ、プロセスローカルなイニシエータースコープ、および agent/* イベント語彙。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-agent
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Use `dsh-agent` to create or resume live agents, send follow-up or steering input, inject model-facing context, cancel work, and wait for idle completion. Plugins, UI, hooks, and orchestrators can also observe or intercept agent activity and apply capabilities to one agent without affecting others. Choose it when code needs to control or extend live agents through the public `Agent` API. Pair it with an agent driver such as `dsh-agent-loop`; this package does not create model requests by itself. Initiator attribution is process-local and must be carried explicitly across workers, processes, durable queues, and restarts.
+`dsh-agent` を使うと、ライブエージェントの作成や再開、フォローアップまたはステアリング入力の送信、モデル向けコンテキストの注入、作業のキャンセル、アイドル完了の待機ができる。プラグイン、UI、フック、オーケストレーターは、エージェントのアクティビティを観察またはインターセプトし、他のエージェントに影響を与えずに 1 つのエージェントにケイパビリティを適用することもできる。コードが公開 `Agent` API を通じてライブエージェントを制御または拡張する必要がある場合に選ぶ。`dsh-agent-loop` のようなエージェントドライバーと組み合わせる。このパッケージ自体はモデルリクエストを作成しない。イニシエーターの帰属はプロセスローカルであり、ワーカー、プロセス、永続キュー、および再起動をまたいで明示的に運ばなければならない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount `dsh-agent` wherever live agents exist: it provides `ctx.agents` and the `Agent` handle that plugins, UI, hooks, and orchestrators work against. The service is inert until a driver registers a factory — the shipped driver is `dsh-agent-loop`, so the smallest useful composition loads both.
+ライブエージェントが存在する場所ならどこでも `dsh-agent` をマウントする。これは `ctx.agents` と、プラグイン、UI、フック、オーケストレーターが操作対象とする `Agent` ハンドルを提供する。ドライバーがファクトリーを登録するまでサービスは不活性である。出荷済みのドライバーは `dsh-agent-loop` なので、最小の有用な構成は両方をロードする。
 
-### Create or resume an agent
+### エージェントの作成または再開
 
-`ctx.agents.create()` builds a fresh agent and session under one identity; `ctx.agents.resume()` loads a persisted session and rebuilds the agent on it. Both delegate to the registered factory and return an `AgentHandle` — the only object that can tear that agent down. Set `parentAgent` in either operation's options to make the result a runtime child; omit it for a runtime root. `get(id)`, `list()`, and `roots()` find live agents, and `isOwnedBy(id, parent)` tests that exact live relation.
+`ctx.agents.create()` は 1 つの identity の下に新しいエージェントとセッションを構築する。`ctx.agents.resume()` は永続化されたセッションをロードし、その上にエージェントを再構築する。どちらも登録されたファクトリーに委譲し、`AgentHandle` を返す。これはそのエージェントを破棄できる唯一のオブジェクトである。どちらの操作のオプションでも `parentAgent` を設定すると結果はランタイム子になり、省略するとランタイムルートになる。`get(id)`、`list()`、`roots()` はライブエージェントを見つけ、`isOwnedBy(id, parent)` はその正確なライブ関係を検査する。
 
 ```text
 const handle = await ctx.agents.create({
@@ -40,11 +40,11 @@ const handle = await ctx.agents.create({
 await handle.dispose()   // stops the loop, unregisters, removes the session, unwinds the scope
 ```
 
-`AgentOptions` supplies the initial provider/model route, optional adapter-owned `reasoningEffort`, and optional positive `maxTokens` output cap. The loop validates exact-model reasoning support, resolves adapter defaults, records the effective values in the request header, and applies them to each conversation request. An optional `setup(agentCtx, agent)` callback composes the agent's scoped world before it is published: `agentCtx` owns registrations, while the explicit unpublished Agent provides its Session; the Context has no reverse Agent property. Scoped tools, prompt sections, and listeners exist before any creation announcement. Setup is composition-only: drive the agent only after creation resolves.
+`AgentOptions` は初期の provider/model ルート、オプションのアダプター所有 `reasoningEffort`、およびオプションの正の `maxTokens` 出力上限を供給する。ループは正確なモデルの reasoning サポートを検証し、アダプターのデフォルトを解決し、実効値をリクエストヘッダーに記録し、各会話リクエストに適用する。オプションの `setup(agentCtx, agent)` コールバックは、エージェントが公開される前にそのスコープ付き世界を構成する。`agentCtx` が登録を所有し、明示的な未公開 Agent がその Session を提供する。Context に逆方向の Agent プロパティはない。スコープ付きツール、プロンプトセクション、リスナーは作成アナウンスより前に存在する。setup は構成専用である。エージェントを駆動するのは作成が解決した後にのみ行う。
 
-### Drive an agent's conversation
+### エージェントの会話を駆動する
 
-The handle's methods route identified user-role messages into the agent's inbox. `followup()` queues an ordinary next-turn prompt and wakes the driver; `steer()` submits next-step input and wakes it; `inject()` adds model-facing context without waking the driver, so it lands in the next admitted step. `cancel(cause)` aborts the active activity and, unless `keepInbox` is set, clears pending work; `whenIdle()` resolves after the whole agent reaches quiescence.
+ハンドルのメソッドは、識別された user ロールメッセージをエージェントのインボックスにルーティングする。`followup()` は通常の次ターンプロンプトをキューに入れてドライバーを起こす。`steer()` は次ステップの入力を提出してドライバーを起こす。`inject()` はドライバーを起こさずにモデル向けコンテキストを追加するため、次に許可されたステップで着地する。`cancel(cause)` はアクティブなアクティビティを中断し、`keepInbox` が設定されていない限り保留中の作業をクリアする。`whenIdle()` はエージェント全体が静止状態に達した後に解決する。
 
 ```text
 handle.agent.followup({
@@ -58,131 +58,131 @@ handle.agent.steer({
 await handle.agent.whenIdle()
 ```
 
-### Scope registrations to one agent
+### 登録を 1 つのエージェントにスコープする
 
-`Agent.ctx` is the agent's scoped context: registrations made through it (tools, prompt sections, variables, event listeners, restrictions) apply to that agent alone and unwind on disposal. The same mechanism is what agent presets use to give one session a different capability set without affecting its neighbors.
+`Agent.ctx` はエージェントのスコープ付きコンテキストである。それを通じて行われた登録 (ツール、プロンプトセクション、変数、イベントリスナー、制限) はそのエージェントだけに適用され、破棄時に巻き戻される。エージェントプリセットが、隣接するセッションに影響を与えずに 1 つのセッションへ異なるケイパビリティセットを与えるために使うのも同じ機構である。
 
-### Intercept or observe work in flight
+### 実行中の作業をインターセプトまたは観察する
 
-The `agent/*` events let plugins act on live work without depending on the loop package. `agent/pre-step` can reject a proposed step or replace the messages entering it; `agent/request-error` lets a listener retry a failed model request; `agent/turn-stopping` runs before an otherwise completed turn closes and can steer to keep it open. `agent/assistant-stream` carries one process-local Assistant attempt's ordered start, transient chunk, and end frames. Start names the attempt's turn and step, chunk indexes are dense from zero, and `end.index` is the next chunk position. The loop commits the complete compact stream as one `assistant/message` or `assistant/attempt` before a committed end frame, so the live event remains presentation data rather than the replay source. `agent/status`, `agent/created`, and `agent/disposed` drive UI and coordination state, and the per-message `agent/inbox/*` notifications keep inbox projections in sync. Exact signatures, dispatch modes, and payload contracts live in the generated region of the [core subsystem page](../../../docs/subsystems/core.md#cordis-surface).
+`agent/*` イベントにより、プラグインはループパッケージに依存せずにライブ作業へ作用できる。`agent/pre-step` は提案されたステップを拒否したり、そこに入るメッセージを置き換えたりできる。`agent/request-error` はリスナーが失敗したモデルリクエストを再試行できるようにする。`agent/turn-stopping` は、それ以外は完了したターンが閉じる前に実行され、ステアリングによってターンを開いたままにできる。`agent/assistant-stream` は、プロセスローカルな 1 つの Assistant 試行の順序付けられた start、一時的な chunk、end フレームを運ぶ。start はその試行のターンとステップを名指しし、chunk インデックスは 0 から密に続き、`end.index` は次の chunk 位置である。ループは完全なコンパクトストリームを 1 つの `assistant/message` または `assistant/attempt` としてコミットされた end フレームより前にコミットするため、ライブイベントはリプレイソースではなく表示データのままである。`agent/status`、`agent/created`、`agent/disposed` は UI と連携状態を駆動し、メッセージごとの `agent/inbox/*` 通知はインボックス射影を同期させ続ける。正確なシグネチャ、ディスパッチモード、およびペイロード契約は [core サブシステムページ](../../../docs/subsystems/core.md#cordis-surface)の生成領域にある。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装の内部 — クリックして展開</summary>
 
-This section explains how the package realizes the behavior above; the observable contract is covered in [Use this package](#use-this-package).
+このセクションでは、このパッケージが上記の動作をどのように実現するかを説明する。観察可能な契約は[このパッケージを使う](#use-this-package)で網羅されている。
 
-### Design concept
+### 設計概念
 
-The package is built on one separation: the public `Agent` surface and registry live here, while construction and driving live in the loop package behind a registered factory. Consumers therefore depend on `dsh-agent` and never on `dsh-agent-loop`, keeping the driver swappable. The second idea is the initiator scope: an `AsyncLocalStorage` chain that carries the exact live `Agent` through the asynchronous driver work it starts, so helpers below a driver can attribute their work without forwarding the agent through every call.
+このパッケージは 1 つの分離に基づいて構築されている。公開 `Agent` サーフェスとレジストリはここにあり、構築と駆動は登録されたファクトリーの背後でループパッケージにある。したがってコンシューマーは `dsh-agent` に依存し、`dsh-agent-loop` には決して依存しないため、ドライバーは差し替え可能なままである。第 2 の考えはイニシエータースコープである。`AsyncLocalStorage` チェーンが、そのエージェントが開始する非同期ドライバー作業を通じて正確なライブ `Agent` を運ぶため、ドライバーの下のヘルパーはすべての呼び出しでエージェントを転送しなくても自分の作業を帰属できる。
 
-### Step admission
+### ステップの受付
 
-`PreStepDecision` is either `{ kind: 'reject' }` or `{ kind: 'enter', messages, startsRequestSeries? }`. The enter branch contains the complete identified, frozen message batch. Acceptance does not commit it: after assembly and `step/start`, `agent/request` and `prepareCall()` resolve the route before the loop commits the system prompt and user batch. Cancellation during either async phase commits neither. `startsRequestSeries: true` declares a distinct model-message series; a wrapping listener preserves that declaration and the batch unless it intentionally replaces either one. Claiming removes offered messages from the inbox, while messages inserted after the claim remain pending for a later boundary.
+`PreStepDecision` は `{ kind: 'reject' }` または `{ kind: 'enter', messages, startsRequestSeries? }` のいずれかである。enter ブランチは、識別された完全な凍結メッセージバッチを含む。受け入れてもそれはコミットされない。組み立てと `step/start` の後、ループがシステムプロンプトとユーザーバッチをコミットする前に、`agent/request` と `prepareCall()` がルートを解決する。どちらの非同期フェーズ中のキャンセルも両方をコミットしない。`startsRequestSeries: true` は別個のモデルメッセージ系列を宣言する。ラップするリスナーは、どちらかを意図的に置き換えない限り、その宣言とバッチを保つ。クレームは提供されたメッセージをインボックスから除き、クレーム後に挿入されたメッセージは後の境界まで保留のままである。
 
-### Durable inbox
+### 永続インボックス
 
-`Agent.inbox` exposes only the structural `Inbox` interface and the projection vocabulary stays in this package. dsh-agent-loop owns the package-internal `ReactLoopInbox` and the standard `inbox` projection; constructing its concrete inbox ensures that the projection registry owns one registration for the durable `agent/inbox/spliced` fold. The registry remains the sole owner of the live `{ 'next-turn', 'next-step' }` state. Reconstruction rejects unsafe or out-of-range splice coordinates and duplicate `MessageId` values across both pending lists and reports the offending event seq.
+`Agent.inbox` は構造的な `Inbox` インターフェースのみを公開し、射影の語彙はこのパッケージに留まる。dsh-agent-loop はパッケージ内部の `ReactLoopInbox` と標準 `inbox` 射影を所有する。その具体的なインボックスを構築することで、射影レジストリが永続 `agent/inbox/spliced` フォールド用の登録を 1 つだけ所有することが保証される。レジストリはライブの `{ 'next-turn', 'next-step' }` 状態の唯一のオーナーのままである。再構築は、両方の保留リストにまたがる安全でない、または範囲外の splice 座標と重複 `MessageId` を拒否し、違反したイベント seq を報告する。
 
-`Inbox` exposes pending `nextTurn` and `nextStep` messages and mutates them through `append`, `prepend`, `replace`, `remove`, `clear`, and `splice`. Ordinary removals and `clear()` are durable cancellations. At a step boundary, the loop's internal implementation claims pending input through pure deletion splices. Live notifications are deliberately per-message and minimal: `agent/inbox/inserted { message }`, `agent/inbox/claimed { message, turn }`, and `agent/inbox/discarded { message }`.
+`Inbox` は保留中の `nextTurn` と `nextStep` メッセージを公開し、`append`、`prepend`、`replace`、`remove`、`clear`、および `splice` を通じてそれらを変更する。通常の削除と `clear()` は永続的なキャンセルである。ステップ境界で、ループの内部実装は純粋な削除 splice を通じて保留中の入力をクレームする。ライブ通知は意図的にメッセージ単位で最小限である。`agent/inbox/inserted { message }`、`agent/inbox/claimed { message, turn }`、および `agent/inbox/discarded { message }` の 3 つである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `AgentRegistry`, factory slot, initiator scope, `CreateAgentOptions`/`ResumeAgentOptions` |
-| [`src/runtime-types.ts`](src/runtime-types.ts) | `Agent`, structural `Inbox`, `AgentStatus`, and the `agent/*` event declarations |
-| [`src/types.ts`](src/types.ts) | `AgentOptions`, cancellation causes, and inbox projection vocabulary |
-| [`src/dispatch.ts`](src/dispatch.ts) | `agentEvents` fused dispatcher and `assembleContextFor(agent)` |
-| [`src/consumed-work.ts`](src/consumed-work.ts) | `foldConsumedWork(events)`: what the log's consumed work became |
-| [`src/model-selection.ts`](src/model-selection.ts) | `installModelSelection`: coupling one selection to assembly and routing |
-| [`src/archive-admission.ts`](src/archive-admission.ts) | The `turn` family of the Workspace registry's archive admission: a running turn and its user-cause cancel |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: `AgentRegistry`、ファクトリースロット、イニシエータースコープ、`CreateAgentOptions`/`ResumeAgentOptions` |
+| [`src/runtime-types.ts`](src/runtime-types.ts) | `Agent`、構造的 `Inbox`、`AgentStatus`、および `agent/*` イベント宣言 |
+| [`src/types.ts`](src/types.ts) | `AgentOptions`、キャンセル原因、およびインボックス射影の語彙 |
+| [`src/dispatch.ts`](src/dispatch.ts) | `agentEvents` 融合ディスパッチャーと `assembleContextFor(agent)` |
+| [`src/consumed-work.ts`](src/consumed-work.ts) | `foldConsumedWork(events)`: ログの消費済み作業が何になったか |
+| [`src/model-selection.ts`](src/model-selection.ts) | `installModelSelection`: 1 つの選択を組み立てとルーティングに結合する |
+| [`src/archive-admission.ts`](src/archive-admission.ts) | Workspace レジストリのアーカイブ受付の `turn` ファミリー: 実行中のターンとその user 原因キャンセル |
 
-### Registry and lifecycle
+### レジストリとライフサイクル
 
-`AgentRegistry` keeps one entry per live agent with its carrier and creator relation. Await `register()` to finish serial creation listeners with source `startup` before using an already-constructed agent; the async factory uses the split `enter()`/`announce()` pair so setup and initialization stay rollback-covered. A detach requested during creation waits for every awaited listener to settle, and each detach is bound to the exact entry, so a stale disposer cannot remove a later same-id replacement. Teardown stops and drains the loop, unwinds the scope, detaches the agent, then detaches the session; the id becomes reusable after private cleanup.
+`AgentRegistry` はライブエージェントごとに、そのキャリアと作成者関係を伴う 1 つのエントリを保つ。構築済みのエージェントを使う前に `register()` を待機して、source `startup` を持つ直列の作成リスナーを完了させる。非同期ファクトリーは分割された `enter()`/`announce()` のペアを使うため、setup と初期化はロールバックで覆われたままである。作成中に要求されたデタッチは、待機対象のすべてのリスナーが決着するのを待ち、各デタッチは正確なエントリに束縛されるため、古いディスポーザーが後から同じ id で置き換えられたものを除去することはできない。テアダウンはループを停止して排出し、スコープを巻き戻し、エージェントをデタッチし、次にセッションをデタッチする。id はプライベートなクリーンアップ後に再利用可能になる。
 
-The registry also answers the Workspace registry's archive admission ([seam](../../workspace/workspace/README.md)) for every Agent it publishes: `workspace/session-activity` reports the `turn` family while the Session's Agent is running, a turn waiting for an approval or an answer included, and `workspace/session-stop` cancels that turn the way the user's own stop does — `agent.cancel({ kind: 'user' })`, but without the stop button's `keepInbox`, so queued input is discarded with a logged inbox splice instead of waking the archived Session later. Nothing is awaited to settlement; a Session without a live Agent has no turn that could run. The `turn` key is merged into `SessionActivityKindMap` from [`src/types.ts`](src/types.ts), so a Client that renders the families imports `@deepseek-ai/dsh-agent/types` for it.
+レジストリはまた、公開するすべての Agent について Workspace レジストリのアーカイブ受付 ([シーム](../../workspace/workspace/README.md)) に応答する。`workspace/session-activity` は、Session の Agent が実行中の間、承認や回答を待っているターンを含めて `turn` ファミリーを報告し、`workspace/session-stop` はユーザー自身の停止と同じ方法でそのターンをキャンセルする。すなわち `agent.cancel({ kind: 'user' })` だが、停止ボタンの `keepInbox` は伴わないため、キュー済みの入力はログ済みのインボックス splice と共に破棄され、後からアーカイブ済み Session を起こすことはない。決着まで待機されるものは何もない。ライブ Agent のない Session には実行し得るターンがない。`turn` キーは [`src/types.ts`](src/types.ts) から `SessionActivityKindMap` にマージされるため、ファミリーを描画する Client はそのために `@deepseek-ai/dsh-agent/types` をインポートする。
 
-### Initiator scope
+### イニシエータースコープ
 
-Each driver runs its complete lifetime inside `ctx.agents.withInitiator(agent, ...)`, so inherited async chains observe that agent; `withoutInitiator()` hides it for unrelated process-local work such as shared timers. The boundary is process-local attribution only — ambient presence is neither liveness proof nor authorization, and explicit identity stays authoritative at worker, process, persistence, and wire boundaries. Teardown rejects new boundaries, lets returned-Promise boundaries drain, then disables the underlying storage. The [initiator-scope decision](../../../.agents/notes/implemented/architecture/2026-07-15-agent-initiator-scope.md) owns the detailed contract.
+各ドライバーはその全ライフタイムを `ctx.agents.withInitiator(agent, ...)` の内部で実行するため、継承された非同期チェーンはそのエージェントを観察する。`withoutInitiator()` は、共有タイマーのような無関係なプロセスローカル作業のためにそれを隠す。この境界はプロセスローカルな帰属のみである。周囲の存在はライブネスの証明でも認可でもなく、ワーカー、プロセス、永続化、および wire の境界では明示的な identity が権威のままである。テアダウンは新しい境界を拒否し、返された Promise の境界を排出させてから、基盤ストレージを無効化する。詳細な契約は[イニシエータースコープの決定](../../../.agents/notes/implemented/architecture/2026-07-15-agent-initiator-scope.md)が所有する。
 
-### Ownership invariants
+### 所有権の不変条件
 
-The `AgentHandle` disposer is a capability: among consumers, only its holder can tear the agent down. The registered factory provider is a structural co-owner, because scoped agents depend on that provider's service API; provider unload stops and drains every live handle it made. `ctx.agents.get(id)` still returns a bare `Agent` — the handle is exposed only to the consumer that created it.
+`AgentHandle` のディスポーザーはケイパビリティである。コンシューマーの中で、その保持者だけがエージェントを破棄できる。登録されたファクトリープロバイダーは構造的な共同オーナーである。スコープ付きエージェントはそのプロバイダーのサービス API に依存するためである。プロバイダーのアンロードは、それが作成したすべてのライブハンドルを停止して排出する。`ctx.agents.get(id)` は依然として裸の `Agent` を返す。ハンドルはそれを作成したコンシューマーにのみ公開される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-The package-level contract is enough for most consumers; read these when you need the surrounding domain and the design rationale.
+ほとんどのコンシューマーにはパッケージレベルの契約で十分である。周辺領域と設計根拠が必要な場合に以下を読む。
 
-- [Core subsystem](../../../docs/subsystems/core.md) — the loop map, `Agent` handle, interception decisions, and generated service API.
-- [agent-loop package](../agent-loop/README.md) — the default driver that creates, drives, and disposes agents.
-- [Session subsystem](../../../docs/subsystems/session.md) — the durable log and derived history behind the handle.
-- [Initiator-scope Agent Note](../../../.agents/notes/implemented/architecture/2026-07-15-agent-initiator-scope.md) — the boundary and teardown contract.
-- [Core group map](../README.md) — how the core packages compose.
+- [Core サブシステム](../../../docs/subsystems/core.md) — ループマップ、`Agent` ハンドル、インターセプト決定、および生成サービス API。
+- [agent-loop パッケージ](../agent-loop/README.md) — エージェントを作成、駆動、破棄するデフォルトドライバー。
+- [Session サブシステム](../../../docs/subsystems/session.md) — ハンドルの背後の永続ログと派生履歴。
+- [イニシエータースコープの Agent Note](../../../.agents/notes/implemented/architecture/2026-07-15-agent-initiator-scope.md) — 境界とテアダウンの契約。
+- [Core グループマップ](../README.md) — core パッケージ群の構成方法。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### User, steering, and injected messages
+### ユーザー、ステアリング、および注入メッセージ
 
-#### What the model sees
+#### モデルが見るもの
 
-`followup`, `steer`, and `inject` feed the owning session as identified user-role messages; accepted content becomes part of the derived history the model reads on later steps. `agent/pre-step` and the other declared events let plugins reject a proposed step or add durable request material. `installModelSelection` adds `[model changed: assistant turns above this point were generated by <previous>; the session continues with <next>]` to the first step assembled for a different provider/model route that would send a model request; provider names appear only when the switch crosses providers, and reasoning-effort-only changes add nothing. An empty first decision and a decision that removes offered messages remain no-request results. If a request step fails before logging its header, the next request step receives the notice again because the durable previous route has not changed.
+`followup`、`steer`、`inject` は、識別された user ロールメッセージとして所有セッションに供給される。受け入れられた内容は、モデルが後のステップで読む派生履歴の一部になる。`agent/pre-step` とその他の宣言済みイベントにより、プラグインは提案されたステップを拒否したり、永続的なリクエスト材料を追加したりできる。`installModelSelection` は、モデルリクエストを送信することになる異なる provider/model ルートに対して組み立てられた最初のステップに `[model changed: assistant turns above this point were generated by <previous>; the session continues with <next>]` を追加する。プロバイダー名が現れるのは切り替えがプロバイダーをまたぐ場合のみで、reasoning effort のみの変更は何も追加しない。空の最初の決定と、提供されたメッセージを除く決定は、リクエストなしの結果のままである。リクエストステップがヘッダーをログする前に失敗した場合、永続的な以前のルートが変わっていないため、次のリクエストステップは通知を再び受け取る。
 
-#### Token effect
+#### トークンへの影響
 
-Accepted content becomes retained history or a repeated session prefix; blocked content contributes no request tokens. Each emitted model-switch notice adds its text to retained history. Size is caller- and plugin-dependent.
+受け入れられた内容は保持履歴または反復されるセッションプレフィックスになる。ブロックされた内容はリクエストトークンに寄与しない。発行される各モデル切り替え通知はそのテキストを保持履歴に追加する。サイズは呼び出し元とプラグインに依存する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Accepted history and steering are append-only; a blocked submission sends no request. A session prefix remains stable within its loop instance, while a new or resumed instance may establish a different prefix.
+受け入れられた履歴とステアリングは追記のみである。ブロックされた提出はリクエストを送信しない。セッションプレフィックスはそのループインスタンス内で安定しており、新しい、または再開されたインスタンスは異なるプレフィックスを確立することがある。
 
-### Agent-scoped request composition
+### エージェントスコープのリクエスト構成
 
-#### What the model sees
+#### モデルが見るもの
 
-Registrations through `agent.ctx` can shadow prompt sections or tools and can install agent-only interceptors during unpublished setup, so one agent sees a different prompt and tool set than its neighbors. Model selection captures one provider/model/effort value before prompt assembly and applies it to the same step's request; a later concurrent change waits for another step.
+`agent.ctx` を通じた登録はプロンプトセクションやツールをシャドウでき、未公開の setup 中にエージェント専用のインターセプターを設置できるため、1 つのエージェントは隣接するものとは異なるプロンプトとツールセットを見る。モデル選択はプロンプト組み立てより前に 1 つの provider/model/effort 値を捕捉し、同じステップのリクエストに適用する。後からの並行変更は別のステップを待つ。
 
-#### Token effect
+#### トークンへの影響
 
-Each provider/model switch adds one short retained user-role notice. Other scoped contributions affect only that agent and disappear on disposal.
+provider/model の切り替えごとに、短い保持 user ロール通知を 1 つ追加する。その他のスコープ付きコントリビューションはそのエージェントのみに影響し、破棄時に消える。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-The switch notice appends after the previous history, preserving that prefix, while the route change can prevent the new provider or model from reusing it. Setup or reload that changes prompt sections, tool definitions, or request listeners may invalidate reuse from the first affected request token.
+切り替え通知は以前の履歴の後に追記され、そのプレフィックスを保つ。一方、ルート変更により新しいプロバイダーやモデルがそれを再利用できなくなることがある。プロンプトセクション、ツール定義、またはリクエストリスナーを変更する setup やリロードは、影響を受ける最初のリクエストトークンからの再利用を無効化し得る。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this package needs special care. They are current package constraints, not a task backlog.
+これらの制限は、このパッケージに特別な注意が必要な場合を定義する。これらは現在のパッケージの制約であり、タスクバックログではない。
 
-- **Initiator scope is process-local** — workers, child processes, HTTP, durable queues, and restarts must materialize any required identity explicitly.
-- **Ambient identity may outlive liveness** — consumers still check `agent.status`, cancellation, and the owning capability contract before lifecycle-sensitive work.
-- **Creation listeners share the initialization lifetime.** An `agent/created` listener must not await `agent.whenIdle()` or its own owner's disposal: those operations wait for creation to finish. Return only after required asynchronous tool and prompt installation completes.
-- **`cancel()` clears the inbox by default** — it aborts the in-flight turn plus queued and steering work; `cancel(cause, { keepInbox: true })` aborts only the turn and preserves pending items, and there is no step-only abort that keeps the turn running.
-- **Each additional `UserMessage` carries exactly one `MessageSource`** — contributions from several plugins merged onto one message collapse under one source, so the message cannot name several producers.
+- **イニシエータースコープはプロセスローカルである** — ワーカー、子プロセス、HTTP、永続キュー、および再起動は、必要な identity を明示的にマテリアライズしなければならない。
+- **周囲の identity はライブネスより長生きし得る** — コンシューマーはライフサイクルに敏感な作業の前に、`agent.status`、キャンセル、および所有ケイパビリティの契約を引き続き確認する。
+- **作成リスナーは初期化ライフタイムを共有する。** `agent/created` リスナーは `agent.whenIdle()` や自身のオーナーの破棄を待機してはならない。これらの操作は作成の完了を待つためである。必要な非同期のツールとプロンプトのインストールが完了してからのみ戻る。
+- **`cancel()` はデフォルトでインボックスをクリアする** — 実行中のターンと、キュー済みおよびステアリングの作業を中断する。`cancel(cause, { keepInbox: true })` はターンのみを中断して保留項目を保持する。ターンを実行したままステップのみを中断する方法はない。
+- **追加される各 `UserMessage` はちょうど 1 つの `MessageSource` を運ぶ** — 複数のプラグインからのコントリビューションが 1 つのメッセージにマージされると 1 つの source に畳まれるため、メッセージは複数のプロデューサーを名指しできない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers; it is explicitly non-authoritative. Open, undecided directions: inter-agent channels beyond delegation — shared state, streaming child output, and background or poll semantics remain outside the current delegation seam; and the `SessionStartSource` values `'clear'`/`'compact'` are reserved with no emitter yet, pending the driving subsystems.
+この開発者ノートはメンテナー向けの作業コンテキストであり、明示的に非権威である。未解決で未決定の方向性: 委譲を超えるエージェント間チャネル — 共有状態、子出力のストリーミング、バックグラウンドまたはポーリングのセマンティクスは現在の委譲シームの外に留まる。また `SessionStartSource` の値 `'clear'`/`'compact'` はエミッターのないまま予約されており、駆動サブシステム待ちである。
 
 </details>

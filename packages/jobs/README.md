@@ -1,50 +1,50 @@
 ---
-description: "The jobs group map: background-job control — the registry contract, process-local storage, and the model-facing job tools — for users and maintainers navigating the group."
+description: "ジョブ群マップ。バックグラウンドジョブ制御（レジストリ契約、プロセスローカル保存、モデル向けジョブツール）。群を移動するユーザーとメンテナー向け。"
 kind: "package-group"
 ---
 
-# jobs/ — background-job capability family
+# jobs/ — バックグラウンドジョブ能力ファミリー
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-The jobs group is the background-work capability family: tools that run long work register it as a job, and the owning agent can read, wait on, list, and cancel it without blocking its own turn. Jobs belong to the agent session that started them, so one agent never sees another's work, and completion is delivered to the owning agent in-session instead of polled. The group splits into the registry contract (`jobs`), its process-local storage (`jobs-local`), and the model-facing control tools with completion notices (`tool-jobs`).
+jobs 群はバックグラウンド作業の能力ファミリーである。長時間作業を実行するツールはそれをジョブとして登録し、所有エージェントは自ターンを阻まずに読み取り・待機・一覧・取消ができる。ジョブは開始したエージェントセッションに属するため、1 エージェントが他者の作業を見ることはなく、完了は poll ではなくセッション内で所有エージェントに配送される。群はレジストリ契約（`jobs`）、そのプロセスローカル保存（`jobs-local`）、完了通知付きモデル向け制御ツール（`tool-jobs`）に分かれる。
 
-## Table of Contents
+## 目次
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [パッケージ](#packages)
+- [関連文書](#related-documentation)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## パッケージ
 
-| Package | Role | ctx key |
+| パッケージ | 役割 | ctx キー |
 |---|---|---|
-| [`jobs`](jobs/README.md) | Defines the background-job contract: ids, ownership, lifecycle, and completion listeners | `ctx.jobs` |
-| [`jobs-local`](jobs-local/README.md) | Runs and stores jobs in this process, fenced per owner | registers on `ctx.jobs` |
-| [`tool-jobs`](tool-jobs/README.md) | Lets the model read, list, and kill jobs and delivers completion notices | registers on `ctx.tools` |
+| [`jobs`](jobs/README.md) | バックグラウンドジョブ契約を定義する。id、所有権、ライフサイクル、完了リスナー | `ctx.jobs` |
+| [`jobs-local`](jobs-local/README.md) | このプロセスでジョブを実行・保存し、所有者ごとに隔てる | `ctx.jobs` に登録 |
+| [`tool-jobs`](tool-jobs/README.md) | モデルにジョブの読み取り・一覧・kill と完了通知配送を行わせる | `ctx.tools` に登録 |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 関連文書
 
-- [Background task runtime subsystem](../../docs/subsystems/jobs.md) — the job types, snapshot fields, and the `ctx.jobs` API.
-- [Generic long-running tool runtime reference](jobs/README.md) — the design behind the background-job runtime.
-- [job-registry seam Agent Note](../../.agents/notes/archived/architecture/2026-07-26-job-registry-seam.md) — the owner-fenced registry contract and its rationale.
+- [バックグラウンド task ランタイムサブシステム](../../docs/subsystems/jobs.md) — ジョブ型、snapshot フィールド、`ctx.jobs` API。
+- [汎用長時間実行ツールランタイムリファレンス](jobs/README.md) — バックグラウンドジョブ runtime 背後の設計。
+- [job-registry シームエージェントノート](../../.agents/notes/archived/architecture/2026-07-26-job-registry-seam.md) — 所有者隔離レジストリ契約とその根拠。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

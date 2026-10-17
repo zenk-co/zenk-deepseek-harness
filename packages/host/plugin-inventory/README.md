@@ -1,114 +1,114 @@
 ---
-description: "Read-only projection of the current Cordis Loader plugin state with each agent preset's composition beside it: the pluginInventory service and its pluginInventory/list Remote for web GUI host clients."
+description: "現在の Cordis ローダープラグイン状態を各エージェントプリセット構成と並べた読み取り専用投影: pluginInventory サービスと Web GUI ホストクライアント向け pluginInventory/list リモート。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-host-plugin-inventory
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-Clients can call `pluginInventory/list` to display the host’s current plugins in load order, including each entry’s identifier, module specifier, effective enablement, live phase, and available display text. Deployments with an agent-preset roster also report each preset’s metadata, health, and flattened plugin composition; without a roster, preset data is absent. Each response is a point-in-time, read-only snapshot for display and diagnostics: it cannot mutate plugins and provides no history or change subscription.
+クライアントは `pluginInventory/list` を呼んでホストの現在のプラグインを読み込み順に表示できる。各エントリーの識別子、モジュール指定子、実効有効化、ライブフェーズ、利用可能な表示テキストを含む。エージェントプリセット名簿のあるデプロイメントは各プリセットのメタデータ、健全性、平坦化プラグイン構成も報告する。名簿がなければプリセットデータはない。各応答は表示と診断向けの時点読み取り専用スナップショットである。プラグインを変更できず、履歴も変更購読も提供しない。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Call `pluginInventory/list` when a client or settings page needs to show what is currently composed in the host — which plugins are loaded, enabled, and alive, and what each agent preset would give a session. The Remote is the only entry point: the service is Remote-only and deliberately declares no same-process Cordis `Context` merge.
+ホストに現在構成されているもの (どのプラグインが読み込まれ、有効で、生きているか、各エージェントプリセットがセッションに何を与えるか) をクライアントや設定ページが表示する必要があるときに `pluginInventory/list` を呼ぶ。リモートが唯一の入口である。このサービスはリモート専用であり、意図的に同一プロセス Cordis `Context` マージを宣言しない。
 
-### What a snapshot contains
+### スナップショットが含むもの
 
-Each row is one non-group Loader entry: its entry id, the exact module specifier, the effective enablement (including disabled ancestor groups), and the current root Fiber phase. `pending` means the entry waits to load, `loading` that it is being read, `active` that it is running, `failed` that its fiber rejected, and `unloading` that it is being torn down; `null` means no live root Fiber exists at all. Structural group rows are skipped.
+各行は非グループのローダーエントリー 1 件である。そのエントリー id、正確なモジュール指定子、実効有効化 (無効な祖先グループを含む)、現在のルートファイバーフェーズを持つ。`pending` はエントリーが読み込み待ち、`loading` は読み込み中、`active` は動作中、`failed` はファイバーが拒否、`unloading` は破棄中を意味する。`null` はライブのルートファイバーがまったく存在しないことを意味する。構造グループ行はスキップされる。
 
-Loader and preset rows can carry optional `meta` with a title, description, or metadata diagnostic. The Host returns available translations and literal fallbacks; the Client selects its language. Metadata diagnostics do not change enablement or fiber phase.
+ローダーとプリセットの行は任意 `meta` にタイトル、記述、メタデータ診断を運べる。ホストは利用可能な翻訳とリテラルフォールバックを返す。クライアントは言語を選ぶ。メタデータ診断は有効化もファイバーフェーズも変えない。
 
-### Per-preset compositions
+### プリセットごとの構成
 
-With a roster composed, `agentPresets` carries one group per preset in roster order: its id, whether the deployment ships it or the user owns it (`trust`, which clients use to localize shipped names), published display name, whether a session naming no preset composes it, and flattened plugin rows — entry id (null when the file row declares none), module specifier, effective enablement, the row's own `!!js` disabled expression when it carries one, and a root-fiber phase when the composition is live. A preset some session already composed answers from its newest standing generation — even when its file has since broken, because the mount is what those sessions run; one never composed since boot answers from its composition file with disabled gates evaluated against the Loader context, and reading never mounts a preset. `conditional` enablement marks a gate the Host could not evaluate, and a broken preset nothing composed stays listed with its reason and no rows. Without a roster the field is absent.
+名簿を構成すると、`agentPresets` は名簿順にプリセットごとのグループを 1 件ずつ運ぶ。その id、デプロイメント出荷かユーザー所有か (`trust`。クライアントは出荷名のローカライズに使う)、公開表示名、プリセットを名指さないセッションがそれを構成するか、平坦化プラグイン行 — エントリー id (ファイル行が宣言しないときは null)、モジュール指定子、実効有効化、行自身の `!!js` 無効式 (持つ場合)、構成がライブのときのルートファイバーフェーズである。既に何らかのセッションが構成したプリセットは、そのファイルがその後壊れていても最新の常設世代から答える。マウントこそがそれらのセッションが動かすものだからである。起動後に一度も構成されていないものは構成ファイルから答え、無効ゲートはローダーコンテキストに対して評価される。読み取りがプリセットをマウントすることは決してない。`conditional` 有効化はホストが評価できなかったゲートを示し、壊れて何も構成しなかったプリセットは理由付きで列挙され、行はない。名簿がなければこのフィールドはない。
 
-### What you can and cannot do with it
+### これでできることとできないこと
 
-The inventory is a snapshot for display and diagnostics: a client can render the roster, flag failed entries, and detect changes by comparing snapshots. It cannot enable, disable, add, or remove plugins, and it carries no history — a fiber that already failed and was removed is absent. Because the service reads the Loader on every call, the answer always reflects the current composition rather than a cached view.
+インベントリは表示と診断向けのスナップショットである。クライアントは名簿を描画し、失敗エントリーに印を付け、スナップショット比較で変更を検出できる。プラグインの有効化、無効化、追加、削除はできず、履歴も持たない — 既に失敗して取り除かれたファイバーは存在しない。サービスは呼び出しごとにローダーを読むため、答えはキャッシュビューではなく常に現在の構成を反映する。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-### Design concept
+### 設計コンセプト
 
-The gateway is a direct projection with no second lifecycle truth: every `list()` call reads `ctx.loader.entries()` and maps each non-group entry to its public row. Cordis's internal `plugin/status` events already maintain `Entry.fiber` and `Fiber.state`, so a cache would only add another lifecycle truth to keep synchronized. The agent-preset roster is an optional peer resolved per call through `ctx.get('agentPresets')`: its `compositionInventory()` owns preset composition reads, and this package maps root-fiber states onto the public phases.
+ゲートウェイは第二ライフサイクル真実のない直接投影である。すべての `list()` 呼び出しは `ctx.loader.entries()` を読み、各非グループエントリーを公開行に対応付ける。Cordis 内部の `plugin/status` イベントは既に `Entry.fiber` と `Fiber.state` を維持しているため、キャッシュは同期を保つべきもう 1 件のライフサイクル真実を加えるだけになる。エージェントプリセット名簿は呼び出しごとに `ctx.get('agentPresets')` で解決される任意ピアである。その `compositionInventory()` がプリセット構成読み取りを所有し、このパッケージはルートファイバー状態を公開フェーズに対応付ける。
 
-Display metadata comes from the optional `pluginPackages` service using each Loader tree's resolution base, or the gateway context's base for preset rows. Without the service or the applicable base, `meta` is absent. Reading metadata does not load or activate plugins.
+表示メタデータは各ローダーツリーの解決基盤を使う任意 `pluginPackages` サービスから来るか、プリセット行にはゲートウェイコンテキストの基盤を使う。サービスまたは該当基盤がなければ `meta` はない。メタデータ読み取りはプラグインを読み込みも活性化もしない。
 
-### The phase mapping
+### フェーズ対応付け
 
-Fiber states map onto the public phase vocabulary, with `disposed` folding into `null` — an entry whose fiber is gone has no live root to report. The phase therefore never distinguishes why no live root exists: the entry may never have started, or its fiber may already have been disposed.
+ファイバー状態は公開フェーズ語彙に対応付けられ、`disposed` は `null` に折りたたまれる — ファイバーが去ったエントリーには報告すべきライブルートがない。したがってフェーズはライブルートがない理由を区別しない。エントリーがまだ開始していないか、ファイバーが既に破棄されたかのいずれかである。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `PluginInventoryGateway`: the `pluginInventory` Remote service and the Loader projection |
-| [`src/types.ts`](src/types.ts) | Public payload types: `PluginInventoryEntry`, `PluginInventorySnapshot`, `PluginFiberPhase` |
+| [`src/index.ts`](src/index.ts) | `PluginInventoryGateway`: `pluginInventory` リモートサービスとローダー投影 |
+| [`src/types.ts`](src/types.ts) | 公開ペイロード型: `PluginInventoryEntry`、`PluginInventorySnapshot`、`PluginFiberPhase` |
 
-Typert generates the Host and Client Remote artifacts exposed by `./typert` and `./remote`.
+Typert は `./typert` と `./remote` が公開するホストとクライアントのリモート成果物を生成する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these when the inventory contract is not enough: how the Remote reaches clients, then the Loader it projects and the surface that renders it.
+インベントリ契約では足りないときにこれらを読むこと。リモートがクライアントに届く仕組み、次にそれが投影するローダーとそれを描画する表面へ進む。
 
-- [Remote assembly](../../api/remotes/README.md) — how clients consume `pluginInventory/list` without importing the Host implementation.
-- [Cordis plugin loader](../../../vendor/loader/README.md) — the Loader whose entries this package projects.
-- [Plugin inventory settings surface](../../client/ui-settings-plugin-inventory/README.md) — the browser-side projection that renders the inventory.
+- [リモートアセンブリ](../../api/remotes/README.md) — クライアントがホスト実装を import せずに `pluginInventory/list` を消費する仕組み。
+- [Cordis プラグインローダー](../../../vendor/loader/README.md) — このパッケージが投影するローダー。
+- [プラグインインベントリ設定表面](../../client/ui-settings-plugin-inventory/README.md) — インベントリを描画するブラウザー側投影。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the host-side read-only Loader projection registers nothing model-facing.
+なし。ホスト側の読み取り専用ローダー投影はモデル向けに何も登録しないためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てず送らない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what a point-in-time inventory cannot tell a client. They are current package constraints, not a task backlog.
+これらの制限は時点インベントリがクライアントに教えられないことを定める。現在のパッケージ制約であり、タスクバックログではない。
 
-- **Point-in-time state only** — the result contains no durable failure history or subscription; a missing root Fiber is reported as `null`, regardless of why no live root exists.
-- **No layer attribution or mutation** — the service does not identify which bundle, profile, or override introduced an entry, and it cannot enable, disable, add, or remove plugins in either plane.
-- **Presets appear only with a roster** — a deployment without `dsh-agent-preset-registry` serves Loader entries alone; the `agentPresets` field is absent rather than empty.
+- **時点状態のみ** — 結果は耐久失敗履歴も購読も含まない。ライブルートのないファイバーの欠落は理由にかかわらず `null` として報告される。
+- **層帰属も変更もなし** — サービスはエントリーを持ち込んだバンドル、プロファイル、上書きを識別せず、どちらの面でもプラグインの有効化、無効化、追加、削除はできない。
+- **プリセットは名簿があってのみ現れる** — `dsh-agent-preset-registry` のないデプロイメントはローダーエントリーのみ提供する。`agentPresets` フィールドは空ではなく存在しない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

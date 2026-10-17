@@ -1,35 +1,35 @@
 ---
-description: "Tool-output trimming for deployments composing compaction: choosing size limits or debugging why oversized tool results get shortened."
+description: "compaction を構成するデプロイ向けのツール出力トリミング: サイズ制限の選び方、または過大なツール結果が短縮される理由のデバッグ。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-compaction-tool-result-pruner
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-compaction-tool-result-pruner` keeps oversized tool output from filling the context window. Once a compaction trigger qualifies, it replaces over-budget text with a bounded head, a short "middle pruned" marker, and a bounded tail; below-pressure conversations remain unchanged. The complete original result remains in the session log for exact replay and inspection. Trimming makes no model call and may relieve enough token pressure to skip summarization. Character budgets only approximate token use; the token meter determines whether pressure was relieved.
+`dsh-compaction-tool-result-pruner` は、過大なツール出力がコンテキストウィンドウを埋め尽くすのを防ぐ。compaction トリガーが該当すると、予算超過のテキストを上限付きの先頭部分、短い「middle pruned」マーカー、上限付きの末尾部分に置き換える。圧力が低い会話は変更されない。完全な元の結果は、正確なリプレイと検査のためにセッションログに残る。トリミングはモデル呼び出しを行わず、トークン圧力を十分に緩和して要約をスキップできる場合がある。文字数予算はトークン使用量の近似にすぎず、圧力が緩和されたかどうかはトークンメーターが判断する。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらなる探索](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と延期された作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this package next to `dsh-compaction-basic` when tool output regularly dominates the conversation window. Trimming changes what the model sees — shorter results — and gives compaction less history to condense.
+ツール出力が日常的に会話ウィンドウを占める場合は、このパッケージを `dsh-compaction-basic` の隣にマウントする。トリミングはモデルが見る内容 — より短い結果 — を変え、compaction が凝縮する履歴を減らす。
 
-### Smallest working composition
+### 最小の動作構成
 
-Mount token measurement, this package, and the backend in this order:
+トークン計測、このパッケージ、バックエンドをこの順にマウントする:
 
 ```yaml
 - name: '@deepseek-ai/dsh-token-meter'
@@ -37,112 +37,112 @@ Mount token measurement, this package, and the backend in this order:
 - name: '@deepseek-ai/dsh-compaction-basic'
 ```
 
-With these rows, oversized tool results are trimmed automatically as part of condensation. You can verify success by checking that future requests show the trimmed results; the full originals remain in the session log.
+これらの行により、過大なツール結果は凝縮の一部として自動的にトリミングされる。成功は、以降のリクエストがトリミング済みの結果を示すことを確認して検証できる。完全な元データはセッションログに残る。
 
-### What gets trimmed
+### 何がトリミングされるか
 
-Every tool result whose text exceeds the threshold is replaced by a trimmed version: the configured head, a short "middle pruned" marker, and the configured tail. Rich content such as images and structured blocks keeps its order and all logged image-offload selections. The replacement keeps the tool call, step, errors, and metadata — only the text content changes. If a replacement cannot be recorded, the run fails and the trims already applied stay in place.
+テキストがしきい値を超えるすべてのツール結果は、トリミング版に置き換えられる: 設定された先頭、短い「middle pruned」マーカー、設定された末尾である。画像や構造化ブロックなどのリッチコンテンツは、その順序とログに記録された画像オフロード選択をすべて保持する。置き換えはツール呼び出し、ステップ、エラー、メタデータを保持し、変わるのはテキスト内容だけである。置き換えを記録できない場合、実行は失敗し、すでに適用されたトリミングはそのまま残る。
 
-### Setting the size limits
+### サイズ制限の設定
 
-All settings are optional; the defaults trim any result with more than 8,192 text characters to its first 4,096 plus its last 1,024, joined by the marker. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-compaction-tool-result-pruner) is the exhaustive source.
+すべての設定は任意である。デフォルトでは、テキストが 8,192 文字を超える結果を先頭 4,096 文字と末尾 1,024 文字に切り詰め、マーカーで連結する。生成された[設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-compaction-tool-result-pruner)が網羅的なソースである。
 
-| Field | Default | Meaning |
+| フィールド | デフォルト | 意味 |
 |---|---|---|
-| `thresholdChars` | `8192` | Trim when combined text exceeds this many Unicode code points. |
-| `headChars` | `4096` | Leading Unicode code points retained. |
-| `tailChars` | `1024` | Trailing Unicode code points retained. |
+| `thresholdChars` | `8192` | 結合テキストがこの Unicode コードポイント数を超えたらトリミングする。 |
+| `headChars` | `4096` | 保持する先頭の Unicode コードポイント数。 |
+| `tailChars` | `1024` | 保持する末尾の Unicode コードポイント数。 |
 
-Character counts are Unicode code points, so slicing never splits an emoji pair, though a multi-character grapheme can still be cut. The head plus the marker plus the tail must fit within the threshold, so a valid configuration trims every over-budget result without growth or repeated rewriting. An unknown setting rejects the plugin at construction.
+文字数は Unicode コードポイントであるため、スライスが絵文字ペアを分割することはないが、複数文字の書記素は依然として切断されうる。先頭、マーカー、末尾の合計はしきい値内に収まる必要があり、有効な設定ではすべての予算超過結果が増殖や繰り返し書き換えなしにトリミングされる。未知の設定は構築時にプラグインを拒否する。
 
-### When trimming runs
+### トリミングが実行されるタイミング
 
-Trimming only runs when a compaction trigger qualifies: `dsh-compaction-basic` invokes it after pressure or overflow is confirmed, before it selects what to condense. Below pressure nothing is trimmed, and trimming itself makes no model call.
+トリミングは compaction トリガーが該当する場合にのみ実行される: `dsh-compaction-basic` は、圧力またはオーバーフローが確認された後、凝縮対象を選択する前にこれを呼び出す。圧力未満では何もトリミングされず、トリミング自体はモデル呼び出しを行わない。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design decisions behind the pruner; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションでは pruner の背後にある設計判断を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱う。
 
-### Design philosophy
+### 設計思想
 
-The pruner is built on three commitments:
+pruner は 3 つの約束の上に築かれている:
 
-- **Deterministic one-pass convergence.** Slicing is by Unicode code point with fixed budgets, so every emitted result has exactly the configured head, marker, and tail in text code points, is no larger than `thresholdChars`, and is strictly smaller than the triggering input.
-- **Replay-safe replacement.** The original event remains in the append-only log; the replacement cites it through `sourceEventSeqs`, so replay recovers the exact input that produced the pruned result.
-- **The shadow-price protocol.** `compaction/prune` immediately precedes its replacement, pricing the exact replaced range through the injected token meter so pure consumers subtract it without per-node state — the shared protocol documented on the `compaction/prune` event.
+- **決定論的な単一パス収束。** スライスは固定予算で Unicode コードポイント単位に行われるため、出力されるすべての結果は設定された先頭・マーカー・末尾をテキストコードポイントで正確に持ち、`thresholdChars` 以下であり、トリガーとなった入力より厳密に小さい。
+- **リプレイ安全な置き換え。** 元のイベントは追記専用ログに残り、置き換えは `sourceEventSeqs` を通じてそれを参照するため、リプレイは pruned 結果を生み出した正確な入力を復元できる。
+- **シャドープライスプロトコル。** `compaction/prune` は置き換えの直前に位置し、注入されたトークンメーターを通じて置き換えられた正確な範囲の価格を付けるため、純粋なコンシューマーはノードごとの状態なしにそれを差し引ける — `compaction/prune` イベントに記述された共有プロトコルである。
 
-### Pruning mechanics
+### プルーニングの仕組み
 
-Pruning measures `text` blocks by Unicode code point (non-text blocks cost zero), produces a bounded replacement — or none when content is already within budget — and swaps each over-budget tool result for one newly appended `tool/result` that replaces the original event and cites it through `sourceEventSeqs`, immediately preceded by a `compaction/prune` shadow-price event. A session that rejects a replacement fails the run synchronously; replacements committed earlier in the pass stay durable. Non-text blocks keep their original relative positions, and slicing never splits a UTF-16 surrogate pair. Exact signatures are in [`src/index.ts`](src/index.ts).
+プルーニングは `text` ブロックを Unicode コードポイントで計測し（非テキストブロックはゼロ）、上限付きの置き換えを生成する — 内容がすでに予算内であれば何も生成しない — そして予算超過の各ツール結果を、新たに追記される 1 つの `tool/result` と交換する。これは元のイベントを置き換え、`sourceEventSeqs` を通じて参照し、直前に `compaction/prune` シャドープライスイベントが付く。置き換えを拒否するセッションは実行を同期的に失敗させる。パス内で先にコミットされた置き換えは永続的に残る。非テキストブロックは元の相対位置を保ち、スライスが UTF-16 サロゲートペアを分割することはない。正確なシグネチャは [`src/index.ts`](src/index.ts) にある。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `ToolResultPruner` service, `pruneSession` / `pruneContent` / `measureContent` |
-| [`src/config.ts`](src/config.ts) | `PRUNE_MARKER`, defaults, code-point counting, budget validation |
-| [`src/types.ts`](src/types.ts) | `ToolResultPruneConfig`, `ResolvedConfig`, `PrunedEntry`, `PruneResult` |
+| [`src/index.ts`](src/index.ts) | プラグインエントリ: `ToolResultPruner` サービス、`pruneSession` / `pruneContent` / `measureContent` |
+| [`src/config.ts`](src/config.ts) | `PRUNE_MARKER`、デフォルト、コードポイント計数、予算検証 |
+| [`src/types.ts`](src/types.ts) | `ToolResultPruneConfig`、`ResolvedConfig`、`PrunedEntry`、`PruneResult` |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらなる探索
 
-Read these pages when the package-level contract is not enough; they move from the consuming backend to the shared seam and the pricing service.
+パッケージレベルの契約では足りないときにこれらのページを読む。消費側バックエンドから共有シーム、そして価格付けサービスへと進む。
 
-- [Compaction basic backend](../compaction-basic/README.md) — the backend that trims oversized tool outputs before condensing.
-- [Compaction seam](../compaction/README.md) — the condensation contract this package plugs into.
-- [Compaction subsystem reference](../../../docs/subsystems/compaction.md) — the condensation vocabulary, results, and service behavior.
-- [Token meter](../../llm/token-meter/README.md) — the measurement service that decides whether trimming relieved pressure.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-compaction-tool-result-pruner) — every accepted config field and its source declaration.
+- [Compaction basic バックエンド](../compaction-basic/README.md) — 凝縮の前に過大なツール出力をトリミングするバックエンド。
+- [Compaction シーム](../compaction/README.md) — このパッケージが接続する凝縮契約。
+- [Compaction サブシステムリファレンス](../../../docs/subsystems/compaction.md) — 凝縮の語彙、結果、およびサービス動作。
+- [トークンメーター](../../llm/token-meter/README.md) — トリミングが圧力を緩和したかどうかを判断する計測サービス。
+- [生成された設定カタログ](../../../docs/config-catalog.md#deepseek-aidsh-compaction-tool-result-pruner) — 受け付けられるすべての設定フィールドとそのソース宣言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Pruned tool result
+### プルーニングされたツール結果
 
-#### What the model sees
+#### モデルが見るもの
 
-Once a compaction trigger qualifies, future requests see the retained head, `\n\n[... tool result middle pruned ...]\n\n`, and retained tail in place of the removed text. Rich blocks keep their order. The model does not see a second copy of the original.
+compaction トリガーが該当すると、以降のリクエストは、除去されたテキストの代わりに、保持された先頭、`\n\n[... tool result middle pruned ...]\n\n`、および保持された末尾を見る。リッチブロックは順序を保つ。モデルは元データの 2 つ目のコピーを見ることはない。
 
-#### Token effect
+#### トークンへの影響
 
-Each rewritten tool result has at most `thresholdChars` text code points. Pruning itself makes no model call; compaction-basic skips summarization when the remeasured request falls below pressure, otherwise the summarizer reads the pruned surface.
+書き換えられた各ツール結果は最大 `thresholdChars` テキストコードポイントを持つ。プルーニング自体はモデル呼び出しを行わない。再計測されたリクエストが圧力未満に下がれば compaction-basic は要約をスキップし、そうでなければ要約器が pruned 面を読む。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-Replacing an earlier result invalidates reuse from the first changed token. The pruned prefix is eligible for reuse while its route, envelope, and preceding history remain identical.
+以前の結果を置き換えると、最初に変化したトークン以降の再利用が無効になる。pruned プレフィックスは、そのルート、エンベロープ、および先行する履歴が同一である限り再利用可能である。
 
-## Known Limitations and Deferred Work
+## 既知の制限と延期された作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when trimming is a poor fit or needs special care; they are the current package constraints.
+これらの制限は、トリミングが不向きな場合や特別な注意が必要な場合を定義する。これらは現在のパッケージ制約である。
 
-- **Character budgets are not token budgets** — provider token density varies, so `ctx.tokenMeter` remains the authority for deciding whether trimming relieved request pressure.
-- **Pruning is syntactic** — it retains the beginning and end without interpreting which middle lines are semantically important.
-- **Grapheme clusters can split** — code-point slicing protects surrogate pairs but does not perform locale-aware grapheme segmentation.
+- **文字数予算はトークン予算ではない** — プロバイダーのトークン密度は変動するため、トリミングがリクエスト圧力を緩和したかどうかの判断は `ctx.tokenMeter` が引き続き権威である。
+- **プルーニングは構文的** — どの中間行が意味的に重要かを解釈せずに先頭と末尾を保持する。
+- **書記素クラスターは分割されうる** — コードポイントスライスはサロゲートペアを保護するが、ロケール対応の書記素分割は行わない。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-This Dev Note is working context for maintainers and is explicitly non-authoritative; shipped behavior lives in the sections above, the package code, and the linked Agent Notes.
+この開発メモはメンテナー向けの作業コンテキストであり、明示的に非権威である。出荷済みの動作は上記のセクション、パッケージコード、およびリンクされた Agent Note にある。
 
-- **Semantic middle selection, undecided** — pruning keeps the head and tail blindly; interpreting which middle lines matter would need a model or structured heuristics, neither of which ships.
-- **Token-based budgets, deferred** — budgets are Unicode code points; switching to token-based budgets would require an estimator contract the token meter does not expose.
+- **意味的な中間選択、未決定** — プルーニングは先頭と末尾を無条件に保持する。どの中間行が重要かの解釈にはモデルまたは構造化ヒューリスティクスが必要だが、どちらも出荷されていない。
+- **トークンベースの予算、延期** — 予算は Unicode コードポイントである。トークンベースの予算への切り替えには、トークンメーターが公開していないエスティメーター契約が必要になる。
 
 </details>

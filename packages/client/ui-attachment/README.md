@@ -1,106 +1,106 @@
 ---
-description: "Attachment presentation for the conversation UI: mixed draft-attachment rail, document drop target, history-image gallery, and original-image lightbox; for users and maintainers of the Web attachment experience."
+description: "会話 UI 向け添付表示。混合下書き添付レール、文書ドロップ対象、履歴画像ギャラリー、元画像ライトボックス。Web 添付体験のユーザーとメンテナー向け。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-attachment
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-This package renders everything the conversation UI shows about attachments: one ordered draft rail under the composer, a full-viewport drop invitation, durable images in Chat, Trajectory, and Tool results, and a lightbox for the original image. Attachment data, upload state, image loading, and callbacks come from the declared slot owners. Choose it for the DeepSeek Chat-style attachment experience.
+このパッケージは会話 UI が添付について表示するすべてを描画する。コンポーザー下の順序付き下書きレール 1 件、全画面ドロップ誘い、チャット・軌跡・ツール結果内の耐久画像、元画像用ライトボックスである。添付データ・アップロード状態・画像読み込み・コールバックは宣言済みスロット所有者から来る。DeepSeek チャット風の添付体験に選ぶ。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Mount this plugin alongside [`ui-conversation`](../ui-conversation/README.md) and [`ui-tool`](../ui-tool/README.md) when tool results need an image gallery. It waits for their slot declarations and registers its components into them. Users then see the mixed draft-attachment rail, DeepSeek Web file cards with upload controls, the drop overlay with its limits line, message images sized by count, the tool card's gallery, and the Escape/mask/close lightbox.
+ツール結果に画像ギャラリーが必要な場合、このプラグインを [`ui-conversation`](../ui-conversation/README.md) と [`ui-tool`](../ui-tool/README.md) のそばにマウントする。それらのスロット宣言を待ってコンポーネントを登録する。ユーザーは混合下書き添付レール、アップロード制御付き DeepSeek Web ファイルカード、制限行付きドロップオーバーレイ、件数別サイズのメッセージ画像、ツールカードのギャラリー、Escape/マスク/閉じるライトボックスを見る。
 
-### Draft attachments
+### 下書き添付
 
-Images and generic files retain pick order in one non-wrapping horizontal rail. Every item is 64px high: an image is a 64px square thumbnail, while a generic file is a 240px-wide DeepSeek Web card with a 16px radius, blue gradient document glyph, filename, and uppercase extension plus byte size. Edge arrows page hidden overflow, the scrollbar stays hidden, and a newly added item is revealed at the rail's end. Uploading replaces a file glyph with a spinner and shows byte progress when the carrier reports it, with an indeterminate bar before the first report; failure shows retry, and removal controls appear on hover or keyboard focus while remaining visible on touch devices. Clicking an image opens the original.
+画像と汎用ファイルは選択順を 1 件の折り返しなし水平レールに保持する。すべての項目は高さ 64px である。画像は 64px 四方サムネイルであり、汎用ファイルは 240px 幅の DeepSeek Web カード（16px 半径、青グラデーション文書グリフ、ファイル名、大文字拡張子＋バイトサイズ）である。端矢印は隠れたあふれをページ送りし、スクロールバーは隠れたままであり、新規追加項目はレール末尾で現す。アップロードはファイルグリフをスピナーに置換し、運び手が報告する場合にバイト進捗を示し、初回報告前は不確定バーである。失敗は再試行を示し、除去制御はホバーやキーボードフォーカスで現れ、タッチ機器では見えたままである。画像のクリックは元画像を開く。
 
-### Message images and the lightbox
+### メッセージ画像とライトボックス
 
-In Chat, one user message presents files and images in a right-aligned wrapping flow that preserves source order. A lone image without another attachment renders at 240px on its longer edge (aspect clamped to [0.25, 4], never upscaled); when the message has more than one attachment, each image is a fixed 64px square beside 240×64px file cards. A loaded image opens the document-level lightbox on click; a failed load shows a retry control instead. The lightbox closes on Escape, a mask press, or its close control, and restores focus to its opener.
+チャットでは 1 件のユーザーメッセージがファイルと画像をソース順保持の右寄せ折り返し流れで示す。他添付のない単独画像は長い辺 240px で描画する（縦横比は [0.25, 4] に抑え、拡大しない）。メッセージに複数添付がある場合、各画像は 240×64px ファイルカードそばの固定 64px 四方である。読み込み済み画像はクリックで文書レベルライトボックスを開き、読み込み失敗は代わりに再試行制御を示す。ライトボックスは Escape、マスク押下、閉じる制御で閉じ、フォーカスを開き手に戻す。
 
-Trajectory attachment rows request 48px square thumbnails that contain the complete image without cropping. Loading and retry icons keep the same box, with localized tooltips and accessible names; the image opens the same lightbox. A slot owner may supply a presentation-only image label for the thumbnail and lightbox without changing the durable reference or the cache lookup.
+軌跡添付行は 48px 四方サムネイルを要求し、完全な画像を切り抜きなく収める。読み込みと再試行アイコンは同一枠を保ち、ローカライズ済みツールチップと accessible 名を持つ。画像は同一ライトボックスを開く。スロット所有者は耐久参照やキャッシュ参照を変えずに表示専用画像ラベルをサムネイルとライトボックスに提供できる。
 
-### Drop overlay
+### ドロップオーバーレイ
 
-While a file drag is over the page, the full-viewport overlay announces the drop: illustration, title, and a limits line when drops are accepted. The overlay only shows state — the owner's document-level listeners decide accept or reject, and the drop handler reports which dropped members are directories through the entry API so the owner can cite or refuse them.
+ファイルドラッグがページ上にある間、全画面オーバーレイがドロップを告げる。図・題名・受付時の制限行である。オーバーレイは状態のみを示す。所有者の文書レベルリスナーが受付・拒否を決め、ドロップハンドラーは落とされたメンバーのうちディレクトリであるものを入口 API 経由で報告し、所有者が引用または拒否できるようにする。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The plugin provides the root-scoped `conversation.images.content` Factory. Its official `MessageImages` entries fill `conversation.chat.user.images`, `conversation.chat.message.images`, `conversation.trajectory.images`, and `tool.call.images` at priority 100 through `ctx.slots.inject`. A lower-priority entry replaces only its own position; removing it restores the official entry. All defaults reuse one gallery with explicit image references, authorized loader, layout hints, and optional complete labels. The Factory owns gallery presentation and default copy, not Session state or read authorization. Each domain owns its Slot declaration. The composer attachment rail remains a separate entry, and the package entry exports no components.
+このプラグインはルートスコープの `conversation.images.content` ファクトリーを提供する。その公式 `MessageImages` エントリは `ctx.slots.inject` 経由で優先度 100 で `conversation.chat.user.images`、`conversation.chat.message.images`、`conversation.trajectory.images`、`tool.call.images` を満たす。低優先度エントリは自位置のみを置換し、その除去は公式エントリを復元する。すべての既定は明示的画像参照・認可済みローダー・配置ヒント・任意の完全ラベルを持つ 1 件のギャラリーを再利用する。ファクトリーはギャラリー表示と既定文言を所有し、セッション状態や読み取り認可は所有しない。各領域はスロット宣言を所有する。コンポーザー添付レールは別エントリのままであり、パッケージ入口はコンポーネントをエクスポートしない。
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/client/ComposerAttachments.tsx`](src/client/ComposerAttachments.tsx) | Ordered image/file rail + drop overlay assembly |
-| [`src/client/drop-events.ts`](src/client/drop-events.ts) | Document drag-and-drop listeners installed by each mounted attachment view's effect |
-| [`src/AttachmentRail.tsx`](src/AttachmentRail.tsx) | Horizontal attachment overflow, wheel translation, edge arrows |
-| [`src/client/MessageImages.tsx`](src/client/MessageImages.tsx) | Per-message gallery + lightbox assembly |
-| [`src/MessageImage.tsx`](src/MessageImage.tsx) | Single image sizing, load/retry, click-to-open; local submission-echo previews render their object URL directly |
-| [`ImageLightbox`](../ui-primitives/src/ImageLightbox.tsx) | Document-level modal preview over the shared mask |
-| [`src/DropOverlay.tsx`](src/DropOverlay.tsx) | Pointer-inert drag invitation portal |
+| [`src/client/ComposerAttachments.tsx`](src/client/ComposerAttachments.tsx) | 順序付き画像/ファイルレール＋ドロップオーバーレイ組み立て |
+| [`src/client/drop-events.ts`](src/client/drop-events.ts) | 各マウント添付ビューのエフェクトが設置する文書ドラッグ＆ドロップリスナー |
+| [`src/AttachmentRail.tsx`](src/AttachmentRail.tsx) | 水平添付あふれ、ホイール変換、端矢印 |
+| [`src/client/MessageImages.tsx`](src/client/MessageImages.tsx) | メッセージごとギャラリー＋ライトボックス組み立て |
+| [`src/MessageImage.tsx`](src/MessageImage.tsx) | 単一画像サイズ決定・読み込み/再試行・クリックで開く。ローカル送信エコープレビューはオブジェクト URL を直接描画する |
+| [`ImageLightbox`](../ui-primitives/src/ImageLightbox.tsx) | 共有マスク上の文書レベルモーダルプレビュー |
+| [`src/DropOverlay.tsx`](src/DropOverlay.tsx) | ポインター不透過のドラッグ誘いポータル |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the attachment surface is not enough. They move from the slots this package fills to the conversation shell that owns the input flow.
+添付面だけでは足りない場合にこれらのページを読む。このパッケージが満たすスロットから入力流れを所有する会話シェルへ進む。
 
-- [ui-conversation](../ui-conversation/README.md) — declares the attachment slots and owns the composer and image intake.
-- [Web client architecture](../../../docs/subsystems/web-client.md) — how browser plugin rows load and register slots.
-- [Client package map](../README.md) — adjacent browser UI packages.
+- [ui-conversation](../ui-conversation/README.md) — 添付スロットを宣言し、コンポーザーと画像取り込みを所有する。
+- [Web クライアントアーキテクチャ](../../../docs/subsystems/web-client.md) — ブラウザープラグイン行の読み込みとスロット登録方法。
+- [クライアントパッケージマップ](../README.md) — 隣接ブラウザー UI パッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the plugin only renders attachment state supplied by the conversation UI and contributes no model-visible input.
+なし。このプラグインは会話 UI 提供の添付状態を描画するだけで、モデル可視入力を提供しないためである。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てず送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the current attachment surface. They are package constraints, not a general image-viewer comparison or a task backlog.
+現行添付面をこれらの制限が定義する。これらは一般画像ビューアー比較でもタスクバックログでもなくパッケージ制約である。
 
-- **No zoom or download in the lightbox** — the preview renders the original at fit-to-viewport size only.
-- **The lightbox does not trap focus** — it sets `aria-modal` and restores focus on close, but Tab can reach the page behind it.
+- **ライトボックスにズームやダウンロードなし** — プレビューは元画像を viewport 適合サイズのみで描画する。
+- **ライトボックスはフォーカスを閉じ込めない** — `aria-modal` を設定し終了時にフォーカスを戻すが、Tab は背後のページに届き得る。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

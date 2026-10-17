@@ -1,35 +1,35 @@
 ---
-description: "Session-log snapshot support for keyless profile tests: manifests, identity redaction, normalization, workspace checks, and protocol adapters."
+description: "キーなしプロファイルテストのためのセッションログスナップショットサポート: マニフェスト、ID リダクション、正規化、ワークスペースチェック、プロトコルアダプター。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-session-snapshot
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-session-snapshot` provides the shared support behind keyless recorded-session tests (`pnpm run test:snapshot`): closed manifests, typed identity redaction, normalization, workspace comparison, fixture guards, and protocol adapters for headless, SDK (`sdk` and `sdk-minimal`), ACP, and Web owners. The ACP adapter launches the tested profile as a real subprocess, drives a deterministic input script, and registers the complete record, replay, and refresh suite. Every scenario owns enough committed evidence to prove model-visible output and filesystem effects without trusting the agent's report. The package entry imports vitest and is therefore available only inside a vitest run.
+`dsh-session-snapshot` は、キーなしの記録済みセッションテスト（`pnpm run test:snapshot`）を支える共有サポートを提供する。閉じたマニフェスト、型付き ID リダクション、正規化、ワークスペース比較、フィクスチャガード、および headless、SDK（`sdk` と `sdk-minimal`）、ACP、Web の各オーナー向けのプロトコルアダプターである。ACP アダプターは、テスト対象のプロファイルを実際のサブプロセスとして起動し、決定論的な入力スクリプトを駆動し、記録・再生・更新の完全なスイートを登録する。各シナリオは、エージェントの報告を信用せずにモデル可視の出力とファイルシステムへの影響を証明するのに十分なコミット済みの証拠を所有する。パッケージエントリーは vitest をインポートするため、vitest 実行内でのみ利用できる。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-This package turns a shipped profile scenario into a keyless snapshot suite: write a scenario table and a fixtures directory, call the matching adapter once, and the kit owns launching or composing the profile, driving the scenario, comparing normalized output, and guarding the committed fixtures.
+このパッケージは、出荷済みプロファイルのシナリオをキーなしスナップショットスイートに変える。シナリオテーブルとフィクスチャディレクトリを書き、対応するアダプターを 1 回呼ぶと、あとはキットがプロファイルの起動または構成、シナリオの駆動、正規化出力の比較、コミット済みフィクスチャのガードを所有する。
 
-### Writing a snapshot suite
+### スナップショットスイートを書く
 
-A consuming `*.snapshot.ts` is the scenario table plus one factory call. `AgentUnderTest` supplies absolute `binScript`, optional `libBinScript`, `configPath`, and `tsconfigPath` paths, because the subprocess cwd sits outside the repository:
+利用側の `*.snapshot.ts` は、シナリオテーブルと 1 回のファクトリー呼び出しである。サブプロセスの cwd がリポジトリの外に位置するため、`AgentUnderTest` は絶対の `binScript`、オプションの `libBinScript`、`configPath`、`tsconfigPath` パスを供給する:
 
 ```ts
 import { dirname, join } from 'node:path'
@@ -68,109 +68,109 @@ defineAcpSnapshotSuite({
 })
 ```
 
-Each recorded-session directory carries a closed `snapshot.yml` manifest plus canonical parent and contiguous child roles. Parent filenames are `session[.vN].jsonl`; children are `session.<ordinal>[.vN].jsonl`; v0 omits `.v0`, positive versions use lowercase `.vN`, and every filename agrees with its header. A role may retain older generations, but the harness selects the numerically highest one. An owning manifest may declare `sessionFormat.version` plus one or more closed `coverage` names to keep that historical generation as an explicit migration fixture. Without that declaration, record and refresh write the current generation; replay independently accepts the retained V3 baseline or the current generation for each parent/child role under the [corpus policy](../../../snapshots/AGENTS.md). An explicit `sessionFormat.version` requires every selected role to match that version. The manifest also names the scenario, shipped profile, composition/header class, recording source, and only the replay, platform, permission, environment, workspace, or input facts the completed Session cannot reconstruct. Storage guards check tool results and portable paths in every selected parent and child role. Prompt/schema scrubbing, message identity, and prompt-before-request ordering apply to current generations; retained predecessors keep their historical representation. The adapter registers expected-output, Session-log, and optional `workspace.expected/` comparisons; guards reject orphan directories, missing roles, noncanonical names, absolute paths, malformed manifests, and platform-specific separators.
+各記録済みセッションディレクトリは、閉じた `snapshot.yml` マニフェストと、正規の親ロールおよび連続する子ロールを保持する。親のファイル名は `session[.vN].jsonl`、子は `session.<ordinal>[.vN].jsonl` である。v0 は `.v0` を省略し、正のバージョンは小文字の `.vN` を使い、すべてのファイル名はそのヘッダーと一致する。ロールは古い世代を保持してよいが、ハーネスは数値上最大のものを選択する。所有マニフェストは `sessionFormat.version` と 1 つ以上の閉じた `coverage` 名を宣言して、その歴史的世代を明示的な移行フィクスチャとして保持できる。その宣言がない場合、record と refresh は現在の世代を書き込み、replay は[コーパスポリシー](../../../snapshots/AGENTS.md)の下で、親/子ロールごとに保持された V3 ベースラインまたは現在の世代を独立に受け入れる。明示的な `sessionFormat.version` は、選択されたすべてのロールがそのバージョンに一致することを要求する。マニフェストはまた、シナリオ、出荷済みプロファイル、構成/ヘッダークラス、記録ソース、および完了したセッションが再構築できない replay、プラットフォーム、許可、環境、ワークスペース、または入力の事実のみを名指す。ストレージガードは、選択されたすべての親ロールと子ロールのツール結果とポータブルパスを検査する。プロンプト/スキーマのスクラブ、メッセージ ID、リクエスト前のプロンプト順序は現在の世代に適用され、保持された先行世代はその歴史的表現を保つ。アダプターは expected-output、セッションログ、およびオプションの `workspace.expected/` 比較を登録する。ガードは孤立ディレクトリ、欠落ロール、非正規名、絶対パス、不正なマニフェスト、プラットフォーム固有のセパレーターを拒否する。
 
-`normalizeSessionSnapshot` retains the complete Session header and event payloads but omits top-level `seq`/`time` envelopes from committed fixtures after normalizing paths and scrubbing system-prompt text and tool schemas; it also normalizes embedded stream clocks and historical packed-row `seq0`/`time0` envelopes, and catalog child-creation clocks. Event order and source-event reference order are preserved. Record and refresh write top-level `sourceEventSeqs` as expanded arrays. Replay synthesizes the top-level envelopes in memory, while runtime persistence continues to write complete logs. Multi-session comparison validates expected and harvested logs through the strict build-static Session format catalog before identity redaction and normalization; source filenames cannot alter format validation. A retained historical replay input is not the native current-format writer-output oracle: structural migration preserves request meaning but can produce a different event layout. Normalization preserves unexpected request-header fields, including `system`, so regressions remain visible. Versionless protocol-adapter unit fixtures remain outside the released Session format corpus. Fixtures in the [current writer format](../../../docs/session-format-status.md) use one row per event; retained v0/v1 fixtures may use canonical packed rows. The [temporary repository migrator](../../../scripts/migrate-packed-session-fixtures.ts) (`pnpm run migrate:packed-session-fixtures`) rewrites older historical layouts, and its [removal proposal](../../../.agents/notes/proposed/process/2026-07-26-remove-packed-session-fixture-migrator.md) owns its deletion.
+`normalizeSessionSnapshot` は完全なセッションヘッダーとイベントペイロードを保持するが、パスを正規化しシステムプロンプトテキストとツールスキーマをスクラブした後、コミット済みフィクスチャからトップレベルの `seq`/`time` エンベロープを省略する。また、埋め込みストリームクロックと歴史的な packed 行の `seq0`/`time0` エンベロープ、およびカタログの子作成クロックを正規化する。イベント順序とソースイベント参照順序は保持される。record と refresh はトップレベルの `sourceEventSeqs` を展開された配列として書き込む。replay はトップレベルのエンベロープをメモリ内で合成し、ランタイム永続化は引き続き完全なログを書き込む。マルチセッション比較は、ID リダクションと正規化の前に、ビルド時に静的に提供される厳密なセッション形式カタログを通じて期待ログと収穫ログを検証する。ソースのファイル名が形式検証を変えることはできない。保持された歴史的 replay 入力は、ネイティブの現行形式ライター出力のオラクルではない。構造的移行はリクエストの意味を保つが、異なるイベントレイアウトを生みうる。正規化は `system` を含む予期しないリクエストヘッダーフィールドを保持し、リグレッションが可視のまま残る。バージョンのないプロトコルアダプター単体フィクスチャは、リリースされたセッション形式コーパスの外に留まる。[現在のライター形式](../../../docs/session-format-status.md)のフィクスチャはイベントごとに 1 行を使い、保持された v0/v1 フィクスチャは正規の packed 行を使ってよい。[一時的なリポジトリ移行ツール](../../../scripts/migrate-packed-session-fixtures.ts)（`pnpm run migrate:packed-session-fixtures`）は古い歴史的レイアウトを書き換え、その[削除提案](../../../.agents/notes/proposed/process/2026-07-26-remove-packed-session-fixture-migrator.md)がその削除を所有する。
 
-Spill scenarios save through the real local provider under a private temporary root. Their fixture adapter exposes fixed-length logical locators and maps only this run’s saved locators back to real files for retrieval, preserving preview budgets without writing into a shared logical path. Known snapshot spill paths normalize to stable locator tokens, including paths quoted inside JSON omission notices with JSON-escaped Windows separators. Refresh extraction preserves the matched serialized path spelling for literal replacement. Normalization changes only the locator: saved byte lengths and omission counts remain comparison evidence.
+スピルシナリオは、プライベートな一時ルートの下で実際のローカルプロバイダーを通じて保存する。それらのフィクスチャアダプターは固定長の論理ロケーターを公開し、この実行で保存されたロケーターだけを実ファイルへマップして取得させる。これにより、共有の論理パスへ書き込むことなくプレビュー予算を保つ。既知のスナップショットスピルパスは安定したロケータートークンへ正規化される。JSON 省略通知の中に引用され、Windows セパレーターが JSON エスケープされたパスも含む。refresh の抽出は、リテラル置換のために一致したシリアライズ済みパスの綴りを保持する。正規化が変えるのはロケーターのみである。保存されたバイト長と省略件数は比較の証拠として残る。
 
-Retained historical scenarios keep their canonical Session files unchanged and selected for replay, with no newer canonical sibling in the pinned directory. Their exact normalized native writer output is recorded separately in `writer.expected.jsonl` for the parent and `writer.<ordinal>.expected.jsonl` for children; these are output oracles, not replay generations. Output oracles may retain an older supported generation: comparison restores them through the strict catalog, while harvested logs must use the checkout writer. Fresh-writer golden comparisons select `nativeWriterOutput` to tokenize only delivery markers qualified by each input’s original writer generation after strict restoration. Other delivery generations and captured-source fields remain numeric; source-versus-migrated-artifact comparisons preserve exact generations by default. Recording and refresh never store these comparison tokens. Retained SDK scenarios use `notifications.current.expected.jsonl` for current protocol output. Comparisons neither project current events back into a historical format nor strip structural differences. Independent migration tests verify the official transform rather than treating native writer layout as its expected event sequence.
+保持された歴史的シナリオは、正規のセッションファイルを変更せず replay 用に選択したまま保ち、固定ディレクトリ内に新しい正規の兄弟を持たない。それらの正確な正規化済みネイティブライター出力は、親では `writer.expected.jsonl`、子では `writer.<ordinal>.expected.jsonl` に別途記録される。これらは出力オラクルであり、replay 世代ではない。出力オラクルは古いサポート対象世代を保持してよい。比較は厳密なカタログを通じてそれらを復元し、収穫ログはチェックアウトのライターを使わなければならない。新ライターのゴールデン比較は `nativeWriterOutput` を選択して、厳密な復元後に各入力の元のライター世代で修飾された配送マーカーのみをトークン化する。他の配送世代とキャプチャ済みソースフィールドは数値のまま残る。ソース対移行済みアーティファクトの比較は、既定で正確な世代を保持する。記録と refresh はこれらの比較トークンを保存しない。保持された SDK シナリオは現在のプロトコル出力に `notifications.current.expected.jsonl` を使う。比較は現在のイベントを歴史的形式へ投影し戻すことも、構造的差異を取り除くこともない。独立した移行テストは、ネイティブライターのレイアウトを期待イベントシーケンスとして扱うのではなく、公式の変換を検証する。
 
-Headless/ACP and SDK adapters compare raw catalog child-creation times with harvested child headers before normalization. Refresh preserves the chosen child header time in every matching catalog entry, including inherited copies, so retained header clocks cannot diverge from freshly written catalog clocks. Committed historical inconsistencies remain unchanged migration-refusal evidence; normalizing their clocks does not establish successful migration.
+Headless/ACP と SDK のアダプターは、正規化の前に、生のカタログ子作成時刻と収穫された子ヘッダーを比較する。refresh は、継承されたコピーを含む一致するすべてのカタログエントリーで選択された子ヘッダー時刻を保持するので、保持されたヘッダークロックが新しく書き込まれたカタログクロックから乖離することはない。コミット済みの歴史的不整合は、変更されない移行拒否の証拠として残る。そのクロックを正規化しても、移行の成功は確立されない。
 
-### Record, replay, and refresh
+### 記録、再生、更新
 
-`pnpm run test:snapshot:record` calls the live LLM and writes the harvested current generation under its canonical versioned filename. Record and refresh never rename or delete a completed generation, including generations of a child role absent from a later run; reviewed source-tree curation removes a predecessor only after the same role has a verified current replacement. Scenarios with an explicit `sessionFormat` remain read-only in record mode. `pnpm run test:snapshot:refresh` stays keyless, runs the selected highest replay input, and writes stdout, owned prompt and tool-schema sidecars, and a fresh current-generation comparable Session output; retained historical scenarios write the separate writer-output oracles instead of a canonical current-format replay generation. Headless and SDK scenarios may add a local `runtime.cordis.yml` patch for execution fixtures. Each composition owner keeps its replay patch beside its live patch; top-level `snapshots/` owns Session-driven scenarios, while other expected outputs stay beside their owning package. [`dsh-llm-replay`](../llm-replay/README.md) serves the recorded streams selected through `DSH_SNAPSHOT_*` environment values.
+`pnpm run test:snapshot:record` はライブ LLM を呼び出し、収穫した現在の世代をその正規のバージョン付きファイル名で書き込む。記録と refresh は完了した世代を決して改名も削除もしない。後の実行に存在しない子ロールの世代も含む。レビュー済みのソースツリー整理は、同じロールに検証済みの現在の代替ができた後にのみ先行世代を削除する。明示的な `sessionFormat` を持つシナリオは record モードでも読み取り専用のままである。`pnpm run test:snapshot:refresh` はキーなしのままで、選択された最大の replay 入力を実行し、stdout、所有するプロンプトとツールスキーマのサイドカー、および新鮮な現行世代の比較可能なセッション出力を書き込む。保持された歴史的シナリオは、正規の現行形式 replay 世代ではなく、別個のライター出力オラクルを書き込む。Headless と SDK のシナリオは、実行フィクスチャ用にローカルの `runtime.cordis.yml` パッチを追加してよい。各構成オーナーは replay パッチをライブパッチの隣に保つ。トップレベルの `snapshots/` はセッション駆動のシナリオを所有し、他の期待出力は所有パッケージの隣に留まる。[`dsh-llm-replay`](../llm-replay/README.md) は `DSH_SNAPSHOT_*` 環境値で選択された記録済みストリームを提供する。
 
-### Pinning request headers and system prompts
+### リクエストヘッダーとシステムプロンプトの固定
 
-A pin owns its generated `system-prompt.expected.md` or `tool-schemas.expected.json` sidecar by default; `systemPromptSource` and `toolSchemasSource` name another pin when the complete corresponding sequence is identical, so each distinct version is committed once. The system prompt is surface node 0, logged as a `system/message` event before the step's first `request/header`; every fixture stores its text block as `"text":"{{system}}"` and the prompt sidecar keeps the full text. The pin's `request/header` events store `"tools":"{{tools}}"` while retaining config and reason, and the structured schema sidecar keeps the full catalogs. Logs containing developer messages retain ordered tool names in each header instead of the token so historical addition references remain verifiable. A child Session whose own scope composes a different request declares it per fixture index with `pinsChildToolSchemas` and `pinsChildSystemPrompts`. A scenario that changes the request header mid-run declares `expectedHeaderChanges`; a scenario whose prompt changes mid-run — replacing node 0, or appending after the cached history on an `in-history` route — declares `expectedPromptChanges`, and each change adds a `<!-- system/message change N -->` section to the prompt sidecar. The manifest spells these `header.changes` and `header.promptChanges`.
+ピンは既定で自身の生成する `system-prompt.expected.md` または `tool-schemas.expected.json` サイドカーを所有する。`systemPromptSource` と `toolSchemasSource` は、対応する完全なシーケンスが同一である場合に別のピンを名指すので、異なる各バージョンは 1 回だけコミットされる。システムプロンプトはサーフェスノード 0 であり、そのステップの最初の `request/header` より前に `system/message` イベントとしてログ記録される。すべてのフィクスチャはそのテキストブロックを `"text":"{{system}}"` として保存し、プロンプトサイドカーが完全なテキストを保持する。ピンの `request/header` イベントは config と reason を保持しつつ `"tools":"{{tools}}"` を保存し、構造化スキーマサイドカーが完全なカタログを保持する。開発者メッセージを含むログは、歴史的な追加参照が検証可能なまま残るよう、各ヘッダーでトークンではなく順序付きのツール名を保持する。自身のスコープが異なるリクエストを構成する子セッションは、フィクスチャインデックスごとに `pinsChildToolSchemas` と `pinsChildSystemPrompts` でそれを宣言する。実行中にリクエストヘッダーを変更するシナリオは `expectedHeaderChanges` を宣言する。実行中にプロンプトが変わるシナリオ（ノード 0 の置き換え、または `in-history` ルートでキャッシュ済み履歴の後への追記）は `expectedPromptChanges` を宣言し、各変更はプロンプトサイドカーに `<!-- system/message change N -->` セクションを追加する。マニフェストはこれらを `header.changes` と `header.promptChanges` と綴る。
 
-### Platform and composition variants
+### プラットフォームと構成のバリアント
 
-A scenario requiring a non-Windows host declares `posixOnly`, which skips its run test on Windows while the fixture guards keep covering its committed files everywhere; a scenario whose composition needs a usable `pwsh` declares `pwshOnly`. `workspaceParent` moves the generated child cwd outside the platform temp directory when temporary-directory grants are themselves under test; a scenario's committed `workspace/` is copied into that child first, then `prepareWorkspace` runs against the generated cwd before the agent starts. Default generated workspaces are stored in session fixtures as `{{cwd}}`, so platform temp roots and random basenames do not affect recordings. Headless manifests use `workspace.parent: outside-temp` when the Session workspace grant itself is under test. The adapter allocates beside the platform temp root when its parent is writable and outside system temporary grants, otherwise under home, and rejects any generated cwd already covered by automatic temporary write grants.
+非 Windows ホストを必要とするシナリオは `posixOnly` を宣言する。これは Windows での実行テストをスキップし、フィクスチャガードはどこでもコミット済みファイルをカバーし続ける。構成に使用可能な `pwsh` を必要とするシナリオは `pwshOnly` を宣言する。一時ディレクトリのグラント自体がテスト対象である場合、`workspaceParent` は生成される子 cwd をプラットフォームの一時ディレクトリの外へ移動する。シナリオのコミット済み `workspace/` はまずその子へコピーされ、次にエージェントの開始前に `prepareWorkspace` が生成された cwd に対して実行される。既定の生成ワークスペースはセッションフィクスチャに `{{cwd}}` として保存されるので、プラットフォームの一時ルートやランダムなベース名が記録に影響しない。セッションのワークスペースグラント自体がテスト対象の場合、Headless マニフェストは `workspace.parent: outside-temp` を使う。アダプターは、親が書き込み可能でシステムの一時グラントの外にある場合はプラットフォーム一時ルートの隣に、そうでなければホームの下に割り当て、自動一時書き込みグラントで既にカバーされている生成 cwd を拒否する。
 
-### What can go wrong
+### 何がうまくいかなくなりうるか
 
-- **A durable wait times out** — `waitForTurnStart`, `waitForTurnEnd`, `waitForSubagentTurnEnd`, `waitForGoalPhase`, `waitForInboxMessage`, `waitForTitleAfterTurnEnd`, and `waitForEventAfterTurnEnd` identify the session or child and deadline even when the first log harvest exceeds that deadline. Child waits also name the requested turn. All retain the underlying failure as the error cause. `waitForTurnStart` rejects malformed turn records immediately.
-- **A fixture guard rejects the committed files** — orphan scenario dirs, missing files, multiple pins for one header class, duplicate sidecar content, unscrubbed prompt text or tool schemas, a `request/header` with no preceding `system/message`, and malformed pinning headers all fail the suite before comparisons run.
-- **The session harvest needs raw JSONL mode** — snapshot configs set the JSONL backend's `compression: 'none'`; compressed JSONL has no snapshot-harvest path.
-- **Built mode needs current artifacts** — run `pnpm run build` before selecting `DSH_EXAMPLE_MODE=lib`; source mode remains the zero-build path.
+- **永続的な待機がタイムアウトする** — `waitForTurnStart`、`waitForTurnEnd`、`waitForSubagentTurnEnd`、`waitForGoalPhase`、`waitForInboxMessage`、`waitForTitleAfterTurnEnd`、`waitForEventAfterTurnEnd` は、最初のログ収穫がそのデッドラインを超える場合でも、セッションまたは子とデッドラインを識別する。子の待機は要求されたターンも名指す。すべてが根本の失敗をエラー原因として保持する。`waitForTurnStart` は不正なターンレコードを即座に拒否する。
+- **フィクスチャガードがコミット済みファイルを拒否する** — 孤立したシナリオディレクトリ、欠落ファイル、1 つのヘッダークラスに対する複数のピン、重複したサイドカー内容、スクラブされていないプロンプトテキストまたはツールスキーマ、先行する `system/message` のない `request/header`、不正なピンヘッダーは、すべて比較の実行前にスイートを失敗させる。
+- **セッション収穫には生の JSONL モードが必要** — スナップショット設定は JSONL バックエンドの `compression: 'none'` を設定する。圧縮された JSONL にはスナップショット収穫パスがない。
+- **ビルドモードには現在のアーティファクトが必要** — `DSH_EXAMPLE_MODE=lib` を選択する前に `pnpm run build` を実行する。ソースモードは引き続きビルド不要のパスである。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-This section explains the design of the kit; the observable behavior is fully covered in [Use this package](#use-this-package).
+この節はキットの設計を説明する。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱っている。
 
-### Design
+### 設計
 
-The shared core owns manifests, generation-qualified role selection, workspace setup/comparison, typed identity mapping, normalizers, and fixture invariants. The ACP adapter adds four composable layers: launcher, scenario harness, normalizers, and suite factory. `launchAcpTestAgent` boots a source profile under tsx or a built `lib` profile under plain Node, connects the SDK client over a raw-byte stdout tee, collects Session updates and stderr, fails closed on unhandled permission requests, and owns shutdown. `runScenario` drives ACP JSON-RPC stdio and harvests the numerically highest persisted raw JSONL generation for every Session directory. The pure normalizers replace cwd paths and typed identities with stable tokens, zero times, expand physical source-event ranges, and scrub system-prompt text and tool-schema bulk. `defineAcpSnapshotSuite` registers comparisons, generation-qualified fixture write-back, and the live uniformity guard.
+共有コアは、マニフェスト、世代で修飾されたロール選択、ワークスペースのセットアップ/比較、型付き ID マッピング、正規化器、フィクスチャ不変条件を所有する。ACP アダプターは 4 つの合成可能な層を追加する。ランチャー、シナリオハーネス、正規化器、スイートファクトリーである。`launchAcpTestAgent` は、tsx の下でソースプロファイルを、またはプレーン Node の下でビルド済み `lib` プロファイルを起動し、生バイトの stdout tee 上で SDK クライアントを接続し、セッション更新と stderr を収集し、未処理の許可リクエストでフェイルクローズドし、シャットダウンを所有する。`runScenario` は ACP JSON-RPC stdio を駆動し、すべてのセッションディレクトリについて、永続化された生 JSONL の数値上最大の世代を収穫する。純粋な正規化器は cwd パスと型付き ID を安定したトークンへ置き換え、時刻をゼロにし、物理ソースイベント範囲を展開し、システムプロンプトテキストとツールスキーマの大部分をスクラブする。`defineAcpSnapshotSuite` は比較、世代修飾されたフィクスチャの書き戻し、ライブ均一性ガードを登録する。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/launcher.ts`](src/launcher.ts) | Subprocess/client launcher and shutdown ownership |
-| [`src/harness.ts`](src/harness.ts) | Scripted scenario driver and session-log harvest |
-| [`src/manifest.ts`](src/manifest.ts) | Closed `snapshot.yml` schema, collection, and ownership rules |
-| [`src/session-files.ts`](src/session-files.ts) | Canonical parent/child generation grammar, header agreement, and highest-role selection |
-| [`src/identity.ts`](src/identity.ts) | Typed first-seen identity tokenization across parent and child logs |
-| [`src/normalize.ts`](src/normalize.ts) | Pure normalizers and scrubbing helpers |
-| [`src/workspace.ts`](src/workspace.ts) | Scenario workspace setup and complete expected-state comparison |
-| [`src/suite.ts`](src/suite.ts) | Scenario-table suite factory, fixture guards, record/refresh write-back |
-| [`src/index.ts`](src/index.ts) | Package entry re-exporting the four layers |
+| [`src/launcher.ts`](src/launcher.ts) | サブプロセス/クライアントランチャーとシャットダウンの所有 |
+| [`src/harness.ts`](src/harness.ts) | スクリプト化されたシナリオドライバーとセッションログ収穫 |
+| [`src/manifest.ts`](src/manifest.ts) | 閉じた `snapshot.yml` スキーマ、収集、所有規則 |
+| [`src/session-files.ts`](src/session-files.ts) | 正規の親/子世代文法、ヘッダー一致、最大ロール選択 |
+| [`src/identity.ts`](src/identity.ts) | 親ログと子ログにまたがる型付き初回出現 ID のトークン化 |
+| [`src/normalize.ts`](src/normalize.ts) | 純粋な正規化器とスクラブヘルパー |
+| [`src/workspace.ts`](src/workspace.ts) | シナリオワークスペースのセットアップと完全な期待状態比較 |
+| [`src/suite.ts`](src/suite.ts) | シナリオテーブルスイートファクトリー、フィクスチャガード、record/refresh の書き戻し |
+| [`src/index.ts`](src/index.ts) | 4 つの層を再エクスポートするパッケージエントリー |
 
-### Data flow
+### データフロー
 
-A scenario runs the agent under the launcher, feeds it the input script through the harness, and captures stdout plus the persisted logs. The normalizers canonicalize those captures — ids to first-seen sequence, generated cwd to `{{cwd}}`, `system/message` text to `{{system}}` and header tool schemas to `{{tools}}` — so recorded and fresh runs compare structurally. The factory then compares normalized stdout and re-persisted logs against committed fixtures, or writes them back in record/refresh mode, and its guards reject malformed or drifting fixtures before any comparison result is trusted.
+シナリオはランチャーの下でエージェントを実行し、ハーネスを通じて入力スクリプトを供給し、stdout と永続化されたログをキャプチャする。正規化器はそれらのキャプチャを正規化する。ID は初回出現シーケンスへ、生成された cwd は `{{cwd}}` へ、`system/message` テキストは `{{system}}` へ、ヘッダーのツールスキーマは `{{tools}}` へ。これにより記録済み実行と新鮮な実行が構造的に比較される。ファクトリーは次に、正規化された stdout と再永続化されたログをコミット済みフィクスチャと比較し、または record/refresh モードで書き戻す。そのガードは、比較結果が信頼される前に、不正またはドリフトしたフィクスチャを拒否する。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough. They move from the snapshot kit to the model fixture source, the launch mechanics, and the policy that requires the tier.
+パッケージレベルの契約では足りないときにこれらのページを読む。スナップショットキットからモデルフィクスチャソース、起動の仕組み、この層を要求するポリシーへ進む。
 
-- [llm-replay](../llm-replay/README.md) — the keyless model fixture source replay mode consumes.
-- [loader-smoke](../loader-smoke/README.md) — the mode-aware subprocess launch mechanics the launcher builds on.
-- [Testing policy](../../../docs/testing.md) — the keyless snapshot tier, when it is required, and the fixture ownership rules.
-- [Test-support group map](../README.md) — sibling harnesses and support packages.
+- [llm-replay](../llm-replay/README.md) — replay モードが消費するキーなしモデルフィクスチャソース。
+- [loader-smoke](../loader-smoke/README.md) — ランチャーが基盤とするモード対応のサブプロセス起動の仕組み。
+- [テストポリシー](../../../docs/testing.md) — キーなしスナップショット層、それが要求される場面、フィクスチャ所有の規則。
+- [Test-support グループマップ](../README.md) — 兄弟ハーネスとサポートパッケージ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as this test-only support records, normalizes, and compares profile sessions without changing the agent's assembled model request.
+なし。このテスト専用サポートは、エージェントが組み立てるモデルリクエストを変えずに、プロファイルセッションを記録、正規化、比較する。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立ても送信もしない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the kit needs special care. They are current package constraints, not a task backlog.
+これらの制限は、キットが特別な注意を要する場面を定義する。それらは現在のパッケージ制約であり、タスクバックログではない。
 
-- **Session harvest requires raw JSONL mode** — `runScenario` collects persisted `.jsonl` logs, so snapshot configs set the JSONL backend's `compression: 'none'`; compressed JSONL has no snapshot-harvest path.
-- **Built mode requires current artifacts** — run `pnpm run build` before selecting `DSH_EXAMPLE_MODE=lib`; source mode remains the zero-build path.
-- **ACP remains for protocol behavior** — cancellation and permission round trips whose stimulus is the ACP client stay on that adapter; assembled one-shot and persistent-control behavior uses headless and SDK adapters.
+- **セッション収穫には生の JSONL モードが必要** — `runScenario` は永続化された `.jsonl` ログを収集するため、スナップショット設定は JSONL バックエンドの `compression: 'none'` を設定する。圧縮された JSONL にはスナップショット収穫パスがない。
+- **ビルドモードには現在のアーティファクトが必要** — `DSH_EXAMPLE_MODE=lib` を選択する前に `pnpm run build` を実行する。ソースモードは引き続きビルド不要のパスである。
+- **ACP はプロトコル動作のために残る** — 刺激が ACP クライアントであるキャンセルと許可の往復はそのアダプターに留まる。組み立て済みのワンショットおよび持続制御の動作は headless と SDK アダプターを使う。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

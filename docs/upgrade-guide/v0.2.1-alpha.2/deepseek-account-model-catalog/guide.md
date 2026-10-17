@@ -1,20 +1,20 @@
 ---
 kind: upgrade-guide
-description: "The DeepSeek account route no longer accepts a models catalog; the account listing supplies its models and modelOverrides adjusts them."
+description: "DeepSeek アカウントルートはモデルカタログを受け付けなくなる。アカウント一覧がモデルを供給し、modelOverrides がそれらを調整する。"
 ---
 
-# DeepSeek account models come from the account listing
+# DeepSeek アカウントのモデルはアカウント一覧から取得される
 
-English | [中文](guide.zh.md)
+日本語 | [English](guide.en.md) | [中文](guide.zh.md)
 
-## Change
+## 変更
 
-The `deepseek-account` route previously read its model catalog from the `models` field of the `llm-deepseek-account` entry, which the Models page could edit for the account. The route now lists models from the account's `GET /models` endpoint, serves the built-in catalog until a listing loads, and accepts per-model adjustments only through `modelOverrides`; the Models page no longer offers an editor for this route. A listed model can require a newer DeepSeek Harness; such a model is hidden, and a request for it fails with `CLIENT_UPGRADE_REQUIRED`. A `models` field left in the entry, including one saved by the earlier Models page editor, stops the plugin at load with `llm-deepseek-account: models is no longer configurable`, and Desktop and Web show no account models until the field is removed. Signed-in accounts without a saved catalog need no action.
+`deepseek-account` ルートは従来、`llm-deepseek-account` エントリの `models` フィールドからモデルカタログを読み取っており、モデルページでアカウント用に編集できた。現在ルートはアカウントの `GET /models` エンドポイントの一覧からモデルを提供し、一覧読み込みまでは内蔵カタログを出し、モデルごとの調整は `modelOverrides` 経由でのみ受け付ける。このルート向けのエディターをモデルページは提供しなくなる。一覧のモデルが新しい DeepSeek Harness を要求する場合があり、そのようなモデルは非表示となり、それへの要求は `CLIENT_UPGRADE_REQUIRED` で失敗する。エントリに残った `models` フィールド（以前のモデルページエディターが保存したものを含む）は、読み込み時に `llm-deepseek-account: models is no longer configurable` でプラグインを停止させ、フィールド削除までデスクトップと Web にアカウントモデルは表示されない。保存済みカタログのないサインイン済みアカウントでは操作は不要である。
 
-## Migration
+## 移行
 
-1. Open `$DSH_HOME/profiles/<profile>/cordis.patch.yml` and find the entry with `id: llm-deepseek-account`.
-2. Delete its `models` field. For each model whose fields you changed, move only the changed fields under `modelOverrides.<model id>`:
+1. `$DSH_HOME/profiles/<profile>/cordis.patch.yml` を開き、`id: llm-deepseek-account` のエントリを探す。
+2. その `models` フィールドを削除する。フィールドを変更したモデルごとに、変更したフィールドのみを `modelOverrides.<model id>` の下に移す。
 
    ```yaml
    - id: llm-deepseek-account
@@ -24,4 +24,4 @@ The `deepseek-account` route previously read its model catalog from the `models`
            maxTokens: 131072
    ```
 
-3. Restart DeepSeek Harness, sign in to the DeepSeek account, and confirm that the model selector lists the account models and the Models page shows the account as signed in. An override the listed model rejects, or one that names an unknown model, appears as the account's diagnostic on the Models page.
+3. DeepSeek Harness を再起動し、DeepSeek アカウントにサインインして、モデルセレクターにアカウントモデルが並び、モデルページにアカウントがサインイン済みと表示されることを確認する。一覧のモデルが拒否した上書き、または未知のモデルを指名する上書きは、モデルページ上のアカウント診断として表示される。

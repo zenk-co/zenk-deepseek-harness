@@ -1,111 +1,111 @@
 ---
-description: "Native-OS-chooser backend of the directory-picker seam: opens one platform chooser per pick for operators sitting at the web GUI host's display."
+description: "directory-picker シームのネイティブ OS チューザーバックエンド: Web GUI ホストのディスプレイ前にいるオペレーター向けに選択ごとにプラットフォームチューザーを 1 件開く。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-host-directory-picker-native
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-An operator at the host's display picks a workspace directory through a native OS chooser: `dsh-host-directory-picker-native` opens one platform directory chooser per pick and resolves the chosen absolute path (`null` on cancel). macOS drives a scripted AppKit panel that carries the standard Edit menu, Linux uses Zenity with a KDialog fallback, and Windows opens the modern `IFileOpenDialog` in a spawned child process. Only viable when the operator sits at the host's display — remote deployments compose the [browse backend](../directory-picker-browse/README.md) instead. One composition row also registers the matching browser-side interaction in the workspace flow, so it selects both sides.
+ホストのディスプレイ前のオペレーターはネイティブ OS チューザーでワークスペースディレクトリを選ぶ。`dsh-host-directory-picker-native` は選択ごとにプラットフォームディレクトリチューザーを 1 件開き、選ばれた絶対パスを解決する (キャンセル時は `null`)。macOS は標準編集メニューを運ぶスクリプト AppKit パネルを駆動し、Linux は KDialog フォールバック付き Zenity を使い、Windows は生成子プロセスでモダンな `IFileOpenDialog` を開く。ホストのディスプレイ前にオペレーターがいるときにのみ viable であり、リモートデプロイメントは代わりに [browse バックエンド](../directory-picker-browse/README.md) を構成する。1 構成行はワークスペースフロー中の一致するブラウザー側操作も登録するため、両側を選ぶ。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と先送り作業](#known-limitations-and-deferred-work)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Compose this backend when the operator works at the host's display and a native chooser is the right interaction. A workspace flow that opens a directory picker calls `pick(signal)` once per open request; the returned promise resolves with the chosen absolute path, or `null` when the operator cancels.
+オペレーターがホストのディスプレイ前で作業し、ネイティブチューザーが適切な操作であるときにこのバックエンドを構成する。ディレクトリピッカーを開くワークスペースフローは開要求ごとに `pick(signal)` を 1 回呼ぶ。返された promise は選ばれた絶対パスで解決し、オペレーターがキャンセルすると `null` になる。
 
-### When to choose it
+### 選ぶべきとき
 
-Choose this backend for a workstation-local operator on macOS, Windows, or desktop Linux. Choose the [browse backend](../directory-picker-browse/README.md) when clients cannot reach an OS chooser — remote browsers, SSH-forwarded sessions, or unattended hosts. When the situation varies, the [adaptive chooser](../directory-picker-auto/README.md) resolves it at boot.
+macOS、Windows、デスクトップ Linux のワークステーションローカルオペレーターにはこのバックエンドを選ぶ。OS チューザーに届かないクライアント (リモートブラウザー、SSH 転送セッション、無人ホスト) には [browse バックエンド](../directory-picker-browse/README.md) を選ぶ。状況が変わり得るときは[適応チューザー](../directory-picker-auto/README.md) が起動時に解決する。
 
-### What an operator experiences
+### オペレーターが体験すること
 
-Each call opens one native chooser on the host display and waits for the operator; aborting the caller's signal terminates the chooser process instead of leaving it open. On Linux the chooser needs either Zenity or KDialog installed; with neither present, `pick` rejects with an actionable error instead of falling back to a typed-path prompt. The browser half of this package registers a renderless flow occupant into the workspace flow — every `open` request drives `directoryPicker/pick` and reports the one outcome (picked path, cancel, or failure).
+各呼び出しはホストディスプレイにネイティブチューザーを 1 件開き、オペレーターを待つ。呼び出し元シグナルの中断はチューザープロセスを開いたままにせず終了させる。Linux のチューザーは Zenity または KDialog のいずれかのインストールを要する。どちらもないと、`pick` は型付きパスプロンプトへのフォールバックではなく、対処可能なエラーで拒否する。このパッケージのブラウザー半分はワークスペースフローに描画なしフロー占有を登録する — すべての `open` 要求が `directoryPicker/pick` を駆動し、1 件の結果 (選択パス、キャンセル、失敗) を報告する。
 
-### Observable failures
+### 観測可能な失敗
 
-A cancel returns `null`, not an error. Missing platform tooling, a failed chooser launch, or an aborted pick surfaces as a rejection the UI can present; the [browse backend](../directory-picker-browse/README.md) remains the composition-level fallback for deployments where native picking is unreliable.
+キャンセルはエラーではなく `null` を返す。プラットフォーム道具の欠落、チューザー起動失敗、中断された選択は UI が提示できる拒否として現れる。[browse バックエンド](../directory-picker-browse/README.md)はネイティブ選択が信頼できないデプロイメント向けの構成レベルフォールバックのままである。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-### Design concept
+### 設計コンセプト
 
-The backend is a thin service over a platform chooser: `NativeDirectoryPicker` registers the `native` capability whose `pick` forwards to `pickNativeDirectory`, and the chooser runs as a subprocess so the host process never blocks on the dialog. The command boundary (`DirectoryPickerRunner`) and platform facts are injectable, and the shared no-shell subprocess runner lives in [`dsh-native-command`](../../util/native-command/README.md).
+バックエンドはプラットフォームチューザー上の薄いサービスである。`NativeDirectoryPicker` は `pick` を `pickNativeDirectory` に転送する `native` ケイパビリティを登録し、チューザーはホストプロセスがダイアログでブロックしないようサブプロセスとして走る。コマンド境界 (`DirectoryPickerRunner`) とプラットフォーム事実は注入可能であり、共有ノーシェルサブプロセスランナーは [`dsh-native-command`](../../util/native-command/README.md) にある。
 
-### Platform mechanics
+### プラットフォーム機構
 
-Platform tools run without a shell: on macOS one `osascript -l JavaScript` script runs through the system JXA host, installs a main menu carrying the standard Edit key equivalents, and opens `NSOpenPanel`. A native panel resolves ⌘C/⌘V/⌘A/⌘X against that menu rather than the focused field, which AppleScript's menu-less `choose folder` dialog could not provide. Linux uses Zenity with a KDialog fallback, and the caller's abort terminates the native process. Windows opens the modern `IFileOpenDialog` in a spawned child process — a koffi-driven COM conversation on the child's main thread with the best thread DPI awareness the host accepts (per-monitor-v2 first), aborted by posting `WM_CLOSE` to the dialog thread. Immediately before `Show`, the child synthesizes one Alt press through `keybd_event`, which lets the dialog activate as the foreground window even when a background host process spawned the child.
+プラットフォーム道具はシェルなしで走る。macOS では `osascript -l JavaScript` スクリプト 1 件がシステム JXA ホスト経由で走り、標準編集キー相当を運ぶ主メニューを据え、`NSOpenPanel` を開く。ネイティブパネルはフォーカス欄ではなくそのメニューに対して ⌘C/⌘V/⌘A/⌘X を解決する。AppleScript のメニューレス `choose folder` ダイアログはこれを提供できなかった。Linux は Zenity を使い、KDialog をフォールバックにする。呼び出し元の中断はネイティブプロセスを終了させる。Windows は生成子プロセスでモダンな `IFileOpenDialog` を開く — 子の主スレッド上の koffi 駆動 COM 会話であり、ホストが受け入れる最良のスレッド DPI 認識 (まず per-monitor-v2) を使い、ダイアログスレッドへの `WM_CLOSE` 送付で中断する。`Show` 直前に子は `keybd_event` 経由で Alt 押下を 1 回合成し、バックグラウンドホストプロセスが子を生成してもダイアログがフォアグラウンドウィンドウとして活性化できるようにする。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `NativeDirectoryPicker` service with the stable `native` capability |
-| [`src/native-picker.ts`](src/native-picker.ts) | Chooser dispatch: platform selection, subprocess running, abort wiring |
-| [`src/win32-dialog.ts`](src/win32-dialog.ts) + siblings | Windows child-process `IFileOpenDialog` via koffi, DPI handling, `WM_CLOSE` abort |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: 安定 `native` ケイパビリティを持つ `NativeDirectoryPicker` サービス |
+| [`src/native-picker.ts`](src/native-picker.ts) | チューザー振り分け: プラットフォーム選択、サブプロセス実行、中断配線 |
+| [`src/win32-dialog.ts`](src/win32-dialog.ts) + 姉妹編 | koffi 経由の Windows 子プロセス `IFileOpenDialog`、DPI 処理、`WM_CLOSE` 中断 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these when the backend contract is not enough: the seam definition first, then the alternative backend and the chooser that selects between them.
+バックエンド契約では足りないときにこれらを読むこと。まずシーム定義、次に代替バックエンドと両者を選ぶチューザーへ進む。
 
-- [Directory-picker seam](../directory-picker/README.md) — the `native` capability contract and the typed error vocabulary.
-- [Directory-picker capability seam decision](../../../.agents/notes/archived/architecture/2026-07-28-directory-picker-capability-seam.md) — why backends differ in interaction shape.
-- [Browse backend](../directory-picker-browse/README.md) — the in-app alternative for remote clients.
-- [Adaptive chooser](../directory-picker-auto/README.md) — boot-time resolution between native and browse.
-- [No-shell subprocess runner](../../util/native-command/README.md) — the shared subprocess primitive the chooser runs on.
+- [Directory-picker シーム](../directory-picker/README.md) — `native` ケイパビリティ契約と型付きエラー語彙。
+- [Directory-picker ケイパビリティシーム決定](../../../.agents/notes/archived/architecture/2026-07-28-directory-picker-capability-seam.md) — 操作形状がバックエンドで異なる理由。
+- [Browse バックエンド](../directory-picker-browse/README.md) — リモートクライアント向けアプリ内代替。
+- [適応チューザー](../directory-picker-auto/README.md) — ネイティブと browse 間の起動時解決。
+- [ノーシェルサブプロセスランナー](../../util/native-command/README.md) — チューザーが載る共有サブプロセスプリミティブ。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-None, as the GUI-host picking backend registers nothing model-facing.
+なし。GUI ホスト選択バックエンドはモデル向けに何も登録しないためである。
 
-#### KV Cache effect
+#### KV キャッシュへの影響
 
-None; this package neither assembles nor sends a provider request.
+なし。このパッケージはプロバイダーリクエストを組み立てず送らない。
 
-## Known Limitations and Deferred Work
+## 既知の制限と先送り作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the native interaction is unavailable or fragile. They are current package constraints, not a task backlog.
+これらの制限はネイティブ操作が利用不可または脆い場合を定める。現在のパッケージ制約であり、タスクバックログではない。
 
-- **Linux requires desktop tooling** — with neither Zenity nor KDialog installed, `pick` rejects with an actionable error; it does not fall back to a typed-path prompt (the browse backend is that fallback at the composition level).
-- **Windows has no mechanism fallback** — the child-process picker through packaged koffi is the only native tier, so a COM refusal or dialog crash surfaces the failure; the browse backend remains the fallback at the composition level.
-- **Windows foreground grant relies on injected input** — the child synthesizes an Alt press before `Show` so the dialog can take the foreground from a background host; where synthesized input is suppressed (secure desktops, restricted remote sessions, an elevated foreground window), the dialog may still open behind other windows. The technique is validated on Windows 11 only.
+- **Linux はデスクトップ道具を要する** — Zenity も KDialog もインストールされていないと `pick` は対処可能なエラーで拒否する。型付きパスプロンプトにはフォールバックしない (browse バックエンドが構成レベルのそのフォールバックである)。
+- **Windows に機構フォールバックなし** — パッケージ済み koffi 経由の子プロセスピッカーが唯一のネイティブ層であるため、COM 拒否やダイアログクラッシュは失敗を表面化させる。browse バックエンドは引き続き構成レベルのフォールバックである。
+- **Windows フォアグラウンド付与は注入入力に依存** — 子は `Show` 前に Alt 押下を合成し、バックグラウンドホストからダイアログがフォアグラウンドを取れるようにする。合成入力が抑止される所 (セキュアデスクトップ、制限リモートセッション、昇格フォアグラウンドウィンドウ) ではダイアログが他ウィンドウの背後に開き得る。この手法は Windows 11 でのみ検証されている。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発者ノート
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックで展開</summary>
 
-None.
+なし。
 
 </details>

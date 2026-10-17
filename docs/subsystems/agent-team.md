@@ -1,12 +1,12 @@
-# Agent Teams
+# エージェントチーム
 
-English | [中文](agent-team.zh.md)
+日本語 | [English](agent-team.en.md) | [中文](agent-team.zh.md)
 
-Types shared by the experimental implicit-root Team domain, model tools, and host adapters. The [Agent Teams Agent Note](../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md) owns identity, mailbox, task, and shared-checkout decisions; this page records the durable and client-visible forms from [`packages/experimental/agent-team/src/types.ts`](../../packages/experimental/agent-team/src/types.ts).
+実験的な暗黙ルートの Team ドメイン、モデルツール、ホストアダプターが共有する型。[Agent Teams の Agent Note](../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md) が識別、メールボックス、タスク、共有チェックアウトの決定を所有し、このページは [`packages/experimental/agent-team/src/types.ts`](../../packages/experimental/agent-team/src/types.ts) からの永続的でクライアント可視の形式を記録する。
 
-## Identity and roster
+## 識別とロスター
 
-`TeamId` is the root `SessionId` under a distinct [brand](core.md#branded-ids). `TeamTaskId` is allocated as `task-<n>`. New sends return the target inbox `MessageId`; `TeamMessageId` is retained only for historical mailbox records. Teammate names are immutable labels.
+`TeamId` は別個の[ブランド](core.md#branded-ids)の下のルート `SessionId` である。`TeamTaskId` は `task-<n>` として割り当てられる。新しい送信はターゲット受信箱の `MessageId` を返す。`TeamMessageId` は履歴メールボックスレコードのためにのみ保持される。チームメイト名は不変のラベルである。
 
 ```ts type-equiv
 /** Whole durable value written on every teammate lifecycle change. */
@@ -21,11 +21,11 @@ interface TeamMemberSnapshot {
 }
 ```
 
-Every member starts in `provisioning` and reaches exactly one terminal roster phase, `active` or `failed`. Roster `running`/`inactive` status is derived separately and never rewrites this record.
+すべてのメンバーは `provisioning` で開始し、ちょうど 1 つの終端ロスターフェイズ、`active` または `failed` に到達する。ロスターの `running`/`inactive` ステータスは別途導出され、このレコードを書き換えることは決してない。
 
-## Messages and historical mailbox
+## メッセージと履歴メールボックス
 
-New sends return inbox acceptance or reject. The target stores the existing `agent-message` source with the real sender Session id and a sender-name content prefix. Team has no new-message outbox or resend deduplication. The [package contract](../../packages/experimental/agent-team/README.md#understand-the-implementation) defines persistence. The following mailbox types remain readable so historical Lead logs still replay; Team does not deliver their pending records.
+新しい送信は受信箱の受理または拒否を返す。ターゲットは既存の `agent-message` ソースを、実際の送信者 Session id と送信者名のコンテンツプレフィックス付きで保存する。Team には新規メッセージ用の outbox や再送の重複排除はない。[パッケージ契約](../../packages/experimental/agent-team/README.md#understand-the-implementation)が永続化を定義する。以下のメールボックス型は、履歴の Lead ログが依然として再生できるように読み取り可能のままである。Team はそれらの保留レコードを配送しない。
 
 ```ts type-equiv
 /** One peer message recorded by the historical Team mailbox. */
@@ -38,9 +38,9 @@ interface TeamMessageSnapshot {
 }
 ```
 
-Every message attempts Steer delivery. A running target receives it at the nearest step boundary; an inactive target starts a turn if loaded or cold-resumes otherwise. Scheduling is not stored in the durable record because callers cannot select another mode.
+すべてのメッセージは Steer 配送を試みる。実行中のターゲットは最も近いステップ境界でそれを受け取る。非アクティブなターゲットは、ロード済みならターンを開始し、そうでなければコールドレジュームする。呼び出し元が別のモードを選択できないため、スケジューリングは永続レコードに保存されない。
 
-Historical `team-message` sources retain the old message id and sender attribution; the client uses them for the message title and icon.
+履歴の `team-message` ソースは古いメッセージ id と送信者の帰属を保持する。クライアントはメッセージのタイトルとアイコンにそれらを使う。
 
 ```ts type-equiv
 /** Source recorded by a target Session for one historical Team mailbox delivery. */
@@ -53,9 +53,9 @@ interface TeamMessageSource {
 }
 ```
 
-## Shared task DAG
+## 共有タスク DAG
 
-Every task event stores a complete snapshot. `revision` is the compare-and-set value and increments by one per mutation. `blockedBy` edges must name non-deleted tasks and keep the graph acyclic. `writeScopes` are normalized advisory path prefixes rather than locks.
+すべてのタスクイベントは完全なスナップショットを保存する。`revision` は比較交換値で、変更ごとに 1 つ増える。`blockedBy` エッジは削除されていないタスクを名指し、グラフを非巡回に保たなければならない。`writeScopes` はロックではなく、正規化された勧告的なパスプレフィックスである。
 
 ```ts type-equiv
 /** Whole durable task snapshot; every mutation increments {@link revision}. */
@@ -71,13 +71,13 @@ interface TeamTaskSnapshot {
 }
 ```
 
-`pending` is unstarted or released, `in_progress` carries an owner, `completed` satisfies blockers, and `deleted` is a retained tombstone. Views add owner name, readiness, and write-scope overlap warnings without changing the durable snapshot.
+`pending` は未開始または解放済み、`in_progress` はオーナーを持つ、`completed` はブロッカーを満たす、`deleted` は保持された墓標である。ビューは永続スナップショットを変えずに、オーナー名、レディネス、書き込みスコープの重複警告を追加する。
 
 <a id="web-projection"></a>
 
-## Web projection
+## Web 投影
 
-The Lead Session publishes `SessionProjectionMap.agentTeam` with durable roster rows and non-deleted task views. `failure` reports a rejected persisted record beside the last valid state. Member activity comes from Session status; model labels come from each member's `modelSelection` projection.
+Lead Session は `SessionProjectionMap.agentTeam` を、永続的なロスター行と削除されていないタスクビューとともに公開する。`failure` は最後の有効な状態の隣に拒否された永続レコードを報告する。メンバーのアクティビティは Session ステータスから、モデルラベルは各メンバーの `modelSelection` 投影から来る。
 
 ```ts type-equiv
 /** One durable roster row published through the `agentTeam` Session projection. */
@@ -120,9 +120,9 @@ interface TeamProjection {
 }
 ```
 
-## Replay
+## 再生
 
-The `agentTeam` Session projection replays one root Session into the roster, task board, and historical queued-minus-delivered mailbox. It selects records by `TeamId`, so events inherited by an ordinary fork retain the ancestor id and never enter the new root's state. Session event `seq` and `time` remain the ordering and timing record; Team snapshots do not duplicate them. Roster and task reads reach callers as views; pending mail is not exposed to callers. The package [README](../../packages/experimental/agent-team/README.md) owns operation, authorization, recovery, and limit behavior.
+`agentTeam` Session 投影は、1 つのルート Session をロスター、タスクボード、履歴の queued-minus-delivered メールボックスへ再生する。レコードを `TeamId` で選択するので、通常のフォークが継承したイベントは祖先の id を保持し、新しいルートの状態に入ることは決してない。Session イベントの `seq` と `time` が順序とタイミングのレコードのままである。Team スナップショットはそれらを複製しない。ロスターとタスクの読み取りはビューとして呼び出し元に届く。保留メールは呼び出し元に公開されない。操作、認可、リカバリー、制限の挙動はパッケージ [README](../../packages/experimental/agent-team/README.md) が所有する。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -130,13 +130,13 @@ The `agentTeam` Session projection replays one root Session into the roster, tas
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+`scripts/gen-cordis-catalog.ts` によってソースから生成される（doc-sync の `pnpm run verify-cordis-catalog` で最新性を検証。`pnpm run gen-cordis-catalog` で再生成）。言語版はロケール固有の対訳ドキュメントパスだけが異なる。シグネチャーブロックは `ts cordis-catalog` フェンスを使い、元のソース JSDoc を保持する。ディスパッチモードは[入門](../cordis-primer.md#dispatch-modes)で定義され、フレームワーク継承の `ctx` API は [cordis-api/inherited.md](../cordis-api/inherited.md) にある。
 
 <a id="ctxagentteams--teamservice"></a>
 
 ### `ctx.agentTeams` — `TeamService`
 
-Agent Teams service backed by the exact live Lead Session log.
+正確なライブ Lead Session ログに裏打ちされた Agent Teams サービス。
 
 ```ts cordis-catalog
 /**
@@ -225,7 +225,7 @@ interrupt(caller: Agent, targetName: string): { previousStatus: 'running' | 'ina
 tryMembership(agent: Agent): TeamMembership | undefined
 ```
 
-Types: [Agent](core.md)
+型: [Agent](core.md)
 
-Source: [`packages/experimental/agent-team/src/index.ts`](../../packages/experimental/agent-team/src/index.ts)
+ソース: [`packages/experimental/agent-team/src/index.ts`](../../packages/experimental/agent-team/src/index.ts)
 <!-- END GENERATED cordis-surface -->

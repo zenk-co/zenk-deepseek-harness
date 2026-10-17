@@ -1,47 +1,47 @@
 ---
-description: "Retrospective Session persistence types and adjacent-release changes for dsh-v0.1.1-rc.2."
+description: "dsh-v0.1.1-rc.2 の回顧的なセッション永続化型と隣接リリースの変更。"
 kind: persistence-release
 ---
 
-# Persistence release: dsh-v0.1.1-rc.2
+# 永続化リリース: dsh-v0.1.1-rc.2
 
-English | [中文](dsh-v0.1.1-rc.2.zh.md)
+日本語 | [English](dsh-v0.1.1-rc.2.en.md) | [中文](dsh-v0.1.1-rc.2.zh.md)
 
-## Summary
+## 概要
 
-permission/preset removes origin, while attachment records gain optional originalDimensions across the message and tool payloads that reference them. The writer format remains 0.
+permission/preset は origin を削除し、メッセージとそれを参照するツールペイロードにわたって添付ファイルレコードが任意の originalDimensions を獲得する。writer フォーマットは 0 のままである。
 
-## Table of Contents
+## 目次
 
-- [Release evidence](#evidence)
-- [Declaration](#declaration)
-- [Structural changes](#changes)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [リリース証跡](#evidence)
+- [宣言](#declaration)
+- [構造的変更](#changes)
+- [検証](#verification)
+- [開発者ノート](#dev-note)
 
 -----
 
 <a id="evidence"></a>
-## Release evidence
+## リリース証跡
 
-This approximate backfill supports reading and format validation; it is not a contemporaneous compatibility acknowledgement. See the [archive reference](README.md) for extraction and coverage limits.
+この近似バックフィルは読み取りとフォーマット検証を支えるものであり、同時代の互換性承認ではない。抽出とカバレッジの限界は[アーカイブリファレンス](README.md)を参照。
 
-| Item | Recorded value |
+| 項目 | 記録値 |
 |---|---|
-| Source tag | `dsh-v0.1.1-rc.2` |
-| Source date | 2026-08-21T12:03:37.000Z |
-| Release record | Release object present. |
-| Previous release | [dsh-v0.1.1-rc.1](dsh-v0.1.1-rc.1.md) |
-| Session writer version | 0 |
-| Reconstructed inventory | <!-- persistence-release-inventory:start -->51 roots / 404 types<!-- persistence-release-inventory:end --> |
-| This snapshot | [dsh-v0.1.1-rc.2.schema.json](dsh-v0.1.1-rc.2.schema.json) |
+| ソースタグ | `dsh-v0.1.1-rc.2` |
+| ソース日付 | 2026-08-21T12:03:37.000Z |
+| リリース記録 | リリースオブジェクトあり。 |
+| 前回のリリース | [dsh-v0.1.1-rc.1](dsh-v0.1.1-rc.1.md) |
+| セッション writer バージョン | 0 |
+| 再構成インベントリー | <!-- persistence-release-inventory:start -->51 roots / 404 types<!-- persistence-release-inventory:end --> |
+| このスナップショット | [dsh-v0.1.1-rc.2.schema.json](dsh-v0.1.1-rc.2.schema.json) |
 
-Source evidence for the writer version constant at this tag:
+このタグにおける writer バージョン定数のソース証跡:
 
 - `packages/core/session/src/types.ts`: `export const SESSION_FORMAT_VERSION = 0`
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-release
 schemaVersion: 1
@@ -53,16 +53,16 @@ changes:
     before: 7a0b347ba6a465a7813490036bde98bdc658609c6de9545ba58be26c372c5030
     after: 402ee62cd1447d03340e206138fb107d865a3452ea73c15c22fb6bc48fdf181a
   - root: event:assistant/chunk
-    before: de04e4ae000cc4422a15fb86dce7c398c8a9970ac963b6f7f785e2276a939e62
+    before: de04e4ae00cc4422a15fb86dce7c398c8a9970ac963b6f7f785e2276a939e62
     after: 51045f351a56e61da8be1dd5bba8080ac5e8ac2ff3d62a308a7f3e710b7cb18b
   - root: event:assistant/message
-    before: fb7d974e1945b4c8e72ee540daf64eb9e81984030ff52e1a97a4e1f71b9dd2f9
+    before: fb7d974e1945b4c8e72e540daf64eb9e81984030ff52e1a97a4e1f71b9dd2f9
     after: 395d04e6fd6f40eae4099cfaf3793fb710cee646fac53378433bc2d74bebd386
   - root: event:compaction/summary
     before: 67c53a0cdc70f8330a84b9a16481bc6cc45e23d1ae8041485a0b0453c11fc9aa
     after: 80316c3b92f42f246ab57d649dc546a8adeb11b96db3b11361ea32709b6bdc35
   - root: event:permission/preset
-    before: 7271e4b771406aaf06014c2269edd6cb68055bb8b8686571730813ce0ababc22
+    before: 7271e4b771406aaf06014c2269edd6cb68055bb8b8686570813ce0ababc22
     after: 5c45bf4c544a7211dcd8ba6ba7e5f1bc39b49e7a9df9d5cbdc8e87c22771b37b
   - root: event:session/title-llm-request
     before: ee6c879669bb83325e4cd3011227f238bf51765744990fc4bb12089d6dd6563a
@@ -82,13 +82,13 @@ changes:
 ```
 
 <a id="changes"></a>
-## Structural changes
+## 構造的変更
 
 <!-- persistence-release-changes:start -->
 
-Detected 10 changed roots and 11 structural differences. The review requirement below is calculated using current rules for comparison only; it does not assert historical compliance, migration correctness, or runtime compatibility.
+10 個の変更ルートと 11 個の構造的差異を検出した。以下のレビュー要件は比較のみを目的として現在の規則で計算されたものであり、歴史的な準拠、マイグレーションの正しさ、ランタイム互換性を主張するものではない。
 
-| Path | Change | Review requirement |
+| パス | 変更 | レビュー要件 |
 |---|---|---|
 | `event:agent/inbox/spliced.data.inserted[].content[].attachment.originalDimensions` | `optional-property-added` | `not-required` |
 | `event:assistant/chunk.data.chunk.block.attachment.originalDimensions` | `optional-property-added` | `not-required` |
@@ -105,15 +105,15 @@ Detected 10 changed roots and 11 structural differences. The review requirement 
 <!-- persistence-release-changes:end -->
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Extraction passed canonical-graph, root-digest, and reachable-type-digest validation, permitting the original optional `surfaceOp` only for historical surface events. The in-tree check reconstructs each tag from its predecessor and verifies before/after values, snapshot coverage, and bilingual machine declarations.
+抽出は正規グラフ、ルートダイジェスト、到達可能型ダイジェストの検証に合格し、元の任意の `surfaceOp` は歴史的サーフェスイベントに対してのみ許容された。ツリー内チェックは各タグをその前身から再構成し、before/after 値、スナップショットカバレッジ、バイリンガルの機械宣言を検証する。
 
 ```sh
 pnpm run verify-persistence-releases
 ```
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発者ノート
 
-None.
+なし。

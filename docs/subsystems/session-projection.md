@@ -1,14 +1,14 @@
-# Session Projections
+# セッションプロジェクション
 
-English | [中文](session-projection.zh.md)
+日本語 | [English](session-projection.en.md) | [中文](session-projection.zh.md)
 
-The session-projection seam — a [capability seam](../capability-seams.md) through which domain host plugins serve whole current values of log-derived per-session state to client carriers: the Service Definition and registry ([dsh-session-projection](../../packages/session/session-projection), `ctx.sessionProjections`), domain contributors (each registering one pure unit), and carriers ([dsh-session-controller](../../packages/api/session-controller)'s history tail page and `session/projection` push frame). It is one optional capability, not part of the agent-loop spine. The framework drives, the domain computes: the registry subscribes to `session/event` once and folds every committed event through every unit; domains hold no subscriptions and clients never fold domain events — they receive finished values. Design authority: the [session-projection RFC](../../.agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.md); drive/cache/feed contracts: the [package README](../../packages/session/session-projection/README.md).
+セッションプロジェクションのシーム — [ケイパビリティシーム](../capability-seams.md)であり、ドメインの Host プラグインがログ由来のセッション単位状態の現在の全量値をクライアントのキャリアへ提供する: Service Definition とレジストリ（[dsh-session-projection](../../packages/session/session-projection)、`ctx.sessionProjections`）、ドメインの貢献者（それぞれが 1 つの純粋なユニットを登録する）、およびキャリア（[dsh-session-controller](../../packages/api/session-controller) の履歴テールページと `session/projection` プッシュフレーム）。これはオプションのケイパビリティの 1 つであり、agent-loop の背骨の一部ではない。フレームワークが駆動し、ドメインが計算する: レジストリは `session/event` を 1 回だけ購読し、コミットされたすべてのイベントをすべてのユニットに通して畳み込む。ドメインは購読を持たず、クライアントがドメインイベントを畳み込むこともない — 完成した値を受け取る。設計権威: [session-projection RFC](../../.agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.md)。駆動・キャッシュ・フィードの契約: [パッケージ README](../../packages/session/session-projection/README.md)。
 
-Source: [`packages/session/session-projection/src/index.ts`](../../packages/session/session-projection/src/index.ts)
+ソース: [`packages/session/session-projection/src/index.ts`](../../packages/session/session-projection/src/index.ts)
 
-## The unit
+## ユニット
 
-`SessionProjectionStateMap` is the merge-extensible table of host fold states, while `SessionProjectionMap` retains the client-visible whole values. A domain contributes one `ProjectionDefinition` per state key; a `wire` block makes that key client-visible, and rendering belongs to the slot system, never this layer:
+`SessionProjectionStateMap` は Host 側の畳み込み状態の、マージ拡張可能なテーブルであり、`SessionProjectionMap` はクライアント可視の全量値を保持する。ドメインは状態キーごとに 1 つの `ProjectionDefinition` を寄与し、`wire` ブロックがそのキーをクライアント可視にする。レンダリングはスロットシステムに属し、この層には決して属さない:
 
 ```ts type-equiv
 /**
@@ -67,9 +67,9 @@ interface ProjectionDefinition<
 }
 ```
 
-Every served projection value is a complete read model. A source event may carry a whole value or a domain-owned operation; the unit's deterministic `apply` owns replay, and checkpoint plus forward tail replay reconstructs the same state.
+提供されるすべてのプロジェクション値は完全な読み取りモデルである。ソースイベントは全量値を運ぶことも、ドメイン所有の操作を運ぶこともある。ユニットの決定的な `apply` が再生を所有し、チェックポイントと前方テール再生が同じ状態を再構築する。
 
-## The snapshot and the change feed
+## スナップショットと変更フィード
 
 ```ts type-equiv
 /**
@@ -99,11 +99,11 @@ type ProjectionChangeListener = (
 ) => void
 ```
 
-`snapshot(session)` is fully synchronous: a carrier reads it in the same tick as its page slice, so `asOfSeq` covers both reads at one sequence number. It returns only client views, and every value passes its unit's `viewSchema` before return. `stateOf(session, key)` reads one live host state without computing unrelated views; callers must not mutate the borrowed reference. A state-reference change computes one cached raw view, and the change feed fires only when that result changes by `Object.is`; an object-valued view must preserve its reference to suppress publication across internal-only state changes.
+`snapshot(session)` は完全に同期的である。キャリアはページスライスと同じティックでこれを読むため、`asOfSeq` は両方の読み取りを 1 つのシーケンス番号で覆う。クライアントビューのみを返し、すべての値は返却前にユニットの `viewSchema` を通過する。`stateOf(session, key)` は無関係なビューを計算せずに 1 つのライブ Host 状態を読む。呼び出し元は借用した参照を変更してはならない。状態参照の変更は 1 つのキャッシュされた生ビューを計算し、変更フィードはその結果が `Object.is` で変化したときにのみ発火する。オブジェクト値のビューは、内部のみの状態変化をまたいで公開を抑制するために、その参照を保持しなければならない。
 
-## The registry: `ctx.sessionProjections`
+## レジストリ: `ctx.sessionProjections`
 
-`SessionProjectionRegistry` ([signatures](#ctxsessionprojections--sessionprojectionregistry)) owns the drive: one `session/event` subscription, eager `apply` over every registered unit, and per-session per-unit watermark cells. Cells build lazily — a unit registered after events flowed, or a session older than the registry, folds `init` over the in-memory log on first touch (event or read). Registration is an effect whose disposer rides the calling fiber: an unloaded domain plugin's key (with its cached cells) disappears from subsequent drives and snapshots, and clients read that as capability absence; a duplicate key with a different `stateVersion` throws, while same-version registrants share one unit and are counted. Domain plugins register under `ctx.inject(['sessionProjections'], …)` so headless assemblies without the registry stay unaffected.
+`SessionProjectionRegistry`（[シグネチャ](#ctxsessionprojections--sessionprojectionregistry)）が駆動を所有する。1 つの `session/event` 購読、登録されたすべてのユニットへの即時 `apply`、およびセッションごと・ユニットごとのウォーターマークセルである。セルは遅延構築される — イベントが流れた後に登録されたユニット、またはレジストリより古いセッションは、最初のタッチ（イベントまたは読み取り）時に `init` をインメモリログ上で畳み込む。登録はエフェクトであり、そのディスポーザーは呼び出し元ファイバーに追随する。アンロードされたドメインプラグインのキー（キャッシュされたセルとともに）は後続の駆動とスナップショットから消え、クライアントはそれをケイパビリティの不在として読む。異なる `stateVersion` を持つ重複キーは throw し、同じバージョンの登録者は 1 つのユニットを共有してカウントされる。ドメインプラグインは `ctx.inject(['sessionProjections'], …)` の下で登録するため、レジストリを持たないヘッドレス構成は影響を受けない。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

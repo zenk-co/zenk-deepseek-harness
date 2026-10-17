@@ -1,25 +1,25 @@
 ---
-description: "Records a persistence type transition and its compatibility acknowledgement."
+description: "永続型遷移とその互換承認を記録する。"
 kind: persistence-change
 ---
 
-# 2026-09-14-image-offload
+# 2026-09-14 画像荷降ろし
 
-English | [中文](2026-09-14-image-offload.zh.md)
+日本語 | [English](2026-09-14-image-offload.en.md) | [中文](2026-09-14-image-offload.zh.md)
 
-## Summary
+## 概要
 
-Record selected image occurrences with the image/offload event and derive their offloaded marks through the owning plugin's message projection.
+選択した画像出現を image/offload イベントで記録し、その荷降ろし標を所有插件の文投影で導く。
 
-## Table of Contents
+## 目次
 
-- [Declaration](#declaration)
-- [Compatibility](#compatibility)
-- [Verification](#verification)
-- [Dev Note](#dev-note)
+- [宣言](#declaration)
+- [互換性](#compatibility)
+- [検証](#verification)
+- [開発メモ](#dev-note)
 
 <a id="declaration"></a>
-## Declaration
+## 宣言
 
 ```yaml persistence-change
 schemaVersion: 1
@@ -81,16 +81,16 @@ changes:
 ```
 
 <a id="compatibility"></a>
-## Compatibility
+## 互換性
 
-Existing logs remain readable. The optional offloaded image field leaves unmarked occurrences retained. The new event is required on read: older builds that do not recognize image/offload refuse those logs, and current readers require its message projection. Event envelopes and structural Session format versions are unchanged.
+既存記録は読み可能なままである。任意荷降ろし画像項目は標なし出現を保持したままにする。新イベントは読み取りに必須である。image/offload を認識しない旧 build はそれら記録を拒み、現行読み手はその文投影を要求する。包絡と構造セッション形式版は変わらない。
 
 <a id="verification"></a>
-## Verification
+## 検証
 
-Session and image-offload tests cover event validation, immutable message projection, missing interpreters, restore, and retry. The focused 1,144-test run and two TypeScript image snapshots pass. The Python advanced SDK recording was refreshed through the built dsh profile and includes the standalone image/offload event.
+セッションと画像荷降ろし試験はイベント検証、不変文投影、欠落解釈子、復元、再試行を覆う。焦点 1,144 試験走行と 2 つの TypeScript 画像 snapshot が通る。Python 上級 SDK 記録は build 済み dsh プロファイル経由で更新され、単立 image/offload イベントを含む。
 
 <a id="dev-note"></a>
-## Dev Note
+## 開発メモ
 
-None.
+なし。

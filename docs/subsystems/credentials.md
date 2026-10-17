@@ -1,14 +1,14 @@
-# User Credentials
+# ユーザー資格情報
 
-English | [中文](credentials.zh.md)
+日本語 | [English](credentials.en.md) | [中文](credentials.zh.md)
 
-The credential seam of [dsh-credentials](../../packages/credentials/credentials) keeps secrets out of configuration: settings sections and `cordis.yml` entries carry *references* (environment-variable names), providers such as [dsh-credentials-local](../../packages/credentials/credentials-local) own the values, and consumers resolve a reference once per operation — the LLM adapters resolve once per model request, so a rotated credential reaches the very next request without any restart. One seam-wide rule binds every provider: an empty stored value is absent everywhere.
+[dsh-credentials](../../packages/credentials/credentials) の資格情報シームは、シークレットを設定の外に保つ。設定セクションと `cordis.yml` のエントリは*参照* (環境変数名) を運び、[dsh-credentials-local](../../packages/credentials/credentials-local) のようなプロバイダーが値を所有し、コンシューマーは操作ごとに 1 回だけ参照を解決する — LLM アダプターはモデルリクエストごとに 1 回解決するので、ローテーションされた資格情報は再起動なしで次のリクエストに到達する。シーム全体の 1 つのルールがすべてのプロバイダーを拘束する。空の保存値はどこでも存在しないものとして扱われる。
 
-Source: [`packages/credentials/credentials/src/index.ts`](../../packages/credentials/credentials/src/index.ts)
+ソース: [`packages/credentials/credentials/src/index.ts`](../../packages/credentials/credentials/src/index.ts)
 
-## Identity
+## アイデンティティ
 
-A reference names one credential as a POSIX-style environment-variable name. The brand prevents callers from mixing credential references with other strings passed between packages or processes; construction validates the shell-identifier syntax.
+参照は 1 つの資格情報を POSIX 形式の環境変数名として名指す。ブランドは、呼び出し元が資格情報参照と、パッケージまたはプロセス間で渡される他の文字列を混同することを防止する。構築はシェル識別子構文を検証する。
 
 ```ts type-equiv
 /** Nominal reference to one credential: a POSIX-style environment-variable name. */
@@ -16,9 +16,9 @@ type CredentialRef = Branded<'CredentialRef'>
 ```
 
 <a id="resolution"></a>
-## Resolution
+## 解決
 
-`resolve(ref)` returns the value with the provider-defined source layer that supplied it, or `undefined` while unconfigured. Consumers re-resolve at each operation and never cache across operations — that per-operation read is the hot-update mechanism.
+`resolve(ref)` は、その値を供給したプロバイダー定義のソース層とともに値を返すか、未設定の間は `undefined` を返す。コンシューマーは操作ごとに再解決し、操作をまたいでキャッシュすることは決してない — この操作ごとの読み取りがホットアップデート機構である。
 
 ```ts type-equiv
 /** One resolved credential value and the source layer that supplied it. */
@@ -30,9 +30,9 @@ interface ResolvedCredential {
 }
 ```
 
-## Description
+## 記述
 
-`describe(ref)` answers configuration surfaces without ever exposing a value: whether the reference resolves, from which layer, and whether `set` would currently succeed. The local provider ranks its managed file above the launch environment, so saving a value always creates the effective writable layer; removing it reveals the launch environment or `.env` fallback again.
+`describe(ref)` は、値を決して露出することなく、設定サーフェスに応答する。参照が解決するかどうか、どの層からか、そして `set` が現在成功するかどうかである。ローカルプロバイダーは管理ファイルを起動環境より上位に位置付けるので、値の保存は常に実効的な書き込み可能層を作成し、削除すると起動環境または `.env` フォールバックが再び現れる。
 
 ```ts type-equiv
 /**
@@ -50,17 +50,17 @@ interface CredentialInfo {
 }
 ```
 
-## Change commits
+## 変更コミット
 
-`credentials/reference-updated (ref)` fires after a committed change to a provider-managed source — a `set`, an `unset`, or an external edit observed in storage. Ambient process-environment changes are not observable and never emit. Consumers do not need the event (they re-resolve per operation); it exists for configuration surfaces refreshing a "configured" badge.
+`credentials/reference-updated (ref)` は、プロバイダー管理ソースへのコミット済み変更 — `set`、`unset`、またはストレージで観測された外部編集 — の後に発火する。アンビエントなプロセス環境の変更は観測できず、決して発火しない。コンシューマーはこのイベントを必要としない (操作ごとに再解決する)。これは「設定済み」バッジを更新する設定サーフェスのために存在する。
 
-## Embedded Platform credentials
+## 埋め込み Platform 資格情報
 
-PlatformSession is a Host-only snapshot from getPlatformSession: origin names the configured Platform issuer and token contains its stored account credential. userId repeats the stable account ID from the most recent successful getProfile, and is null until one succeeds or when that profile carries no ID. The snapshot reuses that ID without issuing a profile request of its own, so an unknown ID leaves userId null instead of delaying the caller; a profile read whose stable ID first becomes available or changes notifies only Host subscribers using `watch(signal, true)`, which lets identity consumers re-read the snapshot. Consumers key persistent browser storage by origin and userId and fall back to temporary storage for null. Signed-out accounts and credentials changed during the credential read return no snapshot; a mismatched issuer fails. Native consumers own document invalidation when credentials change. This snapshot is excluded from account-controller RPC, AccountView, and AccountDetails.
+PlatformSession は getPlatformSession からの Host 専用スナップショットである。origin は設定済みの Platform 発行者を名指し、token はその保存済みアカウント資格情報を含む。userId は直近の成功した getProfile からの安定したアカウント ID を繰り返し、成功するまでは、またはそのプロファイルが ID を持たない場合は null である。スナップショットは自身でプロファイルリクエストを発行することなくその ID を再利用するので、未知の ID は呼び出し元を遅延させる代わりに userId を null のままにする。安定した ID が初めて利用可能になるか変化したプロファイル読み取りは、`watch(signal, true)` を使う Host サブスクライバーにのみ通知し、これによりアイデンティティコンシューマーはスナップショットを再読み取りできる。コンシューマーは永続ブラウザーストレージを origin と userId でキー付けし、null には一時ストレージにフォールバックする。サインアウト済みのアカウントと、資格情報の読み取り中に変更された資格情報はスナップショットを返さない。発行者の不一致は失敗する。ネイティブコンシューマーは資格情報の変更時にドキュメントの無効化を所有する。このスナップショットは account-controller RPC、AccountView、AccountDetails から除外される。
 
-AccountDetails.balance projects recharge wallets in value and promotional wallets in bonusWallets, with independent currency and decimal balance strings. Failed queries contain no wallet arrays.
+AccountDetails.balance はリチャージウォレットを value に、プロモーションウォレットを bonusWallets に投影し、それぞれ独立した通貨と 10 進残高文字列を持つ。失敗したクエリはウォレット配列を含まない。
 
-Bonus notification queries return an AccountBonusBatch with the current Platform account id and eligible orders in server order. AccountBonusNotification retains the server message and expiry without projecting credentials. Acknowledgment carries the expected account id and order id; the Host refuses it after an account change. Both notification operations use the initiating UI language through x-client-locale, without a language query parameter.
+ボーナス通知クエリは、現在の Platform アカウント id と適格な注文をサーバー順で持つ AccountBonusBatch を返す。AccountBonusNotification は資格情報を投影することなく、サーバーメッセージと有効期限を保持する。確認応答は期待されるアカウント id と注文 id を運び、Host はアカウント変更後にそれを拒否する。両方の通知操作は、言語クエリパラメーターなしで、x-client-locale を通じて開始側 UI の言語を使う。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -488,6 +488,6 @@ Local grant removal has completed.
 Source: [`packages/credentials/deepseek-account/src/index.ts`](../../packages/credentials/deepseek-account/src/index.ts)
 <!-- END GENERATED cordis-surface -->
 
-The account Service Definition exposes getState, getProfile, getBalance, getUnnotifiedBonuses, ackBonusNotified, startSignIn, cancelSignIn, signOut, watch, and Host-only resolveToken and getPlatformSession. The platform provider implements it with an AuthorizationFlow and a private GrantRecord. AccountView distinguishes stored presence from server validation; attempt IDs bind cancellation to one local flow. See [the account package](../../packages/credentials/deepseek-account/README.md).
+アカウント Service Definition は getState、getProfile、getBalance、getUnnotifiedBonuses、ackBonusNotified、startSignIn、cancelSignIn、signOut、watch、および Host 専用の resolveToken と getPlatformSession を公開する。プラットフォームプロバイダーは AuthorizationFlow とプライベート GrantRecord でそれを実装する。AccountView は保存済みの存在をサーバー検証から区別し、試行 ID はキャンセルを 1 つのローカルフローに束縛する。[アカウントパッケージ](../../packages/credentials/deepseek-account/README.md)を参照。
 
-`AccountClientMetadata` carries `version` from the caller’s `DSH_CLIENT_VERSION`, its active UI `locale`, and `timezoneOffsetSeconds` sampled when the operation begins. The offset is local time minus UTC in seconds: UTC+8 is `28800`. It contains no credentials. Login attempts retain their initiating metadata through exchange and cancellation; sign-out retains its metadata for revocation retries.
+`AccountClientMetadata` は、呼び出し元の `DSH_CLIENT_VERSION` からの `version`、そのアクティブな UI `locale`、および操作開始時にサンプリングされた `timezoneOffsetSeconds` を運ぶ。オフセットはローカル時間から UTC を引いた秒数である。UTC+8 は `28800` である。資格情報は含まない。ログイン試行は交換とキャンセルを通じて開始時のメタデータを保持し、サインアウトは取り消しリトライのためにそのメタデータを保持する。

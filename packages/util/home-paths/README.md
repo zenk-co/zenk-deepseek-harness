@@ -1,32 +1,32 @@
 ---
-description: "Shared resolution of the DeepSeek Harness home and the shared agent configuration root, plus user-data paths, tilde expansion, and stable watch paths."
+description: "DeepSeek Harness ホームと共有エージェント設定ルートの共有解決に加え、ユーザーデータパス、チルダ展開、安定監視パス。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-home-paths
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`@deepseek-ai/dsh-home-paths` lets package authors resolve the DeepSeek Harness data root and the shared agent configuration root their consumers read. An explicit path wins over the environment variable, which wins over the default under the operating-system home; blank environment values are ignored. Its public helpers can render a root without revealing an absolute machine path, expand only bare or current-user tilde forms, and canonicalize watch targets whose final components do not yet exist. Use it as a direct library dependency, not through `cordis.yml`.
+`@deepseek-ai/dsh-home-paths` はパッケージ作者がコンシューマーの読む DeepSeek Harness データルートと共有エージェント設定ルートを解決できるようにする。明示パスは環境変数に優先し、環境変数は OS ホーム配下の既定に優先する。空の環境値は無視される。その公開ヘルパーは絶対マシンパスを明かさずにルートを描画し、素または現行ユーザーのチルダ形式のみを展開し、末尾要素がまだ存在しない監視対象を正規化できる。`cordis.yml` 経由ではなく直接ライブラリ依存として使う。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [既知の制限と deferred work](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Use these helpers wherever a package must agree with the rest of the harness about where user data lives: resolve the home once, then derive every child path from it.
+ユーザーデータの場所についてハーネス残部と一致しなければならないすべての場所でこれらのヘルパーを使う。ホームを 1 回解決し、すべての子パスをそこから導出する。
 
-### Resolving the home
+### ホームの解決
 
 ```ts
 import { resolveDshHome, dshHomePath, dshCachePath } from '@deepseek-ai/dsh-home-paths'
@@ -36,11 +36,11 @@ const settings = dshHomePath('settings')     // join one child onto the resolved
 const cache = dshCachePath('models')         // $DSH_HOME/cache/models, default ~/.dsh/cache/models
 ```
 
-An explicit configured path has the highest precedence, then `$DSH_HOME`, then the default `~/.dsh`. An empty or whitespace-only `$DSH_HOME` is treated as unset, so a blank override never resolves the home to the current working directory.
+明示設定パスが最優先であり、次に `$DSH_HOME`、次に既定 `~/.dsh` である。空または空白のみの `$DSH_HOME` は未設定として扱うため、空上書きがホームを現行作業ディレクトリに解決することはない。
 
-`dshCachePath(...segments)` derives paths from the resolved home's `cache` directory. With no segments it returns the cache directory itself. Pass an initial options object, `dshCachePath({ dshHome: home }, ...segments)`, to use an explicit configured home with the same precedence and tilde expansion. It returns an absolute path without creating directories.
+`dshCachePath(...segments)` は解決済みホームの `cache` ディレクトリからパスを導出する。区分なしではキャッシュディレクトリ自体を返す。先頭 options オブジェクト `dshCachePath({ dshHome: home }, ...segments)` を渡すと、同一優先順位とチルダ展開で明示設定ホームを使う。ディレクトリを作成せずに絶対パスを返す。
 
-### Resolving the shared agents root
+### 共有エージェントルートの解決
 
 ```ts
 import { resolveAgentsHome, agentsHomeDisplay } from '@deepseek-ai/dsh-home-paths'
@@ -49,75 +49,75 @@ const agents = resolveAgentsHome()   // configured path, else $DSH_AGENTS_HOME, 
 agentsHomeDisplay(agents)            // ~/.agents, or $DSH_AGENTS_HOME for any configured root
 ```
 
-`resolveAgentsHome` applies the same precedence, blank-value handling, and tilde expansion as `resolveDshHome`. The root is deliberately outside `$DSH_HOME` because other agent tools share it; `dsh-agent-instructions` reads its user-global `AGENTS.md`, and `dsh-skill-filesystem` scans its `skills/` directory.
+`resolveAgentsHome` は `resolveDshHome` と同一の優先順位・空値扱い・チルダ展開を適用する。ルートは他のエージェントツールも共有するため意図的に `$DSH_HOME` の外である。`dsh-agent-instructions` はそのユーザーグローバル `AGENTS.md` を読み、`dsh-skill-filesystem` はその `skills/` ディレクトリを走査する。
 
-### Displaying a home
+### ホームの表示
 
-For user-facing paths, render a root symbolically rather than as a machine path: the default harness home displays as `~/.dsh`, any configured harness home as `$DSH_HOME`, the default shared agents root as `~/.agents`, and any configured shared agents root as `$DSH_AGENTS_HOME`. Neither display form leaks an absolute machine path.
+ユーザー向けパスではマシンパスではなく記号的にルートを描画する。既定ハーネスホームは `~/.dsh`、設定済みハーネスホームは `$DSH_HOME`、既定共有エージェントルートは `~/.agents`、設定済み共有エージェントルートは `$DSH_AGENTS_HOME` と表示する。いずれの表示形式も絶対マシンパスを漏らさない。
 
-### Expanding user paths
+### ユーザーパスの展開
 
-`expandHomePath` expands a leading `~`, `~/`, or `~\` against the operating-system home and leaves everything else untouched — non-tilde paths and named-user forms such as `~alice/...` pass through unchanged.
+`expandHomePath` は先頭 `~`、`~/`、`~\` を OS ホームに対して展開し、他はすべてそのままにする。非チルダパスや `~alice/...` のような名前付きユーザー形式は変更せずに通す。
 
-### Canonicalizing watch paths
+### 監視パスの正規化
 
-`canonicalizeWatchPath` gives a native filesystem watcher one canonical spelling of its target: the deepest existing ancestor is resolved through `realpath` and any missing suffix is restored, so a file or directory can be watched before it is created. This prevents Windows from treating a regular-file ancestor as ordinary absence, and prevents 8.3 short-name aliases from mixing with the long paths the native watcher backend emits.
+`canonicalizeWatchPath` はネイティブファイルシステム監視器にその対象の正規綴りを 1 件与える。存在する最深祖先を `realpath` で解決し、欠落接尾辞を復元するため、作成前のファイルやディレクトリを監視できる。これにより Windows が通常ファイル祖先を通常の不在として扱うことを防ぎ、ネイティブ監視バックエンドが出す長いパスと 8.3 短名別名の混在を防ぐ。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックして展開</summary>
 
-The package is built on one principle: harness user data lives under one root, and the shared agent configuration root stays separate because other agent tools read it too. `resolveRoot` and `rootDisplay` own the precedence and display rules for both roots, so neither can drift from the other.
+このパッケージは 1 原則の上に構築される。ハーネスユーザーデータは 1 ルート配下にあり、共有エージェント設定ルートは他のエージェントツールも読むため別に残る。`resolveRoot` と `rootDisplay` が両ルートの優先順位と表示規則を所有するため、どちらも他から乖離できない。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Home resolution, path joining, display, tilde expansion, and watch-path canonicalization |
+| [`src/index.ts`](src/index.ts) | ホーム解決、パス結合、表示、チルダ展開、監視パス正規化 |
 
-### Resolution rules
+### 解決規則
 
-`resolveDshHome` reads the explicit override, then `$DSH_HOME`, then falls back to the operating-system home joined with `.dsh`. `resolveAgentsHome` reads the same three levels for `$DSH_AGENTS_HOME` and `~/.agents`. The chosen value is tilde-expanded and normalized to an absolute path; `dshHomePath` joins child segments with Node's platform path rules. `dshHomeDisplay` and `agentsHomeDisplay` compare the resolved path against the default root and return the symbolic label, so a configured root never leaks its absolute path.
+`resolveDshHome` は明示上書き、次に `$DSH_HOME` を読み、OS ホームと `.dsh` の結合にフォールバックする。`resolveAgentsHome` は `$DSH_AGENTS_HOME` と `~/.agents` について同一 3 階層を読む。選んだ値はチルダ展開され絶対パスに正規化される。`dshHomePath` は Node の平台パス規則で子区分を結合する。`dshHomeDisplay` と `agentsHomeDisplay` は解決パスを既定ルートと比較して記号ラベルを返すため、設定済みルートは絶対パスを漏らさない。
 
-### Canonicalization mechanics
+### 正規化の仕組み
 
-`canonicalizeWatchPath` walks up from the target until it finds an existing ancestor, resolves it with `realpath`, proves it is an enumerable directory, and restores the missing suffix. Errors other than absence propagate, and a missing-suffix ancestor that is not a directory is rejected.
+`canonicalizeWatchPath` は対象から上向きに歩いて存在する祖先を見つけ、`realpath` で解決し、列挙可能ディレクトリであることを証明し、欠落接尾辞を復元する。不在以外の誤差は伝播し、ディレクトリでない欠落接尾辞祖先は拒否される。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when you need the launcher or the consumers that depend on a single home root.
+ランチャーや単一ホームルートに依存するコンシューマーが必要な場合にこれらのページを読む。
 
-- [Boot package](../../boot/app-boot/README.md) — the launcher that resolves the home before any plugin mounts.
-- [Shell environment](../../shell/shell-env/README.md) — how `DSH_HOME` reaches model shell calls.
-- [Anonymous user id](../../identity/anonymous-user-id/README.md) — a stored identity file under the resolved home.
+- [Boot パッケージ](../../boot/app-boot/README.md) — プラグインマウントの前にホームを解決するランチャー。
+- [シェル環境](../../shell/shell-env/README.md) — `DSH_HOME` がモデルシェル呼び出しにどう届くか。
+- [匿名ユーザー id](../../identity/anonymous-user-id/README.md) — 解決済みホーム配下の保存済み同一性ファイル。
 
 -----
 
-## Known Limitations and Deferred Work
+## 既知の制限と deferred work
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the helpers are not the right tool. They are current package constraints, not a task backlog.
+ヘルパーが適材でない場合をこれらの制限が定義する。これらはタスクバックログではなく現行パッケージ制約である。
 
-- **Expansion is deliberately narrow** — only bare `~`, `~/...`, and `~\...` use the current operating-system home; named-user forms such as `~alice/...`, environment variables, and shell expressions remain unchanged.
-- **Canonicalization reads but never mutates** — `canonicalizeWatchPath` performs `realpath` probes and propagates errors other than absence; callers still own directory creation, permissions, and trust policy for the resulting path.
+- **展開は意図的に狭い** — 素 `~`、`~/...`、`~\...` のみが現行 OS ホームを使う。`~alice/...` のような名前付きユーザー形式、環境変数、シェル式は変更されないままである。
+- **正規化は読み取りのみで変更しない** — `canonicalizeWatchPath` は `realpath` による探索を行い、不在以外の誤差を伝播する。結果パスのディレクトリ作成・権限・信頼ポリシーは依然呼び出し側が所有する。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向け作業コンテキスト — クリックして展開</summary>
 
-None.
+なし。
 
 </details>

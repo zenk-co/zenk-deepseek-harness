@@ -1,57 +1,57 @@
 ---
-description: "The on-demand /compact command for interactive compositions: what it does, what you see, and how to mount it."
+description: "対話的なコンポジション向けのオンデマンド /compact コマンド: 何をするか、何が見えるか、どうマウントするか。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-command-compact
 
-English | [中文](README.zh.md)
+日本語 | [English](README.en.md) | [中文](README.zh.md)
 
-## Summary
+## 概要
 
-`dsh-command-compact` adds a `/compact` command to chat UIs: type it and the conversation condenses on demand — the older history is replaced by one summary even before automatic pressure triggers. The command works with any condensation backend and does not consume a model turn; after it finishes you see how many history items were condensed and the estimated tokens saved. While the agent is mid-turn or condensation is already running, it tells you condensation is unavailable. Prompts you send while it runs stay queued and start after it finishes.
+`dsh-command-compact` はチャット UI に `/compact` コマンドを追加します: 入力すると会話がオンデマンドで圧縮されます — 自動プレッシャーが発動する前でも、古い履歴が 1 つのサマリーに置き換わります。このコマンドは任意の圧縮バックエンドで動作し、モデルターンを消費しません。完了後には、圧縮された履歴項目数と推定節約トークン数が表示されます。エージェントがターン中、または圧縮がすでに実行中のときは、圧縮が利用不能であることを伝えます。実行中に送信したプロンプトはキューに留まり、終了後に開始します。
 
-## Table of Contents
+## 目次
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [このパッケージを使う](#use-this-package)
+- [実装を理解する](#understand-the-implementation)
+- [さらに調べる](#further-exploration)
+- [モデル体験](#model-experience)
+- [既知の制限と保留作業](#known-limitations-and-deferred-work)
+- [開発メモ](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## このパッケージを使う
 
-Type `/compact` in a chat UI when the conversation has grown long and you want to condense it immediately. The shipped `dsh` base mounts the command next to the default backend, so it is usually already available.
+会話が長くなり、すぐに圧縮したいときにチャット UI で `/compact` と入力します。出荷済みの `dsh` ベースはデフォルトバックエンドの隣にこのコマンドをマウントするため、通常はすでに利用できます。
 
-### Using the command
+### コマンドの使用
 
-| Input | Result |
+| 入力 | 結果 |
 |---|---|
-| `/compact` | Condense one useful balanced older span even below automatic pressure, then report the replaced history-item count and estimated tokens. |
-| `/compact` with no compactable history | `No compactable history yet.` — nothing changes. |
-| `/compact <anything>` | `Usage: /compact (no arguments)` — the command takes no arguments. |
+| `/compact` | 自動プレッシャー未満でも、有用でバランスの取れた古い範囲を 1 つ圧縮し、置き換えられた履歴項目数と推定トークン数を報告する。 |
+| 圧縮可能な履歴がない `/compact` | `No compactable history yet.` — 何も変わらない。 |
+| `/compact <anything>` | `Usage: /compact (no arguments)` — このコマンドは引数を取らない。 |
 
-### What you see
+### 表示されるもの
 
-The command turns each expected failure into a stable message you can show directly; the situation on the left is what produced the message on the right.
+コマンドは各予期される失敗を、そのまま表示できる安定したメッセージに変換します。左側の状況が右側のメッセージを生み出したものです。
 
-| Situation | Message you see |
+| 状況 | 表示されるメッセージ |
 |---|---|
-| Compaction already running, or the agent is mid-turn | `Compaction is unavailable because this process has an active compaction, or the agent is not idle.` |
-| The history changed while condensing | `The history selected for compaction changed before it could be replaced. The attempt is recorded in the session log.` |
-| No useful summary could be produced | `Compaction could not produce a useful summary. The attempt is recorded in the session log.` |
-| Condensation did not finish cleanly | `Compaction did not finish cleanly; some session history may have changed. Inspect the current session state before retrying.` |
-| The conversation could not be saved | `Compaction finished, but the session could not be saved.` |
+| 圧縮がすでに実行中、またはエージェントがターン中 | `Compaction is unavailable because this process has an active compaction, or the agent is not idle.` |
+| 圧縮中に履歴が変化した | `The history selected for compaction changed before it could be replaced. The attempt is recorded in the session log.` |
+| 有用なサマリーを生成できなかった | `Compaction could not produce a useful summary. The attempt is recorded in the session log.` |
+| 圧縮がクリーンに終了しなかった | `Compaction did not finish cleanly; some session history may have changed. Inspect the current session state before retrying.` |
+| 会話を保存できなかった | `Compaction finished, but the session could not be saved.` |
 
-Cancelling the command stops the wait: the backend finishes its required cleanup, and the command settles as `Compaction cancelled.` while the UI stops waiting. Failures other than these expected cases surface as errors rather than being silently converted.
+コマンドをキャンセルすると待機が止まります: バックエンドは必要なクリーンアップを完了し、コマンドは `Compaction cancelled.` として確定し、UI は待機を中止します。これらの予期されるケース以外の失敗は、暗黙に変換されるのではなくエラーとして現れます。
 
-### Composing the command
+### コマンドのコンポーズ
 
-Mount the command registry, one condensation backend, and this plugin:
+コマンドレジストリ、1 つの圧縮バックエンド、このプラグインをマウントします:
 
 ```yaml
 - id: commands
@@ -62,94 +62,94 @@ Mount the command registry, one condensation backend, and this plugin:
   name: '@deepseek-ai/dsh-command-compact'
 ```
 
-The shipped `dsh` base mounts it beside the default backend, and the Web client provides the command adapter. Automation surfaces that compose no command adapter keep automatic condensation only.
+出荷済みの `dsh` ベースはデフォルトバックエンドの隣にこれをマウントし、Web クライアントがコマンドアダプターを提供します。コマンドアダプターをコンポーズしないオートメーションサーフェスは自動圧縮のみを保ちます。
 
-### What happens to the conversation
+### 会話に起こること
 
-When the command succeeds, the selected older span is replaced by one summary and the recent history is untouched; the command reports the number of condensed items and estimated tokens. Prompts you submit while condensation runs are accepted and start only after it finishes — they are not lost or reordered. The command lifecycle is recorded in the session log but never enters model history.
+コマンドが成功すると、選択された古い範囲が 1 つのサマリーに置き換わり、最近の履歴は触れられません。コマンドは圧縮された項目数と推定トークンを報告します。圧縮の実行中に送信したプロンプトは受理され、終了後にのみ開始します — 失われたり並べ替えられたりすることはありません。コマンドのライフサイクルはセッションログに記録されますが、モデル履歴には決して入りません。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 実装を理解する
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>実装内部 — クリックで展開</summary>
 
-This section explains the design decisions behind the command; the observable behavior is fully covered in [Use this package](#use-this-package).
+このセクションではコマンド背後の設計上の決定を説明します。観察可能な動作は[このパッケージを使う](#use-this-package)で完全に扱います。
 
-### Design philosophy
+### 設計哲学
 
-The command is built on three commitments:
+コマンドは 3 つのコミットメントの上に構築されています:
 
-- **Backend-independent control.** The handler depends only on `compactNow(agent, signal)`, so it works with any `CompactionEngine` implementation. The invoking agent is the exact target, and the dispatching UI's cancellation signal is forwarded through the seam.
-- **The command lifecycle stays out of model history.** `command/run` and `command/done` are log-only events; `sourceEventSeq` correlates the successful result with the `compaction/summary` event without relying on text or row adjacency.
-- **Quiescent teardown.** The lifecycle effect unregisters `/compact` before draining already-started handlers, so an aborted command's close and flush work settles before root disposal completes.
+- **バックエンド非依存の制御。** ハンドラーは `compactNow(agent, signal)` のみに依存するため、任意の `CompactionEngine` 実装で動作します。呼び出し元のエージェントが正確なターゲットで、ディスパッチする UI のキャンセルシグナルがシームを通じて転送されます。
+- **コマンドライフサイクルはモデル履歴に入らない。** `command/run` と `command/done` はログ専用イベントです。`sourceEventSeq` は、テキストや行の隣接性に頼らずに、成功した結果を `compaction/summary` イベントと相関させます。
+- **静穏なティアダウン。** ライフサイクルエフェクトは、開始済みのハンドラーをドレインする前に `/compact` を登録解除するため、中断されたコマンドのクローズとフラッシュ作業がルート破棄の完了前に確定します。
 
-### Lifecycle and correlation
+### ライフサイクルと相関
 
-Every resolved invocation records the executor-owned log-only pair `command/run` / `command/done`; neither event joins model history. On success, `command/done.sourceEventSeq` names the transaction's `compaction/summary` event so a presentation can fold the command lifecycle into its checkpoint without parsing result text or assuming adjacent rows. The busy outcome is intentionally process-scoped: a live unmatched marker blocks, while a marker older than the newest `session/end-seed` is stale and does not. The plugin tracks each real handler promise and unregisters `/compact` before draining handlers that already started, so root teardown cannot pass an aborted command's close or flush boundary. Prompts submitted while compaction runs remain accepted in the agent's ordinary FIFO and start only after the compaction's explicit durability checkpoint and admission release; idle injected context may sit between `compaction/start` and `compaction/end` and stays visible after the checkpoint.
+解決されたすべての呼び出しは、エグゼキューター所有のログ専用ペア `command/run` / `command/done` を記録します。どちらのイベントもモデル履歴には入りません。成功時は `command/done.sourceEventSeq` がトランザクションの `compaction/summary` イベントを名指すため、プレゼンテーションは結果テキストを解析したり行の隣接を仮定したりせずに、コマンドライフサイクルをそのチェックポイントへフォールドできます。ビジーの結果は意図的にプロセススコープです: ライブの未マッチマーカーはブロックし、最新の `session/end-seed` より古いマーカーは古いものとしてブロックしません。プラグインは実際の各ハンドラープロミスを追跡し、開始済みのハンドラーをドレインする前に `/compact` を登録解除するため、ルートのティアダウンが中断されたコマンドのクローズやフラッシュ境界を通過することはできません。圧縮の実行中に送信されたプロンプトは、エージェントの通常の FIFO で受理されたままで、圧縮の明示的な永続性チェックポイントとアドミッション解放の後にのみ開始します。アイドル時に注入されたコンテキストは `compaction/start` と `compaction/end` の間に留まることがあり、チェックポイント後も可視のままです。
 
-### Source map
+### ソースマップ
 
-| File | Role |
+| ファイル | 役割 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `/compact` registration, argument rejection, error-code mapping, lifecycle drain |
+| [`src/index.ts`](src/index.ts) | プラグインエントリー: `/compact` の登録、引数の拒否、エラーコードのマッピング、ライフサイクルのドレイン |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## さらに調べる
 
-Read these pages when the package-level contract is not enough; they move from the command to the seam, the shipped backend, and the design decisions.
+パッケージレベルの契約では足りないときに、これらのページを読んでください。コマンドからシーム、出荷済みバックエンド、設計上の決定へと進みます。
 
-- [Compaction seam](../compaction/README.md) — the condensation contract this command triggers.
-- [Compaction basic backend](../compaction-basic/README.md) — the shipped backend that condenses automatically and on demand.
-- [Commands package](../../interaction/commands/README.md) — the registry and dispatch contract behind chat commands.
-- [Compaction subsystem reference](../../../docs/subsystems/compaction.md) — the condensation vocabulary, results, and service behavior.
-- [Queued manual compaction reference](../compaction/README.md) — how on-demand condensation serializes against running turns.
+- [圧縮シーム](../compaction/README.md) — このコマンドがトリガーする圧縮の契約。
+- [compaction-basic バックエンド](../compaction-basic/README.md) — 自動とオンデマンドで圧縮する出荷済みバックエンド。
+- [commands パッケージ](../../interaction/commands/README.md) — チャットコマンド背後のレジストリとディスパッチ契約。
+- [圧縮サブシステムリファレンス](../../../docs/subsystems/compaction.md) — 圧縮の語彙、結果、サービス動作。
+- [キューイングされる手動圧縮リファレンス](../compaction/README.md) — オンデマンド圧縮が実行中のターンとどう直列化されるか。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## モデル体験
 
-### Human `/compact` control
+### 人間による `/compact` 制御
 
-#### What the model sees
+#### モデルが見るもの
 
-The slash input and direct result never enter a model request. An accepted compaction separately replaces an older span with the backend's user-role checkpoint inside a standalone `compaction/* { turn: null }` bracket.
+スラッシュ入力と直接の結果はモデルリクエストに決して入りません。受理された圧縮は別途、独立した `compaction/* { turn: null }` ブラケット内で、古い範囲をバックエンドの user ロールチェックポイントに置き換えます。
 
-#### Token effect
+#### トークン効果
 
-The command lifecycle adds no model tokens. A successful compaction reduces later requests by replacing the selected span with one framed summary; summarization itself is one auxiliary request.
+コマンドライフサイクルはモデルトークンを追加しません。成功した圧縮は、選択された範囲を 1 つの枠付きサマリーに置き換えることで後続のリクエストを削減します。要約自体は 1 つの補助リクエストです。
 
-#### KV Cache effect
+#### KV キャッシュ効果
 
-Discovery and command bookkeeping do not affect the cache. The accepted surface replacement invalidates reuse from the first shadowed history token.
+ディスカバリーとコマンドの記帳はキャッシュに影響しません。受理されたサーフェスの置き換えは、最初に影が差す履歴トークンから再利用を無効化します。
 
-## Known Limitations and Deferred Work
+## 既知の制限と保留作業
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the command is a poor fit; they are the current package constraints.
+これらの制限は、コマンドが不向きな場合を定義します。これらは現在のパッケージ制約です。
 
-- **Idle-only** — `/compact` reports that condensation is unavailable when a turn or already accepted waking prompt has right of way; the command itself is not queued.
-- **No range or policy arguments** — the argument-free form keeps behavior stable across command adapters. Explicit ranges remain the programmatic `compactRegion()` path.
-- **Command adapters only** — surfaces without `ctx.commands` cannot invoke it and rely on automatic pressure compaction.
+- **アイドル時のみ** — ターンまたはすでに受理された起床プロンプトが優先権を持つ場合、`/compact` は圧縮が利用不能であると報告します。コマンド自体はキューイングされません。
+- **範囲やポリシーの引数なし** — 引数なしの形式がコマンドアダプター間で動作を安定に保ちます。明示的な範囲はプログラム的な `compactRegion()` パスのままです。
+- **コマンドアダプターのみ** — `ctx.commands` を持たないサーフェスはこれを呼び出せず、自動プレッシャー圧縮に頼ります。
 
 <a id="dev-note"></a>
-### Dev Note
+### 開発メモ
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>メンテナー向けの作業コンテキスト — クリックで展開</summary>
 
-This Dev Note is working context for maintainers and is explicitly non-authoritative; shipped behavior lives in the sections above, the package code, and the linked Agent Notes.
+この開発メモはメンテナー向けの作業コンテキストであり、明示的に非権威です: 出荷済みの動作は上のセクション、パッケージのコード、リンクされた Agent Notes にあります。
 
-- **Queued commands, undecided** — a `/compact` submitted while a turn has right of way reports `busy`; queuing the request instead of rejecting it remains an open direction.
-- **Range and policy arguments, undecided** — argument-free stability is deliberate; adding arguments would need a shared grammar across every command adapter.
+- **キューイングされるコマンド、未決定** — ターンが優先権を持つときに送信された `/compact` は `busy` を報告します。拒否する代わりにリクエストをキューイングすることは未決定の方向性です。
+- **範囲とポリシーの引数、未決定** — 引数なしの安定性は意図的です。引数を追加するには、すべてのコマンドアダプターに共通の文法が必要になります。
 
 </details>
