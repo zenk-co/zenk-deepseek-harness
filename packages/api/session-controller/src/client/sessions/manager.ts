@@ -798,6 +798,7 @@ export class SessionManager {
         prev !== undefined && prev.updatedAt === entry.updatedAt && prev.running === entry.running
         && prev.blank === entry.blank
         && prev.parentSessionId === entry.parentSessionId && prev.cwd === entry.cwd
+        && prev.git?.repo === entry.git?.repo && prev.git?.branch === entry.git?.branch
         && prev.origin === entry.origin && prev.title === entry.title && prev.depth === entry.depth
         && prev.formatStatus === entry.formatStatus
         && prev.projectionValues === entry.projectionValues
@@ -831,6 +832,9 @@ function applyMutation(summaries: readonly SessionSummary[], mutation: SessionLi
     case 'placeholder': {
       const existing = summaries.find(summary => summary.sessionId === mutation.summary.sessionId)
       if (existing === undefined) return [mutation.summary, ...summaries]
+      const incomingGit = mutation.summary.git
+      const gitChanged = (existing.git?.repo ?? null) !== (incomingGit?.repo ?? null)
+        || (existing.git?.branch ?? null) !== (incomingGit?.branch ?? null)
       const filled: SessionSummary = {
         ...existing,
         // Blank only lowers: a stale true (session-added racing the local
@@ -840,8 +844,14 @@ function applyMutation(summaries: readonly SessionSummary[], mutation: SessionLi
           agentAvailable: mutation.summary.agentAvailable,
           running: mutation.summary.running,
           ...(mutation.summary.formatStatus === undefined ? {} : { formatStatus: mutation.summary.formatStatus }),
+          // The Host row is authoritative for working-directory identity, including branch switches.
+          // Clearing a removed checkout is deferred to the next full refresh, which replaces the row.
+          ...(gitChanged && incomingGit !== undefined ? { git: incomingGit } : {}),
         } : {}),
         ...(existing.cwd === undefined && mutation.summary.cwd !== undefined ? { cwd: mutation.summary.cwd } : {}),
+        ...(mutation.kind === 'placeholder' && existing.git === undefined && incomingGit !== undefined
+          ? { git: incomingGit }
+          : {}),
         ...(existing.parentSessionId === undefined && mutation.summary.parentSessionId !== undefined
           ? { parentSessionId: mutation.summary.parentSessionId } : {}),
         ...(existing.origin === undefined && mutation.summary.origin !== undefined
@@ -851,6 +861,8 @@ function applyMutation(summaries: readonly SessionSummary[], mutation: SessionLi
         && filled.origin === existing.origin && filled.blank === existing.blank
         && filled.agentAvailable === existing.agentAvailable && filled.running === existing.running
         && filled.formatStatus === existing.formatStatus
+        && (filled.git?.repo ?? null) === (existing.git?.repo ?? null)
+        && (filled.git?.branch ?? null) === (existing.git?.branch ?? null)
       ) return [...summaries]
       return summaries.map(summary => summary.sessionId === mutation.summary.sessionId ? filled : summary)
     }

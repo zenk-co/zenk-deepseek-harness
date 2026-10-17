@@ -16,9 +16,10 @@ import {
   SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
 } from './types.ts'
 import type {
-  SessionListMetadata, SessionProjectionHints, SessionProjectionValues, SessionSearchItem,
+  SessionGitInfo, SessionListMetadata, SessionProjectionHints, SessionProjectionValues, SessionSearchItem,
   SessionSearchValue, SessionSummary,
 } from './types.ts'
+import { SessionGitInfoResolver } from './git-info.ts'
 
 const SEARCH_PROVIDER_CALL_LIMIT = 100
 const SESSION_SEARCH_QUERY_MAX_CHARS = 500
@@ -76,11 +77,14 @@ export function truncateUnicodeCodePoints(value: string, maximum: number): strin
 
 /** Owns list projection registration, bounded cold summaries, and authorized search. */
 export class ApiSessionList {
+  private readonly git: SessionGitInfoResolver
   /**
    * @param ctx - Host context carrying Session, query, persistence, and projection services.
    * @param workSliceMs - Resolved positive integral list-work budget in milliseconds.
+   * @param git - Working-directory git resolver; defaults to a shell-free execFileSync resolver.
    */
-  constructor(private readonly ctx: Context, private readonly workSliceMs: number) {
+  constructor(private readonly ctx: Context, private readonly workSliceMs: number, git?: SessionGitInfoResolver) {
+    this.git = git ?? new SessionGitInfoResolver()
     ctx.sessionProjections.register<'sessionListMetadata', SessionListMetadata>({
       key: 'sessionListMetadata',
       stateSchema: sessionListMetadataSchema,
@@ -120,6 +124,7 @@ export class ApiSessionList {
       running: this.ctx.agents.get(session.id)?.status === 'running',
       blank: metadata?.blank ?? session.seq === 0,
       ...listFields(session.header),
+      ...gitFields(this.git, session.header.cwd),
       ...(projections === undefined ? {} : { projections }),
     }
   }
@@ -176,6 +181,7 @@ export class ApiSessionList {
       // A large, metadata-less, or inaccessible cache miss remains unknown and visible.
       blank: metadata?.blank ?? false,
       ...listFields(header),
+      ...gitFields(this.git, header.cwd),
       ...(projections === undefined ? {} : { projections }),
     }
   }
@@ -360,4 +366,23 @@ function listFields(header: SessionHeader): {
     ...(header.origin === undefined ? {} : { origin: header.origin }),
     ...(header.cwd === undefined ? {} : { cwd: header.cwd }),
   }
+}
+
+/**
+ * Resolve working-directory git identity without breaking Session reads.
+ * @param resolver - cached per-cwd git resolver.
+ * @param cwd - Session working directory, possibly absent.
+ * @returns the git field, or empty when resolution is unavailable.
+ */
+function gitFields(
+  resolver: SessionGitInfoResolver,
+  cwd: string | undefined,
+): { readonly git?: SessionGitInfo } {
+  let git: SessionGitInfo | undefined
+  try {
+    git = resolver.resolve(cwd)
+  } catch {
+    git = undefined
+  }
+  return git === undefined ? {} : { git }
 }

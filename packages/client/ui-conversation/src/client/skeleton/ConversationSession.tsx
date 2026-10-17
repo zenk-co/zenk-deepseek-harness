@@ -1,6 +1,7 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
 import clsx from 'clsx'
+import { useEffect, useState } from 'react'
 import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
@@ -50,6 +51,35 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
     })
 }
 
+function equalGit(left: SessionSummary['git'], right: SessionSummary['git']): boolean {
+  return (left?.repo ?? null) === (right?.repo ?? null) && (left?.branch ?? null) === (right?.branch ?? null)
+}
+
+/**
+ * Format a timestamp as local HH:mm.
+ * @param now - timestamp in milliseconds.
+ * @returns zero-padded hour and minute.
+ */
+function formatClockTime(now: number): string {
+  const date = new Date(now)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+/**
+ * Current local HH:mm, refreshed on a lightweight minute-scale timer.
+ * @returns the formatted time.
+ */
+function useClockTime(): string {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => { setNow(Date.now()) }, 30_000)
+    return () => { clearInterval(timer) }
+  }, [])
+  return formatClockTime(now)
+}
+
 /**
  * Renders Session header chrome above the resident conversation scrollport.
  * @param props - Strict Session store, view ledger, navigation, render, and locale shares.
@@ -63,6 +93,8 @@ export function ConversationSessionHeader({
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
+  const git = useSessions(s => s.byId[sessionId]?.git, equalGit)
+  const clock = useClockTime()
   const showTabs = !hideChrome && tabs.length > 1
   return (
     <>
@@ -129,6 +161,14 @@ export function ConversationSessionHeader({
               </div>
             </div>
             <div className={css.headerUtilities}>
+              {git !== undefined && (
+                <span className={css.headerMeta} data-testid="conversation-git">
+                  {`${git.repo} / ${git.branch}`}
+                </span>
+              )}
+              <span className={css.headerMeta} data-testid="conversation-clock">
+                {clock}
+              </span>
               {renderSlot('conversation.session.header.utilities', {})}
             </div>
           </>

@@ -174,6 +174,14 @@ export type QueueAction =
   | { readonly kind: 'remove' }
   | { readonly kind: 'steer' }
 
+/** Working-directory git identity attached to a Session list row. */
+export interface SessionGitInfo {
+  /** Repository top-level directory basename. */
+  readonly repo: string
+  /** Current branch name from `git branch --show-current`. */
+  readonly branch: string
+}
+
 /** One Session list entry. */
 export interface SessionSummary {
   /** Whether this Session currently owns a live Agent. */
@@ -187,6 +195,8 @@ export interface SessionSummary {
   readonly parentSessionId?: SessionId
   readonly origin?: 'subagent'
   readonly cwd?: string
+  /** Repository basename and current branch for the Session working directory, absent outside a git checkout. */
+  readonly git?: SessionGitInfo
   readonly projections?: SessionProjectionHints
 }
 
