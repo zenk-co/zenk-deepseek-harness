@@ -64,3 +64,30 @@ export const en = {
   'empty.models': 'No models available.',
   'empty.efforts': 'This model provides no reasoning effort levels.',
 } satisfies Record<ModelKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'provider.account': 'DeepSeek アカウント',
+  'command.label': 'モデル',
+  'command.description': 'このセッションで使用するモデルを選択する',
+  'option.loadError': 'カタログの読み込みに失敗しました：{message}',
+  'trigger.fallback': 'モデルを選択してください',
+  'trigger.loading': 'モデルを読み込み中…',
+  'trigger.selectAria': 'モデルを選択してください',
+  'trigger.aria': 'モデルを選択、現在 {model}',
+  'trigger.ariaEffort': 'モデルを選択、現在 {model}、推論レベル {effort}',
+  'menu.aria': 'モデルと推論レベル',
+  'menu.model': 'モデル',
+  'menu.effort': '推論レベル',
+  'effort.providerDefault': 'デフォルト',
+  'status.loading': 'モデル一覧を更新中…',
+  'error.action': 'モデル操作に失敗しました：{message}',
+  'error.sessionInUse': 'このセッションは既に使用中です。別の実行中の DSH（dsh web やデスクトップアプリなど）が原因の可能性があります。他の実行中の DSH を終了してから再試行してください。',
+  'action.reload': '再読み込み',
+  'warning.groupLoad': '{name} の読み込みに失敗しました：{message}',
+  'search.placeholder': 'モデルを検索…',
+  'search.clear': '検索をクリア',
+  'search.empty': '一致するモデルがありません。',
+  'empty.models': '利用可能なモデルがありません',
+  'empty.efforts': '現在のモデルは推論レベルを提供していません。',
+} satisfies Record<ModelKey, string>

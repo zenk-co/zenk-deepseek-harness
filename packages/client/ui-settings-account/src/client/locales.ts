@@ -1,5 +1,5 @@
 /** Account settings copy, owned by the account feature. */
-import { onboardingCopy, onboardingEnglishCopy } from './locales/onboarding.ts'
+import { onboardingCopy, onboardingEnglishCopy, onboardingJapaneseCopy } from './locales/onboarding.ts'
 
 /** English account dictionary. */
 export const en = {
@@ -70,4 +70,38 @@ export const zh: Record<AccountKey, string> = {
   quotaDescription: '没有可用额度时，DeepSeek Harness 无法开始新的任务，是否前往充值？或者可以稍后前往 设置 → 账号与余额 进行充值。',
   quotaTopUp: '去充值',
   bonusNoticeTitle: '赠金已到账',
+}
+/** Japanese account settings copy. */
+export const ja: Record<AccountKey, string> = {
+  modelSignInRequired: 'モデルが利用できません。サインインしてから再試行してください。',
+  sessionExpired: 'アカウントからサインアウトしました。再度ログインしてください。',
+  ...onboardingJapaneseCopy,
+  close: '閉じる', addApiKey: 'API キーを追加', retry: '再ログイン',
+  loginTitle: 'はじめに', loginDescription: 'DeepSeek アカウントにサインインするか、API キーを追加して開始してください。プロジェクトとファイルはローカルに保存されます。',
+  browserTitle: 'サインイン待ち', browserPrompt: 'ページが自動で開きませんでしたか？', copyLink: 'サインインリンクをコピー', copiedLink: 'リンクをコピーしました', copyFailed: 'コピーに失敗しました',
+  browserDescription: 'をブラウザで開いてサインインを完了してください。',
+  timeoutTitle: 'サインインがタイムアウトしました', timeoutDescription: '再ログインして続行してください。',
+  failureTitle: 'サインインできませんでした',
+  platformFailed: '操作を完了できませんでした。再試行してください。', platformRetry: '再試行',
+  loading: '読み込み中…', backToHarness: 'DeepSeek Harness に戻る',
+  settings: '設定', contactUs: 'フィードバック', menu: 'アカウントメニュー',
+  nav: 'アカウントと残高', signedIn: 'DeepSeek にサインイン済み', signedOut: '未サインイン',
+  signIn: 'サインイン', signOut: 'サインアウト',
+  signOutUnknownDescription: '実行中のタスクを確認できませんでした。サインアウトするとこのアカウントを使用中のタスクが中断される場合があります。今すぐサインアウトしますか？',
+  signOutDescription: 'サインアウトしてもデータは削除されません。このアカウントに再サインインできます。',
+  signOutRunningDescription: '現在タスクが実行中です。「サインアウト」をクリックするとタスクが中断されます。今すぐサインアウトしますか？', cancel: 'キャンセル', open: 'ブラウザで開く',
+  initializing: 'サインインを開始しています…', waiting: 'ブラウザで続行してください',
+  completing: 'サインインを完了しています…', expired: 'サインインの有効期限が切れました。再試行してください。',
+  failed: '操作を完了できませんでした。再試行してください。',
+  noResponse: '問題が発生しました。ネットワーク接続を確認して再試行してください。',
+  settingsSignedOutTitle: 'DeepSeek Harness にサインインしていません',
+  settingsSignedOutDescription: 'DeepSeek Harness アカウントにサインインして専用 API キーを取得してください',
+  signInDescription: 'DeepSeek アカウントで開始します。',
+  profileUnavailable: 'アカウント情報はまだ利用できません。',
+  balance: 'チャージ残高', bonusBalance: '付与残高', balanceUnavailable: 'プラットフォームで表示', balanceSignedOut: 'サインインして表示',
+  accountInfo: 'その他のアカウント情報', more: 'その他', usage: '使用量を表示', topUp: 'チャージ',
+  quotaTitle: '利用可能な残高がありません',
+  quotaDescription: '残高がない場合、このアカウントでは DeepSeek Harness の新しいタスクを開始できません。チャージしますか？後で「設定 → アカウントと残高」からチャージすることもできます。',
+  quotaTopUp: 'チャージする',
+  bonusNoticeTitle: 'ボーナスが付与されました',
 }

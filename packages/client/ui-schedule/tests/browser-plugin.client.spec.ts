@@ -24,7 +24,7 @@ import { ScheduleCatalogAction } from '../src/client/ScheduleCatalogAction.tsx'
 import { SessionScheduleHover } from '../src/client/SessionScheduleHover.tsx'
 import { SessionScheduleMark } from '../src/client/SessionScheduleMark.tsx'
 import { ScheduleTurnCard, type ScheduleTurnCardInjected } from '../src/client/ScheduleTurnCard.tsx'
-import { en, NS, zh } from '../src/client/locales.ts'
+import { en, ja, NS, zh } from '../src/client/locales.ts'
 
 const Empty = () => null
 
@@ -526,6 +526,7 @@ describe('ui-schedule browser half', () => {
     ctx.locale.setLocale('en')
     expect(translate('list.aria')).toBe(en['list.aria'])
     expect(Object.keys(en).sort()).toEqual(Object.keys(zh).sort())
+    expect(Object.keys(ja).sort()).toEqual(Object.keys(zh).sort())
 
     await fiber.dispose()
     expect(translate('list.aria')).not.toBe(en['list.aria'])

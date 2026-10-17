@@ -99,6 +99,45 @@ export const zh: Record<SubagentSettingsLocaleKey, string> = {
   subagentModelSelectionOff: '关闭后，子智能体使用配置的默认模型或继承父 Agent 的模型；已选模型会保留。',
 }
 
+/** Japanese copy. */
+export const ja: Record<SubagentSettingsLocaleKey, string> = {
+  overridden: '上書き済み',
+  reset: '既定値に戻す',
+  readOnly: 'このデプロイの設定は読み取り専用です。',
+  unavailable: 'このプラグインは読み込まれていないため、現在設定できません。',
+  save: '保存',
+  saving: '保存中…',
+  saveFailed: 'このデプロイではこれらの値を受け付けませんでした。修正用に残してあります。',
+  subagentTitle: 'サブエージェント',
+  subagentDescription: 'サブエージェントの再帰深度、数、モデルを設定します。',
+  subagentLimitsTitle: '制限',
+  subagentMaxDepth: '最大再帰深度',
+  subagentDepthHelpLabel: '最大再帰深度について',
+  subagentDepthHelp: 'Agent がサブエージェントを作成できる階層を制限します。',
+  subagentDepthZero: 'サブエージェントを無効化',
+  subagentDepthOne: 'メイン Agent のみサブエージェントを作成可能',
+  subagentDepthOverride: 'ツール側で最大再帰深度が個別に設定されている場合は、そちらが優先されます。',
+  subagentMaxActive: 'サブエージェント並列数上限',
+  subagentCapacityHelpLabel: 'サブエージェント並列数上限について',
+  subagentCapacityHelp: '同一メイン Agent 配下で、全再帰レベルを通じて同時に存在できるサブエージェントの総数。メイン Agent は含みません。上限到達時は新規起動要求が拒否されます。',
+  subagentDepthInvalid: '0 以上の整数を入力してください。',
+  subagentCapacityInvalid: '1 以上の整数を入力してください。',
+  subagentModelSelectionTitle: 'モデル選択',
+  subagentModelSelectionToggle: 'Agent によるサブエージェント用モデルの選択を許可',
+  subagentModelSelectionChoose: '有効にすると、Agent は下記の許可モデルから、サブエージェントごとにプロバイダー、モデル、リーズニング強度を選択できます。新規セッションのみに適用されます。',
+  subagentModelSelectionAllowed: 'Agent が選択できるモデル',
+  subagentModelSelectionLoading: 'モデルを読み込み中…',
+  subagentModelSelectionLoadFailed: 'モデルを読み込めませんでした。',
+  subagentModelSelectionRetry: '再試行',
+  subagentModelSelectionPartial: '一部のモデルプロバイダーを読み込めませんでした。保存済みの選択は削除できます。',
+  subagentModelSelectionUnavailable: '現在利用できません',
+  subagentModelSelectionUnavailableGroup: '保存済みだが現在利用できません',
+  subagentModelSelectionEmpty: '現在モデルを公開しているプロバイダーはありません。',
+  subagentModelSelectionRequired: '保存前に1つ以上のモデルを選択してください。',
+  subagentModelSelectionConflict: '設定が別の場所で変更されました。下書きを破棄して再試行してください。',
+  subagentModelSelectionOff: '無効時は、サブエージェントは設定済みの既定モデルまたは親 Agent のモデルを継承します。保存済みのモデル選択は保持されます。',
+}
+
 /**
  * The form frame's copy, read from this page's dictionary.
  * @param t - the page's locale reader.

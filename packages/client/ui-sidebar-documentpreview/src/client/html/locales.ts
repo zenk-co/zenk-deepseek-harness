@@ -17,6 +17,14 @@ export const en = {
   failed: 'This HTML document could not be previewed.',
 } satisfies Record<HtmlPreviewKey, string>
 
+/** Japanese dictionary with the same keys as the Chinese dictionary. */
+export const ja = {
+  title: 'HTML',
+  frame: 'HTML ドキュメントプレビュー',
+  loading: 'ドキュメントをレンダー中...',
+  failed: 'この HTML ドキュメントはプレビューできませんでした',
+} satisfies Record<HtmlPreviewKey, string>
+
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** HTML preview selection and status text. */

@@ -1,0 +1,38 @@
+- dialog "設定":
+  - navigation:
+    - text: 設定
+    - button "一般設定"
+    - button "モデル"
+    - button "組み込みプラグイン"
+    - button "Agent プリセット"
+  - button "設定ファイルを開く"
+  - button "閉じる"
+  - text: 権限 新しいセッションの既定の権限モードを選択
+  - button "ワークスペースへの書き込み"
+  - text: 言語
+  - button "日本語"
+  - text: 外観
+  - button "ライト"
+  - button "ダーク"
+  - button "システムに従う" [pressed]
+  - text: フォントサイズ 会話内容の文字サイズのみに影響します 14
+  - button "文字サイズを大きくする"
+  - button "文字サイズを小さくする"
+  - text: px
+  - button "その他のフォント設定"
+  - text: 作業ステップの表示 ツール呼び出しの詳細をどれくらい表示するか選んでください
+  - button "詳細"
+  - text: 作業ステップを折りたたむタイミング 作業ステップを自動で折りたたむタイミングを選んでください
+  - button "回答の完了時"
+  - text: コード作業ビューを表示 有効にすると、軌跡・今回のコード差分を表示し、すべての Agent プリセットを選択できます
+  - switch "コード作業ビューを表示"
+  - text: キーボードショートカット
+  - paragraph: 利用可能なショートカットと入力操作の表示と編集
+  - button "ショートカットを編集"
+  - text: ビジー時の送信動作 エージェント実行中に Enter キーと送信ボタンが行う動作。Cmd/Ctrl+Enter はもう一方の動作になります
+  - button "キュー送信"
+  - text: パフォーマンスと使用量 パフォーマンスと使用量の表示の詳細さを選んでください
+  - button "詳細"
+  - text: 公式モデル API 使用時に Session Log をアップロード DeepSeek モデルと製品の改善にご協力ください。
+  - switch "公式モデル API 使用時に Session Log をアップロード"
+  - text: "現在のバージョン: {{version}}"

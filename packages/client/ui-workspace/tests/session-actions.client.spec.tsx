@@ -35,7 +35,7 @@ import { RenameSessionMenuItem, SessionRenameDialog } from '../src/client/sessio
 import { RowActionToast } from '../src/client/session-actions/RowActionToast.tsx'
 import { SessionIdMenuItem } from '../src/client/session-actions/SessionId.tsx'
 import { createWorkspaceViewStore } from '../src/client/stores.ts'
-import { en, zh } from '../src/client/locales.ts'
+import { en, ja, zh } from '../src/client/locales.ts'
 import { ShortcutRegistry } from '../../shortcuts/src/client/registry.ts'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 
@@ -557,7 +557,7 @@ describe('RowActionToast', () => {
     onTestFinished(() => runtime.dispose())
     const locale = new LocaleRuntime(runtime.ctx)
     locale.setLocale(translate === tEn ? 'en' : 'zh')
-    locale.register('workspace', { en, zh })
+    locale.register('workspace', { en, zh, ja })
     runtime.ctx.provide('locale', locale)
     runtime.slots.installLocale(locale)
     await runtime.root.declare({ 'shell.overlay': { kind: 'list', scope: 'root' } }, ToastFrame)

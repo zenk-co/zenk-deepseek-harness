@@ -77,5 +77,25 @@ export const en: Record<OpenInAppKey, string> = {
   'app.terminal': 'Terminal',
 }
 
+/** Japanese dictionary, key-identical to the Chinese source of truth. */
+export const ja: Record<OpenInAppKey, string> = {
+  'open.title': '{app} で開く',
+  'path.appDefault': '{app}（既定）',
+  'path.appsError': 'アプリ一覧を取得できませんでした',
+  'shortcut.busy': 'ワークスペースを開いています',
+  'shortcut.unavailable': '現在のワークスペースまたはローカルアプリは利用できません',
+  'open.tooltip': 'ローカルで開く',
+  'path.open': '開く',
+  'path.more': 'その他の開き方',
+  'path.reveal': 'ファイルの場所を表示',
+  'path.openError': '開けませんでした。再試行してください',
+  'path.revealError': 'ファイルの場所を表示できませんでした。再試行してください',
+  ...PRODUCT_NAMES,
+  'app.finder': 'Finder',
+  'app.explorer': 'エクスプローラー',
+  'app.filemanager': 'ファイル',
+  'app.terminal': 'ターミナル',
+}
+
 /** Key domain of the `open-in-app` namespace (zh is the source of truth). */
 export type OpenInAppKey = keyof typeof zh

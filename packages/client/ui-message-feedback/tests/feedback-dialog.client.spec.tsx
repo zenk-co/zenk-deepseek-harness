@@ -15,7 +15,7 @@ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts
 import { FEEDBACK_CATEGORIES } from '@deepseek-ai/dsh-command-feedback'
 import { FeedbackDialog } from '../src/client/FeedbackDialog.tsx'
 import type { FeedbackDialogState } from '../src/client/dialog.ts'
-import { en, zh } from '../src/client/locales.ts'
+import { en, ja, zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
@@ -41,11 +41,13 @@ function mount(overrides: Partial<FeedbackDialogState> = {}) {
 }
 
 describe('FeedbackDialog', () => {
-  it('owns the conversation-log disclosure and stability category in both supported locales', () => {
+  it('owns the conversation-log disclosure and stability category in all supported locales', () => {
     expect(zh['dialog.hint']).toBe('填写详情以帮助我们改进体验，提交内容会包括当前对话的日志')
     expect(en['dialog.hint']).toBe('Add details to help us improve. Your submission will include the current conversation log.')
+    expect(ja['dialog.hint']).toBe('体験改善のため詳細をご記入ください。送信内容には現在の会話ログが含まれます')
     expect(zh['category.service-stability']).toBe('稳定性和速度')
     expect(en['category.service-stability']).toBe('Stability and speed')
+    expect(ja['category.service-stability']).toBe('安定性と速度')
   })
 
   it('renders nothing but the probe while closed with no toast', () => {

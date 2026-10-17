@@ -18,5 +18,15 @@ export const zoomEn = {
   zoomValue: '{percent}%',
 } satisfies Record<keyof typeof zoomZh, string>
 
+/** Shared Japanese zoom copy. */
+export const zoomJa = {
+  zoomControls: 'ズームコントロール',
+  zoomMenu: '倍率を選択',
+  zoomOut: '縮小',
+  zoomIn: '拡大',
+  zoomFitWidth: '幅に合わせる',
+  zoomValue: '{percent}%',
+} satisfies Record<keyof typeof zoomZh, string>
+
 /** Shared zoom dictionary keys. */
 export type ZoomLocaleKey = keyof typeof zoomZh

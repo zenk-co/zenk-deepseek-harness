@@ -25,6 +25,18 @@ export const en = {
   retry: 'Retry',
 } satisfies Record<ExcelPreviewKey, string>
 
+/** Japanese Excel preview copy. */
+export const ja = {
+  title: 'スプレッドシート', language: 'ja', loading: 'ドキュメントを描画しています...',
+  invalid: 'この表計算シートは開けませんでした。形式、内容、パスワード保護を確認してください。',
+  tooLarge: 'このブックはプレビューのサイズ上限を超えています。', timeout: 'ブックを開く際にタイムアウトしました。小さいファイルで再試行してください。',
+  encoding: 'このテキストのエンコーディングを判別できません。UTF-8 または BOM 付き UTF-16 で保存し直して再試行してください。',
+  formulaWarning: 'このブックには数式が含まれています。表示結果が欠けたり不正確な場合があります。',
+  unsupportedNotice: 'このプレビューはこのブックの {features} に対応していません。すべての機能を利用するにはシステムアプリで開いてください。',
+  charts: 'グラフ', images: '画像', shapes: '図形', conditionalFormatting: '条件付き書式', featureSeparator: '、',
+  retry: '再試行',
+} satisfies Record<ExcelPreviewKey, string>
+
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Excel preview status and third-party locale selection. */

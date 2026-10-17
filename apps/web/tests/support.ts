@@ -333,7 +333,7 @@ export function conversationContextKey(kind: string, id: string): string {
  * @param page - browser page with the mounted sidebar.
  * @param locale - current UI language.
  */
-export async function openSettings(page: Page, locale: 'en' | 'zh'): Promise<void> {
-  await page.getByRole('button', { name: locale === 'zh' ? '账号菜单' : 'Account menu', exact: true }).click()
-  await page.getByRole('menuitem', { name: locale === 'zh' ? '设置' : 'Settings', exact: true }).click()
+export async function openSettings(page: Page, locale: 'en' | 'zh' | 'ja'): Promise<void> {
+  await page.getByRole('button', { name: locale === 'zh' ? '账号菜单' : locale === 'ja' ? 'アカウントメニュー' : 'Account menu', exact: true }).click()
+  await page.getByRole('menuitem', { name: locale === 'zh' ? '设置' : locale === 'ja' ? '設定' : 'Settings', exact: true }).click()
 }

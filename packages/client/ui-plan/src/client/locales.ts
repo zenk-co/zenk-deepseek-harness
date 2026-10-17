@@ -44,3 +44,24 @@ export const en = {
   'chip.on.title': 'Plan mode on — click to turn off (/plan off)',
   'chip.exitFailed': 'Failed to exit plan mode',
 } satisfies Record<PlanKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'chip.label': 'プラン',
+  'preview.title': 'プラン',
+  'preview.document': 'プラン · Markdown',
+  'preview.action': '開く',
+  'preview.open': 'プランをサイドバーで開く',
+  'preview.full': '全文を見る',
+  'preview.openNamed': 'プランを開く：{title}',
+  'preview.loading': 'プランを読み込んでいます…',
+  'preview.failed': 'プランを読み込めませんでした',
+  'preview.invalidAddress': 'プランのアドレスが無効です',
+  'preview.historyUnavailable': 'セッション履歴を読み込めません',
+  'preview.notFound': 'このプランが見つかりませんでした',
+  'preview.unavailable': 'プランプレビューは利用できません',
+  'preview.expired': 'この一時プランのプレビューは期限切れです。承認待ちのカードから開き直してください。',
+  'chip.on.aria': 'プランモードがオンです。押してオフにしてください',
+  'chip.on.title': 'プランモードがオンです — クリックでオフにします（/plan off）',
+  'chip.exitFailed': 'プランモードの終了に失敗しました',
+} satisfies Record<PlanKey, string>

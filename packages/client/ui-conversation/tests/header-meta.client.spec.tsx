@@ -7,7 +7,7 @@ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import { createConversationStore } from '../src/client/stores.ts'
-import { en, zh } from '../src/client/locales.ts'
+import { en, ja, zh } from '../src/client/locales.ts'
 import { ConversationSessionHeader } from '../src/client/skeleton/ConversationSession.tsx'
 
 const t = makeTranslate(zh, commonZh)
@@ -43,8 +43,12 @@ function mountHeader(git: { repo: string; branch: string } | undefined) {
       sessionId={SID}
       hideChrome={false}
       SessionProvider={({ children }) => children}
-      useSession={() => undefined}
-      useConversation={() => undefined}
+      useSession={() => undefined as never}
+      useConversation={() => undefined as never}
+      useAccess={() => true}
+      useRemoteAccess={() => true}
+      useSessionAccess={() => true}
+      useWorkspaceAccess={() => true}
       useConversationViews={selector => selector([
         { id: 'chat', label: 'Chat' },
       ])}
@@ -91,5 +95,6 @@ describe('conversation header git and clock', () => {
   it('uses English dictionary without new copy', () => {
     expect(en['session.hierarchy']).toBeTypeOf('string')
     expect(zh['session.hierarchy']).toBeTypeOf('string')
+    expect(ja['session.hierarchy']).toBeTypeOf('string')
   })
 })

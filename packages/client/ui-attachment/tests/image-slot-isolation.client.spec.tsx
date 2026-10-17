@@ -7,7 +7,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { UiConversation } from '@deepseek-ai/dsh-client-ui-conversation/src/client/conversation/assembly.ts'
-import { en, zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
+import { en, ja, zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
 import type { MessageImagesOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import * as attachmentPlugin from '../src/client/index.ts'
 
@@ -22,7 +22,7 @@ async function bench() {
   const runtime = await SlotTestRuntime.create()
   onTestFinished(() => runtime.dispose())
   const locale = new LocaleRuntime(runtime.ctx)
-  locale.register('conversation', { en, zh })
+  locale.register('conversation', { en, ja, zh })
   locale.setLocale('en')
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)

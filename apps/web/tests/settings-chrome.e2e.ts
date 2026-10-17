@@ -25,8 +25,8 @@ const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/settings-chrome', import.
 const DIALOG_EXPECTED = join(SNAPSHOT_DIR, 'dialog.expected.md')
 const PLUGINS_EXPECTED = join(SNAPSHOT_DIR, 'plugins.expected.md')
 const PLUGIN_INSTANCES_EXPECTED = join(SNAPSHOT_DIR, 'plugin-instances.expected.md')
-// The English fallback surface: a browser naming no shipped language.
-const DIALOG_EN_EXPECTED = join(SNAPSHOT_DIR, 'dialog-en.expected.md')
+// The Japanese default surface: a browser naming no shipped language.
+const DIALOG_JA_EXPECTED = join(SNAPSHOT_DIR, 'dialog-ja.expected.md')
 const PLUGIN_ROW_SELECTOR = '[data-plugin-scope="preset"] [data-plugin-entry="tool-subagent"]'
 const MODE = webSnapshotMode()
 const SCREENSHOTS = 'screenshots/collapse-timing-settings'
@@ -867,9 +867,9 @@ describe('web e2e: settings modal and General preferences', () => {
     }
   }, 90_000)
 
-  it('opens a browser asking for no shipped language in English', async () => {
+  it('opens a browser asking for no shipped language in Japanese', async () => {
     // The product default for "no usable signal": a French browser ships
-    // neither zh nor en, so resolution falls to FALLBACK_LOCALE (en) rather
+    // neither ja, zh nor en, so resolution falls to DEFAULT_LOCALE (ja) rather
     // than to Chinese.
     const fresh = await launchWebScaffold({ developerTools: false })
     const frPage = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'fr-FR' })
@@ -879,22 +879,27 @@ describe('web e2e: settings modal and General preferences', () => {
       await frPage.goto(fresh.authenticatedUrl, { waitUntil: 'load' })
       await frPage.waitForSelector('[class*="frame"]', { timeout: 30_000 })
       expect(await frPage.evaluate(() => localStorage.getItem('dsh.locale'))).toBeNull()
-      await openSettings(frPage, 'en')
-      const dialog = frPage.getByRole('dialog', { name: 'Settings' })
+      await openSettings(frPage, 'ja')
+      const dialog = frPage.getByRole('dialog', { name: '設定' })
       await dialog.waitFor({ timeout: 10_000 })
-      await dialog.getByRole('button', { name: 'English' }).waitFor({ timeout: 10_000 })
-      // A locale-owned nav label proves the dictionaries resolved to en.
-      await dialog.getByRole('button', { name: 'Agent presets' }).waitFor({ timeout: 10_000 })
+      await dialog.getByRole('button', { name: '日本語' }).waitFor({ timeout: 10_000 })
+      // English remains available as a language choice.
+      await dialog.getByRole('button', { name: '日本語' }).click()
+      await frPage.getByRole('menuitem', { name: 'English' }).waitFor({ timeout: 10_000 })
+      await frPage.keyboard.press('Escape')
+      await dialog.waitFor({ timeout: 10_000 })
+      // A locale-owned nav label proves the dictionaries resolved to ja.
+      await dialog.getByRole('button', { name: 'Agent プリセット' }).waitFor({ timeout: 10_000 })
       // The markup already ships `en`, so this alone cannot prove the sync ran
       // — the zh scenario above is the discriminating half. Asserted here too
-      // so a future change that resolves en but writes the wrong tag is caught.
-      expect(await frPage.evaluate(() => document.documentElement.lang)).toBe('en')
-      // Golden of the English fallback dialog — the visible output this change
+      // so a future change that resolves ja but writes the wrong tag is caught.
+      expect(await frPage.evaluate(() => document.documentElement.lang)).toBe('ja')
+      // Golden of the Japanese default dialog — the visible output this change
       // produces. The zh golden above covers the detected-locale surface, so
       // the pair pins both directions of the resolution.
-      await dialog.getByText(`Current version: ${version}`, { exact: true }).waitFor()
+      await dialog.getByText(`現在のバージョン: ${version}`, { exact: true }).waitFor()
       const snapshot = await captureStableAria(frPage, '[role="dialog"]', fresh.workspaceCwd, versionCapture)
-      await compareOrRefreshGolden(DIALOG_EN_EXPECTED, snapshot, MODE)
+      await compareOrRefreshGolden(DIALOG_JA_EXPECTED, snapshot, MODE)
       expect(frTripwire.pageErrors).toEqual([])
       expect(frTripwire.warnings).toEqual([])
     } finally {
@@ -928,7 +933,7 @@ describe('web e2e: settings modal and General preferences', () => {
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(SNAPSHOT_DIR, [
-      'dialog-en.expected.md',
+      'dialog-ja.expected.md',
       'dialog-no-browser.expected.md',
       'dialog.expected.md',
       'collapse-timing-en.expected.md',

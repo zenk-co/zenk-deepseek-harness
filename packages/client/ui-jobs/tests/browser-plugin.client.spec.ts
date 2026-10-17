@@ -14,7 +14,7 @@ import { apply as applyLocale, inject as localeInject } from '@deepseek-ai/dsh-c
 import { apply, inject } from '../src/client/index.ts'
 import type { JobListInjected } from '../src/client/JobListAction.tsx'
 import { apply as applyNode } from '../src/index.ts'
-import { en, NS, zh } from '../src/client/locales.ts'
+import { en, ja, NS, zh } from '../src/client/locales.ts'
 
 /** Slot ledger reader: entry ids currently registered in the header list. */
 function headerEntryIds(ctx: Context): (string | undefined)[] {
@@ -109,12 +109,14 @@ describe('ui-jobs browser half', () => {
     expect(headerEntryIds(ctx)).not.toContain('job-list')
   })
 
-  it('registers both dictionaries under its own namespace and releases them with the fiber', async () => {
+  it('registers all dictionaries under its own namespace and releases them with the fiber', async () => {
     const { ctx, fiber } = await bench()
     const translate = ctx.locale.bind(NS)
     expect(translate('list.aria')).toBe(zh['list.aria'])
     ctx.locale.setLocale('en')
     expect(translate('list.aria')).toBe(en['list.aria'])
+    ctx.locale.setLocale('ja')
+    expect(translate('list.aria')).toBe(ja['list.aria'])
 
     // Withdrawn dictionaries leave the key unresolved rather than translated.
     await fiber.dispose()
@@ -123,6 +125,10 @@ describe('ui-jobs browser half', () => {
 
   it('keeps the English dictionary key-identical to the Chinese source of truth', () => {
     expect(Object.keys(en).sort()).toEqual(Object.keys(zh).sort())
+  })
+
+  it('keeps the Japanese dictionary key-identical to the Chinese source of truth', () => {
+    expect(Object.keys(ja).sort()).toEqual(Object.keys(zh).sort())
   })
 })
 

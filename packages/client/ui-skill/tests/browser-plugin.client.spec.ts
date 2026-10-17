@@ -25,6 +25,7 @@ import type { InjectParams } from '@deepseek-ai/dsh-client-ui-slots'
 import type { RemoteFailure } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ClientSessionContext, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { apply, inject } from '../src/client/index.ts'
+import { en, ja, zh } from '../src/client/locales.ts'
 import { SkillRow as SkillToolRow } from '../src/client/SkillRow.tsx'
 import { SkillReference, type SkillReferenceInjected } from '../src/client/SkillReference.tsx'
 import { UserTextRegistry } from '../../ui-conversation/src/client/conversation/user-text-registry.ts'
@@ -140,28 +141,7 @@ describe('apply', () => {
     expect(entry?.locale).toBe('skill')
     expect(entry?.component).toBe(SkillToolRow)
     expect(presentation.dictionaries).toEqual([{
-      namespace: 'skill', dictionaries: {
-        zh: {
-          'row.title': '加载技能',
-          'row.running': '正在加载 skill',
-          'row.preparing': '准备加载技能',
-          'row.failed': 'skill 加载失败',
-          'row.stopped': 'skill 加载已中止',
-          'row.instructions': '说明',
-          'row.inspect': '查看',
-          'menu.userOnly': '仅用户',
-        },
-        en: {
-          'row.title': 'Skill',
-          'row.running': 'Loading skill',
-          'row.preparing': 'Preparing to load a skill',
-          'row.failed': 'Skill load failed',
-          'row.stopped': 'Skill load stopped',
-          'row.instructions': 'Instructions',
-          'row.inspect': 'Inspect',
-          'menu.userOnly': 'user-only',
-        },
-      },
+      namespace: 'skill', dictionaries: { zh, en, ja },
     }])
   })
 

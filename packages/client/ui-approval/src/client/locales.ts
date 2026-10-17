@@ -20,3 +20,12 @@ export const en = {
   reject: 'Reject',
   allowOnce: 'Allow once',
 } satisfies Record<ApprovalKey, string>
+
+/** Japanese dictionary, checked against the Chinese key set. */
+export const ja = {
+  waiting: '承認待ち',
+  'detail.aria': '承認の詳細',
+  escalation: 'ツール {toolName} が特権実行を要求しています',
+  reject: '拒否',
+  allowOnce: '一度だけ許可',
+} satisfies Record<ApprovalKey, string>

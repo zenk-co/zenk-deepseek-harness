@@ -78,8 +78,11 @@ describe('document language', () => {
     expect(langOf()).toBe('zh-CN')
     locale.setLocale('en')
     // `en` needs no region; `zh` names its script variant, which bare `zh`
-    // leaves ambiguous for pronunciation and font selection.
+    // leaves ambiguous for pronunciation and font selection. `ja` needs no
+    // region either.
     expect(langOf()).toBe('en')
+    locale.setLocale('ja')
+    expect(langOf()).toBe('ja')
     locale.setLocale('zh')
     expect(langOf()).toBe('zh-CN')
   })
@@ -103,13 +106,13 @@ describe('document language', () => {
     const observer = new MutationObserver(() => {})
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] })
     try {
-      const remove = locale.addLanguage({ id: 'ja', label: '日本語', fallback: 'en' })
+      const remove = locale.addLanguage({ id: 'ko', label: '한국어', fallback: 'en' })
       expect(observer.takeRecords()).toHaveLength(0)
       remove()
       expect(observer.takeRecords()).toHaveLength(0)
-      locale.setLocale('en')
+      locale.setLocale('ja')
       expect(observer.takeRecords()).toHaveLength(1)
-      expect(langOf()).toBe('en')
+      expect(langOf()).toBe('ja')
     } finally {
       observer.disconnect()
     }

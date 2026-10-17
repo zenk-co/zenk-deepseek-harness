@@ -42,3 +42,21 @@ export const en = {
   invalidOutput: 'The terminal screen could not be received. Reconnect to recover it.',
   terminalLimit: 'The terminal limit has been reached. Close unused terminals and try again. Exited terminals also count toward the limit.',
 } satisfies Record<keyof typeof zh, string>
+
+/** Japanese terminal copy. */
+export const ja = {
+  'shortcut.noSession': '先にセッションを選択してください',
+  recoveryFailed: 'ターミナルの復元に失敗しました: {message}', retryRecovery: 'ターミナルの復元を再試行',
+  shell: 'シェルを選択', shellLoading: 'シェルを読み取り中…', shellEmpty: '利用可能なシェルがありません', description: 'セッションのワークスペースでコマンドを実行',
+  title: 'ターミナル', new: '新しいターミナル', loading: 'ターミナル環境を読み取り中…', creating: '起動中…',
+  connecting: '接続中…', disconnected: '接続が切断されました。', reconnect: '再接続',
+  readonly: 'このビューは現在読み取り専用です。', control: '入力を引き継ぐ',
+  closed: 'ターミナルは閉じられました。', exited: 'プロセスが終了しました ({code})', failed: 'ターミナルエラー: {message}',
+  rename: 'ターミナル名', unavailable: '利用不可', retry: '再試行',
+  cleanupFailed: 'ターミナル「{title}」を終了できませんでした: {message}',
+  missingTerminal: 'このターミナルは存在しません。新しいターミナルを作成してください。',
+  inputFull: '入力バッファーがいっぱいです。再接続して再試行してください。',
+  attachmentEnded: 'ターミナル接続は終了しました。再接続してください。',
+  invalidOutput: 'ターミナル画面を受信できませんでした。再接続して復旧してください。',
+  terminalLimit: 'ターミナル数が上限に達しました。使っていないターミナルを閉じて再試行してください。終了済みのターミナルも数に含まれます。',
+} satisfies Record<keyof typeof zh, string>

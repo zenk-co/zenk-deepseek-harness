@@ -227,7 +227,7 @@ describe('ui-settings-models apply', () => {
     expect(b.slots.entries('settings.models.footer')).toHaveLength(0)
   })
 
-  it('registers the zh/en nav dictionaries and disposes everything with the fiber', async () => {
+  it('registers the zh/en/ja nav dictionaries and disposes everything with the fiber', async () => {
     const b = await bench()
     declare(b.slots)
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
@@ -239,6 +239,7 @@ describe('ui-settings-models apply', () => {
     // The (ns, locale) seats are free again — the dictionary disposers ran.
     expect(() => b.locale.register('settings.models', 'zh', {})).not.toThrow()
     expect(() => b.locale.register('settings.models', 'en', {})).not.toThrow()
+    expect(() => b.locale.register('settings.models', 'ja', {})).not.toThrow()
   })
 })
 

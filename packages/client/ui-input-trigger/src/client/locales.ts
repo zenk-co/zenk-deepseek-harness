@@ -32,3 +32,16 @@ export const en = {
   'crumbs.aria': 'Folder navigation',
   'suggestions.aria': 'Trigger suggestions',
 } satisfies Record<MenuKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'command': 'コマンド',
+  'skill': 'スキル',
+  'subagent': 'サブエージェント',
+  'loading': '読み込み中…',
+  'drill.aria': 'フォルダーを開く',
+  'drill.hint': 'フォルダーを開く',
+  'drill.key': 'Tab',
+  'crumbs.aria': 'フォルダーナビゲーション',
+  'suggestions.aria': 'トリガー候補',
+} satisfies Record<MenuKey, string>

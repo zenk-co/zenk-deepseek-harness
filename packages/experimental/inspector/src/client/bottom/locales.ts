@@ -16,6 +16,15 @@ export const en: Record<keyof typeof zh, string> = {
   frameTitle: 'NodeJS Inspector',
 }
 
+/** Japanese labels checked against the bottom-panel dictionary. */
+export const ja: Record<keyof typeof zh, string> = {
+  title: 'NodeJS 診断',
+  toggle: 'NodeJS 診断を展開または折りたたむ',
+  close: '折りたたむ',
+  resize: 'NodeJS 診断パネルの高さを調整',
+  frameTitle: 'NodeJS 診断',
+}
+
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Shared Inspector frontend copy. */

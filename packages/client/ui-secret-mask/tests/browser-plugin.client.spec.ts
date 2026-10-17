@@ -20,7 +20,8 @@ describe('apply', () => {
     expect(inject).toEqual(['locale', 'slots', 'uiConversation'])
     const ctx = new Context()
     onTestFinished(() => ctx.fiber.dispose())
-    ctx.provide('locale', new LocaleRuntime(ctx))
+    const locale = new LocaleRuntime(ctx)
+    ctx.provide('locale', locale)
     const sessions = new TestSessions(async (action) => { await action() }, ctx)
     onTestFinished(() => sessions.disposeScopes())
     ctx.provide('sessions', sessions)
@@ -37,7 +38,10 @@ describe('apply', () => {
     expect(ctx.slots.entries('conversation.user.text.node')).toMatchObject([
       { options: { key: 'secret' }, component: SecretText },
     ])
+    locale.setLocale('en')
     expect(ctx.locale.bind(NS)('secret.reveal')).toBe('Show secret')
+    locale.setLocale('ja')
+    expect(ctx.locale.bind(NS)('secret.reveal')).toBe('シークレットを表示')
 
     await fiber.dispose()
     expect(ctx.uiConversation.userText.entries()).toHaveLength(0)

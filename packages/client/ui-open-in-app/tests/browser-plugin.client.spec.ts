@@ -22,7 +22,7 @@ import { apply as nodeApply } from '../src/index.ts'
 import { OpenInAppAction } from '../src/client/OpenInAppAction.tsx'
 import { OpenPathAction } from '../src/client/OpenPathAction.tsx'
 import { OpenPathEmptyAction } from '../src/client/OpenPathEmptyAction.tsx'
-import { en, NS, zh } from '../src/client/locales.ts'
+import { en, ja, NS, zh } from '../src/client/locales.ts'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -290,6 +290,7 @@ describe('open-in-app browser half', () => {
 
   it('keeps the English dictionary key-identical to the Chinese source of truth', () => {
     expect(Object.keys(en).sort()).toEqual(Object.keys(zh).sort())
+    expect(Object.keys(ja).sort()).toEqual(Object.keys(zh).sort())
   })
 })
 

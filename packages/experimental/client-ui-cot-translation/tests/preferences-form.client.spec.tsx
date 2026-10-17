@@ -8,7 +8,7 @@ import { bindSnapshotSelector, makeTranslate, stubConfigForm } from '@deepseek-a
 import { TranslationPreferencesForm } from '../src/client/preferences-form.ts'
 import { TranslationSettings, type TranslationSettingsProps } from '../src/client/TranslationSettings.tsx'
 import type { CotTranslationPreferences } from '../src/preferences.ts'
-import { en, zh, formLabels } from '../src/client/locales.ts'
+import { en, ja, zh, formLabels } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
@@ -42,11 +42,12 @@ it('stages provider and language together, rejects malformed codes, and resets t
   expect(scope.listenerCount()).toBe(0)
 })
 
-it('uses the shared unavailable and read-only states and supplies both dictionaries', () => {
+it('uses the shared unavailable and read-only states and supplies all dictionaries', () => {
   const scope = stubConfigForm<CotTranslationPreferences>()
   const form = new TranslationPreferencesForm(scope.scope), { hooks, ...actions } = form.inject()
   try {
     expect(Object.keys(en)).toEqual(Object.keys(zh))
+    expect(Object.keys(ja)).toEqual(Object.keys(zh))
     expect(formLabels(makeTranslate(zh)).save).toBe('保存')
     const props = { view: 'page' as const, ...actions,
       refreshProviders: vi.fn(), useAvailableProviders: bindSnapshotSelector(

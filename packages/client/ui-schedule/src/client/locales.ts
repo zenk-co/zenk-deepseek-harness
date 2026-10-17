@@ -2,7 +2,7 @@
  * `schedule.catalog` namespace dictionaries: the Session header catalog and the
  * Sidebar row mark with its hover-card task section.
  */
-import { frequencyEn, frequencyZh } from './frequency-locales.ts'
+import { frequencyEn, frequencyJa, frequencyZh } from './frequency-locales.ts'
 
 /** Dictionary namespace owned by this plugin. */
 export const NS = 'schedule.catalog'
@@ -47,6 +47,27 @@ export const en: Record<ScheduleCatalogKey, string> = {
   ...frequencyEn,
   'mark.aria': '{count} scheduled tasks',
   'hover.more': '{count} more',
+}
+
+/** Japanese dictionary, key-identical to the Chinese source of truth. */
+export const ja: Record<ScheduleCatalogKey, string> = {
+  'trigger.label': 'リマインダー',
+  'list.loading': 'リマインダーを読み込んでいます…',
+  'list.error': 'リマインダーを読み込めませんでした。',
+  'list.retry': '再試行',
+  'delete.action': '削除',
+  'delete.pending': '削除しています…',
+  'delete.label': 'リマインダーを削除：{title}',
+  'list.open': 'リマインダーの詳細を開く：{title}',
+  'trigger.one': '{count} 件のリマインダー',
+  'trigger.other': '{count} 件のリマインダー',
+  'list.aria': 'アクティブなリマインダー',
+  'list.nextRun': '次回実行',
+  'frequency.once': '1回のみ',
+  'frequency.every': '{value}{unit}ごと',
+  ...frequencyJa,
+  'mark.aria': '{count} 件の自動化タスク',
+  'hover.more': '他 {count} 件のタスク',
 }
 
 /** Key domain of the Schedule catalog namespace. */

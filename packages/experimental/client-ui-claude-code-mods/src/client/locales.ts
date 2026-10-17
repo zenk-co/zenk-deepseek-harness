@@ -21,3 +21,11 @@ export const en = {
   'press.failed': 'The button failed: {message}',
   'press.stale': 'That button belonged to an earlier drawing; the band has refreshed',
 } satisfies Record<ModsBandKey, string>
+
+/** Japanese dictionary checked against the Chinese key set. */
+export const ja = {
+  band: 'Claude Code モジュール',
+  pressing: '処理中…',
+  'press.failed': 'ボタンの操作に失敗しました:{message}',
+  'press.stale': 'このボタンは古い描画のもので、パネルは更新されています',
+} satisfies Record<ModsBandKey, string>

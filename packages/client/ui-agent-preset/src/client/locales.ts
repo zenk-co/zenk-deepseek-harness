@@ -1,6 +1,6 @@
 /** Locale bundles for the agent-preset hero chip, header label, and management section. */
 
-import { guideEn, guideZh, type PresetGuideKey } from './guide-locales.ts'
+import { guideEn, guideJa, guideZh, type PresetGuideKey } from './guide-locales.ts'
 
 /** Locale keys these surfaces render. */
 export type AgentPresetSettingsKey =
@@ -117,6 +117,47 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   createPluginChecking: '正在确认创造模式是否可用',
   createPluginUnavailable: '暂时不可用，请重新打开菜单重试',
   createPluginMissing: '当前配置未提供创造模式',
+
+}
+
+/** Japanese copy. */
+export const ja: Record<AgentPresetSettingsKey, string> = {
+  ...guideJa,
+  builtInGroup: '組み込み', customGroup: 'カスタム',
+  sectionIntro: 'Agent のツールと動作方式を選択します。日常タスクには「標準モード」、DSH の機能拡張には「クリエイターモード」を利用してください。',
+
+  seatHint: '新しいタスクで使用する Agent プリセットを選択',
+  headerHint: 'このタスクの Agent プリセット（タスク開始時に確定）',
+  nav: 'Agent プリセット',
+
+  setDefault: '新しいタスクの既定に設定',
+  view: '設定を表示',
+
+  presetStandardName: '標準モード',
+  presetStandardDescription: 'コード、ファイル、情報を扱い、多くのタスクに適しています。必要に応じて検索、編集、ターミナルなどのツールを使用します。',
+  presetPtcName: 'PTC モード',
+  presetPtcDescription: '標準モードのすべての機能を含み、ツールを一括呼び出しして結果を選別・整理・重複除去・集計・要約するタスクにより適しています。',
+  presetMinimalName: 'ミニマルモード',
+  presetMinimalDescription: 'Agent はターミナルと画像読み取りを使用し、コンテキスト圧縮に対応します。基本性能の検証や比較に有用です。',
+  presetCordisName: 'クリエイターモード',
+  presetCordisDescription: '対話で DSH をカスタマイズします。機能や UI を追加するプラグインの作成、ツールとプロンプトを組み合わせた独自モードの作成を Agent に依頼できます。',
+
+  inUse: '新しいタスクの既定',
+
+  noDescription: '説明がありません。',
+  brokenBadge: '読み込みに失敗しました',
+
+  switchRefused: '「{name}」に切り替えられませんでした：{reason}',
+  standardUnavailable: '標準モードは利用できません。復元するか、他の利用可能なモードを選択してください。',
+
+  close: '閉じる',
+
+  creatorDraft: 'Agent にプリセット作成を手伝ってもらう',
+  createPlugin: 'Agent にプラグインを作成させる',
+  createPluginDescription: 'クリエイターモードに入り、自分専用の DSH プラグインを作成',
+  createPluginChecking: 'クリエイターモードが利用可能か確認中',
+  createPluginUnavailable: '一時的に利用できません。メニューを開き直して再試行してください',
+  createPluginMissing: '現在の設定ではクリエイターモードは提供されていません',
 
 }
 
