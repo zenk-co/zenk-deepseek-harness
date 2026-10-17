@@ -5,7 +5,7 @@ description: "旧值 ui-chat.transcriptView: normal，以及非 Desktop Web 中�
 
 # 旧值 `normal` 的工作步骤展示改为“详细”
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

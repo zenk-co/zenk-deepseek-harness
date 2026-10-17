@@ -1,6 +1,6 @@
 # 浏览器操作
 
-[English](browser-use.md) | 中文
+[日本語](browser-use.md) | [English](browser-use.en.md) | 中文
 
 浏览器操作让模型通过配置的后端检查与操作网页。DSH 拥有任务循环；提供方提供浏览器操作，并在一个实时 Session 的多个轮次之间保留浏览器状态。
 

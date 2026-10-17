@@ -5,7 +5,7 @@ kind: "package-group"
 
 # ssh/ — POSIX 远端执行提供方
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

@@ -1,6 +1,6 @@
 # Schedule 提醒
 
-[English](schedule.md) | 中文
+[日本語](schedule.md) | [English](schedule.en.md) | 中文
 
 ## 概述
 

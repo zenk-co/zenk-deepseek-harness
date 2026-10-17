@@ -3,7 +3,7 @@
 
 # 能力 Seams 与核心服务
 
-[English](capability-seams.md) | 中文
+[日本語](capability-seams.md) | [English](capability-seams.en.md) | 中文
 
 服务可以是核心主干服务、可替换的能力 seam、组合包／组合点或独立服务。下图展示了拥有服务声明的包、已知实现包，以及直接消费该服务的包。
 

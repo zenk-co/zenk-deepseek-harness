@@ -5,7 +5,7 @@ description: "运行时不变式注册表包和每个包的 `./invariant` 子路
 
 # 运行时不变式插件被移除
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

@@ -5,7 +5,7 @@ description: "自定义标题路由要求注册适配器，并按递增顺序排
 
 # 准备自定义标题路由
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

@@ -5,7 +5,7 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-plugin-manager
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 应用拥有的 profile 通过启动器信息提供内置包管理器调用方式。它在包操作和 registry 检查中优先于 `pnpmCommand`；其环境仅应用于这些子进程。
 

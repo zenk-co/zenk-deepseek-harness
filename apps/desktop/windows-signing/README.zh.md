@@ -4,7 +4,7 @@ description: "配置和维护 Windows 打包 runner、签名凭据、EV Token �
 
 # Windows 签名与 runner 运维
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

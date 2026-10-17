@@ -1,6 +1,6 @@
 # 计算机操作
 
-[English](computer-use.md) | 中文
+[日本語](computer-use.md) | [English](computer-use.en.md) | 中文
 
 计算机操作让模型通过配置的提供方观察并操作本地桌面。DSH 的共享能力称为 **computer use（计算机操作）**；**Cua Driver** 是上游实现的名称。
 

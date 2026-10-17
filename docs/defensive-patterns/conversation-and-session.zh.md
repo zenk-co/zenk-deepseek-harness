@@ -1,6 +1,6 @@
 # 会话与 Session 规则
 
-[English](conversation-and-session.md) | 中文
+[日本語](conversation-and-session.md) | [English](conversation-and-session.en.md) | 中文
 
 关于读取 Session、持有 Session、计算会话节点与渲染它们的规则。数据模型与各类型语义见 [session-projection.zh.md](../subsystems/session-projection.zh.md) 与 [conversation.zh.md](../subsystems/conversation.zh.md)。
 

@@ -5,7 +5,7 @@ description: "JSONL 持久化使用插件命名空间导入；直接构造服务
 
 # 通过插件挂载 JSONL 持久化
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

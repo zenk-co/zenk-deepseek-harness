@@ -5,7 +5,7 @@ description: "DeepSeek 账号路由不再接受 models 目录；模型由账号�
 
 # DeepSeek 账号模型改由账号的模型列表提供
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

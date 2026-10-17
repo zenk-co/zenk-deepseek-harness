@@ -1,6 +1,6 @@
 # 客户端组件规则
 
-[English](client-components.md) | 中文
+[日本語](client-components.md) | [English](client-components.en.md) | 中文
 
 关于客户端组件、其状态与 effect 的规则。详细纪律见 [packages/client/AGENTS.md](../../packages/client/AGENTS.md)；Slot 设计正家是 [slots.zh.md](../subsystems/slots.zh.md)，样式规则正家是 [web-styling.zh.md](../web-styling.zh.md)。以下每一节给出要求、评审判定方式、边界与例外，以及一正一反两个例子。
 

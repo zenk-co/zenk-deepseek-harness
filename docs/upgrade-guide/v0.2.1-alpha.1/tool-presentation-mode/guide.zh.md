@@ -5,7 +5,7 @@ description: "工具呈现方式仅接受 native 或 ptc；混合的 both 模式
 
 # 选择原生或 PTC 工具呈现方式
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

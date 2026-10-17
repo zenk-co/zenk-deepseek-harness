@@ -1,6 +1,6 @@
 # 包面规则
 
-[English](package-surface.md) | 中文
+[日本語](package-surface.md) | [English](package-surface.en.md) | 中文
 
 关于包导出什么、怎么构建、如何声明依赖的规则。布局本身见 [development.zh.md](../development.zh.md#typescript-project-layout)；常设条款见 [packages/AGENTS.md](../../packages/AGENTS.md)。
 

@@ -15,7 +15,7 @@ Cordis は DeepSeek Harness の土台にあるプラグインフレームワー�
 このリポジトリの複製と依存関係のインストールが必要であり、前提条件は[開発ガイド](../development.md#setup-tutorial)に一覧がある。このチュートリアルに API キーは不要であり、すべての例はキーレスで動作する。
 
 ```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
+git clone git@github.com:zenk-co/zenk-deepseek-harness.git
 cd deepseek-harness
 pnpm install
 ```

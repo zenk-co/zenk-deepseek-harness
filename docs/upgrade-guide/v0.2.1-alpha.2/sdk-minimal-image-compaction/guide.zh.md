@@ -5,7 +5,7 @@ description: "sdk-minimal 默认工具清单新增 read_image，并自动生成�
 
 # SDK-minimal 图片读取与自动压缩
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

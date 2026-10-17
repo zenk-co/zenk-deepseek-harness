@@ -5,7 +5,7 @@ description: "自定义 primary-runtime payload 的 Python 解释器别名必须
 
 # 自定义 Python 运行时别名必须指向同目录解释器
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

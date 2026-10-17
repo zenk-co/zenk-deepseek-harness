@@ -5,7 +5,7 @@ description: "受管理的子 agent activation 替代前台与 Job 后台委派�
 
 # 将委派迁移到受管理的子 agent activation
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

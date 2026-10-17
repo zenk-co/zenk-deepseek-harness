@@ -1,6 +1,6 @@
 # OTel 上报
 
-[English](otel.md) | 中文
+[日本語](otel.md) | [English](otel.en.md) | 中文
 
 [OTel 插件](../../packages/telemetry/otel/README.zh.md) 注册 `ctx.otel`，作为独立普通事件通道和 Session 日志通道的共享工厂。它持有传输与 SDK 聚合实现。业务调用方注入服务，显式提供传输、resource 和 scope 选项，并负责返回通道的关闭。
 

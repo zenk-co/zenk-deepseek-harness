@@ -3,7 +3,7 @@ description: "Chat 过程分组与活动摘要的明细业务规则。"
 ---
 # Chat 节点业务规则
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

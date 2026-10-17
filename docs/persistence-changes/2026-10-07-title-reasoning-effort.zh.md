@@ -5,7 +5,7 @@ kind: persistence-change
 
 # 2026-10-07-title-reasoning-effort
 
-[English](2026-10-07-title-reasoning-effort.md) | 中文
+[日本語](2026-10-07-title-reasoning-effort.md) | [English](2026-10-07-title-reasoning-effort.en.md) | 中文
 
 ## 概述
 

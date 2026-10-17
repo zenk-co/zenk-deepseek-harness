@@ -1,6 +1,6 @@
 # 同会话目标
 
-[English](goal.md) | 中文
+[日本語](goal.md) | [English](goal.en.md) | 中文
 
 事件溯源目标服务及其策略消费方共享的类型。[目标领域 参考](../../packages/goal/goal/README.zh.md) 负责记录持久化与激活决策；本页记录 [`packages/goal/goal/src/types.ts`](../../packages/goal/goal/src/types.ts) 中的确切字段和变体。
 

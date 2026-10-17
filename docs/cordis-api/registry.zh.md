@@ -3,7 +3,7 @@
 
 # 注册表
 
-[English](registry.md) | 中文
+[日本語](registry.md) | [English](registry.en.md) | 中文
 
 插件加载与依赖注入。
 

@@ -4,7 +4,7 @@ description: "在专用 macOS 和 Windows runner 上发布留存的 Desktop 安�
 
 # Desktop CI 发布
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

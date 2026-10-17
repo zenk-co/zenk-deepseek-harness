@@ -1,6 +1,6 @@
 # Conversation 组装
 
-[English](conversation.md) | 中文
+[日本語](conversation.md) | [English](conversation.en.md) | 中文
 
 Conversation 是 Client `SessionEventLikeEntry` window 与浏览器 view 之间的 target-neutral assembly 层。[`ui-conversation`](../../packages/client/ui-conversation/README.zh.md)拥有 event 与 view registry、每个 `SessionBinding` 对应的 identity-stable binding、Turn/Step Location、增量 Context assembly、target source、共享 shell 与输入编排。[`ui-chat`](../../packages/client/ui-chat/README.zh.md)和 [`ui-trajectory`](../../packages/client/ui-trajectory/README.zh.md)等 target 包拥有各自的 Definition、最终 snapshot 与渲染。
 

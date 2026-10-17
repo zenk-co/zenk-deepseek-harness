@@ -4,7 +4,7 @@ description: "将测试二进制上传与人工授权的固定 feed 发布分离
 
 # 测试更新上传与发布
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 摘要
 

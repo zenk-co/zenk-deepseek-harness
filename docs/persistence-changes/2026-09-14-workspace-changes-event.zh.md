@@ -5,7 +5,7 @@ kind: persistence-change
 
 # 2026-09-14-workspace-changes-event
 
-[English](2026-09-14-workspace-changes-event.md) | 中文
+[日本語](2026-09-14-workspace-changes-event.md) | [English](2026-09-14-workspace-changes-event.en.md) | 中文
 
 ## 概述
 

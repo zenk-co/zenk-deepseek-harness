@@ -5,7 +5,7 @@ description: "JobId 现在跨注册表生命周期标识一次后台执行。"
 
 # 后台 job id 标识一次执行
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

@@ -5,7 +5,7 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-settings-account
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 桌面端产品事件使用可选的[产品埋点服务](../product-analytics/README.zh.md)，不包含普通 Web 交互。工作区内的登录弹窗不发送认证事件；认证埋点由原生欢迎页负责。
 

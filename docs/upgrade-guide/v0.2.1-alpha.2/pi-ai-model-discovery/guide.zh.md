@@ -5,7 +5,7 @@ description: "指定了凭据的 pi-ai 路由在凭据配置之前隐藏其模�
 
 # pi-ai 路由缺少凭据时的模型可见性
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

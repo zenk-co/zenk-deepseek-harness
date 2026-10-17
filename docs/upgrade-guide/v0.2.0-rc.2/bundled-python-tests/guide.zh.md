@@ -5,7 +5,7 @@ description: "内置 NumPy 和 pandas 不包含其上游测试套件。"
 
 # NumPy 和 pandas 上游测试需要独立环境
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

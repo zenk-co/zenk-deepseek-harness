@@ -3,7 +3,7 @@
 
 # 实验性插件记录目录
 
-[English](experimental-persistence-catalog.md) | 中文
+[日本語](experimental-persistence-catalog.md) | [English](experimental-persistence-catalog.en.md) | 中文
 
 这些当前源码中的 PluginRecordMap 声明描述实验性包拥有的 ignorable、仅日志记录。载荷类型注解链接到所属源码，不展开引用类型。记录不进入已知事件集合、持久化 schema 指纹或兼容性历史；格式迁移以尽力而为的方式保留它们。
 

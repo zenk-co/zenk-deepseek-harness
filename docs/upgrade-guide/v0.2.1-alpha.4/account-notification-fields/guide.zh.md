@@ -5,7 +5,7 @@ description: "AccountBonusNotification 提供未经校验的可选元数据，�
 
 # 更新账号通知使用方
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

@@ -1,6 +1,6 @@
 # 子代理
 
-[English](subagent.md) | 中文
+[日本語](subagent.md) | [English](subagent.en.md) | 中文
 
 统一的 activation API 管理本地会话和外部执行。
 

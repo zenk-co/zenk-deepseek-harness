@@ -1,6 +1,6 @@
 # 持久附件
 
-[English](attachment.md) | 中文
+[日本語](attachment.md) | [English](attachment.en.md) | 中文
 
 附件 seam 将二进制图片和通用文件的所有权与会话日志分离。生产方把字节交给 [`ctx.attachments`](#ctxattachments--attachmentstore-abstract-seam)；只有对象完成持久化后，该服务才会发布不可变的内容寻址引用。会话事件和模型可见的附件块包含该引用及其元数据，绝不包含浏览器对象 URL、宿主临时路径、提供方 URL 或 base64 数据。独立的 [`ctx.fileUploads`](#ctxfileuploads--fileuploads) 服务把浏览器文件传输与暂存凭证绑定到接收方 Agent。
 

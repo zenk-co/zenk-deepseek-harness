@@ -4,7 +4,7 @@ description: "由操作者控制的 Windows 网络故障与恢复，仅针对已
 
 # 测试应用网络故障
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 摘要
 

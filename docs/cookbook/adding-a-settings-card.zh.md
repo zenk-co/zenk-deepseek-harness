@@ -1,6 +1,6 @@
 # 实践指南：即时配置表单
 
-[English](adding-a-settings-card.md) | 中文
+[日本語](adding-a-settings-card.md) | [English](adding-a-settings-card.en.md) | 中文
 
 在插件 Config schema 中声明即时字段，并通过产品所属的设置卡片提供编辑入口。导出的 `Config` 接口描述插件收到的值，包括每个 `Volatile<T>` 引用。
 

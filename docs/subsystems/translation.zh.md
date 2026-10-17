@@ -1,6 +1,6 @@
 # 文本翻译
 
-[English](translation.md) | 中文
+[日本語](translation.md) | [English](translation.en.md) | 中文
 
 实验性 [translator](../../packages/experimental/translator/README.zh.md) 通过免登录浏览器端点或显式选择的付费原生 Flash 路由翻译文本。消费者负责展示、调度及 Session 激活；绑定 Session 的请求通过已激活 Session 的写入器保留可复用结果。
 

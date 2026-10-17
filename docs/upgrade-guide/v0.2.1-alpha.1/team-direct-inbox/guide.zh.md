@@ -5,7 +5,7 @@ description: "Agent Teams 移除待投递消息数量限制，并停止投递历
 
 # Agent Teams 消息使用目标收件箱
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

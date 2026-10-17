@@ -1,6 +1,6 @@
 # Skills
 
-[English](skills.md) | 中文
+[日本語](skills.md) | [English](skills.en.md) | 中文
 
 [skill（技能）能力族](../../packages/skill) 包含 Service Definition（[dsh-skill](../../packages/skill/skill)，`ctx.skills`）、本地 Service Provider（[dsh-skill-filesystem](../../packages/skill/skill-filesystem)）、可选的随包提供方（[dsh-skill-badge](../../packages/experimental/skill-badge)、[dsh-skill-office](../../packages/skill/skill-office) 及 [dsh-sandbox-windows-acl](../../packages/sandbox/sandbox-windows-acl) 中的 Windows ACL 诊断提供方）和 Consumer（[dsh-tool-skill](../../packages/skill/tool-skill)）。注册表在其宿主层与各 scope 层之间合并各提供方的目录；提供方贡献本地或随包 skill；Consumer 拥有初始目录和替换目录，以及面向模型的 `skill` 工具。skill 是可选的指令而非会话事件，因此其词汇定义在此处而非 [core.md](core.zh.md)。
 

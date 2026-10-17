@@ -5,7 +5,7 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-deepseek-account-platform
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 每个到达 Platform 的操作都接收调用方的 `AccountClientMetadata`：客户端版本、当前界面语言和以秒为单位的 UTC 偏移。提供者据此与组合出的平台推导五个 Platform 客户端请求头，因此每个请求报告的是发起它的界面，而不是 Host 上一次见到的调用方。新的登录申请会为该申请的初始化、兑换和取消捕获这份元数据，中途加入的调用方不会替换它；退登则为在请求之后继续进行的撤销重试捕获这份元数据。
 

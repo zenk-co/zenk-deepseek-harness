@@ -5,7 +5,7 @@ kind: persistence-change
 
 # 2026-09-21-user-question-reply
 
-[English](2026-09-21-user-question-reply.md) | 中文
+[日本語](2026-09-21-user-question-reply.md) | [English](2026-09-21-user-question-reply.en.md) | 中文
 
 ## 概述
 

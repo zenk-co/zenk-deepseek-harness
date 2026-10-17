@@ -1,6 +1,6 @@
 # DSH 统一圆角规范
 
-[English](ui-radius.md) | 中文
+[日本語](ui-radius.md) | [English](ui-radius.en.md) | 中文
 
 ## 概述
 

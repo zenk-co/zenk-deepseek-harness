@@ -5,7 +5,7 @@ kind: persistence-change
 
 # 2026-09-30-job-session-lifecycle
 
-[English](2026-09-30-job-session-lifecycle.md) | 中文
+[日本語](2026-09-30-job-session-lifecycle.md) | [English](2026-09-30-job-session-lifecycle.en.md) | 中文
 
 ## 概述
 

@@ -31,7 +31,7 @@ npx @deepseek-ai/dsh web
 リポジトリチェックアウトから実行するには:
 
 ```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
+git clone git@github.com:zenk-co/zenk-deepseek-harness.git
 cd deepseek-harness
 pnpm install
 pnpm run build

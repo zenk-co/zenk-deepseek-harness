@@ -5,7 +5,7 @@ kind: "package-group"
 
 # host/ — Web GUI 宿主侧
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

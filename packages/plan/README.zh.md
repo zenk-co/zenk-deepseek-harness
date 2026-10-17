@@ -5,7 +5,7 @@ kind: "package-group"
 
 # plan/：plan 协作状态
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

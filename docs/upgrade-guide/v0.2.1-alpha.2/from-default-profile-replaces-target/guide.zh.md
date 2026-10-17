@@ -5,7 +5,7 @@ description: "`--from-default-profile` 现在会替换已存在的自定义 prof
 
 # `--from-default-profile` 会替换已存在的 profile
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

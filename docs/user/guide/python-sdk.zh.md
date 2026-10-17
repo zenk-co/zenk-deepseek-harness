@@ -1,6 +1,6 @@
 # Python SDK 入门
 
-[English](python-sdk.md) | 中文
+[日本語](python-sdk.md) | [English](python-sdk.en.md) | 中文
 
 本教程安装已发布的 Python SDK，运行随附的独立极简 profile，并说明如何从自己的程序自定义同一个 `dsh` profile。
 
@@ -22,7 +22,7 @@
 ::: code-group
 
 ```sh [Linux/macOS]
-git clone https://github.com/deepseek-ai/deepseek-harness.git
+git clone git@github.com:zenk-co/zenk-deepseek-harness.git
 cd deepseek-harness
 python -m venv .venv
 . .venv/bin/activate
@@ -30,7 +30,7 @@ python -m pip install deepseek-harness-sdk
 ```
 
 ```powershell [Windows PowerShell]
-git clone https://github.com/deepseek-ai/deepseek-harness.git
+git clone git@github.com:zenk-co/zenk-deepseek-harness.git
 Set-Location deepseek-harness
 py -3.10 -m venv .venv
 .venv\Scripts\Activate.ps1

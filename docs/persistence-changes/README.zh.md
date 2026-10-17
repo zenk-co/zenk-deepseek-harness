@@ -4,7 +4,7 @@ description: "审阅和维护已记录的会话持久化类型变更、对应 sc
 
 # 持久化类型变更记录
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

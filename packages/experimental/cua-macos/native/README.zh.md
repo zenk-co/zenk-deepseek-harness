@@ -5,7 +5,7 @@ kind: "package-reference"
 
 # dsh-cua 原生辅助程序
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 摘要
 

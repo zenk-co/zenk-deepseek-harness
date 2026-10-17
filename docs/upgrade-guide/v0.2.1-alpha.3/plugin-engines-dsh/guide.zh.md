@@ -5,7 +5,7 @@ description: "插件兼容性检查先读 engines.dsh，再读 DSH peerDependenc
 
 # 插件兼容性先读 `engines.dsh`
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

@@ -1,6 +1,6 @@
 # DeepSeek 官方 LLM API 协议扩展
 
-[English](deepseek-llm-api-wire-extensions.md) | 中文
+[日本語](deepseek-llm-api-wire-extensions.md) | [English](deepseek-llm-api-wire-extensions.en.md) | 中文
 
 本参考定义 [`@deepseek-ai/dsh-llm-deepseek`](../packages/llm/llm-deepseek/README.zh.md) 在 `deepseek-official` Messages 请求中发送的全部 DeepSeek Harness 专用 HTTP 标头与附加 JSON 字段。它不重新定义上游 DeepSeek API 自有字段。提供方无关的 LLM 接口与 `llm-pi-ai` 不实现这些扩展。
 

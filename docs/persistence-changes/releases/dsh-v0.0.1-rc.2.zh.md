@@ -5,7 +5,7 @@ kind: persistence-release
 
 # 持久化版本回溯: dsh-v0.0.1-rc.2
 
-[English](dsh-v0.0.1-rc.2.md) | 中文
+[日本語](dsh-v0.0.1-rc.2.md) | [English](dsh-v0.0.1-rc.2.en.md) | 中文
 
 ## 概述
 

@@ -1,6 +1,6 @@
 # 遥测（telemetry）
 
-[English](session-telemetry.md) | 中文
+[日本語](session-telemetry.md) | [English](session-telemetry.en.md) | 中文
 
 [捕获服务](../../packages/session/session-telemetry/README.zh.md) 负责规范事件捕获、脱敏和交接游标。[反馈后端](../../packages/session/session-telemetry-otel/README.zh.md) 授权 Session 前缀，并负责独立队列、逐请求调度及 4,000,000 字节上限。上报数据不会进入模型请求。
 

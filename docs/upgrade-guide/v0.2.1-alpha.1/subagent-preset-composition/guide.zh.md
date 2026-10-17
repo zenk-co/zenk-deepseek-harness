@@ -5,7 +5,7 @@ description: "Subagent 的 persona 与 toolFilter 配置由 Agent Preset 组装�
 
 # 通过 preset 配置子 Agent 组装
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

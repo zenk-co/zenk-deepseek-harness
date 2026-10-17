@@ -5,7 +5,7 @@ kind: "package-group"
 
 # schedule/ — Host 拥有的提醒
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

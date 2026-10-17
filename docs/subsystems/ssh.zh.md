@@ -1,6 +1,6 @@
 # SSH
 
-[English](ssh.md) | 中文
+[日本語](ssh.md) | [English](ssh.en.md) | 中文
 
 [SSH 提供方家族](../../packages/ssh/README.zh.md) 通过部署方持有的 OpenSSH 连接提供一个远端文件系统／进程环境。Harness、模型传输及 Session 存储留在主机。该家族实现既有文件系统、子进程及沙箱 API，不引入 SSH 专用模型工具。
 

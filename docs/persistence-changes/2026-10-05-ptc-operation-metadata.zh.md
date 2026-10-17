@@ -5,7 +5,7 @@ kind: persistence-change
 
 # 2026-10-05-ptc-operation-metadata
 
-[English](2026-10-05-ptc-operation-metadata.md) | 中文
+[日本語](2026-10-05-ptc-operation-metadata.md) | [English](2026-10-05-ptc-operation-metadata.en.md) | 中文
 
 ## 概述
 

@@ -5,7 +5,7 @@ kind: "package-group"
 
 # document/ — Office 转换
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 摘要
 

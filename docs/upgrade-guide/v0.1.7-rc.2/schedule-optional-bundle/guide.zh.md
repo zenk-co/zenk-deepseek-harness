@@ -5,7 +5,7 @@ description: "Web 组合不再包含 Schedule 的三行；改由“自动化任�
 
 # Schedule 移入“自动化任务”可选 bundle
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

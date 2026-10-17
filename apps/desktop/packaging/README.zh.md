@@ -4,7 +4,7 @@ description: "在本地或 Windows／macOS Actions 中生成 Desktop 安装包�
 
 # Desktop 打包
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

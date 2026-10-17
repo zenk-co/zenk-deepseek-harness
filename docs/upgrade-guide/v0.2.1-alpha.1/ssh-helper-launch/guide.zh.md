@@ -5,7 +5,7 @@ description: "SSH 和 Node PTC 配置改用显式启动模式，SSH 客户端要
 
 # SSH helper 与 PTC 启动配置
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

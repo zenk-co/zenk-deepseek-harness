@@ -5,7 +5,7 @@ description: "可选 hooks、webhooks、工具与技能所需的显式安装、p
 
 # 可选能力的显式安装与组合
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

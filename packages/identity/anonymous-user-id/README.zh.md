@@ -5,7 +5,7 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-anonymous-user-id
 
-[English](README.md) | 中文
+[日本語](README.md) | [English](README.en.md) | 中文
 
 ## 概述
 

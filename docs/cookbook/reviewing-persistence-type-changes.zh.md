@@ -4,7 +4,7 @@ description: "在创建 PR 前，本地生成、确认并验证会话持久化�
 
 # 实操手册：审阅持久化类型变更
 
-[English](reviewing-persistence-type-changes.md) | 中文
+[日本語](reviewing-persistence-type-changes.md) | [English](reviewing-persistence-type-changes.en.md) | 中文
 
 ## 概述
 

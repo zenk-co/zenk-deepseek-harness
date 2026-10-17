@@ -1,6 +1,6 @@
 # Cookbook: 添加内置插件功能配图
 
-[English](adding-a-plugin-preview.md) | 中文
+[日本語](adding-a-plugin-preview.md) | [English](adding-a-plugin-preview.en.md) | 中文
 
 插件管理拥有内置组合包的可选功能配图。编辑其内部 `BUNDLE_PREVIEWS` 映射时遵循本指引。包不能通过 manifest 或 exports 声明配图；第三方插件没有配图接口。
 

@@ -5,7 +5,7 @@ description: "启用 HMR 时，安装已安装的包会以 already-installed 失
 
 # 启用 HMR 时拒绝在已安装的插件包上再次安装
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 

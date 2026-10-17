@@ -5,7 +5,7 @@ description: "DeepSeek API Key 模型发现要求已配置凭据。"
 
 # DeepSeek API Key 模型可见性
 
-[English](guide.md) | 中文
+[日本語](guide.md) | [English](guide.en.md) | 中文
 
 ## 变更
 
