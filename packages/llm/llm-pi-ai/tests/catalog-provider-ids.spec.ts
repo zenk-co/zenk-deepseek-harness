@@ -17,10 +17,11 @@ vi.mock('@earendil-works/pi-ai/providers/all', async importOriginal => ({
 }))
 
 import { catalogModels, catalogProvider, catalogProviderIds } from '../src/catalog.ts'
+import { OLLAMA_CLOUD_BASE_URL, OLLAMA_CLOUD_DISPLAY_NAME, OLLAMA_CLOUD_ID } from '../src/catalog.ts'
 
 describe('catalog provider ids', () => {
   it('drops a provider that lists only non-chat models and keeps one that lists none', () => {
-    expect(catalogProviderIds()).toEqual(['chat-provider', 'uncataloged-provider'])
+    expect(catalogProviderIds()).toEqual(['chat-provider', 'uncataloged-provider', OLLAMA_CLOUD_ID])
   })
 
   it('answers no catalog provider or models for the provider it drops', () => {
@@ -28,5 +29,14 @@ describe('catalog provider ids', () => {
     expect(catalogModels('classifier-provider').size).toBe(0)
     expect(catalogProvider('uncataloged-provider')).toEqual({ id: 'uncataloged-provider' })
     expect([...catalogModels('chat-provider').keys()]).toEqual(['chat-model'])
+  })
+
+  it('serves the harness ollama-cloud overlay after the installed catalog', () => {
+    expect(catalogProvider(OLLAMA_CLOUD_ID)).toMatchObject({
+      id: OLLAMA_CLOUD_ID,
+      name: OLLAMA_CLOUD_DISPLAY_NAME,
+      baseUrl: OLLAMA_CLOUD_BASE_URL,
+    })
+    expect(catalogModels(OLLAMA_CLOUD_ID).size).toBe(0)
   })
 })

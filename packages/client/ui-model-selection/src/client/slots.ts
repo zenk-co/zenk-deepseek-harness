@@ -21,7 +21,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /**
      * Non-interactive inline model label; selection controls remain owner-managed.
-     * Without a contribution, the composer displays the catalog name.
+     * Without a contribution, the composer displays the provider and catalog names together.
      * @example
      * return {
      *   inject: ['slots'],

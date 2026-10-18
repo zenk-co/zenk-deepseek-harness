@@ -43,6 +43,24 @@ export const zh: Record<CotTranslationKey, string> = {
   copy: '复制', copied: '已复制', codeTitle: '代码块', wrap: '自动换行', unwrap: '不换行', footnotes: '脚注',
 }
 
+/** Japanese copy. */
+export const ja: Record<CotTranslationKey, string> = {
+  provider: '翻訳サービス', google: 'Google', bing: 'Bing',
+  deepseekAccount: 'DeepSeek Flash・アカウント（有料）', deepseekOfficial: 'DeepSeek Flash・公式 API（有料）',
+  providerUnavailableOption: '{provider} — 利用不可',
+  providerUnavailable: 'このプロバイダーは利用できません。DeepSeek アカウントまたは公式 API プロバイダーを設定するか、利用可能なサービスを選択してください。',
+  paidNotice: '未キャッシュの断片ごとに、選択したアカウントまたは公式 API 認証情報を通じて有料の DeepSeek Flash リクエストが個別に送信されます。リーズニングを再展開すると保存済み結果を再利用します。プロバイダー、言語、原文、リクエスト設定の変更により新たな有料リクエストが発生する場合があります。',
+  anonymousNotice: 'Bing と Google の翻訳に追加のログインや API キーは不要です。ただし匿名エンドポイントは要求を拒否または制限する場合があります。', targetLanguage: '対象言語',
+  targetLanguageHint: 'auto は UI 言語に従います。zh、en、ja などの言語コードも利用できます。',
+  privacy: '展開された思考内容は選択したサービスに送信されます。非公開のコードや会話内容が含まれる場合があります。',
+  translation: '翻訳を表示', original: '原文を表示', retry: '再試行', failed: '翻訳に失敗しました。原文を表示しています。',
+  translating: 'リーズニングを翻訳中', invalidProvider: '翻訳サービスを選択してください。', invalidLanguage: 'auto または言語コード（例：zh、en、ja）を入力してください。',
+  overridden: '上書き済み', reset: '既定値に戻す',
+  unavailable: '翻訳設定は利用できません。', readOnly: 'このデプロイの設定は読み取り専用です。',
+  saveFailed: 'このデプロイではこれらの値を受け付けませんでした。修正用に残してあります。', save: '保存', saving: '保存中…',
+  copy: 'コピー', copied: 'コピーしました', codeTitle: 'コードブロック', wrap: '折り返す', unwrap: '折り返さない', footnotes: '脚注',
+}
+
 /**
  * Read shared form chrome from the plugin dictionary.
  * @param t - current locale reader.

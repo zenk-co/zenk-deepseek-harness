@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { PresentedFileCard } from '../src/client/PresentedFileCard.tsx'
-import { en, zh } from '../src/client/locales.ts'
+import { en, ja, zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 const props = () => ({
@@ -49,7 +49,7 @@ it.each([
 })
 
 
-it.each([en, zh])('distinguishes directory-only progress and errors in each locale', (dictionary) => {
+it.each([en, zh, ja])('distinguishes directory-only progress and errors in each locale', (dictionary) => {
   const p = { ...props(), t: makeTranslate(dictionary) }
   const view = render(<PresentedFileCard {...p} phase="revealing" />)
   expect(view.getByText(dictionary['presented.revealing'])).toBeTruthy()

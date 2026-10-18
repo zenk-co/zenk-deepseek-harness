@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概要
 
-公式 DeepSeek LLM API 要求向けの増分正規セッションログアップロードです。この function プラグインは `ctx.sessions` と `ctx.deepseekLlmApiExtensions` を注入し、`dsh_session_log` 要求フィールドと、受諾ウォーターマークを導出する durable `session-log-deepseek/delivery-accepted` イベントを所有します。公式 API がセッションログ接尾辞を受け取ってはならない場合のみ無効化します。
+公式 DeepSeek LLM API 要求向けの増分正規セッションログアップロードです。この function プラグインは `ctx.sessions` と `ctx.deepseekLlmApiExtensions` を注入し、`dsh_session_log` 要求フィールドと、受諾ウォーターマークを導出する durable `session-log-deepseek/delivery-accepted` イベントを所有します。公式 API にセッションログ接尾辞を送信してよい場合のみ有効化します。
 
 ## 目次
 
@@ -27,10 +27,10 @@ kind: "package-reference"
 
 | Key | Default | Meaning |
 |---|---|---|
-| `enabled` | `true` | Send the `dsh_session_log` contribution. Changes apply to the next request; `false` stops Session-log upload. |
+| `enabled` | `false` | Send the `dsh_session_log` contribution. Changes apply to the next request; `true` enables Session-log upload. |
 | `maxBytes` | 8 MiB | Largest serialized `dsh_session_log` field, in UTF-8 bytes, that one request carries. |
 
-出荷プロファイルはプラグインをマウントするため、既定設定は要求フィールドを登録し、受諾ウォーターマークを追記します。`enabled: false` は寄与を停止します。Web スイッチは有効プロファイル経由でバンドル既定を上書きできます。ホームパッチとコマンドラインオーバーレイは優先を保持し、競合する形式書込みを拒否します。
+出荷プロファイルはプラグインをマウントするが、既定設定では要求フィールドを登録せず、受諾ウォーターマークも追記しない。`enabled: true` は寄与を開始する。Web スイッチは有効プロファイル経由でバンドル既定を上書きできる。ホームパッチとコマンドラインオーバーレイは優先を保持し、競合する形式書込みを拒否する。
 
 Web **Settings → General → Upload Session Log when using the official model API** スイッチはホスト設定経由で `enabled` を永続化します。飛行中要求は準備済みペイロードを保持します。再有効化は無効中に記録されたイベントも含め未受諾接尾辞を再開します。OpenTelemetry フィードバックアップロードは別設定です。
 

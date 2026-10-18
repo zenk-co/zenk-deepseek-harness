@@ -28,6 +28,8 @@ import {
   MAX_TOKENS_FIELDS,
   MODALITIES,
   PiAiCatalogError,
+  catalogDefaultApi,
+  catalogDisplayName,
   resolveRouteModels,
   SUPPORTED_THINKING_FORMATS,
   THINKING_LEVELS,
@@ -458,14 +460,20 @@ export function resolveProfiles(
     // The route key, not the installed provider's own name: the directory has
     // always shown route keys, and a catalog route must not silently rename
     // itself on every configuration surface just because it gained a profile.
-    const displayName = source.displayName ?? provider
+    // The model-less Ollama Cloud overlay is the one exception: it has no
+    // upstream name to keep, so its product name is the default.
+    const displayName = source.displayName ?? catalogDisplayName(provider)
+    // The overlay's protocol default lives beside its display default: its
+    // catalog names no models to derive one from, so a profile listing models
+    // without naming a protocol still resolves.
+    const routeApi = source.api ?? catalogDefaultApi(provider)
     let catalog: RouteCatalog | undefined
     let piProvider: Provider | undefined
     let catalogError: string | undefined
     try {
       catalog = resolveRouteModels({
         provider,
-        ...source.api === undefined ? {} : { api: source.api },
+        ...routeApi === undefined ? {} : { api: routeApi },
         ...source.baseURL === undefined ? {} : { baseURL: source.baseURL },
         ...source.models === undefined ? {} : { models: source.models },
         ...source.modelOverrides === undefined ? {} : { modelOverrides: source.modelOverrides },
@@ -478,7 +486,7 @@ export function resolveProfiles(
       piProvider = buildProvider({
         provider,
         displayName,
-        ...source.api === undefined ? {} : { api: source.api },
+        ...routeApi === undefined ? {} : { api: routeApi },
         ...source.baseURL === undefined ? {} : { baseURL: source.baseURL },
         models: catalog.models,
         namesCredential: source.apiKeyEnv !== undefined,

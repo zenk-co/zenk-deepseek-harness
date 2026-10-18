@@ -38,3 +38,22 @@ export const en = {
   busy: 'Office preview is busy. Try again shortly.',
   changed: 'The file changed while being read. Reopen the preview.',
 } satisfies Record<OfficePreviewKey, string>
+
+/** Japanese translations checked against the Chinese key set. */
+export const ja = {
+  title: 'Office ドキュメント',
+  loading: 'ドキュメントをレンダー中...',
+  retry: '再試行',
+  viewMissingFonts: '{count} 種のフォントが不足しています。クリックして表示',
+  missingFontsTitle: '不足しているフォント',
+  missingFontsDescription: 'このプレビューでは以下のフォントを利用できません。文字やレイアウトが元のドキュメントと異なる場合があります。',
+  missingFontsCount: '{count} 種のフォント',
+  closeDetails: 'フォントの詳細を閉じる',
+  unavailable: 'Office プレビューは利用できません。DeepSeek Harness を実行しているホストでドキュメントプレビューサービスを有効にしてください。',
+  invalid: 'この Office ファイルはプレビューできません。破損しているか、パスワードで保護されているか、拡張子が一致していない可能性があります。',
+  tooLarge: 'Office ファイルまたは変換後の PDF がプレビューのサイズ上限を超えています。ファイルを小さくするか、プレビュー設定を調整してください。',
+  failed: 'Office 変換に失敗し、利用可能な PDF が生成されませんでした。ファイルを確認して再試行してください。',
+  timeout: 'Office 変換がタイムアウトしました。再試行してください。',
+  busy: 'Office プレビューが混み合っています。しばらくしてから再試行してください。',
+  changed: '読み取り中にファイルが変更されました。プレビューを開き直してください。',
+} satisfies Record<OfficePreviewKey, string>

@@ -35,7 +35,7 @@ import {
   selectProducedFiles, type DeliverablesTurnData,
 } from '../src/client/turn-deliverables.ts'
 import { apply, inject } from '../src/client/index.ts'
-import { en, zh } from '../src/client/locales.ts'
+import { en, ja, zh } from '../src/client/locales.ts'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 
@@ -567,14 +567,14 @@ describe('ChangedFiles card', () => {
     return { props, openFile, view }
   }
 
-  it.each([en, zh])('shows one edited filename without a list and opens its review', (locale) => {
+  it.each([en, zh, ja])('shows one edited filename without a list and opens its review', (locale) => {
     const single = servedStore({ turn: 1, files: [changedFile('src/example.scss', 3, 1)], total: 1, added: 3, deleted: 1 })
     const { props, view } = renderCard(new PresentedOpenController(), locale, { changes, presented: [] }, single)
     const t = makeTranslate(locale)
     const card = view.container.querySelector('[data-changed-files]')!
     expect(within(card as HTMLElement).getByText(t('changes.singleTitle', { name: 'example.scss' }))).toBeTruthy()
     expect(card.querySelector('ul')).toBeNull()
-    expect(view.queryByRole('button', { name: /Show all|Collapse changed|展开全部|收起改动/ })).toBeNull()
+    expect(view.queryByRole('button', { name: /Show all|Collapse changed|展开全部|收起改动|すべて展開|折りたたむ/ })).toBeNull()
     expect(card.querySelector('svg [data-file-type-mark]')?.children).toHaveLength(3)
     const open = view.getByRole('button', { name: t('changes.viewDiff', { name: 'src/example.scss' }) })
     expect(open.getAttribute('aria-describedby')).toBeTruthy()

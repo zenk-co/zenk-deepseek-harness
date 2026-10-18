@@ -58,3 +58,22 @@ export const en = {
   'time.months': '{n}mo',
   'time.years': '{n}y',
 } satisfies Record<ReferenceKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'section.files': 'ファイルとフォルダー',
+  'section.subagents': 'サブエージェント',
+  'section.sessions': 'セッション',
+  'candidate.noCwd': '（作業ディレクトリーなし）',
+  'crumb.root': 'ワークスペース',
+  'fileOpen.title': 'ファイルを開けませんでした',
+  'fileOpen.failed': '「{path}」を開けませんでした。再試行するか、このメッセージを閉じてください',
+  'fileOpen.close': '閉じる',
+  'fileOpen.retry': '再試行',
+  'time.now': 'たった今',
+  'time.minutes': '{n}分前',
+  'time.hours': '{n}時間前',
+  'time.days': '{n}日前',
+  'time.months': '{n}か月前',
+  'time.years': '{n}年前',
+} satisfies Record<ReferenceKey, string>

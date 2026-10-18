@@ -14,9 +14,12 @@
 
 import { builtinProviders, getAllBuiltinModels, getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import type { BuiltinProvider } from '@earendil-works/pi-ai/providers/all'
+import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import type {
   AnthropicMessagesCompat,
   Api,
+  ApiKeyAuth,
+  AuthResult,
   BedrockCompat,
   ChatTemplateKwargValue,
   KnownApi,
@@ -27,6 +30,7 @@ import type {
   OpenAICompletionsCompat,
   OpenAIResponsesCompat,
   Provider,
+  ProviderStreams,
   ThinkingLevelMap,
 } from '@earendil-works/pi-ai'
 
@@ -163,6 +167,104 @@ const CHAT_TEMPLATE_VAR_GATE: Record<PiAiChatTemplateVar, true> = {
 /** The request-state placeholders a profile may name. */
 export const CHAT_TEMPLATE_VARS = Object.keys(CHAT_TEMPLATE_VAR_GATE) as readonly PiAiChatTemplateVar[]
 
+/**
+ * Route key of the Ollama Cloud overlay. Upstream pi-ai ships no provider
+ * under this key, so the harness declares it here rather than in the
+ * generated file.
+ */
+export const OLLAMA_CLOUD_ID = 'ollama-cloud'
+
+/** Display name of the Ollama Cloud overlay, shown by configuration surfaces. */
+export const OLLAMA_CLOUD_DISPLAY_NAME = 'Ollama Cloud'
+
+/**
+ * Default endpoint of the Ollama Cloud overlay: Ollama's OpenAI-compatible
+ * cloud endpoint.
+ */
+export const OLLAMA_CLOUD_BASE_URL = 'https://ollama.com/v1'
+
+/** Credential reference the Ollama Cloud overlay authenticates through. */
+export const OLLAMA_CLOUD_API_KEY_ENV = 'OLLAMA_API_KEY'
+
+/**
+ * Wire protocol the Ollama Cloud overlay speaks: Ollama's OpenAI-compatible
+ * chat completions endpoint.
+ */
+export const OLLAMA_CLOUD_API = 'openai-completions'
+
+/**
+ * API-key auth of the Ollama Cloud overlay. A harness-resolved credential
+ * wins; otherwise the ambient `OLLAMA_API_KEY` answers, which is what keeps a
+ * profile naming no credential on the provider-native path. No login is
+ * offered: cloud access is key-only.
+ */
+const ollamaCloudApiKeyAuth: ApiKeyAuth = {
+  name: 'Ollama Cloud API key',
+  resolve: async ({ ctx, credential }): Promise<AuthResult | undefined> => {
+    const key = credential?.key ?? await ctx.env(OLLAMA_CLOUD_API_KEY_ENV)
+    if (key === undefined) return undefined
+    return { auth: { apiKey: key }, source: OLLAMA_CLOUD_API_KEY_ENV }
+  },
+}
+
+/** Cached OpenAI-compatible streams the Ollama Cloud overlay delegates to. */
+let ollamaCloudStreams: ProviderStreams | undefined
+
+/**
+ * The protocol implementation the Ollama Cloud overlay serves requests
+ * through, constructed once.
+ * @returns the shared OpenAI Chat Completions streams.
+ */
+function ollamaCloudApi(): ProviderStreams {
+  ollamaCloudStreams ??= openAICompletionsApi()
+  return ollamaCloudStreams
+}
+
+/** Cached overlay provider, constructed once. */
+let ollamaCloudProvider: Provider | undefined
+
+/**
+ * The synthetic catalog provider for Ollama Cloud. It carries the endpoint,
+ * protocol implementation, and ambient key discovery upstream pi-ai does not
+ * ship; its model list stays empty so `/models` interrogation (and hand entry)
+ * remains the only model source, and no volatile model id is pinned here.
+ * @returns the overlay provider.
+ */
+function ollamaCloudCatalogProvider(): Provider {
+  ollamaCloudProvider ??= {
+    id: OLLAMA_CLOUD_ID,
+    name: OLLAMA_CLOUD_DISPLAY_NAME,
+    baseUrl: OLLAMA_CLOUD_BASE_URL,
+    auth: { apiKey: ollamaCloudApiKeyAuth },
+    getModels: (): Model<Api>[] => [],
+    stream: (model, context, options) => ollamaCloudApi().stream(model, context, options),
+    streamSimple: (model, context, options) => ollamaCloudApi().streamSimple(model, context, options),
+  }
+  return ollamaCloudProvider
+}
+
+/**
+ * Display name configuration surfaces show for one catalog route. Upstream
+ * routes keep their route key; the Ollama Cloud overlay shows its product
+ * name.
+ * @param provider - provider route key.
+ * @returns the display name for the directory and resolved profiles.
+ */
+export function catalogDisplayName(provider: string): string {
+  return provider === OLLAMA_CLOUD_ID ? OLLAMA_CLOUD_DISPLAY_NAME : provider
+}
+
+/**
+ * Default wire protocol for one catalog route whose installed catalog names
+ * none. Only the model-less Ollama Cloud overlay answers here; every other
+ * route resolves its protocol from its catalog models or its profile.
+ * @param provider - provider route key.
+ * @returns the default protocol, or `undefined` when the route has none.
+ */
+export function catalogDefaultApi(provider: string): string | undefined {
+  return provider === OLLAMA_CLOUD_ID ? OLLAMA_CLOUD_API : undefined
+}
+
 let providerIndex: Map<string, Provider> | undefined
 
 /**
@@ -181,20 +283,25 @@ function servesChat(provider: Provider): boolean {
 /**
  * Installed catalog providers this adapter serves, by id, constructed once.
  * Each entry owns the API implementations for its own models, which is why a
- * catalog route reuses this provider instead of being rebuilt from parts.
- * @returns the catalog provider index, in catalog order.
+ * catalog route reuses this provider instead of being rebuilt from parts. The
+ * harness-declared Ollama Cloud overlay joins after every installed provider,
+ * so upstream order stays stable.
+ * @returns the catalog provider index, in catalog order with the overlay last.
  */
 function catalogProviders(): Map<string, Provider> {
-  providerIndex ??= new Map(builtinProviders().filter(servesChat).map(provider => [provider.id, provider]))
+  if (providerIndex === undefined) {
+    providerIndex = new Map(builtinProviders().filter(servesChat).map(provider => [provider.id, provider]))
+    if (!providerIndex.has(OLLAMA_CLOUD_ID)) providerIndex.set(OLLAMA_CLOUD_ID, ollamaCloudCatalogProvider())
+  }
   return providerIndex
 }
 
 /**
  * The installed catalog provider for one route, when pi-ai ships one this
- * adapter serves.
+ * adapter serves or the harness overlay declares one.
  * @param provider - provider route key.
- * @returns the catalog provider, or `undefined` for a route pi-ai does not ship
- *   or ships without a chat model.
+ * @returns the catalog provider, or `undefined` for a route neither pi-ai nor
+ *   the overlay ships, or one pi-ai ships without a chat model.
  */
 export function catalogProvider(provider: string): Provider | undefined {
   return catalogProviders().get(provider)
@@ -202,19 +309,23 @@ export function catalogProvider(provider: string): Provider | undefined {
 
 /**
  * Every provider route the installed pi-ai catalog ships and this adapter
- * serves: a provider whose catalog lists models but no chat model is left out.
- * @returns the catalog provider ids, in catalog order.
+ * serves, plus the harness-declared Ollama Cloud overlay last: a provider
+ * whose catalog lists models but no chat model is left out.
+ * @returns the catalog provider ids, in catalog order with the overlay last.
  */
 export function catalogProviderIds(): readonly string[] {
   return [...catalogProviders().keys()]
 }
 
 /**
- * The installed catalog models for one route, indexed by model id.
+ * The installed catalog models for one route, indexed by model id. The
+ * model-less Ollama Cloud overlay answers empty without consulting pi-ai, so
+ * `/models` interrogation (and hand entry) stays its only model source.
  * @param provider - provider route key.
  * @returns catalog models by id; empty for a route {@link catalogProvider} does not return.
  */
 export function catalogModels(provider: string): Map<string, Model<Api>> {
+  if (provider === OLLAMA_CLOUD_ID) return new Map()
   if (!catalogProviders().has(provider)) return new Map()
   const models = getBuiltinModels(provider as BuiltinProvider) as Model<Api>[]
   return new Map(models.map(model => [model.id, model]))

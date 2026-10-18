@@ -62,3 +62,24 @@ export const en = {
   'error.notDirectory': 'That is not a directory.',
   'error.unavailable': 'Read failed: {message}',
 } satisfies Record<SidebarFilesKey, string>
+
+/** Japanese dictionary, checked against the Chinese key set. */
+export const ja = {
+  'shortcut.noSession': '先にセッションを選択してください',
+  'type.label': 'ファイル',
+  'guide.title': 'ワークスペースのファイル',
+  'guide.description': 'このセッションのワークスペースのファイルを参照',
+  loading: '読み込み中…',
+  empty: '空のディレクトリー',
+  truncated: '項目が多すぎるため、一部のみ表示しています。',
+  noWorkspace: 'このセッションにはワークスペースディレクトリーがありません。',
+  reload: '再読み込み',
+  autoRefresh: '自動更新',
+  'autoRefresh.enable': '自動更新をオンにする',
+  'autoRefresh.disable': '自動更新をオフにする',
+  'entry.other': 'ファイルでもディレクトリーでもないため、開けません。',
+  'error.notFound': 'このディレクトリーはなくなりました。移動または削除された可能性があります。',
+  'error.outsideWorkspace': 'このディレクトリーはワークスペースの外にあるため、サイドバーでは読み込みません。',
+  'error.notDirectory': 'ディレクトリーではありません。',
+  'error.unavailable': '読み込みに失敗しました：{message}',
+} satisfies Record<SidebarFilesKey, string>

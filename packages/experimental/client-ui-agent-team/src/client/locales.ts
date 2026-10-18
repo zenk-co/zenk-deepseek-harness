@@ -63,3 +63,32 @@ export const en = {
   'status.in_progress': 'In progress',
   'status.completed': 'Completed',
 } satisfies Record<TeamKey, string>
+
+/** Japanese dictionary checked against the Chinese key set. */
+export const ja = {
+  trigger: 'エージェントチーム',
+  loading: 'チームを読み込んでいます…',
+  unavailable: 'Teamは現在利用できません',
+  failure: 'チームの永続化記録が無効です：{message}',
+  empty: '共有タスクはまだありません。会話から作成できます',
+  roster: 'メンバー',
+  tasks: '共有タスク',
+  model: 'モデル',
+  open: 'メンバーの会話を開く',
+  current: '現在のチャット',
+  owner: 'Owner',
+  unowned: '未割り当て',
+  blockedBy: '依存関係',
+  writeScopes: '書き込み範囲',
+  ready: '開始可能',
+  blocked: '依存関係によりブロック中',
+  'task.expand': '展開',
+  'task.collapse': '折りたたむ',
+  'memberStatus.running': '実行中',
+  'memberStatus.inactive': '未実行',
+  'memberStatus.provisioning': '準備中',
+  'memberStatus.failed': '失敗',
+  'status.pending': '保留中',
+  'status.in_progress': '進行中',
+  'status.completed': '完了',
+} satisfies Record<TeamKey, string>

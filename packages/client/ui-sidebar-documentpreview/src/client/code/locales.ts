@@ -21,3 +21,10 @@ export const en = {
   copy: 'Copy',
   copied: 'Copied',
 } satisfies Record<keyof typeof zh, string>
+
+/** Japanese dictionary with the same keys. */
+export const ja = {
+  title: 'コード',
+  copy: 'コピー',
+  copied: 'コピーしました',
+} satisfies Record<keyof typeof zh, string>

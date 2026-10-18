@@ -42,6 +42,21 @@ import type { ModelLabelOwner, ModelSelectInjected } from './slots.ts'
 import css from './ModelSelect.module.css'
 import { orderModelProviders } from './provider-order.ts'
 
+/**
+ * Default label when no slot contribution overrides it: provider and model
+ * names together so identical model names from different providers stay
+ * distinguishable in the trigger and every menu row.
+ * @param provider - provider identity and localized display name.
+ * @param model - the provider's model catalog entry.
+ * @returns the combined provider/model display text (data-driven, no locale key).
+ */
+function defaultModelLabel(
+  provider: ModelLabelOwner['provider'],
+  model: ModelLabelOwner['model'],
+): string {
+  return `${provider.name} / ${model.name}`
+}
+
 /** Which pane the dropdown shows: the two-row root or one drilled-in list. */
 type Pane = 'root' | 'model' | 'effort'
 
@@ -422,8 +437,9 @@ export function ModelSelect(
   const waiting = currentChoice === undefined && state.status === 'loading'
   const modelLabel = waiting
     ? t('trigger.loading')
-    : currentChoice?.model.name
-      ?? t('trigger.fallback')
+    : currentChoice === undefined
+      ? t('trigger.fallback')
+      : defaultModelLabel(currentChoice.group.provider, currentChoice.model)
   const triggerLabel = effortLabel === undefined ? modelLabel : `${modelLabel} · ${effortLabel}`
   const triggerAria = waiting
     ? t('trigger.loading')
@@ -439,7 +455,7 @@ export function ModelSelect(
     <span data-provider-id={provider.id} data-model-id={model.id}>
       {renderSlot('conversation.input.model.label', {
         provider, model, placement, selected,
-      }, { fallback: model.name })}
+      }, { fallback: defaultModelLabel(provider, model) })}
     </span>
   )
   let itemIndex = 0
@@ -601,7 +617,7 @@ export function ModelSelect(
                               else itemRefs.current[index]?.focus()
                             }}
                             key={model.id}
-                            title={model.name}
+                            title={defaultModelLabel(group.provider, model)}
                             disabled={busy}
                             onClick={() => { choose({ provider: group.id, model: model.id }) }}
                           >

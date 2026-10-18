@@ -16,7 +16,7 @@ const usePanelInfo: GlobalStandardProps['usePanelInfo'] = selector => selector({
 
 afterEach(cleanup)
 
-const OPTIONS = [{ id: 'zh', label: '中文' }, { id: 'en', label: 'English' }]
+const OPTIONS = [{ id: 'ja', label: '日本語' }, { id: 'zh', label: '中文' }, { id: 'en', label: 'English' }]
 
 function emptySessions() {
   const store = createSnapshotStore<SessionListState>(
@@ -71,6 +71,13 @@ describe('LanguageRow', () => {
     expect(b.setLocale).toHaveBeenCalledWith('zh')
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByRole('menuitem', { name: '中文' })).toBeNull()
+  })
+
+  it('lists Japanese and selects it from the menu', () => {
+    const b = mount('en')
+    fireEvent.click(screen.getByRole('button', { name: /English/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '日本語' }))
+    expect(b.setLocale).toHaveBeenCalledWith('ja')
   })
 
   it('closes on outside pointerdown without selecting', () => {

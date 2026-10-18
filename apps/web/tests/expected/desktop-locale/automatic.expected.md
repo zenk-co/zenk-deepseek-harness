@@ -1,38 +1,38 @@
-- dialog "设置":
+- dialog "設定":
   - navigation:
-    - text: 设置
-    - button "通用设置"
-    - button "模型"
-    - button "内置插件"
-    - button "Agent 预设"
-  - button "打开配置文件"
-  - button "关闭"
-  - text: 权限 选择新会话的默认权限模式
-  - button "工作区内修改"
-  - text: 语言
-  - button "中文"
-  - text: 外观
-  - button "浅色"
-  - button "深色"
-  - button "跟随系统" [pressed]
-  - text: 字号大小 仅影响会话内容的字号 14
-  - button "增大字号"
-  - button "减小字号"
+    - text: 設定
+    - button "一般設定"
+    - button "モデル"
+    - button "組み込みプラグイン"
+    - button "Agent プリセット"
+  - button "設定ファイルを開く"
+  - button "閉じる"
+  - text: 権限 新しいセッションの既定の権限モードを選択
+  - button "ワークスペースへの書き込み"
+  - text: 言語
+  - button "日本語"
+  - text: 外観
+  - button "ライト"
+  - button "ダーク"
+  - button "システムに従う" [pressed]
+  - text: フォントサイズ 会話内容の文字サイズのみに影響します 14
+  - button "文字サイズを大きくする"
+  - button "文字サイズを小さくする"
   - text: px
-  - button "更多字体设置"
-  - text: 工作步骤展示 选择希望看到多少工具调用细节
-  - button "标准"
-  - text: 工作步骤收起时机 选择何时自动收起工作步骤
-  - button "回答结束后"
-  - text: 显示代码工作视图 开启后，显示轨迹、本轮代码差异，可选择完整的 Agent 预设切换
-  - switch "显示代码工作视图" [checked]
-  - text: 快捷键
-  - paragraph: 查看和编辑当前可用的快捷键和输入操作
-  - button "编辑快捷键"
-  - text: 繁忙时的发送行为 智能体运行时 Enter 键和发送按钮的行为；Cmd/Ctrl+Enter 使用另一行为
-  - button "排队发送"
-  - text: 性能与用量 选择性能与用量信息展示的详细程度
-  - button "详细"
-  - text: 在使用官方模型 API 时上传 Session Log 帮助改进 DeepSeek 模型与产品
-  - switch "在使用官方模型 API 时上传 Session Log"
-  - text: 当前版本：{{version}}
+  - button "その他のフォント設定"
+  - text: 作業ステップの表示 ツール呼び出しの詳細をどれくらい表示するか選んでください
+  - button "標準"
+  - text: 作業ステップを折りたたむタイミング 作業ステップを自動で折りたたむタイミングを選んでください
+  - button "回答の完了時"
+  - text: コード作業ビューを表示 有効にすると、軌跡・今回のコード差分を表示し、すべての Agent プリセットを選択できます
+  - switch "コード作業ビューを表示" [checked]
+  - text: キーボードショートカット
+  - paragraph: 利用可能なショートカットと入力操作の表示と編集
+  - button "ショートカットを編集"
+  - text: ビジー時の送信動作 エージェント実行中に Enter キーと送信ボタンが行う動作。Cmd/Ctrl+Enter はもう一方の動作になります
+  - button "キュー送信"
+  - text: パフォーマンスと使用量 パフォーマンスと使用量の表示の詳細さを選んでください
+  - button "詳細"
+  - text: 公式モデル API 使用時に Session Log をアップロード DeepSeek モデルと製品の改善にご協力ください。
+  - switch "公式モデル API 使用時に Session Log をアップロード"
+  - text: "現在のバージョン: {{version}}"

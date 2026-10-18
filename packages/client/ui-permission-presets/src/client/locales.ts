@@ -38,6 +38,22 @@ export const en = {
   'confirm.enable': 'Enable Full access',
 } satisfies Record<PermissionSettingsKey, string>
 
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'title': '権限',
+  'description': '新しいセッションの既定の権限モードを選択',
+  'loading': '読み込み中',
+  'unavailable': '利用不可',
+  'preset.readOnly': '読み取り専用',
+  'preset.workspaceWrite': 'ワークスペースへの書き込み',
+  'preset.fullAccess': 'フルアクセス',
+  'confirm.title': 'フルアクセスを有効にしますか？',
+  'confirm.description': 'フルアクセスを有効にすると、新しいセッションでは確認手順が減り、機密操作、ファイル変更、外部コマンドの実行など、より多くの操作を直接実行できるようになります。後続のタスクを信頼できる場合にのみ使用してください。',
+  'confirm.acknowledge': 'リスクを理解し、続行します',
+  'confirm.cancel': 'キャンセル',
+  'confirm.enable': 'フルアクセスを有効にする',
+} satisfies Record<PermissionSettingsKey, string>
+
 /** Simplified Chinese dictionary for the current-session popup gate. */
 export const accessZh = {
   'mode': '访问模式，当前：{name}',
@@ -81,4 +97,25 @@ export const accessEn = {
   'auto.confirm.description': 'Auto review runs without a sandbox. Before every native tool call and PTC inner call, the same model as the current agent reviews whether to allow it; you approve or reject each call it denies. This feature is experimental, can falsely allow or deny actions, and uses additional tokens.',
   'auto.confirm.acknowledge': 'I understand these risks and want to continue',
   'auto.confirm.enable': 'Enable Auto review',
+} satisfies Record<PermissionAccessKey, string>
+
+/** Japanese dictionary for the current-session popup gate. */
+export const accessJa = {
+  'mode': 'アクセスモード（現在：{name}）',
+  'close': '閉じる',
+  'preset.readOnly': '読み取り専用',
+  'preset.workspaceWrite': 'ワークスペースへの書き込み',
+  'preset.fullAccess': 'フルアクセス',
+  'confirm.title': 'フルアクセスを有効にしますか？',
+  'confirm.description': 'フルアクセスを有効にすると、エージェントの確認手順が減り、機密操作、ファイル変更、外部コマンドの実行など、より多くの操作を直接実行できるようになります。現在のタスクを信頼できる場合にのみ使用してください。',
+  'confirm.acknowledge': 'リスクを理解し、続行します',
+  'confirm.cancel': 'キャンセル',
+  'confirm.enable': 'フルアクセスを有効にする',
+  'auto.label': '自動レビュー',
+  'auto.badge': 'EXP',
+  'auto.description': 'サンドボックスなしで実行します。ネイティブツール呼び出しと PTC 内部呼び出しのたびに、同一モデルによる実験的なレビューを行います。',
+  'auto.confirm.title': '自動レビュー（実験的）を有効にしますか？',
+  'auto.confirm.description': '自動レビューはサンドボックスを使用しません。ネイティブツール呼び出しと PTC 内部呼び出しのたびに、現在のエージェントと同じモデルが許可を審査します。拒否された呼び出しはあなたが承認または拒否します。この機能は実験的であり、誤って許可・拒否する場合があり、追加のトークンを消費します。',
+  'auto.confirm.acknowledge': 'これらのリスクを理解し、続行します',
+  'auto.confirm.enable': '自動レビューを有効にする',
 } satisfies Record<PermissionAccessKey, string>

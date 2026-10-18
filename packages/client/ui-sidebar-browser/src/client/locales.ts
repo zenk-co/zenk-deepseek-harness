@@ -61,6 +61,36 @@ export const en = {
   'address.unknown': 'The page navigated; this carrier cannot read its new URL.',
 } satisfies Record<SidebarBrowserKey, string>
 
+/** Japanese dictionary with the same keys. */
+export const ja = {
+  'type.label': 'ブラウザ',
+  'guide.title': 'ブラウザ',
+  'guide.description': 'Web ページを閲覧する',
+  'shortcut.noSession': '先にセッションを開いてください',
+  'address.placeholder': 'HTTP(S) アドレスを入力',
+  'address.changed': 'URL が変更されました',
+  back: '戻る',
+  forward: '進む',
+  reload: '再読み込み',
+  go: '移動',
+  external: 'システムブラウザで開く',
+  'sandbox.disable': 'サンドボックス制限を無効にする',
+  'sandbox.enable': 'サンドボックス制限を有効に戻す',
+  'sandbox.warning': 'サンドボックス制限は無効です。ページはトップレベルのアプリを遷移でき、ダウンロード、モーダルダイアログ、入力ロックを使用できます。',
+  start: 'HTTP(S) アドレスを入力して閲覧を開始',
+  loading: '開いています…',
+  'restore.previous': '前回開いたページ',
+  'restore.action': 'ページを復元',
+  'error.empty': 'アドレスを入力してください。',
+  'error.invalid': 'このアドレスは無効か長すぎます。',
+  'error.protocol': 'HTTP および HTTPS アドレスのみサポートしています。ローカルファイルにはドキュメントプレビューを使用してください。',
+  'error.credentials': 'アドレスにユーザー名やパスワードを含めることはできません。',
+  'error.application-origin': '埋め込みブラウザで DSH アプリ自体を開くことはできません。',
+  'load.failed': 'ページを読み込めませんでした。再読み込みするか、システムブラウザで開いてください。',
+  'load.failed.detail': 'ページの読み込みに失敗しました ({code})：{description}',
+  'address.unknown': 'ページが遷移しました。このキャリアでは新しい URL を読み取れません。',
+} satisfies Record<SidebarBrowserKey, string>
+
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Sidebar Browser labels, navigation controls, and failures. */

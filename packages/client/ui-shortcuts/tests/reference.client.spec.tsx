@@ -6,7 +6,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ShortcutCatalogEntry, ShortcutCommandId, ShortcutFixedCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { ShortcutReference, ShortcutsRow } from '../src/client/Reference.tsx'
 import { createShortcutsStore } from '../src/client/store.ts'
-import { en, zh } from '../src/client/locales.ts'
+import { en, ja, zh } from '../src/client/locales.ts'
 import { initialShortcutConfig, bindingIssue, normalizeBinding, presentBinding } from '@deepseek-ai/dsh-client-shortcuts/protocol'
 import type { ShortcutConfigSnapshot } from '@deepseek-ai/dsh-client-shortcuts/protocol'
 import { ShortcutRegistry } from '../../shortcuts/src/client/registry.ts'
@@ -250,7 +250,7 @@ it('keeps product order for tied searches while prioritizing stronger matches', 
 })
 
 it.each((['web', 'desktop'] as const).flatMap(runtime => (['invalid', 'future'] as const)
-  .flatMap(error => [{ runtime, error, dictionary: en }, { runtime, error, dictionary: zh }])))
+  .flatMap(error => [{ runtime, error, dictionary: en }, { runtime, error, dictionary: zh }, { runtime, error, dictionary: ja }])))
 ('identifies the $runtime document and preserves $error data in the selected locale', ({ runtime, error, dictionary }) => {
   const f = referenceFixture({ runtime, dictionary })
   act(() => { f.config.set({ ...f.config.getSnapshot(), status: 'unreadable', error, usingDefaults: false,
@@ -258,8 +258,8 @@ it.each((['web', 'desktop'] as const).flatMap(runtime => (['invalid', 'future'] 
   const text = screen.getByRole('alert').textContent
   expect(text).toContain(runtime === 'web' ? 'dsh.keybindings.v1' : 'userData/keybindings.json')
   expect(text).toContain(error === 'future'
-    ? dictionary === en ? 'Upgrade Harness' : '升级 Harness'
-    : dictionary === en ? 'Back up and repair' : '先备份并修复')
+    ? dictionary === en ? 'Upgrade Harness' : dictionary === zh ? '升级 Harness' : 'アップグレード'
+    : dictionary === en ? 'Back up and repair' : dictionary === zh ? '先备份并修复' : 'バックアップ')
   expect(text).toContain(dictionary['using-accepted'])
   const reset = screen.getByRole('button', { name: dictionary['reset-all'] })
   expect(reset.hasAttribute('disabled')).toBe(true)

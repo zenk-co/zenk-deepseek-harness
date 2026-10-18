@@ -45,6 +45,8 @@ export interface SessionNode {
   id: SessionId
   /** Stored title, or empty; the renderer localizes blank and unnamed row labels. */
   title: string
+  /** Project basename derived from the session cwd for the row label; empty when the cwd is unknown. */
+  project?: string
   /** The provisional blank session (renderer shows the localized New Session title). */
   blank: boolean
   /** A Session-scoped UI consumer is awaiting this user. */
@@ -406,6 +408,7 @@ function sessionNode(
   return {
     id: s.id,
     title: sessionTitle(s),
+    project: workspaceLabel(s.cwd),
     blank: s.blank,
     running: status?.running ?? s.running,
     runningSubagentCount: runningChildCount(list, s.id, statuses),

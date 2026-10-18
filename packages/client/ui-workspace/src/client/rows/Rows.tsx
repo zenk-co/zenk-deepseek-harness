@@ -634,6 +634,9 @@ export function SessionNodeItem({
           ? <SessionStatusDots statuses={statuses} />
           : renderSlot('sidebar.session.row.leading', { sessionId: node.id }))}
       </span>
+      {node.project !== undefined && node.project !== '' && (
+        <span className={css.meta}>{node.project}</span>
+      )}
       <span
         ref={titleRef}
         className={css.title}

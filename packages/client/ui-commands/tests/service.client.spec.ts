@@ -20,7 +20,7 @@ import type { ClientSessionContext, ConsumeTokenRequest, InputTriggerPick, Input
 import type { CommandContribution, CommandDecoration, PopupSelectSpec, SelectOption } from '../src/client/contract.ts'
 import type { CommandDescriptor } from '../src/client/directory.ts'
 import { CommandUiRuntime } from '../src/client/service.ts'
-import { en, zh, type CommandKey } from '../src/client/locales.ts'
+import { en, ja, zh, type CommandKey } from '../src/client/locales.ts'
 
 const sid = (k: string): SessionId => k as SessionId
 
@@ -420,7 +420,7 @@ describe('candidates', () => {
       expect(source.matchSpace!(proj('s1'), '/goal')).toHaveProperty('claim.name', 'goal')
     })
 
-    it.each([['en', en], ['zh', zh]] as const)('description edits preserve menu claims and bilingual parsing under %s', async (_locale, dictionary) => {
+    it.each([['en', en], ['zh', zh], ['ja', ja]] as const)('description edits preserve menu claims and trilingual parsing under %s', async (_locale, dictionary) => {
       const commands = SHIPPED.map(command => ({ ...command, description: command.description + '.' }))
       const { fiber, source, warm } = await bench({
         commands: () => Promise.resolve({ commands }),

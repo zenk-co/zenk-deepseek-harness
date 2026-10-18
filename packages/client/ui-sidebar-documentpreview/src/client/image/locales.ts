@@ -1,4 +1,4 @@
-import { zoomEn, zoomZh } from '../zoom/locales.ts'
+import { zoomEn, zoomJa, zoomZh } from '../zoom/locales.ts'
 
 /** Locale-owned image renderer labels and status text. */
 export const zh = {
@@ -21,6 +21,16 @@ export const en = {
   loading: 'Rendering document...',
   failed: 'This image could not be displayed.',
   unsupported: 'Image preview requires the complete file contents.',
+} satisfies Record<ImagePreviewKey, string>
+
+/** Japanese dictionary with the same keys as the Chinese dictionary. */
+export const ja = {
+  ...zoomJa,
+  title: '画像',
+  preview: '画像プレビュー:{name}',
+  loading: 'ドキュメントをレンダー中...',
+  failed: 'この画像は表示できませんでした',
+  unsupported: '画像プレビューには完全なファイル内容が必要です',
 } satisfies Record<ImagePreviewKey, string>
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

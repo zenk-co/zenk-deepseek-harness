@@ -45,6 +45,24 @@ export const zh: Record<ShellSettingsLocaleKey, string> = {
   invalidNumber: '请填数字；留空表示使用默认值。',
 }
 
+/** Japanese copy. */
+export const ja: Record<ShellSettingsLocaleKey, string> = {
+  title: 'シェル',
+  description: '各コマンドの実行時間と出力上限を制限します。',
+  timeoutMs: 'コマンドタイムアウト（ミリ秒）',
+  timeoutMsHint: '1つのコマンドを実行できる時間。超過すると終了されます。',
+  maxOutputBytes: 'ストリームごとの出力上限（バイト）',
+  maxOutputBytesHint: '上限を超えた出力は破棄されず、一時ファイルに保存されます。',
+  overridden: '上書き済み',
+  reset: '既定値に戻す',
+  readOnly: 'このデプロイの設定は読み取り専用です。',
+  unavailable: 'このプラグインは読み込まれていないため、現在設定できません。',
+  save: '保存',
+  saving: '保存中…',
+  saveFailed: 'このデプロイではこれらの値を受け付けませんでした。修正用に残してあります。',
+  invalidNumber: '数値を入力するか、既定値を使う場合は空白のままにしてください。',
+}
+
 /**
  * The form frame's copy, read from this page's dictionary.
  * @param t - the page's locale reader.
